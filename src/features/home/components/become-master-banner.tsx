@@ -71,7 +71,7 @@ export function BecomeMasterBanner() {
           variants={item}
           className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
-          <Button asChild size="lg" className="min-w-[180px] bg-white text-primary hover:bg-white/90">
+          <Button asChild variant="inverted" size="lg" className="min-w-[180px]">
             <Link href="/become-master">{T.cta}</Link>
           </Button>
           <Button

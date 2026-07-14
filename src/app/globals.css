@@ -27,6 +27,15 @@
     --primary-glow: 114 8 8;
     --primary-foreground: 255 255 255; /* white on burgundy */
 
+    /* === Accent-TEXT — split from --primary FILL (FIX-DARK-ACCENT-TEXT-SPLIT) ===
+       Burgundy reads fine as TEXT on cream (light), but the dark burgundy fill
+       (--primary #7A102C) is illegible as foreground text on the dark charcoal
+       card (~1.42:1). This token is BURGUNDY in LIGHT (byte-identical to the
+       light --primary, so light accents are unchanged) and GOLD in DARK
+       (~7:1 on bg-card, ~8:1 on bg-page — legible + on-brand). Only accent
+       TEXT / icons use this; FILLS (buttons/chips/gradient) stay on --primary. */
+    --accent-text: 114 8 8;          /* #720808 burgundy — matches light --primary */
+
     /* === Secondary accents (for badges, alerts) === */
     --rose: 254 198 211;             /* #FEC6D3 baby pink */
     --sky:  186 212 237;             /* #BAD4ED powder blue */
@@ -82,8 +91,8 @@
 
   .dark {
     /* === Surfaces — deep burgundy === */
-    --bg-page: 26 5 7;               /* #1A0507 */
-    --bg-card: 36 10 13;              /* #240A0D */
+    --bg-page: 31 20 23;             /* #1F1417 softer warm charcoal (FIX-BATCH-H) */
+    --bg-card: 48 32 38;             /* #302026 elevated charcoal (FIX-BATCH-H) */
     --bg-input: 31 8 11;
     --bg-input-focus: 42 13 17;
 
@@ -95,14 +104,19 @@
 
     /* === Borders === */
     --border-subtle: 90 24 32;       /* burgundy-tinted */
-    --border-focus: 232 82 111;      /* lighter raspberry */
+    --border-focus: 122 16 44;       /* burgundy focus ring (FIX-BATCH-H) */
 
-    /* === Primary — lighter for dark contrast === */
-    --primary: 232 82 111;           /* #E8526F lifted raspberry */
-    --primary-hover: 244 114 138;    /* #F4728A */
-    --primary-magenta: 254 198 211;  /* #FEC6D3 baby pink */
-    --primary-glow: 232 82 111;
-    --primary-foreground: 26 5 7;    /* dark on light primary */
+    /* === Primary — burgundy, brand-consistent (FIX-BATCH-H, was salmon-pink) === */
+    --primary: 122 16 44;            /* #7A102C burgundy */
+    --primary-hover: 158 30 62;      /* #9E1E3E */
+    --primary-magenta: 190 72 104;   /* #BE4868 */
+    --primary-glow: 158 30 62;       /* #9E1E3E */
+    --primary-foreground: 237 227 228; /* #EDE3E4 light on burgundy fill (FIX-FINAL-TAILS) */
+
+    /* Accent-TEXT — GOLD on dark (FIX-DARK-ACCENT-TEXT-SPLIT). Burgundy as text
+       is illegible on the dark card (~1.42:1); gold (--brand-accent family) is
+       legible (~7:1 bg-card / ~8:1 bg-page) + on-brand. Fills stay --primary. */
+    --accent-text: 198 169 126;      /* #C6A97E warm gold */
 
     /* === Secondary accents === */
     --rose: 90 24 32;                /* deep rose for dark mode */
@@ -113,7 +127,7 @@
     --shadow-lg: 0 28px 52px rgba(0, 0, 0, 0.6);
     --shadow-card: 0 18px 36px rgba(0, 0, 0, 0.5);
     --shadow-hover: 0 28px 52px rgba(0, 0, 0, 0.6);
-    --shadow-brand: 0 12px 40px -8px rgba(232, 82, 111, 0.30);
+    --shadow-brand: 0 12px 40px -8px rgba(122, 16, 44, 0.30); /* burgundy glow (FIX-DARK-ACCENT-TEXT-SPLIT — was stray pink #E8526F) */
 
     --glass-border: 255 255 255;
     --glass-bg: 26 5 7;
@@ -142,7 +156,7 @@
     --text-muted: var(--text-sec);
     --accent: var(--primary);
     --accent-hover: var(--primary-hover);
-    --accent-foreground: 26 5 7;
+    --accent-foreground: 237 227 228; /* #EDE3E4 light on burgundy fill (FIX-FINAL-TAILS) */
     --ring: var(--primary-glow);
     --shadow: var(--shadow-sm);
     --destructive: 220 38 38;
@@ -280,7 +294,7 @@
 .legal-prose li { margin-bottom: 0.5rem; }
 .legal-prose li::marker { color: rgb(var(--text-sec)); }
 .legal-prose a {
-  color: rgb(var(--primary));
+  color: rgb(var(--accent-text)); /* accent TEXT — gold in dark (FIX-DARK-ACCENT-TEXT-SPLIT) */
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -314,7 +328,7 @@
   --rdp-selected-border: 0;
   --rdp-disabled-opacity: 0.35;
   --rdp-outside-opacity: 0.35;
-  --rdp-today-color: rgb(var(--primary));
+  --rdp-today-color: rgb(var(--accent-text)); /* today number — accent TEXT (gold in dark) */
   --rdp-weekday-padding: 0.4rem 0;
   --rdp-weekday-text-align: center;
   --rdp-weekday-text-transform: uppercase;
@@ -334,8 +348,8 @@
   letter-spacing: 0.08em;
 }
 .rdp-theme .rdp-day_button:hover:not([disabled]):not(.rdp-day_selected) {
-  background-color: rgb(var(--primary) / 0.1);
-  color: rgb(var(--primary));
+  background-color: rgb(var(--primary) / 0.1); /* hover tint — fill, stays burgundy */
+  color: rgb(var(--accent-text)); /* hover number — accent TEXT (gold in dark) */
 }
 .rdp-theme .rdp-day_today:not(.rdp-day_selected) {
   font-weight: 600;

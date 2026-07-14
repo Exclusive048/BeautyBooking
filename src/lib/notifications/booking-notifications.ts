@@ -1,7 +1,10 @@
 import { MembershipStatus, NotificationType, Prisma, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
-import { formatZoneLabel } from "@/lib/ui/zone-label";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
+// HARDENING-09 #13: shared salon-tz "when" formatter — the Telegram reminder
+// path now mirrors this exact format via the same helper (single source).
+import { formatBookingWhenLabel as formatDateLabel } from "@/lib/notifications/format-booking-when";
 
 const bookingInclude = {
   clientUser: { select: { id: true } },
@@ -30,22 +33,6 @@ const bookingInclude = {
 export type BookingWithRelations = Prisma.BookingGetPayload<{
   include: typeof bookingInclude;
 }>;
-
-function formatDateLabel(date: Date | null, timezone: string): string | null {
-  if (!date) return null;
-  const label = date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  });
-  // QA-107/FIX-22: reminders/notifications are server-rendered (no browser
-  // viewer context), so they always carry the salon's explicit zone label —
-  // the recipient can't silently mis-read the time against their own clock.
-  const zone = formatZoneLabel({ iso: date.toISOString(), timeZone: timezone });
-  return zone ? `${label} ${zone}` : label;
-}
 
 function resolveServiceLabel(service: { name: string; title: string | null }): string {
   return service.title?.trim() || service.name;
@@ -122,6 +109,10 @@ function buildBookingPayload(booking: BookingWithRelations): Prisma.InputJsonVal
     serviceId: booking.service.id,
     serviceName: resolveServiceLabel(booking.service),
     startAtUtc: booking.startAtUtc ? booking.startAtUtc.toISOString() : null,
+    // BOOKING-STUDIO-RESCHEDULE-PARITY-01: salon tz so the in-app studio
+    // deep-link (`resolveNotificationOpenHref`) can compute the salon-local
+    // `?date=` and land the admin on the correct calendar day.
+    providerTimezone: booking.provider.timezone,
     clientName: booking.clientName,
     clientUserId: booking.clientUserId ?? null,
     studioId: booking.studioId ?? null,
@@ -136,6 +127,19 @@ function bookingPushUrl(bookingId: string, audience: "CLIENT" | "MASTER"): strin
   return `/cabinet/bookings?focus=${bookingId}`;
 }
 
+// BOOKING-STUDIO-RESCHEDULE-PARITY-01: studio push deep-link lands on the exact
+// booking — `?date=<salon-day>` (salon tz) loads the correct day, `?focus=<id>`
+// scrolls + highlights the cell (mirrors the in-app openHref).
+function studioCalendarPushUrl(booking: BookingWithRelations): string {
+  const params = new URLSearchParams();
+  if (booking.startAtUtc) {
+    params.set("view", "day");
+    params.set("date", toLocalDateKey(booking.startAtUtc, booking.provider.timezone));
+  }
+  params.set("focus", booking.id);
+  return `/cabinet/studio/calendar?${params.toString()}`;
+}
+
 function providerNotificationPushUrl(booking: BookingWithRelations, recipientUserId: string): string {
   const assignedMasterUserId =
     booking.masterProvider?.ownerUserId ?? booking.masterProvider?.masterProfile?.userId ?? null;
@@ -143,7 +147,7 @@ function providerNotificationPushUrl(booking: BookingWithRelations, recipientUse
     return bookingPushUrl(booking.id, "MASTER");
   }
   if (booking.provider.type === ProviderType.STUDIO || booking.studioId) {
-    return "/cabinet/studio/calendar";
+    return studioCalendarPushUrl(booking);
   }
   const masterUserId = resolveMasterUserId(booking);
   if (masterUserId && recipientUserId === masterUserId) {

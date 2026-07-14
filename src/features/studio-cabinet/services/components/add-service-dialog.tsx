@@ -214,7 +214,7 @@ export function AddServiceDialog({
                   setProposing(true);
                   setProposeError(null);
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-accent-text transition-colors hover:text-accent-text/80"
               >
                 <Plus className="h-3 w-3" aria-hidden />
                 {T.proposeCategory}

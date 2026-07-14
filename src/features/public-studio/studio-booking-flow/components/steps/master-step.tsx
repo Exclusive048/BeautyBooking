@@ -12,6 +12,8 @@ type Props = {
   availabilityByMaster: Record<string, { serviceAvailable: boolean; slots: SlotItem[] }>;
   selectedMasterId: string;
   selectedServiceName: string;
+  /** Salon (provider) timezone — the "next window" preview is shown in this zone. */
+  salonTimeZone: string;
   onPick: (masterId: string) => void;
   onBack: () => void;
 };
@@ -21,6 +23,7 @@ export function MasterStep({
   availabilityByMaster,
   selectedMasterId,
   selectedServiceName,
+  salonTimeZone,
   onPick,
   onBack,
 }: Props) {
@@ -29,7 +32,7 @@ export function MasterStep({
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <User className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
@@ -100,11 +103,15 @@ export function MasterStep({
                       <div className="truncate text-sm font-semibold">{master.name}</div>
                       {availabilityByMaster[master.id]?.slots[0] ? (
                         <div className="text-xs opacity-80">
+                          {/* FIX-BATCH-C Defect 1: preview the next window in the
+                              SALON's timezone, consistent with steps 3-4 (was the
+                              browser's local zone via a tz-less toLocaleString). */}
                           {new Date(availabilityByMaster[master.id]!.slots[0]!.startAtUtc).toLocaleString("ru-RU", {
                             day: "numeric",
                             month: "short",
                             hour: "2-digit",
                             minute: "2-digit",
+                            timeZone: salonTimeZone,
                           })}
                         </div>
                       ) : null}

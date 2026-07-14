@@ -1,10 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { isSameUtcDay, offsetPxFromDayStart } from "../../lib/time-grid";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { offsetPxFromMinute, salonMinuteOfDay } from "../../lib/time-grid";
 
-export function CurrentTimeLine({ dayStartIso }: { dayStartIso: string }) {
-  const dayStart = new Date(dayStartIso);
+/**
+ * FIX-STUDIO-CALENDAR-SALON-TZ: the "now" marker is positioned by the
+ * salon-local minute-of-day (matching the salon-local axis + booking
+ * cells) and only shown when the viewed day IS today in the SALON's tz
+ * — not the browser's. A Moscow admin viewing a +5 salon at 23:30 MSK
+ * sees the line on the salon's "tomorrow" column, correctly.
+ */
+export function CurrentTimeLine({
+  dateKey,
+  timezone,
+}: {
+  dateKey: string;
+  timezone: string;
+}) {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -14,8 +27,8 @@ export function CurrentTimeLine({ dayStartIso }: { dayStartIso: string }) {
     return () => window.clearInterval(interval);
   }, []);
 
-  if (!now || !isSameUtcDay(now, dayStart)) return null;
-  const top = offsetPxFromDayStart(now, dayStart);
+  if (!now || toLocalDateKey(now, timezone) !== dateKey) return null;
+  const top = offsetPxFromMinute(salonMinuteOfDay(now, timezone));
   if (top < 0) return null;
 
   return (

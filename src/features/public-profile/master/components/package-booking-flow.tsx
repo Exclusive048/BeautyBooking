@@ -230,7 +230,7 @@ export function PackageBookingFlow({ open, onClose, bundle, providerId, provider
                 onClick={() => setSelectedDay(d.key)}
                 className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
                   selectedDay === d.key
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary bg-primary/10 text-accent-text"
                     : "border-border-subtle text-text-sec hover:border-primary/60"
                 }`}
               >

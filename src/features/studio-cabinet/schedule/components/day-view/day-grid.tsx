@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { assignLanes, laneStyle } from "@/lib/calendar/lane-layout";
+import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
+import { useFocusHighlight } from "@/hooks/use-focus-highlight";
+import { formatLocalHm, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { BOOKING_CELL_CLASS } from "../../lib/booking-status-display";
+import { isPendingClientReschedule } from "../../lib/reschedule-decision";
 import {
   GRID_HEIGHT_PX,
   SLOT_HEIGHT_PX,
@@ -12,7 +18,9 @@ import {
   durationPx,
   formatTime,
   iterateSlotMinutes,
-  offsetPxFromDayStart,
+  offsetPxFromMinute,
+  parseDateKey,
+  salonMinuteOfDay,
 } from "../../lib/time-grid";
 import type {
   ScheduleBookingCell,
@@ -46,24 +54,35 @@ type Props = {
    * "no deep-link" — grid renders normally.
    */
   focusMasterId?: string;
+  /**
+   * FIX-STUDIO-CALENDAR-SALON-TZ: the salon's own tz. Drives both the
+   * booking-cell vertical POSITION and its "HH:MM" LABEL so they agree
+   * with each other and with the salon-local axis — regardless of the
+   * admin's browser tz.
+   */
+  timezone: string;
 };
 
-function localTimeShort(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
+export function DayGrid({
+  studioId,
+  day,
+  timezone,
+  services,
+  focusMasterId,
+}: Props) {
   const [createSlot, setCreateSlot] = useState<{
     masterId: string;
     startAtUtc: string;
   } | null>(null);
   const [activeBooking, setActiveBooking] =
     useState<ScheduleBookingCell | null>(null);
+
+  // BOOKING-STUDIO-RESCHEDULE-PARITY-01: `?focus=<bookingId>` deep-link reader
+  // (shared convention). A notification (e.g. reschedule request) links here
+  // with `?date=<salon-day>&focus=<id>` so the correct day loads and the cell
+  // scrolls into view + highlights. Ready signal = booking count (re-triggers
+  // when data changes); graceful no-op if the id isn't on the current day.
+  useFocusHighlight(day.bookings.length);
 
   const slotMinutes = Array.from(iterateSlotMinutes());
 
@@ -82,10 +101,14 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
   }, [focusMasterId]);
 
   const handleEmptyClick = (masterId: string, slotMinutesValue: number) => {
-    const dayStart = new Date(day.dayStartIso);
-    const start = new Date(dayStart);
-    start.setUTCMinutes(slotMinutesValue);
-    setCreateSlot({ masterId, startAtUtc: start.toISOString() });
+    // FIX-STUDIO-CALENDAR-SALON-TZ: the grid axis is salon-local, so a
+    // clicked slot minute-of-day is a salon-local HH:MM. Convert it back
+    // to the correct UTC instant on the salon day (not the browser day).
+    const salonDay = parseDateKey(day.dateKey);
+    const hour = Math.floor(slotMinutesValue / 60);
+    const minute = slotMinutesValue % 60;
+    const startUtc = toUtcFromLocalDateTime(salonDay, hour, minute, timezone);
+    setCreateSlot({ masterId, startAtUtc: startUtc.toISOString() });
   };
 
   if (day.columns.length === 0) {
@@ -98,8 +121,13 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
-        <div className="flex max-h-[70vh] overflow-auto">
+      {/* FIX-BATCH-E: HScrollShadow makes the horizontal scroll discoverable when
+          more master columns exist than fit at ≤1280 (edge fade). The inner div
+          stays the scroll parent so the sticky time axis / headers keep working. */}
+      <HScrollShadow
+        wrapperClassName="rounded-2xl border border-border-subtle bg-bg-card"
+        scrollClassName="flex max-h-[70vh] overflow-auto"
+      >
           {/* Time axis sticky left */}
           <div className="sticky left-0 z-30 bg-bg-card">
             <div className="h-12 border-b border-r border-border-subtle bg-bg-card" />
@@ -112,10 +140,18 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
               const bookingsForColumn = day.bookings.filter(
                 (b) => b.masterId === column.id,
               );
+              // FIX-BATCH-E: split overlapping bookings in this master's column
+              // into side-by-side lanes (epoch-ms axis) — no more stacking.
+              const columnLanes = assignLanes(
+                bookingsForColumn.map((b) => ({
+                  id: b.id,
+                  start: new Date(b.startAtUtc).getTime(),
+                  end: new Date(b.endAtUtc).getTime(),
+                })),
+              );
               const breaksForColumn = day.breaks.filter(
                 (b) => b.masterId === column.id,
               );
-              const dayStart = new Date(day.dayStartIso);
               const isFocused = focusMasterId === column.id;
               return (
                 <div
@@ -172,7 +208,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
                       <BreakCell
                         key={entry.id}
                         entry={entry}
-                        dayStart={dayStart}
+                        timezone={timezone}
                       />
                     ))}
 
@@ -180,23 +216,37 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
                     {bookingsForColumn.map((booking) => {
                       const start = new Date(booking.startAtUtc);
                       const end = new Date(booking.endAtUtc);
+                      const { left, width } = laneStyle(columnLanes.get(booking.id));
+                      const pendingReschedule =
+                        isPendingClientReschedule(booking);
                       return (
                         <button
                           key={booking.id}
                           type="button"
+                          data-focus-id={booking.id}
                           onClick={() => setActiveBooking(booking)}
                           className={cn(
-                            "absolute left-1 right-1 z-10 overflow-hidden rounded-lg p-1.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-sm",
+                            "absolute z-10 overflow-hidden rounded-lg p-1.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-sm",
                             BOOKING_CELL_CLASS[booking.tone],
                           )}
                           style={{
-                            top: offsetPxFromDayStart(start, dayStart),
+                            top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
                             height: durationPx(start, end),
+                            left,
+                            width,
                           }}
                         >
+                          {pendingReschedule ? (
+                            <span
+                              title={T.cell.rescheduleBadge}
+                              className="absolute right-1 top-1 z-10 text-amber-600 dark:text-amber-400"
+                            >
+                              <RefreshCw className="h-3 w-3" aria-hidden />
+                            </span>
+                          ) : null}
                           <div className="font-mono text-[10px]">
-                            {localTimeShort(booking.startAtUtc)} —{" "}
-                            {localTimeShort(booking.endAtUtc)}
+                            {formatLocalHm(start, timezone)} —{" "}
+                            {formatLocalHm(end, timezone)}
                           </div>
                           <div className="truncate font-semibold">
                             {booking.clientName || "—"}
@@ -215,7 +265,10 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
 
                     {/* Current time line */}
                     {column.isAvailable ? (
-                      <CurrentTimeLine dayStartIso={day.dayStartIso} />
+                      <CurrentTimeLine
+                        dateKey={day.dateKey}
+                        timezone={timezone}
+                      />
                     ) : null}
 
                     {/* Disabled overlay */}
@@ -225,8 +278,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
               );
             })}
           </div>
-        </div>
-      </div>
+      </HScrollShadow>
 
       {/* Create dialog */}
       <CreateBookingDialog
@@ -236,6 +288,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
         masters={day.columns}
         services={services}
         startAtUtc={createSlot?.startAtUtc ?? null}
+        timezone={timezone}
         onClose={() => setCreateSlot(null)}
       />
 
@@ -244,6 +297,7 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
         studioId={studioId}
         booking={activeBooking}
         masters={day.columns}
+        timezone={timezone}
         onClose={() => setActiveBooking(null)}
       />
     </>
@@ -252,10 +306,10 @@ export function DayGrid({ studioId, day, services, focusMasterId }: Props) {
 
 function BreakCell({
   entry,
-  dayStart,
+  timezone,
 }: {
   entry: ScheduleBreakCell;
-  dayStart: Date;
+  timezone: string;
 }) {
   const start = new Date(entry.startAtUtc);
   const end = new Date(entry.endAtUtc);
@@ -263,7 +317,7 @@ function BreakCell({
     <div
       className="absolute left-1 right-1 z-[5] flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-[11px] font-medium text-text-sec"
       style={{
-        top: offsetPxFromDayStart(start, dayStart),
+        top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
         height: durationPx(start, end),
       }}
       title={entry.note ?? undefined}

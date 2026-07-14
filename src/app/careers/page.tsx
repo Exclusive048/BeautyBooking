@@ -26,7 +26,7 @@ export default function CareersPage() {
         />
 
         <div className="relative mx-auto max-w-2xl px-4 py-16 text-center lg:py-24">
-          <p className="mb-4 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          <p className="mb-4 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
             {T.eyebrow}
           </p>
           <h1 className="mb-6 font-display text-3xl leading-[1.1] text-text-main lg:text-4xl">

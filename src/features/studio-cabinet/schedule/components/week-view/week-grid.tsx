@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleWeekData } from "../../server/types";
@@ -35,7 +35,7 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                   key={day.dateKey}
                   className={cn(
                     "px-3 py-2 text-center font-mono text-[10px] uppercase tracking-wide",
-                    day.isToday ? "text-primary" : "text-text-sec",
+                    day.isToday ? "text-accent-text" : "text-text-sec",
                   )}
                 >
                   {day.weekdayLabel} {day.dayNumber}
@@ -49,7 +49,7 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                 <td className="sticky left-0 z-10 min-w-[200px] bg-bg-card px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     {row.master.avatarUrl ? (
-                      <FocalImage
+                      <ResilientImage
                         src={row.master.avatarUrl}
                         alt=""
                         width={24}

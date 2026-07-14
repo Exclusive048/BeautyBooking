@@ -77,7 +77,7 @@ export function CitySelector() {
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={T.label}
-        className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm font-medium text-text-main transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm font-medium text-text-main transition-colors hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <span className="max-w-[140px] truncate">{buttonLabel}</span>
         <ChevronDown
@@ -99,7 +99,7 @@ export function CitySelector() {
                   type="button"
                   onClick={() => handleSelect(city.slug)}
                   className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60 ${
-                    isCurrent ? "font-medium text-primary" : "text-text-main"
+                    isCurrent ? "font-medium text-accent-text" : "text-text-main"
                   }`}
                 >
                   {city.name}

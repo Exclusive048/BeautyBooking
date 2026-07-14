@@ -1,5 +1,5 @@
 import { Users } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioTodayBannerData } from "../server/types";
 
@@ -75,7 +75,7 @@ export function StudioTodayBanner({ data, studioName }: Props) {
                     aria-label={master.name}
                   >
                     {master.avatarUrl ? (
-                      <FocalImage
+                      <ResilientImage
                         src={master.avatarUrl}
                         alt=""
                         width={32}

@@ -44,7 +44,7 @@ export function ModelsTopBlock({ userState, children }: Props) {
           title={
             <>
               Услуги{" "}
-              <em className="font-display font-normal italic text-primary">со скидкой</em>{" "}
+              <em className="font-display font-normal italic text-accent-text">со скидкой</em>{" "}
               за участие в практике мастера
             </>
           }

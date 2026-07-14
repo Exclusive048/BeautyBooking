@@ -37,7 +37,7 @@ function TileCard({ icon: Icon, label, value, unit, sublabel, delta }: Tile) {
       <div className="flex items-center justify-between">
         <span
           aria-hidden
-          className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary"
+          className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-accent-text"
         >
           <Icon className="h-4 w-4" />
         </span>
@@ -47,7 +47,12 @@ function TileCard({ icon: Icon, label, value, unit, sublabel, delta }: Tile) {
             DELTA_TONE[delta.tone],
           )}
         >
-          {DELTA_ARROW[delta.tone]} {delta.text}
+          {/* FIX-VISUAL-POLISH I9: neutral (no-change) shows a clean "—"
+              without the "·" arrow, so the pill never reads as a trailing
+              "· 0.0" / "· 0%". Real up/down deltas keep their ↑/↓ arrow. */}
+          {delta.tone === "neutral"
+            ? delta.text
+            : `${DELTA_ARROW[delta.tone]} ${delta.text}`}
         </span>
       </div>
       <div>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Users } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioTopMasterRow } from "../server/types";
@@ -45,7 +45,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
         </div>
         <Link
           href="/cabinet/studio/team"
-          className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          className="inline-flex items-center gap-1 text-xs font-medium text-accent-text transition-colors hover:text-accent-text/80"
         >
           {T.seeAll}
           <ArrowRight className="h-3 w-3" aria-hidden />
@@ -67,7 +67,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
               <div className="min-w-0">
                 <div className="mb-1.5 flex items-center gap-2">
                   {master.avatarUrl ? (
-                    <FocalImage
+                    <ResilientImage
                       src={master.avatarUrl}
                       alt=""
                       width={28}

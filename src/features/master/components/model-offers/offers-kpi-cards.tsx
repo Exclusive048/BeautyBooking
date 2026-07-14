@@ -75,7 +75,7 @@ function Tile({
         className={cn(
           "mt-1.5 font-display text-lg",
           accent === "amber" && "text-amber-700 dark:text-amber-300",
-          accent === "primary" && "text-primary",
+          accent === "primary" && "text-accent-text",
           accent === "neutral" && "text-text-main"
         )}
       >

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, MapPin, Star, Users } from "lucide-react";
+import { ChevronLeft, Clock, MapPin, Star, Users } from "lucide-react";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -26,7 +26,20 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
   const rest = masters.length - visibleMasters.length;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm">
+    <div>
+      {/* FIX-VISUAL-POLISH F1: the back-link was `absolute right-4 top-4` and
+          overlapped the rating pill (`absolute right-4 top-3`) in the band's
+          top-right corner (the reported "doubled/colliding" glyphs). Moved out
+          of the band to a clean breadcrumb-style link above the card — the
+          address (top-left) + rating (top-right) chips no longer collide. */}
+      <Link
+        href={backHref}
+        className="mb-3 inline-flex items-center gap-1 text-sm text-text-muted transition-colors hover:text-text"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden />
+        {UI_TEXT.bookingWidget.backToStudio}
+      </Link>
+      <div className="relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm">
       <div className="relative h-28 bg-brand-gradient sm:h-32">
         <div className="absolute inset-0 opacity-30" aria-hidden>
           <svg width="100%" height="100%" viewBox="0 0 800 144" preserveAspectRatio="none">
@@ -126,12 +139,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         ) : null}
       </div>
 
-      <Link
-        href={backHref}
-        className="absolute right-4 top-4 hidden text-xs text-white/90 underline-offset-2 hover:underline sm:inline-block"
-      >
-        {UI_TEXT.bookingWidget.backToStudio}
-      </Link>
+      </div>
     </div>
   );
 }

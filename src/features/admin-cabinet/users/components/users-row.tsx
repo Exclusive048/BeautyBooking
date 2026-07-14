@@ -35,7 +35,7 @@ export function UsersMobileCard({ user, busy, onChangePlan }: Props) {
             <span className="truncate">{user.displayName}</span>
             {isPremium ? (
               <Crown
-                className="h-3 w-3 shrink-0 text-primary"
+                className="h-3 w-3 shrink-0 text-accent-text"
                 aria-label={T.plan.tierPremium}
               />
             ) : null}
@@ -77,7 +77,7 @@ export function UsersTableRow({ user, busy, onChangePlan }: Props) {
               <span className="truncate">{user.displayName}</span>
               {isPremium ? (
                 <Crown
-                  className="h-3 w-3 shrink-0 text-primary"
+                  className="h-3 w-3 shrink-0 text-accent-text"
                   aria-label={T.plan.tierPremium}
                 />
               ) : null}

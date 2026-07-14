@@ -1,6 +1,7 @@
 import type { NotificationType, Prisma } from "@prisma/client";
 import { createNotification, publishNotifications } from "@/lib/notifications/service";
 import { getTelegramChatIdForUser } from "@/lib/notifications/recipients";
+import { isTelegramEnabled } from "@/lib/env";
 import { createTelegramSendJob } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
 import { logError } from "@/lib/logging/logger";
@@ -104,13 +105,26 @@ export async function deliverNotification(input: DeliveryInput): Promise<void> {
 
   publishNotifications([record]);
 
+  // HARDENING-01 FIX-4: fire-and-forget MUST carry a .catch — a rejected
+  // detached promise inside the worker (booking reminders run here) hits the
+  // global unhandledRejection handler, which exits the whole worker process.
+  // Mirrors the existing pattern in `admin-initiated.ts`.
   void sendPushToUser(input.userId, {
     title: record.title,
     body: record.body,
     url: input.pushUrl,
+  }).catch((error) => {
+    logError("Push notification delivery failed", {
+      userId: input.userId,
+      type: input.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
-  if (input.telegramText) {
+  // FIX-TELEGRAM-KILLSWITCH: fast env-ceiling skip (sync, no DB) before the
+  // plan check. The effective admin-toggle check happens at the recipients
+  // chokepoint (`getTelegramChatIdForUser`), which covers every enqueue path.
+  if (input.telegramText && isTelegramEnabled) {
     void (async () => {
       try {
         const plan = await getCurrentPlan(input.userId);

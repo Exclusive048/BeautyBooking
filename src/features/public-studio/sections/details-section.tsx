@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ProviderSocialLinks } from "@/components/ui/provider-social-links";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { moneyRUBFromKopeks } from "@/lib/format";
@@ -46,7 +47,7 @@ export async function StudioDetailsSection({ studioId }: Props) {
       <Card className="bg-bg-card">
         <CardContent className="space-y-4 p-5 md:p-6">
           {studio.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={studio.avatarUrl}
               alt=""
               width={80}
@@ -78,6 +79,9 @@ export async function StudioDetailsSection({ studioId }: Props) {
               <Badge>{UI_TEXT.publicStudio.noCategories}</Badge>
             )}
           </div>
+          {/* FEAT-PROVIDER-SOCIALS: VK / Instagram community icons (shown only
+              when set; each href re-validated in the shared component). */}
+          <ProviderSocialLinks vk={studio.socialVk} instagram={studio.socialInstagram} />
         </CardContent>
       </Card>
     </div>

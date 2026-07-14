@@ -53,6 +53,7 @@ export function StudioClientsPage({
             studioId={studioId}
             scheduleMasters={scheduleMasters}
             services={services}
+            timezone={data.timezone}
           />
           <ClientsPagination nextCursor={data.nextCursor} />
         </div>

@@ -86,9 +86,22 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
             masterProfileUrl={masterProfileUrl}
           />
         ) : (
+          // FIX-BATCH-C Defect 2: distinguish empty-CART (has services, none
+          // selected yet) from empty-CATALOG (master added no services). Showing
+          // "мастер ещё не добавил услуги" beside bookable services is a
+          // conversion-killing lie; prompt to pick a service instead.
           <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-4">
-            <div className="text-sm font-medium">{tB.emptyTitle}</div>
-            <div className="mt-2 text-sm text-text-sec">{tB.emptyDesc}</div>
+            {provider.services.length > 0 ? (
+              <>
+                <div className="text-sm font-medium">{tB.selectServiceTitle}</div>
+                <div className="mt-2 text-sm text-text-sec">{tB.selectServiceDesc}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-medium">{tB.emptyTitle}</div>
+                <div className="mt-2 text-sm text-text-sec">{tB.emptyDesc}</div>
+              </>
+            )}
           </div>
         )}
       </div>

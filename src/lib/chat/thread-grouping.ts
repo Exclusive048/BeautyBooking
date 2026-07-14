@@ -17,6 +17,12 @@ export type ThreadBookingCard = {
   priceSnapshot: number;
   durationMin: number;
   address: string | null;
+  /**
+   * FIX-TZ-SYSTEM-MESSAGE: the salon's IANA tz (provider.timezone). The card
+   * is bilateral (client + master), so its appointment time is rendered in
+   * salon-tz — never the viewer's browser tz. Plain string, safe to serialize.
+   */
+  timezone: string;
 };
 
 export type ThreadMessage = {

@@ -61,12 +61,12 @@ export default async function PricingPage({ searchParams }: PageProps) {
         />
 
         <div className="relative mx-auto max-w-3xl px-4 py-12 text-center lg:py-16">
-          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
             {T.hero.eyebrow}
           </p>
           <h1 className="mb-4 font-display text-3xl leading-[1.1] text-text-main lg:text-5xl">
             {T.hero.titleBefore}{" "}
-            <em className="font-display font-normal italic text-primary">{T.hero.titleItalic}</em>
+            <em className="font-display font-normal italic text-accent-text">{T.hero.titleItalic}</em>
           </h1>
           <p className="mx-auto mb-8 max-w-xl text-base leading-relaxed text-text-sec">
             {T.hero.description}

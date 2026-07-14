@@ -86,7 +86,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
                 <Star
                   className={`h-7 w-7 transition ${
                     n <= rating
-                      ? "fill-primary text-primary"
+                      ? "fill-primary text-accent-text"
                       : "text-text-sec/40"
                   }`}
                   aria-hidden

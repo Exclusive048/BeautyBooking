@@ -11,6 +11,7 @@ import { HeaderSection } from "./sections/header-section";
 import { LocationSection } from "./sections/location-section";
 import { PortfolioReadonlySection } from "./sections/portfolio-readonly-section";
 import { ServicesReadonlySection } from "./sections/services-readonly-section";
+import { SocialsSection } from "./sections/socials-section";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -46,14 +47,19 @@ export async function MasterProfilePage() {
             <ProfileSidebar completion={view.completion} />
           </aside>
 
-          <main className="space-y-4 lg:col-span-6">
+          {/* A11Y-NESTED-MAIN-MASTER-PROFILE: this is a layout grid column, not
+              a landmark — the page's `<main>` is the MasterCabinetShell. Using
+              `<main>` here nested a second `<main>` inside it (invalid landmark).
+              Plain `<div>`; classes/layout unchanged. */}
+          <div className="space-y-4 lg:col-span-6">
             <HeaderSection providerId={view.providerId} data={view.header} />
             <ContactsSection data={view.contacts} />
+            <SocialsSection vk={view.socials.vk} instagram={view.socials.instagram} />
             <AboutSection bio={view.about.bio} />
             <LocationSection data={view.location} />
             <ServicesReadonlySection data={view.services} />
             <PortfolioReadonlySection data={view.portfolio} />
-          </main>
+          </div>
 
           <aside className="hidden lg:col-span-3 lg:block lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)] lg:self-start">
             <ProfilePreviewPlaceholder />

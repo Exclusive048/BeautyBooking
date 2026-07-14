@@ -11,9 +11,11 @@ type Props = {
   studioId: string;
   rows: StudioBookingRow[];
   masters: ScheduleMasterColumn[];
+  /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for the "when" column. */
+  timezone: string;
 };
 
-export function BookingsTable({ studioId, rows, masters }: Props) {
+export function BookingsTable({ studioId, rows, masters, timezone }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-border-subtle bg-bg-card p-12 text-center">
@@ -61,6 +63,7 @@ export function BookingsTable({ studioId, rows, masters }: Props) {
                 studioId={studioId}
                 row={row}
                 masters={masters}
+                timezone={timezone}
               />
             ))}
           </tbody>

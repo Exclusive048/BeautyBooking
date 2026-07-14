@@ -1,5 +1,5 @@
 import { Building2 } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -31,7 +31,7 @@ export function StudioUserChip({ name, avatarUrl, studioName }: Props) {
   return (
     <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
       {avatarUrl ? (
-        <FocalImage
+        <ResilientImage
           src={avatarUrl}
           alt=""
           width={36}
@@ -49,7 +49,7 @@ export function StudioUserChip({ name, avatarUrl, studioName }: Props) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-text-main">{name}</p>
         <p className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
-          <Building2 className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+          <Building2 className="h-3 w-3 shrink-0 text-accent-text" aria-hidden />
           <span className="truncate">{T.currentContext.replace("{studio}", studioName)}</span>
         </p>
       </div>

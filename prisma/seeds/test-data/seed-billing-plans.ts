@@ -128,6 +128,7 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       clientVisitHistory: false,
       clientNotes: false,
       highlightCard: false,
+      // BC-CAP: keep in sync with STUDIO_TEAM_CAP_BY_TIER.FREE (src/lib/billing/constants.ts)
       maxTeamMasters: 2,
       maxPortfolioPhotosStudioDesign: 15,
       maxPortfolioPhotosPerStudioMaster: 10,
@@ -153,7 +154,8 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       analytics_dashboard: true,
       analytics_revenue: true,
       analytics_clients: true,
-      maxTeamMasters: 8,
+      // BC-CAP: keep in sync with STUDIO_TEAM_CAP_BY_TIER.PRO (src/lib/billing/constants.ts)
+      maxTeamMasters: 6,
       maxPortfolioPhotosStudioDesign: 60,
       maxPortfolioPhotosPerStudioMaster: 40,
     },
@@ -181,7 +183,8 @@ const PLANS: ReadonlyArray<PlanSeed> = [
       analytics_booking_insights: true,
       analytics_cohorts: true,
       analytics_forecast: true,
-      maxTeamMasters: 30,
+      // BC-CAP: keep in sync with STUDIO_TEAM_CAP_BY_TIER.PREMIUM (src/lib/billing/constants.ts)
+      maxTeamMasters: 20,
       maxPortfolioPhotosStudioDesign: 200,
       maxPortfolioPhotosPerStudioMaster: 100,
     },

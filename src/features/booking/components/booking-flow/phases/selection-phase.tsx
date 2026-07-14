@@ -58,6 +58,7 @@ export function SelectionPhase({
 
       <DateGrid
         providerId={providerId}
+        providerTimezone={providerTimezone}
         selectedDateKey={selectedDateKey}
         onSelect={onSelectDate}
       />

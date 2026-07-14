@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { SlotItem } from "@/features/booking/lib/studio-booking";
 import { todayKey, buildDateBounds, STUDIO_BOOKING_DAYS_AHEAD } from "@/features/booking/lib/studio-booking";
 
@@ -56,6 +57,9 @@ type Props = {
   onDateChange: (dateKey: string) => void;
   selectedSlotLabel: string;
   onSlotChange: (label: string) => void;
+  /** Salon (provider) timezone — every slot time is rendered in this zone. */
+  salonTimeZone: string;
+  /** Viewer's browser zone — only used to decide whether to show the zone label. */
   viewerTimeZone: string;
   selectedMasterName: string;
   isAnyMaster: boolean;
@@ -70,6 +74,7 @@ export function WhenStep({
   onDateChange,
   selectedSlotLabel,
   onSlotChange,
+  salonTimeZone,
   viewerTimeZone,
   selectedMasterName,
   isAnyMaster,
@@ -80,7 +85,9 @@ export function WhenStep({
   const strip = useMemo(() => buildStrip(daysAhead), [daysAhead]);
   const bounds = useMemo(() => buildDateBounds(new Date(), daysAhead), [daysAhead]);
 
-  // Group slots into morning / day / evening by local hour
+  // Group slots into morning / day / evening by the SALON's local hour (a slot
+  // at 13:00 salon-time is "День" in the salon's day, regardless of the viewer's
+  // zone) — FIX-BATCH-C Defect 1.
   const grouped = useMemo(() => {
     const morning: SlotItem[] = [];
     const day: SlotItem[] = [];
@@ -89,7 +96,7 @@ export function WhenStep({
       const date = new Date(slot.startAtUtc);
       const hour = Number(
         new Intl.DateTimeFormat("ru-RU", {
-          timeZone: viewerTimeZone,
+          timeZone: salonTimeZone,
           hour: "2-digit",
           hour12: false,
         }).format(date),
@@ -99,12 +106,20 @@ export function WhenStep({
       else evening.push(slot);
     }
     return { morning, day: day, evening };
-  }, [slots, viewerTimeZone]);
+  }, [slots, salonTimeZone]);
+
+  // Salon-tz «(город, GMT+N)» label — shown when the viewer's zone differs from
+  // the salon's, so a cross-tz client reads the salon-local clock correctly.
+  const zoneLabel =
+    slots.length > 0 &&
+    zonesDifferForViewer({ iso: slots[0]!.startAtUtc, salonTimeZone, viewerTimeZone })
+      ? formatZoneLabel({ iso: slots[0]!.startAtUtc, timeZone: salonTimeZone })
+      : "";
 
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <CalendarIcon className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
@@ -143,7 +158,7 @@ export function WhenStep({
                 >
                   <span
                     className={`font-mono text-[10px] uppercase tracking-wider ${
-                      isSelected ? "text-white/90" : cell.isWeekend ? "text-primary" : "text-text-muted"
+                      isSelected ? "text-white/90" : cell.isWeekend ? "text-accent-text" : "text-text-muted"
                     }`}
                   >
                     {cell.label}
@@ -173,26 +188,34 @@ export function WhenStep({
         </div>
       ) : (
         <div className="space-y-4">
+          {zoneLabel ? (
+            <p className="flex items-center gap-1 text-xs font-medium text-accent-text">
+              <CalendarIcon className="h-3 w-3 shrink-0" aria-hidden />
+              <span>
+                {UI_TEXT.bookingWidget.whenStep.salonTimeNote} {zoneLabel}
+              </span>
+            </p>
+          ) : null}
           <SlotGroup
             label={UI_TEXT.bookingWidget.whenStep.morning}
             slots={grouped.morning}
             selectedLabel={selectedSlotLabel}
             onPick={onSlotChange}
-            viewerTimeZone={viewerTimeZone}
+            salonTimeZone={salonTimeZone}
           />
           <SlotGroup
             label={UI_TEXT.bookingWidget.whenStep.day}
             slots={grouped.day}
             selectedLabel={selectedSlotLabel}
             onPick={onSlotChange}
-            viewerTimeZone={viewerTimeZone}
+            salonTimeZone={salonTimeZone}
           />
           <SlotGroup
             label={UI_TEXT.bookingWidget.whenStep.evening}
             slots={grouped.evening}
             selectedLabel={selectedSlotLabel}
             onPick={onSlotChange}
-            viewerTimeZone={viewerTimeZone}
+            salonTimeZone={salonTimeZone}
           />
         </div>
       )}
@@ -207,13 +230,13 @@ function SlotGroup({
   slots,
   selectedLabel,
   onPick,
-  viewerTimeZone,
+  salonTimeZone,
 }: {
   label: string;
   slots: SlotItem[];
   selectedLabel: string;
   onPick: (label: string) => void;
-  viewerTimeZone: string;
+  salonTimeZone: string;
 }) {
   if (slots.length === 0) return null;
   return (
@@ -234,7 +257,7 @@ function SlotGroup({
                   : "border-border-subtle bg-bg-card text-text hover:border-primary/60"
               }`}
             >
-              {UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone })}
+              {UI_FMT.timeShort(slot.startAtUtc, { timeZone: salonTimeZone })}
             </button>
           );
         })}

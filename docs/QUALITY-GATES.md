@@ -95,7 +95,7 @@
 - [ ] Для bugs с `position: fixed` (модалки, drawer, popover): проверить ancestor chain от мест монтирования до root на наличие `transform`, `filter`, `backdrop-filter`, `will-change`, `contain`, `perspective` — любое из этих свойств создаёт **containing block** для fixed-descendant и ломает viewport-anchoring
 - [ ] Для bugs повторяющихся 2+ раза: предыдущий audit gave wrong verdict. Не повторять тот же подход — менять метод (если file-level не нашло → переходить к DOM ancestry trace; если static не нашло → DevTools на реальном environment)
 - [ ] Документировать ограничения аудита: «что не доказано из кода» (например, browser-specific quirks, runtime-only behaviours). Pragmatic fixes лучше confident wrong root cause — см. `modals-investigation` коммит как пример (Portal-to-body fix addressed all 8 hypotheses simultaneously without needing to prove which one was real)
-- [ ] Modal positioning: ВСЕГДА через `ModalSurface` (использует `createPortal` к `document.body`). Любой `fixed inset-0 z-...` outside `ModalSurface`, drawer или bottom-sheet primitive — нарушение convention. После 3 recurrences один и тот же bug → нужен ESLint rule (см. BACKLOG)
+- [ ] Modal positioning: ВСЕГДА через `ModalSurface` (использует `createPortal` к `document.body`). Любой `fixed inset-0 z-...` outside `ModalSurface`, drawer или bottom-sheet primitive — нарушение convention. **✅ ESLint-гейт построен (GUARDRAILS-01 2026-07-06):** `no-restricted-syntax` warn-rule в `eslint.config.mjs` флагает `fixed inset-0` / `fixed top-0 left-0 right-0 bottom-0` в `.tsx`; exempt-list (2 primitives + 4 nav-backdrops + 2 click-catchers) документирован там же. 5 genuine content-overlay кандидатов (city-prompt / portfolio-editor crop / portfolio-strip lightbox / reviews-preview / stories-viewer) сейчас warn'ят — follow-up на рефактор через `ModalSurface`/`Drawer` (см. BACKLOG.md 🟡).
 
 ---
 
@@ -153,6 +153,10 @@ npm run check:schema-drift                          # обязательно: dr
 
 Snapshot `MASTERRYADOM_AI_CONTEXT.md` живёт рядом с кодом и должен отражать реальное состояние. Прошлый раз он ушёл в drift на 2 месяца (`CONTEXT-REFRESH-V2` 2026-05-13 это исправил) — повторять не хочется.
 
+**Куда пишется `### Context updates` (DOCS-LEDGER-01, 2026-07-06):** секция `### Context updates` живёт в **отчёте по коммиту (в чате)**, а НЕ внутри `MASTERRYADOM_AI_CONTEXT.md`. Сам файл снапшота редактируется **только** когда сработал структурный триггер из таблицы ниже. Рутинные UI/refactor/bugfix-коммиты → в отчёте пишем «не затронуто», файл **не редактируем** — это дефолт, а не исключение. (Session-log audit 2026-07-06: bookkeeping-правки составляли 24.5% всех edit-операций — BACKLOG.md 453 + AI_CONTEXT 309; это правило убирает рутинную часть.)
+
+**Выполненные пункты бэклога:** удалить пункт из активного `BACKLOG.md` + дописать **одну строку** в `BACKLOG-DONE.md` (append-only, новое сверху, формат `- YYYY-MM-DD · <область> · <пункт>`). Не держать «Выполнено» в активном файле и не редактировать старые записи ledger'а.
+
 ### Триггеры ОБЯЗАТЕЛЬНОГО обновления
 
 | Изменение в коммите | Что обновляется |
@@ -165,7 +169,7 @@ Snapshot `MASTERRYADOM_AI_CONTEXT.md` живёт рядом с кодом и д�
 | Изменения в auth / RBAC / rate-limit | Раздел 10 (Безопасность) |
 | Изменения в core flows (auth, bookings, payments, notifications, schedule) | Раздел 5 |
 | Новые dependencies (`package.json`) | Раздел 2 (Тех. стек) |
-| Завершение пункта redesign-map | `BACKLOG.md` — перенос в ✅ Выполнено + актуализация map |
+| Завершение пункта backlog | удалить из активного `BACKLOG.md` + дописать одну строку в `BACKLOG-DONE.md` (append-only) |
 
 ### НЕ требуют обновления
 
@@ -187,8 +191,8 @@ Snapshot `MASTERRYADOM_AI_CONTEXT.md` живёт рядом с кодом и д�
   - (или: «не затронуто, изменения не требуют обновления»)
 - BACKLOG.md:
   - Добавлено в категорию X: ...
-  - Перенесено в ✅ Выполнено: ...
-  - (или: «обновлено только дата выполнения»)
+  - Завершено → удалено из BACKLOG.md, строка дописана в BACKLOG-DONE.md: ...
+  - (или: «не затронуто»)
 ```
 
 ### Periodic full refresh

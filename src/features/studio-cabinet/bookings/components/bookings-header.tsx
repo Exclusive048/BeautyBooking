@@ -20,6 +20,8 @@ type Props = {
     priceKopeks: number;
     masterIds: string[];
   }>;
+  /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the create-booking dialog. */
+  timezone: string;
 };
 
 export function BookingsHeader({
@@ -27,6 +29,7 @@ export function BookingsHeader({
   visibleCount,
   masters,
   services,
+  timezone,
 }: Props) {
   const [createOpen, setCreateOpen] = useState(false);
   return (
@@ -53,6 +56,7 @@ export function BookingsHeader({
         startAtUtc={null}
         masters={masters}
         services={services}
+        timezone={timezone}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
       />

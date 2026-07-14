@@ -1,3 +1,4 @@
+import { isTelegramEnabled } from "@/lib/env";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import {
@@ -53,7 +54,11 @@ export async function buildSupportContactOptionsFromUser(
   };
 
   pushUnique(buildOption("phone", normalizePhoneForContact(user.phone)));
-  pushUnique(buildOption("telegram", user.telegramId));
+  // FIX-TELEGRAM-COPY-SWEEP: don't surface a "Telegram: @x" support-contact
+  // option when user-facing Telegram is off (the prefill is rendered copy).
+  if (isTelegramEnabled) {
+    pushUnique(buildOption("telegram", user.telegramId));
+  }
 
   const vkLink = await prisma.vkLink.findUnique({
     where: { userId: user.id },

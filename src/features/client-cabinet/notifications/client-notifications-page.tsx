@@ -300,7 +300,7 @@ function NotificationRow({
       >
         <div
           className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full ${
-            isUnread ? "bg-primary/15 text-primary" : "bg-bg-input text-text-sec"
+            isUnread ? "bg-primary/15 text-accent-text" : "bg-bg-input text-text-sec"
           }`}
         >
           <Icon className="h-4 w-4" aria-hidden />
@@ -339,7 +339,7 @@ function NotificationRow({
               <button
                 type="button"
                 onClick={onToggleRead}
-                className="text-xs font-medium text-text-sec hover:text-primary"
+                className="text-xs font-medium text-text-sec hover:text-accent-text"
                 title={isUnread ? T.markRead : T.markUnread}
               >
                 {isUnread ? T.markRead : T.markUnread}

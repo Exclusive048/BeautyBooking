@@ -104,8 +104,8 @@ export function RevenueSection({ data, comparison }: Props) {
         >
           <defs>
             <linearGradient id="ma-revenue-area" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" className="text-primary [stop-color:currentColor]" stopOpacity="0.22" />
-              <stop offset="100%" className="text-primary [stop-color:currentColor]" stopOpacity="0" />
+              <stop offset="0%" className="text-accent-text [stop-color:currentColor]" stopOpacity="0.22" />
+              <stop offset="100%" className="text-accent-text [stop-color:currentColor]" stopOpacity="0" />
             </linearGradient>
           </defs>
           {tickFractions.map((t) => {

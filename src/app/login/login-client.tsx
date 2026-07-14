@@ -6,10 +6,11 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
+import YandexLoginButton from "@/components/auth/yandex-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { cn } from "@/lib/cn";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
@@ -28,7 +29,12 @@ type LoginClientProps = {
   // QA-001: resolved server-side in page.tsx and passed down so the social
   // buttons render the same branch on server + client (no hydration mismatch).
   telegramBotUsername?: string;
+  // FIX-TELEGRAM-KILLSWITCH: effective Telegram flag (resolved server-side).
+  // When false the Telegram login button is omitted entirely.
+  telegramEnabled?: boolean;
   vkEnabled?: boolean;
+  // FIX-YANDEX-OAUTH: server-resolved Yandex-enabled flag (button absent when false).
+  yandexEnabled?: boolean;
 };
 
 function normalizePhone(input: string): string {
@@ -201,7 +207,9 @@ export default function LoginClient({
   emailEnabled = false,
   stats = null,
   telegramBotUsername,
+  telegramEnabled = false,
   vkEnabled,
+  yandexEnabled = false,
 }: LoginClientProps) {
   const searchParams = useSearchParams();
   const nextPath = useMemo(() => safeNext(searchParams.get("next")), [searchParams]);
@@ -456,7 +464,7 @@ export default function LoginClient({
 
           {/* Optional hero photo overlay */}
           {heroImageUrl ? (
-            <FocalImage
+            <ResilientImage
               src={heroImageUrl}
               alt=""
               sizes="(max-width: 1200px) 50vw, 600px"
@@ -686,6 +694,7 @@ export default function LoginClient({
                     onClick={sendCode}
                     disabled={loading || !inputValid || (inputValid && !agreedToTerms)}
                     size="lg"
+                    data-testid="login-send-code"
                     className="w-full"
                   >
                     {loading ? T.sending : (
@@ -722,6 +731,7 @@ export default function LoginClient({
                     onClick={() => verifyCode()}
                     disabled={loading || code.length < OTP_LENGTH}
                     size="lg"
+                    data-testid="login-verify"
                     className="w-full"
                   >
                     {loading ? T.verifying : (
@@ -754,7 +764,7 @@ export default function LoginClient({
                         type="button"
                         onClick={resendCode}
                         disabled={loading}
-                        className="text-sm font-medium text-primary transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
+                        className="text-sm font-medium text-accent-text transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
                       >
                         {T.resendCode}
                       </button>
@@ -773,10 +783,23 @@ export default function LoginClient({
               <div className="h-px flex-1 bg-border-subtle" />
             </div>
 
-            {/* Social login — 1-col on small, 2-col from sm: */}
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
+            {/* Social login — grid columns adapt to the number of enabled
+                providers (Telegram gated by FIX-TELEGRAM-KILLSWITCH; VK + Yandex
+                self-gate). Launch config = VK + Yandex → 2 columns. */}
+            <div
+              className={`grid gap-2.5${
+                [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length >= 3
+                  ? " sm:grid-cols-3"
+                  : [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length === 2
+                    ? " sm:grid-cols-2"
+                    : ""
+              }`}
+            >
+              {telegramEnabled && (
+                <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
+              )}
               <VkLoginButton enabled={vkEnabled} />
+              <YandexLoginButton enabled={yandexEnabled} />
             </div>
 
             {/* Bottom hint */}

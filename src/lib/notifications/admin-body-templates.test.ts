@@ -99,7 +99,7 @@ describe("buildPlanEditedSummary", () => {
     const summary = buildPlanEditedSummary({
       isActive: { before: true, after: false },
     });
-    expect(summary).toContain("приостановлен");
+    expect(summary).toContain("закрыт для новых подписок");
   });
 });
 

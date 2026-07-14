@@ -16,7 +16,12 @@ export type RoleKey =
   | "studio-admin"
   | "master-in-studio"
   | "client"
-  | "site-admin";
+  | "site-admin"
+  // SEED-FRESHNESS-01 billing/plan-gating fixtures (unpublished MASTER providers).
+  | "billing-free"
+  | "billing-premium"
+  | "billing-grace"
+  | "billing-expired";
 
 export type Role = {
   key: RoleKey;
@@ -75,5 +80,43 @@ export const ROLES: Role[] = [
     expectedLanding: "/admin",
     landingNote:
       "QA-002 (FIX-08): a platform admin (roles CLIENT,ADMIN) now lands on /admin after OTP login (was /cabinet/profile — the redirect had no ADMIN branch).",
+  },
+  // ── SEED-FRESHNESS-01 plan-gating fixtures (unpublished MASTER providers). ──
+  // Land on the master cabinet; used to drive tier gating + grace/expired access.
+  {
+    key: "billing-free",
+    index: 6,
+    label: "Billing FREE master",
+    phone: "+79000009001",
+    roles: "CLIENT, MASTER",
+    expectedLanding: "/cabinet/master/dashboard",
+    landingNote: "MASTER_FREE ACTIVE — lower-tier gating baseline (billing-free-master).",
+  },
+  {
+    key: "billing-premium",
+    index: 7,
+    label: "Billing PREMIUM master",
+    phone: "+79000009002",
+    roles: "CLIENT, MASTER",
+    expectedLanding: "/cabinet/master/dashboard",
+    landingNote: "MASTER_PREMIUM ACTIVE — completes FREE/PRO(Anna)/PREMIUM triad (billing-premium-master).",
+  },
+  {
+    key: "billing-grace",
+    index: 8,
+    label: "Billing grace master",
+    phone: "+79000009003",
+    roles: "CLIENT, MASTER",
+    expectedLanding: "/cabinet/master/dashboard",
+    landingNote: "MASTER_PRO PAST_DUE + graceUntil>now — HARDENING-03 grace KEEPS access (billing-grace-master).",
+  },
+  {
+    key: "billing-expired",
+    index: 9,
+    label: "Billing expired master",
+    phone: "+79000009004",
+    roles: "CLIENT, MASTER",
+    expectedLanding: "/cabinet/master/dashboard",
+    landingNote: "MASTER_PRO EXPIRED — access LOST (billing-expired-master).",
   },
 ];

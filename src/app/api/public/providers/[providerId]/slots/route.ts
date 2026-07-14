@@ -100,7 +100,7 @@ export async function GET(
   // `/availability` reschedule surface is bounded by `maxBookingDaysAhead`
   // instead — see bookable-window.ts).
   const nowForPolicy = new Date();
-  const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy);
+  const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy, provider.timezone);
   const effectiveToKeyExclusive = clampedToKey
     ? addDaysToDateKey(clampedToKey, 1)
     : toKey || undefined;

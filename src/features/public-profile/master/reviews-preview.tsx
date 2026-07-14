@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { ReportReviewModal } from "@/features/reviews/components/report-review-modal";
 import type { ReviewDto } from "@/lib/reviews/types";
@@ -222,7 +223,7 @@ export function ReviewsPreview({
         {summaryVisible ? (
           <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 dark:border-primary/30 dark:bg-primary/10">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-text-main">
-              <Sparkles className="h-4 w-4 text-primary" />
+              <Sparkles className="h-4 w-4 text-accent-text" />
               {t.summaryTitle}
             </div>
             {summaryLoading ? (
@@ -275,30 +276,27 @@ export function ReviewsPreview({
         </motion.div>
       </CardContent>
 
-      {showAllModal ? (
-        <div className="fixed inset-0 z-50">
-          <Button
-            variant="wrapper"
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setShowAllModal(false)}
-            aria-label={UI_TEXT.common.cancel}
-          />
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-2xl rounded-[26px] border border-border-subtle bg-bg-card p-5 shadow-hover">
-              <div className="mb-3 text-lg font-semibold">{t.all}</div>
-              {allReviewsLoading ? <div className="text-sm text-text-sec">{UI_TEXT.common.loading}</div> : null}
-              {allReviewsError ? <div className="text-sm text-red-600">{allReviewsError}</div> : null}
-              {!allReviewsLoading && !allReviewsError ? (
-                <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
-                  {(allReviews ?? []).map((review) => (
-                    <ReviewCard key={review.id} review={review} currentUserId={currentUserId} onReport={setReportingReviewId} />
-                  ))}
-                </div>
-              ) : null}
-            </div>
+      {/* OVERLAY-PORTAL-REFACTOR-01: was a hand-rolled `fixed inset-0` overlay.
+          Now portals through <ModalSurface size="lg"> (max-w-2xl preserved).
+          `title` gains an id'd heading + aria-labelledby (previously absent);
+          gains focus-trap, scroll-lock + Escape close on top of the existing
+          backdrop-click close. */}
+      <ModalSurface
+        open={showAllModal}
+        onClose={() => setShowAllModal(false)}
+        size="lg"
+        title={t.all}
+      >
+        {allReviewsLoading ? <div className="text-sm text-text-sec">{UI_TEXT.common.loading}</div> : null}
+        {allReviewsError ? <div className="text-sm text-red-600">{allReviewsError}</div> : null}
+        {!allReviewsLoading && !allReviewsError ? (
+          <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
+            {(allReviews ?? []).map((review) => (
+              <ReviewCard key={review.id} review={review} currentUserId={currentUserId} onReport={setReportingReviewId} />
+            ))}
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </ModalSurface>
 
       {reportingReviewId ? (
         <ReportReviewModal

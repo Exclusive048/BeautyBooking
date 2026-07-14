@@ -1,5 +1,5 @@
 import { Crown } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PlanTier = "FREE" | "PRO" | "PREMIUM";
@@ -50,7 +50,7 @@ export function MasterUserChip({
   return (
     <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
       {avatarUrl ? (
-        <FocalImage
+        <ResilientImage
           src={avatarUrl}
           alt=""
           width={36}
@@ -69,7 +69,7 @@ export function MasterUserChip({
         <p className="truncate text-sm font-medium text-text-main">{name}</p>
         <p className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
           {showCrown ? (
-            <Crown className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+            <Crown className="h-3 w-3 shrink-0 text-accent-text" aria-hidden />
           ) : null}
           <span className="truncate">{statusText}</span>
         </p>

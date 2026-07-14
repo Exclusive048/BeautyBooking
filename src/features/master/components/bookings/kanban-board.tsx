@@ -25,7 +25,11 @@ type Props = {
 export function KanbanBoard({ columns }: Props) {
   return (
     <div className="-mx-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0">
-      <div className="flex snap-x snap-mandatory gap-4">
+      {/* FIX-VISUAL-POLISH G6: `items-start` so each column sizes to its own
+          content. The default `align-items: stretch` made every column as tall
+          as the fullest one — short columns rendered as tall empty "bands"
+          (the reported over-stretch). Columns now read as cards. */}
+      <div className="flex snap-x snap-mandatory items-start gap-4">
         {COLUMN_ORDER.map((col) => (
           <KanbanColumn
             key={col.id}

@@ -7,7 +7,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
 import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
-import { isProduction } from "@/lib/env";
+import { isProduction, isVkAuthEnabled } from "@/lib/env";
 
 const VK_NOT_CONFIGURED_CODES = new Set([
   "VK_CLIENT_ID_MISSING",
@@ -20,6 +20,13 @@ const VK_NOT_CONFIGURED_CODES = new Set([
 
 export async function GET(req: Request) {
   return withRequestContext(req, async () => {
+    // AUTH-KILLSWITCH-ENFORCE-01: refuse when the provider is disabled
+    // server-side (FZ-199 kill-switch), before any cred read / OAuth work —
+    // a flag-off provider with creds present must not initiate the flow.
+    if (!isVkAuthEnabled) {
+      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+    }
+
     try {
       const state = crypto.randomBytes(32).toString("hex");
       const codeVerifier = generateCodeVerifier();

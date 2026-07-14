@@ -30,7 +30,7 @@ export function MasterDetailWeekSchedule({
         </div>
         <Link
           href={`/cabinet/studio/calendar?master=${encodeURIComponent(viewToken)}`}
-          className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          className="text-xs font-medium text-accent-text transition-colors hover:text-accent-text/80"
         >
           {T.seeCalendar}
         </Link>
@@ -56,7 +56,7 @@ export function MasterDetailWeekSchedule({
               <p
                 className={cn(
                   "font-mono text-[10px] uppercase tracking-wide",
-                  cell.isToday ? "text-primary" : "text-text-sec",
+                  cell.isToday ? "text-accent-text" : "text-text-sec",
                 )}
               >
                 {cell.dateLabel}

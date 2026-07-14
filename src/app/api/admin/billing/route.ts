@@ -5,7 +5,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
-import { BILLING_PERIODS } from "@/lib/billing/constants";
+import { BILLING_PERIODS, STUDIO_TEAM_CAP_BY_TIER } from "@/lib/billing/constants";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import {
   FEATURE_CATALOG,
@@ -202,6 +202,17 @@ export async function POST(req: Request) {
       ? (resolveEffectiveFeatures(parsed.data.inheritsFromPlanId, plansById) as Record<LimitFeatureKey, number | null | undefined>)
       : ({} as Record<LimitFeatureKey, number | null | undefined>);
     const overrides = parseOverrides(parsed.data.features);
+    // BC-CAP: a STUDIO plan created without an explicit team cap inherits its
+    // tier default (else it silently falls to the global DEFAULT_FEATURES floor
+    // of 2 = the FREE cap — a PRO/PREMIUM footgun). Only for standalone plans;
+    // an inheriting plan derives its cap from the parent chain.
+    if (
+      parsed.data.scope === "STUDIO" &&
+      !parsed.data.inheritsFromPlanId &&
+      overrides.maxTeamMasters === undefined
+    ) {
+      overrides.maxTeamMasters = STUDIO_TEAM_CAP_BY_TIER[parsed.data.tier];
+    }
     assertRelaxedLimits(overrides, parentEffective);
 
     const normalized = normalizePrices(parsed.data.prices);

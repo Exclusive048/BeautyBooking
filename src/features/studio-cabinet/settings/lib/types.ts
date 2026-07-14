@@ -17,6 +17,8 @@ import type { StudioRole } from "@prisma/client";
 
 export type StudioSettingsSection =
   | "general"
+  | "profile-media"
+  | "portfolio"
   | "owner-team"
   | "notifications"
   | "policy"
@@ -97,6 +99,8 @@ export type StudioSettingsData = {
 export function isStudioSettingsSection(value: unknown): value is StudioSettingsSection {
   return (
     value === "general" ||
+    value === "profile-media" ||
+    value === "portfolio" ||
     value === "owner-team" ||
     value === "notifications" ||
     value === "policy" ||

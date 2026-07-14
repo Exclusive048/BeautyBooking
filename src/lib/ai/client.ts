@@ -21,9 +21,10 @@ import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
  *     env value preserved as vestigial schema field (back-compat for existing
  *     `.env.local` files) but ignored here.
  *
- *   Visual search (`src/lib/visual-search/*`) imports OpenAI SDK directly and
- *   still uses OPENAI_API_KEY. Migration of that surface к Yandex (vision +
- *   embeddings) is separate post-launch work.
+ *   - 2026-07-13 — VISUAL-SEARCH-YANDEX-MIGRATION-01: visual search
+ *     (`src/lib/visual-search/provider.ts`) migrated to Yandex too (AI Studio
+ *     multimodal qwen3.6-35b-a3b + text-search-doc/query embeddings). OpenAI is
+ *     fully gone from the codebase; `OPENAI_API_KEY` removed from env.
  * ───────────────────────────────────────────────────────────────────────────
  *
  * COMPAT VERIFIED 2026-05-31 (live API smoke against Yandex compat endpoint):

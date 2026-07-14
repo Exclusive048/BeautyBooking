@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Heart, Star } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
-import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -42,6 +41,8 @@ type CatalogCardItem = {
   // (renamed from the implicit `todaySlotsCount > 0` signal).
   slotPrecision?: string;
   availableToday?: boolean;
+  /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the (dormant) `nextSlot` time. */
+  timezone?: string;
 };
 
 type Props = {
@@ -77,7 +78,6 @@ export function CatalogCard({
   onLoginRequired,
 }: Props) {
   const router = useRouter();
-  const viewerTimeZone = useViewerTimeZoneContext();
   const [favorited, setFavorited] = useState(initialFavorited);
   const [favoritePending, setFavoritePending] = useState(false);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
@@ -148,7 +148,10 @@ export function CatalogCard({
     precision: normalizeSlotPrecision(item.slotPrecision),
     nextSlotStartAt: item.nextSlot?.startAt ?? null,
     availableToday: item.availableToday ?? (item.todaySlotsCount ?? 0) > 0,
-    timeZone: viewerTimeZone,
+    // TZ-DISPLAY-SALON-PARITY-01: a slot time is a SALON-tz instant, never the
+    // viewer's browser tz. `nextSlot` is null today (dormant) — this is
+    // correct-when-lit. Fallback is the platform-default salon tz, not viewer.
+    timeZone: item.timezone ?? "Europe/Moscow",
     fallbackToOpen: false,
   });
 
@@ -161,6 +164,7 @@ export function CatalogCard({
       role="link"
       tabIndex={0}
       aria-label={item.title}
+      data-testid="catalog-card"
       onClick={() => router.push(href)}
       onKeyDown={(e) => {
         if (e.key === "Enter") router.push(href);
@@ -170,7 +174,7 @@ export function CatalogCard({
       {/* Photo / hue placeholder. Aspect-[4/3] matches reference proportions. */}
       <div className="relative aspect-[4/3] w-full overflow-hidden">
         {photo ? (
-          <FocalImage
+          <ResilientImage
             src={photo}
             alt={item.title}
             width={400}
@@ -231,7 +235,7 @@ export function CatalogCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-center gap-3">
           {item.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={item.avatarUrl}
               alt=""
               width={36}
@@ -264,7 +268,7 @@ export function CatalogCard({
 
         <div className="flex items-center gap-1.5 text-xs text-text-sec">
           {isNew ? (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-accent-text">
               {TC.newLabel}
             </span>
           ) : (

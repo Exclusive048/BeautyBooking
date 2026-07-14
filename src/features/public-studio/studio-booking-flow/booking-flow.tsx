@@ -23,6 +23,7 @@ import {
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { BookingHero } from "./components/booking-hero";
 import { StepsBar, type WizardStep } from "./components/steps-bar";
@@ -138,6 +139,18 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   );
   const slotByLabel = useMemo(() => new Map(slots.map((slot) => [slot.label, slot])), [slots]);
   const selectedSlot = slotLabel ? slotByLabel.get(slotLabel) ?? null : null;
+
+  // FIX-BATCH-C Defect 1 (QA-107/FIX-22): slot times are shown in the SALON's
+  // timezone (a booking happens at the salon's local clock), never silently
+  // converted to the client's browser zone. `salonTz` drives every time display
+  // below; the «(город, GMT+N)» label (shown when the viewer's zone differs) is
+  // computed with the same shared `zone-label` primitive the bookings list uses.
+  const salonTz = studio?.timezone ?? viewerTimeZone;
+  const selectedSlotZoneLabel =
+    selectedSlot &&
+    zonesDifferForViewer({ iso: selectedSlot.startAtUtc, salonTimeZone: salonTz, viewerTimeZone })
+      ? formatZoneLabel({ iso: selectedSlot.startAtUtc, timeZone: salonTz })
+      : "";
 
   const prefilledMaster = useMemo(
     () =>
@@ -467,11 +480,20 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           ? UI_TEXT.bookingWidget.summary.anyMaster
           : masters.find((m) => m.id === resolvedMasterId)?.name ?? "";
 
+      const successZoneLabel = zonesDifferForViewer({
+        iso: slot.startAtUtc,
+        salonTimeZone: salonTz,
+        viewerTimeZone,
+      })
+        ? formatZoneLabel({ iso: slot.startAtUtc, timeZone: salonTz })
+        : "";
       setSuccess({
         serviceName: selectedService.name,
         masterName,
         dateLabel: formatDateLabel(selectedDate),
-        timeLabel: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
+        timeLabel: `${UI_FMT.timeShort(slot.startAtUtc, { timeZone: salonTz })}${
+          successZoneLabel ? ` ${successZoneLabel}` : ""
+        }`,
       });
     } finally {
       setSubmitLoading(false);
@@ -517,7 +539,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-4">
+      {/* min-w-0: let the wizard column shrink below content width so the
+          service-step category filter-chip strip scrolls internally instead
+          of forcing page-level horizontal overflow on mobile (WAVE-2-SMALL). */}
+      <div className="min-w-0 space-y-4">
         <BookingHero
           studio={studio}
           masters={masters}
@@ -548,6 +573,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                 availabilityByMaster={availabilityByMaster}
                 selectedMasterId={masterId}
                 selectedServiceName={selectedService?.name ?? ""}
+                salonTimeZone={salonTz}
                 onPick={(id) => {
                   setMasterId(id);
                   goNext("master");
@@ -570,6 +596,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                   setSlotLabel(label);
                   goNext("when");
                 }}
+                salonTimeZone={salonTz}
                 viewerTimeZone={viewerTimeZone}
                 selectedMasterName={
                   resolvedMasterId
@@ -636,8 +663,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           isAnyMaster={masterId === ANY_MASTER_ID}
           dateLabel={selectedDate ? formatDateLabel(selectedDate) : null}
           timeLabel={
-            selectedSlot ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: viewerTimeZone }) : null
+            selectedSlot ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: salonTz }) : null
           }
+          zoneLabel={selectedSlotZoneLabel}
           totalKopeks={selectedService?.price ?? null}
           cancellationDeadlineHours={studio.cancellationDeadlineHours ?? null}
           submitDisabled={submitDisabled}

@@ -8,8 +8,12 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
+import { groupServicesByCategory } from "@/lib/providers/group-services";
 
 type ServiceItem = ProviderProfileDto["services"][number];
+
+// Client-only render key for the uncategorized bucket (never a DB id — rule 12).
+const UNCATEGORIZED_CHIP_KEY = "__uncat__";
 
 type Props = {
   services: ServiceItem[];
@@ -36,6 +40,29 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
     return baseServices.filter((service) => service.name.toLowerCase().includes(q));
   }, [baseServices, query]);
 
+  // FIX-R2-04-C: group the (search-filtered) services by attached category.
+  // Presentational only — selection mechanic (onPick) unchanged.
+  const groups = useMemo(() => groupServicesByCategory(filtered), [filtered]);
+
+  // WAVE-2-SMALL: category filter-chips over the R2-04-C sections. Chips are
+  // derived from `groups` (labels, not ids — rule 12), so they always reflect
+  // the current search results. Presentational filtering only.
+  const [activeCat, setActiveCat] = useState<string | null>(null);
+  const chips = useMemo(
+    () =>
+      groups.map((group) => ({
+        key: group.categoryName ?? UNCATEGORIZED_CHIP_KEY,
+        label: group.categoryName ?? UI_TEXT.bookingWidget.serviceStep.categoryOther,
+      })),
+    [groups],
+  );
+  // Guard against search dropping the active category out of the result set —
+  // fall back to "all" so the user is never trapped in an empty category.
+  const activeExists = activeCat !== null && chips.some((chip) => chip.key === activeCat);
+  const visibleGroups = activeExists
+    ? groups.filter((group) => (group.categoryName ?? UNCATEGORIZED_CHIP_KEY) === activeCat)
+    : groups;
+
   const heading = prefilledMaster
     ? UI_TEXT.bookingWidget.serviceStep.titleMaster.replace("{master}", prefilledMaster.name.split(" ")[0] ?? "")
     : UI_TEXT.bookingWidget.serviceStep.titleStudio;
@@ -46,7 +73,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <Sparkles className="h-4 w-4" aria-hidden />
         </span>
         <div>
@@ -67,53 +94,99 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
         />
       </div>
 
+      {chips.length > 1 ? (
+        <div
+          className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
+          role="group"
+          aria-label={UI_TEXT.bookingWidget.serviceStep.titleStudio}
+        >
+          <Button
+            type="button"
+            variant={activeCat === null ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setActiveCat(null)}
+            className="shrink-0 rounded-full"
+            aria-pressed={activeCat === null}
+          >
+            {UI_TEXT.bookingWidget.serviceStep.catAll}
+          </Button>
+          {chips.map((chip) => (
+            <Button
+              key={chip.key}
+              type="button"
+              variant={activeCat === chip.key ? "primary" : "secondary"}
+              size="sm"
+              onClick={() => setActiveCat(chip.key)}
+              className="shrink-0 rounded-full"
+              aria-pressed={activeCat === chip.key}
+            >
+              {chip.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-8 text-center text-sm text-text-muted">
           {query ? UI_TEXT.bookingWidget.serviceStep.searchEmpty : UI_TEXT.bookingWidget.serviceStep.noServices}
         </div>
       ) : (
-        <ul className="grid gap-2.5 sm:grid-cols-2">
-          {filtered.map((service) => {
-            const isSelected = service.id === selectedServiceId;
-            return (
-              <li key={service.id}>
-                <Button
-                  type="button"
-                  variant={isSelected ? "primary" : "secondary"}
-                  size="none"
-                  onClick={() => onPick(service.id)}
-                  className={`w-full rounded-xl border px-4 py-3.5 text-left transition ${
-                    isSelected
-                      ? "border-primary ring-2 ring-primary/30"
-                      : "border-border-subtle hover:border-primary/60"
-                  }`}
-                  aria-pressed={isSelected}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold">{service.name}</div>
-                      <div className="mt-1 text-xs opacity-80">
-                        {service.durationMin
-                          ? UI_TEXT.bookingWidget.serviceStep.duration.replace(
-                              "{min}",
-                              String(service.durationMin),
-                            )
-                          : ""}
-                        {service.durationMin && service.price > 0 ? " · " : ""}
-                        {service.price > 0
-                          ? UI_FMT.priceLabel(service.price)
-                          : UI_TEXT.bookingWidget.serviceStep.priceOnRequest}
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary">
-                      {isSelected ? "✓" : UI_TEXT.bookingWidget.serviceStep.pick}
-                    </span>
-                  </div>
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-6">
+          {visibleGroups.map((group) => (
+            <div key={group.categoryName ?? "__uncat"} className="space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                <h3 className="font-display text-sm font-semibold text-text">
+                  {group.categoryName ?? UI_TEXT.bookingWidget.serviceStep.categoryOther}
+                </h3>
+                <span className="rounded-full bg-bg-muted px-2 py-0.5 font-mono text-[10px] text-text-muted">
+                  {group.services.length}
+                </span>
+              </div>
+              <ul className="grid gap-2.5 sm:grid-cols-2">
+                {group.services.map((service) => {
+                  const isSelected = service.id === selectedServiceId;
+                  return (
+                    <li key={service.id}>
+                      <Button
+                        type="button"
+                        variant={isSelected ? "primary" : "secondary"}
+                        size="none"
+                        onClick={() => onPick(service.id)}
+                        className={`w-full rounded-xl border px-4 py-3.5 text-left transition ${
+                          isSelected
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-border-subtle hover:border-primary/60"
+                        }`}
+                        aria-pressed={isSelected}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold">{service.name}</div>
+                            <div className="mt-1 text-xs opacity-80">
+                              {service.durationMin
+                                ? UI_TEXT.bookingWidget.serviceStep.duration.replace(
+                                    "{min}",
+                                    String(service.durationMin),
+                                  )
+                                : ""}
+                              {service.durationMin && service.price > 0 ? " · " : ""}
+                              {service.price > 0
+                                ? UI_FMT.priceLabel(service.price)
+                                : UI_TEXT.bookingWidget.serviceStep.priceOnRequest}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-accent-text">
+                            {isSelected ? "✓" : UI_TEXT.bookingWidget.serviceStep.pick}
+                          </span>
+                        </div>
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       )}
 
       {masters.length > 0 && !prefilledMaster ? (

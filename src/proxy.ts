@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { verifyToken } from "@/lib/auth/jwt";
 
@@ -82,6 +83,7 @@ type RateLimitTier =
   | "modelOffer"
   | "modelApplication"
   | "cabinetMutation"
+  | "webhookIngress"
   | "publicApi";
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
@@ -106,19 +108,6 @@ function normalizePathname(pathname: string): string {
   return pathname;
 }
 
-function extractIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp && realIp.trim()) return realIp.trim();
-
-  return "unknown";
-}
-
 function resolveRateLimitTier(method: string, pathname: string): RateLimitTier | null {
   if (!pathname.startsWith("/api/")) return null;
   if (pathname === REFRESH_ENDPOINT_PATH) return null;
@@ -129,6 +118,10 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
     if (pathname === "/api/media") return "mediaUpload";
     if (pathname === "/api/model-offers") return "modelOffer";
     if (pathname === "/api/model-applications") return "modelApplication";
+    // HARDENING-02: YooKassa webhook — generous, isolated tier so its (spaced)
+    // retries never trip a shared public-API limit. Still sensitive/fail-closed
+    // via the /api/payments prefix in rate-limit/index.ts.
+    if (pathname === "/api/payments/yookassa/webhook") return "webhookIngress";
   }
 
   if (
@@ -224,7 +217,7 @@ export async function proxy(request: NextRequest) {
   const tier = resolveRateLimitTier(method, pathname);
 
   if (tier) {
-    const ip = extractIp(request);
+    const ip = getClientIp(request);
     const key = `rl:${tier}:${ip}:${method}:${pathname}`;
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 

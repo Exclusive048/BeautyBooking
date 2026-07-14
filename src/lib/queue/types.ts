@@ -32,6 +32,17 @@ export type MediaCleanupPayload = Record<string, never>;
 
 export type MrrSnapshotDailyPayload = Record<string, never>;
 
+/**
+ * CATALOG-AVAILABLE-TODAY Phase 4: targeted recompute of a single provider's
+ * `availableToday` after a mutation that changed its today-availability
+ * (a booking made/cancelled/moved, a schedule/day-off edit). Complements the
+ * 30-min sweep (`recomputeAvailableToday`) — near-real-time freshness instead
+ * of ≤30-min stale. The handler also fans out to the master's studio.
+ */
+export type AvailableTodayRecomputePayload = {
+  providerId: string;
+};
+
 export type PlanEditedNotifyPayload = {
   planId: string;
   planCode: string;
@@ -41,20 +52,17 @@ export type PlanEditedNotifyPayload = {
   summary: string;
 };
 
+/**
+ * HARDENING-02: the enqueued webhook job carries only the event name and the
+ * notification object's id — NOTHING else from the (untrusted) notification
+ * body is propagated. The worker re-fetches the authoritative object from the
+ * YooKassa API by `objectId` and acts on the API-reported status/amount/metadata.
+ * `objectId` is a payment id for `payment.*` events and a refund id for
+ * `refund.*` events (the worker dispatches by event prefix).
+ */
 export type YookassaWebhookPayload = {
-  event?: string;
-  type?: string;
-  object?: {
-    id?: string;
-    status?: string;
-    metadata?: Record<string, unknown> | null;
-    payment_method?: { id?: string; saved?: boolean };
-    confirmation?: { confirmation_url?: string };
-    payment_id?: string;
-  };
-  payment?: {
-    id?: string;
-  };
+  event: string;
+  objectId: string;
 };
 
 type JobMeta = {
@@ -110,6 +118,12 @@ export type MrrSnapshotDailyJob = {
   payload: MrrSnapshotDailyPayload;
 } & JobMeta;
 
+export type AvailableTodayRecomputeJob = {
+  id: string;
+  type: "availableToday.recompute";
+  payload: AvailableTodayRecomputePayload;
+} & JobMeta;
+
 export type PlanEditedNotifyJob = {
   id: string;
   type: "notification.billing.plan-edited.mass";
@@ -124,6 +138,7 @@ export type Job =
   | MediaCleanupJob
   | YookassaWebhookJob
   | MrrSnapshotDailyJob
+  | AvailableTodayRecomputeJob
   | PlanEditedNotifyJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
@@ -133,6 +148,7 @@ export const SLOT_FREED_JOB_TYPE = "slot.freed";
 export const MEDIA_CLEANUP_JOB_TYPE = "media.cleanup";
 export const YOOKASSA_WEBHOOK_JOB_TYPE = "yookassa.webhook";
 export const MRR_SNAPSHOT_DAILY_JOB_TYPE = "mrr.snapshot.daily";
+export const AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE = "availableToday.recompute";
 export const PLAN_EDITED_NOTIFY_JOB_TYPE = "notification.billing.plan-edited.mass";
 export const DEFAULT_JOB_MAX_ATTEMPTS = 5;
 
@@ -189,6 +205,13 @@ function isMrrSnapshotDailyPayload(value: unknown): value is MrrSnapshotDailyPay
   return isRecord(value);
 }
 
+function isAvailableTodayRecomputePayload(
+  value: unknown,
+): value is AvailableTodayRecomputePayload {
+  if (!isRecord(value)) return false;
+  return typeof value.providerId === "string" && value.providerId.length > 0;
+}
+
 function isPlanEditedNotifyPayload(value: unknown): value is PlanEditedNotifyPayload {
   if (!isRecord(value)) return false;
   return (
@@ -200,14 +223,12 @@ function isPlanEditedNotifyPayload(value: unknown): value is PlanEditedNotifyPay
 
 function isYookassaWebhookPayload(value: unknown): value is YookassaWebhookPayload {
   if (!isRecord(value)) return false;
-
-  const object = value.object;
-  if (typeof object !== "undefined" && !isRecord(object)) return false;
-
-  const payment = value.payment;
-  if (typeof payment !== "undefined" && !isRecord(payment)) return false;
-
-  return true;
+  return (
+    typeof value.event === "string" &&
+    value.event.length > 0 &&
+    typeof value.objectId === "string" &&
+    value.objectId.length > 0
+  );
 }
 
 export function isJob(value: unknown): value is Job {
@@ -252,6 +273,10 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
     return isMrrSnapshotDailyPayload(value.payload);
+  }
+
+  if (value.type === AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE) {
+    return isAvailableTodayRecomputePayload(value.payload);
   }
 
   if (value.type === PLAN_EDITED_NOTIFY_JOB_TYPE) {
@@ -399,6 +424,27 @@ export function createMrrSnapshotDailyJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: MRR_SNAPSHOT_DAILY_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createAvailableTodayRecomputeJob(
+  payload: AvailableTodayRecomputePayload,
+  input?: Partial<
+    Pick<
+      AvailableTodayRecomputeJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): AvailableTodayRecomputeJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

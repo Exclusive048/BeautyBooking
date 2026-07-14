@@ -13,7 +13,7 @@ export function PerEventPlaceholder() {
   return (
     <section className="rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 p-5">
       <div className="flex items-start gap-3">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden />
         <div>
           <h3 className="font-display text-base text-text-main">{T.perEventTitle}</h3>
           <p className="mt-1 text-sm leading-relaxed text-text-sec">{T.perEventBody}</p>

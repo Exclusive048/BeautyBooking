@@ -10,7 +10,7 @@ type CTA = { label: string; href: string };
 type Props = {
   /** Tiny uppercased label above the headline. */
   eyebrow?: string;
-  /** Headline — pass JSX with <em className="font-display font-normal italic text-primary">…</em> for accents. */
+  /** Headline — pass JSX with <em className="font-display font-normal italic text-accent-text">…</em> for accents. */
   title: ReactNode;
   description: string;
   cta?: { primary?: CTA; secondary?: CTA };
@@ -66,7 +66,7 @@ export function HeroSection({ eyebrow, title, description, cta, decoration }: Pr
           {eyebrow ? (
             <motion.p
               variants={variantsItem}
-              className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary"
+              className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text"
             >
               {eyebrow}
             </motion.p>

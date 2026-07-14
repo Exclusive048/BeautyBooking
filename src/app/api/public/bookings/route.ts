@@ -19,6 +19,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { normalizePhone } from "@/lib/auth/otp";
 import { prisma } from "@/lib/prisma";
+import { getClientIp } from "@/lib/http/ip";
 
 /**
  * Public (no-auth) booking creation endpoint (32b).
@@ -36,11 +37,6 @@ import { prisma } from "@/lib/prisma";
  */
 const PUBLIC_BOOKING_PHONE_RATE = { limit: 5, windowSeconds: 60 };
 const PUBLIC_BOOKING_IP_RATE = { limit: 10, windowSeconds: 60 };
-
-function getClientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || "unknown";
-}
 
 export async function POST(req: Request) {
   const requestId = getRequestId(req);

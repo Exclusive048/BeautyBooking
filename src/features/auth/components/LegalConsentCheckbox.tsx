@@ -80,7 +80,7 @@ export function LegalConsentCheckbox({
       <label htmlFor={inputId} className="cursor-pointer leading-relaxed">
         <ConsentText
           variant={variant}
-          linkClass="rounded-sm text-text-main underline underline-offset-4 decoration-dotted transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          linkClass="rounded-sm text-text-main underline underline-offset-4 decoration-dotted transition hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         />
       </label>
     </div>

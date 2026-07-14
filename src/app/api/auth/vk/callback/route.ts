@@ -15,7 +15,7 @@ import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { exchangeVkCodeForToken, fetchVkProfile, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { readSignedVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
-import { isProduction } from "@/lib/env";
+import { isProduction, isVkAuthEnabled } from "@/lib/env";
 
 const callbackSchema = z.object({
   code: z.string().trim().min(1),
@@ -120,6 +120,13 @@ function parseVkCallback(url: URL): z.infer<typeof callbackSchema> {
 
 export async function GET(req: Request) {
   return withRequestContext(req, async () => {
+    // AUTH-KILLSWITCH-ENFORCE-01: gate the callback too — gating `start` alone
+    // is bypassable by hitting `callback` directly (this is the leg that issues
+    // the session). Refuse before touching cookies / creds / OAuth exchange.
+    if (!isVkAuthEnabled) {
+      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+    }
+
     const cookieStore = await cookies();
 
     try {
@@ -167,8 +174,8 @@ export async function GET(req: Request) {
             error: error instanceof Error ? error.stack : error,
           });
           void sendTelegramAlert(
-            `User ${sessionUser.id} logged in without free subscription`,
-            `auth:free-subscription:vk-link:${sessionUser.id}`
+            "A user logged in without a free subscription",
+            "auth:free-subscription:vk-link"
           );
         }
 
@@ -244,8 +251,8 @@ export async function GET(req: Request) {
           error: error instanceof Error ? error.stack : error,
         });
         void sendTelegramAlert(
-          `User ${user.id} logged in without free subscription`,
-          `auth:free-subscription:vk-auth:${user.id}`
+          "A user logged in without a free subscription",
+          "auth:free-subscription:vk-auth"
         );
       }
 

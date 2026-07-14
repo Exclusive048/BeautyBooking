@@ -4,7 +4,7 @@ import Link from "next/link";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 
 type MapSidebarItem = {
   id: string;
@@ -60,7 +60,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                 onMouseLeave={() => onHover(null)}
               >
                 {item.avatarUrl ? (
-                  <FocalImage
+                  <ResilientImage
                     src={item.avatarUrl}
                     alt={item.title}
 
@@ -121,7 +121,7 @@ export function CatalogMapSidebar({ items, open, onClose, onHover }: CatalogMapS
                 onMouseLeave={() => onHover(null)}
               >
                 {item.avatarUrl ? (
-                  <FocalImage
+                  <ResilientImage
                     src={item.avatarUrl}
                     alt={item.title}
 

@@ -28,6 +28,10 @@ type SubscriptionSummary = {
     scope: SubscriptionScope;
   };
   pendingConfirmationUrl: string | null;
+  // BILLING-RENEWAL-OPTIN-02: opt-in-on-price-increase window. When true the
+  // cabinet shows a banner to accept the new price (checkout) before graceUntil.
+  pendingPriceOptIn: boolean;
+  pendingPriceKopeks: number | null;
 };
 
 export async function GET() {
@@ -58,6 +62,8 @@ export async function GET() {
       graceUntil: true,
       paymentMethodId: true,
       lastPaymentAt: true,
+      pendingPriceOptIn: true,
+      pendingPriceKopeks: true,
       plan: {
         select: { id: true, code: true, name: true, tier: true, scope: true },
       },
@@ -103,6 +109,8 @@ export async function GET() {
       lastPaymentAt: subscription.lastPaymentAt?.toISOString() ?? null,
       plan: subscription.plan,
       pendingConfirmationUrl: pendingBySubscription.get(subscription.id) ?? null,
+      pendingPriceOptIn: subscription.pendingPriceOptIn,
+      pendingPriceKopeks: subscription.pendingPriceKopeks ?? null,
     };
   }
 

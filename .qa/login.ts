@@ -7,7 +7,7 @@
 // network requests observed during login + first paint, so the smoke can
 // report defects even when login itself "works".
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type Browser } from "@playwright/test";
 import { recoverOtp } from "./otp";
 import type { Role } from "./roles";
 
@@ -75,18 +75,26 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   // valid phone) becomes visible is deterministic against the hydration race.
   const phoneInput = page.getByRole("textbox", { name: /Телефон/ });
   const consent = page.getByRole("checkbox");
+  // Fold type -> consent-appears -> check -> assert-checked into ONE retry unit
+  // (40 s for cold compiles). The QA-003 hydration race can wipe the tree
+  // between "consent visible" and a separate `.check()`, which failed ~20% of
+  // logins in the PASS-02 stability run; retrying the whole unit absorbs it.
   await expect(async () => {
     await phoneInput.click({ clickCount: 3 });
     await phoneInput.pressSequentially(role.phone, { delay: 25 });
-    await expect(consent).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 20_000 });
-  await consent.check();
+    await expect(consent).toBeVisible({ timeout: 2000 });
+    if (!(await consent.isChecked().catch(() => false))) {
+      await consent.check({ timeout: 2000 });
+    }
+    await expect(consent).toBeChecked({ timeout: 1000 });
+  }).toPass({ timeout: 40_000 });
 
   // Step 3 — request the code.
   await page.getByRole("button", { name: /Отправить код/ }).click();
 
-  // Step 4 — wait for the 6-box OTP step.
-  await expect(page.getByLabel("Цифра 1 из 6")).toBeVisible({ timeout: 15_000 });
+  // Step 4 — wait for the 6-box OTP step (30 s: the request round-trips and a
+  // cold dev compile of the verify step can be slow).
+  await expect(page.getByLabel("Цифра 1 из 6")).toBeVisible({ timeout: 30_000 });
 
   // Step 5 — recover the plaintext code from the DB and type it. Typing
   // char-by-char lets the component's focus cascade move between boxes
@@ -95,14 +103,26 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   await page.getByLabel("Цифра 1 из 6").click();
   await page.keyboard.type(code, { delay: 80 });
 
-  // Step 6 — land. The auto-submit navigates away from /login; if it did
-  // not fire, fall back to clicking the explicit verify button.
+  // Step 6 — land. The 6th OTP digit auto-submits and navigates away from
+  // /login. Under a slow dev compile that navigation can exceed the first
+  // wait; when it does, login has usually ALREADY succeeded, so the old
+  // fallback clicked a «Вход» button that no longer exists → a 20 s timeout
+  // and a false failure (the PASS-01 papercut). Fix: only fall back if we are
+  // genuinely still on /login, and only click the button if it is actually
+  // present. Waits are 30 s to tolerate cold on-demand compiles.
   const leftLogin = (url: URL): boolean => !url.pathname.startsWith("/login");
+  const alreadyLeft = (): boolean => leftLogin(new URL(page.url()));
   try {
-    await page.waitForURL(leftLogin, { timeout: 15_000 });
+    await page.waitForURL(leftLogin, { timeout: 30_000 });
   } catch {
-    await page.getByRole("button", { name: /Вход/ }).click();
-    await page.waitForURL(leftLogin, { timeout: 15_000 });
+    if (!alreadyLeft()) {
+      const verify = page.getByRole("button", { name: /Вход/ });
+      if (await verify.isVisible().catch(() => false)) {
+        await verify.click().catch(() => {});
+      }
+      // Still on /login and no button fired — give the auto-submit more room.
+      await page.waitForURL(leftLogin, { timeout: 30_000 });
+    }
   }
   await page.waitForLoadState("domcontentloaded");
 
@@ -113,4 +133,37 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
     consoleErrors,
     failedRequests,
   };
+}
+
+/**
+ * Resilient login for flow-driving. `/login` has a known dev-mode hydration
+ * mismatch (QA-003) that intermittently (~20% single-attempt) wipes the
+ * phone/consent tree mid-entry → a `toBeVisible` timeout. That is a dev
+ * artifact of the page, not a product auth defect, and it is *recoverable*:
+ * loginAs either lands cleanly or throws — it never falsely reports success.
+ * So retry the whole login on a fresh context (3 attempts → ~99% success),
+ * which is what lets Phase-B flow specs drive reliably. Returns the logged-in
+ * page (caller closes `page.context()` when done).
+ */
+export async function loginResilient(
+  browser: Browser,
+  role: Role,
+  baseURL: string,
+  attempts = 3,
+): Promise<{ page: Page; result: LoginResult; attempt: number }> {
+  let lastErr: unknown;
+  for (let i = 1; i <= attempts; i += 1) {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const page = await ctx.newPage();
+    try {
+      const result = await loginAs(page, role, baseURL);
+      return { page, result, attempt: i };
+    } catch (e) {
+      lastErr = e;
+      await ctx.close().catch(() => {});
+    }
+  }
+  throw new Error(
+    `loginResilient(${role.key}) failed after ${attempts} attempts: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+  );
 }

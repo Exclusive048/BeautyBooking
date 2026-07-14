@@ -35,7 +35,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
             <div className="flex items-center gap-2">
               <span
                 aria-hidden
-                className="inline-grid h-7 w-7 place-items-center rounded-lg bg-bg-card/85 text-primary"
+                className="inline-grid h-7 w-7 place-items-center rounded-lg bg-bg-card/85 text-accent-text"
               >
                 <Package className="h-4 w-4" strokeWidth={1.6} />
               </span>
@@ -107,7 +107,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
                 {UI_FMT.priceLabel(pkg.finalPrice)}
               </p>
               {pkg.discountAmount > 0 ? (
-                <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary">
+                <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-accent-text">
                   <Sparkles className="h-3 w-3" aria-hidden strokeWidth={1.8} />
                   {T.savingsTemplate.replace(
                     "{amount}",

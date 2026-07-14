@@ -7,10 +7,13 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
+import { salonInputToUtcIso, utcIsoToSalonInput } from "../../lib/datetime-input";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.createDialog;
+const TV = UI_TEXT.studioCabinet.scheduleV2;
 const E = UI_TEXT.studioCabinet.scheduleV2.errors;
 
 type ServiceOption = {
@@ -27,6 +30,12 @@ type Props = {
   startAtUtc: string | null;
   masters: ScheduleMasterColumn[];
   services: ServiceOption[];
+  /**
+   * TZ-DISPLAY-SALON-PARITY-01: salon (provider) tz. The read-only time card
+   * and the datetime-local input (header-button flow) render + read back in
+   * SALON-local time, matching the calendar grid the admin clicked.
+   */
+  timezone: string;
   open: boolean;
   onClose: () => void;
   /**
@@ -40,49 +49,13 @@ type Props = {
   prefilledClient?: { name: string; phone: string } | null;
 };
 
-function formatTimeLocal(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ru-RU", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/**
- * STUDIO-BOOKINGS-FIX-A #3б — datetime-local string conversion
- * helpers. The form switches to a datetime input when the dialog
- * opens without a pre-filled `startAtUtc` (i.e. the «Новая запись»
- * header button vs the calendar empty-slot click). Pre-fix the
- * button silently rejected submit because `!startAtUtc` was treated
- * as a generic error.
- */
-function utcIsoToLocalInput(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
-}
-
-function localInputToUtcIso(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
-}
-
 export function CreateBookingDialog({
   studioId,
   masterId,
   startAtUtc,
   masters,
   services,
+  timezone,
   open,
   onClose,
   prefilledClient = null,
@@ -98,7 +71,7 @@ export function CreateBookingDialog({
   // `startAtUtc` is pre-filled and the time card renders read-only —
   // matches the existing flow.
   const [startAtLocal, setStartAtLocal] = useState<string>(
-    startAtUtc ? utcIsoToLocalInput(startAtUtc) : "",
+    startAtUtc ? utcIsoToSalonInput(startAtUtc, timezone) : "",
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,9 +93,9 @@ export function CreateBookingDialog({
     setClientPhone(prefilledClient?.phone ?? "");
     setServiceId("");
     setSelectedMasterId(masterId ?? "");
-    setStartAtLocal(startAtUtc ? utcIsoToLocalInput(startAtUtc) : "");
+    setStartAtLocal(startAtUtc ? utcIsoToSalonInput(startAtUtc, timezone) : "");
     setError(null);
-  }, [open, masterId, startAtUtc, prefilledClient]);
+  }, [open, masterId, startAtUtc, prefilledClient, timezone]);
 
   const availableServices = useMemo(() => {
     if (!selectedMasterId) return services;
@@ -163,7 +136,7 @@ export function CreateBookingDialog({
     // local datetime input (header-button flow). Either path must
     // produce a valid ISO string for the API.
     const effectiveStartIso =
-      startAtUtc ?? localInputToUtcIso(startAtLocal);
+      startAtUtc ?? salonInputToUtcIso(startAtLocal, timezone);
     if (!effectiveStartIso) {
       setError(E.startAtRequired);
       return;
@@ -205,9 +178,11 @@ export function CreateBookingDialog({
       <div className="space-y-4">
         {startAtUtc ? (
           // Calendar-click flow — time pre-filled, render read-only.
+          // TZ-DISPLAY-SALON-PARITY-01: salon-tz (matches the grid the admin
+          // clicked), not the browser tz.
           <div className="rounded-lg border border-border-subtle bg-bg-input/40 px-3 py-2 text-sm text-text-main">
             <span className="text-text-sec">{T.timeLabel}: </span>
-            {formatTimeLocal(startAtUtc)}
+            {UI_FMT.dateTimeShort(startAtUtc, { timeZone: timezone })}
           </div>
         ) : (
           // STUDIO-BOOKINGS-FIX-A #3б: header-button flow — let
@@ -216,7 +191,10 @@ export function CreateBookingDialog({
           // was treated as a generic error.
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-text-main">
-              {T.timeLabel}
+              {T.timeLabel}{" "}
+              <span className="font-normal text-text-sec">
+                · {TV.salonTimeInputHint}
+              </span>
             </span>
             <Input
               type="datetime-local"

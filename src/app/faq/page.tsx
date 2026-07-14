@@ -38,16 +38,16 @@ export default function FaqPage() {
 
       {/* Hero — utilitarian, much smaller than /about or /how-it-works */}
       <section className="mx-auto max-w-3xl px-4 pb-8 pt-12 lg:pt-16">
-        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
           {T.hero.eyebrow}
         </p>
         <h1 className="font-display text-3xl text-text-main lg:text-4xl">
           Часто{" "}
-          <em className="font-display font-normal italic text-primary">спрашивают</em>
+          <em className="font-display font-normal italic text-accent-text">спрашивают</em>
         </h1>
         <p className="mt-3 leading-relaxed text-text-sec">
           {T.hero.descriptionPrefix}{" "}
-          <Link href="/support" className="text-primary underline-offset-2 hover:underline">
+          <Link href="/support" className="text-accent-text underline-offset-2 hover:underline">
             {T.hero.descriptionLink}
           </Link>
           .

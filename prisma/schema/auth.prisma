@@ -25,6 +25,8 @@ model UserProfile {
 
   vkLink VkLink?
 
+  yandexLink YandexLink?
+
   createdCategories GlobalCategory[] @relation("GlobalCategoryCreator")
 
   subscriptions        UserSubscription[]
@@ -257,6 +259,29 @@ model VkLink {
   refreshToken String
 
   deviceId String
+
+  isEnabled Boolean @default(true)
+
+  linkedAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// FIX-YANDEX-OAUTH: Yandex ID auth link, bespoke-parallel to VkLink. No
+// deviceId (Yandex OAuth2 has none). isEnabled kept for parity (unlink = disable
+// + zeroed tokens, same as VK).
+model YandexLink {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  yandexUserId String @unique
+
+  accessToken String
+
+  refreshToken String
 
   isEnabled Boolean @default(true)
 

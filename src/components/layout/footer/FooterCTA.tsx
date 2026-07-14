@@ -98,7 +98,7 @@ function CTACard({
             "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wider",
             isBrand
               ? "border-white/25 bg-white/10 text-white"
-              : "border-primary/25 bg-primary/10 text-primary",
+              : "border-primary/25 bg-primary/10 text-accent-text",
           )}
         >
           {icon}
@@ -130,12 +130,9 @@ function CTACard({
       <div className="relative mt-auto">
         <Button
           asChild
-          variant={isBrand ? "secondary" : "primary"}
+          variant={isBrand ? "inverted" : "primary"}
           size="md"
-          className={cn(
-            "inline-flex items-center gap-1.5",
-            isBrand && "bg-white text-primary hover:bg-white/90",
-          )}
+          className="inline-flex items-center gap-1.5"
         >
           <Link href={href}>
             {copy.cta}

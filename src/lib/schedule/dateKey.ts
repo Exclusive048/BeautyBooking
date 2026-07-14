@@ -29,6 +29,23 @@ export function dateFromLocalDateKey(dateKey: string, timeZone: string, hour = 1
   return toUtcFromLocalDateTime(base, hour, minute, timeZone);
 }
 
+/**
+ * The UTC bounds of a SALON-LOCAL day: `[startUtc, endExclusiveUtc)` where
+ * `startUtc` is salon-local midnight of `dateKey` and `endExclusiveUtc` is
+ * salon-local midnight of the next day. Salon-tz (rule 8 / SKILL-TZ), NOT naive
+ * UTC — a +5 salon's "day" starts 19:00Z the previous UTC day. Feed these to
+ * `buildBookingOverlapWhere` to get the day's booking-conflict set.
+ */
+export function localDayRangeUtc(
+  dateKey: string,
+  timeZone: string,
+): { startUtc: Date; endExclusiveUtc: Date } {
+  return {
+    startUtc: dateFromLocalDateKey(dateKey, timeZone, 0, 0),
+    endExclusiveUtc: dateFromLocalDateKey(addDaysToDateKey(dateKey, 1), timeZone, 0, 0),
+  };
+}
+
 export function addDaysToDateKey(dateKey: string, days: number): string {
   const base = parseDateKeyToUtc(dateKey);
   const next = new Date(base);

@@ -31,7 +31,7 @@ export function StudioBundleCard({ bundle, studioTimezone, masters }: Props) {
       />
       <div className="relative">
         <div className="mb-3 flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-bg-card/85 text-primary">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-bg-card/85 text-accent-text">
             <Package className="h-4 w-4" aria-hidden strokeWidth={1.6} />
           </span>
           <h3 className="font-display text-base text-text-main">{bundle.name}</h3>
@@ -52,7 +52,7 @@ export function StudioBundleCard({ bundle, studioTimezone, masters }: Props) {
             <div className="text-[11px] uppercase tracking-wider text-text-sec">{T.finalPriceLabel}</div>
             <div className="font-display text-xl text-text-main">{UI_FMT.priceLabel(bundle.finalPrice)}</div>
             {savings ? (
-              <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-primary">
+              <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-accent-text">
                 <Sparkles className="h-3 w-3" aria-hidden strokeWidth={1.8} />
                 {T.youSaveTemplate.replace("{amount}", savings)}
               </div>

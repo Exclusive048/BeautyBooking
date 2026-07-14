@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, MapPin } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioGeneralData } from "../../lib/types";
 import { GeneralForm } from "../general-form";
@@ -28,7 +28,7 @@ export function GeneralSection({ data }: Props) {
       <SectionCard title={T.cardTitle} description={T.cardDesc}>
         <div className="flex items-start gap-3">
           {data.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={data.avatarUrl}
               alt=""
               width={64}
@@ -76,7 +76,7 @@ export function GeneralSection({ data }: Props) {
             href={data.address.mapUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text hover:underline"
           >
             <MapPin className="h-4 w-4" aria-hidden />
             {T.openMap}

@@ -174,7 +174,7 @@ function FeatureRow({
           <p className="text-xs text-text-sec">{item.description}</p>
         </div>
         {item.minTierLabel ? (
-          <span className="shrink-0 text-[11px] text-primary underline-offset-2 group-hover:underline">
+          <span className="shrink-0 text-[11px] text-accent-text underline-offset-2 group-hover:underline">
             {item.minTierLabel}
           </span>
         ) : null}
@@ -220,7 +220,7 @@ function FeatureGroupCard({
         className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-bg-input/40"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-          <GroupIcon className="h-4 w-4 text-primary" aria-hidden />
+          <GroupIcon className="h-4 w-4 text-accent-text" aria-hidden />
         </span>
         <span className="flex-1 text-sm font-semibold text-text-main">{group.group}</span>
         <span className="mr-2 text-xs text-text-sec">
@@ -285,7 +285,7 @@ export function FeaturesPageClient({ scope, billingHref }: Props) {
     <div className="space-y-4">
       {/* Plan badge */}
       <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-card px-4 py-3">
-        <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <Sparkles className="h-4 w-4 shrink-0 text-accent-text" aria-hidden />
         <div className="flex-1">
           <p className="text-sm font-semibold text-text-main">{t.planBadge(planName)}</p>
           {allUnlocked && (

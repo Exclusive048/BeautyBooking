@@ -9,6 +9,7 @@ import { getSessionUserFromRequest } from "@/lib/auth/session";
 import { normalizePhone } from "@/lib/auth/otp";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
+import { getClientIp } from "@/lib/http/ip";
 
 /**
  * PACKAGE-BOOKING-MVP-2 — atomic studio multi-master package booking. Mirrors
@@ -35,11 +36,6 @@ const studioPackageBookSchema = z.object({
     .min(2, "В пакете должно быть минимум 2 услуги.")
     .max(12),
 });
-
-function getClientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || "unknown";
-}
 
 export async function POST(
   req: Request,

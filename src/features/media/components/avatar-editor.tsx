@@ -8,7 +8,7 @@ import type { MediaAssetDto } from "@/lib/media/types";
 import { assetHasCrop } from "@/lib/media/types";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CropPicker } from "@/features/media/components/crop-picker";
 
@@ -142,7 +142,7 @@ export function AvatarEditor({
   const pickerAsset = cropAsset ?? activeAsset;
 
   const avatarPreview = imageUrl ? (
-    <FocalImage
+    <ResilientImage
       src={imageUrl}
       alt=""
       cropX={activeAsset?.cropX ?? null}
@@ -168,7 +168,7 @@ export function AvatarEditor({
             className="group relative block h-full w-full overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
           >
             {imageUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={imageUrl}
                 alt=""
                 cropX={activeAsset?.cropX ?? null}
@@ -179,9 +179,12 @@ export function AvatarEditor({
                 className="object-cover"
               />
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-1 text-text-sec">
-                <Camera className="h-4 w-4" />
-                <span className="text-[10px] leading-none">{t.noAvatar}</span>
+              // FIX-VISUAL-POLISH F2: only the Camera icon here — the bottom
+              // action bar already labels "Загрузить". On the small 80px studio
+              // avatar the extra centered "Нет фото" text collided with that bar
+              // ("Нет фото / Загрузить фото" overlap). One label, no overlap.
+              <div className="flex h-full w-full items-center justify-center text-text-sec">
+                <Camera className="h-5 w-5" />
               </div>
             )}
             <div

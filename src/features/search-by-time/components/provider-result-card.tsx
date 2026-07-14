@@ -7,7 +7,7 @@ import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 
 type Props = {
   item: AvailabilityProviderItem;
@@ -33,7 +33,7 @@ export function ProviderResultCard({ item }: Props) {
       <div className="space-y-3 p-4">
         <div className="flex items-center gap-3">
           {item.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={item.avatarUrl}
               alt={item.name}
               width={40}

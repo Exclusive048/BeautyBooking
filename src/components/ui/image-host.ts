@@ -5,7 +5,7 @@
  * portfolio image points at a host that is NOT configured in
  * `next.config.ts` `images.remotePatterns`, `next/image` THROWS during
  * render — which on a Server Component can break the whole route, not just
- * the one card. This module lets the shared <FocalImage> decide up-front
+ * the one card. This module lets the shared <ResilientImage> decide up-front
  * whether a `src` is safe to hand to `next/image`, and substitute a local
  * placeholder otherwise (per-card degradation instead of a route-wide break).
  *

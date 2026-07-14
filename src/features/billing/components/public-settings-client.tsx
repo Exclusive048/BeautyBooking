@@ -635,7 +635,7 @@ export function PublicSettingsClient({
           <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
             <div className="border-b border-border-subtle/60 px-4 py-3">
               <div className="flex items-center gap-2">
-                <QrCode className="h-4 w-4 text-primary" aria-hidden />
+                <QrCode className="h-4 w-4 text-accent-text" aria-hidden />
                 <p className="text-sm font-semibold text-text-main">{t.qrTitle}</p>
               </div>
               <p className="mt-0.5 text-xs text-text-sec">{t.qrHint}</p>

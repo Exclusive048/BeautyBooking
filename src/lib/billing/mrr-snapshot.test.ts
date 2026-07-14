@@ -141,6 +141,78 @@ describe("createMrrSnapshotForToday", () => {
     expect(result.snapshot.mrrKopeks).toBe(BigInt(0));
     expect(result.snapshot.activeSubscriptionsCount).toBe(1);
   });
+
+  // HARDENING-10 #14 — MRR counts only *paying* subs: the query excludes
+  // never-billed trials and perpetually-ACTIVE lapsed admin grants.
+  it("queries only paid-and-current, non-trial subscriptions (excludes trials + lapsed grants)", async () => {
+    snapshotFindUnique.mockResolvedValueOnce(null);
+    subFindMany.mockResolvedValueOnce([]);
+    snapshotCreate.mockImplementationOnce(async ({ data }) => ({
+      snapshotDate: data.snapshotDate,
+      mrrKopeks: data.mrrKopeks,
+      activeSubscriptionsCount: data.activeSubscriptionsCount,
+    }));
+
+    await createMrrSnapshotForToday();
+
+    expect(subFindMany).toHaveBeenCalledTimes(1);
+    expect(subFindMany.mock.calls[0][0].where).toEqual({
+      status: "ACTIVE",
+      isTrial: false,
+      currentPeriodEnd: { gt: new Date("2026-05-13T10:30:00Z") },
+    });
+  });
+
+  it("ignores an inactive price row — a subscription valued by a retired price contributes 0", async () => {
+    snapshotFindUnique.mockResolvedValueOnce(null);
+    subFindMany.mockResolvedValueOnce([
+      {
+        planId: "p1",
+        periodMonths: 1,
+        // Only price row for the sub's period is retired (isActive: false).
+        plan: {
+          prices: [{ periodMonths: 1, priceKopeks: 99_000, isActive: false }],
+        },
+      },
+    ]);
+    snapshotCreate.mockImplementationOnce(async ({ data }) => ({
+      snapshotDate: data.snapshotDate,
+      mrrKopeks: data.mrrKopeks,
+      activeSubscriptionsCount: data.activeSubscriptionsCount,
+    }));
+
+    const result = await createMrrSnapshotForToday();
+
+    expect(result.snapshot.mrrKopeks).toBe(BigInt(0));
+    expect(result.snapshot.activeSubscriptionsCount).toBe(1);
+  });
+
+  it("counts a genuine paid-and-current subscription at its active price", async () => {
+    snapshotFindUnique.mockResolvedValueOnce(null);
+    subFindMany.mockResolvedValueOnce([
+      {
+        planId: "p1",
+        periodMonths: 12,
+        plan: {
+          prices: [
+            { periodMonths: 12, priceKopeks: 500_000, isActive: false }, // retired — ignored
+            { periodMonths: 12, priceKopeks: 1_200_000, isActive: true }, // active — used
+          ],
+        },
+      },
+    ]);
+    snapshotCreate.mockImplementationOnce(async ({ data }) => ({
+      snapshotDate: data.snapshotDate,
+      mrrKopeks: data.mrrKopeks,
+      activeSubscriptionsCount: data.activeSubscriptionsCount,
+    }));
+
+    const result = await createMrrSnapshotForToday();
+
+    // 1_200_000 / 12 = 100_000
+    expect(result.snapshot.mrrKopeks).toBe(BigInt(100_000));
+    expect(result.snapshot.activeSubscriptionsCount).toBe(1);
+  });
 });
 
 describe("getMrrSnapshotDaysAgo", () => {

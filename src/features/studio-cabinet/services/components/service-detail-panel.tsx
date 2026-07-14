@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -229,7 +229,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
             <button
               type="button"
               onClick={() => setAssignOpen(true)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-primary/10"
             >
               <UserPlus className="h-3.5 w-3.5" aria-hidden />
               {T.assignMaster}
@@ -252,7 +252,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
                     title={master.displayName}
                   >
                     {master.avatarUrl ? (
-                      <FocalImage
+                      <ResilientImage
                         src={master.avatarUrl}
                         alt=""
                         width={20}

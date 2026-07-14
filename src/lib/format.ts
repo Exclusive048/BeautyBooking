@@ -1,13 +1,11 @@
 export const LOCALE = "ru-RU";
 export const CURRENCY = "RUB";
 
-export function moneyRUB(value: number) {
-  return new Intl.NumberFormat(LOCALE, {
-    style: "currency",
-    currency: CURRENCY,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
+// NOTE (LEGACY-MONEY-UTILS-RETIRE 2026-07-01): the non-÷100 `moneyRUB` /
+// `moneyRUBPlain` (took a rubles value, formatted without dividing) are gone —
+// prices are stored in KOPEKS, so all money display goes through a ÷100
+// formatter: `moneyRUBFromKopeks` / `moneyRUBPlainFromKopeks` here, or the
+// canonical `UI_FMT.priceLabel` (src/lib/ui/fmt.ts). See MONEY-BRAND-TYPE-A.
 
 export function moneyRUBFromKopeks(valueKopeks: number) {
   const value = valueKopeks / 100;
@@ -26,12 +24,6 @@ export function moneyRUBPlainFromKopeks(valueKopeks: number) {
   return new Intl.NumberFormat(LOCALE, {
     minimumFractionDigits: hasFraction ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(value);
-}
-
-export function moneyRUBPlain(value: number) {
-  return new Intl.NumberFormat(LOCALE, {
-    maximumFractionDigits: 0,
   }).format(value);
 }
 

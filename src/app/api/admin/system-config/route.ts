@@ -9,16 +9,19 @@ import { formatZodError } from "@/lib/api/validation";
 import { clearLegalDraftModeCache } from "@/lib/legal/config";
 import { logInfo } from "@/lib/logging/logger";
 import { clearVisualSearchEnabledCache } from "@/lib/visual-search/config";
+import { clearTelegramEnabledCache } from "@/lib/telegram/feature";
 
 const updateSchema = z.object({
   onlinePaymentsEnabled: z.boolean().optional(),
   visualSearchEnabled: z.boolean().optional(),
   legalDraftMode: z.boolean().optional(),
+  telegramEnabled: z.boolean().optional(),
 }).refine(
   (value) =>
     value.onlinePaymentsEnabled !== undefined ||
     value.visualSearchEnabled !== undefined ||
-    value.legalDraftMode !== undefined,
+    value.legalDraftMode !== undefined ||
+    value.telegramEnabled !== undefined,
   { message: "At least one setting is required" },
 );
 
@@ -28,6 +31,11 @@ const FLAG_DEFAULTS = {
   // legalDraftMode defaults to true (banner visible) to match runtime semantics
   // in `getLegalDraftMode()`.
   legalDraftMode: true,
+  // FIX-TELEGRAM-KILLSWITCH: raw admin toggle defaults to ON. The env hard
+  // ceiling (NEXT_PUBLIC_TELEGRAM_ENABLED) clamps the EFFECTIVE value to off
+  // when the env is off — applied in `getTelegramEnabled()` / `getSystemFlags()`,
+  // not here. This raw value is what the audit diff records.
+  telegramEnabled: true,
 } as const;
 
 function parseFlag(value: unknown, fallback: boolean): boolean {
@@ -35,7 +43,7 @@ function parseFlag(value: unknown, fallback: boolean): boolean {
 }
 
 async function readAllFlags() {
-  const [onlinePayments, visualSearch, legalDraft] = await Promise.all([
+  const [onlinePayments, visualSearch, legalDraft, telegram] = await Promise.all([
     prisma.systemConfig.findUnique({
       where: { key: "onlinePaymentsEnabled" },
       select: { value: true },
@@ -48,12 +56,19 @@ async function readAllFlags() {
       where: { key: "legalDraftMode" },
       select: { value: true },
     }),
+    prisma.systemConfig.findUnique({
+      where: { key: "telegramEnabled" },
+      select: { value: true },
+    }),
   ]);
 
+  // Raw stored values (the env hard ceiling is applied at read-for-display /
+  // runtime, not here — so the audit diff records the admin's actual intent).
   return {
     onlinePaymentsEnabled: parseFlag(onlinePayments?.value, FLAG_DEFAULTS.onlinePaymentsEnabled),
     visualSearchEnabled: parseFlag(visualSearch?.value, FLAG_DEFAULTS.visualSearchEnabled),
     legalDraftMode: parseFlag(legalDraft?.value, FLAG_DEFAULTS.legalDraftMode),
+    telegramEnabled: parseFlag(telegram?.value, FLAG_DEFAULTS.telegramEnabled),
   };
 }
 
@@ -161,6 +176,32 @@ export async function PATCH(req: Request) {
           context: auditContext,
         });
       }
+
+      if (parsed.data.telegramEnabled !== undefined &&
+          parsed.data.telegramEnabled !== before.telegramEnabled) {
+        await tx.systemConfig.upsert({
+          where: { key: "telegramEnabled" },
+          update: { value: parsed.data.telegramEnabled },
+          create: { key: "telegramEnabled", value: parsed.data.telegramEnabled },
+        });
+        changed.telegramEnabled = {
+          before: before.telegramEnabled,
+          after: parsed.data.telegramEnabled,
+        };
+        await createAdminAuditLog({
+          tx,
+          adminUserId: auth.user.id,
+          action: "SETTINGS_FLAG_TOGGLED",
+          targetType: "system_config",
+          targetId: "telegramEnabled",
+          details: {
+            key: "telegramEnabled",
+            value: parsed.data.telegramEnabled,
+            prevValue: before.telegramEnabled,
+          },
+          context: auditContext,
+        });
+      }
     });
 
     if (changed.visualSearchEnabled) {
@@ -168,6 +209,9 @@ export async function PATCH(req: Request) {
     }
     if (changed.legalDraftMode) {
       await clearLegalDraftModeCache();
+    }
+    if (changed.telegramEnabled) {
+      await clearTelegramEnabledCache();
     }
 
     if (Object.keys(changed).length > 0) {

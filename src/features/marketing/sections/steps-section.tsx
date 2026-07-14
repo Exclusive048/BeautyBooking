@@ -44,7 +44,7 @@ export function StepsSection({ eyebrow, title, description, steps, columns }: Pr
                 viewport={{ once: true, margin: "-80px" }}
                 transition={transition}
               >
-                <div className="mb-4 font-display text-5xl leading-none text-primary/25">
+                <div className="mb-4 font-display text-5xl leading-none text-accent-text/25">
                   {String(idx + 1).padStart(2, "0")}
                 </div>
                 <h3 className="mb-2 font-display text-xl text-text-main">{step.title}</h3>

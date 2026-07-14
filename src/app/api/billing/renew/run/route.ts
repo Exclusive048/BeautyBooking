@@ -4,13 +4,17 @@ import { createRecurringPayment } from "@/lib/payments/yookassa/client";
 import { addMonthsUtc, sha256 } from "@/lib/billing/utils";
 import { BILLING_PERIODS, PAST_DUE_GRACE_DAYS } from "@/lib/billing/constants";
 import { resolvePlanPrice } from "@/lib/billing/pricing";
+import { priceOptInDeadline, shouldEnterPriceOptIn } from "@/lib/billing/price-optin";
+import { processPriceOptInReminders } from "@/lib/billing/price-optin-cron";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
+import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
 import { logError } from "@/lib/logging/logger";
 import { NotificationType } from "@prisma/client";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 import { env } from "@/lib/env";
 import { processTrialExpirations } from "@/lib/billing/trial-cron";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 
@@ -56,13 +60,22 @@ export async function POST(req: Request) {
 
   const overdue = await prisma.userSubscription.findMany({
     where: { status: "PAST_DUE", graceUntil: { lt: now } },
-    select: { id: true, userId: true, scope: true },
+    select: { id: true, userId: true, scope: true, pendingPriceOptIn: true },
   });
 
   if (overdue.length > 0) {
     await prisma.userSubscription.updateMany({
       where: { id: { in: overdue.map((s) => s.id) } },
-      data: { status: "EXPIRED", autoRenew: false },
+      // BILLING-RENEWAL-OPTIN-02: clear opt-in flags on lapse too — an EXPIRED
+      // row must never carry a stale pendingPriceOptIn / markers.
+      data: {
+        status: "EXPIRED",
+        autoRenew: false,
+        pendingPriceOptIn: false,
+        pendingPriceKopeks: null,
+        priceOptIn24hSentAt: null,
+        priceOptIn2hSentAt: null,
+      },
     });
 
     await prisma.billingAuditLog.createMany({
@@ -71,7 +84,9 @@ export async function POST(req: Request) {
         scope: s.scope,
         subscriptionId: s.id,
         action: "SUBSCRIPTION_EXPIRED",
-        details: { reason: "PAST_DUE_GRACE_EXPIRED" },
+        // A price-opt-in sub that lapsed declined the higher price (never
+        // force-charged); distinguish it from a plain payment-failure grace.
+        details: { reason: s.pendingPriceOptIn ? "PRICE_OPTIN_DECLINED" : "PAST_DUE_GRACE_EXPIRED" },
       })),
     });
 
@@ -80,8 +95,12 @@ export async function POST(req: Request) {
       await createBillingNotification({
         userId: s.userId,
         type: NotificationType.BILLING_SUBSCRIPTION_EXPIRED,
-        title: "Подписка истекла",
-        body: "Льготный период оплаты истёк. Подписка отключена.",
+        title: s.pendingPriceOptIn
+          ? UI_TEXT.billing.priceOptIn.lapsedTitle
+          : "Подписка истекла",
+        body: s.pendingPriceOptIn
+          ? UI_TEXT.billing.priceOptIn.lapsedBody
+          : "Льготный период оплаты истёк. Подписка отключена.",
         payloadJson: { scope: s.scope, subscriptionId: s.id },
       });
     }
@@ -198,6 +217,65 @@ export async function POST(req: Request) {
         subscriptionId: subscription.id,
         action: "RENEWAL_FAILED",
         details: { reason: "MISSING_PRICE" },
+      });
+      continue;
+    }
+
+    // BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2): a renewal whose effective price is
+    // HIGHER than what the subscriber last actually paid must NOT auto-charge.
+    // Enter a 2-day opt-in window (PAST_DUE + graceUntil = deadline) — access is
+    // preserved via HARDENING-03 grace; the higher amount is charged ONLY if the
+    // subscriber explicitly accepts (checkout at the new price). Equal/lower
+    // price, or no prior SUCCEEDED payment → falls through to the normal
+    // (byte-identical) auto-renew below. This branch NEVER calls
+    // createRecurringPayment — a non-opting subscriber lapses via the §1 expiry
+    // path, never force-charged the higher amount.
+    const lastSucceeded = await prisma.billingPayment.findFirst({
+      where: { subscriptionId: subscription.id, status: "SUCCEEDED" },
+      select: { amountKopeks: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (shouldEnterPriceOptIn(resolvedPriceKopeks, lastSucceeded?.amountKopeks ?? null)) {
+      const deadline = priceOptInDeadline(now);
+      await prisma.userSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: "PAST_DUE",
+          graceUntil: deadline,
+          pendingPriceOptIn: true,
+          pendingPriceKopeks: resolvedPriceKopeks,
+          priceOptIn24hSentAt: null,
+          priceOptIn2hSentAt: null,
+        },
+      });
+      await createBillingAuditLog({
+        userId: subscription.userId,
+        scope: subscription.scope,
+        subscriptionId: subscription.id,
+        action: "RENEWAL_PRICE_OPTIN_STARTED",
+        details: {
+          oldPriceKopeks: lastSucceeded?.amountKopeks ?? null,
+          newPriceKopeks: resolvedPriceKopeks,
+          periodMonths: subscription.periodMonths,
+          deadline: deadline.toISOString(),
+        },
+      });
+      await invalidatePlanCache(subscription.userId, subscription.scope);
+      await createBillingNotification({
+        userId: subscription.userId,
+        type: NotificationType.BILLING_RENEWAL_PRICE_INCREASE,
+        scope: subscription.scope,
+        title: UI_TEXT.billing.priceOptIn.startedTitle,
+        body: UI_TEXT.billing.priceOptIn.startedBody(
+          moneyRUBFromKopeks(resolvedPriceKopeks),
+          dateRU(deadline),
+        ),
+        payloadJson: {
+          scope: subscription.scope,
+          subscriptionId: subscription.id,
+          newPriceKopeks: resolvedPriceKopeks,
+          deadline: deadline.toISOString(),
+        },
       });
       continue;
     }
@@ -462,5 +540,16 @@ export async function POST(req: Request) {
     });
   }
 
-  return ok({ ok: true, renewed: candidates.length, trialExpirations });
+  // Price-increase opt-in reminders (24h/2h before the opt-in deadline).
+  // Wrapped so a reminder failure doesn't kill the rest of the cron run.
+  let priceOptInReminders = { sent24h: 0, sent2h: 0, errors: 0 };
+  try {
+    priceOptInReminders = await processPriceOptInReminders(now);
+  } catch (error) {
+    logError("processPriceOptInReminders failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return ok({ ok: true, renewed: candidates.length, trialExpirations, priceOptInReminders });
 }

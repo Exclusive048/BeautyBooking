@@ -71,13 +71,13 @@ export function CookieConsent() {
             {/* Icon + text */}
             <div className="flex items-start gap-3 md:flex-1 md:items-center">
               <div className="shrink-0 rounded-xl bg-primary/10 p-2.5">
-                <Cookie className="h-5 w-5 text-primary" aria-hidden />
+                <Cookie className="h-5 w-5 text-accent-text" aria-hidden />
               </div>
               <div className="min-w-0">
                 <p className="text-sm text-text-main">{t.text}</p>
                 <Link
                   href="/privacy"
-                  className="mt-0.5 block text-xs text-primary hover:underline"
+                  className="mt-0.5 block text-xs text-accent-text hover:underline"
                 >
                   {t.privacyLink}
                 </Link>

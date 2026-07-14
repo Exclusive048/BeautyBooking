@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { HeaderBlock } from "@/components/ui/header-block";
+import { isTelegramEnabled } from "@/lib/env";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
@@ -20,7 +21,8 @@ export default async function SettingsPage() {
       />
 
       <div className="grid gap-4">
-        <TelegramNotificationsSection />
+        {/* FIX-TELEGRAM-KILLSWITCH: absent when off (no mount, no status fetch). */}
+        {isTelegramEnabled && <TelegramNotificationsSection />}
         <VkNotificationsSection />
         <EmailNotificationsSection />
         <PushNotificationsSection />

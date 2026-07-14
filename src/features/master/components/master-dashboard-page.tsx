@@ -10,11 +10,9 @@ import { UpcomingBookingsSection } from "@/features/master/components/dashboard/
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
-import { NotificationButton } from "@/features/master/components/notification-button";
 import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
-import { getUnreadBadgeCount } from "@/lib/notifications/badge";
 import { getDayOfWeek } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -42,13 +40,11 @@ export async function MasterDashboardPage() {
   if (!sessionUser) redirect("/login");
 
   const masterId = await getCurrentMasterProviderId(userId);
-  // `getUnreadBadgeCount` is wrapped in `React.cache` and was already called
-  // by the layout — re-using it here costs nothing and lets the page header
-  // surface the same number the sidebar shows.
-  const [data, unreadBadge] = await Promise.all([
-    getMasterDashboardData({ masterId }),
-    getUnreadBadgeCount({ userId, phone: sessionUser.phone ?? null, context: "master" }),
-  ]);
+  // FIX-VISUAL-POLISH F4: the page-header notification bell was removed (the
+  // global topbar already carries the canonical `NotificationsBell` sitewide —
+  // two bells were redundant), so the unread count is no longer fetched here.
+  // The sidebar still surfaces it via the layout's own `getUnreadBadgeCount`.
+  const data = await getMasterDashboardData({ masterId });
 
   const firstName =
     sessionUser.firstName?.trim() ||
@@ -97,10 +93,7 @@ export async function MasterDashboardPage() {
         title={HOME_TITLE.title}
         subtitle={HOME_TITLE.subtitle}
         actions={
-          <>
-            <NotificationButton count={unreadBadge.count} />
-            <NewBookingButton label={HEADER.newBookingCta} className="rounded-xl" />
-          </>
+          <NewBookingButton label={HEADER.newBookingCta} className="rounded-xl" />
         }
       />
       <FocusHighlighter />
@@ -109,7 +102,7 @@ export async function MasterDashboardPage() {
         {/* QA-115 (FIX-06): studio context for a studio master (nothing for independent). */}
         {data.master.studio ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-sec">
-            <Building2 className="h-3.5 w-3.5 text-primary" aria-hidden strokeWidth={1.6} />
+            <Building2 className="h-3.5 w-3.5 text-accent-text" aria-hidden strokeWidth={1.6} />
             <span>
               {UI_TEXT.cabinetMaster.dashboard.studioChipTemplate.replace(
                 "{name}",

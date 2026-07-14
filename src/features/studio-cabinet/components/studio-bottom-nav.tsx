@@ -66,7 +66,7 @@ function NavTab({
     >
       <span className="relative">
         <Icon
-          className={cn("h-5 w-5", active ? "text-primary" : "text-text-sec")}
+          className={cn("h-5 w-5", active ? "text-accent-text" : "text-text-sec")}
           aria-hidden
         />
         {badge > 0 ? (
@@ -81,7 +81,7 @@ function NavTab({
       <span
         className={cn(
           "text-[10px] font-medium",
-          active ? "text-primary" : "text-text-sec",
+          active ? "text-accent-text" : "text-text-sec",
         )}
       >
         {label}
@@ -152,7 +152,7 @@ export function StudioBottomNav({ counts }: Props) {
                       className={cn(
                         "relative flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
                         active
-                          ? "bg-primary/10 text-primary"
+                          ? "bg-primary/10 text-accent-text"
                           : "text-text-sec hover:bg-bg-input",
                       )}
                     >
@@ -203,14 +203,14 @@ export function StudioBottomNav({ counts }: Props) {
                 <MoreHorizontal
                   className={cn(
                     "h-5 w-5",
-                    moreActive || moreOpen ? "text-primary" : "text-text-sec",
+                    moreActive || moreOpen ? "text-accent-text" : "text-text-sec",
                   )}
                   aria-hidden
                 />
                 <span
                   className={cn(
                     "text-[10px] font-medium",
-                    moreActive || moreOpen ? "text-primary" : "text-text-sec",
+                    moreActive || moreOpen ? "text-accent-text" : "text-text-sec",
                   )}
                 >
                   {T.bottomNav.more}

@@ -10,17 +10,7 @@ import { logInfo } from "@/lib/logging/logger";
 import { maskPhone } from "@/lib/logging/masking";
 import { isProduction } from "@/lib/env";
 import { sendOtpSms } from "@/lib/sms";
-
-function extractClientIp(req: Request): string | null {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
-  }
-  const realIp = req.headers.get("x-real-ip");
-  if (realIp && realIp.trim()) return realIp.trim();
-  return null;
-}
+import { extractClientIp } from "@/lib/http/ip";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {

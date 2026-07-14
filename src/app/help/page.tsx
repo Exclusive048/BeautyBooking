@@ -46,7 +46,7 @@ export default async function HelpPage({ searchParams }: PageProps) {
         />
 
         <div className="relative mx-auto max-w-3xl px-4 py-12 text-center lg:py-16">
-          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
             {T.hero.eyebrow}
           </p>
           <h1 className="mb-4 font-display text-3xl leading-[1.1] text-text-main lg:text-4xl">

@@ -2,6 +2,7 @@ import { Smartphone } from "lucide-react";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
 import type { StudioNotificationsData } from "../../lib/types";
@@ -55,16 +56,20 @@ export function NotificationsSection({ data }: Props) {
         <p className="text-[11px] text-text-sec">{T.pushHint}</p>
       </SectionCard>
 
-      <SectionCard title={T.telegramTitle} description={T.telegramDesc}>
-        <FeatureGate
-          feature="tgNotifications"
-          scope="STUDIO"
-          variant="inline"
-          description={FG.telegramLocked}
-        >
-          <TelegramNotificationsSection embedded />
-        </FeatureGate>
-      </SectionCard>
+      {/* FIX-TELEGRAM-KILLSWITCH: the entire Telegram card (header + control) is
+          absent when the flag is off — no empty "Telegram"-titled card. */}
+      {isTelegramEnabled && (
+        <SectionCard title={T.telegramTitle} description={T.telegramDesc}>
+          <FeatureGate
+            feature="tgNotifications"
+            scope="STUDIO"
+            variant="inline"
+            description={FG.telegramLocked}
+          >
+            <TelegramNotificationsSection embedded />
+          </FeatureGate>
+        </SectionCard>
+      )}
 
       <SectionCard title={T.vkTitle} description={T.vkDesc}>
         <FeatureGate

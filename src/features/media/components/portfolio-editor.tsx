@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -196,7 +196,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         {assets.map((asset) => (
           <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             <Button variant="wrapper" className="relative h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
-              <FocalImage
+              <ResilientImage
                 src={asset.url}
                 alt=""
                 sizes="(max-width: 768px) 50vw, 25vw"
@@ -241,7 +241,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <Button variant="wrapper" className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label={mediaText.closePreviewAria} />
           <div className="relative h-[90vh] w-[90vw]">
-            <FocalImage
+            <ResilientImage
               src={previewUrl}
               alt=""
               sizes="90vw"

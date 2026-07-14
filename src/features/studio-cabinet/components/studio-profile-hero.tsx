@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Switch } from "@/components/ui/switch";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -45,7 +45,7 @@ export function StudioProfileHero({
           aria-label={UI_TEXT.studio.profile.coverUpload}
         >
           {bannerUrl ? (
-            <FocalImage
+            <ResilientImage
               src={bannerUrl}
               alt=""
               sizes="(max-width: 768px) 100vw, 960px"

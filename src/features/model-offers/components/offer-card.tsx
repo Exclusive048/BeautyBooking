@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { PublicModelOfferItem } from "@/lib/model-offers/public.service";
 
@@ -59,7 +59,7 @@ export function OfferCard({ offer }: Props) {
       <div className="flex items-center gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-border-subtle/60 bg-bg-input text-text-sec">
           {master.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={master.avatarUrl}
               alt=""
               width={40}
@@ -97,10 +97,10 @@ export function OfferCard({ offer }: Props) {
       {/* Price block */}
       <div className="flex items-baseline gap-2">
         {isFreeForModel ? (
-          <span className="font-display text-2xl text-primary">{T.priceFreeForModel}</span>
+          <span className="font-display text-2xl text-accent-text">{T.priceFreeForModel}</span>
         ) : (
           <>
-            <span className="font-display text-2xl text-primary tabular-nums">
+            <span className="font-display text-2xl text-accent-text tabular-nums">
               {formatRub(price)}
             </span>
             {originalPrice && originalPrice > price ? (
@@ -109,7 +109,7 @@ export function OfferCard({ offer }: Props) {
                   {formatRub(originalPrice)}
                 </span>
                 {discountPercent !== null ? (
-                  <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-accent-text">
                     −{discountPercent}%
                   </span>
                 ) : null}

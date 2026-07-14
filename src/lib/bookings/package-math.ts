@@ -12,6 +12,8 @@
  *      the N sibling slots must be pairwise-checked in memory.
  */
 
+import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
+
 /**
  * Distributes `finalTotal` (kopeks) across `prices` proportionally.
  * Guarantees `Σ result === finalTotal` exactly (largest-remainder).
@@ -23,7 +25,10 @@
  *   components with the largest fractional remainder (ties broken by index
  *   → deterministic).
  */
-export function proportionalDiscountedPrices(prices: number[], finalTotal: number): number[] {
+export function proportionalDiscountedPrices(
+  prices: Kopeks[],
+  finalTotal: Kopeks,
+): Kopeks[] {
   const n = prices.length;
   if (n === 0) return [];
 
@@ -32,7 +37,7 @@ export function proportionalDiscountedPrices(prices: number[], finalTotal: numbe
 
   if (total <= 0) {
     // All components free → nothing to weight by; everyone 0.
-    return prices.map(() => 0);
+    return prices.map(() => toKopeks(0));
   }
 
   const raw = prices.map((p) => (Math.max(0, p) * target) / total);
@@ -51,7 +56,8 @@ export function proportionalDiscountedPrices(prices: number[], finalTotal: numbe
     remainder -= 1;
     cursor += 1;
   }
-  return result;
+  // Re-brand once at the return (arithmetic widened to `number`).
+  return result.map(toKopeks);
 }
 
 /**
@@ -63,15 +69,16 @@ export function proportionalDiscountedPrices(prices: number[], finalTotal: numbe
  * "FIXED") so this stays a pure helper (no Prisma import).
  */
 export function packageFinalTotal(
-  prices: number[],
+  prices: Kopeks[],
   discountType: "PERCENT" | "FIXED",
+  // dual-unit (percent for PERCENT, kopeks for FIXED) → plain number, not Kopeks.
   discountValue: number,
-): number {
+): Kopeks {
   const total = prices.reduce((sum, p) => sum + Math.max(0, p), 0);
   const value = Math.max(0, Math.floor(discountValue));
   const discount =
     discountType === "PERCENT" ? Math.round((total * value) / 100) : Math.min(total, value);
-  return Math.max(0, total - discount);
+  return toKopeks(Math.max(0, total - discount));
 }
 
 export type PackageSlot = {

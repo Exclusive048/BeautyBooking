@@ -209,7 +209,7 @@ function RoleSwitcherDrawer({
                       className={cn(
                         "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
                         isActive
-                          ? "bg-primary/10 font-medium text-primary"
+                          ? "bg-primary/10 font-medium text-accent-text"
                           : "text-text-sec hover:bg-bg-card hover:text-text-main"
                       )}
                     >
@@ -229,7 +229,7 @@ function RoleSwitcherDrawer({
                   <Link
                     href="/cabinet/roles"
                     onClick={onClose}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-primary transition-colors hover:bg-primary/5"
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-accent-text transition-colors hover:bg-primary/5"
                   >
                     <UserPlus className="h-4 w-4 shrink-0" />
                     {t.becomeMasterCta}
@@ -239,7 +239,7 @@ function RoleSwitcherDrawer({
                   <Link
                     href="/cabinet/roles"
                     onClick={onClose}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-primary transition-colors hover:bg-primary/5"
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-accent-text transition-colors hover:bg-primary/5"
                   >
                     <Building2 className="h-4 w-4 shrink-0" />
                     {t.createStudioCta}
@@ -292,11 +292,21 @@ export function BottomNav() {
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
-  // Inside master/studio cabinets their own bottom navs are rendered;
-  // hide the global one so they don't overlap.
+  // Inside the master/studio/client cabinets their own bottom navs are
+  // rendered; hide the global one so they don't overlap. The client cabinet
+  // is the rest of the /cabinet subtree (its (user) route group is invisible
+  // in the URL — /cabinet, /cabinet/bookings, …), EXCEPT /cabinet/billing,
+  // which sits outside that group and relies on this global nav on mobile.
   const isInsideMaster = pathname.startsWith("/cabinet/master");
   const isInsideStudio = pathname.startsWith("/cabinet/studio");
-  if (isHidden || isInsideMaster || isInsideStudio) return null;
+  const isCabinetBillingFallback =
+    pathname === "/cabinet/billing" || pathname.startsWith("/cabinet/billing/");
+  const isInsideClientCabinet =
+    (pathname === "/cabinet" || pathname.startsWith("/cabinet/")) &&
+    !isInsideMaster &&
+    !isInsideStudio &&
+    !isCabinetBillingFallback;
+  if (isHidden || isInsideMaster || isInsideStudio || isInsideClientCabinet) return null;
 
   const showSwitcher = isLoggedIn && availableRoles.length > 1;
 
@@ -320,7 +330,7 @@ export function BottomNav() {
                 href={item.href}
                 className={cn(
                   "flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] transition",
-                  isActive ? "text-primary" : "text-text-sec"
+                  isActive ? "text-accent-text" : "text-text-sec"
                 )}
                 aria-current={isActive ? "page" : undefined}
               >

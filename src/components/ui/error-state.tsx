@@ -36,7 +36,7 @@ const DEFAULT_ICONS: Record<ErrorStateVariant, LucideIcon> = {
 };
 
 const ICON_COLORS: Record<ErrorStateVariant, string> = {
-  default: "text-primary",
+  default: "text-accent-text",
   danger: "text-rose-500 dark:text-rose-400",
   warning: "text-amber-500 dark:text-amber-400",
 };

@@ -381,8 +381,8 @@ export async function getConversationThread(input: {
                   status: true,
                   startAtUtc: true,
                   endAtUtc: true,
-                  provider: { select: { address: true } },
-                  masterProvider: { select: { address: true } },
+                  provider: { select: { address: true, timezone: true } },
+                  masterProvider: { select: { address: true, timezone: true } },
                   serviceItems: {
                     select: {
                       titleSnapshot: true,
@@ -439,6 +439,12 @@ export async function getConversationThread(input: {
               priceSnapshot: refItem?.priceSnapshot ?? ref.service.price,
               durationMin: refItem?.durationSnapshotMin ?? ref.service.durationMin,
               address: ref.masterProvider?.address ?? ref.provider.address ?? null,
+              // FIX-TZ-SYSTEM-MESSAGE: salon-tz for the card's appointment
+              // time — mirror the address source (masterProvider is where a
+              // studio booking physically happens; solo master has no
+              // masterProvider so we fall back to the provider). Provider.timezone
+              // is non-nullable (schema default Europe/Moscow).
+              timezone: ref.masterProvider?.timezone ?? ref.provider.timezone,
             }
           : null,
       };

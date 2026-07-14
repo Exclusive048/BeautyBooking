@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { AvailabilitySlotPreview } from "@/lib/search-by-time/types";
-import { moneyRUB } from "@/lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 
 type Props = {
@@ -27,7 +27,11 @@ function formatDiscount(slot: AvailabilitySlotPreview): string | null {
   if (slot.discountType === "PERCENT") {
     return `-${slot.discountValue}%`;
   }
-  return `-${moneyRUB(slot.discountValue)}`;
+  // FIXED `discountValue` is in KOPEKS (the hot-slot pricing subtracts it from a
+  // kopeks price: `base − value`). The legacy `moneyRUB` (no ÷100) showed it 100×
+  // too large — SLOT-DISCOUNT-100X. Route through the canonical ÷100 ₽ boundary so
+  // the label matches the actual applied discount (`originalPrice − discountedPrice`).
+  return `-${UI_FMT.priceLabel(slot.discountValue)}`;
 }
 
 export function SlotBubblesRow({ provider, serviceId, slots }: Props) {

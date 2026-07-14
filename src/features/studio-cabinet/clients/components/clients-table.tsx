@@ -16,9 +16,11 @@ type Props = {
   studioId: string;
   scheduleMasters: StudioCabinetShellExtras["scheduleMasters"];
   services: StudioCabinetServiceOption[];
+  /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the «Записать» dialog. */
+  timezone: string;
 };
 
-export function ClientsTable({ rows, studioId, scheduleMasters, services }: Props) {
+export function ClientsTable({ rows, studioId, scheduleMasters, services, timezone }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle bg-bg-card p-10 text-center">
@@ -50,6 +52,7 @@ export function ClientsTable({ rows, studioId, scheduleMasters, services }: Prop
               studioId={studioId}
               scheduleMasters={scheduleMasters}
               services={services}
+              timezone={timezone}
             />
           ))}
         </tbody>

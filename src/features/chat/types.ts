@@ -38,6 +38,12 @@ export type ThreadBookingCardDto = {
   priceSnapshot: number;
   durationMin: number;
   address: string | null;
+  /**
+   * FIX-TZ-SYSTEM-MESSAGE: salon-tz (provider.timezone) for the appointment
+   * time. The card renders the time in this tz (both parties see the salon's
+   * wall clock), with an explicit zone label when the viewer's tz differs.
+   */
+  timezone: string;
 };
 
 export type ThreadMessageDto = {

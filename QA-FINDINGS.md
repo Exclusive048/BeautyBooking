@@ -14,6 +14,22 @@ Method: exploratory self-QA. Findings only — fixes are separate, explicitly-in
 
 ---
 
+## ⚠️ STATUS RECONCILIATION (2026-07-01, WAVE-1) — this file is STALE post-2026-06-26
+
+> **Source of truth for status = [`BACKLOG.md`](BACKLOG.md) + [`BACKLOG-DONE.md`](BACKLOG-DONE.md) + `MASTERRYADOM_AI_CONTEXT.md` §15 changelog.** This findings log was **not** updated after the FIX-PRE-STAGING / FIX-EXP-SEED-HYGIENE / PACKAGE-MVP waves — its sweep/summary sections (~lines 2011–2367) still list as **open** numerous items that are **CLOSED**. Verified-closed (do not treat as open):
+>
+> | Item | Closed by | Date |
+> |---|---|---|
+> | R2-02-B (studio publish gate) · R2-02-C (empty-studio redirect) · R2-02-E (master-copy to client) · R2-02-F (empty-name `<title>`) · R2-05-H (plan-disable confirm) · R2-05-E (soft-delete copy) · R2-01-D (solo manual `actionRequiredBy`) · STUDIO-SCHEDULE-UTC-DAY-GROUPING · FOOTER-VK-HANDLE-FIX · QA-106 (off-schedule/SLOT_CONFLICT server-string) | FIX-PRE-STAGING | 2026-06-26 |
+> | R2-03-A (₽0 analytics seed) | FIX-EXP-SEED-HYGIENE | 2026-06-26 |
+> | R2-04-PKG (studio packages bookable) | PACKAGE-BOOKING-MVP-2 | 2026-06-25 |
+> | R2-06-A (studio reschedule two-sided #32) · R2-06-I (self-review block #33) | FIX-R2-06-A / R2-06-FI; LIVE-VERIFIED STUDIO-BOOKING-E2E | 2026-06-24 / -06-30 |
+> | QA-113 (host-tz booking grid/labels — **not** reviews-stats month bucket; that was a phantom) | FIX-11 + FIX-20 | 2026-06-16 |
+>
+> WAVE-1 (2026-07-01) additionally closed: **QA-121** (double mobile bottom-nav), **R2-05-I** («приостановлен» copy), **TELEGRAM-ALERT-PII-REVIEW** (user-cuid in ops alert). QA-106 + QA-113 were **re-verified already-closed, no edit** (verify-before-fix). See BACKLOG-DONE.md → "2026-07-01 — WAVE-1".
+
+---
+
 ## Recon (QA-01) — login / OTP harness
 
 - **OTP:** 6 digits (`crypto.randomInt(100000, 1000000)`). `OtpCode.codeHash` =

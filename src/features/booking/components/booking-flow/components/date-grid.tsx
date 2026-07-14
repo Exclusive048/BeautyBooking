@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
@@ -13,6 +14,7 @@ const PAGE_SIZE = 7;
 
 type Props = {
   providerId: string;
+  providerTimezone: string;
   selectedDateKey: string | null;
   onSelect: (dateKey: string) => void;
 };
@@ -78,11 +80,17 @@ function buildCells(
  * those days off, so the user can't book them but still gets full
  * calendar continuity.
  */
-export function DateGrid({ providerId, selectedDateKey, onSelect }: Props) {
+export function DateGrid({ providerId, providerTimezone, selectedDateKey, onSelect }: Props) {
   const [workingDays, setWorkingDays] = useState<Set<string>>(new Set());
+  // FIX-BATCH-C Defect 3: seed the strip from TODAY in the provider's salon
+  // timezone, not the browser's UTC date. Using getUTCDate() offered a past day
+  // near the UTC↔salon date boundary (e.g. late-UTC evening a +5 salon is already
+  // "tomorrow", so the UTC-based strip started at yesterday). `toLocalDateKey`
+  // is the shared entity-tz primitive (same one TimeGrid uses for "today").
   const [baseFromDate] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayKey = toLocalDateKey(new Date(), providerTimezone);
+    const [y, m, d] = todayKey.split("-").map(Number);
+    return new Date(Date.UTC(y ?? 2000, (m ?? 1) - 1, d ?? 1));
   });
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +154,7 @@ export function DateGrid({ providerId, selectedDateKey, onSelect }: Props) {
               "inline-flex h-6 w-6 items-center justify-center rounded-md border border-border-subtle text-text-sec transition",
               page === 0 || loading
                 ? "cursor-not-allowed opacity-40"
-                : "hover:border-primary hover:text-primary",
+                : "hover:border-primary hover:text-accent-text",
             )}
             aria-label={T.prevWeek}
           >
@@ -160,7 +168,7 @@ export function DateGrid({ providerId, selectedDateKey, onSelect }: Props) {
               "inline-flex h-6 w-6 items-center justify-center rounded-md border border-border-subtle text-text-sec transition",
               page >= totalPages - 1 || loading
                 ? "cursor-not-allowed opacity-40"
-                : "hover:border-primary hover:text-primary",
+                : "hover:border-primary hover:text-accent-text",
             )}
             aria-label={T.nextWeek}
           >

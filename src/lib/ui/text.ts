@@ -633,6 +633,10 @@ export const UI_TEXT = {
       loginButton: "Войти через VK",
       loginFailed: "Не удалось войти через VK",
     },
+    yandex: {
+      loginButton: "Войти через Яндекс",
+      loginFailed: "Не удалось войти через Яндекс",
+    },
   },
   nav: {
     catalog: "Каталог",
@@ -681,6 +685,23 @@ export const UI_TEXT = {
     becomeMasterCta: "Стать мастером",
     createStudioCta: "Создать студию",
     more: "Ещё",
+  },
+  // FEAT-PROVIDER-SOCIALS: shared strings for the VK / Instagram community-link
+  // inputs (studio + master cabinets), their live preview, and the public icons.
+  social: {
+    vkLabel: "VK",
+    instagramLabel: "Instagram",
+    vkPlaceholder: "vk.com/studio или @studio",
+    instagramPlaceholder: "instagram.com/studio или @studio",
+    vkAria: "Сообщество ВКонтакте",
+    instagramAria: "Страница в Instagram",
+    previewTemplate: "Ссылка: {label}",
+    invalid: "Не распознали ссылку. Укажите адрес на vk.com или instagram.com.",
+    hint: "Полный адрес или @имя — покажем аккуратной иконкой в профиле.",
+    masterSectionTitle: "Соцсети",
+    masterSectionSubtitle: "Ссылки на ваши сообщества — покажем в публичном профиле",
+    editAria: "Изменить ссылку",
+    notSet: "Не указано",
   },
   footer: {
     aria: {
@@ -743,10 +764,13 @@ export const UI_TEXT = {
       "Маркетплейс мастеров красоты. Находите лучших мастеров рядом и записывайтесь онлайн без звонков.",
     legal: {
       copyright: "© {year} МастерРядом",
-      // FIX-EXP-CONTENT-GRAMMAR (EXP-005): the ИНН is filled from
-      // `NEXT_PUBLIC_LEGAL_INN` (FooterCopyright). When unset, the footer shows
-      // `innUnset` — an OBVIOUS placeholder, never a fake-looking number.
+      // The ИНН is filled from `NEXT_PUBLIC_LEGAL_INN` (FooterCopyright).
+      // FIX-VISUAL-POLISH I8: when it's unset (or the old fake "1234567890"),
+      // the footer shows the legal entity WITHOUT the ИНН clause
+      // (`entityWithoutInn`) — a graceful degrade, never the literal
+      // «[не указан]». Set the real requisites before launch.
       entityTemplate: "Дмитриев Артем Романович, ИНН {inn}",
+      entityWithoutInn: "Дмитриев Артем Романович",
       innUnset: "[не указан]",
     },
     socials: {
@@ -844,6 +868,25 @@ export const UI_TEXT = {
       enableFailed: "Не удалось включить автопродление.",
       disableFailed: "Не удалось отменить автопродление.",
       notAvailableForFree: "Недоступно для бесплатного тарифа",
+    },
+    // BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2): opt-in renewal on a price increase.
+    // Copy shared by the renewal cron notifications and the cabinet banner.
+    // `{priceLabel}` / `{deadlineLabel}` are pre-formatted (₽ + RU date) by callers.
+    priceOptIn: {
+      startedTitle: "Цена подписки изменилась",
+      startedBody: (priceLabel: string, deadlineLabel: string) =>
+        `Стоимость вашего тарифа выросла до ${priceLabel}. Продлите по новой цене до ${deadlineLabel}, иначе подписка приостановится.`,
+      reminderTitle: "Продлите подписку по новой цене",
+      reminderBody: (priceLabel: string, deadlineLabel: string) =>
+        `Новая стоимость тарифа — ${priceLabel}. Примите новую цену до ${deadlineLabel}, чтобы сохранить подписку.`,
+      lapsedTitle: "Подписка приостановлена",
+      lapsedBody:
+        "Новая стоимость тарифа не была принята в отведённый срок. Подписка отключена — вы можете оформить её заново в любой момент.",
+      bannerTitle: "Цена тарифа выросла",
+      bannerBody: (priceLabel: string, deadlineLabel: string) =>
+        `Новая стоимость — ${priceLabel}. Продлите по новой цене до ${deadlineLabel}, чтобы сохранить доступ.`,
+      acceptCta: "Принять новую цену",
+      acceptFailed: "Не удалось продлить подписку. Попробуйте ещё раз.",
     },
     currentFeatures: {
       sectionTitle: (planName: string) => `Что включено в тариф «${planName}»`,
@@ -1218,8 +1261,6 @@ export const UI_TEXT = {
       phonePlaceholder: "+7 900 000 00 00",
       emailLabel: "Email",
       emailPlaceholder: "studio@email.com",
-      telegramLabel: "Telegram",
-      telegramPlaceholder: "@username",
       vkLabel: "VK",
       vkPlaceholder: "vk.com/studio",
       instagramLabel: "Instagram",
@@ -4492,6 +4533,12 @@ export const UI_TEXT = {
           sortOrderHint: "Меньше — выше в списке",
           priceLabel: "{months} мес.",
           priceCurrency: "₽",
+          // BILLING-PRICE-ACTIVE-UI-01 (R2-05-J): per-period isActive toggle.
+          priceActiveLabel: "Активна",
+          priceActiveHint:
+            "Выключите, чтобы деактивировать цену без удаления строки. Чтобы совсем убрать период — обнулите цену.",
+          priceEffectiveLabel: "Итоговая:",
+          priceEffectiveNone: "нет цены",
           inheritsFromLabel: "Наследует от тарифа",
           inheritsFromNone: "Не наследует",
           inheritsFromHint: "Дочерний тариф получает все возможности родителя; здесь — только overrides поверх них.",
@@ -4501,13 +4548,15 @@ export const UI_TEXT = {
         save: "Сохранить",
         errorPriceInvalid: "Все цены должны быть целыми неотрицательными числами в рублях.",
         errorNameRequired: "Название не должно быть пустым.",
+        errorPriceLastActive:
+          "Нельзя деактивировать цену для периода {months} мес.: тариф останется без работающей цены на этот срок. Оставьте активной месячную цену (её берут за основу остальные сроки) или обнулите цену, чтобы убрать период.",
         errorFeaturesValidation: "Не удалось сохранить: проверьте настройки возможностей.",
         errorStrictLimit: "Лимит «{feature}» строже родительского тарифа. Можно только ослаблять.",
         errorInheritanceCycle: "Обнаружен цикл наследования тарифов — выберите другой родительский тариф.",
         errorParentNotFound: "Родительский тариф не найден. Обновите страницу и попробуйте ещё раз.",
         disableConfirmTitle: "Приостановить тариф?",
         disableConfirmBody:
-          "Активные подписчики получат уведомление о приостановке тарифа — отозвать его нельзя. Затронуто подписчиков: {count}. Продолжить?",
+          "Тариф закроется для новых подписок. Активные подписчики сохранят доступ и получат уведомление об изменении — отозвать его нельзя. Затронуто подписчиков: {count}. Продолжить?",
         disableConfirmAction: "Приостановить",
       },
       features: {
@@ -4730,6 +4779,10 @@ export const UI_TEXT = {
             legalDraftMode: {
               label: "Юр. документы в режиме черновика",
               desc: "Баннер «Черновик» на страницах Условий и Конфиденциальности",
+            },
+            telegramEnabled: {
+              label: "Telegram включён",
+              desc: "Вход, привязка и уведомления через Telegram. Переключатель работает только если Telegram разрешён в окружении (NEXT_PUBLIC_TELEGRAM_ENABLED). Если в окружении выключено — остаётся выключенным.",
             },
           },
         },
@@ -5426,6 +5479,7 @@ export const UI_TEXT = {
       add: "Добавить",
       remove: "Удалить",
       priceOnRequest: "Цена по запросу",
+      categoryOther: "Другие услуги",
     },
     portfolio: {
       title: "Портфолио",
@@ -5452,8 +5506,14 @@ export const UI_TEXT = {
     },
     booking: {
       title: "Запись",
+      // FIX-BATCH-C Defect 2: distinct empty states.
+      // `emptyTitle`/`emptyDesc` = genuine no-services-at-all (empty catalog).
+      // `selectServiceTitle`/`selectServiceDesc` = has services but the client
+      // hasn't picked one yet (empty cart) — must NOT claim the master has no services.
       emptyTitle: "Онлайн-запись пока недоступна",
       emptyDesc: "Мастер ещё не добавил услуги для записи. Загляните позже или свяжитесь с ним напрямую.",
+      selectServiceTitle: "Выберите услугу, чтобы записаться",
+      selectServiceDesc: "Отметьте услугу в списке — и мы подберём свободное время.",
       chooseTime: "Выбрать время",
       backToCart: "Назад к корзине",
       continueToConfirm: "Продолжить",
@@ -6172,6 +6232,7 @@ export const UI_TEXT = {
         refreshedAtTemplate: "обновлено {time}",
         addBooking: "Добавить запись",
         manageBreaks: "Перерывы",
+        salonTimeNote: "Время салона",
       },
       breakDialog: {
         title: "Перерывы мастеров",
@@ -6213,7 +6274,14 @@ export const UI_TEXT = {
       cell: {
         breakLabel: "Перерыв",
         emptyHint: "Создать запись",
+        // BOOKING-STUDIO-RESCHEDULE-PARITY-01: at-a-glance marker on a cell
+        // whose client asked to move it — the studio must accept/decline.
+        rescheduleBadge: "Клиент просит перенос",
       },
+      // TZ-DISPLAY-SALON-PARITY-01: the datetime-local inputs in the
+      // create/move dialogs are edited as SALON-local wall-clock (converted
+      // via salon tz), so a cross-tz admin knows they're not editing browser tz.
+      salonTimeInputHint: "время салона",
       actions: {
         menuTitle: "Действия с записью",
         // STUDIO-CLEANUP-FIX-A #1г: `details` key removed alongside
@@ -6221,6 +6289,15 @@ export const UI_TEXT = {
         moveToMaster: "Перенести на другого мастера",
         moveTime: "Перенести по времени",
         cancel: "Отменить запись",
+      },
+      // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline a client-proposed
+      // reschedule from the calendar cell + journal row action menu (parity with
+      // the master side). Reuses `/confirm` + `/decline-reschedule`.
+      reschedule: {
+        title: "Клиент предложил новое время",
+        proposedLabel: "Новое время",
+        accept: "Принять новое время",
+        decline: "Отклонить перенос",
       },
       createDialog: {
         title: "Новая запись",
@@ -6275,6 +6352,10 @@ export const UI_TEXT = {
         create: "Не удалось создать запись. Попробуйте ещё раз.",
         move: "Не удалось перенести запись. Возможно, конфликт времени.",
         cancel: "Не удалось отменить запись. Попробуйте ещё раз.",
+        // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline of a client-proposed
+        // reschedule failed (e.g. the new time now conflicts).
+        bookingReschedule:
+          "Не удалось выполнить действие. Попробуйте ещё раз.",
         masterRequired: "Выберите мастера.",
         serviceRequired: "Выберите услугу.",
         clientNameRequired: "Укажите имя клиента.",
@@ -6565,15 +6646,21 @@ export const UI_TEXT = {
       nav: {
         sectionsLabel: "Разделы",
         general: "Общее",
+        profileMedia: "Профиль и медиа",
+        portfolio: "Портфолио",
         ownerTeam: "Владелец и команда",
         notifications: "Уведомления и связь",
         policy: "Правила студии",
         danger: "Опасная зона",
       },
+      portfolio: {
+        cardTitle: "Портфолио",
+        cardDesc: "Добавляйте работы студии — они появятся на публичной странице.",
+      },
       general: {
         cardTitle: "Карточка студии",
         cardDesc: "Базовые данные. Видны на публичной странице студии.",
-        logoHint: "Загрузка логотипа — в редакторе профиля (legacy флоу).",
+        logoHint: "Логотип, обложку и адрес меняйте в разделе «Профиль и медиа».",
         nameLabel: "Название",
         taglineLabel: "Краткий слоган",
         descriptionLabel: "Описание",
@@ -6588,7 +6675,7 @@ export const UI_TEXT = {
         districtLabel: "Район",
         openMap: "Открыть на Яндекс.Картах",
         addressEditHint:
-          "Изменение адреса и геокодирование — в legacy редакторе профиля. Перенесём в новый интерфейс отдельным апдейтом.",
+          "Изменить адрес и координаты можно в разделе «Профиль и медиа».",
       },
       ownerTeam: {
         ownerTitle: "Владелец студии",
@@ -7159,6 +7246,10 @@ export const UI_TEXT = {
     addService: "＋",
     servicePriceOnRequest: "Цена по запросу",
     allServices: "Все услуги",
+    // FIX-BATCH-B: category grouping ported from the booking wizard (R2-04-C).
+    // `categoryAll` = the "all" filter chip; `categoryOther` = uncategorized bucket label.
+    categoryAll: "Все",
+    categoryOther: "Другие услуги",
     noServices: "Услуги пока не добавлены",
     goToBooking: "К записи",
     sectionPhotos: "Фотографии студии",
@@ -7240,6 +7331,7 @@ export const UI_TEXT = {
       searchPlaceholder: "Найти услугу — «маникюр», «балаяж»…",
       searchEmpty: "Ничего не нашлось. Попробуйте по-другому.",
       catAll: "Всё",
+      categoryOther: "Другие услуги",
       pick: "Выбрать",
       noServices: "Услуги пока не добавлены",
       priceOnRequest: "Цена по запросу",
@@ -7269,6 +7361,9 @@ export const UI_TEXT = {
       tomorrow: "Завтра",
       daysOfWeek: ["вс", "пн", "вт", "ср", "чт", "пт", "сб"],
       months: ["янв", "фев", "мар", "апр", "мая", "июня", "июля", "авг", "сен", "окт", "ноя", "дек"],
+      // FIX-BATCH-C Defect 1 (QA-107/FIX-22): slot times are shown in the SALON's
+      // timezone; this note + «(город, GMT+N)» label clarifies that for a cross-tz client.
+      salonTimeNote: "Время салона",
     },
     youStep: {
       title: "Последний шаг",
@@ -7306,6 +7401,8 @@ export const UI_TEXT = {
       submitting: "Создаём запись…",
       freeCancelTemplate: "Бесплатная отмена за {hours} ч",
       freeCancelHint: "Мы напомним о записи",
+      // FIX-BATCH-C Defect 1: salon-tz note in the summary (mirrors whenStep).
+      salonTimeNote: "Время салона",
     },
     errors: {
       // FIX-25 (QA-106): SLOT_CONFLICT covers both "taken" and off-schedule
@@ -7516,8 +7613,7 @@ export const UI_TEXT = {
         "Срок действия — 12 месяцев",
         "Принимается у любого мастера на платформе",
       ],
-      footerText: "Хотите узнать первыми о запуске?",
-      footerCta: "Подпишитесь на Telegram-канал →",
+      footerText: "Подарочные карты появятся совсем скоро.",
     },
     publicProfile: {
       notFoundTitle: "Профиль не найден | МастерРядом",
@@ -7710,6 +7806,11 @@ export const UI_TEXT = {
     day: {
       today: "Сегодня",
       yesterday: "Вчера",
+    },
+    card: {
+      // FIX-TZ-SYSTEM-MESSAGE: prefix for the salon-tz zone label on the pinned
+      // booking card, e.g. «Время салона (Екатеринбург, GMT+5)».
+      salonTimeNote: "Время салона",
     },
   },
 } as const;

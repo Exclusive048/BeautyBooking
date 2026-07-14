@@ -23,7 +23,7 @@ export default function PartnersPage() {
         title={
           <>
             Готовы{" "}
-            <em className="font-display font-normal italic text-primary">обсудить</em>
+            <em className="font-display font-normal italic text-accent-text">обсудить</em>
           </>
         }
         description="Если у вас есть предложение по сотрудничеству — расскажите о нём. Мы откроем диалог в течение 3 рабочих дней."
@@ -78,7 +78,7 @@ export default function PartnersPage() {
         title={
           <>
             Что для нас{" "}
-            <em className="font-display font-normal italic text-primary">важно</em>
+            <em className="font-display font-normal italic text-accent-text">важно</em>
           </>
         }
         paragraphs={[
@@ -104,7 +104,7 @@ export default function PartnersPage() {
         <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
           <a
             href={T.alternativeContact.emailHref}
-            className="font-medium text-primary underline-offset-2 hover:underline"
+            className="font-medium text-accent-text underline-offset-2 hover:underline"
           >
             {T.alternativeContact.email}
           </a>

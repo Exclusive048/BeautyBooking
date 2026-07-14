@@ -11,6 +11,19 @@ import type { AnalyticsRange } from "@/features/analytics/domain/date-range";
 
 export type TimelineGranularity = "day" | "week" | "month";
 
+/**
+ * The tenant-scope `where` for a booking analytics query — the SINGLE tenant
+ * boundary definition (HARDENING-05). MASTER scope early-returns, scoped to the
+ * master's own provider; STUDIO scope covers the studio (`studioId`) or its
+ * provider (`providerId`), optionally narrowed to one master.
+ *
+ * FIX-7 footgun class: the STUDIO branch must NEVER emit `{ studioId: undefined }`
+ * inside the OR — a null studioId would drop the key → `{}` → match-all
+ * (platform-wide, a cross-tenant leak). `resolveAnalyticsContext` always sets a
+ * non-null studioId for STUDIO scope (and MASTER early-returns above), so this
+ * is unreachable today; the conditional makes the boundary explicit and
+ * refactor-safe rather than relying on that upstream invariant.
+ */
 export function buildScopeWhere(context: AnalyticsContext): Prisma.BookingWhereInput {
   if (context.scope === "MASTER") {
     return {
@@ -21,9 +34,9 @@ export function buildScopeWhere(context: AnalyticsContext): Prisma.BookingWhereI
     };
   }
 
-  const studioScope: Prisma.BookingWhereInput = {
-    OR: [{ studioId: context.studioId ?? undefined }, { providerId: context.providerId }],
-  };
+  const studioScope: Prisma.BookingWhereInput = context.studioId
+    ? { OR: [{ studioId: context.studioId }, { providerId: context.providerId }] }
+    : { providerId: context.providerId };
 
   if (context.masterFilterId) {
     return {

@@ -13,6 +13,7 @@ import {
   type PlanNode,
   type PlanTier,
 } from "@/lib/billing/features";
+import { isSubscriptionActive } from "@/lib/billing/subscription-active";
 
 export type AnalyticsScope = SubscriptionScope;
 
@@ -108,15 +109,15 @@ export async function getPlanFeaturesForUser(input: {
     select: {
       status: true,
       currentPeriodEnd: true,
+      graceUntil: true,
       plan: { select: PLAN_SELECT },
     },
   });
 
   const now = new Date();
-  const isActive =
-    subscription &&
-    (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") &&
-    (!subscription.currentPeriodEnd || subscription.currentPeriodEnd > now);
+  // FIX-5: keep the "active" definition identical to get-current-plan.ts —
+  // PAST_DUE within the grace window still grants paid (analytics) features.
+  const isActive = isSubscriptionActive(subscription, now);
 
   let plan: PlanTree | null = (isActive ? subscription?.plan : null) as PlanTree | null;
 

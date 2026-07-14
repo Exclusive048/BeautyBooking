@@ -5,6 +5,8 @@ import { GeneralSection } from "./sections/general-section";
 import { NotificationsSection } from "./sections/notifications-section";
 import { OwnerTeamSection } from "./sections/owner-team-section";
 import { PolicySection } from "./sections/policy-section";
+import { PortfolioSection } from "./sections/portfolio-section";
+import { ProfileMediaSection } from "./sections/profile-media-section";
 import { SettingsNav } from "./settings-nav";
 
 const T = UI_TEXT.studioCabinet.settingsV2;
@@ -45,6 +47,12 @@ export function StudioSettingsPage({ data, section }: Props) {
         <SettingsNav active={effectiveSection} canDanger={data.scope.canDanger} />
         <div className="min-w-0 space-y-4">
           {effectiveSection === "general" ? <GeneralSection data={data.general} /> : null}
+          {effectiveSection === "profile-media" ? (
+            <ProfileMediaSection data={data.general} />
+          ) : null}
+          {effectiveSection === "portfolio" ? (
+            <PortfolioSection providerId={data.general.providerId} />
+          ) : null}
           {effectiveSection === "owner-team" ? <OwnerTeamSection team={data.team} /> : null}
           {effectiveSection === "notifications" ? (
             <NotificationsSection data={data.notifications} />

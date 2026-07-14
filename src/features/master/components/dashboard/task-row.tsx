@@ -24,7 +24,7 @@ export function TaskRow({ icon: Icon, title, description, cta, urgency, focusId 
   const iconColor =
     urgency === "high"
       ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-      : "bg-primary/10 text-primary";
+      : "bg-primary/10 text-accent-text";
 
   return (
     <div data-focus-id={focusId} className="flex items-start gap-3 px-4 py-3.5">

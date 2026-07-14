@@ -1,3 +1,4 @@
+import "server-only"; // GUARDRAILS-01: redis root (pulls node:net/tls) — hard-fail if it reaches a client bundle
 import { createClient } from "redis";
 import type { RedisClientType } from "redis";
 import { logError, logInfo } from "@/lib/logging/logger";

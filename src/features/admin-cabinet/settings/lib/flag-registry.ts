@@ -16,4 +16,5 @@ export const REAL_FLAGS: ReadonlyArray<RealFlagDefinition> = [
   { key: "onlinePaymentsEnabled", labelKey: "onlinePaymentsEnabled" },
   { key: "visualSearchEnabled", labelKey: "visualSearchEnabled" },
   { key: "legalDraftMode", labelKey: "legalDraftMode" },
+  { key: "telegramEnabled", labelKey: "telegramEnabled" },
 ];

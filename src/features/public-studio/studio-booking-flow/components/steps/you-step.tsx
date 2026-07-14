@@ -42,7 +42,7 @@ export function YouStep({
   return (
     <section className="space-y-4">
       <header className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-accent-text">
           <Phone className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
@@ -91,7 +91,7 @@ export function YouStep({
           </div>
           <div className="text-xs text-text-muted">
             {UI_TEXT.bookingWidget.youStep.loginHint}{" "}
-            <Link href={loginHref} className="font-medium text-primary underline-offset-2 hover:underline">
+            <Link href={loginHref} className="font-medium text-accent-text underline-offset-2 hover:underline">
               {UI_TEXT.bookingWidget.youStep.loginCta}
             </Link>
           </div>

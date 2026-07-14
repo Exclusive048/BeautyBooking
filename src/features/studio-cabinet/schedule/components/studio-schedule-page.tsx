@@ -33,6 +33,7 @@ export function StudioSchedulePage({ studioId, view, data, focusMasterId }: Prop
         view={view}
         dateKey={data.dateKey}
         dayStartIso={data.day.dayStartIso}
+        timezone={data.timezone}
         kpis={data.kpis}
         masters={data.day.columns}
         breaks={data.day.breaks}
@@ -46,6 +47,7 @@ export function StudioSchedulePage({ studioId, view, data, focusMasterId }: Prop
         <DayGrid
           studioId={studioId}
           day={data.day}
+          timezone={data.timezone}
           services={data.services}
           focusMasterId={focusMasterId}
         />

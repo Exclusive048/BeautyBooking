@@ -33,7 +33,8 @@ export function AdminShell({ user, children }: Props) {
     <div className="flex min-h-screen w-full bg-bg-page">
       {/* Desktop sidebar — fixed-width column with its own scroll. */}
       <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
-        <div className="sticky top-0 h-screen overflow-y-auto">
+        {/* FIX-BATCH-A: park below the now-sticky global navbar (see master layout). */}
+        <div className="sticky top-[var(--topbar-h)] h-[calc(100dvh-var(--topbar-h))] overflow-y-auto">
           <AdminSidebar user={user} />
         </div>
       </div>
@@ -45,7 +46,7 @@ export function AdminShell({ user, children }: Props) {
         user={user}
       />
 
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main data-testid="page-main" className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar onOpenMobileNav={() => setMobileOpen(true)} />
         <div className="flex-1 px-4 py-6 md:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>

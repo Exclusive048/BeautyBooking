@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { moneyRUBFromKopeks } from "@/lib/format";
@@ -128,7 +128,7 @@ export function ClientBookingsPage() {
       ) : bookings.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-8" data-testid="bookings-list">
           {months.map((month) => (
             <section key={month.key}>
               <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
@@ -136,7 +136,7 @@ export function ClientBookingsPage() {
               </div>
               <ul className="space-y-3">
                 {month.bookings.map((b) => (
-                  <li key={b.id} data-focus-id={b.id}>
+                  <li key={b.id} data-focus-id={b.id} data-testid="booking-row">
                     <BookingRow
                       booking={b}
                       onCancel={() => handleCancel(b)}
@@ -357,7 +357,7 @@ function BookingRow({
         <div className="font-semibold text-text-main">{booking.service.name}</div>
 
         {zoneLabel ? (
-          <div className="flex items-center gap-1 text-xs font-medium text-primary">
+          <div className="flex items-center gap-1 text-xs font-medium text-accent-text">
             <Calendar className="h-3 w-3 shrink-0" aria-hidden />
             <span>
               {T.salonTimeNote} {zoneLabel}
@@ -367,7 +367,7 @@ function BookingRow({
 
         <div className="flex items-center gap-2 text-sm text-text-sec">
           {booking.provider.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={booking.provider.avatarUrl}
               alt=""
               width={20}
@@ -573,7 +573,7 @@ type ActionVariant = "default" | "primary" | "danger";
 function actionClass(variant: ActionVariant): string {
   switch (variant) {
     case "primary":
-      return "border-primary/30 bg-primary/10 text-primary hover:bg-primary/15";
+      return "border-primary/30 bg-primary/10 text-accent-text hover:bg-primary/15";
     case "danger":
       return "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30";
     default:

@@ -37,7 +37,7 @@ const META: Record<StudioAttentionItem["id"], ItemMeta> = {
     icon: Star,
     titleTemplate: T.items.reviewsUnansweredTitle,
     action: T.items.reviewsUnansweredAction,
-    tone: "bg-primary/10 text-primary",
+    tone: "bg-primary/10 text-accent-text",
   },
   "schedule-requests": {
     icon: CalendarClock,
@@ -97,7 +97,7 @@ export function StudioAttentionPanel({ items, total, urgent }: Props) {
                     {meta.titleTemplate.replace("{count}", String(item.count))}
                   </div>
                   {item.urgent ? (
-                    <div className="mt-0.5 text-[11px] font-mono uppercase tracking-wide text-primary">
+                    <div className="mt-0.5 text-[11px] font-mono uppercase tracking-wide text-accent-text">
                       {T.urgentLabel}
                     </div>
                   ) : null}

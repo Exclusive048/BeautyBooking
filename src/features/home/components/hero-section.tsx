@@ -79,7 +79,7 @@ export function HeroSection({ stats }: Props) {
         {/* Eyebrow */}
         <motion.p
           variants={item}
-          className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary"
+          className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text"
         >
           {eyebrowText}
         </motion.p>
@@ -90,7 +90,7 @@ export function HeroSection({ stats }: Props) {
           className="mt-4 text-balance text-[2.25rem] font-bold leading-[1.1] tracking-tight text-text-main sm:text-5xl lg:text-[3.75rem]"
         >
           {T.heroTitle}{" "}
-          <em className="font-display font-normal italic text-primary">{T.heroTitleAccent}</em>{" "}
+          <em className="font-display font-normal italic text-accent-text">{T.heroTitleAccent}</em>{" "}
           {T.heroTitleAfter}
         </motion.h1>
 

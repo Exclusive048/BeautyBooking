@@ -96,7 +96,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
             {zoneLabel ? (
               <>
                 {" "}
-                <span className="font-mono text-xs text-primary">{zoneLabel}</span>
+                <span className="font-mono text-xs text-accent-text">{zoneLabel}</span>
               </>
             ) : null}
           </span>

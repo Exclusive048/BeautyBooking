@@ -1,4 +1,5 @@
 import { Prisma, SubscriptionScope } from "@prisma/client";
+import { STUDIO_TEAM_CAP_BY_TIER } from "@/lib/billing/constants";
 import { prisma } from "@/lib/prisma";
 
 // Only FREE plans are seeded. PRO and PREMIUM are created and configured
@@ -72,8 +73,8 @@ const FREE_PLANS: Array<{
       analytics_cohorts: false,
       analytics_forecast: false,
 
-      // Limits
-      maxTeamMasters: 2,
+      // Limits — team cap from the canonical BC-CAP tier map (FREE = 2)
+      maxTeamMasters: STUDIO_TEAM_CAP_BY_TIER.FREE,
       maxPortfolioPhotosStudioDesign: 15,
       maxPortfolioPhotosPerStudioMaster: 10,
     },

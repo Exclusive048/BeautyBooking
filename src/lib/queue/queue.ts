@@ -8,6 +8,14 @@ import { isProduction } from "@/lib/env";
 const QUEUE_KEY = "queue:jobs";
 const PROCESSING_KEY = "queue:processing";
 const DEAD_KEY = "queue:dead";
+// FIX-12/15 (HARDENING-07): side hash `jobId → last-heartbeat-ts`. Decouples a
+// job's processing start-time / lease from the list element so the job never has
+// to be re-written in place (no lRem+rPush limbo window), and so recovery keys
+// off a live heartbeat instead of a fixed-from-start timeout.
+const PROCESSING_HEARTBEAT_KEY = "queue:processing:heartbeat";
+// FIX-15: lease staleness threshold. A job is only "stuck" if its heartbeat
+// hasn't been refreshed for this long — a live long-running job (heartbeated by
+// the worker) is never re-queued.
 const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RECOVERY_ATTEMPTS = 3;
 const allowMemoryQueueFallback = !isProduction;
@@ -15,6 +23,7 @@ const allowMemoryQueueFallback = !isProduction;
 const memoryQueue: Job[] = [];
 const memoryProcessing: Job[] = [];
 const memoryDead: Job[] = [];
+const memoryHeartbeat = new Map<string, number>();
 
 type QueueRedisClient = NonNullable<Awaited<ReturnType<typeof getRedisConnection>>>;
 type QueueRedisRequiredError = Error & { code: "REDIS_REQUIRED_FOR_QUEUE" };
@@ -99,17 +108,53 @@ function applyEnqueueDelay(job: Job, options?: EnqueueOptions): Job {
   };
 }
 
-function withProcessingTimestamp(job: Job): Job {
-  return normalizeJobMeta({
-    ...job,
-    _processingStartedAt: Date.now(),
-  });
-}
-
 function withoutProcessingTimestamp(job: Job): Job {
   const cleared = { ...job };
   delete cleared._processingStartedAt;
   return normalizeJobMeta(cleared);
+}
+
+async function setJobHeartbeat(jobId: string, ts: number): Promise<void> {
+  const client = await getQueueRedisConnection("setJobHeartbeat");
+  if (!client) {
+    memoryHeartbeat.set(jobId, ts);
+    return;
+  }
+  await runQueueRedisCommand(
+    "setJobHeartbeat:hSet",
+    client.hSet(PROCESSING_HEARTBEAT_KEY, jobId, String(ts))
+  );
+}
+
+async function clearJobHeartbeat(jobId: string): Promise<void> {
+  const client = await getQueueRedisConnection("clearJobHeartbeat");
+  if (!client) {
+    memoryHeartbeat.delete(jobId);
+    return;
+  }
+  await runQueueRedisCommand(
+    "clearJobHeartbeat:hDel",
+    client.hDel(PROCESSING_HEARTBEAT_KEY, jobId)
+  );
+}
+
+/**
+ * FIX-15: the worker calls this periodically while a job runs, renewing its
+ * lease so `recoverStuckJobs` never re-queues a live long-running job. Best-effort
+ * — a failed heartbeat at worst risks an early (recovery is attempt-bounded and,
+ * for non-idempotent jobs, deduped) re-queue, never job loss.
+ */
+export async function heartbeatJob(jobId: string): Promise<void> {
+  try {
+    await setJobHeartbeat(jobId, Date.now());
+  } catch (error) {
+    if (isQueueRedisRequiredError(error)) return;
+    logError("Queue heartbeat failed", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+      __skipAlert: true,
+    });
+  }
 }
 
 async function removeProcessingById(jobId: string): Promise<boolean> {
@@ -173,16 +218,15 @@ export async function dequeue(): Promise<Job | null> {
       const nextJob = memoryQueue.shift() ?? null;
       if (!nextJob) return null;
 
-      const processingJob = withProcessingTimestamp(nextJob);
-      memoryProcessing.push(processingJob);
-
-      if (isScheduledForFuture(processingJob)) {
-        memoryProcessing.pop();
-        memoryQueue.push(withoutProcessingTimestamp(processingJob));
+      const job = normalizeJobMeta(nextJob);
+      if (isScheduledForFuture(job)) {
+        memoryQueue.push(job); // not due yet — back to the queue, unprocessed
         return null;
       }
 
-      return processingJob;
+      memoryProcessing.push(job);
+      memoryHeartbeat.set(job.id, Date.now());
+      return job;
     }
 
     const raw = await runQueueRedisCommand(
@@ -198,25 +242,25 @@ export async function dequeue(): Promise<Job | null> {
       return null;
     }
 
-    const processingJob = withProcessingTimestamp(job);
-    const processingRaw = JSON.stringify(processingJob);
-
-    await runQueueRedisCommand("dequeue:lRemRaw", client.lRem(PROCESSING_KEY, 1, raw));
-    await runQueueRedisCommand("dequeue:rPushProcessing", client.rPush(PROCESSING_KEY, processingRaw));
-
-    if (isScheduledForFuture(processingJob)) {
-      await runQueueRedisCommand(
-        "dequeue:lRemScheduledProcessing",
-        client.lRem(PROCESSING_KEY, 1, processingRaw)
-      );
-      await runQueueRedisCommand(
-        "dequeue:rPushScheduledBack",
-        client.rPush(QUEUE_KEY, JSON.stringify(withoutProcessingTimestamp(processingJob)))
-      );
+    // Not due yet → return it to the queue without processing. Add-to-queue
+    // BEFORE removing from processing, so a crash here duplicates the job
+    // (recoverable) rather than loses it.
+    if (isScheduledForFuture(job)) {
+      await runQueueRedisCommand("dequeue:rPushScheduledBack", client.rPush(QUEUE_KEY, raw));
+      await runQueueRedisCommand("dequeue:lRemScheduled", client.lRem(PROCESSING_KEY, 1, raw));
       return null;
     }
 
-    return processingJob;
+    // FIX-12: the job stays in PROCESSING exactly as `lMove` left it — its
+    // start-time (initial heartbeat) is recorded in the side hash keyed by
+    // job.id. No lRem+rPush → there is no window where the job is in neither
+    // list. A crash between `lMove` and this hSet leaves the job in PROCESSING
+    // with no heartbeat, which recovery treats as recoverable (never lost).
+    await runQueueRedisCommand(
+      "dequeue:hSetHeartbeat",
+      client.hSet(PROCESSING_HEARTBEAT_KEY, job.id, String(Date.now()))
+    );
+    return job;
   } catch (error) {
     logError("Queue dequeue error", {
       error: error instanceof Error ? error.message : String(error),
@@ -231,27 +275,14 @@ export async function dequeue(): Promise<Job | null> {
 
 export async function acknowledge(job: Job): Promise<void> {
   try {
-    const client = await getQueueRedisConnection("acknowledge");
-
-    if (!client) {
-      const removed = await removeProcessingById(job.id);
-      if (!removed) {
-        logError("acknowledge: job not found in processing queue", { jobId: job.id, __skipAlert: true });
-      }
-      return;
+    // FIX-12: the processing entry is the original enqueued string (no in-place
+    // stamp), so remove by job.id rather than by an exact serialization match,
+    // then drop the side-hash entry so it can't leak.
+    const removed = await removeProcessingById(job.id);
+    if (!removed) {
+      logError("acknowledge: job not found in processing queue", { jobId: job.id, __skipAlert: true });
     }
-
-    const serialized = JSON.stringify(job);
-    const removed = await runQueueRedisCommand(
-      "acknowledge:lRem",
-      client.lRem(PROCESSING_KEY, 1, serialized)
-    );
-    if (removed === 0) {
-      const fallbackRemoved = await removeProcessingById(job.id);
-      if (!fallbackRemoved) {
-        logError("acknowledge: job not found in processing queue", { jobId: job.id, __skipAlert: true });
-      }
-    }
+    await clearJobHeartbeat(job.id);
   } catch (error) {
     logError("Queue acknowledge error", {
       jobId: job.id,
@@ -293,34 +324,43 @@ export async function recoverStuckJobs(): Promise<number> {
     if (!client) {
       const now = Date.now();
       const remaining: Job[] = [];
+      const liveIds = new Set<string>();
 
       for (const job of memoryProcessing) {
-        const startedAt = job._processingStartedAt ?? 0;
-        const isStuck = now - startedAt > PROCESSING_TIMEOUT_MS;
+        const hb = memoryHeartbeat.get(job.id);
 
-        if (!isStuck) {
+        // FIX-12: no heartbeat → the job is in processing but was never stamped
+        // (crash between dequeue's push and the heartbeat write, or a legacy
+        // job). Adopt it THIS cycle (stamp now) and keep it — this avoids racing
+        // a job that was just dequeued and is about to be processed. If it's
+        // truly orphaned, its adopted stamp goes stale and it recovers next cycle.
+        if (hb === undefined) {
+          memoryHeartbeat.set(job.id, now);
           remaining.push(job);
+          liveIds.add(job.id);
           continue;
         }
 
+        // FIX-15: only re-queue when the LEASE is stale (no heartbeat for the
+        // timeout), never on a fixed-from-start clock — a live long-running job
+        // keeps refreshing its heartbeat and is never re-queued.
+        if (now - hb <= PROCESSING_TIMEOUT_MS) {
+          remaining.push(job);
+          liveIds.add(job.id);
+          continue;
+        }
+
+        memoryHeartbeat.delete(job.id);
         const attempts = (job.attempts ?? 0) + 1;
         if (attempts <= MAX_RECOVERY_ATTEMPTS) {
           memoryQueue.unshift(
-            normalizeJobMeta({
-              ...withoutProcessingTimestamp(job),
-              attempts,
-              _recoveredAt: now,
-            })
+            normalizeJobMeta({ ...withoutProcessingTimestamp(job), attempts, _recoveredAt: now })
           );
           recovered += 1;
           logError("Recovered stuck job", { jobId: job.id, attempts, __skipAlert: true });
         } else {
           memoryDead.push(
-            normalizeJobMeta({
-              ...withoutProcessingTimestamp(job),
-              attempts,
-              failedAt: now,
-            })
+            normalizeJobMeta({ ...withoutProcessingTimestamp(job), attempts, failedAt: now })
           );
           logError("Job permanently failed — too many attempts", {
             jobId: job.id,
@@ -332,6 +372,11 @@ export async function recoverStuckJobs(): Promise<number> {
 
       memoryProcessing.length = 0;
       memoryProcessing.push(...remaining);
+      // Prune orphan heartbeat entries (job no longer in processing — e.g. a
+      // failed clear on ack) so the map can't grow unbounded.
+      for (const id of [...memoryHeartbeat.keys()]) {
+        if (!liveIds.has(id)) memoryHeartbeat.delete(id);
+      }
       return recovered;
     }
 
@@ -339,6 +384,13 @@ export async function recoverStuckJobs(): Promise<number> {
       "recoverStuckJobs:lRange",
       client.lRange(PROCESSING_KEY, 0, -1)
     );
+    const heartbeats = await runQueueRedisCommand(
+      "recoverStuckJobs:hGetAll",
+      client.hGetAll(PROCESSING_HEARTBEAT_KEY)
+    );
+    const now = Date.now();
+    const liveIds = new Set<string>();
+
     for (const raw of items) {
       const job = parseJob(raw);
       if (!job) {
@@ -346,18 +398,35 @@ export async function recoverStuckJobs(): Promise<number> {
         continue;
       }
 
-      const startedAt = job._processingStartedAt ?? 0;
-      const isStuck = Date.now() - startedAt > PROCESSING_TIMEOUT_MS;
-      if (!isStuck) continue;
+      const hbRaw = heartbeats[job.id];
+      const hb = hbRaw !== undefined ? Number(hbRaw) : NaN;
 
+      // FIX-12: no heartbeat → adopt this cycle (race-safe), recover next if dead.
+      if (Number.isNaN(hb)) {
+        await runQueueRedisCommand(
+          "recoverStuckJobs:adopt",
+          client.hSet(PROCESSING_HEARTBEAT_KEY, job.id, String(now))
+        );
+        liveIds.add(job.id);
+        continue;
+      }
+
+      // FIX-15: fresh lease → live worker → leave it running.
+      if (now - hb <= PROCESSING_TIMEOUT_MS) {
+        liveIds.add(job.id);
+        continue;
+      }
+
+      // Stale lease → dead worker → recover exactly once.
       await runQueueRedisCommand("recoverStuckJobs:lRem", client.lRem(PROCESSING_KEY, 1, raw));
+      await runQueueRedisCommand("recoverStuckJobs:hDel", client.hDel(PROCESSING_HEARTBEAT_KEY, job.id));
 
       const attempts = (job.attempts ?? 0) + 1;
       if (attempts <= MAX_RECOVERY_ATTEMPTS) {
         const recoveredJob = normalizeJobMeta({
           ...withoutProcessingTimestamp(job),
           attempts,
-          _recoveredAt: Date.now(),
+          _recoveredAt: now,
         });
         await runQueueRedisCommand("recoverStuckJobs:lPush", client.lPush(QUEUE_KEY, JSON.stringify(recoveredJob)));
         recovered += 1;
@@ -366,7 +435,7 @@ export async function recoverStuckJobs(): Promise<number> {
         const deadJob = normalizeJobMeta({
           ...withoutProcessingTimestamp(job),
           attempts,
-          failedAt: Date.now(),
+          failedAt: now,
         });
         await runQueueRedisCommand("recoverStuckJobs:rPushDead", client.rPush(DEAD_KEY, JSON.stringify(deadJob)));
         logError("Job permanently failed — too many attempts", {
@@ -374,6 +443,16 @@ export async function recoverStuckJobs(): Promise<number> {
           attempts,
           __skipAlert: true,
         });
+      }
+    }
+
+    // Prune orphan heartbeat entries (in the hash but no longer in processing).
+    for (const id of Object.keys(heartbeats)) {
+      if (!liveIds.has(id)) {
+        await runQueueRedisCommand(
+          "recoverStuckJobs:pruneOrphan",
+          client.hDel(PROCESSING_HEARTBEAT_KEY, id)
+        );
       }
     }
 

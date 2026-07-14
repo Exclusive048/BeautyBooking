@@ -18,7 +18,7 @@ export function NotificationsNotice() {
         {T.notice}
         <Link
           href="/notifications"
-          className="text-primary underline-offset-2 hover:underline"
+          className="text-accent-text underline-offset-2 hover:underline"
         >
           {T.noticeLink}
         </Link>

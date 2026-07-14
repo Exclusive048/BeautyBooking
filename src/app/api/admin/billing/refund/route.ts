@@ -3,12 +3,13 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { toKopeks } from "@/lib/money/kopeks";
 
 import { prisma } from "@/lib/prisma";
 
 import { createRefund } from "@/lib/payments/yookassa/client";
 
-import { sha256, formatTimeBucketUtc } from "@/lib/billing/utils";
+import { decideRefund } from "@/lib/billing/refund-guard";
 
 import { createBillingAuditLog } from "@/lib/billing/audit";
 
@@ -90,6 +91,8 @@ export async function POST(req: Request) {
 
         id: true,
 
+        status: true,
+
         amountKopeks: true,
 
         yookassaPaymentId: true,
@@ -110,23 +113,21 @@ export async function POST(req: Request) {
 
     }
 
+    // FIX-11: SUCCEEDED-only, full-refund-only, deterministic idempotency key.
+    // See decideRefund for the rationale (partial masking, double-refund, hour
+    // bucket).
+    const decision = decideRefund({
+      yookassaPaymentId: payment.yookassaPaymentId,
+      paymentStatus: payment.status,
+      paymentAmountKopeks: payment.amountKopeks,
+      requestedAmountKopeks: amountKopeks ?? null,
+    });
 
-
-    const refundAmount = amountKopeks ?? payment.amountKopeks;
-
-    if (refundAmount <= 0) {
-
-      return fail("Сумма возврата должна быть больше нуля.", 400, "VALIDATION_ERROR");
-
+    if (!decision.ok) {
+      return fail(decision.message, decision.status, decision.code);
     }
 
-
-
-    const idempotenceKey = sha256(
-
-      `refund:${payment.yookassaPaymentId}:${formatTimeBucketUtc(new Date())}`
-
-    );
+    const { refundAmountKopeks: refundAmount, idempotenceKey } = decision;
 
 
 
@@ -134,7 +135,7 @@ export async function POST(req: Request) {
 
       paymentId: payment.yookassaPaymentId,
 
-      amountKopeks: refundAmount,
+      amountKopeks: toKopeks(refundAmount),
 
       idempotenceKey,
 
@@ -156,6 +157,13 @@ export async function POST(req: Request) {
 
 
 
+    // HARDENING-10 (refund audit-action desync): the initiation record is
+    // always written here; the TERMINAL record (`PAYMENT_REFUNDED`) is written
+    // by whichever path observes completion — this route on a synchronous
+    // `succeeded`, or the webhook on an async one. The webhook no-ops when the
+    // payment is already REFUNDED (mirroring HARDENING-03's once-and-only-once
+    // REFUNDED write), so a completed refund yields exactly one initiation + one
+    // terminal record with the SAME action name regardless of timing.
     await createBillingAuditLog({
 
       userId: payment.subscription.userId,
@@ -176,6 +184,24 @@ export async function POST(req: Request) {
       },
 
     });
+
+    if (refund.status === "succeeded") {
+      // Synchronous completion observed here — write the terminal record now.
+      // The async webhook path writes the same action on its own completion; the
+      // already-REFUNDED status set above makes the webhook no-op (no double).
+      await createBillingAuditLog({
+        userId: payment.subscription.userId,
+        scope: payment.subscription.scope,
+        subscriptionId: payment.subscriptionId,
+        paymentId: payment.id,
+        action: "PAYMENT_REFUNDED",
+        details: {
+          yookassaPaymentId: payment.yookassaPaymentId,
+          yookassaRefundId: refund.id,
+          amountKopeks: refundAmount,
+        },
+      });
+    }
 
     // The YooKassa refund call has already mutated external state — do
     // not let an audit-write failure surface as a 500. Use the safe

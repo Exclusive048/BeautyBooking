@@ -10,13 +10,13 @@ type Props = {
 
 /**
  * Shared eyebrow + h2 + description block used across marketing sections.
- * Eyebrow style mirrors the homepage hero: font-mono uppercase tracking-[0.18em] text-primary.
+ * Eyebrow style mirrors the homepage hero: font-mono uppercase tracking-[0.18em] text-accent-text.
  */
 export function SectionHeader({ eyebrow, title, description, align = "left" }: Props) {
   return (
     <div className={align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-2xl"}>
       {eyebrow ? (
-        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
           {eyebrow}
         </p>
       ) : null}

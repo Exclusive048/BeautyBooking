@@ -2,6 +2,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logging/logger";
 import { ok, fail } from "@/lib/api/response";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/http/ip";
 
 export const runtime = "nodejs";
 
@@ -16,13 +17,9 @@ const schema = z.object({
 const RATE_WINDOW = 60;
 const RATE_MAX = 20;
 
-function getIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-}
-
 export async function POST(req: Request) {
   try {
-    const ip = getIp(req);
+    const ip = getClientIp(req);
     const isLimited = await checkRateLimit(`log-error:${ip}`, RATE_MAX, RATE_WINDOW);
     if (isLimited) {
       return fail("Too many requests", 429);

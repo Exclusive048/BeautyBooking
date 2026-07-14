@@ -2,7 +2,24 @@ import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
+import { resolveStoredSocialLink, type SocialKind } from "@/lib/providers/social-links";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
+
+// FEAT-PROVIDER-SOCIALS: normalize a raw social input into the value to store
+// (safe URL or null), throwing a clean 400 on hostile/foreign input. The
+// server is the authoritative validation boundary (client preview mirrors it).
+function resolveSocialOrThrow(kind: SocialKind, raw: string | null | undefined): string | null {
+  const result = resolveStoredSocialLink(kind, raw);
+  if ("invalid" in result) {
+    const label = kind === "vk" ? "VK" : "Instagram";
+    throw new AppError(
+      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${kind}.com.`,
+      400,
+      "INVALID_SOCIAL_LINK",
+    );
+  }
+  return result.value;
+}
 
 export type StudioProviderPrivateDto = {
   id: string;
@@ -14,6 +31,8 @@ export type StudioProviderPrivateDto = {
   contactName: string | null;
   contactPhone: string | null;
   contactEmail: string | null;
+  socialVk: string | null;
+  socialInstagram: string | null;
   description: string | null;
   avatarUrl: string | null;
   geoLat: number | null;
@@ -43,6 +62,8 @@ export async function getStudioProviderById(
       contactName: true,
       contactPhone: true,
       contactEmail: true,
+      socialVk: true,
+      socialInstagram: true,
       description: true,
       avatarUrl: true,
       geoLat: true,
@@ -72,6 +93,8 @@ export async function getStudioProviderById(
     contactName: provider.contactName,
     contactPhone: provider.contactPhone,
     contactEmail: provider.contactEmail,
+    socialVk: provider.socialVk,
+    socialInstagram: provider.socialInstagram,
     description: provider.description,
     avatarUrl: provider.avatarUrl,
     geoLat: provider.geoLat,
@@ -95,6 +118,8 @@ export type StudioProfileUpdate = {
   contactName?: string | null;
   contactPhone?: string | null;
   contactEmail?: string | null;
+  socialVk?: string | null;
+  socialInstagram?: string | null;
   description?: string | null;
   geoLat?: number | null;
   geoLng?: number | null;
@@ -127,6 +152,17 @@ export async function updateStudioProviderProfile(
   }
   const resolvedTimezone =
     input.timezone !== undefined ? input.timezone : derivedTimezone;
+
+  // FEAT-PROVIDER-SOCIALS: normalize + validate before the write (throws 400
+  // on hostile/foreign input). Computed up-front so an invalid link never
+  // reaches the DB update.
+  const socialData: { socialVk?: string | null; socialInstagram?: string | null } = {};
+  if (input.socialVk !== undefined) {
+    socialData.socialVk = resolveSocialOrThrow("vk", input.socialVk);
+  }
+  if (input.socialInstagram !== undefined) {
+    socialData.socialInstagram = resolveSocialOrThrow("instagram", input.socialInstagram);
+  }
 
   // Publication gate (R2-02-B): mirror master's `profile.service.ts` exactly —
   // publishing requires a non-empty address AND a resolved cityId. (Master does
@@ -167,6 +203,10 @@ export async function updateStudioProviderProfile(
       ...(input.contactName !== undefined ? { contactName: input.contactName } : {}),
       ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone } : {}),
       ...(input.contactEmail !== undefined ? { contactEmail: input.contactEmail } : {}),
+      ...(socialData.socialVk !== undefined ? { socialVk: socialData.socialVk } : {}),
+      ...(socialData.socialInstagram !== undefined
+        ? { socialInstagram: socialData.socialInstagram }
+        : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
       ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
@@ -189,6 +229,8 @@ export async function updateStudioProviderProfile(
       contactName: true,
       contactPhone: true,
       contactEmail: true,
+      socialVk: true,
+      socialInstagram: true,
       description: true,
       avatarUrl: true,
       geoLat: true,
@@ -222,6 +264,8 @@ export async function updateStudioProviderProfile(
     contactName: provider.contactName,
     contactPhone: provider.contactPhone,
     contactEmail: provider.contactEmail,
+    socialVk: provider.socialVk,
+    socialInstagram: provider.socialInstagram,
     description: provider.description,
     avatarUrl: provider.avatarUrl,
     geoLat: provider.geoLat,

@@ -1,4 +1,4 @@
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import {
   formatHeroDate,
   getTimeGreeting,
@@ -72,7 +72,7 @@ export function GreetingHero({ firstName, now, context, nextBooking, timezone }:
         {nextBooking ? (
           <div className="flex min-w-[260px] items-center gap-3 rounded-xl bg-white/15 p-3 backdrop-blur-sm">
             {nextBooking.clientAvatarUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={nextBooking.clientAvatarUrl}
                 alt=""
                 width={40}

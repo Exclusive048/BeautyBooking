@@ -69,6 +69,12 @@ export type CatalogProviderItem = {
   // listing.
   slotPrecision?: string;
   availableToday?: boolean;
+  /**
+   * TZ-DISPLAY-SALON-PARITY-01: the provider's (salon) tz. Used to render
+   * `nextSlot` availability in salon-tz when the nearest-slot snapshot pipeline
+   * lights up (`nextSlot` is null today, so this is dormant-but-correct).
+   */
+  timezone?: string;
 };
 
 export type CatalogModelOfferItem = {
@@ -605,6 +611,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       geoLng: true,
       availableToday: true,
       slotPrecision: true,
+      timezone: true,
       ownerUserId: true,
       services: {
         where: { isEnabled: true, isActive: true },
@@ -748,6 +755,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       nextSlot: null,
       slotPrecision: provider.slotPrecision,
       availableToday: provider.availableToday,
+      timezone: provider.timezone,
       ...(provider.availableToday ? { todaySlotsCount: 1 } : {}),
       ...(provider.ownerUserId && highlightedUserIds.has(provider.ownerUserId)
         ? { isHighlighted: true }

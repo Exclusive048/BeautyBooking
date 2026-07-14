@@ -3,6 +3,7 @@ import { DayOffOverlay } from "@/features/master/components/schedule/day-off-ove
 import { EmptyCellsOverlay } from "@/features/master/components/schedule/empty-cells-overlay";
 import { TimeBlockCard } from "@/features/master/components/schedule/time-block-card";
 import type { ScheduleDay } from "@/lib/master/schedule.service";
+import { assignLanes } from "@/lib/calendar/lane-layout";
 import { cn } from "@/lib/cn";
 
 type Props = {
@@ -40,6 +41,16 @@ export function WeekGridColumn({ day, hourStart, hourEnd, hourPx, timezone }: Pr
       endMin: tb.endMinuteOfDay,
     })),
   ];
+
+  // FIX-BATCH-E: split overlapping bookings into side-by-side lanes so a pending
+  // request over a confirmed booking reads as two adjacent blocks (not stacked).
+  const lanes = assignLanes(
+    day.bookings.map((b) => ({
+      id: b.id,
+      start: b.startMinuteOfDay,
+      end: b.endMinuteOfDay,
+    })),
+  );
 
   return (
     <div
@@ -103,6 +114,7 @@ export function WeekGridColumn({ day, hourStart, hourEnd, hourPx, timezone }: Pr
             booking={booking}
             topPx={Math.max(0, top)}
             heightPx={Math.min(totalMin * pxPerMin - Math.max(0, top), height)}
+            placement={lanes.get(booking.id)}
             timezone={timezone}
           />
         );

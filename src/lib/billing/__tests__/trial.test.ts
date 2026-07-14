@@ -304,13 +304,17 @@ describe("processTrialExpirations", () => {
     };
     subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
 
-    // Inside downgradeTrialToFree's transaction:
+    // Inside downgradeTrialToFree's transaction (genuine unconverted trial:
+    // no payment evidence, period ended with the trial):
     subFindUnique.mockResolvedValueOnce({
       id: "sub-1",
       isTrial: true,
       planId: "plan-premium",
       scope: "MASTER",
       userId: "user-1",
+      lastPaymentAt: null,
+      currentPeriodEnd: new Date("2026-05-14T12:00:00Z"),
+      plan: { tier: "PREMIUM" },
     });
     planFindFirst.mockResolvedValueOnce({ id: "plan-free", code: "MASTER_FREE" });
     subUpdate.mockResolvedValueOnce({});
@@ -358,6 +362,9 @@ describe("processTrialExpirations", () => {
       planId: "plan-premium",
       scope: "MASTER",
       userId: "user-1",
+      lastPaymentAt: null,
+      currentPeriodEnd: new Date("2026-05-14T12:00:00Z"),
+      plan: { tier: "PREMIUM" },
     });
     planFindFirst.mockResolvedValueOnce(null); // FREE not configured
 
@@ -393,6 +400,9 @@ describe("processTrialExpirations", () => {
       planId: "plan-studio-premium",
       scope: "STUDIO",
       userId: "user-d",
+      lastPaymentAt: null,
+      currentPeriodEnd: new Date("2026-05-14T12:00:00Z"),
+      plan: { tier: "PREMIUM" },
     });
     planFindFirst.mockResolvedValueOnce({ id: "plan-studio-free", code: "STUDIO_FREE" });
     subUpdate.mockResolvedValueOnce({});
@@ -403,5 +413,73 @@ describe("processTrialExpirations", () => {
 
     expect(result.warned).toBe(1);
     expect(result.downgraded).toBe(1);
+  });
+
+  // HARDENING-01 FIX-1 (defense-in-depth): the cron must be unable to
+  // downgrade a subscription with evidence of successful payment, even when
+  // the trial flags are inconsistent (converted before the webhook started
+  // clearing them).
+  it("skips a converted subscription (lastPaymentAt set) — no downgrade, no expiry notice", async () => {
+    const expired = {
+      id: "sub-1",
+      userId: "user-1",
+      scope: "MASTER" as const,
+      planId: "plan-premium",
+    };
+    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
+    subFindUnique.mockResolvedValueOnce({
+      id: "sub-1",
+      isTrial: true, // flags inconsistent — user paid mid-trial pre-fix
+      planId: "plan-premium",
+      scope: "MASTER",
+      userId: "user-1",
+      lastPaymentAt: new Date("2026-05-10T12:00:00Z"),
+      currentPeriodEnd: new Date("2026-06-10T12:00:00Z"),
+      plan: { tier: "PREMIUM" },
+    });
+
+    const result = await processTrialExpirations(NOW);
+
+    expect(result.downgraded).toBe(0);
+    expect(result.downgradeErrors).toBe(0);
+    expect(subUpdate).not.toHaveBeenCalled();
+    expect(sendTrialExpired).not.toHaveBeenCalled();
+    expect(invalidatePlanCache).not.toHaveBeenCalled();
+    expect(logError).toHaveBeenCalledWith(
+      "Trial downgrade skipped: subscription has payment evidence",
+      expect.objectContaining({ subscriptionId: "sub-1", userId: "user-1" }),
+    );
+  });
+
+  it("skips when a paid-tier plan has a future currentPeriodEnd (payment evidence without lastPaymentAt)", async () => {
+    const expired = {
+      id: "sub-2",
+      userId: "user-2",
+      scope: "STUDIO" as const,
+      planId: "plan-studio-premium",
+    };
+    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
+    subFindUnique.mockResolvedValueOnce({
+      id: "sub-2",
+      isTrial: true,
+      planId: "plan-studio-premium",
+      scope: "STUDIO",
+      userId: "user-2",
+      lastPaymentAt: null,
+      // Future period on a paid tier only exists after a real payment
+      // re-anchored it — a genuine trial's period ends WITH the trial.
+      currentPeriodEnd: new Date("2026-06-01T12:00:00Z"),
+      plan: { tier: "PREMIUM" },
+    });
+
+    const result = await processTrialExpirations(NOW);
+
+    expect(result.downgraded).toBe(0);
+    expect(subUpdate).not.toHaveBeenCalled();
+    expect(sendTrialExpired).not.toHaveBeenCalled();
+    expect(logError).toHaveBeenCalledWith(
+      "Trial downgrade skipped: subscription has payment evidence",
+      expect.objectContaining({ subscriptionId: "sub-2" }),
+    );
   });
 });

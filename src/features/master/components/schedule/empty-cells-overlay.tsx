@@ -71,7 +71,7 @@ export function EmptyCellsOverlay({
             key={`${iso}:${slot.startMin}`}
             type="button"
             onClick={() => handleClick(slot.startMin)}
-            className="pointer-events-auto absolute inset-x-1 cursor-pointer rounded-md border border-transparent text-center text-[10px] font-medium text-primary opacity-0 transition-opacity hover:border-primary/30 hover:bg-primary/5 hover:opacity-100 focus-visible:opacity-100"
+            className="pointer-events-auto absolute inset-x-1 cursor-pointer rounded-md border border-transparent text-center text-[10px] font-medium text-accent-text opacity-0 transition-opacity hover:border-primary/30 hover:bg-primary/5 hover:opacity-100 focus-visible:opacity-100"
             style={{ top, height }}
           >
             {UI_TEXT.cabinetMaster.schedule.emptyCellHint}

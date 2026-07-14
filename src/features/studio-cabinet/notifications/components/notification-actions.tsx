@@ -138,7 +138,7 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
           {openHref ? (
             <Link
               href={openHref}
-              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-xs font-medium text-accent-text hover:underline"
             >
               {T.openRequest}
             </Link>
@@ -184,8 +184,8 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
             {T.declineReschedule}
           </Button>
           <Link
-            href="/cabinet/studio/bookings"
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            href={openHref ?? "/cabinet/studio/bookings"}
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent-text hover:underline"
           >
             {T.openBooking}
           </Link>

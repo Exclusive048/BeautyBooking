@@ -18,8 +18,8 @@ const TONE: Record<AccountType, string> = {
   [AccountType.MASTER]: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
   [AccountType.STUDIO]: "bg-blue-500/12 text-blue-700 dark:text-blue-300",
   [AccountType.STUDIO_ADMIN]: "bg-blue-500/12 text-blue-700 dark:text-blue-300",
-  [AccountType.ADMIN]: "bg-primary/10 text-primary",
-  [AccountType.SUPERADMIN]: "bg-primary/15 text-primary",
+  [AccountType.ADMIN]: "bg-primary/10 text-accent-text",
+  [AccountType.SUPERADMIN]: "bg-primary/15 text-accent-text",
 };
 
 type Props = {

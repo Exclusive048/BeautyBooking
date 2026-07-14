@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type TelegramLinkResponse = {
@@ -44,6 +45,12 @@ export function TelegramNotificationsSection({
   const { status, loading, error: statusError, reload } = useTelegramStatus();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // FIX-TELEGRAM-KILLSWITCH: component-level guard placed AFTER the hooks
+  // (rules-of-hooks — hooks must run unconditionally). Defense-in-depth: the
+  // render sites are also gated, so when off this component normally isn't
+  // mounted; this guard covers any direct/legacy caller.
+  if (!isTelegramEnabled) return null;
 
   const onConnect = async () => {
     setError(null);

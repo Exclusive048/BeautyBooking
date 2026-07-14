@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PhotoCarouselProps = {
@@ -20,7 +20,7 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[24px] bg-muted">
       {current ? (
-        <FocalImage
+        <ResilientImage
           src={current}
           alt={alt}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

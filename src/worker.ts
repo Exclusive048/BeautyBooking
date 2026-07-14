@@ -6,10 +6,12 @@ import {
   enqueue,
   enqueueDeadJob,
   getQueueStats,
+  heartbeatJob,
   recoverStuckJobs,
 } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
+import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
@@ -19,6 +21,7 @@ import { env, isProduction } from "@/lib/env";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
+  AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
   BOOKING_REMINDER_JOB_TYPE,
   DEFAULT_JOB_MAX_ATTEMPTS,
   MEDIA_CLEANUP_JOB_TYPE,
@@ -46,6 +49,10 @@ import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
 import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
 import { processPlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
+import {
+  recomputeAvailableToday,
+  recomputeAvailableTodayForProvider,
+} from "@/lib/schedule/recompute-available-today";
 
 ensureVisualSearchStartupConfig();
 
@@ -56,6 +63,21 @@ let workerSecretMissingLogged = false;
 
 const HEALTHCHECK_INTERVAL_MS = 30_000;
 const STUCK_RECOVERY_INTERVAL_MS = 2 * 60 * 1000;
+// FIX-15: refresh the in-flight job's lease well within PROCESSING_TIMEOUT_MS
+// (5 min) so a live long-running job is never re-queued as "stuck".
+const JOB_HEARTBEAT_INTERVAL_MS = 30_000;
+
+/**
+ * FIX-15: keep the currently-processing job's lease fresh while it runs, so
+ * `recoverStuckJobs` only re-queues genuinely dead work. Returns a stopper the
+ * job loop calls (in `finally`) once processing/ack completes.
+ */
+function startJobHeartbeat(jobId: string): () => void {
+  const timer = setInterval(() => {
+    void heartbeatJob(jobId);
+  }, JOB_HEARTBEAT_INTERVAL_MS);
+  return () => clearInterval(timer);
+}
 const QUEUE_STATS_CHECK_EVERY_JOBS = 100;
 const QUEUE_PENDING_OVERLOAD_THRESHOLD = 1000;
 const QUEUE_DEAD_THRESHOLD = 10;
@@ -99,6 +121,26 @@ function sleep(ms: number): Promise<void> {
 }
 
 function startPeriodicJobs() {
+  // CATALOG-AVAILABLE-TODAY Phase 3: recompute `Provider.availableToday` for
+  // published providers. Fire-and-guard — a sweep error logs but NEVER crashes
+  // the worker or blocks other jobs (same isolation as the jobs below). Runs
+  // once at startup (fresh values immediately post-deploy, not all-`false`
+  // until the first tick) + every 30 min. The sweep is engine-safe (a pure
+  // read + a column write; slot-gen untouched).
+  const runAvailableTodaySweep = () => {
+    void recomputeAvailableToday()
+      .then((summary) => {
+        logInfo("availableToday.recompute.done", summary);
+      })
+      .catch((error) => {
+        logError("availableToday.recompute.failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  };
+  // Startup run — non-blocking (fire-and-forget; never delays worker boot).
+  runAvailableTodaySweep();
+
   const intervalMs = 30 * 60 * 1000;
   setInterval(() => {
     void runHotSlotExpiringJob().catch((error) => {
@@ -111,6 +153,7 @@ function startPeriodicJobs() {
         error: error instanceof Error ? error.message : String(error),
       });
     });
+    runAvailableTodaySweep();
   }, intervalMs);
 
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
@@ -258,6 +301,12 @@ async function moveToDeadQueue(job: Job): Promise<void> {
 async function processTelegramSend(
   job: Extract<Job, { type: typeof TELEGRAM_SEND_JOB_TYPE }>
 ): Promise<void> {
+  // FIX-TELEGRAM-KILLSWITCH: final safety gate. Drop any already-queued
+  // telegram job when user-facing Telegram is disabled — no API call, no retry,
+  // no dead-letter. (Enqueue paths are already gated; this catches in-flight
+  // jobs queued before the flag flipped.)
+  if (!(await getTelegramEnabled())) return;
+
   const scheduleAt = getJobScheduleAt(job);
   if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
     await enqueueRetry(job, scheduleAt - Date.now());
@@ -455,6 +504,26 @@ async function processMrrSnapshotDailyJob(
   });
 }
 
+async function processAvailableTodayRecomputeJob(
+  job: Extract<Job, { type: typeof AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  // CATALOG-AVAILABLE-TODAY Phase 4: targeted recompute for the mutated provider
+  // (+ studio fan-out). Reuses the Phase-1 pure read path — no slot-gen touched.
+  const summary = await recomputeAvailableTodayForProvider(job.payload.providerId);
+  logInfo("worker.availableToday.recompute-provider.processed", {
+    providerId: job.payload.providerId,
+    total: summary.total,
+    changed: summary.changed,
+    errored: summary.errored,
+  });
+}
+
 async function processPlanEditedNotifyJob(
   job: Extract<Job, { type: typeof PLAN_EDITED_NOTIFY_JOB_TYPE }>
 ): Promise<void> {
@@ -489,6 +558,8 @@ async function processJob(job: Job): Promise<void> {
       await processMediaCleanupJob(job);
     } else if (job.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
       await processMrrSnapshotDailyJob(job);
+    } else if (job.type === AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE) {
+      await processAvailableTodayRecomputeJob(job);
     } else if (job.type === PLAN_EDITED_NOTIFY_JOB_TYPE) {
       await processPlanEditedNotifyJob(job);
     } else {
@@ -553,7 +624,14 @@ async function runLoop() {
       continue;
     }
 
-    await processJob(job);
+    // FIX-15: renew the job's lease while it runs so a live long-running job is
+    // never re-queued by recoverStuckJobs. `processJob` acks on completion.
+    const stopHeartbeat = startJobHeartbeat(job.id);
+    try {
+      await processJob(job);
+    } finally {
+      stopHeartbeat();
+    }
     await monitorQueueStatsIfNeeded();
   }
 

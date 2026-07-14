@@ -7,9 +7,16 @@ import { requireAuth } from "@/lib/auth/guards";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
 import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
-import { isProduction } from "@/lib/env";
+import { isProduction, isVkAuthEnabled } from "@/lib/env";
 
 export async function GET() {
+  // AUTH-KILLSWITCH-ENFORCE-01: the VK-connect (notifications) flow is the same
+  // VK OAuth mechanism as login — gate it on the same `isVkAuthEnabled` so a
+  // disabled VK provider can't be reached via the integrations entry point.
+  if (!isVkAuthEnabled) {
+    return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+  }
+
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
 

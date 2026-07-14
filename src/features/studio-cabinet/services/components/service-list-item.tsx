@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -77,7 +77,7 @@ export function ServiceListItem({
               title={master.displayName}
             >
               {master.avatarUrl ? (
-                <FocalImage
+                <ResilientImage
                   src={master.avatarUrl}
                   alt=""
                   width={24}

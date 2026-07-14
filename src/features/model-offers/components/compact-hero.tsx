@@ -36,18 +36,18 @@ export function CompactHero({ open, onLearnMoreClick }: Props) {
           animate={reduce ? undefined : { opacity: 1, y: 0 }}
           transition={reduce ? undefined : { duration: 0.45, ease: EASE }}
         >
-          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+          <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
             {UI_TEXT.models.hero.eyebrow}
           </p>
           <h1 className="mb-4 font-display text-3xl leading-[1.1] text-text-main lg:text-4xl">
             Услуги{" "}
-            <em className="font-display font-normal italic text-primary">со скидкой</em>
+            <em className="font-display font-normal italic text-accent-text">со скидкой</em>
           </h1>
           <button
             type="button"
             onClick={onLearnMoreClick}
             aria-expanded={open}
-            className="inline-flex items-center gap-1 rounded-md text-sm text-text-sec transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page"
+            className="inline-flex items-center gap-1 rounded-md text-sm text-text-sec transition-colors hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page"
           >
             {UI_TEXT.models.compactHero.learnMore}
             {open ? (

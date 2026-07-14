@@ -22,7 +22,7 @@ export function NotificationsInfoBanner() {
         {before}
         <Link
           href="/cabinet/studio/settings"
-          className="text-primary underline-offset-2 hover:underline"
+          className="text-accent-text underline-offset-2 hover:underline"
         >
           {T.infoBannerLink}
         </Link>

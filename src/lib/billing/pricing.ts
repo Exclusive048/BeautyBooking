@@ -1,5 +1,9 @@
 import { BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
+import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 
+// Raw stored price row (a `BillingPlanPrice` DB read). `resolvePlanPrice` is the
+// DB-read→domain boundary: it takes raw rows and BRANDS its resolved output —
+// so callers pass Prisma rows unchanged and the resolved price is `Kopeks`.
 export type PlanPriceRow = { periodMonths: number; priceKopeks: number };
 
 /**
@@ -47,18 +51,19 @@ function isPriceable(kopeks: number | null | undefined): kopeks is number {
 export function resolvePlanPrice(
   activePrices: ReadonlyArray<PlanPriceRow>,
   periodMonths: number,
-): number | null {
+): Kopeks | null {
   // Only an explicit POSITIVE row wins; a stored 0/non-positive row is treated as
   // "no price" and falls through to the monthly-derived fallback — identical on
   // checkout, renewal, and display (the FIX-BC-1-2 single-source invariant).
   const exact = activePrices.find((p) => p.periodMonths === periodMonths);
-  if (exact && isPriceable(exact.priceKopeks)) return exact.priceKopeks;
+  if (exact && isPriceable(exact.priceKopeks)) return toKopeks(exact.priceKopeks);
 
   const monthly = activePrices.find((p) => p.periodMonths === 1)?.priceKopeks;
   if (!isPriceable(monthly)) return null;
 
+  // Arithmetic widened to `number` → re-brand once at the return.
   if (periodMonths === 12) {
-    return Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT));
+    return toKopeks(Math.floor(monthly * 12 * (1 - BILLING_YEARLY_DISCOUNT)));
   }
-  return monthly * periodMonths;
+  return toKopeks(monthly * periodMonths);
 }

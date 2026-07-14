@@ -46,25 +46,59 @@ export default function TelegramLoginButton({
 
   useEffect(() => {
     if (!botUsername) return;
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
     if (didInitRef.current) return;
     didInitRef.current = true;
 
-    containerRef.current.innerHTML = "";
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute("data-telegram-login", botUsername);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-userpic", "false");
-    // FIX-23 (CSP unsafe-eval): redirect mode (`data-auth-url`) instead of the
-    // callback mode (`data-onauth`). `data-onauth` makes telegram-widget.js
-    // compile the callback string via `new Function`/`eval` at widget-init —
-    // the prod-only `unsafe-eval` pageerror on /login under strict-dynamic CSP.
-    // In redirect mode the widget navigates to this GET callback with the
-    // signed auth params; the server verifies the HMAC and issues the session.
-    script.setAttribute("data-auth-url", "/api/auth/telegram/login");
-    containerRef.current.appendChild(script);
+    let cancelled = false;
+
+    // FIX-9 (HARDENING-06): fetch a single-use login nonce (the server sets an
+    // HttpOnly state cookie) and round-trip it via `data-auth-url=...?s=<nonce>`
+    // so a captured Telegram payload can't force-login another browser. On any
+    // failure we append WITHOUT a nonce — the GET then rejects (fail-closed).
+    void (async () => {
+      let authUrl = "/api/auth/telegram/login";
+      try {
+        const res = await fetch("/api/auth/telegram/login-init", {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const payload = (await res.json().catch(() => null)) as
+            | { data?: { state?: string } }
+            | null;
+          const state = payload?.data?.state;
+          if (state) {
+            authUrl = `/api/auth/telegram/login?s=${encodeURIComponent(state)}`;
+          }
+        }
+      } catch {
+        // Network error — leave authUrl without a nonce (the GET will reject).
+      }
+      if (cancelled) return;
+
+      container.innerHTML = "";
+      const script = document.createElement("script");
+      script.async = true;
+      script.src = "https://telegram.org/js/telegram-widget.js?22";
+      script.setAttribute("data-telegram-login", botUsername);
+      script.setAttribute("data-size", "large");
+      script.setAttribute("data-userpic", "false");
+      // FIX-23 (CSP unsafe-eval): redirect mode (`data-auth-url`) instead of the
+      // callback mode (`data-onauth`). `data-onauth` makes telegram-widget.js
+      // compile the callback string via `new Function`/`eval` at widget-init —
+      // the prod-only `unsafe-eval` pageerror on /login under strict-dynamic CSP.
+      // In redirect mode the widget navigates to this GET callback with the
+      // signed auth params; the server verifies the HMAC and issues the session.
+      script.setAttribute("data-auth-url", authUrl);
+      container.appendChild(script);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [botUsername]);
 
   function handleClick() {

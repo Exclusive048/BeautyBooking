@@ -22,15 +22,15 @@ export function TrialPromoBlock({ scope }: Props) {
       <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/8 via-bg-card/50 to-primary-magenta/8 p-8 text-center sm:p-10">
         <Sparkles
           aria-hidden
-          className="pointer-events-none absolute right-6 top-6 h-7 w-7 text-primary/30"
+          className="pointer-events-none absolute right-6 top-6 h-7 w-7 text-accent-text/30"
         />
 
-        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+        <p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
           {T.eyebrow}
         </p>
         <h2 className="mb-3 font-display text-2xl text-text-main lg:text-3xl">
           {T.titleBefore}{" "}
-          <em className="font-display font-normal italic text-primary">{T.titleItalic}</em>
+          <em className="font-display font-normal italic text-accent-text">{T.titleItalic}</em>
         </h2>
         <p className="mx-auto mb-6 max-w-xl leading-relaxed text-text-sec">{description}</p>
 

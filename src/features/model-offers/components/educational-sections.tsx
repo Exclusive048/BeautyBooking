@@ -46,7 +46,7 @@ export function EducationalSections() {
         title={
           <>
             Что{" "}
-            <em className="font-display font-normal italic text-primary">важно знать</em>
+            <em className="font-display font-normal italic text-accent-text">важно знать</em>
           </>
         }
         paragraphs={[

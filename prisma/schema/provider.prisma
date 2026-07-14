@@ -77,6 +77,13 @@ model Provider {
 
   contactEmail String?
 
+  // FEAT-PROVIDER-SOCIALS: free-text VK / Instagram community-page links
+  // (NOT OAuth account links — those live on UserProfile.vkLink/telegramLink).
+  // Stored as a normalized, safe `https://<host>/<handle>` URL or null.
+  // Normalization + host/scheme validation: src/lib/providers/social-links.ts.
+  socialVk        String?
+  socialInstagram String?
+
   description String?
 
   avatarUrl String?

@@ -55,7 +55,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
                 className={cn(
                   "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition-colors",
                   active
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary/10 text-accent-text"
                     : "text-text-main hover:bg-bg-input/60",
                 )}
               >
@@ -66,7 +66,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
                 <span
                   className={cn(
                     "shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] tabular-nums",
-                    active ? "bg-primary/20 text-primary" : "bg-bg-input text-text-sec",
+                    active ? "bg-primary/20 text-accent-text" : "bg-bg-input text-text-sec",
                   )}
                 >
                   {counts[entry.key]}

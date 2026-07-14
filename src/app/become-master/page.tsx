@@ -70,10 +70,10 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Кабинет, который{" "}
-            <em className="font-display font-normal italic text-primary">работает за вас</em>
+            <em className="font-display font-normal italic text-accent-text">работает за вас</em>
           </>
         }
-        description="Подключите расписание к МастерРядом и забудьте про переписки в Telegram. Клиенты записываются сами, напоминания работают, CRM ведёт историю. Без комиссий с услуг — только подписка за платформу."
+        description="Подключите расписание к МастерРядом и забудьте про бесконечные переписки. Клиенты записываются сами, напоминания работают, CRM ведёт историю. Без комиссий с услуг — только подписка за платформу."
         cta={{
           primary: { label: "Зарегистрироваться", href: REGISTER_URL },
           secondary: { label: "Посмотреть тарифы", href: PRICING_URL },
@@ -85,7 +85,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Расписание в скриншотах,{" "}
-            <em className="font-display font-normal italic text-primary">клиенты в Telegram</em>
+            <em className="font-display font-normal italic text-accent-text">клиенты в переписке</em>
           </>
         }
         paragraphs={[
@@ -144,7 +144,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             От регистрации до публикации —{" "}
-            <em className="font-display font-normal italic text-primary">за 30 минут</em>
+            <em className="font-display font-normal italic text-accent-text">за 30 минут</em>
           </>
         }
         description="Не нужны интеграции, не нужны разработчики. Регистрация и публикация — простой процесс."
@@ -152,7 +152,7 @@ export default async function BecomeMasterPage() {
           {
             title: "Зарегистрируйтесь",
             description:
-              "Введите номер телефона и подтвердите код. Или войдите через Telegram — быстрее.",
+              "Введите номер телефона и подтвердите код. Или войдите через ВКонтакте — быстрее.",
           },
           {
             title: "Заполните профиль",
@@ -177,7 +177,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Подписка вместо{" "}
-            <em className="font-display font-normal italic text-primary">комиссий</em>
+            <em className="font-display font-normal italic text-accent-text">комиссий</em>
           </>
         }
         description="Выберите план под вашу нагрузку. Сменить можно в любой момент."
@@ -205,7 +205,7 @@ export default async function BecomeMasterPage() {
               "Аналитика загрузки и выручки",
               "Горящие окошки со скидкой",
               "Онлайн-оплата через ЮКассу",
-              "Уведомления в Telegram и ВКонтакте",
+              "Уведомления о записях: push и email",
             ],
           }),
           teaserPlanFromMarket(pricing.master.premium, {
@@ -232,7 +232,7 @@ export default async function BecomeMasterPage() {
         title={
           <>
             Платформа, которую строят{" "}
-            <em className="font-display font-normal italic text-primary">для долгого использования</em>
+            <em className="font-display font-normal italic text-accent-text">для долгого использования</em>
           </>
         }
         paragraphs={[

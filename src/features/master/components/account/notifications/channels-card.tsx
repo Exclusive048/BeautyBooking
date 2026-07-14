@@ -3,6 +3,7 @@ import { EmailNotificationsSection } from "@/features/cabinet/components/email-n
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.notifications;
@@ -25,14 +26,18 @@ export function ChannelsCard() {
         <p className="mt-1 text-sm text-text-sec">{T.channelsSubtitle}</p>
       </header>
       <div className="space-y-3">
-        <FeatureGate
-          feature="tgNotifications"
-          scope="MASTER"
-          variant="inline"
-          description={FG.telegramLocked}
-        >
-          <TelegramNotificationsSection embedded />
-        </FeatureGate>
+        {/* FIX-TELEGRAM-KILLSWITCH: the whole Telegram row is absent when the
+            flag is off — not a disabled/locked control. */}
+        {isTelegramEnabled && (
+          <FeatureGate
+            feature="tgNotifications"
+            scope="MASTER"
+            variant="inline"
+            description={FG.telegramLocked}
+          >
+            <TelegramNotificationsSection embedded />
+          </FeatureGate>
+        )}
         <FeatureGate
           feature="vkNotifications"
           scope="MASTER"

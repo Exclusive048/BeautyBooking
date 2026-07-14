@@ -72,7 +72,8 @@ export default async function StudioCabinetLayout({
       <div className="flex min-h-screen bg-bg-page">
         {/* Desktop sidebar */}
         <div className="hidden border-r border-border-subtle lg:block lg:shrink-0">
-          <div className="sticky top-0 h-screen overflow-y-auto">
+          {/* FIX-BATCH-A: park below the now-sticky global navbar (see master layout). */}
+          <div className="sticky top-[var(--topbar-h)] h-[calc(100dvh-var(--topbar-h))] overflow-y-auto">
             <StudioSidebar
               counts={sidebarCounts}
               user={{
@@ -88,7 +89,7 @@ export default async function StudioCabinetLayout({
         </div>
 
         {/* Main content column — full width, padding only */}
-        <main className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-6 lg:px-8 lg:pb-8">
+        <main data-testid="page-main" className="min-w-0 flex-1 px-4 py-6 pb-24 md:px-6 lg:px-8 lg:pb-8">
           {trialActive && daysLeft > 0 ? (
             <div className="mb-4 flex justify-end">
               <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />

@@ -94,6 +94,24 @@ model UserSubscription {
   // never re-warn the same trial twice across cron runs.
   trialEndingNotificationSentAt DateTime?
 
+  // BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2): opt-in renewal on a PRICE INCREASE.
+  // When a renewal's effective price is HIGHER than what the subscriber last
+  // paid, the cron does NOT auto-charge — it enters a 2-day opt-in window
+  // (status PAST_DUE + graceUntil = deadline) so the higher amount is never
+  // charged without explicit consent (accept via checkout at the new price).
+  // `pendingPriceOptIn` is the discriminator distinguishing this from a plain
+  // payment-failure PAST_DUE (both share status + graceUntil). Cleared on BOTH
+  // exits: accept (checkout webhook success) and lapse (grace cron → EXPIRED).
+  // `graceUntil` doubles as the opt-in deadline — no separate column.
+  pendingPriceOptIn  Boolean @default(false)
+  // Snapshot of the new (higher) price the subscriber is being asked to accept
+  // — for reminder/lapse copy and audit clarity.
+  pendingPriceKopeks Int?
+  // Restart-robust reminder sent-markers (scan approach, mirrors
+  // `trialEndingNotificationSentAt`) — each of the 24h/2h reminders fires once.
+  priceOptIn24hSentAt DateTime?
+  priceOptIn2hSentAt  DateTime?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt

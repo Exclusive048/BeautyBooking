@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
+import { salonInputToUtcIso, salonLocalDatetimeInput } from "../../lib/datetime-input";
 import type {
   ScheduleBreakCell,
   ScheduleMasterColumn,
 } from "../../server/types";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.breakDialog;
+const TV = UI_TEXT.studioCabinet.scheduleV2;
 const E = UI_TEXT.studioCabinet.scheduleV2.errors;
 
 type Props = {
@@ -21,53 +24,26 @@ type Props = {
   masters: ScheduleMasterColumn[];
   breaks: ScheduleBreakCell[];
   dayStartIso: string;
+  /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for the existing-breaks range. */
+  timezone: string;
   open: boolean;
   onClose: () => void;
 };
-
-function toLocalDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
-}
-
-function fromLocalDateTime(value: string): string {
-  if (!value) return new Date().toISOString();
-  return new Date(value).toISOString();
-}
-
-function defaultStartFor(dayStartIso: string): string {
-  // 13:00 local time on the viewed day — a reasonable lunch default.
-  const dayStart = new Date(dayStartIso);
-  const lunch = new Date(dayStart);
-  lunch.setHours(13, 0, 0, 0);
-  return toLocalDateTime(lunch.toISOString());
-}
-
-function defaultEndFor(dayStartIso: string): string {
-  const dayStart = new Date(dayStartIso);
-  const lunch = new Date(dayStart);
-  lunch.setHours(14, 0, 0, 0);
-  return toLocalDateTime(lunch.toISOString());
-}
 
 export function ManageBreaksDialog({
   studioId,
   masters,
   breaks,
   dayStartIso,
+  timezone,
   open,
   onClose,
 }: Props) {
   const router = useRouter();
   const availableMasters = masters.filter((m) => m.isAvailable);
   const [masterId, setMasterId] = useState(availableMasters[0]?.id ?? "");
-  const [startAt, setStartAt] = useState(defaultStartFor(dayStartIso));
-  const [endAt, setEndAt] = useState(defaultEndFor(dayStartIso));
+  const [startAt, setStartAt] = useState(() => salonLocalDatetimeInput(dayStartIso, 13, timezone));
+  const [endAt, setEndAt] = useState(() => salonLocalDatetimeInput(dayStartIso, 14, timezone));
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,11 +52,11 @@ export function ManageBreaksDialog({
   useEffect(() => {
     if (!open) return;
     setMasterId(availableMasters[0]?.id ?? "");
-    setStartAt(defaultStartFor(dayStartIso));
-    setEndAt(defaultEndFor(dayStartIso));
+    setStartAt(salonLocalDatetimeInput(dayStartIso, 13, timezone));
+    setEndAt(salonLocalDatetimeInput(dayStartIso, 14, timezone));
     setNote("");
     setError(null);
-  }, [open, dayStartIso, availableMasters]);
+  }, [open, dayStartIso, availableMasters, timezone]);
 
   function handleClose() {
     if (submitting || deleting) return;
@@ -92,8 +68,15 @@ export function ManageBreaksDialog({
       setError(E.breakMasterRequired);
       return;
     }
-    const startIso = fromLocalDateTime(startAt);
-    const endIso = fromLocalDateTime(endAt);
+    // TZ-DISPLAY-MANAGE-BREAKS-INPUT: interpret the entered wall-clock in the
+    // SALON tz → UTC (never the browser tz). Empty/malformed → reject, never
+    // silently shift to "now" (the old `fromLocalDateTime` fallback).
+    const startIso = salonInputToUtcIso(startAt, timezone);
+    const endIso = salonInputToUtcIso(endAt, timezone);
+    if (!startIso || !endIso) {
+      setError(E.breakTimeRange);
+      return;
+    }
     if (new Date(endIso) <= new Date(startIso)) {
       setError(E.breakTimeRange);
       return;
@@ -166,15 +149,14 @@ export function ManageBreaksDialog({
             <ul className="space-y-1.5">
               {breaks.map((entry) => {
                 const master = masters.find((m) => m.id === entry.masterId);
-                const startDate = new Date(entry.startAtUtc);
-                const endDate = new Date(entry.endAtUtc);
-                const range = `${startDate.toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })} — ${endDate.toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}`;
+                // FIX-STUDIO-CALENDAR-SALON-TZ: existing breaks are shown in the
+                // salon's tz (matching the calendar grid). The add-break
+                // datetime-local inputs below now ALSO edit in salon-tz via the
+                // shared datetime-input helpers (TZ-DISPLAY-MANAGE-BREAKS-INPUT).
+                const range = `${formatLocalHm(
+                  new Date(entry.startAtUtc),
+                  timezone,
+                )} — ${formatLocalHm(new Date(entry.endAtUtc), timezone)}`;
                 return (
                   <li
                     key={entry.id}
@@ -235,7 +217,8 @@ export function ManageBreaksDialog({
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-text-main">
-                {T.startLabel}
+                {T.startLabel}{" "}
+                <span className="font-normal text-text-sec">· {TV.salonTimeInputHint}</span>
               </span>
               <Input
                 type="datetime-local"
@@ -246,7 +229,8 @@ export function ManageBreaksDialog({
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-text-main">
-                {T.endLabel}
+                {T.endLabel}{" "}
+                <span className="font-normal text-text-sec">· {TV.salonTimeInputHint}</span>
               </span>
               <Input
                 type="datetime-local"

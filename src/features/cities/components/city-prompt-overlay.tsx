@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
+import { ModalSurface } from "@/components/ui/modal-surface";
 import { fetchJson } from "@/lib/http/client";
 import { getCurrentCitySlug, setCurrentCitySlug } from "@/lib/cities/client-city";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -27,7 +27,6 @@ export function CityPromptOverlay() {
   const pathname = usePathname();
   const [show, setShow] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const reduce = useReducedMotion();
   const { data, isLoading } = useSWR<CitiesResponse>("/api/cities", fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
@@ -65,67 +64,52 @@ export function CityPromptOverlay() {
     setShow(false);
   };
 
+  // OVERLAY-PORTAL-REFACTOR-01: was a hand-rolled `fixed inset-0` overlay
+  // (positioning hazard — broke under any transformed ancestor). Now portals
+  // through <ModalSurface size="sm"> (max-w-md preserved). Gains focus-trap,
+  // return-focus, initial-focus, body scroll-lock, Escape + backdrop-click
+  // close — all previously absent. `handleClose` (hide without writing a city)
+  // now also runs on Escape / backdrop, semantically identical to the × button.
+  // Heading kept as an in-panel <h2> to preserve its text-2xl display size.
   return (
-    <AnimatePresence>
-      {show ? (
-        <motion.div
-          initial={reduce ? false : { opacity: 0 }}
-          animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-          exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="city-prompt-title"
-        >
-          <motion.div
-            initial={reduce ? false : { y: 16, opacity: 0 }}
-            animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1 }}
-            exit={reduce ? { opacity: 0 } : { y: 12, opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="relative w-full max-w-md rounded-2xl border border-border-subtle/40 bg-bg-card p-6 shadow-2xl sm:p-7"
-            onClick={(e) => e.stopPropagation()}
-          >
+    <ModalSurface open={show} onClose={handleClose} size="sm">
+      <button
+        type="button"
+        onClick={handleClose}
+        aria-label={T.close}
+        className="absolute right-3 top-3 rounded-lg p-1.5 text-text-sec transition-colors hover:bg-muted hover:text-text-main"
+      >
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+
+      <h2 id="city-prompt-title" className="font-display text-2xl font-semibold text-text-main">
+        {T.title}
+      </h2>
+      <p className="mt-2 text-sm text-text-sec">
+        {cities.length > 0 ? T.description : T.descriptionEmpty}
+      </p>
+
+      {cities.length > 0 ? (
+        <div className="mt-6 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+          {cities.map((city) => (
             <button
+              key={city.id}
               type="button"
-              onClick={handleClose}
-              aria-label={T.close}
-              className="absolute right-3 top-3 rounded-lg p-1.5 text-text-sec transition-colors hover:bg-muted hover:text-text-main"
+              onClick={() => handleChoose(city.slug)}
+              className="flex w-full items-center justify-between rounded-xl border border-border-subtle/60 px-4 py-3 text-left text-sm font-medium text-text-main transition-colors hover:border-primary hover:bg-primary/5"
             >
-              <X className="h-4 w-4" aria-hidden />
+              <span>{city.name}</span>
+              <span aria-hidden className="text-text-sec">→</span>
             </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-6 rounded-xl border border-dashed border-border-subtle/60 p-6 text-center text-sm text-text-sec">
+          {T.empty}
+        </p>
+      )}
 
-            <h2 id="city-prompt-title" className="font-display text-2xl font-semibold text-text-main">
-              {T.title}
-            </h2>
-            <p className="mt-2 text-sm text-text-sec">
-              {cities.length > 0 ? T.description : T.descriptionEmpty}
-            </p>
-
-            {cities.length > 0 ? (
-              <div className="mt-6 max-h-[320px] space-y-2 overflow-y-auto pr-1">
-                {cities.map((city) => (
-                  <button
-                    key={city.id}
-                    type="button"
-                    onClick={() => handleChoose(city.slug)}
-                    className="flex w-full items-center justify-between rounded-xl border border-border-subtle/60 px-4 py-3 text-left text-sm font-medium text-text-main transition-colors hover:border-primary hover:bg-primary/5"
-                  >
-                    <span>{city.name}</span>
-                    <span aria-hidden className="text-text-sec">→</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-6 rounded-xl border border-dashed border-border-subtle/60 p-6 text-center text-sm text-text-sec">
-                {T.empty}
-              </p>
-            )}
-
-            <p className="mt-5 text-center text-xs text-text-sec">{T.note}</p>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>
+      <p className="mt-5 text-center text-xs text-text-sec">{T.note}</p>
+    </ModalSurface>
   );
 }

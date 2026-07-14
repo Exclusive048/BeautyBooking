@@ -23,7 +23,7 @@ export default function HowToBookPage() {
         title={
           <>
             Запись к мастеру за{" "}
-            <em className="font-display font-normal italic text-primary">5 простых шагов</em>
+            <em className="font-display font-normal italic text-accent-text">5 простых шагов</em>
           </>
         }
         description="Никаких звонков, никаких переписок в мессенджерах. Открыл, выбрал, записался — за минуту."
@@ -37,7 +37,7 @@ export default function HowToBookPage() {
         title={
           <>
             Пять шагов до{" "}
-            <em className="font-display font-normal italic text-primary">записи</em>
+            <em className="font-display font-normal italic text-accent-text">записи</em>
           </>
         }
         description="Весь процесс — от поиска до похода к мастеру. Без скрытых подвохов."
@@ -60,7 +60,7 @@ export default function HowToBookPage() {
           {
             title: "Дождись подтверждения",
             description:
-              "Мастер увидит заявку и подтвердит — обычно за пару минут. Тебе придёт уведомление в Telegram, push или email — что выбрал.",
+              "Мастер увидит заявку и подтвердит — обычно за пару минут. Тебе придёт уведомление в push или по email — что выбрал.",
           },
           {
             title: "Приди вовремя",
@@ -75,7 +75,7 @@ export default function HowToBookPage() {
         title={
           <>
             Если планы{" "}
-            <em className="font-display font-normal italic text-primary">меняются</em>
+            <em className="font-display font-normal italic text-accent-text">меняются</em>
           </>
         }
         paragraphs={[

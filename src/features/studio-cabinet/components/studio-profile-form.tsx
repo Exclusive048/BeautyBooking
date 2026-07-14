@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useRef, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SocialLinkPreview } from "@/components/ui/social-link-preview";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -14,7 +15,6 @@ type Props = {
   address: string;
   phone: string;
   email: string;
-  telegram: string;
   instagram: string;
   vk: string;
   addressInputRef: Ref<HTMLInputElement>;
@@ -30,7 +30,6 @@ type Props = {
   onAddressChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
   onEmailChange: (value: string) => void;
-  onTelegramChange: (value: string) => void;
   onInstagramChange: (value: string) => void;
   onVkChange: (value: string) => void;
 };
@@ -44,7 +43,6 @@ export function StudioProfileForm({
   address,
   phone,
   email,
-  telegram,
   instagram,
   vk,
   addressInputRef,
@@ -60,7 +58,6 @@ export function StudioProfileForm({
   onAddressChange,
   onPhoneChange,
   onEmailChange,
-  onTelegramChange,
   onInstagramChange,
   onVkChange,
 }: Props) {
@@ -254,15 +251,10 @@ export function StudioProfileForm({
                 className={inputClass}
               />
             </div>
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-text-label">{studioFormText.telegramLabel}</div>
-              <Input
-                value={telegram}
-                onChange={(event) => onTelegramChange(event.target.value)}
-                placeholder={studioFormText.telegramPlaceholder}
-                className={inputClass}
-              />
-            </div>
+            {/* FIX-STUDIO-SOCIAL-PERSIST: Telegram contact input removed
+                (FZ-199 killswitch — don't collect data the platform won't
+                surface). VK + Instagram kept but still not persisted — a
+                schema column is required; flagged for a follow-up migration. */}
             <div className="space-y-2">
               <div className="text-xs font-medium text-text-label">{studioFormText.vkLabel}</div>
               <Input
@@ -271,6 +263,7 @@ export function StudioProfileForm({
                 placeholder={studioFormText.vkPlaceholder}
                 className={inputClass}
               />
+              <SocialLinkPreview kind="vk" value={vk} />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <div className="text-xs font-medium text-text-label">{studioFormText.instagramLabel}</div>
@@ -280,6 +273,7 @@ export function StudioProfileForm({
                 placeholder={studioFormText.instagramPlaceholder}
                 className={inputClass}
               />
+              <SocialLinkPreview kind="instagram" value={instagram} />
             </div>
           </div>
         </div>

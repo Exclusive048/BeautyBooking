@@ -6,10 +6,9 @@ import type { ApiResponse } from "@/lib/types/api";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Drawer } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
-import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type CardPhoto = {
   id: string;
@@ -34,6 +33,8 @@ type CardData = {
   }>;
   visitsCount: number;
   daysSinceLastVisit: number | null;
+  /** TZ-DISPLAY-SALON-PARITY-01: salon (provider) tz for the visit-history dates. */
+  timeZone: string;
 };
 
 type Props = {
@@ -85,13 +86,15 @@ export function ClientCardDrawer({
   onClose,
   onUpdated,
 }: Props) {
-  const viewerTimeZone = useViewerTimeZoneContext();
   const [notes, setNotes] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [photos, setPhotos] = useState<CardPhoto[]>([]);
   const [history, setHistory] = useState<CardData["history"]>([]);
   const [visitsCount, setVisitsCount] = useState(0);
   const [daysSinceLastVisit, setDaysSinceLastVisit] = useState<number | null>(null);
+  // TZ-DISPLAY-SALON-PARITY-01: salon tz from the card DTO — visit-history dates
+  // render in the cabinet's provider tz, not the viewer's browser tz.
+  const [cardTimeZone, setCardTimeZone] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +113,7 @@ export function ClientCardDrawer({
     setHistory([]);
     setVisitsCount(0);
     setDaysSinceLastVisit(null);
+    setCardTimeZone(null);
     try {
       const res = await fetch(`${baseUrl}/${encodeURIComponent(clientKey)}/card${query}`, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<CardData> | null;
@@ -122,6 +126,7 @@ export function ClientCardDrawer({
       setHistory(json.data.history ?? []);
       setVisitsCount(json.data.visitsCount ?? 0);
       setDaysSinceLastVisit(json.data.daysSinceLastVisit ?? null);
+      setCardTimeZone(json.data.timeZone ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить карточку клиента");
     } finally {
@@ -300,7 +305,7 @@ export function ClientCardDrawer({
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
                 {photos.map((photo) => (
                   <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
-                    <FocalImage src={photo.url} alt="" sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
+                    <ResilientImage src={photo.url} alt="" sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
                     <Button
                       variant="ghost"
                       size="none"
@@ -338,7 +343,7 @@ export function ClientCardDrawer({
                         <div className="text-text-sec">{statusLabel(item.status)}</div>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-text-sec">
-                        <span>{UI_FMT.dateTimeShort(item.date, { timeZone: viewerTimeZone })}</span>
+                        <span>{UI_FMT.dateTimeShort(item.date, { timeZone: cardTimeZone ?? "Europe/Moscow" })}</span>
                         <span>•</span>
                         <span>{UI_FMT.priceLabel(item.amount)}</span>
                       </div>

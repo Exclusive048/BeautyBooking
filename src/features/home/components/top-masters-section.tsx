@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { searchCatalog, type CatalogProviderItem } from "@/lib/catalog/catalog.service";
 import { logError } from "@/lib/logging/logger";
 import { providerPublicUrl } from "@/lib/public-urls";
@@ -65,14 +65,14 @@ function MasterCard({ master }: { master: TopMaster }) {
         {/* Cover photo */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
           {master.photo ? (
-            <FocalImage
+            <ResilientImage
               src={master.photo}
               alt={master.title}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
           ) : master.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={master.avatarUrl}
               alt={master.title}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
@@ -85,7 +85,7 @@ function MasterCard({ master }: { master: TopMaster }) {
           )}
           {master.ratingAvg > 0 ? (
             <Badge className="absolute left-3 top-3 gap-1 border-0 bg-bg-card/95 px-2 py-1 text-text-main shadow-sm backdrop-blur-sm">
-              <Star className="h-3 w-3 fill-primary text-primary" aria-hidden />
+              <Star className="h-3 w-3 fill-primary text-accent-text" aria-hidden />
               <span className="font-mono text-xs font-semibold tabular-nums">
                 {master.ratingAvg.toFixed(1)}
               </span>
@@ -125,7 +125,7 @@ export async function TopMastersSection() {
       <div className="mb-10 text-center">
         <h2 className="text-3xl font-bold tracking-tight text-text-main sm:text-4xl">
           {T.title}{" "}
-          <em className="font-display font-normal italic text-primary">{T.titleAccent}</em>
+          <em className="font-display font-normal italic text-accent-text">{T.titleAccent}</em>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-base text-text-sec">{T.subtitle}</p>
       </div>
@@ -139,7 +139,7 @@ export async function TopMastersSection() {
       <div className="mt-10 text-center">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary-hover"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-primary-hover"
         >
           {T.seeAll}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

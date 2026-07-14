@@ -42,7 +42,7 @@ export function ChipGroup<T>({ value, onChange, options, size = "md", disabled =
               size === "sm" ? "h-7 px-2.5 text-[11px]" : "h-8 px-3 text-xs",
               active
                 ? "bg-primary text-white shadow-card"
-                : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-primary",
+                : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-accent-text",
               disabled && "cursor-not-allowed opacity-50"
             )}
           >

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
+import { formatLocalHm, toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import {
@@ -11,10 +12,8 @@ import {
   bookingToneFromStatus,
 } from "@/features/studio-cabinet/schedule/lib/booking-status-display";
 import { BookingActionMenu } from "@/features/studio-cabinet/schedule/components/dialogs/booking-action-menu";
-import type {
-  ScheduleBookingCell,
-  ScheduleMasterColumn,
-} from "@/features/studio-cabinet/schedule/server/types";
+import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
+import { bookingToCell } from "../lib/booking-to-cell";
 import {
   SOURCE_BADGE_CLASS,
   getBookingSourceDisplay,
@@ -30,55 +29,48 @@ function initials(name: string): string {
   return (first + last).toUpperCase() || "•";
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return formatLocalHm(date, timeZone);
 }
 
-function formatDateLabel(iso: string): string {
+function formatDateLabel(iso: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const tomorrowStart = new Date(todayStart);
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  if (next.getTime() === todayStart.getTime()) return T.table.todayPrefix;
-  if (next.getTime() === tomorrowStart.getTime()) return T.table.tomorrowPrefix;
-  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  // FIX-STUDIO-CALENDAR-SALON-TZ: today/tomorrow + the date are resolved in
+  // the salon's tz, so a cross-tz admin near midnight sees the salon's day.
+  const now = new Date();
+  const dayKey = toLocalDateKey(date, timeZone);
+  const todayKey = toLocalDateKey(now, timeZone);
+  const tomorrowKey = toLocalDateKey(
+    new Date(now.getTime() + 24 * 60 * 60 * 1000),
+    timeZone,
+  );
+  if (dayKey === todayKey) return T.table.todayPrefix;
+  if (dayKey === tomorrowKey) return T.table.tomorrowPrefix;
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    timeZone,
+  });
 }
 
 function statusLabel(status: StudioBookingRow["status"]): string {
   return T.filters.statusLabels[status] ?? status;
 }
 
-function bookingToCell(row: StudioBookingRow): ScheduleBookingCell {
-  return {
-    id: row.id,
-    masterId: row.master.id,
-    startAtUtc: row.startAtUtc,
-    endAtUtc: row.endAtUtc,
-    status: row.status,
-    tone: bookingToneFromStatus(row.status),
-    clientName: row.client.displayName,
-    clientPhone: row.client.phone,
-    isNewClient: row.client.isNewClient,
-    serviceTitle: row.service.name,
-    serviceId: "",
-    priceKopeks: row.priceKopeks,
-  };
-}
-
 export function BookingRow({
   studioId,
   row,
   masters,
+  timezone,
 }: {
   studioId: string;
   row: StudioBookingRow;
   masters: ScheduleMasterColumn[];
+  /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for time + date + action menu. */
+  timezone: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const sourceDisplay = getBookingSourceDisplay(row.source);
@@ -89,16 +81,16 @@ export function BookingRow({
       <tr className="border-t border-border-subtle hover:bg-bg-input/30">
         <td className="px-3 py-3 align-top">
           <div className="font-display text-sm font-semibold tabular-nums text-text-main">
-            {formatTime(row.startAtUtc)}
+            {formatTime(row.startAtUtc, timezone)}
           </div>
           <div className="text-[11px] text-text-sec">
-            {formatDateLabel(row.startAtUtc)}
+            {formatDateLabel(row.startAtUtc, timezone)}
           </div>
         </td>
         <td className="px-3 py-3 align-top">
           <div className="flex items-center gap-2">
             {row.master.avatarUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={row.master.avatarUrl}
                 alt=""
                 width={28}
@@ -197,6 +189,7 @@ export function BookingRow({
         studioId={studioId}
         booking={menuOpen ? bookingToCell(row) : null}
         masters={masters}
+        timezone={timezone}
         onClose={() => setMenuOpen(false)}
       />
     </>

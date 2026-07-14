@@ -1,11 +1,18 @@
 import { DayHeader } from "@/features/master/components/schedule/day-header";
 import { TimeAxis } from "@/features/master/components/schedule/time-axis";
 import { WeekGridColumn } from "@/features/master/components/schedule/week-grid-column";
+import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
 import type { ScheduleDay } from "@/lib/master/schedule.service";
 
 const HOUR_PX = 60;
-/** Minimum column width on overflow-scroll surfaces (mobile). Desktop columns flex. */
-const MIN_COL_PX = 168;
+/**
+ * Minimum column width on overflow-scroll surfaces. FIX-BATCH-E: tightened
+ * 168→120 so all 7 weekday columns fit at desktop (≥1280) instead of the
+ * weekend being hidden behind an invisible scroll; columns still flex wider to
+ * fill extra space (`1fr`), and narrower viewports force a horizontal scroll
+ * (now with a visible edge-fade via HScrollShadow).
+ */
+const MIN_COL_PX = 120;
 
 type Props = {
   days: ScheduleDay[];
@@ -23,7 +30,7 @@ type Props = {
 export function WeekGrid({ days, hourRange, timezone }: Props) {
   const gridTemplate = `64px repeat(7, minmax(${MIN_COL_PX}px, 1fr))`;
   return (
-    <div className="overflow-x-auto rounded-2xl border border-border-subtle bg-bg-card">
+    <HScrollShadow wrapperClassName="rounded-2xl border border-border-subtle bg-bg-card">
       <div className="min-w-fit">
         <div
           className="grid border-b border-border-subtle"
@@ -49,6 +56,6 @@ export function WeekGrid({ days, hourRange, timezone }: Props) {
           ))}
         </div>
       </div>
-    </div>
+    </HScrollShadow>
   );
 }

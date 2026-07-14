@@ -371,7 +371,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                   className="rounded-xl border border-primary/40 bg-primary/5 p-3"
                 >
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-primary">
+                    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-medium text-accent-text">
                       {index + 1}
                     </span>
                     <div className="min-w-0">
@@ -397,7 +397,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                             onClick={() => setSelectedMasterId(master.id)}
                             className={`rounded-full border px-3 py-1.5 text-xs transition ${
                               selectedMasterId === master.id
-                                ? "border-primary bg-primary/10 text-primary"
+                                ? "border-primary bg-primary/10 text-accent-text"
                                 : "border-border-subtle text-text-sec hover:border-primary/60"
                             }`}
                           >
@@ -416,7 +416,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                                 onClick={() => setSelectedDay(d.key)}
                                 className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
                                   selectedDay === d.key
-                                    ? "border-primary bg-primary/10 text-primary"
+                                    ? "border-primary bg-primary/10 text-accent-text"
                                     : "border-border-subtle text-text-sec hover:border-primary/60"
                                 }`}
                               >

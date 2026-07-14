@@ -260,7 +260,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
             type="checkbox"
             checked={defaultPublic}
             onChange={(event) => setDefaultPublic(event.target.checked)}
-            className="h-4 w-4 rounded border border-border-subtle text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <span>{T.defaultPublicLabel}</span>
         </label>

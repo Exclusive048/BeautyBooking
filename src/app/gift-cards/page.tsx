@@ -13,7 +13,7 @@ export default function GiftCardsPage() {
     <main className="mx-auto max-w-[720px] px-4 py-12 md:py-24">
       <InfoPageLayout breadcrumb={UI_TEXT.pages.giftCards.navLabel}>
         <div className="text-center space-y-8 pt-4">
-          <Gift className="h-16 w-16 text-primary mx-auto" aria-hidden />
+          <Gift className="h-16 w-16 text-accent-text mx-auto" aria-hidden />
           <h1 className="text-4xl font-bold text-text-main tracking-tight">
             {UI_TEXT.pages.giftCards.heading}
           </h1>
@@ -25,22 +25,14 @@ export default function GiftCardsPage() {
             <ul className="space-y-2 text-sm text-text-sec">
               {UI_TEXT.pages.giftCards.plannedItems.map((item) => (
                 <li key={item} className="flex items-start gap-2">
-                  <span className="text-primary mt-0.5">✦</span>
+                  <span className="text-accent-text mt-0.5">✦</span>
                   {item}
                 </li>
               ))}
             </ul>
           </div>
           <p className="text-sm text-text-sec">
-            {UI_TEXT.pages.giftCards.footerText}{" "}
-            <a
-              href="https://t.me/masterryadom_news"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              {UI_TEXT.pages.giftCards.footerCta}
-            </a>
+            {UI_TEXT.pages.giftCards.footerText}
           </p>
         </div>
       </InfoPageLayout>

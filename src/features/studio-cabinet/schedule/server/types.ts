@@ -32,6 +32,15 @@ export type ScheduleBookingCell = {
   serviceTitle: string;
   serviceId: string;
   priceKopeks: number;
+  /**
+   * BOOKING-STUDIO-RESCHEDULE-PARITY-01: a client-proposed reschedule the
+   * studio must accept/decline. Present (non-null) only when `status ===
+   * CHANGE_REQUESTED`. Times are UTC ISO — display in salon-tz at the surface
+   * via `formatLocalHm`. `actionRequiredBy === "MASTER"` = studio's turn.
+   */
+  proposedStartAtUtc: string | null;
+  proposedEndAtUtc: string | null;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
 };
 
 export type ScheduleBreakCell = {
@@ -88,6 +97,13 @@ export type ScheduleWeekData = {
 export type StudioScheduleData = {
   dateKey: string;
   view: "day" | "week";
+  /**
+   * FIX-STUDIO-CALENDAR-SALON-TZ: the salon's own tz (`Provider.timezone`).
+   * The day grid positions + labels appointment times in this tz so a
+   * cross-tz admin (e.g. Moscow browser) sees the salon's local schedule,
+   * not the browser's — matching the client-cabinet convention (QA-107).
+   */
+  timezone: string;
   day: ScheduleDayData;
   kpis: ScheduleKpis;
   week: ScheduleWeekData | null;

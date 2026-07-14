@@ -6,6 +6,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ClientBookingDTO } from "@/lib/client-cabinet/bookings.service";
 
@@ -67,6 +68,11 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
   );
 
   const slots = useMemo(() => slotsData?.slots ?? [], [slotsData]);
+  // FIX-STUDIO-CALENDAR-SALON-TZ: reschedule slot times shown in the salon's
+  // tz (matching the client-cabinet bookings list), not the browser's. The
+  // slots endpoint returns the provider tz; `booking.provider.timezone` is a
+  // stable fallback before the slots load.
+  const salonTz = slotsData?.timezone ?? booking.provider.timezone;
 
   async function handleSubmit() {
     if (!slotIso) return;
@@ -75,10 +81,7 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const time = new Date(slot.startAtUtc).toLocaleTimeString("ru-RU", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      const time = formatLocalHm(new Date(slot.startAtUtc), salonTz);
       const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
         method: "POST",
         credentials: "include",
@@ -147,10 +150,7 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {slots.map((slot) => {
                 const active = slot.startAtUtc === slotIso;
-                const time = new Date(slot.startAtUtc).toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
+                const time = formatLocalHm(new Date(slot.startAtUtc), salonTz);
                 return (
                   <button
                     key={slot.startAtUtc}
@@ -185,6 +185,7 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
             size="sm"
             onClick={handleSubmit}
             disabled={!slotIso || submitting}
+            data-testid="reschedule-submit"
           >
             <CalendarIcon className="mr-1.5 h-3.5 w-3.5" aria-hidden />
             {submitting ? T.moving : T.moveConfirm}

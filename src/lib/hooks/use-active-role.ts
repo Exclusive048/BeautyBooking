@@ -50,10 +50,8 @@ export function useActiveRole() {
       setActiveRoleState(stored);
     } else {
       const auto = pickAutoRole(userRoles);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveRoleState(auto);
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHydrated(true);
   }, [isLoading, user]);
 

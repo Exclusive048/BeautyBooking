@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CropPicker } from "@/features/media/components/crop-picker";
 import type { ApiResponse } from "@/lib/types/api";
@@ -119,7 +119,7 @@ export function LoginHeroImageManager() {
 
       <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
         {asset ? (
-          <FocalImage
+          <ResilientImage
             src={asset.url}
             alt={t.loginHeroTitle}
             cropX={asset.cropX}

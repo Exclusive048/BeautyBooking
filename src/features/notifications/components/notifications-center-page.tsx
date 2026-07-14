@@ -587,7 +587,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
                       }`}
                     >
                       <Icon
-                        className={`h-5 w-5 ${isUnread ? "text-primary" : "text-text-sec"}`}
+                        className={`h-5 w-5 ${isUnread ? "text-accent-text" : "text-text-sec"}`}
                         aria-hidden
                       />
                     </div>

@@ -77,7 +77,7 @@ export function PopularCategoriesSection() {
         </div>
         <Link
           href="/catalog"
-          className="shrink-0 text-sm font-medium text-primary hover:underline"
+          className="shrink-0 text-sm font-medium text-accent-text hover:underline"
         >
           {UI_TEXT.home.categories.showAll}
         </Link>
@@ -101,11 +101,11 @@ export function PopularCategoriesSection() {
                   {cat.icon}
                 </span>
               ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary text-base font-bold">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-accent-text text-base font-bold">
                   {cat.title.charAt(0)}
                 </div>
               )}
-              <span className="text-sm font-medium leading-tight text-text-main group-hover:text-primary">
+              <span className="text-sm font-medium leading-tight text-text-main group-hover:text-accent-text">
                 {cat.title}
               </span>
             </Link>

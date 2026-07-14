@@ -35,7 +35,7 @@ type Props = {
  */
 export function BookingRow({ booking, timezone }: Props) {
   return (
-    <div data-focus-id={booking.id} className="flex gap-4 px-4 py-4">
+    <div data-focus-id={booking.id} data-testid="booking-row" className="flex gap-4 px-4 py-4">
       <div className="w-12 shrink-0 text-center">
         <p className="font-display text-base text-text-main">
           {formatLocalHm(booking.startAtUtc, timezone)}

@@ -1,5 +1,6 @@
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
+import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.security;
@@ -20,7 +21,8 @@ export function ConnectionsCard() {
         <p className="mt-1 text-sm text-text-sec">{T.connectionsSubtitle}</p>
       </header>
       <div className="space-y-3">
-        <TelegramNotificationsSection embedded />
+        {/* FIX-TELEGRAM-KILLSWITCH: absent when off (no mount, no status fetch). */}
+        {isTelegramEnabled && <TelegramNotificationsSection embedded />}
         <VkNotificationsSection embedded />
       </div>
     </section>

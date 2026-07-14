@@ -105,7 +105,7 @@ export function EmailNotificationsSection() {
                 <button
                   type="button"
                   onClick={() => setDialogOpen(true)}
-                  className="mt-2 text-xs text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:rounded"
+                  className="mt-2 text-xs text-accent-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:rounded"
                 >
                   {t.changeEmail}
                 </button>

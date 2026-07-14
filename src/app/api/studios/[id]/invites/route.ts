@@ -107,7 +107,7 @@ export async function POST(
   }
 
   try {
-    await ensureStudioTeamLimit(auth.user.id, studio.id);
+    await ensureStudioTeamLimit(studio.id);
   } catch (error) {
     const appError = toAppError(error);
     return fail(appError.message, appError.status, appError.code, appError.details);

@@ -61,7 +61,7 @@ export function ReviewsFilters({ filter, masterId, masters, counts }: Props) {
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                 active
-                  ? "border-primary/40 bg-primary/10 text-primary"
+                  ? "border-primary/40 bg-primary/10 text-accent-text"
                   : "border-border-subtle bg-bg-card text-text-sec hover:text-text-main",
               )}
             >
@@ -69,7 +69,7 @@ export function ReviewsFilters({ filter, masterId, masters, counts }: Props) {
               <span
                 className={cn(
                   "rounded-full px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
-                  active ? "bg-primary/20 text-primary" : "bg-bg-input text-text-sec",
+                  active ? "bg-primary/20 text-accent-text" : "bg-bg-input text-text-sec",
                 )}
               >
                 {count}

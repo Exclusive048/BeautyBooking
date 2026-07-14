@@ -46,7 +46,7 @@ export function ReviewsFeed({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid="reviews-list">
       {reviews.map((review) => (
         <ReviewCard
           key={review.id}

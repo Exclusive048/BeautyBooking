@@ -12,13 +12,14 @@ export type FormattedDelta = {
  * when both values are 0.
  */
 export function formatRelativeDelta(current: number, previous: number): FormattedDelta {
+  // FIX-VISUAL-POLISH I9: no-change / no-baseline reads as a clean "—" (not
+  // "0%") so the neutral KPI pill doesn't render a meaningless trailing value.
   if (previous === 0) {
-    if (current === 0) return { text: "0%", tone: "neutral" };
     return { text: "—", tone: "neutral" };
   }
   const ratio = (current - previous) / Math.abs(previous);
   const percent = Math.round(ratio * 100);
-  if (percent === 0) return { text: "0%", tone: "neutral" };
+  if (percent === 0) return { text: "—", tone: "neutral" };
   const sign = percent > 0 ? "+" : "−";
   return {
     text: `${sign}${Math.abs(percent)}%`,
@@ -33,7 +34,7 @@ export function formatRelativeDelta(current: number, previous: number): Formatte
  */
 export function formatPointsDelta(current: number, previous: number): FormattedDelta {
   const diff = Math.round(current - previous);
-  if (diff === 0) return { text: "0 п.п.", tone: "neutral" };
+  if (diff === 0) return { text: "—", tone: "neutral" };
   const sign = diff > 0 ? "+" : "−";
   return {
     text: `${sign}${Math.abs(diff)} п.п.`,
@@ -47,7 +48,7 @@ export function formatPointsDelta(current: number, previous: number): FormattedD
  */
 export function formatRatingDelta(current: number, previous: number): FormattedDelta {
   const diff = Math.round((current - previous) * 10) / 10;
-  if (diff === 0) return { text: "0.0", tone: "neutral" };
+  if (diff === 0) return { text: "—", tone: "neutral" };
   const sign = diff > 0 ? "+" : "−";
   return {
     text: `${sign}${Math.abs(diff).toFixed(1)}`,

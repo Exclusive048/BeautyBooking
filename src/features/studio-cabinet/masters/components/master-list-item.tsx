@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -60,7 +60,7 @@ export function MasterListItem({
       aria-pressed={isSelected}
     >
       {master.avatarUrl ? (
-        <FocalImage
+        <ResilientImage
           src={master.avatarUrl}
           alt=""
           width={40}
@@ -81,7 +81,7 @@ export function MasterListItem({
             {master.displayName}
           </span>
           {master.isCurrentUser ? (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-primary">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-accent-text">
               {T.listItem.youChip}
             </span>
           ) : null}

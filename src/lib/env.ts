@@ -32,6 +32,21 @@ const envSchema = z.object({
   // ── Auth ──────────────────────────────────────────────────────────────────
   AUTH_COOKIE_NAME: z.string().min(1).default("bh_session"),
 
+  // ── Trusted proxy / client-IP derivation (HARDENING-08 FIX-17) ────────────
+  // Number of trusted reverse-proxy hops in front of the app. The client IP is
+  // taken `TRUSTED_PROXY_HOPS` entries from the RIGHT of X-Forwarded-For (never
+  // the client-spoofable leftmost). Default 1 = a single reverse proxy (the
+  // docker-compose `127.0.0.1:3000` topology). Set to match prod exactly
+  // (e.g. 2 for CDN+LB) — too-high re-opens the OTP rate-limit spoof.
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(10).default(1),
+  // Optional dedicated real-IP header the edge OVERWRITES (e.g. "x-real-ip").
+  // Only set when the edge is confirmed to set it — otherwise it's spoofable.
+  TRUSTED_REAL_IP_HEADER: z.string().trim().default(""),
+  // Flip the YooKassa webhook IP allowlist from log-only to REJECT. Leave false
+  // until TRUSTED_PROXY_HOPS is confirmed for prod — enforcing with a wrong hop
+  // count rejects real notifications. (Worker API re-fetch is the anchor either way.)
+  YOOKASSA_IP_ALLOWLIST_ENFORCED: boolFlag,
+
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: z.string().optional(),
   REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
@@ -41,6 +56,9 @@ const envSchema = z.object({
   WORKER_SECRET: z.string().optional(),
   BILLING_RENEW_SECRET: z.string().optional(),
   MRR_SNAPSHOT_SECRET: z.string().optional(),
+  // CATALOG-AVAILABLE-TODAY: token gating the availableToday recompute trigger.
+  // Fail-closed — the endpoint refuses when unset (never runs unauthenticated).
+  AVAILABILITY_CRON_TOKEN: z.string().optional(),
 
   // ── Storage ───────────────────────────────────────────────────────────────
   STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
@@ -57,11 +75,26 @@ const envSchema = z.object({
   // ── Telegram ──────────────────────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: z.string().optional(),
+  // FIX-TELEGRAM-KILLSWITCH: legal kill-switch for *user-facing* Telegram
+  // (login, cabinet-connect, notification delivery, footer). Defaults to false
+  // (fail-safe OFF) — an unset/misread flag must never leave Telegram on.
+  // Public flag so the client gates UI without a server round-trip (mirrors
+  // NEXT_PUBLIC_VK_ENABLED). Does NOT touch the internal ops-monitoring
+  // Telegram (MONITORING_TELEGRAM_*) — separate system.
+  NEXT_PUBLIC_TELEGRAM_ENABLED: boolFlag,
 
   // ── VK OAuth ──────────────────────────────────────────────────────────────
+  // VK creds accept two name sets: the canonical `VK_*` (what the prod template
+  // ships) and the `VK_ID_*` aliases (local dev / VK ID console naming). Both are
+  // declared here so NEITHER bypasses Zod (VK_ID_*-SCHEMA-GAP fix): `vk/config.ts`
+  // reads them via `env` (not `process.env`), alias-first then canonical. All
+  // optional — gating stays on `isVkAuthEnabled` (canonical `VK_CLIENT_ID`).
   VK_CLIENT_ID: z.string().optional(),
   VK_CLIENT_SECRET: z.string().optional(),
   VK_REDIRECT_URI: z.string().optional(),
+  VK_ID_CLIENT_ID: z.string().optional(),
+  VK_ID_CLIENT_SECRET: z.string().optional(),
+  VK_ID_REDIRECT_URI: z.string().optional(),
   NEXT_PUBLIC_VK_ENABLED: boolFlag,
   // VK-NOTIFICATIONS-FLAG-A: independent flag for the VK push-notifications
   // subsystem. VK login (`NEXT_PUBLIC_VK_ENABLED`) and VK notifications
@@ -73,6 +106,12 @@ const envSchema = z.object({
   // ── YooKassa ─────────────────────────────────────────────────────────────
   YOOKASSA_SHOP_ID: z.string().optional(),
   YOOKASSA_SECRET_KEY: z.string().optional(),
+  // HARDENING-02: optional merchant-controlled URL query secret for the webhook,
+  // NOT a signature/bearer token (YooKassa does not sign notifications). When set,
+  // configure the ЛК webhook URL as
+  // `https://<host>/api/payments/yookassa/webhook?token=<value>` and the route
+  // requires a matching `?token=`. When unset the route still accepts and relies
+  // on the worker's API re-fetch for authenticity.
   YOOKASSA_WEBHOOK_TOKEN: z.string().optional(),
 
   // ── Push (VAPID) ─────────────────────────────────────────────────────────
@@ -84,6 +123,15 @@ const envSchema = z.object({
   YANDEX_GEOCODER_API_KEY: z.string().optional(),
   YANDEX_SUGGEST_API_KEY: z.string().optional(),
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: z.string().optional(),
+
+  // ── Yandex OAuth (Yandex ID) ───────────────────────────────────────────────
+  // FIX-YANDEX-OAUTH: new auth provider, bespoke-parallel to VK. Register a
+  // Yandex OAuth app (oauth.yandex.ru), set the creds + redirect_uri, and flip
+  // NEXT_PUBLIC_YANDEX_ENABLED=true. Default OFF → button absent until creds.
+  YANDEX_OAUTH_CLIENT_ID: z.string().optional(),
+  YANDEX_OAUTH_SECRET: z.string().optional(),
+  YANDEX_OAUTH_REDIRECT_URI: z.string().optional(),
+  NEXT_PUBLIC_YANDEX_ENABLED: boolFlag,
 
   // FIX-EXP-CONTENT-GRAMMAR (EXP-005): real legal ИНН for the footer requisites.
   // Optional — the footer shows an obvious "[не указан]" placeholder when unset
@@ -97,28 +145,17 @@ const envSchema = z.object({
   // launch (see deploy-checklist «social links»).
   NEXT_PUBLIC_VK_COMMUNITY_URL: z.string().optional(),
 
-  // ── OpenAI (legacy — visual-search only, AI chat surfaces migrated to Yandex) ─
-  // OPENAI_API_KEY remains in schema because `src/lib/visual-search/*` still
-  // imports the OpenAI SDK directly (vision + embeddings — Yandex multimodal
-  // migration deferred post-launch per docs/AI-MIGRATION-STRATEGY.md). For the
-  // 4 chat surfaces it's no longer needed — Yandex is the single AI provider.
-  OPENAI_API_KEY: z.string().optional(),
-
-  // ── AI provider (post-migration 2026-05-31 — OPENAI-CLEANUP-A) ───────────
-  // The 4 chat surfaces (review-summary / review-reply / service-description /
-  // advisor) flow through `src/lib/ai/client.ts` which is wired to Yandex
-  // Cloud's OpenAI-compatible endpoint (`https://llm.api.cloud.yandex.net/v1`)
-  // via YANDEX_API_KEY + YANDEX_FOLDER_ID.
-  //
-  // `AI_PROVIDER` is vestigial post-cleanup — schema kept so existing `.env`
-  // files with `AI_PROVIDER=yandex` don't break Zod parse, but `client.ts`
-  // ignores the value and always constructs a Yandex client. Refine below
-  // requires YANDEX credentials unconditionally when AI_FEATURES_ENABLED.
-  //
-  // Visual search (`src/lib/visual-search/*`) imports the OpenAI SDK directly
-  // and uses OPENAI_API_KEY independently. Migrating it to Yandex (vision +
-  // embeddings) happens post-launch (separate work).
-  AI_PROVIDER: z.enum(["openai", "yandex"]).default("yandex"),
+  // ── AI — chat + visual-search both on Yandex ─────────────────────────────────
+  // Chat surfaces (review-summary / review-reply / service-description / advisor)
+  // flow through `src/lib/ai/client.ts`; visual search flows through
+  // `src/lib/visual-search/provider.ts` (VISUAL-SEARCH-YANDEX-MIGRATION-01). Both
+  // are wired to Yandex Cloud — chat via the Foundation Models OpenAI-compatible
+  // endpoint, visual search via AI Studio multimodal `qwen3.6-35b-a3b` +
+  // `text-search-doc`/`text-search-query` embeddings — all using YANDEX_API_KEY +
+  // YANDEX_FOLDER_ID. The refines below require both when AI_FEATURES_ENABLED or
+  // VISUAL_SEARCH_ENABLED is on. (OPENAI-CLEANUP-A 2026-05-31 moved chat to Yandex;
+  // OPENAI_API_KEY was dropped by VISUAL-SEARCH-YANDEX-MIGRATION-01 2026-07-13 —
+  // nothing reads it anymore. Zod strips any leftover from existing `.env` files.)
   YANDEX_API_KEY: z.string().optional(),
   YANDEX_FOLDER_ID: z.string().optional(),
 
@@ -177,16 +214,16 @@ const refinedSchema = envSchema
     "S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY are required when STORAGE_PROVIDER=s3"
   )
   .refine(
-    (e) => !e.VISUAL_SEARCH_ENABLED || Boolean(e.OPENAI_API_KEY),
-    "OPENAI_API_KEY is required when VISUAL_SEARCH_ENABLED=true"
+    (e) =>
+      !e.VISUAL_SEARCH_ENABLED || (Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)),
+    "VISUAL_SEARCH_ENABLED=true requires YANDEX_API_KEY + YANDEX_FOLDER_ID (visual search hits Yandex AI Studio qwen3.6-35b-a3b + text-search embeddings)."
   )
-  // Post-migration (OPENAI-CLEANUP-A 2026-05-31): Yandex is the single chat
-  // provider. `client.ts` ignores AI_PROVIDER and always constructs a Yandex
-  // client, so YANDEX credentials are required unconditionally when AI
-  // features are on. (OPENAI_API_KEY is checked separately for visual-search.)
+  // Post-migration: Yandex is the single provider for BOTH chat and visual search
+  // — `client.ts` and `visual-search/provider.ts` always construct Yandex clients,
+  // so YANDEX credentials are required unconditionally when AI features are on.
   .refine(
     (e) => !e.AI_FEATURES_ENABLED || (Boolean(e.YANDEX_API_KEY) && Boolean(e.YANDEX_FOLDER_ID)),
-    "AI_FEATURES_ENABLED=true requires YANDEX_API_KEY + YANDEX_FOLDER_ID (chat surfaces hit Yandex Cloud Foundation Models post-migration). Visual search uses OPENAI_API_KEY separately."
+    "AI_FEATURES_ENABLED=true requires YANDEX_API_KEY + YANDEX_FOLDER_ID (chat surfaces hit Yandex Cloud Foundation Models)."
   )
   .refine(
     (e) =>
@@ -253,8 +290,10 @@ const clientEnv = {
   NODE_ENV: process.env.NODE_ENV,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME,
+  NEXT_PUBLIC_TELEGRAM_ENABLED: process.env.NEXT_PUBLIC_TELEGRAM_ENABLED,
   NEXT_PUBLIC_VK_ENABLED: process.env.NEXT_PUBLIC_VK_ENABLED,
   NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: process.env.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED,
+  NEXT_PUBLIC_YANDEX_ENABLED: process.env.NEXT_PUBLIC_YANDEX_ENABLED,
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
   NEXT_PUBLIC_LEGAL_INN: process.env.NEXT_PUBLIC_LEGAL_INN,
@@ -280,7 +319,33 @@ export const isPushEnabled = Boolean(
 );
 export const isPaymentsEnabled = Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
 export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
+/**
+ * FIX-TELEGRAM-KILLSWITCH — env HARD CEILING for user-facing Telegram. When
+ * false (the launch default), Telegram is absent from the UI and inert in
+ * delivery everywhere. The admin SystemConfig toggle (see
+ * `getTelegramEnabled` in src/lib/telegram/feature.ts) can only act BELOW this
+ * ceiling — it can never re-enable Telegram past an env-OFF.
+ *
+ * String-coerced for client-safety: on the server `env` is Zod-parsed →
+ * boolean; on the client the parse falls back to raw `process.env` (string).
+ * `String(x) === "true"` normalises both (same rationale as
+ * `isVkNotificationsEnabled`).
+ *
+ * Distinct from `isTelegramAuthEnabled` (token presence) — this is the
+ * intent/legal switch, independent of whether a bot token is configured.
+ */
+export const isTelegramEnabled =
+  String(env.NEXT_PUBLIC_TELEGRAM_ENABLED) === "true";
 export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
+/**
+ * FIX-YANDEX-OAUTH — Yandex ID auth provider gate. Mirrors `isVkAuthEnabled`:
+ * both the public enable flag AND a configured client id must be present.
+ * String-coerced for client-safety (server boolean vs client raw string). The
+ * `YandexLoginButton` self-gates on this; the button is absent until a real
+ * Yandex OAuth app is registered + `NEXT_PUBLIC_YANDEX_ENABLED=true`.
+ */
+export const isYandexAuthEnabled =
+  String(env.NEXT_PUBLIC_YANDEX_ENABLED) === "true" && Boolean(env.YANDEX_OAUTH_CLIENT_ID);
 /**
  * VK-NOTIFICATIONS-FLAG-A: VK push-notifications subsystem is incomplete
  * (no delivery path in `notifications/delivery.ts`). The flag gates the

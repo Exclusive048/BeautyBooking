@@ -7,7 +7,7 @@ import { Menu, X, Scissors, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import { UI_TEXT } from "@/lib/ui/text";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 
 type WorkspaceMenuLink = {
   href: string;
@@ -43,7 +43,7 @@ function WorkspaceMenuItem({
     >
       <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-subtle/80 bg-bg-card text-text-sec">
         {item.avatarUrl ? (
-          <FocalImage
+          <ResilientImage
             src={item.avatarUrl}
             alt=""
             width={32}

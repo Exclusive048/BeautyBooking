@@ -57,6 +57,12 @@ export async function GET(req: Request, ctx: RouteContext) {
         providerId: true,
         masterProviderId: true,
         actionRequiredBy: true,
+        // TZ-DISPLAY-SALON-PARITY-01: the booking's provider tz so the modal
+        // renders the current-time label + slot times in SALON-tz (not the
+        // viewer's browser tz). Precedence mirrors `resolvedMasterId` below,
+        // and matches the provider `/availability` loads for slot generation.
+        provider: { select: { timezone: true } },
+        masterProvider: { select: { timezone: true } },
         service: { select: { durationMin: true, baseDurationMin: true } },
       },
     });
@@ -76,6 +82,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     // (the actual master if studio booking) — `masterProviderId` for
     // studio bookings, otherwise the provider itself for solo masters.
     const resolvedMasterId = booking.masterProviderId ?? booking.providerId;
+    const timezone = booking.masterProvider?.timezone ?? booking.provider.timezone;
 
     const runtimeStatus = resolveBookingRuntimeStatus({
       status: booking.status,
@@ -87,6 +94,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       masterProviderId: resolvedMasterId,
       serviceId: booking.serviceId,
       durationMin,
+      timezone,
       status: runtimeStatus,
       // MASTER-BOOKING-UI-FIX-A: surfacing actionRequiredBy lets the
       // reschedule modal distinguish initiator vs awaited side for

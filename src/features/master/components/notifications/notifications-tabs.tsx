@@ -84,7 +84,7 @@ export function NotificationsTabs({ activeTab, tabCounts, sort }: Props) {
                     className={cn(
                       "inline-flex min-w-[1.25rem] justify-center rounded-full px-1.5 py-0.5 font-mono text-[10px]",
                       active
-                        ? "bg-primary/10 text-primary"
+                        ? "bg-primary/10 text-accent-text"
                         : "bg-bg-input text-text-sec"
                     )}
                   >

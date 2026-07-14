@@ -41,6 +41,8 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       categories: true,
       availableToday: true,
       timezone: true,
+      socialVk: true,
+      socialInstagram: true,
       cancellationDeadlineHours: true,
       discountRule: { select: { isEnabled: true } },
       geoLat: true,
@@ -52,6 +54,8 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
           name: true,
           durationMin: true,
           price: true,
+          // FIX-R2-04-C: attached category label + order for booking-list grouping.
+          globalCategory: { select: { name: true, orderIndex: true } },
         },
       },
     },

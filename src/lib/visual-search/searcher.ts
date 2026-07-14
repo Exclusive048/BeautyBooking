@@ -8,16 +8,16 @@ import { getStrategy } from "@/lib/visual-search/category-registry";
 import { classifyImage } from "@/lib/visual-search/classifier";
 import { assertVisualSearchEnabled } from "@/lib/visual-search/config";
 import {
-  createTextEmbedding,
+  createQueryEmbedding,
   describeImageWithStrategy,
-  resizeForOpenAI,
-} from "@/lib/visual-search/openai";
+  resizeForVision,
+} from "@/lib/visual-search/provider";
 import type { VisualCategorySlug, VisualSearchStrategy } from "@/lib/visual-search/prompt";
 
 const MIN_FILTERED_ASSETS = 5;
 const FILTER_LIMIT = 5000;
 const VECTOR_LIMIT = 50;
-const EMBEDDING_DIMENSIONS = 1536;
+const EMBEDDING_DIMENSIONS = 256;
 const MAX_PROVIDER_RESULTS = 5;
 const MAX_PROVIDER_PHOTOS = 3;
 
@@ -203,7 +203,7 @@ function buildProviderResults(input: {
 export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearchResponse> {
   await assertVisualSearchEnabled();
 
-  const resizedBytes = await resizeForOpenAI(imageBytes);
+  const resizedBytes = await resizeForVision(imageBytes);
   const classification = await classifyImage(resizedBytes);
 
   if (classification.category === "none") {
@@ -244,7 +244,7 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
     return { ok: false, reason: "not_enough_indexed" };
   }
 
-  const queryEmbedding = await createTextEmbedding(described.text_description);
+  const queryEmbedding = await createQueryEmbedding(described.text_description);
   if (!queryEmbedding) {
     return { ok: false, reason: "not_enough_indexed" };
   }

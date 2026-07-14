@@ -5,7 +5,9 @@ import {
   AlertOctagon,
   Bell,
   Building2,
+  Images,
   ShieldCheck,
+  UserRound,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -25,6 +27,8 @@ const SECTIONS: Array<{
   icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }> = [
   { key: "general", labelKey: "general", icon: Building2 },
+  { key: "profile-media", labelKey: "profileMedia", icon: UserRound },
+  { key: "portfolio", labelKey: "portfolio", icon: Images },
   { key: "owner-team", labelKey: "ownerTeam", icon: Users },
   { key: "notifications", labelKey: "notifications", icon: Bell },
   { key: "policy", labelKey: "policy", icon: ShieldCheck },
@@ -64,7 +68,7 @@ export function SettingsNav({ active, canDanger }: Props) {
                   isActive
                     ? isDanger
                       ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
-                      : "bg-primary/10 text-primary"
+                      : "bg-primary/10 text-accent-text"
                     : isDanger
                       ? "text-rose-700/80 hover:bg-rose-50/60 dark:text-rose-400/80 dark:hover:bg-rose-950/30"
                       : "text-text-main hover:bg-bg-input/60",

@@ -734,7 +734,7 @@ export default function CatalogPageClient({
               count. */}
           <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <p className="mb-1.5 font-mono text-xs font-medium uppercase tracking-[0.18em] text-primary">
+              <p className="mb-1.5 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
                 {UI_TEXT.catalog2.resultsHeader.eyebrowNoCategory.replace("{city}", "")}
               </p>
               <h1 className="font-display text-3xl leading-[1.1] text-text-main sm:text-4xl lg:text-5xl">
@@ -823,6 +823,7 @@ export default function CatalogPageClient({
 
           {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
             <motion.div
+              data-testid="catalog-list"
               className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
               initial="hidden"
               animate="visible"

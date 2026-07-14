@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +38,7 @@ import {
 } from "./hooks/use-profile-autosave";
 import { EmailVerifyModal } from "./modals/email-verify-modal";
 import { TelegramConnectModal } from "./modals/telegram-connect-modal";
+import { isTelegramEnabled } from "@/lib/env";
 
 const T = UI_TEXT.clientCabinet.profilePage;
 
@@ -252,7 +253,7 @@ export function ClientProfilePage({ userId }: Props) {
         />
       ) : null}
 
-      {tgModalOpen ? (
+      {isTelegramEnabled && tgModalOpen ? (
         <TelegramConnectModal
           key="tg-modal"
           onClose={() => setTgModalOpen(false)}
@@ -274,12 +275,15 @@ function ProfileHeaderCard({
   data,
   status,
   userId,
-  onAvatarChanged: _onAvatarChanged,
 }: {
   data: ProfileDTO;
   status: SaveStatus;
   userId: string;
-  onAvatarChanged: () => void;
+  // `onAvatarChanged` is accepted for the caller's contract but unused here:
+  // <AvatarEditor> owns its full upload/reload pipeline (self-contained), so the
+  // parent doesn't need a change callback. Kept in the type so the wiring is
+  // discoverable if AvatarEditor later exposes an onChange.
+  onAvatarChanged?: () => void;
 }) {
   const displayName =
     [data.personal.firstName, data.personal.lastName].filter(Boolean).join(" ") ||
@@ -314,7 +318,7 @@ function ProfileHeaderCard({
               {formatVisitsLabel(data.stats.visitsCount)}
             </span>
             <span className="inline-flex items-center gap-1">
-              <Heart className="h-3 w-3 text-primary" aria-hidden />
+              <Heart className="h-3 w-3 text-accent-text" aria-hidden />
               {data.stats.favoritesCount} в избранном
             </span>
           </div>
@@ -519,25 +523,29 @@ function LinkedAccountsCard({
       />
 
       <div className="space-y-2.5">
-        <ConnectRow
-          icon={<MessageCircle className="h-5 w-5" aria-hidden />}
-          iconColor="#2AABEE"
-          name="Telegram"
-          connected={tg.connected}
-          status={
-            tg.connected
-              ? tg.username
-                ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
-                : `подключён ${formatConnectedAt(tg.connectedAt)}`
-              : "Войти через Telegram и получать уведомления"
-          }
-          actionLabel={tg.connected ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
-          onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
-        />
+        {/* FIX-TELEGRAM-KILLSWITCH: the Telegram connect row is absent when the
+            flag is off (the connect modal + unlink handler are gated inert). */}
+        {isTelegramEnabled && (
+          <ConnectRow
+            icon={<MessageCircle className="h-5 w-5" aria-hidden />}
+            iconColor="#2AABEE"
+            name="Telegram"
+            connected={tg.connected}
+            status={
+              tg.connected
+                ? tg.username
+                  ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
+                  : `подключён ${formatConnectedAt(tg.connectedAt)}`
+                : "Войти через Telegram и получать уведомления"
+            }
+            actionLabel={tg.connected ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
+            onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
+          />
+        )}
         <ConnectRow
           icon={<Users className="h-5 w-5" aria-hidden />}
           iconColor="#0077FF"
-          name="VKontakte"
+          name="ВКонтакте"
           connected={vk.connected}
           status={
             vk.connected
@@ -636,8 +644,14 @@ function CompletionGradientCard({
 }: {
   completion: ProfileDTO["completion"];
 }) {
-  const total = 6;
-  const done = Object.values(completion.items).filter(Boolean).length;
+  // FIX-TELEGRAM-COPY-SWEEP: exclude the tgLinked step when Telegram is off so
+  // the "X из N" text matches the (server-recomputed) percent and 100% is
+  // reachable without a Telegram step.
+  const countedEntries = Object.entries(completion.items).filter(
+    ([key]) => isTelegramEnabled || key !== "tgLinked"
+  );
+  const total = countedEntries.length;
+  const done = countedEntries.filter(([, value]) => Boolean(value)).length;
   return (
     <Card className="overflow-hidden border-0 bg-brand-gradient p-5 text-white">
       <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/80">
@@ -679,7 +693,10 @@ function ChecklistCard({
       <div className="mb-3 text-sm font-semibold text-text-main">
         {T.completion.checklistTitle}
       </div>
-      {CHECKLIST_ROWS.map((row) => {
+      {CHECKLIST_ROWS.filter(
+        // FIX-TELEGRAM-KILLSWITCH: drop the "Telegram" checklist row when off.
+        (row) => isTelegramEnabled || row.key !== "tgLinked"
+      ).map((row) => {
         const done = items[row.key];
         return (
           <div
@@ -790,6 +807,6 @@ function ProfileSkeleton() {
 }
 
 // Suppress lint hint about unused imports leftover from the consolidation —
-// `FocalImage` + `Textarea` may be re-introduced when photo previews / email
+// `ResilientImage` + `Textarea` may be re-introduced when photo previews / email
 // modals land. Mark as referenced explicitly.
-export const _ProfileImports = { FocalImage, Textarea, MapPin };
+export const _ProfileImports = { ResilientImage, Textarea, MapPin };

@@ -24,7 +24,7 @@ export function ApplicationEmptyState({ isFiltered }: Props) {
       {isFiltered ? (
         <Link
           href="?#applications"
-          className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+          className="mt-3 inline-block text-sm font-medium text-accent-text hover:underline"
         >
           {PT.filterReset}
         </Link>

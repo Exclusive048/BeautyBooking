@@ -27,4 +27,12 @@ COPY src ./src
 
 ENV NODE_ENV=production
 
-CMD ["node_modules/.bin/tsx", "src/worker.ts"]
+# WORKER-BOOT-SERVER-ONLY-01: the worker is a legitimate server runtime that
+# transitively imports `server-only`-guarded modules (redis/connection, prisma).
+# Under plain Node (tsx), `server-only` resolves to its throwing `index.js` and
+# kills the process at import. Passing Node's `react-server` condition — the
+# escape the package itself provides — resolves it to the no-op `empty.js`.
+# The flag is an explicit tsx arg (not NODE_OPTIONS) so `env_file` can't clobber
+# it; exec-form CMD keeps tsx as PID 1 for graceful SIGTERM shutdown.
+# MUST stay in lockstep with the `worker` npm script (package.json).
+CMD ["node_modules/.bin/tsx", "--conditions=react-server", "src/worker.ts"]

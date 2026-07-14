@@ -7,6 +7,7 @@ import {
 import { CLIENT_STATUS_THRESHOLDS } from "@/lib/master/clients-classifier";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
+import { mapProposedReschedule } from "@/features/studio-cabinet/schedule/lib/reschedule-decision";
 import {
   bookingsTimeRangeBounds,
   type BookingsTimeRange,
@@ -99,15 +100,21 @@ export async function listStudioBookings(input: {
 }): Promise<StudioBookingsListData> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
-    select: { id: true, providerId: true },
+    select: {
+      id: true,
+      providerId: true,
+      provider: { select: { timezone: true } },
+    },
   });
   if (!studio) {
     return {
       items: [],
       nextCursor: null,
       rangeCounts: { today: 0, tomorrow: 0, week: 0, all: 0 },
+      timezone: "Europe/Moscow",
     };
   }
+  const timezone = studio.provider.timezone;
 
   const baseScope: Prisma.BookingWhereInput = {
     OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
@@ -164,6 +171,15 @@ export async function listStudioBookings(input: {
           clientUserId: true,
           masterProviderId: true,
           providerId: true,
+          // BOOKING-JOURNAL-SERVICEID-01: the booking's gating service, threaded
+          // into the cell so Move-from-journal gates the master picker (parity
+          // with the calendar path, which selects `serviceId` the same way).
+          serviceId: true,
+          // BOOKING-STUDIO-RESCHEDULE-PARITY-01: surface a pending client-proposed
+          // reschedule so the journal row's action menu can offer accept/decline.
+          proposedStartAt: true,
+          proposedEndAt: true,
+          actionRequiredBy: true,
           service: {
             select: { name: true, title: true, price: true, durationMin: true },
           },
@@ -313,6 +329,9 @@ export async function listStudioBookings(input: {
         isNewClient: stats.completedCount <= 1,
         isVip: stats.revenue >= CLIENT_STATUS_THRESHOLDS.VIP_LTV_KOPEKS,
       },
+      // BOOKING-JOURNAL-SERVICEID-01: `Booking.serviceId` is a non-null FK, so
+      // this is always the real gating service (no `""` sentinel).
+      serviceId: row.serviceId,
       service: {
         name: row.service?.title?.trim() || row.service?.name || "Услуга",
         durationMin: row.service?.durationMin ?? 0,
@@ -320,6 +339,7 @@ export async function listStudioBookings(input: {
       priceKopeks: resolveBookingPriceKopeks(row),
       source: row.source as BookingSource,
       status: row.status,
+      ...mapProposedReschedule(row),
     };
   });
 
@@ -330,5 +350,5 @@ export async function listStudioBookings(input: {
     all: allCount,
   };
 
-  return { items, nextCursor, rangeCounts };
+  return { items, nextCursor, rangeCounts, timezone };
 }

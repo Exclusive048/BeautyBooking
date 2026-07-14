@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { motion, useReducedMotion } from "framer-motion";
 import { useStoriesViewer } from "@/features/home/stories-viewer-context";
 import {
@@ -66,14 +66,14 @@ function StoryRing({
         >
           <div className="relative h-full w-full overflow-hidden rounded-full bg-bg-card">
             {group.avatarUrl ? (
-              <FocalImage
+              <ResilientImage
                 src={group.avatarUrl}
                 alt=""
                 sizes="72px"
                 className="object-cover"
               />
             ) : (
-              <span className="flex h-full w-full items-center justify-center bg-primary/10 text-sm font-semibold text-primary">
+              <span className="flex h-full w-full items-center justify-center bg-primary/10 text-sm font-semibold text-accent-text">
                 {initials || "?"}
               </span>
             )}
@@ -141,7 +141,7 @@ export function StoriesRail() {
   // Loading: skeleton with reserved height, no layout-jump when groups load
   if (isLoading && !data) {
     return (
-      <section aria-label="Сторис мастеров" className="-mx-4 sm:-mx-6">
+      <section data-testid="stories-rail" aria-label="Сторис мастеров" className="-mx-4 sm:-mx-6">
         <RailSkeleton />
       </section>
     );
@@ -154,6 +154,7 @@ export function StoriesRail() {
 
   return (
     <motion.section
+      data-testid="stories-rail"
       initial={reduce ? false : { opacity: 0, y: -8 }}
       animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={reduce ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}

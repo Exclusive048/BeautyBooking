@@ -3,9 +3,10 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Building2, ChevronRight, MapPin, Share2, Star } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { Button } from "@/components/ui/button";
 import { FavoriteToggleButton } from "@/components/ui/favorite-toggle-button";
+import { ProviderSocialLinks } from "@/components/ui/provider-social-links";
 import { HotSlotsSubscribeButton } from "@/features/hot-slots/components/hot-slots-subscribe-button";
 import { AvailabilityHint } from "@/features/public-profile/master/components/availability-hint";
 import { PremiumRing } from "@/features/public-profile/master/components/premium-ring";
@@ -109,7 +110,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
           >
             <PremiumRing active={isPremium}>
               {provider.avatarUrl ? (
-                <FocalImage
+                <ResilientImage
                   src={provider.avatarUrl}
                   alt={provider.name}
                   width={132}
@@ -165,7 +166,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 {studio.publicUsername ? (
                   <Link
                     href={`/u/${studio.publicUsername}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-main transition hover:border-primary/40 hover:text-primary"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-main transition hover:border-primary/40 hover:text-accent-text"
                   >
                     <Building2 className="h-3.5 w-3.5" aria-hidden strokeWidth={1.6} />
                     <span>{T.studioAffiliationTemplate.replace("{name}", studio.name)}</span>
@@ -230,6 +231,14 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 ))}
               </motion.div>
             ) : null}
+
+            {/* FEAT-PROVIDER-SOCIALS: VK / Instagram community icons (shown only
+                when set; each href re-validated in the shared component). */}
+            <ProviderSocialLinks
+              vk={provider.socialVk}
+              instagram={provider.socialInstagram}
+              className="mt-4"
+            />
           </div>
 
           <div className="flex shrink-0 items-center gap-2 self-start">

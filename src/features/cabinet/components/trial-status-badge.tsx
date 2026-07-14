@@ -50,7 +50,7 @@ export function TrialStatusBadge({ trialEndsAt }: Props) {
   const Icon = isUrgent ? Clock : Sparkles;
   const className = isUrgent
     ? "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
-    : "inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary";
+    : "inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-accent-text";
 
   return (
     <span className={className} aria-live="polite">

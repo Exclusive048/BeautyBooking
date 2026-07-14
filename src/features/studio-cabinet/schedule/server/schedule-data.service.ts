@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { bookingToneFromStatus } from "../lib/booking-status-display";
+import { mapProposedReschedule } from "../lib/reschedule-decision";
 import {
   DAY_END_HOUR,
   DAY_START_HOUR,
@@ -116,6 +117,11 @@ async function buildDayData(
         clientName: true,
         clientPhone: true,
         clientUserId: true,
+        // BOOKING-STUDIO-RESCHEDULE-PARITY-01: surface a pending client-proposed
+        // reschedule so the calendar cell + action menu can offer accept/decline.
+        proposedStartAt: true,
+        proposedEndAt: true,
+        actionRequiredBy: true,
         service: { select: { name: true, title: true, price: true } },
         serviceItems: { select: { priceSnapshot: true } },
       },
@@ -197,6 +203,7 @@ async function buildDayData(
         serviceTitle: b.service?.title?.trim() || b.service?.name || "Услуга",
         serviceId: b.serviceId,
         priceKopeks: resolveBookingPriceKopeks(b),
+        ...mapProposedReschedule(b),
       };
     });
 
@@ -430,6 +437,7 @@ export async function loadStudioScheduleData(input: {
   return {
     dateKey: effectiveDateKey,
     view: input.view,
+    timezone: studioTimezone,
     day,
     kpis: computeKpis(day),
     week,

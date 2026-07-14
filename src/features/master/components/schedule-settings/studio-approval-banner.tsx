@@ -52,7 +52,7 @@ export function StudioApprovalBanner({ studioName, initialPending }: Props) {
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-border-subtle bg-bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-2.5">
-        <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <Clock className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden />
         <p className="text-sm text-text-main">{message}</p>
       </div>
       {pending ? (

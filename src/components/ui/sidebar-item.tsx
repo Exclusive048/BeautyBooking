@@ -44,7 +44,7 @@ export function SidebarItem({
         <Icon
           className={cn(
             "h-4 w-4 shrink-0 transition-colors",
-            active ? "text-primary" : "text-text-sec"
+            active ? "text-accent-text" : "text-text-sec"
           )}
         />
       ) : null}

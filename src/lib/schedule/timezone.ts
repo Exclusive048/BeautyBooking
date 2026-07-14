@@ -1,5 +1,29 @@
 import type { DayOfWeek } from "@/lib/domain/schedule";
 
+/**
+ * Read-time fallback tz (HARDENING-06 FIX-10). Kept as a literal (NOT the `env`
+ * import) so this module stays client-safe (rule 13) — it's imported by client
+ * components via `formatLocalHm`. Mirrors `env.DEFAULT_TIMEZONE`.
+ */
+const FALLBACK_TIME_ZONE = "Europe/Moscow";
+
+/**
+ * Is `value` a formatter-usable IANA timezone? Write-time validation (FIX-10)
+ * uses this in the studio/master PATCH schemas so a bad tz (e.g. `""`) can never
+ * be stored; `partsFromDate` uses it as a read-time guard so a pre-existing bad
+ * row degrades to the fallback instead of throwing `RangeError` on live
+ * calendar/booking surfaces. Pure Intl → client-safe.
+ */
+export function isValidTimeZone(value: string): boolean {
+  if (typeof value !== "string" || value.trim().length < 3) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const WEEKDAY_MAP: Record<string, DayOfWeek> = {
   Sun: 0,
   Mon: 1,
@@ -25,8 +49,14 @@ function partsFromDate(date: Date, timeZone: string): DateParts {
       `Invalid date in partsFromDate: ${String(date)} (type=${typeof date}, value=${JSON.stringify(date)})`
     );
   }
+  // FIX-10 read-time guard: a bad stored tz (empty/garbage) would make the
+  // `Intl.DateTimeFormat` constructor throw `RangeError` → 500 on live
+  // calendar/booking surfaces. Write-time validation (schema) keeps new rows
+  // clean; this degrades a pre-existing bad row to the fallback. Client-safe →
+  // no `logError` here (rule 13); the schema rejection is the observable signal.
+  const safeTimeZone = isValidTimeZone(timeZone) ? timeZone : FALLBACK_TIME_ZONE;
   const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: safeTimeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

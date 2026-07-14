@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { BookingStatus } from "@prisma/client";
+import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
 import type { AnalyticsRange } from "@/features/analytics/domain/date-range";
 import {
@@ -57,16 +58,34 @@ type ForecastResult = {
   forecastRevenue: number;
 };
 
-async function loadBookingRevenueMap(bookingIds: string[]): Promise<Map<string, number>> {
-  if (bookingIds.length === 0) return new Map();
+/**
+ * Booking → revenue map, mirroring the dashboard's `sumBookingPrice`
+ * (`day.service.ts`, R2-03-B): the sum of positive `BookingServiceItem`
+ * snapshots when present, else a fallback to `Service.price`. Never both —
+ * item present (snap > 0) → snapshot; item absent → service price.
+ *
+ * Production `createBooking` always writes a priced item in-tx, so the
+ * fallback only affects item-less / imported rows; adding it keeps analytics
+ * consistent with the dashboard on the same data (the R2-03 reconciliation).
+ */
+async function loadBookingRevenueMap(
+  bookings: Array<{ id: string; servicePrice: Kopeks }>,
+): Promise<Map<string, Kopeks>> {
+  if (bookings.length === 0) return new Map();
   const grouped = await prisma.bookingServiceItem.groupBy({
     by: ["bookingId"],
-    where: { bookingId: { in: bookingIds } },
+    where: { bookingId: { in: bookings.map((booking) => booking.id) } },
     _sum: { priceSnapshot: true },
   });
-  const map = new Map<string, number>();
+  const snapshotSum = new Map<string, number>();
   for (const row of grouped) {
-    map.set(row.bookingId, Math.max(0, row._sum?.priceSnapshot ?? 0));
+    snapshotSum.set(row.bookingId, Math.max(0, row._sum?.priceSnapshot ?? 0));
+  }
+  const map = new Map<string, Kopeks>();
+  for (const booking of bookings) {
+    const snap = snapshotSum.get(booking.id) ?? 0;
+    // Re-brand once at the map insert (fallback/arithmetic widened to `number`).
+    map.set(booking.id, toKopeks(snap > 0 ? snap : Math.max(0, booking.servicePrice)));
   }
   return map;
 }
@@ -86,10 +105,13 @@ export async function getRevenueTimeline(input: {
       id: true,
       startAtUtc: true,
       clientUserId: true,
+      service: { select: { price: true } },
     },
   });
 
-  const revenueMap = await loadBookingRevenueMap(bookings.map((item) => item.id));
+  const revenueMap = await loadBookingRevenueMap(
+    bookings.map((item) => ({ id: item.id, servicePrice: toKopeks(item.service?.price ?? 0) })),
+  );
   const bucketKeys = listBucketKeys(input.range, input.context.timeZone, input.granularity);
   const buckets = new Map<string, { revenue: number; bookings: number; clients: Set<string> }>();
   bucketKeys.forEach((key) => buckets.set(key, { revenue: 0, bookings: 0, clients: new Set() }));
@@ -169,10 +191,13 @@ export async function getRevenueByMaster(input: {
       id: true,
       masterProviderId: true,
       providerId: true,
+      service: { select: { price: true } },
     },
   });
 
-  const revenueMap = await loadBookingRevenueMap(bookings.map((item) => item.id));
+  const revenueMap = await loadBookingRevenueMap(
+    bookings.map((item) => ({ id: item.id, servicePrice: toKopeks(item.service?.price ?? 0) })),
+  );
 
   const totals = new Map<string, { revenue: number; bookings: number }>();
   for (const booking of bookings) {
@@ -235,9 +260,11 @@ export async function getRevenueForecast(input: {
 
   const upcoming = await prisma.booking.findMany({
     where: upcomingWhere,
-    select: { id: true },
+    select: { id: true, service: { select: { price: true } } },
   });
-  const revenueMap = await loadBookingRevenueMap(upcoming.map((item) => item.id));
+  const revenueMap = await loadBookingRevenueMap(
+    upcoming.map((item) => ({ id: item.id, servicePrice: toKopeks(item.service?.price ?? 0) })),
+  );
   const plannedRevenue = Array.from(revenueMap.values()).reduce((sum, value) => sum + value, 0);
 
   const historyStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);

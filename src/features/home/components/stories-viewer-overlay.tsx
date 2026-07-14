@@ -14,7 +14,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useStoriesViewer, type ViewerState } from "@/features/home/stories-viewer-context";
 import { markItemViewed } from "@/features/home/stories-viewed-storage";
 import type { StoriesGroup, StoryItem } from "@/features/home/types/stories";
@@ -243,7 +243,7 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
                 transition={{ duration: reduceMotion ? 0 : 0.15 }}
                 className="absolute inset-0"
               >
-                <FocalImage
+                <ResilientImage
                   src={item.mediaUrl}
                   alt=""
                   sizes="(max-width: 768px) 100vw, 480px"
@@ -331,7 +331,7 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
           >
             <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full ring-2 ring-white/40 transition group-hover:ring-white">
               {group.avatarUrl ? (
-                <FocalImage
+                <ResilientImage
                   src={group.avatarUrl}
                   alt=""
                   sizes="32px"

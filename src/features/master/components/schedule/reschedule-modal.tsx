@@ -14,9 +14,11 @@ import {
   type SlotItem as SlotPickerItem,
 } from "@/features/booking/components/slot-picker/slot-picker";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 
 const T = UI_TEXT.cabinetMaster.schedule.reschedule;
 
@@ -30,6 +32,12 @@ type RescheduleContext = {
   masterProviderId: string;
   serviceId: string;
   durationMin: number;
+  /**
+   * TZ-DISPLAY-SALON-PARITY-01: the booking's provider (salon) tz. All
+   * booking/slot times in this modal render in it (not the viewer's browser
+   * tz), matching the salon-tz slot generation.
+   */
+  timezone: string;
   status:
     | "PENDING"
     | "CONFIRMED"
@@ -56,32 +64,28 @@ type Props = {
   onClose: () => void;
 };
 
-function toDateKey(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function buildDateRange(days: number): string[] {
-  const start = new Date();
-  const items: string[] = [];
+// TZ-DISPLAY-SALON-PARITY-01: build the day-chip range as SALON-local date keys
+// (was browser-local `new Date()` + getDate) so the chips + the slots they
+// filter agree in the salon's tz.
+function buildSalonDateKeys(salonTz: string, days: number): string[] {
+  const todayKey = toLocalDateKey(new Date(), salonTz);
+  const keys: string[] = [];
   for (let i = 0; i < days; i += 1) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    items.push(toDateKey(d));
+    keys.push(addDaysToDateKey(todayKey, i));
   }
-  return items;
+  return keys;
 }
 
-function formatDateLabel(dateKey: string, timeZone: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+// A salon-local date key (already tz-resolved) → its «Пн 08 июл» label. Anchored
+// at UTC noon so the key's Y-M-D renders as-is with no tz day-shift.
+function formatDateLabel(dateKey: string): string {
+  const dt = new Date(`${dateKey}T12:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return dateKey;
   return dt.toLocaleDateString("ru-RU", {
     weekday: "short",
     day: "2-digit",
     month: "short",
-    timeZone,
+    timeZone: "UTC", // tz-ok: date-key label (salon-local), UTC-noon anchor
   });
 }
 
@@ -133,10 +137,15 @@ export function RescheduleModal({
   const [contextLoading, setContextLoading] = useState(false);
   const [contextError, setContextError] = useState<string | null>(null);
 
-  const dateOptions = useMemo(() => buildDateRange(14), []);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    () => dateOptions[0] ?? "",
+  // TZ-DISPLAY-SALON-PARITY-01: salon tz arrives with the reschedule-context
+  // fetch; until then the picker + date chips aren't rendered (both gated on
+  // `context`), so `salonTz` is always present where booking/slot times show.
+  const salonTz = context?.timezone ?? null;
+  const dateOptions = useMemo(
+    () => (salonTz ? buildSalonDateKeys(salonTz, 14) : []),
+    [salonTz],
   );
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [slots, setSlots] = useState<ApiSlot[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotLabel, setSlotLabel] = useState<string>("");
@@ -153,8 +162,17 @@ export function RescheduleModal({
     setSlotLabel("");
     setComment("");
     setError(null);
-    setSelectedDate(dateOptions[0] ?? "");
-  }, [open, dateOptions, bookingId]);
+    setSelectedDate("");
+  }, [open, bookingId]);
+
+  // TZ-DISPLAY-SALON-PARITY-01: pick the first day once the SALON-local range is
+  // known (i.e. context loaded). Functional update avoids a `selectedDate` dep.
+  useEffect(() => {
+    if (!open || dateOptions.length === 0) return;
+    setSelectedDate((current) =>
+      dateOptions.includes(current) ? current : dateOptions[0]!,
+    );
+  }, [open, dateOptions]);
 
   // Load booking context (master+service+status) on open.
   useEffect(() => {
@@ -234,19 +252,23 @@ export function RescheduleModal({
   // Filter and group slots for the picker; exclude the booking's
   // current slot (master shouldn't "move to where it already is").
   const slotItemsForDate = useMemo<SlotPickerItem[]>(() => {
+    // TZ-DISPLAY-SALON-PARITY-01: filter the day + render the time in SALON tz
+    // (was viewer tz), matching the salon-tz slot generation. `salonTz` is
+    // always set here — `slots` only load after the context (with tz) arrives.
+    if (!salonTz) return [];
     const originalIso = (() => {
       const d = new Date(startAtUtc);
       return Number.isNaN(d.getTime()) ? null : d.toISOString();
     })();
     return slots
-      .filter((slot) => toLocalDateKey(slot.startAtUtc, viewerTimeZone) === selectedDate)
+      .filter((slot) => toLocalDateKey(slot.startAtUtc, salonTz) === selectedDate)
       .filter((slot) => slot.startAtUtc !== originalIso)
       .map((slot) => ({
         id: slot.label,
         label: slot.label,
-        timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: viewerTimeZone }),
+        timeText: UI_FMT.timeShort(slot.startAtUtc, { timeZone: salonTz }),
       }));
-  }, [selectedDate, slots, viewerTimeZone, startAtUtc]);
+  }, [selectedDate, slots, salonTz, startAtUtc]);
 
   const slotGroups = useMemo(
     () =>
@@ -263,14 +285,21 @@ export function RescheduleModal({
 
   if (!open) return null;
 
-  // EXP-019: the "current time" label must render in the SAME tz as the slot
-  // picker below it (viewer/salon tz) — the old `getHours()`/`getDate()` form
-  // read the host process tz, so the original-time label disagreed with the
-  // slots by the tz offset.
+  // EXP-019 + TZ-DISPLAY-SALON-PARITY-01: the "current time" label renders in
+  // the SALON tz (matching the slot picker below), labeled «(город, GMT+N)» when
+  // the viewer differs. Shown once the context (and thus `salonTz`) has loaded;
+  // until then a dash (the picker also shows its own loading state).
   const original = new Date(startAtUtc);
-  const originalLabel = Number.isNaN(original.getTime())
-    ? "—"
-    : `${UI_FMT.dateShort(startAtUtc, { timeZone: viewerTimeZone })} · ${UI_FMT.timeShort(startAtUtc, { timeZone: viewerTimeZone })}`;
+  const originalLabel =
+    !salonTz || Number.isNaN(original.getTime())
+      ? "—"
+      : `${UI_FMT.dateShort(startAtUtc, { timeZone: salonTz })} · ${UI_FMT.timeShort(startAtUtc, { timeZone: salonTz })}`;
+  const originalZoneLabel =
+    salonTz &&
+    !Number.isNaN(original.getTime()) &&
+    zonesDifferForViewer({ iso: startAtUtc, salonTimeZone: salonTz, viewerTimeZone })
+      ? formatZoneLabel({ iso: startAtUtc, timeZone: salonTz })
+      : "";
 
   // ── #5а pending guard ────────────────────────────────────────────
   // When the booking already has a pending change request, the modal
@@ -351,7 +380,12 @@ export function RescheduleModal({
             <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
               {T.currentLabel}
             </p>
-            <p className="text-sm text-text-main">{originalLabel}</p>
+            <p className="text-sm text-text-main">
+              {originalLabel}
+              {originalZoneLabel ? (
+                <span className="text-text-sec"> {originalZoneLabel}</span>
+              ) : null}
+            </p>
             {context ? (
               <p className="mt-0.5 text-xs text-text-sec">
                 {T.durationLabel.replace("{N}", String(context.durationMin))}
@@ -387,7 +421,7 @@ export function RescheduleModal({
                         variant={active ? "active" : "default"}
                         className="whitespace-nowrap"
                       >
-                        {formatDateLabel(date, viewerTimeZone)}
+                        {formatDateLabel(date)}
                       </Chip>
                     );
                   })}

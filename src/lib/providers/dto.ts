@@ -22,6 +22,12 @@ export type ProviderServiceDto = {
   name: string;
   durationMin: number;
   price: number;
+  // FIX-R2-04-C: attached global-category LABEL (+ order) for presentational
+  // grouping of the public booking service list. Rule-12-safe — `categoryName`
+  // is a human label and `categoryOrder` a sort int, neither an internal id.
+  // `null` when the service has no attached category (→ "Другие услуги" bucket).
+  categoryName: string | null;
+  categoryOrder: number | null;
 };
 
 export type ProviderSuperpowerBadgeDto = {
@@ -66,6 +72,10 @@ export type ProviderProfileDto = {
   categories: string[];
   availableToday: boolean;
   timezone: string;
+  // FEAT-PROVIDER-SOCIALS: normalized safe community-link URLs (or null).
+  // Rule-12-safe — a social link is public by design (no internal id).
+  socialVk: string | null;
+  socialInstagram: string | null;
   cancellationDeadlineHours: number | null;
   hotSlotsEnabled: boolean;
   geoLat: number | null;

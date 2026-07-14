@@ -10,7 +10,8 @@ import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
-import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
+import { buildBookingOverlapWhere, bookingOverlapsRange } from "@/lib/schedule/overlap";
 import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { logError } from "@/lib/logging/logger";
@@ -271,29 +272,38 @@ async function computeAvailabilityHint(
       range: { fromKey: todayKey, toKeyExclusive },
     });
 
-    const bookings = await prisma.booking.findMany({
+    // FIX-8 (HARDENING-04): fetch the conflict set by OVERLAP with the probe
+    // window, then bucket per day by overlap — NOT `startAtUtc >= now` keyed by
+    // start-day. The old approach dropped in-progress bookings (started before
+    // `now`) and mis-filed cross-midnight bookings under the PREVIOUS day, so
+    // the profile advertised a nearest slot sitting under an ongoing/overnight
+    // appointment (which then 409s at submit). Same overlap primitive the
+    // engine uses. The slot HORIZON is unchanged — the `earliestBookable`
+    // cutoff below still gates which slots are offered.
+    const lastProbeDayKey = addDaysToDateKey(todayKey, AVAILABILITY_PROBE_DAYS - 1);
+    const probeWindowStartUtc = localDayRangeUtc(todayKey, timezone).startUtc;
+    const probeWindowEndUtc = localDayRangeUtc(lastProbeDayKey, timezone).endExclusiveUtc;
+    const bookingRows = await prisma.booking.findMany({
       where: {
         OR: [
           { masterProviderId: providerId },
           { masterProviderId: null, providerId },
         ],
         status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-        startAtUtc: { gte: now },
+        ...buildBookingOverlapWhere(probeWindowStartUtc, probeWindowEndUtc),
       },
       select: { startAtUtc: true, endAtUtc: true },
     });
-
-    const bookingsByDateKey = new Map<
-      string,
-      Array<{ startAtUtc: Date; endAtUtc: Date }>
-    >();
-    for (const booking of bookings) {
-      if (!booking.startAtUtc || !booking.endAtUtc) continue;
-      const key = toLocalDateKey(booking.startAtUtc, timezone);
-      const list = bookingsByDateKey.get(key) ?? [];
-      list.push({ startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc });
-      bookingsByDateKey.set(key, list);
-    }
+    const activeBookings = bookingRows.filter(
+      (booking): booking is { startAtUtc: Date; endAtUtc: Date } =>
+        booking.startAtUtc !== null && booking.endAtUtc !== null,
+    );
+    const bookingsForDay = (dateKey: string): Array<{ startAtUtc: Date; endAtUtc: Date }> => {
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc(dateKey, timezone);
+      return activeBookings.filter((booking) =>
+        bookingOverlapsRange(booking, startUtc, endExclusiveUtc),
+      );
+    };
 
     let cursor = todayKey;
     for (let i = 0; i < AVAILABILITY_PROBE_DAYS; i += 1) {
@@ -307,7 +317,7 @@ async function computeAvailabilityHint(
           // EXP-023: use the provider's real between-bookings buffer (was 0) so
           // the probe pads existing bookings exactly as the widget does.
           bufferMin,
-          bookings: bookingsByDateKey.get(cursor) ?? [],
+          bookings: bookingsForDay(cursor),
           now,
           slotStepMin,
         });

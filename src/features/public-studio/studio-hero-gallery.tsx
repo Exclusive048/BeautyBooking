@@ -7,7 +7,7 @@ import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import { UI_TEXT } from "@/lib/ui/text";
 import { withQuery } from "@/lib/public-urls";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 
 type StudioHeroData = {
   name: string;
@@ -53,7 +53,7 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
       <div className="grid gap-2 p-2 md:grid-cols-[2fr_1fr]">
         <div className="relative h-64 overflow-hidden rounded-2xl md:h-[420px]">
           {primary ? (
-            <FocalImage
+            <ResilientImage
               src={primary.url}
               alt={studio.name}
               sizes="(max-width: 768px) 100vw, 66vw"
@@ -72,7 +72,7 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
             return (
               <div key={index} className="relative h-32 overflow-hidden rounded-2xl md:h-full">
                 {item ? (
-                  <FocalImage
+                  <ResilientImage
                     src={item.url}
                     alt=""
                     sizes="(max-width: 768px) 50vw, 17vw"

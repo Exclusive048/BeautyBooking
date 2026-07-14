@@ -54,6 +54,8 @@ type SubscriptionSummary = {
     scope: SubscriptionScope;
   };
   pendingConfirmationUrl: string | null;
+  pendingPriceOptIn: boolean;
+  pendingPriceKopeks: number | null;
 };
 
 type StatusResponse = {
@@ -333,6 +335,45 @@ export function BillingPage({ scope }: BillingPageProps) {
     }
   };
 
+  // BILLING-RENEWAL-OPTIN-02: accept the higher renewal price. Routes through
+  // the existing checkout at the subscription's own plan + ORIGINAL period; the
+  // server resolves the (new) active price authoritatively and the webhook
+  // re-anchors ACTIVE + clears the opt-in flags. Idempotent server-side.
+  const handleAcceptNewPrice = async (sub: SubscriptionSummary) => {
+    setBusyScope(sub.scope);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope: sub.scope,
+          planId: sub.plan.id,
+          periodMonths: sub.periodMonths,
+          returnUrl: `${window.location.origin}${sub.scope === "STUDIO" ? "/cabinet/studio/billing" : "/cabinet/master/billing"}`,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok: true; data: { confirmationUrl?: string; mode?: string } }
+        | { ok: false; error: { message: string } }
+        | null;
+      if (!res.ok || !json || !("ok" in json) || !json.ok) {
+        throw new Error(
+          json && "error" in json ? json.error.message : UI_TEXT.billing.priceOptIn.acceptFailed
+        );
+      }
+      if (json.data.confirmationUrl) {
+        window.location.href = json.data.confirmationUrl;
+        return;
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : UI_TEXT.billing.priceOptIn.acceptFailed);
+    } finally {
+      setBusyScope(null);
+    }
+  };
+
   const handleToggleAutoRenew = async (selectedScope: SubscriptionScope, nextValue: boolean) => {
     setBusyScope(selectedScope);
     setError(null);
@@ -404,6 +445,27 @@ export function BillingPage({ scope }: BillingPageProps) {
 
       {error ? (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
+      ) : null}
+
+      {subscription?.pendingPriceOptIn && subscription.pendingPriceKopeks !== null ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="font-semibold">{UI_TEXT.billing.priceOptIn.bannerTitle}</div>
+            <p className="mt-0.5">
+              {UI_TEXT.billing.priceOptIn.bannerBody(
+                moneyRUBFromKopeks(subscription.pendingPriceKopeks),
+                subscription.graceUntil ? dateRU(new Date(subscription.graceUntil)) : ""
+              )}
+            </p>
+          </div>
+          <Button
+            disabled={isBusy}
+            onClick={() => void handleAcceptNewPrice(subscription)}
+            className="shrink-0"
+          >
+            {UI_TEXT.billing.priceOptIn.acceptCta}
+          </Button>
+        </div>
       ) : null}
 
       <section className="space-y-4">

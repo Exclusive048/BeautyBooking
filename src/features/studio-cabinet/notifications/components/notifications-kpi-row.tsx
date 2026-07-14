@@ -66,7 +66,7 @@ function Tile({
         <span
           className={
             accent
-              ? "grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary"
+              ? "grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-accent-text"
               : "grid h-7 w-7 place-items-center rounded-lg bg-bg-input text-text-sec"
           }
         >

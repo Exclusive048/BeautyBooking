@@ -3,7 +3,7 @@
 import { Calendar, Phone } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { FocalImage } from "@/components/ui/focal-image";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ChatPerspective, ConversationPartnerDto } from "@/features/chat/types";
 
@@ -48,7 +48,7 @@ export function WindowHeader({
         ) : null}
         <div className="relative shrink-0">
           {partner.avatarUrl ? (
-            <FocalImage
+            <ResilientImage
               src={partner.avatarUrl}
               alt={partner.name}
               width={40}
