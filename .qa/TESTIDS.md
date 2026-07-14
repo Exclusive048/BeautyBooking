@@ -56,14 +56,24 @@
 |---|---|---|
 | `login-send-code` | `app/login/login-client.tsx` | request OTP (phone/email step) |
 | `login-verify` | `app/login/login-client.tsx` | submit OTP → log in |
+| `login-tab-phone` / `login-tab-email` | `app/login/login-client.tsx` (via `ui/segmented-tabs.tsx`) | switch OTP channel — **present only when email OTP is configured** (`isEmailConfigured()`); phone-only deployments render no tabs |
+| `login-back` | `app/login/login-client.tsx` | OTP step → back to phone/email entry |
+| `login-resend` | `app/login/login-client.tsx` | resend OTP — **rendered only after the 60 s cooldown elapses** (before that the countdown text shows instead) |
 | `booking-submit` | `booking/components/booking-flow/phases/form-phase.tsx` | public booking widget — final «Записаться» |
 | `booking-confirm` | `master/components/bookings/booking-card-actions.tsx` | master accepts a pending / change-requested booking (the reschedule-accept side) |
 | `booking-decline` | `master/components/bookings/booking-card-actions.tsx` | master declines a pending / change-requested booking |
 | `reschedule-submit` | `client-cabinet/bookings/client-reschedule-modal.tsx` | client proposes a new time |
 
-> Login still exposes the 6 OTP boxes via `getByLabel("Цифра N из 6")`; `.qa/login.ts`
-> `loginAs` remains the canonical login path and does not depend on these testids —
-> they are additional stable hooks for asserting the login surface directly.
+> Login still exposes the 6 OTP boxes via `getByLabel("Цифра N из 6")` (unchanged
+> by LOGIN-REDESIGN-01 — the OTP grid moved to the shared `ui/otp-input.tsx`
+> primitive but keeps the exact per-box `aria-label`); `.qa/login.ts` `loginAs`
+> remains the canonical login path and does not depend on these testids — they are
+> additional stable hooks for asserting the login surface directly. The **phone
+> input** is located by `getByRole("textbox", { name: /Телефон/ })`, the **consent
+> checkbox** by `getByRole("checkbox")` (single, renders only for a valid phone),
+> the **send CTA** by `/Отправить код/`, and the **social-login buttons** by their
+> accessible names (`/Telegram/`, `/VK/`, `/Яндекс/`) — each present only when its
+> provider flag is enabled.
 
 ## Not covered yet (incremental breadth — `QA-TESTID-COVERAGE`)
 

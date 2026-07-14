@@ -40,6 +40,14 @@
     --rose: 254 198 211;             /* #FEC6D3 baby pink */
     --sky:  186 212 237;             /* #BAD4ED powder blue */
 
+    /* === Login brand-stage accents (LOGIN-REDESIGN-01) ===
+       The login brand pane is a FIXED dark surface in BOTH themes, so its
+       decorative accents must be theme-STABLE — using `--rose`/`--sky` there
+       would flip them deep in dark and drop the shimmer/aurora contrast. These
+       hold the LIGHT pink/blue and are intentionally NOT overridden in `.dark`. */
+    --login-accent-pink: 254 198 211;  /* fixed baby pink */
+    --login-accent-blue: 186 212 237;  /* fixed powder blue */
+
     /* === Shadows — burgundy-tinted === */
     --shadow-sm: 0 10px 24px rgba(42, 10, 16, 0.08);
     --shadow-lg: 0 24px 44px rgba(42, 10, 16, 0.14);
@@ -55,6 +63,10 @@
     --brand-from: 114 8 8;
     --brand-via:  161 7 40;
     --brand-deep: 86 5 5;
+    /* Brand-pane base — the deep burgundy backdrop of the login brand stage
+       (LOGIN-REDESIGN-01). Darker than --brand-deep; the aurora blobs sit on
+       top. Dark in BOTH themes (it is a brand surface, not a page surface). */
+    --brand-pane: 58 4 12;
     /* Warm-sand accent reserved for AI / discovery affordances
        (Visual Search modal, etc.). Distinct from the burgundy
        primary so AI moments read as a separate semantic. Same in
@@ -136,6 +148,7 @@
     --brand-from: 114 8 8;
     --brand-via:  161 7 40;
     --brand-deep: 86 5 5;
+    --brand-pane: 58 4 12;
     --brand-accent: 198 169 126;
 
     --bg: var(--bg-page);
@@ -386,3 +399,142 @@
     }
   }
 }
+
+/* ============================================================
+   LOGIN SURFACE FX (LOGIN-REDESIGN-01)
+   Decorative, brand-tinted motion for the auth entry point.
+
+   Split (per redesign.md): framer-motion drives step transitions
+   and panel enter/stagger IN THE PAGE; this file holds only the
+   INFINITE decorative loops (aurora, sheen, sparkles, pulse-dot,
+   word-rise, shimmer, marquee, halo) plus two micro-feedbacks
+   (otp digit-pop / grid-shake) that read better as CSS keyframes.
+
+   Every looping animation is gated behind
+   `prefers-reduced-motion: no-preference`, so reduced-motion
+   users get the static composition — the aurora AND the marquee
+   actually stop.
+
+   Colours come from brand tokens. The brand pane is dark in BOTH
+   themes, so the white shimmer/sheen highlights are intentional
+   and theme-stable (no light-mode variant needed for them).
+   ============================================================ */
+
+/* — Brand-pane decoration — */
+.login-aurora {
+  position: absolute;
+  inset: -30%;
+  z-index: -2;
+  filter: blur(70px) saturate(1.15);
+  pointer-events: none;
+  transition: transform 400ms ease-out;
+}
+.login-aurora > i {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.85;
+  will-change: transform;
+}
+.login-aurora > i:nth-child(1) { width: 60%; height: 55%; left: 2%;  top: 4%;      background: rgb(var(--brand-from)); }
+.login-aurora > i:nth-child(2) { width: 55%; height: 50%; right: -4%; top: 26%;     background: rgb(var(--brand-via)); }
+.login-aurora > i:nth-child(3) { width: 48%; height: 42%; left: 22%; bottom: -2%;   background: rgb(var(--brand-deep)); }
+.login-aurora > i:nth-child(4) { width: 34%; height: 30%; right: 16%; bottom: 22%;  background: rgb(var(--login-accent-pink) / 0.55); }
+.login-aurora > i:nth-child(5) { width: 26%; height: 24%; left: 8%;  top: 44%;      background: rgb(var(--login-accent-blue) / 0.35); }
+
+.login-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxNDAnIGhlaWdodD0nMTQwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC45JyBudW1PY3RhdmVzPScyJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzE0MCcgaGVpZ2h0PScxNDAnIGZpbHRlcj0ndXJsKCNuKScgb3BhY2l0eT0nMC4wNScvPjwvc3ZnPg==");
+}
+.login-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 30%, rgb(255 255 255 / 0.06) 46%, transparent 60%);
+  background-size: 300% 100%;
+}
+
+.login-spark {
+  position: absolute;
+  z-index: 1;
+  color: rgb(var(--login-accent-pink) / 0.9);
+  pointer-events: none;
+  opacity: 0;
+}
+.login-dot {
+  box-shadow: 0 0 0 0 rgb(var(--success) / 0.5);
+}
+
+/* Shimmer italic word — gradient text-clip over the dark pane. Fixed pink →
+   white → fixed pink so it reads identically in both themes (pane is dark). */
+.login-shimmer {
+  background: linear-gradient(100deg, rgb(var(--login-accent-pink)) 20%, rgb(255 255 255) 40%, rgb(var(--login-accent-pink)) 60%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.05em;
+}
+
+/* Word-rise headline — each word sits below its mask until it rises.
+   With `both` the fill holds the hidden `from` during the delay; under
+   reduced motion the animation never applies, so the word shows at rest. */
+.login-word-mask { display: inline-block; overflow: hidden; vertical-align: bottom; }
+.login-word { display: inline-block; }
+
+/* Form-pane halo */
+.login-halo {
+  position: absolute;
+  width: 560px;
+  height: 560px;
+  max-width: 120%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--primary) / 0.07), transparent 65%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* — Marquee — */
+.login-mq-col { display: flex; flex-direction: column; gap: 0.875rem; }
+
+/* — OTP micro-feedback (static classes; animated only under no-preference) — */
+
+@media (prefers-reduced-motion: no-preference) {
+  .login-aurora > i:nth-child(1) { animation: login-float-a 19s ease-in-out infinite alternate; }
+  .login-aurora > i:nth-child(2) { animation: login-float-b 23s ease-in-out infinite alternate; }
+  .login-aurora > i:nth-child(3) { animation: login-float-c 17s ease-in-out infinite alternate; }
+  .login-aurora > i:nth-child(4) { animation: login-float-a 26s ease-in-out infinite alternate-reverse; }
+  .login-aurora > i:nth-child(5) { animation: login-float-b 21s ease-in-out infinite alternate-reverse; }
+  .login-sheen::after { animation: login-sheen 9s ease-in-out infinite; }
+  .login-spark { animation: login-spark 5s ease-in-out infinite; }
+  .login-dot { animation: login-pulse-dot 2.2s ease-in-out infinite; }
+  .login-shimmer { animation: login-text-shimmer 4.5s ease-in-out infinite; }
+  .login-word { animation: login-word-up 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .login-halo { animation: login-halo 8s ease-in-out infinite; }
+  .login-mq-col { animation: login-marquee-up 26s linear infinite; }
+  .login-mq-col.is-rev { animation: login-marquee-down 30s linear infinite; }
+  .login-mq-zone:hover .login-mq-col { animation-play-state: paused; }
+  .login-otp-pop { animation: login-digit-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .login-otp-shake { animation: login-otp-shake 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+}
+
+@keyframes login-float-a { from { transform: translate(0, 0) scale(1); }   to { transform: translate(9%, 13%) scale(1.18); } }
+@keyframes login-float-b { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-11%, -8%) scale(0.92); } }
+@keyframes login-float-c { from { transform: translate(0, 0) scale(0.95); } to { transform: translate(7%, -11%) scale(1.14); } }
+@keyframes login-sheen { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
+@keyframes login-spark { 0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 0.9; transform: scale(1) rotate(90deg); } }
+@keyframes login-pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 rgb(var(--success) / 0.5); } 50% { box-shadow: 0 0 0 7px rgb(var(--success) / 0); } }
+@keyframes login-text-shimmer { 0%, 100% { background-position: 110% 0; } 50% { background-position: -10% 0; } }
+@keyframes login-word-up { from { transform: translateY(110%); } to { transform: translateY(0); } }
+@keyframes login-halo { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.12); } }
+@keyframes login-marquee-up { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+@keyframes login-marquee-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+@keyframes login-digit-pop { 0% { transform: scale(0.92); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes login-otp-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 45% { transform: translateX(7px); } 70% { transform: translateX(-4px); } 90% { transform: translateX(2px); } }

@@ -623,6 +623,27 @@ export const UI_TEXT = {
       emailNotConfigured: "Вход по email временно недоступен",
       brandSubtitle: "BEAUTY MARKETPLACE",
       heroTitleAccent: "30 секунд",
+      // LOGIN-REDESIGN-01 — brand-stage copy.
+      // Headline is split into words for the word-rise animation; the accented
+      // word carries the shimmer. Kept as one visible phrase.
+      brandHeadlineLead: "Красота начинается",
+      brandHeadlineWith: "со",
+      brandHeadlineAccent: "входа",
+      brandTagline: "Запись к мастеру за 30 секунд — без звонков и переписок. Выбирайте по работам, платите после процедуры.",
+      // Divider above the social-login buttons.
+      socialDividerLabel: "или войти через",
+      // Vertical marquee of benefit cards on the brand stage. These are product
+      // benefits (no invented person, no invented quote, no fabricated rating) —
+      // real trust framing, kept as a purely visual device.
+      marqueeAria: "Преимущества платформы",
+      marquee: [
+        { title: "Запись за 30 секунд", subtitle: "Без звонков и переписок", badge: "быстро" },
+        { title: "Оплата после визита", subtitle: "Никакой предоплаты", badge: "удобно" },
+        { title: "Выбор по портфолио", subtitle: "Смотрите работы и отзывы", badge: "" },
+        { title: "Напоминание о визите", subtitle: "Не забудете о записи", badge: "авто" },
+        { title: "Перенос в пару кликов", subtitle: "Планы меняются — это нормально", badge: "" },
+        { title: "Проверенные мастера", subtitle: "Только реальные записи", badge: "" },
+      ],
     },
     telegram: {
       loginButton: "Войти через Telegram",
