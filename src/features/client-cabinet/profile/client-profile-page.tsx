@@ -545,7 +545,7 @@ function LinkedAccountsCard({
         <ConnectRow
           icon={<Users className="h-5 w-5" aria-hidden />}
           iconColor="#0077FF"
-          name="VKontakte"
+          name="ВКонтакте"
           connected={vk.connected}
           status={
             vk.connected
