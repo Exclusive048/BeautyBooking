@@ -101,6 +101,7 @@ import { seedShowcaseStudio } from "./seed-showcase-studio";
 import { seedShowcaseAdmin } from "./seed-showcase-admin";
 import { seedShowcaseClient } from "./seed-showcase-client";
 import { seedShowcaseStudioClientBookings } from "./seed-showcase-studio-client-bookings";
+import { seedBillingFixtures } from "./seed-billing-fixtures";
 
 async function main() {
   if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
@@ -144,6 +145,12 @@ async function main() {
   // (Елена's profile) — it resolves all of them by stable key.
   await seedShowcaseStudioClientBookings();
 
+  // SEED-FRESHNESS-01: plan-gating fixtures (FREE / PREMIUM / PAST_DUE+grace /
+  // EXPIRED masters). Unpublished → they don't touch the showcase catalog /
+  // counts / analytics. Needs the resolved plans; independent of the showcase
+  // rigs otherwise, so it runs last.
+  const billingFixtureCount = await seedBillingFixtures({ plans });
+
   logSeed.summary({
     cities: cities.length,
     categories: categories.length,
@@ -156,6 +163,7 @@ async function main() {
     hotSlots: hotCount,
     modelOffers: offerCount,
     favorites: favCount,
+    billingFixtures: billingFixtureCount,
   });
 }
 

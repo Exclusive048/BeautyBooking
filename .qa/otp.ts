@@ -13,8 +13,29 @@ import { createHmac, createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-const PG_CONTAINER = process.env.QA_PG_CONTAINER ?? "masterryadom-db";
-const REDIS_CONTAINER = process.env.QA_REDIS_CONTAINER ?? "beautyhub-redis";
+// Container names drift (compose adds a `-1` suffix: `beautyhub-redis` ->
+// `beautyhub-redis-1`), which silently broke every `docker exec` in PASS-01.
+// Discover the running container by name-pattern so it can't drift again; an
+// explicit env var still wins, and a hard default is the last resort.
+function discoverContainer(pattern: RegExp, fallback: string): string {
+  try {
+    const out = execFileSync("docker", ["ps", "--format", "{{.Names}}"], {
+      encoding: "utf8",
+    });
+    const names = out
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return names.find((n) => pattern.test(n)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const PG_CONTAINER =
+  process.env.QA_PG_CONTAINER ?? discoverContainer(/masterryadom-db|postgres/i, "masterryadom-db");
+const REDIS_CONTAINER =
+  process.env.QA_REDIS_CONTAINER ?? discoverContainer(/redis/i, "beautyhub-redis-1");
 
 type EnvMap = Record<string, string>;
 

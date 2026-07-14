@@ -18,6 +18,15 @@ export const metadata: Metadata = {
 
 const T = UI_TEXT.support;
 
+// This page reads the session cookie (`getSessionUser()`) to prefill the
+// contact field. Reading cookies during static generation throws Next's
+// `DynamicServerError` bailout — which the try/catch below (kept for genuine
+// prefill failures like the VK-link DB read) would otherwise swallow into a
+// false "contact prefill failed" ops alert. Declaring the route dynamic makes
+// the intent explicit and stops Next from ever static-rendering it, so the
+// bailout never fires and the prefill actually runs. (SUPPORT-PAGE-DYNAMIC-SERVER-USAGE)
+export const dynamic = "force-dynamic";
+
 export default async function SupportPage() {
   let contactOptions: SupportContactOption[] = [];
 

@@ -41,6 +41,8 @@
 |---|---|
 | `bookings-list` | client bookings container — `features/client-cabinet/bookings/client-bookings-page.tsx` |
 | `booking-row` | each booking row/card — client `client-bookings-page.tsx` (`<li>`), master kanban `bookings/booking-card.tsx`, master dashboard `dashboard/booking-row.tsx` |
+
+> ℹ️ On the **client** bookings list `booking-row` is on **every** month-grouped `<li>` regardless of status (all/upcoming/finished/cancelled) — verified 13/13 rows (FIX-ROUND-01). If `getByTestId('booking-row').count()` reads 0 while times are visible, the list is still on the SWR **skeleton** (rows aren't in the DOM on mount — see `useFocusHighlight`) or under concurrent dev load — wait for `[data-testid="bookings-list"]` to hold `<li>`s before counting. The KpiCards "next booking" time (`client-bookings-page.tsx` KPI card) is a **separate** surface, NOT a `booking-row`.
 | `bookings-column-{id}` | each master-kanban column — `bookings/kanban-column.tsx` (id ∈ `pending`/`confirmed`/`today`/`done`/`cancelled`) |
 | `reviews-list` | master reviews container — `master/components/reviews/reviews-feed.tsx` |
 | `review-row` | each review card — `master/components/reviews/review-card.tsx` |
