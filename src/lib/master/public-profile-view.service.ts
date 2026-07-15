@@ -57,6 +57,15 @@ export type MasterPublicProfileView = {
   experienceMonths: number | null;
   availability: AvailabilityHint;
   /**
+   * PACKAGE-SOLO-WIZARD-01: the master's normalized between-bookings buffer, in
+   * minutes. The package wizard needs it client-side because
+   * `createSoloPackageBooking` requires this gap BETWEEN two package siblings
+   * (`intraPackageOverlap`), and the slots API can't express it — the sibling
+   * isn't committed yet, so its window still reads free. Without it the wizard
+   * would offer a slot the create then rejects with 409.
+   */
+  providerBufferMin: number;
+  /**
    * QA-115 (FIX-06): studio affiliation when the master belongs to a studio.
    * `publicUsername` is the studio's *public* identifier for the profile link
    * (rule 12 — never an internal id); `null` when the studio isn't publicly
@@ -239,6 +248,9 @@ export const getMasterPublicProfileView = cache(
       planTier,
       experienceMonths,
       availability,
+      // PACKAGE-SOLO-WIZARD-01 — same normalization the booking core applies,
+      // so the wizard's cursor matches the create's `intraPackageOverlap` gap.
+      providerBufferMin: normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
       studio,
     };
   },

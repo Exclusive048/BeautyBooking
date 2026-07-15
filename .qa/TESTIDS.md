@@ -53,6 +53,10 @@
 | `notifications-list` | notifications feed container — same file. Absent when the feed is empty (the empty state renders instead) |
 | `notification-row` | each notification card — same file. Carries `data-group` (bookings/reminders/reviews/promo/billing/studio/models/system) and `data-unread` ("true"/"false") so a pass can assert filtering + read state without reading Russian copy |
 | `notifications-empty` | empty state — same file (mutually exclusive with `notifications-list`) |
+| `package-wizard` | solo package wizard build step — `public-profile/master/components/package-booking-flow.tsx` (PACKAGE-SOLO-WIZARD-01) |
+| `package-component` | each package component row — same file. Carries `data-state` (`placed`/`active`/`waiting`) so a pass can assert wizard progress + the sequential gating without reading Russian copy. Exactly one row is `active` until all are placed |
+| `package-date-grid` / `package-time-grid` | the active component's date / time pickers — same file. `package-time-grid` renders **only after a date is picked** (date → time, per component) |
+| `package-review` / `package-contacts` / `package-success` | the wizard's later steps — same file. `package-contacts` appears **once**, after every component is placed |
 | `notifications-invites` | studio-invites section — same file. **Rendered only when the viewer has ≥1 pending invite** (NOTIFICATIONS-REDESIGN-01); its absence is the expected state for most users, not a failure |
 
 ### Key CTAs
@@ -69,6 +73,10 @@
 | `login-back` | `app/login/login-client.tsx` | OTP step → back to phone/email entry |
 | `login-resend` | `app/login/login-client.tsx` | resend OTP — **rendered only after the 60 s cooldown elapses** (before that the countdown text shows instead) |
 | `booking-submit` | `booking/components/booking-flow/phases/form-phase.tsx` | public booking widget — final «Записаться» |
+| `package-to-review` | `public-profile/master/components/package-booking-flow.tsx` | solo package wizard — «Продолжить» to review. **Rendered only once every component is placed** (its absence mid-wizard is the expected state) |
+| `package-continue` | same file | review → contacts |
+| `package-submit` | same file | contacts → «Записать пакет» (the ONLY call that creates bookings — N of them, atomically) |
+| `package-change` | same file | re-pick a placed component (cascade-clears the tail) |
 | `booking-confirm` | `master/components/bookings/booking-card-actions.tsx` | master accepts a pending / change-requested booking (the reschedule-accept side) |
 | `booking-decline` | `master/components/bookings/booking-card-actions.tsx` | master declines a pending / change-requested booking |
 | `reschedule-submit` | `client-cabinet/bookings/client-reschedule-modal.tsx` | client proposes a new time |

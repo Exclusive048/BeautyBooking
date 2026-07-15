@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { AppError, type ErrorCode } from "@/lib/api/errors";
+import { AppError, type ErrorCode, toAppError } from "@/lib/api/errors";
 import {
   Prisma,
   ProviderType,
@@ -13,9 +13,6 @@ import {
   normalizeBufferMinutes,
   type BookingCoreContext,
 } from "@/lib/bookings/booking-core";
-import { listBookableSlots } from "@/lib/schedule/bookable-window";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import {
   proportionalDiscountedPrices,
   packageFinalTotal,
@@ -287,84 +284,99 @@ export type ProposeResult =
       failedComponentName?: string;
     };
 
+export type SoloPackageSlot = { serviceId: string; startAtUtc: Date };
+
 /**
- * Sequential placement (solo): same master, same local day, each component
- * starting at or after the previous component's end + buffer. Non-contiguous
- * gaps allowed. Component 0 is anchored to the client-chosen `startAtUtc`;
- * each subsequent component takes the first available slot at/after the
- * running cursor. Returns the proposed slots + per-component proportional
- * discounted price for the review screen.
- *
- * Advisory only — `createSoloPackageBooking` re-validates everything
- * authoritatively. This drives the UX so the client never confirms a
- * placement the create would reject.
+ * Re-orders the client's chosen slots into the package's `sortOrder`,
+ * validating that they cover exactly the package components (one slot per
+ * service). Throws PACKAGE_MISMATCH on any drift (so the client re-loads a
+ * stale cart). Mirrors the studio `orderSelections`; shared by propose +
+ * create so placement and pricing align on the same order.
  */
-export async function proposeSoloPackagePlacement(input: {
+function orderSoloSlots(
+  pkg: LoadedSoloPackage,
+  slots: SoloPackageSlot[],
+): Array<{ component: SoloPackageComponent; startAtUtc: Date }> {
+  if (slots.length !== pkg.components.length) {
+    throw new AppError("Состав пакета изменился. Обновите страницу.", 409, "PACKAGE_MISMATCH");
+  }
+  const byService = new Map(slots.map((s) => [s.serviceId, s]));
+  return pkg.components.map((component) => {
+    const chosen = byService.get(component.serviceId);
+    if (!chosen) {
+      throw new AppError("Состав пакета изменился. Обновите страницу.", 409, "PACKAGE_MISMATCH");
+    }
+    return { component, startAtUtc: chosen.startAtUtc };
+  });
+}
+
+/**
+ * PACKAGE-SOLO-WIZARD-01 — validates the client's chosen per-component slots +
+ * prices the package for the review screen. Mirrors
+ * `proposeStudioPackagePlacement`: one `resolveBookingCore` per component
+ * (service enabled + salon-tz availability/work-hours + booking window +
+ * price/duration), the intra-package overlap guard, then the proportional
+ * split.
+ *
+ * Advisory only — `createSoloPackageBooking` re-validates authoritatively.
+ * `clientUserId` is threaded so the accept-new-clients check matches the
+ * eventual create (a returning client isn't prematurely blocked).
+ *
+ * Replaces the MVP-1 single-anchor auto-sequencer, which greedily packed every
+ * component into the SAME local day after one chosen start and failed the whole
+ * package (`PACKAGE_PLACEMENT_FAILED`) on a busy day, with no way for the
+ * client to place component N themselves. The wizard now picks a (date, time)
+ * per component, so placement is the client's — this only validates + prices
+ * it. Components may span different days; the client-timeline ORDER is held by
+ * the widget cursor (the backend enforces non-overlap, not order — same
+ * contract as studio).
+ */
+export async function proposeSoloPackageSelections(input: {
   packageId: string;
-  startAtUtc: Date;
-  now?: Date;
+  slots: SoloPackageSlot[];
+  clientUserId?: string | null;
 }): Promise<ProposeResult> {
   const pkg = await loadSoloPackage(input.packageId);
-  const now = input.now ?? new Date();
-  const dayKey = toLocalDateKey(input.startAtUtc, pkg.timezone);
-  const toKeyExclusive = addDaysToDateKey(dayKey, 1);
+  const ordered = orderSoloSlots(pkg, input.slots);
 
-  const provider = {
-    id: pkg.providerId,
-    timezone: pkg.timezone,
-    minBookingHoursAhead: pkg.minBookingHoursAhead,
-  };
-
-  const placed: Array<{ serviceId: string; name: string; startAtUtc: Date; endAtUtc: Date; durationMin: number }> = [];
-  let cursor = input.startAtUtc;
-
-  for (let i = 0; i < pkg.components.length; i += 1) {
-    const component = pkg.components[i]!;
-    const bookable = await listBookableSlots({
-      provider,
-      serviceId: component.serviceId,
-      durationMinutes: component.durationMin,
-      fromKey: dayKey,
-      toKeyExclusive,
-      now,
-    });
-    if (!bookable.ok) {
+  const cores: BookingCoreContext[] = [];
+  for (let i = 0; i < ordered.length; i += 1) {
+    const { component, startAtUtc } = ordered[i]!;
+    try {
+      const core = await resolveBookingCore({
+        providerId: pkg.providerId,
+        serviceId: component.serviceId,
+        masterProviderId: null, // solo → resolvedMasterProviderId === provider.id
+        clientUserId: input.clientUserId ?? null,
+        startAtUtc,
+      });
+      cores.push(core);
+    } catch (error) {
+      const appError = toAppError(error);
       return {
         ok: false,
-        code: "PACKAGE_PLACEMENT_FAILED",
-        message: "Не удалось подобрать время для пакета. Выберите другое начало.",
+        code: appError.code,
+        message: appError.message,
         failedComponentIndex: i,
         failedComponentName: component.name,
       };
     }
-
-    const slot =
-      i === 0
-        ? bookable.slots.find(
-            (s) => new Date(s.startAtUtc).getTime() === input.startAtUtc.getTime(),
-          )
-        : bookable.slots.find((s) => new Date(s.startAtUtc).getTime() >= cursor.getTime());
-
-    if (!slot) {
-      return {
-        ok: false,
-        code: "PACKAGE_PLACEMENT_FAILED",
-        message:
-          i === 0
-            ? "Выбранное время недоступно. Выберите другое начало."
-            : `Не удалось разместить «${component.name}» в этот день. Выберите другое начало.`,
-        failedComponentIndex: i,
-        failedComponentName: component.name,
-      };
-    }
-
-    const start = new Date(slot.startAtUtc);
-    const end = new Date(slot.endAtUtc);
-    placed.push({ serviceId: component.serviceId, name: component.name, startAtUtc: start, endAtUtc: end, durationMin: component.durationMin });
-    cursor = new Date(end.getTime() + pkg.bufferMin * 60 * 1000);
   }
 
-  const prices = pkg.components.map((c) => toKopeks(c.effectivePrice));
+  // Same-master siblings need the between-bookings buffer between them — and
+  // they're invisible to `ensureNoConflicts` (uncommitted), so this mirrors the
+  // guard `createSoloPackageBooking` will run.
+  const bufferMin = cores[0]?.bufferMin ?? pkg.bufferMin;
+  const placement = cores.map((core) => ({ startAtUtc: core.startAtUtc, endAtUtc: core.endAtUtc }));
+  if (intraPackageOverlap(placement, bufferMin)) {
+    return {
+      ok: false,
+      code: "SLOT_CONFLICT",
+      message: "Услуги пакета пересекаются по времени. Выберите другое время.",
+    };
+  }
+
+  const prices = cores.map((c) => toKopeks(c.service.effectivePrice));
   const finalTotal = packageFinalTotal(prices, pkg.discountType as "PERCENT" | "FIXED", pkg.discountValue);
   const split = proportionalDiscountedPrices(prices, finalTotal);
 
@@ -373,12 +385,12 @@ export async function proposeSoloPackagePlacement(input: {
     packageId: pkg.id,
     packageName: pkg.name,
     totalKopeks: finalTotal,
-    components: placed.map((p, i) => ({
-      serviceId: p.serviceId,
-      name: p.name,
-      startAtUtc: p.startAtUtc.toISOString(),
-      endAtUtc: p.endAtUtc.toISOString(),
-      durationMin: p.durationMin,
+    components: ordered.map((o, i) => ({
+      serviceId: o.component.serviceId,
+      name: o.component.name,
+      startAtUtc: cores[i]!.startAtUtc.toISOString(),
+      endAtUtc: cores[i]!.endAtUtc.toISOString(),
+      durationMin: cores[i]!.durationMin,
       discountedPrice: split[i]!,
     })),
   };
@@ -405,23 +417,13 @@ export async function createSoloPackageBooking(input: {
   comment?: string | null;
   silentMode?: boolean;
   /** Chosen slots, one per component. serviceId must belong to the package. */
-  slots: Array<{ serviceId: string; startAtUtc: Date }>;
+  slots: SoloPackageSlot[];
 }): Promise<CreateSoloPackageResult> {
   const pkg = await loadSoloPackage(input.packageId);
 
   // The provided slots must cover exactly the package components (by service),
   // re-ordered into the package's sortOrder so placement + pricing align.
-  if (input.slots.length !== pkg.components.length) {
-    throw new AppError("Состав пакета изменился. Обновите страницу.", 409, "PACKAGE_MISMATCH");
-  }
-  const slotByService = new Map(input.slots.map((s) => [s.serviceId, s]));
-  const orderedSlots = pkg.components.map((component) => {
-    const chosen = slotByService.get(component.serviceId);
-    if (!chosen) {
-      throw new AppError("Состав пакета изменился. Обновите страницу.", 409, "PACKAGE_MISMATCH");
-    }
-    return { component, startAtUtc: chosen.startAtUtc };
-  });
+  const orderedSlots = orderSoloSlots(pkg, input.slots);
 
   // 1. Validate each component through the SAME core as a single booking
   //    (service enabled, window, availability, duration → start/end, price).

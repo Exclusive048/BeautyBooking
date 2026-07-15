@@ -1,17 +1,39 @@
+import { z } from "zod";
 import { jsonOk, jsonFail } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { tooManyRequests } from "@/lib/api/response";
+import { parseBody } from "@/lib/validation";
 import { parseISOToUTC } from "@/lib/time";
-import { proposeSoloPackagePlacement } from "@/lib/bookings/package-booking";
+import { proposeSoloPackageSelections } from "@/lib/bookings/package-booking";
+import { getSessionUserFromRequest } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 /**
- * PACKAGE-BOOKING-MVP-1 — sequential-placement proposal for the review
- * screen. Public (advisory only); the booking is re-validated on create.
+ * PACKAGE-SOLO-WIZARD-01 — per-component solo package proposal for the review
+ * screen. Public (advisory only); the booking is re-validated on create. The
+ * session is resolved (when present) so the accept-new-clients check matches
+ * the eventual create — a returning client isn't prematurely blocked.
+ *
+ * Was single-anchor (`{ startAtUtc }` → the server auto-sequenced the rest into
+ * the SAME day and failed the package on a busy day). The wizard now picks a
+ * (date, time) per component, so this mirrors the studio `/studio/propose`
+ * contract: validate + price exactly what the client chose.
  */
 const PROPOSE_RATE = { windowSeconds: 60, maxRequests: 30 };
+
+const soloProposeSchema = z.object({
+  slots: z
+    .array(
+      z.object({
+        serviceId: z.string().trim().min(1),
+        startAtUtc: z.string().trim().min(1),
+      }),
+    )
+    .min(2, "В пакете должно быть минимум 2 услуги.")
+    .max(12),
+});
 
 export async function POST(
   req: Request,
@@ -25,12 +47,20 @@ export async function POST(
     if (rate.limited) return tooManyRequests(rate.retryAfterSeconds);
 
     const p = params instanceof Promise ? await params : params;
-    const body = (await req.json().catch(() => null)) as { startAtUtc?: unknown } | null;
-    const startRaw = typeof body?.startAtUtc === "string" ? body.startAtUtc : "";
-    if (!startRaw) return jsonFail(400, "Не указано время начала.", "DATE_INVALID");
+    const body = await parseBody(req, soloProposeSchema);
 
-    const startAtUtc = parseISOToUTC(startRaw, "startAtUtc");
-    const result = await proposeSoloPackagePlacement({ packageId: p.id, startAtUtc });
+    const slots = body.slots.map((s) => ({
+      serviceId: s.serviceId,
+      startAtUtc: parseISOToUTC(s.startAtUtc, "startAtUtc"),
+    }));
+
+    const session = await getSessionUserFromRequest(req);
+
+    const result = await proposeSoloPackageSelections({
+      packageId: p.id,
+      slots,
+      clientUserId: session?.id ?? null,
+    });
 
     if (!result.ok) {
       return jsonFail(409, result.message, result.code, {

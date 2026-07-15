@@ -14,6 +14,8 @@ type Props = {
   initialServiceId: string | null;
   providerId: string;
   providerTimezone: string;
+  /** PACKAGE-SOLO-WIZARD-01: the master's between-bookings buffer — the package wizard's cursor gap. */
+  providerBufferMin: number;
   packageBookable: boolean;
 };
 
@@ -25,6 +27,7 @@ export function ServicesSectionClient({
   initialServiceId,
   providerId,
   providerTimezone,
+  providerBufferMin,
   packageBookable,
 }: Props) {
   const { selectedServices, addService, setSelectedServices } = useSelectedServices();
@@ -63,6 +66,7 @@ export function ServicesSectionClient({
                 bundle={bundle}
                 providerId={providerId}
                 providerTimezone={providerTimezone}
+                providerBufferMin={providerBufferMin}
                 bookable={packageBookable}
               />
             ))}
