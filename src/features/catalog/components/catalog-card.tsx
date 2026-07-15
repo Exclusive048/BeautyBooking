@@ -277,9 +277,8 @@ export function CatalogCard({
               <span className="font-semibold tabular-nums text-text-main">
                 {item.ratingAvg.toFixed(1)}
               </span>
-              <span className="tabular-nums">
-                {TC.reviewsLabel.replace("{count}", String(item.reviewsCount))}
-              </span>
+              <span aria-hidden>·</span>
+              <span className="tabular-nums">{TC.reviewsLabel(item.reviewsCount)}</span>
             </>
           )}
         </div>

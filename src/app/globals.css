@@ -538,3 +538,69 @@
 @keyframes login-marquee-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
 @keyframes login-digit-pop { 0% { transform: scale(0.92); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
 @keyframes login-otp-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 45% { transform: translateX(7px); } 70% { transform: translateX(-4px); } 90% { transform: translateX(2px); } }
+
+/* ============================================================
+   CATALOG MAP MARKERS (FIX-POLISH-01 walkthrough #5)
+   Yandex Maps renders these custom `templateLayoutFactory` divs, but their
+   classes were never defined in any stylesheet — so the marker divs collapsed
+   to 0×0 and only the raw cluster count text painted (bare numbers, no logos).
+   Sizes match the placemark iconShape: marker Circle r=22 → 44px, cluster
+   Circle r=24 → 48px. Single-provider markers already carry `avatarUrl`
+   (real avatar or a branded SVG fallback) as a background-image — sizing them
+   here reveals it. Tokens only; theme-reactive so markers adapt to the
+   light/dark map customization. Cluster keeps the count in a branded bubble
+   (site-logo-on-cluster is a separate spec — see BACKLOG).
+   ============================================================ */
+.map-marker {
+  width: 44px;
+  height: 44px;
+  background-color: rgb(var(--bg-card));
+  background-size: cover;
+  background-position: center;
+  border: 2px solid rgb(var(--primary));
+  box-shadow: 0 2px 8px rgb(var(--primary) / 0.28);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+.map-marker.marker-master { border-radius: 9999px; }
+.map-marker.marker-studio { border-radius: 12px; }
+.map-marker.map-marker--active {
+  transform: scale(1.12);
+  border-color: rgb(var(--primary-hover));
+  box-shadow: 0 6px 18px rgb(var(--primary) / 0.45);
+  z-index: 5;
+}
+.map-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background-image: linear-gradient(135deg, rgb(var(--brand-from)) 0%, rgb(var(--brand-via)) 55%, rgb(var(--brand-deep)) 100%);
+  color: rgb(var(--primary-foreground));
+  font-weight: 700;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid rgb(var(--bg-card));
+  box-shadow: 0 4px 14px rgb(var(--primary) / 0.35);
+  cursor: pointer;
+}
+.map-hint {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background-color: rgb(var(--bg-card));
+  color: rgb(var(--text-main));
+  border: 1px solid rgb(var(--border-subtle));
+  box-shadow: 0 4px 12px rgb(var(--primary) / 0.15);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.map-user-marker {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background-color: rgb(var(--primary));
+  border: 3px solid rgb(var(--bg-card));
+  box-shadow: 0 0 0 3px rgb(var(--primary) / 0.30);
+}

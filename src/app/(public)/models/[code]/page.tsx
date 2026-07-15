@@ -157,10 +157,10 @@ export default async function ModelOfferPage({ params }: PageProps) {
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <CalendarDays className="h-4 w-4" aria-hidden />
-                    {UI_TEXT.pages.modelOffer.dateTimeLabel}
+                    {UI_TEXT.pages.modelOffer.bookingWindowLabel}
                   </span>
                   <span className="font-medium text-foreground">
-                    {offer.dateLocal}
+                    {offer.dateLocal}, {offer.timeRangeStartLocal}–{offer.timeRangeEndLocal}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -169,10 +169,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                     {UI_TEXT.pages.modelOffer.durationLabel}
                   </span>
                   <span className="font-medium text-foreground">
-                    {offer.timeRangeStartLocal}–{offer.timeRangeEndLocal}
-                    <span className="ml-1 text-xs text-muted-foreground">
-                      ({offer.service.durationMin} {UI_TEXT.common.minutesShort})
-                    </span>
+                    {offer.service.durationMin} {UI_TEXT.common.minutesShort}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

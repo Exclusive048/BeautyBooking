@@ -6,6 +6,11 @@ import type {
   CatalogSort,
 } from "@/lib/catalog/schemas";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
+import * as cache from "@/lib/cache/cache";
+import {
+  BAYESIAN_PRIOR_FALLBACK,
+  sortByBayesianRating,
+} from "@/lib/catalog/ranking";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 /** Encode an internal row ID as an opaque, URL-safe cursor token. */
@@ -143,6 +148,100 @@ type CatalogSearchInput = {
 
 const PREMIUM_BOOST = 0.5;
 const HISTOGRAM_BUCKETS = 15;
+
+// CATALOG-RANKING-01 — prior `C` for the Bayesian «По рейтингу» sort.
+const RATING_PRIOR_CACHE_KEY = "catalog:rating-prior:v1";
+const RATING_PRIOR_TTL_SECONDS = 600; // 10 min — see loadGlobalMeanRating().
+
+/**
+ * `C` — the global mean rating, the prior every provider's score is pulled
+ * toward. See `ranking.ts` for the formula.
+ *
+ * **Only rated providers count.** A never-rated provider has `ratingAvg = 0`,
+ * which is a "no data" sentinel and NOT a rating of zero; averaging those in
+ * drags the prior from ~4.0 down to ~2.9 (measured), which would make the prior
+ * meaningless and over-reward anyone with a single review.
+ *
+ * **Global, not per-filter.** The prior is deliberately computed over the whole
+ * published catalog rather than the current filter set: it represents a stable
+ * market-wide expectation. Deriving it per-filter would make the same provider
+ * score differently between two views, and a provider's rank would shift for
+ * reasons unrelated to its own reviews.
+ *
+ * **Cached, not per-request.** This is a full-table aggregate; running it on
+ * every catalog request would add a scan to a hot discovery path for a value
+ * that moves very slowly (it's an average over the entire catalog — one new
+ * review barely perturbs it). A 10-minute TTL keeps ranking stable and costs at
+ * most one aggregate per 10 min per node. Redis-primary with memory fallback in
+ * dev, same as the rest of the cache layer.
+ */
+async function loadGlobalMeanRating(): Promise<number> {
+  const cached = await cache.get<number>(RATING_PRIOR_CACHE_KEY);
+  if (typeof cached === "number" && Number.isFinite(cached)) return cached;
+
+  const aggregate = await prisma.provider.aggregate({
+    _avg: { ratingAvg: true },
+    where: { isPublished: true, reviews: { gt: 0 } },
+  });
+  const mean = aggregate._avg.ratingAvg;
+  const prior =
+    typeof mean === "number" && Number.isFinite(mean) && mean > 0
+      ? mean
+      : BAYESIAN_PRIOR_FALLBACK;
+
+  await cache.set(RATING_PRIOR_CACHE_KEY, prior, RATING_PRIOR_TTL_SECONDS);
+  return prior;
+}
+
+/**
+ * Resolve the page of provider IDs for `sort=rating`, ranked **globally**.
+ *
+ * Why this exists: the Bayesian score is a computed expression over two columns
+ * plus two runtime constants, and Prisma's `orderBy` can only order by columns —
+ * so Postgres cannot page by it. The normal path lets the DB do
+ * `ORDER BY ratingAvg … LIMIT/OFFSET`; re-ranking that page in memory would
+ * reorder rows *within a page the DB already chose by the wrong key* — a
+ * proven master on page 2 by raw average would never reach page 1. That is
+ * silent mis-ranking, so instead we rank the whole filtered set on light rows
+ * (`id, ratingAvg, reviews, createdAt`) and slice the page from the result.
+ *
+ * Cost: one extra query returning 4 small columns for every row matching the
+ * filter (44 published providers today — negligible). It is a filtered scan,
+ * so it does not scale indefinitely; the scale answer is a precomputed score
+ * column, which is a schema change and deliberately out of scope here.
+ *
+ * Returns `take + 1` ids so the caller's existing `hasMore` sentinel logic is
+ * unchanged.
+ */
+async function resolveRatingRankedPageIds(args: {
+  where: Prisma.ProviderWhereInput;
+  take: number;
+  pageMode: boolean;
+  pageOffset: number;
+  cursorId: string | null;
+}): Promise<string[]> {
+  const [rows, prior] = await Promise.all([
+    prisma.provider.findMany({
+      where: args.where,
+      select: { id: true, ratingAvg: true, reviews: true, createdAt: true },
+    }),
+    loadGlobalMeanRating(),
+  ]);
+
+  const ranked = sortByBayesianRating(rows, prior);
+
+  let start = 0;
+  if (args.pageMode) {
+    start = args.pageOffset;
+  } else if (args.cursorId) {
+    const index = ranked.findIndex((row) => row.id === args.cursorId);
+    // Unknown cursor → restart from the top rather than throw (mirrors the
+    // permissive decodeCursor contract).
+    start = index >= 0 ? index + 1 : 0;
+  }
+
+  return ranked.slice(start, start + args.take + 1).map((row) => row.id);
+}
 
 const SMART_TAG_TO_REVIEW_CODE: Record<CatalogSmartTagPreset, string> = {
   rush: "FAST",
@@ -585,18 +684,33 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   const pageOffset = pageMode ? (input.page! - 1) * take : 0;
   const totalCount = pageMode ? await prisma.provider.count({ where }) : undefined;
 
-  const providers = await prisma.provider.findMany({
-    where,
+  // CATALOG-RANKING-01: «По рейтингу» pages by a globally-ranked id list
+  // (Prisma can't ORDER BY the Bayesian expression — see
+  // resolveRatingRankedPageIds). Every other sort keeps the original
+  // single-query DB path untouched.
+  const ratingPageIds =
+    input.sort === "rating"
+      ? await resolveRatingRankedPageIds({ where, take, pageMode, pageOffset, cursorId })
+      : null;
+
+  const providersRaw = await prisma.provider.findMany({
+    where: ratingPageIds ? { id: { in: ratingPageIds } } : where,
     orderBy: [{ ratingAvg: "desc" }, { reviews: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-    take: take + 1,
-    ...(pageMode
-      ? { skip: pageOffset }
-      : cursorId
-      ? {
-          skip: 1,
-          cursor: { id: cursorId },
-        }
-      : {}),
+    // The rating path already narrowed to exactly the page's ids; take/skip
+    // would re-slice an already-sliced set.
+    ...(ratingPageIds
+      ? {}
+      : {
+          take: take + 1,
+          ...(pageMode
+            ? { skip: pageOffset }
+            : cursorId
+            ? {
+                skip: 1,
+                cursor: { id: cursorId },
+              }
+            : {}),
+        }),
     select: {
       id: true,
       type: true,
@@ -658,6 +772,16 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     },
   });
 
+  // Restore the global Bayesian order: `WHERE id IN (…)` returns rows in the
+  // query's own orderBy, not in the order of the id list. The last element is
+  // the `take + 1` sentinel the `hasMore` check below consumes, so the order
+  // must be exact before it is sliced off.
+  const providers = ratingPageIds
+    ? (ratingPageIds
+        .map((id) => providersRaw.find((provider) => provider.id === id))
+        .filter((provider): provider is (typeof providersRaw)[number] => Boolean(provider)))
+    : providersRaw;
+
   const hasMore = providers.length > take;
   const rows = hasMore ? providers.slice(0, -1) : providers;
   const smartTagCounts = await loadSmartTagCounts(
@@ -682,8 +806,13 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     if (explicitSort) {
       const arr = [...rows];
       if (input.sort === "rating") {
-        arr.sort((a, b) => b.ratingAvg - a.ratingAvg || b.reviews - a.reviews);
-      } else if (input.sort === "popular") {
+        // Already in final order: `resolveRatingRankedPageIds` ranked the whole
+        // filtered set by Bayesian score and this page was sliced from it.
+        // Re-sorting here by raw `ratingAvg` would undo that and put
+        // 5.0/1-review providers back on top within the page.
+        return arr;
+      }
+      if (input.sort === "popular") {
         arr.sort((a, b) => b.reviews - a.reviews || b.ratingAvg - a.ratingAvg);
       } else if (input.sort === "price-asc" || input.sort === "price-desc") {
         const pickPrice = (p: (typeof rows)[number]) => {

@@ -45,6 +45,14 @@ const T = UI_TEXT.clientCabinet.profilePage;
 type Props = {
   /** Server-loaded user id needed for the AvatarEditor (entityType=USER). */
   userId: string;
+  /**
+   * Server-resolved SMTP gate (`isEmailConfigured()`). When false the platform
+   * physically cannot send the verification code, so the affordance is hidden
+   * rather than offered as a dead end — the same treatment `/login` gives its
+   * email tab and the VK/Yandex/Telegram buttons. The route itself already
+   * fail-closes with 503 `SYSTEM_FEATURE_DISABLED`; this is the UI half.
+   */
+  emailEnabled?: boolean;
 };
 
 const fetcher = (url: string) =>
@@ -72,7 +80,7 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
   }
 }
 
-export function ClientProfilePage({ userId }: Props) {
+export function ClientProfilePage({ userId, emailEnabled = false }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
@@ -181,6 +189,7 @@ export function ClientProfilePage({ userId }: Props) {
         <ContactsCard
           data={data}
           onPatch={applyPatch}
+          emailEnabled={emailEnabled}
           onEmailVerify={() => setEmailModalOpen(true)}
         />
 
@@ -426,10 +435,12 @@ function PersonalCard({
 function ContactsCard({
   data,
   onPatch,
+  emailEnabled,
   onEmailVerify,
 }: {
   data: ProfileDTO;
   onPatch: (p: Partial<ProfileUpdatePatch>) => void;
+  emailEnabled: boolean;
   onEmailVerify: () => void;
 }) {
   return (
@@ -470,7 +481,9 @@ function ContactsCard({
               <Check className="mr-0.5 h-3 w-3" aria-hidden />
               {T.fields.emailVerified}
             </Badge>
-          ) : data.contacts.email ? (
+          ) : // `emailEnabled === false` → SMTP isn't configured, so the code can
+          // never arrive. Don't offer the button at all (see Props.emailEnabled).
+          data.contacts.email && emailEnabled ? (
             <Button variant="secondary" size="sm" onClick={onEmailVerify}>
               <Mail className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               {T.fields.emailVerify}

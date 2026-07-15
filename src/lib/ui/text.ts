@@ -307,7 +307,12 @@ export const UI_TEXT = {
       saveTooltip: "Сохранить мастера",
       saveTodoToast: "Скоро будет доступно",
       distanceKm: "км",
-      reviewsLabel: "({count})",
+      // CATALOG-RANKING-01: was `"({count})"` → «4.9 (47)». The catalog now
+      // ranks by a Bayesian score weighted by review volume, so the volume is
+      // what the score rests on and must be legible: «4.9 · 47 отзывов» reads
+      // as earned, «5.0 · 1 отзыв» reads as provisional. Mirrors the existing
+      // `search-by-time` card, plus proper RU pluralisation.
+      reviewsLabel: (count: number) => `${count} ${pluralize(count, "отзыв", "отзыва", "отзывов")}`,
       newLabel: "Новый",
       availability: {
         nextSlotExact: "Ближайшее: {when}",
@@ -5359,7 +5364,10 @@ export const UI_TEXT = {
         confirm: "Подтвердить",
         success: "Email подтверждён",
         invalidCode: "Неверный код",
-        sendFailed: "Не удалось отправить код",
+        // FIX-POLISH-01 (walkthrough #7): «…Попробуйте ещё раз.» per the error
+        // convention — this is what the modal shows when the send genuinely
+        // fails (the route now returns EMAIL_SEND_FAILED instead of a false 200).
+        sendFailed: "Не удалось отправить код. Попробуйте ещё раз.",
         verifyFailed: "Не удалось подтвердить email",
       },
       danger: {
@@ -5514,7 +5522,12 @@ export const UI_TEXT = {
     },
     reviews: {
       title: "Отзывы",
-      all: "Все отзывы",
+      // REVIEWS-LOADMORE-01: `all` («Все отзывы») removed with the dialog it
+      // opened — that dialog hard-capped limit=50 and silently truncated any
+      // provider with more reviews while claiming to show «все». Reviews now
+      // page inline via `loadMore`. No other caller referenced `all`.
+      loadMore: "Показать больше отзывов",
+      loadMoreLoading: "Загружаем...",
       leaveReview: "Оставить отзыв",
       noReviews: "Отзывов пока нет — станьте первым",
       loadFailed: "Не удалось загрузить отзывы",
@@ -7678,8 +7691,13 @@ export const UI_TEXT = {
       backToOffers: "← Все предложения",
       masterLabel: "Мастер",
       masterProfileCta: "Профиль мастера →",
-      dateTimeLabel: "Дата и время",
-      durationLabel: "Длительность",
+      // FIX-POLISH-01 (walkthrough #2): the offer carries a booking WINDOW (the
+      // range of start-times the master can take you) and a separate service
+      // DURATION. They used to share the «Длительность» row (window shown large,
+      // duration in parens) — reading like a 6-hour appointment claiming 2 hours.
+      // Split into two honest labels.
+      bookingWindowLabel: "Окно записи",
+      durationLabel: "Длительность услуги",
       priceLabel: "Стоимость",
       originalPriceLabel: "Обычная цена",
       requirementsTitle: "Требования к модели",
