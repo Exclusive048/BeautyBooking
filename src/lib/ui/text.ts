@@ -1418,17 +1418,30 @@ export const UI_TEXT = {
     subtitle: "Единый центр приглашений и системных событий.",
     invitesTitle: "Приглашения в студии",
     timelineTitle: "Лента событий",
-    phoneRequired: "Добавьте номер телефона в профиль, чтобы получать приглашения.",
+    // `phoneRequired` removed (NOTIFICATIONS-REDESIGN-01): the invites card now
+    // renders only when there ARE invites, and invites are matched by phone
+    // server-side — so «добавьте телефон» was advice that could only ever show
+    // to someone who had no invites to see. Its only caller is gone.
     emptyTimeline: "По выбранному фильтру пока нет событий.",
     noActiveInvites: "Нет активных приглашений.",
     openAction: "Открыть",
+    // NOTIFICATIONS-REDESIGN-01: filters were channel-based (Все/Мастер/Студия/
+    // Система/Приглашения) and identical for every viewer — a pure client was
+    // offered «Студия» and «Приглашения» tabs that could never hold anything.
+    // Replaced with semantic type-groups; the page renders a pill only when the
+    // viewer's role admits the group AND it actually has items.
     filters: {
       all: "Все",
-      master: "Мастер",
+      bookings: "Записи",
+      reminders: "Напоминания",
+      reviews: "Отзывы",
+      promo: "Акции",
+      billing: "Оплаты",
       studio: "Студия",
+      models: "Модели",
       system: "Система",
-      invites: "Приглашения",
     },
+    onlyUnread: "Только непрочитанные",
     channels: {
       master: "Мастер",
       studio: "Студия",

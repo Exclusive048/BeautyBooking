@@ -84,11 +84,24 @@ function MasterCard({ master }: { master: TopMaster }) {
             </div>
           )}
           {master.ratingAvg > 0 ? (
+            // CATALOG-DEFAULT-RANKING-01: the rail is ranked by a review-volume
+            // weighted score, so show the volume the score rests on — same
+            // «4.9 · 47 отзывов» reading as the catalog card.
             <Badge className="absolute left-3 top-3 gap-1 border-0 bg-bg-card/95 px-2 py-1 text-text-main shadow-sm backdrop-blur-sm">
               <Star className="h-3 w-3 fill-primary text-accent-text" aria-hidden />
               <span className="font-mono text-xs font-semibold tabular-nums">
                 {master.ratingAvg.toFixed(1)}
               </span>
+              {master.reviewsCount > 0 ? (
+                <>
+                  <span className="text-xs text-text-sec" aria-hidden>
+                    ·
+                  </span>
+                  <span className="font-mono text-xs tabular-nums text-text-sec">
+                    {UI_TEXT.catalog2.card.reviewsLabel(master.reviewsCount)}
+                  </span>
+                </>
+              ) : null}
             </Badge>
           ) : null}
         </div>

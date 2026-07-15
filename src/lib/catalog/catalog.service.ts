@@ -9,6 +9,7 @@ import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features"
 import * as cache from "@/lib/cache/cache";
 import {
   BAYESIAN_PRIOR_FALLBACK,
+  bayesianRating,
   sortByBayesianRating,
 } from "@/lib/catalog/ranking";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
@@ -194,42 +195,33 @@ async function loadGlobalMeanRating(): Promise<number> {
 }
 
 /**
- * Resolve the page of provider IDs for `sort=rating`, ranked **globally**.
- *
- * Why this exists: the Bayesian score is a computed expression over two columns
- * plus two runtime constants, and Prisma's `orderBy` can only order by columns —
- * so Postgres cannot page by it. The normal path lets the DB do
- * `ORDER BY ratingAvg … LIMIT/OFFSET`; re-ranking that page in memory would
- * reorder rows *within a page the DB already chose by the wrong key* — a
- * proven master on page 2 by raw average would never reach page 1. That is
- * silent mis-ranking, so instead we rank the whole filtered set on light rows
- * (`id, ratingAvg, reviews, createdAt`) and slice the page from the result.
- *
- * Cost: one extra query returning 4 small columns for every row matching the
- * filter (44 published providers today — negligible). It is a filtered scan,
- * so it does not scale indefinitely; the scale answer is a precomputed score
- * column, which is a schema change and deliberately out of scope here.
- *
- * Returns `take + 1` ids so the caller's existing `hasMore` sentinel logic is
- * unchanged.
+ * Deterministic base order for every "rank the whole set" query below. Ranking
+ * is a *stable* sort over rows already in this order, so equal-score rows keep
+ * exactly the tiebreak the catalog has always had (`ratingAvg → reviews →
+ * createdAt → id`), and the array index doubles as the old "original Prisma
+ * index" tiebreak the relevance path used.
  */
-async function resolveRatingRankedPageIds(args: {
-  where: Prisma.ProviderWhereInput;
+const BASE_ORDER: Prisma.ProviderOrderByWithRelationInput[] = [
+  { ratingAvg: "desc" },
+  { reviews: "desc" },
+  { createdAt: "desc" },
+  { id: "asc" },
+];
+
+type PageWindow = {
   take: number;
   pageMode: boolean;
   pageOffset: number;
   cursorId: string | null;
-}): Promise<string[]> {
-  const [rows, prior] = await Promise.all([
-    prisma.provider.findMany({
-      where: args.where,
-      select: { id: true, ratingAvg: true, reviews: true, createdAt: true },
-    }),
-    loadGlobalMeanRating(),
-  ]);
+};
 
-  const ranked = sortByBayesianRating(rows, prior);
-
+/**
+ * Slice the page out of a globally-ranked list.
+ *
+ * Returns `take + 1` ids so the caller's existing `hasMore` sentinel logic is
+ * unchanged.
+ */
+function sliceRankedPageIds<T extends { id: string }>(ranked: T[], args: PageWindow): string[] {
   let start = 0;
   if (args.pageMode) {
     start = args.pageOffset;
@@ -239,8 +231,169 @@ async function resolveRatingRankedPageIds(args: {
     // permissive decodeCursor contract).
     start = index >= 0 ? index + 1 : 0;
   }
-
   return ranked.slice(start, start + args.take + 1).map((row) => row.id);
+}
+
+/**
+ * ─── Why the "rank whole set, then slice" shape exists ───────────────────────
+ *
+ * Prisma's `orderBy` can only order by columns. Every sort whose key is a
+ * *computed expression* (Bayesian score, relevance composite, min-price across
+ * relations) therefore cannot be paged by Postgres. The tempting shortcut —
+ * let the DB page by `ratingAvg` and re-sort that page in memory — reorders
+ * rows *within a page the DB already chose by the wrong key*, so a provider who
+ * belongs at #1 but sits on page 3 by raw average can never surface. That is
+ * silent mis-ranking (CATALOG-RANKING-01 measured it; `popular` and
+ * `price-desc` still had it before this change).
+ *
+ * So: rank the whole filtered set on light rows, slice the page, then fetch the
+ * page's full rows. `sort=popular` is the exception — its key (`reviews`) IS a
+ * column, so it just moves into the query's `orderBy` and is global for free.
+ *
+ * Cost: one extra query of a few small columns per row matching the filter (44
+ * published providers today — negligible). It is a filtered scan, so it does
+ * not scale indefinitely; the scale answer is a precomputed score column, i.e.
+ * a schema change, deliberately out of scope.
+ */
+async function resolveRatingRankedPageIds(args: PageWindow & {
+  where: Prisma.ProviderWhereInput;
+}): Promise<string[]> {
+  const [rows, prior] = await Promise.all([
+    prisma.provider.findMany({
+      where: args.where,
+      orderBy: BASE_ORDER,
+      select: { id: true, ratingAvg: true, reviews: true, createdAt: true },
+    }),
+    loadGlobalMeanRating(),
+  ]);
+
+  // Rating sort = pure quality signal. No premium/smart-tag boosts here: the
+  // user asked for a specific order (pre-existing rule, preserved).
+  return sliceRankedPageIds(sortByBayesianRating(rows, prior), args);
+}
+
+/**
+ * Relevance (the DEFAULT view, and what the home «Топ-мастера» rail consumes).
+ *
+ * CATALOG-DEFAULT-RANKING-01: relevance is a **composite**, not a rating sort:
+ *
+ *     score = ratingBase + smartBoost(+1) + premium(+0.5)
+ *
+ * Only the **rating base** changes here — raw `ratingAvg` → Bayesian score. The
+ * smart-tag and Premium signals are untouched, and because the Bayesian score
+ * lives on the same 0–5 scale as `ratingAvg`, the boosts keep exactly the
+ * relative weight they always had (no re-tuning).
+ *
+ * It also becomes global: previously the boosts only reordered the already-
+ * fetched page, so Premium could never lift a provider from page 2 to page 1.
+ *
+ * Returns the premium set it had to compute anyway — it is a superset of the
+ * page's, so the caller reuses it for the `isHighlighted` flag instead of
+ * re-querying.
+ */
+async function resolveRelevanceRankedPage(args: PageWindow & {
+  where: Prisma.ProviderWhereInput;
+  smartTag: CatalogSmartTagPreset | undefined;
+}): Promise<{
+  pageIds: string[];
+  highlightedUserIds: Set<string>;
+}> {
+  const [rows, prior] = await Promise.all([
+    prisma.provider.findMany({
+      where: args.where,
+      orderBy: BASE_ORDER,
+      select: {
+        id: true,
+        ratingAvg: true,
+        reviews: true,
+        createdAt: true,
+        ownerUserId: true,
+        type: true,
+      },
+    }),
+    loadGlobalMeanRating(),
+  ]);
+
+  const ownerUserIds = [...new Set(rows.filter((r) => r.ownerUserId).map((r) => r.ownerUserId!))];
+  const providerTypeMap = new Map(rows.map((r) => [r.ownerUserId ?? "", r.type]));
+  const [highlightedUserIds, smartTagCounts] = await Promise.all([
+    loadHighlightedUserIds(ownerUserIds, providerTypeMap),
+    // No-op (empty map, no query) unless a smart-tag preset is active.
+    loadSmartTagCounts(
+      args.smartTag ? rows.map((r) => r.id) : [],
+      args.smartTag
+    ),
+  ]);
+
+  const ranked = rows
+    .map((provider, index) => {
+      const smartCount = smartTagCounts.get(provider.id) ?? 0;
+      const smartBoost = args.smartTag && smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
+      const premium =
+        provider.ownerUserId && highlightedUserIds.has(provider.ownerUserId) ? PREMIUM_BOOST : 0;
+      const score =
+        bayesianRating({ rating: provider.ratingAvg, reviews: provider.reviews, prior }) +
+        smartBoost +
+        premium;
+      return { provider, index, score, smartCount };
+    })
+    .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
+      if (a.smartCount !== b.smartCount) return b.smartCount - a.smartCount;
+      // `index` is the position in BASE_ORDER — the old "original Prisma index".
+      return a.index - b.index;
+    })
+    .map((entry) => entry.provider);
+
+  return {
+    pageIds: sliceRankedPageIds(ranked, args),
+    highlightedUserIds,
+  };
+}
+
+/**
+ * Price sorts. Nothing to do with rating — this fixes **global ordering only**.
+ *
+ * `pickPrice` is a min across two relations with a `priceFrom` fallback, so it
+ * isn't a column Postgres can `ORDER BY`; the old in-memory sort therefore only
+ * ordered the fetched page (measured: `price-desc&limit=3` reported 279 400 as
+ * the dearest while the real maximum was 430 800).
+ */
+async function resolvePriceRankedPageIds(args: PageWindow & {
+  where: Prisma.ProviderWhereInput;
+  direction: 1 | -1;
+}): Promise<string[]> {
+  const rows = await prisma.provider.findMany({
+    where: args.where,
+    orderBy: BASE_ORDER,
+    select: {
+      id: true,
+      priceFrom: true,
+      services: {
+        where: { isEnabled: true, isActive: true },
+        select: { price: true },
+      },
+      masterServices: {
+        where: { isEnabled: true, service: { isEnabled: true, isActive: true } },
+        select: { service: { select: { price: true } } },
+      },
+    },
+  });
+
+  // Same rule as the page-local version it replaces: cheapest enabled service,
+  // else `priceFrom`, else last (Infinity).
+  const pickPrice = (row: (typeof rows)[number]) => {
+    const prices = [
+      ...row.services.map((s) => s.price),
+      ...row.masterServices.map((m) => m.service.price),
+    ].filter((v): v is number => typeof v === "number" && v > 0);
+    if (prices.length > 0) return Math.min(...prices);
+    return row.priceFrom > 0 ? row.priceFrom : Number.POSITIVE_INFINITY;
+  };
+
+  // Stable sort over BASE_ORDER rows → equal prices keep the previous tiebreak.
+  const ranked = [...rows].sort((a, b) => (pickPrice(a) - pickPrice(b)) * args.direction);
+  return sliceRankedPageIds(ranked, args);
 }
 
 const SMART_TAG_TO_REVIEW_CODE: Record<CatalogSmartTagPreset, string> = {
@@ -684,21 +837,46 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   const pageOffset = pageMode ? (input.page! - 1) * take : 0;
   const totalCount = pageMode ? await prisma.provider.count({ where }) : undefined;
 
-  // CATALOG-RANKING-01: «По рейтингу» pages by a globally-ranked id list
-  // (Prisma can't ORDER BY the Bayesian expression — see
-  // resolveRatingRankedPageIds). Every other sort keeps the original
-  // single-query DB path untouched.
-  const ratingPageIds =
-    input.sort === "rating"
-      ? await resolveRatingRankedPageIds({ where, take, pageMode, pageOffset, cursorId })
+  // Every sort whose key is a computed expression must be ranked across the
+  // WHOLE filtered set and then sliced — never re-sorted inside a page the DB
+  // picked by a different key. See the block comment above the resolvers.
+  //   rating   → Bayesian score                        (CATALOG-RANKING-01)
+  //   relevance→ Bayesian base + smart-tag + Premium   (CATALOG-DEFAULT-RANKING-01)
+  //   price-*  → min-price across relations            (global-ordering fix only)
+  //   popular  → `reviews` IS a column → ordered by the query below, global for
+  //              free, and deliberately NOT Bayesian-weighted: «popular» ranks
+  //              BY review count, so few-review providers sink on their own —
+  //              there is no small-sample distortion to correct.
+  //   distance → falls through to relevance (unchanged: no geo ordering yet).
+  const pageWindow = { take, pageMode, pageOffset, cursorId };
+  const relevanceRanked =
+    !input.sort || input.sort === "relevance" || input.sort === "distance"
+      ? await resolveRelevanceRankedPage({ where, ...pageWindow, smartTag: input.smartTag })
       : null;
+  const rankedPageIds =
+    relevanceRanked?.pageIds ??
+    (input.sort === "rating"
+      ? await resolveRatingRankedPageIds({ where, ...pageWindow })
+      : input.sort === "price-asc" || input.sort === "price-desc"
+      ? await resolvePriceRankedPageIds({
+          where,
+          ...pageWindow,
+          direction: input.sort === "price-asc" ? 1 : -1,
+        })
+      : null);
 
   const providersRaw = await prisma.provider.findMany({
-    where: ratingPageIds ? { id: { in: ratingPageIds } } : where,
-    orderBy: [{ ratingAvg: "desc" }, { reviews: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-    // The rating path already narrowed to exactly the page's ids; take/skip
+    where: rankedPageIds ? { id: { in: rankedPageIds } } : where,
+    orderBy:
+      // `popular` is the one non-default sort the DB can express: ordering here
+      // makes it global (it used to re-sort only the fetched page, so
+      // `limit=3` and `limit=40` disagreed on who was most popular).
+      input.sort === "popular"
+        ? [{ reviews: "desc" }, { ratingAvg: "desc" }, { createdAt: "desc" }, { id: "asc" }]
+        : BASE_ORDER,
+    // The ranked paths already narrowed to exactly the page's ids; take/skip
     // would re-slice an already-sliced set.
-    ...(ratingPageIds
+    ...(rankedPageIds
       ? {}
       : {
           take: take + 1,
@@ -772,80 +950,43 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
     },
   });
 
-  // Restore the global Bayesian order: `WHERE id IN (…)` returns rows in the
-  // query's own orderBy, not in the order of the id list. The last element is
-  // the `take + 1` sentinel the `hasMore` check below consumes, so the order
-  // must be exact before it is sliced off.
-  const providers = ratingPageIds
-    ? (ratingPageIds
+  // Restore the global order: `WHERE id IN (…)` returns rows in the query's own
+  // orderBy, not in the order of the id list. The last element is the
+  // `take + 1` sentinel the `hasMore` check below consumes, so the order must be
+  // exact before it is sliced off.
+  const providers = rankedPageIds
+    ? (rankedPageIds
         .map((id) => providersRaw.find((provider) => provider.id === id))
         .filter((provider): provider is (typeof providersRaw)[number] => Boolean(provider)))
     : providersRaw;
 
   const hasMore = providers.length > take;
   const rows = hasMore ? providers.slice(0, -1) : providers;
-  const smartTagCounts = await loadSmartTagCounts(
-    rows.map((provider) => provider.id),
-    input.smartTag
-  );
 
+  // Still needed for the `isHighlighted` DTO flag. The relevance ranker already
+  // resolved it across the whole filtered set (a superset of this page), so
+  // reuse that instead of issuing the same query again.
+  //
+  // `loadSmartTagCounts` is no longer called out here: smart-tag counts only
+  // ever fed the relevance re-rank, which now happens inside the ranker — so
+  // for every other sort this was a query whose result nothing read.
   const ownerUserIds = [...new Set(rows.filter((p) => p.ownerUserId).map((p) => p.ownerUserId!))];
   const providerTypeMap = new Map(rows.map((p) => [p.ownerUserId ?? "", p.type]));
-  const highlightedUserIds = await loadHighlightedUserIds(ownerUserIds, providerTypeMap);
+  const highlightedUserIds =
+    relevanceRanked?.highlightedUserIds ??
+    (await loadHighlightedUserIds(ownerUserIds, providerTypeMap));
 
-  const isPremium = (provider: { ownerUserId: string | null }) =>
-    Boolean(provider.ownerUserId && highlightedUserIds.has(provider.ownerUserId));
-
-  // Sorting strategy:
-  //   - "rating", "price-asc", "price-desc", "popular" → explicit user choice; Premium boost not applied (user asked for a specific order)
-  //   - "distance"  → handled at query layer if/when geo distance is available; falls back to default order
-  //   - "relevance" (default) → ratingAvg-driven order from Prisma + smart-tag re-rank if active + Premium boost (+0.5)
-  const explicitSort = input.sort && input.sort !== "relevance" && input.sort !== "distance";
-
-  const rankedRows = (() => {
-    if (explicitSort) {
-      const arr = [...rows];
-      if (input.sort === "rating") {
-        // Already in final order: `resolveRatingRankedPageIds` ranked the whole
-        // filtered set by Bayesian score and this page was sliced from it.
-        // Re-sorting here by raw `ratingAvg` would undo that and put
-        // 5.0/1-review providers back on top within the page.
-        return arr;
-      }
-      if (input.sort === "popular") {
-        arr.sort((a, b) => b.reviews - a.reviews || b.ratingAvg - a.ratingAvg);
-      } else if (input.sort === "price-asc" || input.sort === "price-desc") {
-        const pickPrice = (p: (typeof rows)[number]) => {
-          const services = [
-            ...p.services.map((s) => s.price),
-            ...p.masterServices.map((m) => m.service.price),
-          ].filter((v): v is number => typeof v === "number" && v > 0);
-          return services.length > 0 ? Math.min(...services) : p.priceFrom > 0 ? p.priceFrom : Number.POSITIVE_INFINITY;
-        };
-        const dir = input.sort === "price-asc" ? 1 : -1;
-        arr.sort((a, b) => (pickPrice(a) - pickPrice(b)) * dir);
-      }
-      return arr;
-    }
-
-    // Relevance path — ratingAvg from query is base, plus optional smart-tag boost, plus Premium +0.5.
-    return [...rows]
-      .map((provider, index) => {
-        const smartCount = smartTagCounts.get(provider.id) ?? 0;
-        const smartBoost = input.smartTag && smartCount >= SMART_TAG_MIN_COUNT ? 1 : 0;
-        const premium = isPremium(provider) ? PREMIUM_BOOST : 0;
-        // Score combines Prisma's ratingAvg/reviews ordering with smart-tag and premium nudges.
-        // Higher score wins; ties broken by original Prisma index (stable).
-        const score = provider.ratingAvg + smartBoost + premium;
-        return { provider, index, score, smartCount };
-      })
-      .sort((a, b) => {
-        if (a.score !== b.score) return b.score - a.score;
-        if (a.smartCount !== b.smartCount) return b.smartCount - a.smartCount;
-        return a.index - b.index;
-      })
-      .map((entry) => entry.provider);
-  })();
+  // CATALOG-DEFAULT-RANKING-01: there is no in-memory re-rank any more. Every
+  // ordering is now decided across the WHOLE filtered set before the page is
+  // fetched:
+  //   - rating / relevance / price-* → ranked by the resolvers above, this page
+  //     was sliced out of that global order (`rankedPageIds`), and `providers`
+  //     was re-sorted back into it;
+  //   - popular → ordered by the query's `orderBy` on a real column;
+  //   - distance → falls through to relevance (no geo ordering yet).
+  // Re-sorting here would silently undo that: it can only permute the page,
+  // which is exactly the per-page mis-ranking this change removes.
+  const rankedRows = rows;
 
   const items: CatalogProviderItem[] = rankedRows.map((provider) => {
     const directServices = provider.services.map(toServiceLite);

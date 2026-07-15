@@ -49,6 +49,11 @@
 | `catalog-list` | catalog results grid — `features/catalog/pages/catalog-page-client.tsx` (default list view) |
 | `catalog-card` | each provider card — `features/catalog/components/catalog-card.tsx` |
 | `stories-rail` | home stories rail container (holds the story-ring buttons) — `features/home/components/stories-rail.tsx` (on both the loaded `<section>` and the loading skeleton) |
+| `notifications-center` | the shared `/notifications` page root — `features/notifications/components/notifications-center-page.tsx` |
+| `notifications-list` | notifications feed container — same file. Absent when the feed is empty (the empty state renders instead) |
+| `notification-row` | each notification card — same file. Carries `data-group` (bookings/reminders/reviews/promo/billing/studio/models/system) and `data-unread` ("true"/"false") so a pass can assert filtering + read state without reading Russian copy |
+| `notifications-empty` | empty state — same file (mutually exclusive with `notifications-list`) |
+| `notifications-invites` | studio-invites section — same file. **Rendered only when the viewer has ≥1 pending invite** (NOTIFICATIONS-REDESIGN-01); its absence is the expected state for most users, not a failure |
 
 ### Key CTAs
 
@@ -57,6 +62,10 @@
 | `login-send-code` | `app/login/login-client.tsx` | request OTP (phone/email step) |
 | `login-verify` | `app/login/login-client.tsx` | submit OTP → log in |
 | `login-tab-phone` / `login-tab-email` | `app/login/login-client.tsx` (via `ui/segmented-tabs.tsx`) | switch OTP channel — **present only when email OTP is configured** (`isEmailConfigured()`); phone-only deployments render no tabs |
+| `notifications-filters` | `features/notifications/components/notifications-center-page.tsx` | filter-pill row — **rendered only when >1 group has items** (a single-category inbox needs no filter) |
+| `notifications-filter-pill` | same file | one semantic-group pill (`Все`/`Записи`/…) — role- and data-gated; use `data-group` on `notification-row` to assert the effect |
+| `notifications-only-unread` | same file | «Только непрочитанные» switch |
+| `notifications-mark-all` | same file | «Прочитать все» — **rendered only when unread > 0** |
 | `login-back` | `app/login/login-client.tsx` | OTP step → back to phone/email entry |
 | `login-resend` | `app/login/login-client.tsx` | resend OTP — **rendered only after the 60 s cooldown elapses** (before that the countdown text shows instead) |
 | `booking-submit` | `booking/components/booking-flow/phases/form-phase.tsx` | public booking widget — final «Записаться» |

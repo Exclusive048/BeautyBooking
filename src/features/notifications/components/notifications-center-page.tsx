@@ -7,6 +7,7 @@ import {
   Bell,
   BellOff,
   Calendar,
+  CheckCheck,
   CreditCard,
   Star,
   MessageCircle,
@@ -15,9 +16,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, type TabItem } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
+import { useActiveRole } from "@/lib/hooks/use-active-role";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
+import {
+  PROFESSIONAL_GROUPS,
+  centerGroupForType,
+  type CenterNotificationGroup,
+} from "@/lib/notifications/center-groups";
 import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
 import {
@@ -31,7 +38,59 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
-type FilterKey = "all" | "master" | "studio" | "system" | "invites";
+// NOTIFICATIONS-REDESIGN-01: was `"all" | "master" | "studio" | "system" |
+// "invites"` — channel buckets offered identically to every viewer. Now a
+// semantic group (or "all"); invites are a conditional section, not a tab.
+type FilterKey = "all" | CenterNotificationGroup;
+
+/**
+ * Filter pill with a count, matching the `clientNotif` reference (type pills
+ * carrying their own counts, active one filled with `primary`). Tokens only.
+ */
+function FilterPill({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      data-testid="notifications-filter-pill"
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border-subtle bg-bg-card text-text-main hover:bg-bg-input"
+      }`}
+    >
+      {label}
+      <span
+        className={`tabular-nums text-xs ${active ? "text-primary-foreground/75" : "text-text-sec"}`}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
+
+/** Display order of the filter pills — most actionable first, «Система» last. */
+const GROUP_ORDER: readonly CenterNotificationGroup[] = [
+  "bookings",
+  "reminders",
+  "reviews",
+  "promo",
+  "billing",
+  "studio",
+  "models",
+  "system",
+];
 
 type Props = {
   initialData: NotificationCenterData;
@@ -231,6 +290,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const [invites, setInvites] = useState(initialData.invites);
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
   const [notifications, setNotifications] = useState(initialData.notifications);
+  const [onlyUnread, setOnlyUnread] = useState(false);
+  // The app's existing role source (session-backed) — not a new role concept.
+  const { hasMaster, hasStudio } = useActiveRole();
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const actionNoticeTimerRef = useRef<number | null>(null);
@@ -271,30 +333,41 @@ export function NotificationsCenterPage({ initialData }: Props) {
     }, 3000);
   }, []);
 
-  useEffect(() => {
-    const markAllRead = async () => {
-      setNotifications((current) =>
-        current.map((note) =>
-          note.id.startsWith("schedule-request:")
-            ? note
-            : {
-                ...note,
-                isRead: true,
-                readAt: note.readAt ?? new Date().toISOString(),
-              }
-        )
-      );
-      try {
-        await fetchWithAuth("/api/notifications/read-all", { method: "POST" });
-        emitBellRefresh();
-      } catch {
-        // Ignore errors on mark-all.
-        emitBellRefresh();
-      }
-    };
-
-    void markAllRead();
+  // Unchanged contract: same optimistic flip, same `/api/notifications/read-all`
+  // POST, same `emitBellRefresh()` so the global bell re-reads its count.
+  // Extracted from the mount effect only so the explicit «Прочитать все» button
+  // can reuse it — schedule-requests stay untouched (they aren't Notification
+  // rows and have no read state).
+  const markAllRead = useCallback(async () => {
+    setNotifications((current) =>
+      current.map((note) =>
+        note.id.startsWith("schedule-request:")
+          ? note
+          : {
+              ...note,
+              isRead: true,
+              readAt: note.readAt ?? new Date().toISOString(),
+            }
+      )
+    );
+    try {
+      await fetchWithAuth("/api/notifications/read-all", { method: "POST" });
+      emitBellRefresh();
+    } catch {
+      // Ignore errors on mark-all.
+      emitBellRefresh();
+    }
   }, []);
+
+  // PRESERVED behaviour (NOTIFICATIONS-REDESIGN-01): auto-mark-all-read on
+  // mount. This mirrors the already-redesigned client cabinet page ("opening
+  // the surface implies the user has «seen» these") and keeps the unread
+  // semantics the bell depends on exactly as they were. Whether it should
+  // become explicit-only is an open product question for Artem — deliberately
+  // NOT decided here.
+  useEffect(() => {
+    void markAllRead();
+  }, [markAllRead]);
 
   const markNotificationRead = async (noteId: string) => {
     if (noteId.startsWith("schedule-request:")) return;
@@ -454,44 +527,125 @@ export function NotificationsCenterPage({ initialData }: Props) {
     });
   }, [reloadCenterData]);
 
-  const filteredNotifications = useMemo(() => {
-    if (filter === "all" || filter === "invites") return notifications;
-    if (filter === "master") return notifications.filter((note) => note.channel === "MASTER");
-    if (filter === "studio") return notifications.filter((note) => note.channel === "STUDIO");
-    return notifications.filter((note) => note.channel === "SYSTEM");
-  }, [filter, notifications]);
+  // Role-aware filter set. Two gates, both required:
+  //   1. ROLE — professional groups (Оплаты/Студия/Модели) are only offered to a
+  //      viewer who holds that role (`useActiveRole` — the app's existing role
+  //      source, read from the session; no new role concept invented here).
+  //   2. DATA — a pill only appears if it actually has items. This is what makes
+  //      the page honest: we never advertise a category that would open empty,
+  //      and it needs no per-role allowlist to maintain.
+  const groupCounts = useMemo(() => {
+    const counts = new Map<CenterNotificationGroup, number>();
+    for (const note of notifications) {
+      const group = centerGroupForType(note.type);
+      counts.set(group, (counts.get(group) ?? 0) + 1);
+    }
+    return counts;
+  }, [notifications]);
 
-  const filterItems: TabItem[] = useMemo(
-    () => [
-      { id: "all", label: t.filters.all },
-      { id: "master", label: t.filters.master },
-      { id: "studio", label: t.filters.studio },
-      { id: "system", label: t.filters.system },
-      { id: "invites", label: t.filters.invites, badge: invitesCount > 0 ? invitesCount : undefined },
-    ],
-    [invitesCount, t.filters.all, t.filters.invites, t.filters.master, t.filters.studio, t.filters.system]
+  const availableFilters = useMemo(() => {
+    const eligible = (group: CenterNotificationGroup) =>
+      !PROFESSIONAL_GROUPS.has(group) || hasMaster || hasStudio;
+    return GROUP_ORDER.filter((group) => (groupCounts.get(group) ?? 0) > 0 && eligible(group));
+  }, [groupCounts, hasMaster, hasStudio]);
+
+  // A filter the viewer no longer has data for (e.g. the last item of a group
+  // got cleared) must not strand the list on an empty selection.
+  useEffect(() => {
+    if (filter !== "all" && !availableFilters.includes(filter)) setFilter("all");
+  }, [availableFilters, filter]);
+
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter((note) => {
+      if (onlyUnread && note.isRead) return false;
+      if (filter === "all") {
+        // Never surface a professional group to a role that can't act on it.
+        const group = centerGroupForType(note.type);
+        return !PROFESSIONAL_GROUPS.has(group) || hasMaster || hasStudio;
+      }
+      return centerGroupForType(note.type) === filter;
+    });
+  }, [filter, hasMaster, hasStudio, notifications, onlyUnread]);
+
+  // Invites are gated on CONTENT, not role: a studio invite is matched by phone,
+  // so a pure client can legitimately receive one and must be able to act on it.
+  // Previously this card rendered unconditionally (even at zero, showing a «Нет
+  // активных приглашений» placeholder to every user forever).
+  const showInvites = invitesCount > 0 && filter === "all";
+  const unreadTotal = useMemo(
+    () => notifications.filter((note) => !note.isRead).length,
+    [notifications]
+  );
+  /** «Все» pill count — role-filtered, ignoring the unread toggle. */
+  const visibleTotal = useMemo(
+    () =>
+      notifications.filter((note) => {
+        const group = centerGroupForType(note.type);
+        return !PROFESSIONAL_GROUPS.has(group) || hasMaster || hasStudio;
+      }).length,
+    [hasMaster, hasStudio, notifications]
   );
 
-  const showInvites = filter === "all" || filter === "invites";
-  const showTimeline = filter !== "invites";
-
   return (
-    <section className="space-y-5">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-text-main">{t.title}</h1>
-        <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
+    <section className="space-y-5" data-testid="notifications-center">
+      {/* Page header — cabinet standard: title + subtitle left, actions right. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-text-main">
+            {t.title}
+          </h1>
+          <p className="mt-1 text-sm text-text-sec">{t.subtitle}</p>
+        </div>
+        {unreadTotal > 0 ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="rounded-lg"
+            onClick={() => void markAllRead()}
+            data-testid="notifications-mark-all"
+          >
+            <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+            {t.markAllRead}
+          </Button>
+        ) : null}
       </div>
 
-      {/* Filter tabs — horizontal scroll on mobile */}
-      <div className="overflow-x-auto scrollbar-hide">
-        <Tabs
-          items={filterItems}
-          value={filter}
-          onChange={(value) => setFilter(value as FilterKey)}
-          className="flex-nowrap w-max"
-        />
-      </div>
+      {/* Filters — semantic groups, role- and data-gated. Rendered only when
+          there's more than one thing to choose between. */}
+      {availableFilters.length > 1 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="-mx-1 flex flex-nowrap gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide"
+            data-testid="notifications-filters"
+          >
+            <FilterPill
+              label={t.filters.all}
+              count={visibleTotal}
+              active={filter === "all"}
+              onClick={() => setFilter("all")}
+            />
+            {availableFilters.map((group) => (
+              <FilterPill
+                key={group}
+                label={t.filters[group]}
+                count={groupCounts.get(group) ?? 0}
+                active={filter === group}
+                onClick={() => setFilter(group)}
+              />
+            ))}
+          </div>
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-text-sec">
+            <Switch
+              checked={onlyUnread}
+              onCheckedChange={setOnlyUnread}
+              aria-label={t.onlyUnread}
+              data-testid="notifications-only-unread"
+            />
+            {t.onlyUnread}
+          </label>
+        </div>
+      ) : null}
 
       {/* Action notice toast */}
       <AnimatePresence>
@@ -513,37 +667,42 @@ export function NotificationsCenterPage({ initialData }: Props) {
         ) : null}
       </AnimatePresence>
 
-      {/* Invites section */}
+      {/* Invites — conditional section. NOTIFICATIONS-REDESIGN-01: this card
+          used to render for every visitor on «Все», showing a permanent «Нет
+          активных приглашений» placeholder (and an «Приглашения» tab) to people
+          who will never join a studio. Now it exists only when there is
+          something to act on.
+          The old `hasPhone` branch is gone with it: invites are matched by phone
+          server-side, so no phone ⇒ no invites ⇒ this block never renders — the
+          «add a phone» prompt was unreachable advice aimed at the wrong surface. */}
       {showInvites ? (
-        <div className="rounded-[22px] border border-border-subtle bg-bg-card p-5 shadow-card md:p-6">
+        <div
+          className="rounded-[22px] border border-border-subtle bg-bg-card p-5 shadow-card md:p-6"
+          data-testid="notifications-invites"
+        >
           <h2 className="mb-3 text-sm font-semibold text-text-main">{t.invitesTitle}</h2>
-          {!initialData.hasPhone ? (
-            <div className="rounded-2xl border border-border-subtle bg-bg-input/65 p-4 text-sm text-text-sec">
-              {t.phoneRequired}
-            </div>
-          ) : (
-            <StudioInviteCards
-              invites={invites}
-              onChanged={(items) => {
-                setInvites(items);
-                setInvitesCount(items.length);
-              }}
-            />
-          )}
+          <StudioInviteCards
+            invites={invites}
+            onChanged={(items) => {
+              setInvites(items);
+              setInvitesCount(items.length);
+            }}
+          />
         </div>
       ) : null}
 
-      {/* Notifications timeline */}
-      {showTimeline ? (
-        filteredNotifications.length > 0 ? (
+      {/* Notifications timeline. Always rendered now — «Приглашения» is no
+          longer a tab that replaces the feed, it's a section above it. */}
+      {visibleNotifications.length > 0 ? (
           <motion.div
             className="space-y-2"
             initial="hidden"
             animate="visible"
             variants={listAnim}
+            data-testid="notifications-list"
           >
             <AnimatePresence>
-              {filteredNotifications.map((note) => {
+              {visibleNotifications.map((note) => {
                 const bookingPayload = parseBookingPayload(note.payloadJson);
                 const bookingStatus = bookingPayload?.bookingStatus?.toUpperCase();
                 const canAct =
@@ -562,6 +721,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
                     key={note.id}
                     layout
                     variants={itemAnim}
+                    data-testid="notification-row"
+                    data-group={centerGroupForType(note.type)}
+                    data-unread={isUnread ? "true" : "false"}
                     exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
                     className={`relative flex gap-3 rounded-2xl border p-4 transition-colors ${
                       isUnread
@@ -671,20 +833,38 @@ export function NotificationsCenterPage({ initialData }: Props) {
               })}
             </AnimatePresence>
           </motion.div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-input">
-              <BellOff className="h-8 w-8 text-text-sec" aria-hidden />
-            </div>
-            <p className="mt-4 font-medium text-text-main">
-              {filter === "all" ? t.emptyAll : t.emptyFilter}
-            </p>
-            {filter === "all" ? (
-              <p className="mt-1.5 max-w-xs text-sm text-text-sec">{t.emptyAllSub}</p>
-            ) : null}
+      ) : (
+        // Empty state — one line + one action, per convention. «Показать все»
+        // only appears when a filter/toggle is what's hiding things; with a
+        // genuinely empty inbox there is nothing to reset to.
+        <div
+          className="flex flex-col items-center justify-center py-16 text-center"
+          data-testid="notifications-empty"
+        >
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-input">
+            <BellOff className="h-8 w-8 text-text-sec" aria-hidden />
           </div>
-        )
-      ) : null}
+          <p className="mt-4 font-medium text-text-main">
+            {filter === "all" && !onlyUnread ? t.emptyAll : t.emptyFilter}
+          </p>
+          {filter === "all" && !onlyUnread ? (
+            <p className="mt-1.5 max-w-xs text-sm text-text-sec">{t.emptyAllSub}</p>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-4 rounded-lg"
+              onClick={() => {
+                setFilter("all");
+                setOnlyUnread(false);
+              }}
+            >
+              {t.showAll}
+            </Button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
