@@ -62,6 +62,52 @@ describe("schedule/slots", () => {
     expect(slots[0]?.label).toBe("2026-03-03 11:00");
   });
 
+  // FIX-TIMEBLOCK-ENFORCEMENT-01: a TimeBlock window is removed from
+  // availability. Instant-based UTC overlap, no buffer (hard window) — the slots
+  // immediately before and after the block are still offered.
+  it("skips slots overlapping a TimeBlock but keeps the ones abutting it", () => {
+    const slots = buildSlotsForDay({
+      dayPlan: basePlan,
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [],
+      blocks: [
+        {
+          startAtUtc: new Date("2026-03-03T10:30:00Z"),
+          endAtUtc: new Date("2026-03-03T11:00:00Z"),
+        },
+      ],
+      now: new Date("2026-03-03T08:00:00Z"),
+    });
+
+    const labels = slots.map((slot) => slot.label.slice(-5));
+    // 10:30 overlaps the block → gone; 10:00 (ends 10:30) and 11:00 (starts at
+    // the block end) abut it → kept — a block is a hard window, not buffered.
+    expect(labels).toEqual(["10:00", "11:00", "11:30"]);
+  });
+
+  it("blocks the whole day when the TimeBlock covers the working interval", () => {
+    const slots = buildSlotsForDay({
+      dayPlan: basePlan,
+      dateKey: "2026-03-03",
+      timeZone: "UTC",
+      serviceDurationMin: 30,
+      bufferMin: 0,
+      bookings: [],
+      blocks: [
+        {
+          startAtUtc: new Date("2026-03-03T09:00:00Z"),
+          endAtUtc: new Date("2026-03-03T13:00:00Z"),
+        },
+      ],
+      now: new Date("2026-03-03T08:00:00Z"),
+    });
+
+    expect(slots).toEqual([]);
+  });
+
   // FIX-05 (QA-111): the grid step must honour the master's slotStepMin.
   it("honours slotStepMin=15 (15-min grid), default 30 when omitted", () => {
     const args = {

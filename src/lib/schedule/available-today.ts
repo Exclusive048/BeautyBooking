@@ -6,6 +6,7 @@ import { buildSlotsForDay } from "@/lib/schedule/slots";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
 import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
+import { loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
@@ -135,6 +136,10 @@ export async function providerHasFreeSlotToday(
     )
     .map((booking) => ({ startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc }));
 
+  // FIX-TIMEBLOCK-ENFORCEMENT-01: a fully-blocked master must not show as
+  // "available today" — feed the same TimeBlock windows the booking flow honours.
+  const todayBlocks = await loadTimeBlockRanges(provider.id, dayStartUtc, dayEndUtc);
+
   const slots = buildSlotsForDay({
     dayPlan: plan,
     dateKey: todayKey,
@@ -142,6 +147,7 @@ export async function providerHasFreeSlotToday(
     serviceDurationMin: AVAILABILITY_PROBE_DURATION_MIN,
     bufferMin: normalizeBufferMinutes(provider.bufferBetweenBookingsMin),
     bookings: todayBookings,
+    blocks: todayBlocks,
     now,
     slotStepMin: normalizeSlotStepMin(provider.slotStepMin),
   });

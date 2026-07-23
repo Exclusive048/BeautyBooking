@@ -16,6 +16,7 @@ import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { resolveMoveDurationMin, resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 /**
@@ -273,6 +274,14 @@ export async function createStudioBooking(input: {
           );
         }
 
+        // FIX-TIMEBLOCK-ENFORCEMENT-01: studio admin create is direct authority
+        // (#22) but still cannot land on a TimeBlock the master is closed for.
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: master.id,
+          startAtUtc: input.startAt,
+          endAtUtc: endAt,
+        });
+
         const booking = await tx.booking.create({
           data: {
             providerId: studio.providerId,
@@ -529,6 +538,14 @@ export async function moveStudioBooking(input: {
             "SLOT_CONFLICT",
           );
         }
+
+        // FIX-TIMEBLOCK-ENFORCEMENT-01: a move must not drop the booking into a
+        // window the TARGET master is closed for (block owner = target master).
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: input.targetMasterId,
+          startAtUtc: newStart,
+          endAtUtc: newEnd,
+        });
 
         await tx.booking.update({
           where: { id: booking.id },

@@ -12,6 +12,7 @@ import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { buildBookingOverlapWhere, bookingOverlapsRange } from "@/lib/schedule/overlap";
+import { loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
 import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { logError } from "@/lib/logging/logger";
@@ -317,6 +318,14 @@ async function computeAvailabilityHint(
       );
     };
 
+    // FIX-TIMEBLOCK-ENFORCEMENT-01: the "nearest slot" hint must skip TimeBlock
+    // windows too — same probe window + per-day overlap bucketing as bookings.
+    const blockRanges = await loadTimeBlockRanges(providerId, probeWindowStartUtc, probeWindowEndUtc);
+    const blocksForDay = (dateKey: string): Array<{ startAtUtc: Date; endAtUtc: Date }> => {
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc(dateKey, timezone);
+      return blockRanges.filter((block) => bookingOverlapsRange(block, startUtc, endExclusiveUtc));
+    };
+
     let cursor = todayKey;
     for (let i = 0; i < AVAILABILITY_PROBE_DAYS; i += 1) {
       const plan = await ScheduleEngine.getDayPlanFromContext(ctx, cursor);
@@ -330,6 +339,7 @@ async function computeAvailabilityHint(
           // the probe pads existing bookings exactly as the widget does.
           bufferMin,
           bookings: bookingsForDay(cursor),
+          blocks: blocksForDay(cursor),
           now,
           slotStepMin,
         });

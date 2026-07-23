@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import {
   emitBookingConfirmedSystemMessage,
@@ -166,6 +167,18 @@ export async function confirmBooking(
         if (conflict) {
           throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
         }
+
+        // FIX-TIMEBLOCK-ENFORCEMENT-01: confirming a reschedule applies the
+        // proposed time — it must not land the booking inside a TimeBlock. Owner
+        // is the performing master (`masterProviderId`, or `providerId` for solo).
+        // Only the moving side pays this: for a plain PENDING→CONFIRMED the time
+        // is unchanged, but re-checking is harmless (a block created under an
+        // existing booking is surfaced here rather than silently confirmed).
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: booking.masterProviderId ?? booking.providerId,
+          startAtUtc,
+          endAtUtc,
+        });
 
         return tx.booking.update({
           where: { id: bookingId },
