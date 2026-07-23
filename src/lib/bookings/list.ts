@@ -1,6 +1,7 @@
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { toBookingDto, toClientBookingDto } from "@/lib/bookings/mappers";
 import type { BookingClientDto, BookingDto } from "@/lib/bookings/dto";
 
@@ -40,9 +41,17 @@ export async function listProviderBookingsForOwner(
     throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
   }
 
+  // F1 (FIX-STUDIO-BLOCKERS-01): for a MASTER provider the listing must use
+  // the performer predicate — studio bookings the master performs are keyed
+  // providerId=STUDIO + masterProviderId=master and never match a bare
+  // `{ providerId }`. STUDIO providers keep the bare filter (the studio's own
+  // journal) byte-identically.
+  const bookingScope =
+    provider.type === "MASTER" ? masterPerformedBookingWhere(providerId) : { providerId };
+
   if (provider.ownerUserId && provider.ownerUserId === userId) {
     const bookings = await prisma.booking.findMany({
-      where: { providerId },
+      where: bookingScope,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -85,7 +94,7 @@ export async function listProviderBookingsForOwner(
   await requireStudioAdmin(userId, studioId);
 
   const bookings = await prisma.booking.findMany({
-    where: { providerId },
+    where: bookingScope,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

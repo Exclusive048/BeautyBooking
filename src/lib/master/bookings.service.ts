@@ -1,5 +1,6 @@
 import { BookingStatus, ReviewTargetType, type Prisma } from "@prisma/client";
 import { cache } from "react";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { parseClientKeyIdentity } from "@/lib/crm/card-service";
@@ -173,7 +174,14 @@ export const getMasterBookingsForKanban = cache(
     const [activeRows, cancelledRows] = await Promise.all([
       prisma.booking.findMany({
         where: {
-          providerId: input.masterId,
+          // F1: shared performer predicate — a studio master's bookings are
+          // keyed providerId=STUDIO + masterProviderId=master, which the old
+          // `providerId: input.masterId` filter could never match. Wrapped in
+          // AND because this query carries its own OR (the time window).
+          AND: [
+            masterPerformedBookingWhere(input.masterId),
+            ...(clientFilter ? [clientFilter] : []),
+          ],
           status: {
             notIn: [
               BookingStatus.CANCELLED,
@@ -185,7 +193,6 @@ export const getMasterBookingsForKanban = cache(
             { startAtUtc: { gte: doneCutoff, lt: futureCutoff } },
             { startAtUtc: null },
           ],
-          ...(clientFilter ? { AND: [clientFilter] } : {}),
         },
         orderBy: { startAtUtc: "asc" },
         select: {
@@ -203,7 +210,10 @@ export const getMasterBookingsForKanban = cache(
       }),
       prisma.booking.findMany({
         where: {
-          providerId: input.masterId,
+          AND: [
+            masterPerformedBookingWhere(input.masterId),
+            ...(clientFilter ? [clientFilter] : []),
+          ],
           status: {
             in: [BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.NO_SHOW],
           },
@@ -211,7 +221,6 @@ export const getMasterBookingsForKanban = cache(
             { cancelledAtUtc: { gte: cancelledCutoff } },
             { cancelledAtUtc: null, updatedAt: { gte: cancelledCutoff } },
           ],
-          ...(clientFilter ? { AND: [clientFilter] } : {}),
         },
         orderBy: { updatedAt: "desc" },
         take: 50,
@@ -251,7 +260,7 @@ export const getMasterBookingsForKanban = cache(
         ? prisma.booking.groupBy({
             by: ["clientUserId"],
             where: {
-              providerId: input.masterId,
+              ...masterPerformedBookingWhere(input.masterId),
               clientUserId: { in: clientUserIds },
               status: BookingStatus.FINISHED,
             },

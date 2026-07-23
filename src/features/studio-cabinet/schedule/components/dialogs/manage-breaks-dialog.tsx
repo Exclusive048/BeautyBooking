@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Coffee, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,8 +40,15 @@ export function ManageBreaksDialog({
   onClose,
 }: Props) {
   const router = useRouter();
-  const availableMasters = masters.filter((m) => m.isAvailable);
-  const [masterId, setMasterId] = useState(availableMasters[0]?.id ?? "");
+  // FIX-STUDIO-BLOCKERS-01 (F2): memoised — the inline `masters.filter(...)`
+  // produced a NEW array identity on every render, and that array sat in the
+  // reset-effect's dependency list below. Every state change (each keystroke)
+  // re-rendered → the effect re-fired → the whole form snapped back to its
+  // defaults, so the API always received «first master, today 13:00–14:00»
+  // regardless of what the admin entered (QA-FINDINGS-STUDIO F2).
+  const availableMasters = useMemo(() => masters.filter((m) => m.isAvailable), [masters]);
+  const defaultMasterId = availableMasters[0]?.id ?? "";
+  const [masterId, setMasterId] = useState(defaultMasterId);
   const [startAt, setStartAt] = useState(() => salonLocalDatetimeInput(dayStartIso, 13, timezone));
   const [endAt, setEndAt] = useState(() => salonLocalDatetimeInput(dayStartIso, 14, timezone));
   const [note, setNote] = useState("");
@@ -49,14 +56,17 @@ export function ManageBreaksDialog({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, startDelete] = useTransition();
 
+  // Reset ONLY when it should: the dialog opens, the day changes, the tz
+  // changes, or the default master genuinely changes — all STABLE primitives,
+  // so unrelated re-renders (typing in a field) no longer wipe the form.
   useEffect(() => {
     if (!open) return;
-    setMasterId(availableMasters[0]?.id ?? "");
+    setMasterId(defaultMasterId);
     setStartAt(salonLocalDatetimeInput(dayStartIso, 13, timezone));
     setEndAt(salonLocalDatetimeInput(dayStartIso, 14, timezone));
     setNote("");
     setError(null);
-  }, [open, dayStartIso, availableMasters, timezone]);
+  }, [open, dayStartIso, defaultMasterId, timezone]);
 
   function handleClose() {
     if (submitting || deleting) return;

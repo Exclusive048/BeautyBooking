@@ -1,5 +1,6 @@
 import { BookingActionRequiredBy, BookingStatus } from "@prisma/client";
 import { cache } from "react";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
 
 export type PendingBookingRow = {
@@ -27,7 +28,9 @@ export const getPendingBookingsForMaster = cache(
     const now = new Date();
     const rows = await prisma.booking.findMany({
       where: {
-        providerId: masterProviderId,
+        // F1: performer predicate (studio bookings carry providerId=STUDIO).
+        // AND-wrapped: this query has its own OR for the actionable statuses.
+        AND: [masterPerformedBookingWhere(masterProviderId)],
         startAtUtc: { gt: now },
         OR: [
           {

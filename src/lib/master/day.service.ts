@@ -3,6 +3,7 @@ import { ensureNoConflicts, normalizeBufferMinutes } from "@/lib/bookings/bookin
 import { toBookingDto as toNormalizedBookingDto } from "@/lib/bookings/toBookingDto";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
 import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
@@ -222,10 +223,7 @@ export async function getMasterDay(input: {
   const [bookingsRaw, finishedMonth, reviews, services, newBookingsCount] = await prisma.$transaction([
     prisma.booking.findMany({
       where: {
-        OR: [
-          { masterProviderId: input.masterId },
-          { masterProviderId: null, providerId: input.masterId },
-        ],
+        ...masterPerformedBookingWhere(input.masterId),
         startAtUtc: { gte: start, lt: end },
       },
       select: {
@@ -251,10 +249,7 @@ export async function getMasterDay(input: {
     }),
     prisma.booking.findMany({
       where: {
-        OR: [
-          { masterProviderId: input.masterId },
-          { masterProviderId: null, providerId: input.masterId },
-        ],
+        ...masterPerformedBookingWhere(input.masterId),
         startAtUtc: { gte: monthStart, lt: monthEnd },
         status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       },
@@ -296,10 +291,7 @@ export async function getMasterDay(input: {
     }),
     prisma.booking.count({
       where: {
-        OR: [
-          { masterProviderId: input.masterId },
-          { masterProviderId: null, providerId: input.masterId },
-        ],
+        ...masterPerformedBookingWhere(input.masterId),
         ...(master.masterProfile?.lastBookingsSeenAt
           ? { createdAt: { gt: master.masterProfile.lastBookingsSeenAt } }
           : {}),

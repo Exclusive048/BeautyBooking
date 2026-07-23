@@ -1,5 +1,6 @@
 import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
@@ -249,7 +250,8 @@ export const getMasterScheduleWeek = cache(
       Promise.all(weekDays.map((d) => ScheduleEngine.getDayPlanFromContext(ctx, d.iso))),
       prisma.booking.findMany({
         where: {
-          providerId: master.id,
+          // F1: performer predicate — see master-booking-scope.ts.
+          ...masterPerformedBookingWhere(master.id),
           startAtUtc: { gte: input.weekStart, lt: weekEnd },
           status: {
             notIn: [BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.NO_SHOW],
@@ -297,7 +299,7 @@ export const getMasterScheduleWeek = cache(
       ? await prisma.booking.groupBy({
           by: ["clientUserId"],
           where: {
-            providerId: master.id,
+            ...masterPerformedBookingWhere(master.id),
             clientUserId: { in: clientUserIds },
             status: BookingStatus.FINISHED,
           },
