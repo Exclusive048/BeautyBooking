@@ -8,33 +8,20 @@
 
 ## Команды
 
-- `npm run dev` — dev server
-- `npm run worker` — воркер очереди задач (отдельный процесс)
-- `npm run test` — Vitest
-- `npm run typecheck` — проверка типов
-- `npm run lint` — ESLint
-- `npm run check` — полная проверка (lint + types + prisma + encoding + mojibake + ui-text)
-- `npm run build` — production build
-- `npx prisma validate` — валидация схемы
-- `npx prisma generate` — генерация клиента
+Все скрипты — в `package.json`. Неочевидное: `npm run worker` — отдельный процесс (воркер очереди), `npm run check` — полная проверка (lint + types + prisma + encoding + mojibake + ui-text + schema-drift).
 
 ## Дизайн
 
-При любой работе с UI, страницами, компонентами и стилями — ВСЕГДА сначала читай @.claude/skills/ui-ux-pro-max/SKILL.md и следуй его инструкциям.
+При любой работе с UI, страницами, компонентами и стилями — ВСЕГДА сначала вызывай скилл `ui-ux-pro-max` (`.claude/skills/ui-ux-pro-max/SKILL.md`) и следуй его инструкциям. Он загружается по требованию — не читай файл вручную, вызывай скилл.
 
 ## Архитектура
 
-- `src/app/` — Next.js App Router (pages + API routes)
-- `src/lib/` — бизнес-логика (домены: schedule, bookings, billing, auth, notifications, queue)
-- `src/features/` — UI по фичам
-- `src/features/master/components/{dashboard,bookings,schedule,schedule-settings}/` — кабинет мастера, переписан в текущем sprint
-- `src/components/ui/` — shared UI-компоненты
+Раскладка каталогов выводится из `ls src/`. Здесь — только то, что из структуры не видно:
+
 - `src/components/layout/app-shell-content.tsx` — global wrapper, выбирает full-width vs constrained по pathname
 - `src/lib/ui/text.ts` — **ЕДИНСТВЕННЫЙ** источник всех UI-текстов (`UI_TEXT`)
 - `src/lib/schedule/editor.ts` (server-only) и `src/lib/schedule/editor-shared.ts` (client-safe) — граница для типов/нормализаторов расписания
 - `.claude/references/` — design references (`{page}.png` + `{page}.js`) для каждой страницы
-- `src/worker.ts` — воркер очереди задач
-- `prisma/schema/` — модель данных (split на несколько файлов)
 
 ## ВАЖНЫЕ ПРАВИЛА
 
@@ -76,7 +63,7 @@ npm run typecheck && npm run lint && npm run check:encoding && npm run check:moj
 
 ## Качество — чеклист
 
-@docs/QUALITY-GATES.md
+Перед коммитом — скилл `quality-gates` (загружается по требованию). Канонический документ — `docs/QUALITY-GATES.md`.
 
 ## graphify
 

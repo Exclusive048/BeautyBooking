@@ -77,60 +77,24 @@
 
 ## 2. ТЕХНИЧЕСКИЙ СТЕК
 
-### Frontend
-| Технология | Версия | Назначение |
-|-----------|--------|-----------|
-| Next.js | ^16.1.6 | App Router, SSR/SSG (webpack, не turbopack). **Не апгрейдить без согласования.** |
-| React | 19.2.3 | UI |
-| TypeScript | ^5 | strict: true |
-| Tailwind CSS | ^3.4.17 | Стили (только токены — см. дизайн-скилл) |
-| SWR | ^2.4.0 | Клиентская загрузка данных |
-| Lucide React | ^0.541 | Иконки |
-| framer-motion | ^12.38 | Анимации |
-| @tanstack/react-virtual | ^3.13 | Виртуализация списков |
-| next-pwa / next-themes | — | PWA + Service Worker / тёмная-светлая тема |
-
-### Backend
-| Технология | Версия | Назначение |
-|-----------|--------|-----------|
-| Next.js API Routes | ^16.1.6 | REST API |
-| Prisma | ^6.19.2 | ORM. **🚨 Не до v7 без согласования.** |
-| PostgreSQL + pgvector | — | Основная БД + вектора (dev: `pgvector/pgvector:pg16`) |
-| Redis | ^5.10 | Кэш, rate-limit, очередь задач, pub/sub |
-| Zod | ^4.3 | Валидация |
+### Версии и зависимости
+Источник — `package.json`. Пины, которые нельзя менять без согласования: **Next.js не апгрейдить** (16.x, webpack, не turbopack), **Prisma не до v7**. БД — PostgreSQL + pgvector (dev-образ `pgvector/pgvector:pg16`), кэш/очередь — Redis, валидация — Zod, стили — Tailwind (только токены, см. дизайн-скилл).
 
 ### Интеграции
 YooKassa (платежи) · Яндекс S3 / Геокодер / Suggest (медиа, адреса) · Yandex ID OAuth · VK OAuth · Telegram Bot API (gated OFF, + monitoring) · YandexGPT (chat AI, §11) · Yandex AI Studio (visual-search vision `qwen3.6-35b-a3b` + `text-search` embeddings, §11; dormant) · web-push VAPID (push) · nodemailer SMTP (email) · SMSC.ru (SMS, код готов — не подключён) · Sharp (изображения) · AWS SDK S3. *(OpenAI полностью удалён из кодбазы — VISUAL-SEARCH-YANDEX-MIGRATION-01 2026-07-13.)*
 
 ### CI/CD и запуск
-- GitHub Actions `.github/workflows/quality-gates.yml`: prisma validate/generate → lint → typecheck → tests → mojibake → encoding → schema-drift → context-freshness → openapi-routes.
-- **Docker + деплой в Yandex Cloud** есть: `Dockerfile`, `Dockerfile.worker`, `docker-compose.prod.yml`, `.github/workflows/deploy.yml` (`prisma migrate deploy` → build → push в Yandex Container Registry → SSH-деплой).
-- Команды: `npm run dev` (Next dev) · `npm run worker` (воркер очереди, отдельный процесс) · `npm run build` (prod). См. §14.
+CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.github/workflows/deploy.yml` (Docker → Yandex Container Registry → SSH). Не выводится из конфигов: **воркер очереди (`npm run worker`) — отдельный процесс**, его надо поднимать рядом с Next-приложением.
 
 ---
 
 ## 3. АРХИТЕКТУРА КОДА
 
 ### Структура `src/`
-```
-src/
-├── app/                    # Next.js App Router: (admin) (cabinet) (public) группы + api/ (route.ts) + страницы
-├── components/             # Shared UI: ui/ auth/ billing/ cabinet/ layout/ notifications/ providers/ pwa/ ...
-├── features/               # Feature-слайсы (UI по фичам): admin-cabinet, analytics, auth, billing, booking,
-│                           #   catalog, chat, client-cabinet, crm, feed, home, hot-slots, master, media,
-│                           #   model-offers, notifications, public-profile, public-studio, reviews, schedule,
-│                           #   search-by-time, studio-cabinet  (features/studio/ удалён)
-├── hooks/                  # Глобальные хуки
-├── lib/                    # Домены/утилиты: advisor, ai, api, audit, auth, billing, bookings, cache, catalog,
-│                           #   chat, crm, deletion, feed, hot-slots, http, idempotency, invites, logging, maps,
-│                           #   master, media, money, model-offers, monitoring, notifications, openapi, payments,
-│                           #   phone, profiles, providers, queue, rate-limit, redis, reviews, schedule, seo,
-│                           #   services, sms, studio(s), support, telegram, time, ui, users, validation,
-│                           #   visual-search, vk, yandex, env.ts
-├── proxy.ts                # Middleware-class (в Next 16 переименован из middleware.ts): CORS/CSP/rate-limit-tier
-├── worker.ts               # Воркер очереди задач + периодические джобы (available-today sweep, price-optin cron, ...)
-└── types/
-```
+Раскладка выводится из `ls src/` (`app/` · `components/` · `features/` · `hooks/` · `lib/` · `types/`). Что из дерева НЕ видно:
+- `src/proxy.ts` — middleware-class, в Next 16 переименован из `middleware.ts`; делает CORS/CSP/rate-limit-tier.
+- `src/worker.ts` — воркер очереди задач + периодические джобы (available-today sweep, price-optin cron, …), **отдельный процесс**.
+- `src/features/studio/` удалён — актуальный слайс `studio-cabinet`.
 
 ### Ключевые паттерны
 - **Thin API routes** — бизнес-логика в `src/lib/`, `route.ts` — тонкая обёртка.
@@ -151,60 +115,16 @@ src/
 
 > Источник истины — `prisma/schema/*.prisma`. Схема меняется **только** через `npx prisma migrate dev` (`db push` запрещён — CLAUDE.md rule 16). Ниже — карта, не автогенерация.
 
-### Enums (37)
-OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole, StudioMemberStatus, MembershipStatus, CategoryStatus, BookingStatus, BookingCancelledBy, BookingRequestedBy, BookingActionRequiredBy, BookingSource, **BookingPackageStatus** (ACTIVE/CANCELLED), ChatSenderType, ScheduleMode, ScheduleBreakKind, ScheduleOverrideKind, ScheduleChangeRequestStatus, TimeBlockType, PlanTier, SubscriptionScope, SubscriptionStatus, BillingPaymentStatus, NotificationType (55+ значений), MediaEntityType, MediaKind, MediaAssetStatus, ReviewTargetType, ReviewTagType, ReviewReportReason, DiscountType, DiscountApplyMode, ModelOfferStatus, ModelApplicationStatus, AdminAuditAction.
+Модели (~67), enum'ы (37), поля, связи и индексы **читаются из `prisma/schema/*.prisma`** — не дублируем их здесь. Центральные модели: `UserProfile`, `Provider` (+ `MasterProfile` / `Studio`), `Booking` (+ `BookingPackage` / `BookingServiceItem`), `Service` / `MasterService` / `ServicePackage`, `UserSubscription` / `BillingPlan` / `BillingPayment`, `Schedule*`, `Review`, `MediaAsset`, `City`.
 
-Ключевые значения:
-| Enum | Значения |
-|------|---------|
-| BookingStatus | NEW, PENDING, CONFIRMED, CHANGE_REQUESTED, REJECTED, IN_PROGRESS, PREPAID, STARTED, FINISHED, CANCELLED, NO_SHOW |
-| SubscriptionStatus | ACTIVE, PENDING, PAST_DUE, CANCELLED, EXPIRED |
-| BillingPaymentStatus | PENDING, SUCCEEDED, CANCELED, FAILED, REFUNDED |
-| ScheduleMode | FLEXIBLE, FIXED · ScheduleOverrideKind | OFF, TIME_RANGE, TEMPLATE |
-| CategoryStatus | PENDING, APPROVED, REJECTED · ModelApplicationStatus | PENDING, REJECTED, APPROVED_WAITING_CLIENT, CONFIRMED |
-| StudioMemberStatus | ACTIVE, INVITED, DISABLED · MembershipStatus | ACTIVE, PENDING, REJECTED, LEFT |
-| BookingSource | MANUAL, WEB, APP · DiscountType | PERCENT, FIXED · DiscountApplyMode | ALL_SERVICES, PRICE_FROM, MANUAL |
-
-### Основные модели (~67)
-| Модель | Ключевые поля | Связи / заметки |
-|--------|--------------|-------|
-| **UserProfile** | id, roles[], phone?, email?, emailVerifiedAt?, telegramId?, publicUsername?, **pushNotificationsEnabled**, blockedAt?/blockedByUserId?/blockedReason? | Provider[], Studio[], Booking[], Notification[], PushSubscription[], RefreshSession[], vkLink?, **yandexLink?**, adminAuditLogs[], reviewsDeleted[], self-relation blockedBy/blockedUsers |
-| **Provider** | id, type, name, isPublished, timezone, cityId?, scheduleMode, autoConfirmBookings, bufferBetweenBookingsMin, slotStepMin, minBookingHoursAhead, maxBookingDaysAhead, lateCancelAction, slotPrecision, visibleSlotDays, acceptNewClients, autoPublishStoriesEnabled, **availableToday**, **socialVk?**, **socialInstagram?** | City?, Service[], Booking[], scheduleOverrides, weeklyScheduleConfig, DiscountRule?, HotSlot[], servicePackages[] |
-| **MasterProfile** | id, userId, providerId | UserProfile, Provider |
-| **Studio** | id, providerId (1:1) | StudioMember[], StudioInvite[], Service[], Booking[] |
-| **StudioMember** / **StudioMembership** | studioId, userId, role(s), status | Studio, UserProfile (обе таблицы популируются для совместимости; canonical state-machine — Membership) |
-| **Booking** | id, providerId, serviceId, clientUserId?, startAtUtc?, endAtUtc?, status, slotLabel, source, **bookingPackageId?**, notes?, comment?, proposedStartAt?, actionRequiredBy? | Provider, Service, UserProfile, BookingChat?, Review?, BookingServiceItem[], BookingPackage? |
-| **BookingPackage** ⭐ | id, servicePackageId?(SetNull), providerId, clientUserId?, discountType+discountValue (snapshot), totalKopeks (=Σ child priceSnapshots), status(BookingPackageStatus) | bookings[] (инв. #34) |
-| **BookingServiceItem** | id, bookingId, studioId?, serviceId?, titleSnapshot, priceSnapshot, durationSnapshotMin | Booking, Studio?, Service? |
-| **Service** | id, providerId, name, durationMin, price, isEnabled, isActive, onlinePaymentEnabled | Provider, MasterService[], HotSlot[] |
-| **MasterService** | masterProviderId, serviceId, priceOverride?, durationOverrideMin?, isEnabled, commissionPct? | `@@unique([masterProviderId, serviceId])` (инв. #7) |
-| **ServicePackage** / **ServicePackageItem** | masterId(=providerId), title, discountPct?, isEnabled / packageId, serviceId, priceSnapshot, durationSnapshotMin, **sortOrder** | bundle услуг со скидкой |
-| **ScheduleTemplate / …Break / WeeklyScheduleConfig / …Day / ScheduleOverride / ScheduleBreak** | шаблоны, недельная конфигурация, per-date overrides, перерывы | движок расписания (`ScheduleEngine`) |
-| **ScheduleChangeRequest** | id, studioId?, providerId, payloadJson, status | заявки мастеров студии на изменение расписания |
-| **HotSlot** / **HotSlotSubscription** | providerId, serviceId?, startAtUtc, endAtUtc, discountType/Value, expiresAtUtc / userId+providerId | `@@unique([providerId,startAtUtc,endAtUtc])` (инв. #9) |
-| **UserSubscription** | id, userId, planId, status, scope, currentPeriodEnd, autoRenew, graceUntil?, isTrial, trialEndsAt, pendingPriceOptIn, pendingPriceKopeks, priceOptIn24h/2hSentAt | `@@unique([userId, scope])` (инв. #8) |
-| **BillingPlan** / **BillingPlanPrice** | code, tier, scope, features(Json), inheritsFromPlanId? / period, kopeks, isActive | наследование фич; canonical codes UPPERCASE |
-| **BillingPayment** | subscriptionId, status, amountKopeks, yookassaPaymentId?, idempotenceKey(@unique) | инв. #4 |
-| **BillingAuditLog** / **AdminAuditLog** | action, details? / adminUserId(onDelete Restrict), action(enum), targetType?, targetId?, reason?, ipAddress?, userAgent? | админ-аудит (инв. #16/#18/#19) |
-| **MrrSnapshot** | snapshotDate(@unique @db.Date), mrrKopeks(BigInt), activeSubscriptionsCount, breakdownJson? | daily-snapshot MRR (paid-and-current: ACTIVE+!trial+currentPeriodEnd>now) |
-| **Notification** / **PushSubscription** | userId, type, title, body, payloadJson, isRead, bookingId? / endpoint(@unique), p256dh, auth | in-app / push |
-| **MediaAsset** / **MediaAssetEmbedding** | entityType, entityId, kind, storageKey, status, visualIndexed / embedding(vector(256)) | pgvector + hnsw cosine index (инв. #12) |
-| **Review** | id, bookingId?, authorId, targetType, targetId, rating, replyText?, reportedAt?/reportReason?/reportComment?, deletedAt?/deletedByUserId?/deletedReason? | soft-delete (инв. #17) |
-| **ModelOffer** / **ModelApplication** | masterId, dateLocal, time…Local, status / offerId, clientUserId, status, bookingId? | офферы моделям |
-| **ClientCard** | providerId, clientUserId?, clientPhone?, notes?, tags[] | CRM (privacy — инв. #25) |
-| **GlobalCategory** | name, slug, parentId?, status, isSystem, visibleToAll, visualSearchSlug? | инв. #23 |
-| **City** | slug(@unique), name, nameGenitive?, latitude, longitude, timezone, isActive, autoCreated | Provider.cityId (onDelete Restrict); auto-grow из геокодера |
-| **VkLink** / **TelegramLink** / **YandexLink** ⭐ | userId, <provider>UserId, accessToken, refreshToken, isEnabled | OAuth-привязки (YandexLink: `@@unique(userId,yandexUserId)`, onDelete Cascade) |
-| **ConversationSlug** | slug(@unique), bookingId(@unique) | opaque chat-URL |
-| **RefreshSession** | userId, jti(@unique), expiresAt, usedAt?, revokedAt?, rotatedToSessionId? | single-use refresh (инв. #3) |
-| **OtpCode** | phone, email?, channel, codeHash, expiresAt, usedAt? | HMAC codeHash (инв. #2) |
-| **TimeBlock / DiscountRule / AppSetting / SystemConfig / UserConsent / ServiceBookingQuestion / PortfolioItem / PortfolioItemService / Tag / PublicUsernameAlias** | — | вспомогательные |
-
-### Важные индексы
-- `Provider`: `[isPublished, ratingAvg DESC, reviews DESC, createdAt DESC]`, `[type, isPublished, address]`, `[cityId, isPublished]`.
-- `Booking`: `[providerId, startAtUtc, endAtUtc]`, `[status, startAtUtc]`.
-- `UserSubscription`: `[status, autoRenew, nextBillingAt]`, `[status, graceUntil]`.
-- `MediaAsset`: `[kind, visualIndexed, visualCategory]`.
+### Заметки, которых в схеме не видно
+- **`StudioMember` / `StudioMembership`** — обе таблицы популируются для совместимости; canonical state-machine — **Membership**.
+- **`BillingPlan.code`** — canonical codes UPPERCASE; фичи наследуются через `inheritsFromPlanId`.
+- **`MrrSnapshot`** — «paid-and-current» = `ACTIVE` + `!isTrial` + `currentPeriodEnd > now`.
+- **`City`** — auto-grow из геокодера (`autoCreated`); `Provider.cityId` — `onDelete: Restrict`.
+- **`Provider`** — дублирующие rating-поля (`rating`/`ratingAvg`, `reviews`/`ratingCount`) — техдолг, см. §8.
+- **`Booking.startAt`/`endAt`** — deprecated, канон `startAtUtc`/`endAtUtc` (инв. #1).
+- Уникальности и каскады, на которые опираются инварианты: #2 `OtpCode.codeHash` · #3 `RefreshSession.jti` · #4 `BillingPayment.idempotenceKey` · #7 `MasterService` · #8 `UserSubscription` · #9 `HotSlot` · #12 `MediaAssetEmbedding.vector(256)` · #16 `AdminAuditLog.adminUserId onDelete Restrict` · #17 `Review` soft-delete. Полные определения — §12 + схема.
 
 ---
 
@@ -256,21 +176,19 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 
 ## 6. МАРШРУТЫ И API
 
-### Публичные страницы
-`/` · `/catalog` · `/u/[username]` (+ `/booking`) · `/c/[username]` · `/providers/[id]` · `/clients/[id]` · `/hot` · `/inspiration` · `/models` (+ `/[offerId]`) · `/book` · `/login` · `/logout` · `/pricing` · `/about` `/how-it-works` `/how-to-book` `/blog` `/faq` `/support` `/help/masters` · `/become-master` `/partners` `/careers` · `/gift-cards` · `/privacy` `/terms` · `/notifications` · `/offline` · `/403`.
+Полный список страниц и эндпоинтов выводится из `ls src/app/` (группы `(public)` / `(cabinet)` / `(admin)` + `api/**/route.ts`). Ниже — только то, что из дерева не читается.
 
-### Кабинеты
-- **Master** (роль MASTER): `/cabinet/master/{dashboard,bookings,schedule,schedule/settings,analytics,clients,model-offers,profile,reviews}` — sidebar shell + per-page `MasterPageHeader` + full-width. Schedule settings — 5 табов, auto-save.
-- **Studio** (STUDIO/STUDIO_ADMIN): `/cabinet/studio/{,calendar,bookings,schedule-requests,analytics,clients,services,team,reviews,settings}`. Settings — 7 разделов через `?section=`.
-- **User/Client:** `/cabinet` (редирект по роли) · `/cabinet/(user)/{bookings,favorites,messages,notifications,reviews,model-applications,profile,roles,settings,faq}` · `/cabinet/billing`.
-- **Admin** (`/admin`): dashboard · catalog · cities · billing (Plans/Subscriptions/Payments + cancel/refund + price isActive toggle) · reviews · settings · users. Все действия audit-logged.
+### Кабинеты — устройство
+- **Master** (`/cabinet/master/*`, роль MASTER) — sidebar shell + per-page `MasterPageHeader` + full-width. Schedule settings — 5 табов, auto-save.
+- **Studio** (`/cabinet/studio/*`, STUDIO/STUDIO_ADMIN) — Settings это **7 разделов через `?section=`**, не отдельные routes.
+- **User/Client** — `/cabinet` это редирект по роли; страницы клиента лежат в route-группе `(user)`.
+- **Admin** (`/admin/*`) — все мутирующие действия audit-logged (инв. #18/#19).
 
-### API (~ всего много route.ts; ниже группы)
-- **Auth:** `/api/auth/otp/{request,verify}` · `/api/auth/refresh` · `/api/auth/telegram/{login-init,login}` (GET; gated) · `/api/auth/vk/{start,callback}` · **`/api/auth/yandex/{start,callback,unlink}`** · `/api/auth/{profile/ensure,account-type/set,roles/add}` · `/api/logout`.
-- **Bookings:** `/api/bookings` (GET/POST) · `/api/bookings/my` · `/api/bookings/[id]/{cancel,confirm,reschedule,decline-reschedule,chat,chat/messages,chat/read}` · `/api/bookings/upload-reference` · **`/api/bookings/package/[id]/cancel`** · **`/api/public/packages/[id]/{propose,book}` + `/studio/{propose,book}`**.
-- **Payments/Billing:** `/api/billing/{checkout,plans,status,cancel,renew/run}` · `/api/billing/mrr/snapshot/run` · `/api/payments/yookassa/webhook` (optional `?token=` + IP-allowlist log-only + worker API re-fetch).
-- **Schedule/Slots:** `/api/public/providers/[providerId]/{slots,booking-days}` · `/api/masters/[id]/availability` · `/api/provider/schedule/{overrides,weekly,templates,status}`.
-- **Catalog/прочее:** **`/api/catalog/available-today/run`** (cron-token) · `/api/catalog/*` · `/api/analytics/*` · `/api/master/*` · `/api/studio/*` · `/api/cabinet/{master,studio,user}/*` · `/api/chat/*` (+ `attachment/[token]`) · `/api/cities` · `/api/me/*` · `/api/notifications/*` · `/api/feed/*` · `/api/home/*` · `/api/reviews/*` · `/api/integrations/vk/*` · `/api/onboarding/professional/*` · `/api/search/*` · `/api/categories/*` · `/api/admin/*`.
+### API — заметки, которых в дереве нет
+- **Cron/секретные эндпоинты** (fail-closed по токену): `/api/billing/renew/run` · `/api/billing/mrr/snapshot/run` · `/api/catalog/available-today/run` · `/api/health/worker`.
+- **`/api/payments/yookassa/webhook`** — тело untrusted; authenticity держит worker API re-fetch (инв. #5), не подпись.
+- **Публичные пакеты:** `/api/public/packages/[id]/{propose,book}` + `…/studio/{propose,book}` — `propose` advisory, брони материализуются только на `/book`.
+- **Reschedule** — `/api/bookings/[id]/{confirm,decline-reschedule}`, общий backend для solo-мастера и studio-admin (инв. #32).
 
 ---
 
@@ -278,32 +196,23 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 
 > Все env-вары идут через **`src/lib/env.ts`** (Zod). `process.env.*` напрямую запрещён в `src/` (исключения: `env.ts`, Prisma-config, тесты, `startup.ts`, `proxy.ts`) — CLAUDE.md rule 11. Computed-флаги (`isPushEnabled`, `isPaymentsEnabled`, `isTelegramEnabled`, `isYandexAuthEnabled`, `isVkAuthEnabled`, `isSmsConfigured`, `isProduction` и пр.) — из того же модуля.
 
-| Переменная | Обязательна | Заметка / default |
-|-----------|-------------|-------------------|
-| `DATABASE_URL` / `DIRECT_URL` | DB да / нет | Postgres; DIRECT_URL для migrate/pooler |
-| `AUTH_JWT_SECRET` / `OTP_HMAC_SECRET` | ДА | иначе Error |
-| `REDIS_URL` (+ `REDIS_*_TIMEOUT_MS`) | нет | без него — memory fallback |
-| `STORAGE_PROVIDER` / `MEDIA_LOCAL_*` / `MEDIA_DELIVERY_SECRET` / `S3_*` | если S3 | `local` по умолчанию |
-| `SMS_PROVIDER_ENABLED` / `SMS_PROVIDER_LOGIN` / `SMS_PROVIDER_PASSWORD` | для SMS | default OFF → mock (OTP в логи). Prod: включить + пополнить SMSC |
-| `NEXT_PUBLIC_TELEGRAM_ENABLED` | legal kill-switch | unset → **false** (hard-ceiling над admin-toggle; НЕ влияет на `MONITORING_TELEGRAM_*`) |
-| `TELEGRAM_BOT_TOKEN` / `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | для TG auth | работает только при флаге=true |
-| `NEXT_PUBLIC_YANDEX_ENABLED` / `YANDEX_OAUTH_CLIENT_ID` / `_SECRET` / `_REDIRECT_URI` | для Yandex ID login | кнопка absent без флага+id |
-| `VK_CLIENT_ID` (alias `VK_ID_CLIENT_ID`) / `_SECRET` / `_REDIRECT_URI` / `NEXT_PUBLIC_VK_ENABLED` | для VK OAuth | оба имени в env.ts |
-| `NEXT_PUBLIC_VK_COMMUNITY_URL` | для footer VK | unset → иконка опускается |
-| `YANDEX_API_KEY` / `YANDEX_FOLDER_ID` | для chat-AI **и visual-search** | YandexGPT chat + AI Studio vision/embeddings (см. §11) |
-| `VISUAL_SEARCH_ENABLED` | если visual-search | dormant, default false; требует `YANDEX_API_KEY`+`YANDEX_FOLDER_ID` (не OpenAI) |
-| `YOOKASSA_SHOP_ID` / `YOOKASSA_SECRET_KEY` | для платежей | иначе Error |
-| `YOOKASSA_WEBHOOK_TOKEN` | нет | optional URL `?token=` (не подпись); authenticity держит worker re-fetch |
-| `YOOKASSA_IP_ALLOWLIST_ENFORCED` | нет | default log-only; `true` только после подтверждённого `TRUSTED_PROXY_HOPS` |
-| `TRUSTED_PROXY_HOPS` / `TRUSTED_REAL_IP_HEADER` | нет | client-IP из XFF справа (default hops=1); выставить под prod-edge |
-| `BILLING_RENEW_SECRET` / `MRR_SNAPSHOT_SECRET` / `AVAILABILITY_CRON_TOKEN` / `WORKER_SECRET` | для cron/health | fail-closed эндпоинты |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL` | для push | `isVapidConfigured` guard |
-| `YANDEX_GEOCODER_API_KEY` / `YANDEX_SUGGEST_API_KEY` / `NEXT_PUBLIC_YANDEX_MAPS_API_KEY` | для карт/адресов | |
-| `SMTP_HOST/PORT/USER/PASS/FROM` / `SUPPORT_TO` / `SUPPORT_TO_PARTNERSHIP` | для email | иначе не отправляет |
-| `MONITORING_TELEGRAM_BOT_TOKEN` / `_CHAT_ID` | нет | ops-алерты (отдельно от user-facing TG) |
-| `NEXT_PUBLIC_APP_URL` / `APP_PUBLIC_URL` / `DEFAULT_TIMEZONE` / `NEXT_PUBLIC_LEGAL_INN` / `AUTH_COOKIE_NAME` / `NODE_ENV` | нет | tz default `Europe/Moscow`; cookie `bh_session` |
+Полный список переменных с типами и дефолтами — **`src/lib/env.ts`** (Zod-схема) + templates `.env.example` / `.env.production.example`. Ниже — только семантика, которой в схеме нет.
 
-> **Удалён:** `AI_PROVIDER` (был vestigial; `ai/client.ts` — Yandex-only). Полные templates — `.env.example` / `.env.production.example`.
+**Обязательные (иначе Error на старте):** `AUTH_JWT_SECRET`, `OTP_HMAC_SECRET`, `YOOKASSA_SHOP_ID` + `YOOKASSA_SECRET_KEY`, `DATABASE_URL`.
+
+**Флаги с нетривиальным поведением:**
+- `NEXT_PUBLIC_TELEGRAM_ENABLED` — **legal kill-switch (152-ФЗ)**, unset → `false`, hard-ceiling над admin-toggle. НЕ влияет на `MONITORING_TELEGRAM_*` (ops-алерты — отдельная система).
+- `SMS_PROVIDER_ENABLED` — default OFF → mock, OTP пишется в логи. В prod: включить + пополнить баланс SMSC.
+- `VISUAL_SEARCH_ENABLED` — dormant, default false; требует `YANDEX_API_KEY` + `YANDEX_FOLDER_ID`.
+- `REDIS_URL` — без него memory-fallback (в dev). Sensitive-роуты при этом fail-closed (инв. #6).
+- `YOOKASSA_WEBHOOK_TOKEN` — optional URL `?token=`, **не подпись**; authenticity держит worker re-fetch.
+- `YOOKASSA_IP_ALLOWLIST_ENFORCED` — default log-only; в `true` только после подтверждённого `TRUSTED_PROXY_HOPS`.
+- `TRUSTED_PROXY_HOPS` / `TRUSTED_REAL_IP_HEADER` — client-IP берётся из XFF **справа** (default hops=1); выставить под prod-edge.
+- `BILLING_RENEW_SECRET` / `MRR_SNAPSHOT_SECRET` / `AVAILABILITY_CRON_TOKEN` / `WORKER_SECRET` — fail-closed cron/health эндпоинты.
+- `VK_CLIENT_ID` имеет alias `VK_ID_CLIENT_ID` — оба имени читаются в `env.ts`.
+- Дефолты: tz `Europe/Moscow`, cookie `bh_session`.
+
+> **Удалён:** `AI_PROVIDER` (был vestigial; `ai/client.ts` — Yandex-only).
 
 ---
 
@@ -449,15 +358,7 @@ OtpChannel, AccountType, ConsentType, ProviderType, StudioRole, StudioMemberRole
 | Добавить API route | похожий `route.ts` + `src/lib/api/response.ts` + `src/lib/auth/guards.ts` |
 
 ### Команды
-```bash
-npm run dev              # Next.js dev
-npm run worker           # воркер очереди (отдельный процесс)
-npm run test             # Vitest
-npm run typecheck        # типы
-npm run lint             # ESLint
-npm run check            # полная проверка (lint+types+prisma+encoding+mojibake+ui-text+schema-drift+context-freshness+openapi-routes+smoke)
-npx prisma migrate dev --name <descriptive>   # изменение схемы (db push запрещён)
-```
+Скрипты — в `package.json`; чеклист проверок — скилл `quality-gates`. Неочевидное: `npm run worker` — отдельный процесс; схема меняется только через `npx prisma migrate dev --name <descriptive>` (`db push` запрещён).
 
 ### Knowledge graph (Graphify)
 Read-only структурный слой для навигации (tree-sitter, 0 LLM-cost). Артефакты в `graphify-out/` (gitignored). Команды: `graphify update .` (rebuild после структурных фаз) · `graphify query "<question>"` · `graphify path "<A>" "<B>"` · `graphify explain "<symbol>"`. Для больших вопросов по кодбазе — быстрее grep.
