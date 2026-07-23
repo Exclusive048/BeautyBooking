@@ -1,16 +1,19 @@
 import {
   AccountType,
+  MembershipStatus,
   PlanTier,
   ProviderType,
   ScheduleMode,
   StudioMemberRole,
   StudioMemberStatus,
+  StudioRole,
   SubscriptionScope,
   SubscriptionStatus,
   type BillingPlan,
   type City,
   type GlobalCategory,
   type Provider,
+  type Service,
   type UserProfile,
 } from "@prisma/client";
 import { prisma } from "./helpers/prisma";
@@ -51,6 +54,12 @@ const MASTER_COUNT = 28;
 const STUDIO_COUNT = 6;
 const MASTER_PHONE_BASE = 1; // +79000000001 .. +79000000028
 const STUDIO_PHONE_BASE = 150; // +79000000150 .. +79000000155
+// STUDIO-SEED-01: studio team masters get their OWN dedicated accounts in the
+// 0200 band (see helpers/markers.ts). Previously the studio "team" was built by
+// slicing the 28 standalone masters — which produced overlapping teams (one
+// master in two studios) and masters living in a different city than their
+// studio. Dedicated masters are created in the studio's own city/timezone.
+const STUDIO_MASTER_PHONE_BASE = 200; // +79000000200 .. +79000000215
 const MASTERS_PER_STUDIO = [3, 2, 4, 2, 3, 2] as const;
 
 // Top-level category slug → city ordinal weight (sums must be > 0).
@@ -214,8 +223,11 @@ async function ensureServices(args: {
   topCategorySlugs: string[];
   categoriesBySlug: Map<string, GlobalCategory>;
   rng: ReturnType<typeof createRng>;
-}): Promise<{ minPrice: number }> {
+  /** Studio row id — set on studio-owned services so studio scoping resolves. */
+  studioId?: string;
+}): Promise<{ minPrice: number; services: Service[] }> {
   let minPrice = Number.POSITIVE_INFINITY;
+  const services: Service[] = [];
   for (const topSlug of args.topCategorySlugs) {
     const subSlugs = TOP_TO_SUB[topSlug] ?? [topSlug];
     for (const subSlug of subSlugs) {
@@ -238,7 +250,7 @@ async function ensureServices(args: {
           select: { id: true },
         });
         if (existing) {
-          await prisma.service.update({
+          const updated = await prisma.service.update({
             where: { id: existing.id },
             data: {
               durationMin: t.durationMin,
@@ -246,10 +258,12 @@ async function ensureServices(args: {
               globalCategoryId: category?.id ?? null,
               isEnabled: true,
               isActive: true,
+              ...(args.studioId ? { studioId: args.studioId } : {}),
             },
           });
+          services.push(updated);
         } else {
-          await prisma.service.create({
+          const created = await prisma.service.create({
             data: {
               providerId: args.providerId,
               name: t.name,
@@ -258,13 +272,15 @@ async function ensureServices(args: {
               globalCategoryId: category?.id ?? null,
               isEnabled: true,
               isActive: true,
+              ...(args.studioId ? { studioId: args.studioId } : {}),
             },
           });
+          services.push(created);
         }
       }
     }
   }
-  return { minPrice: Number.isFinite(minPrice) ? minPrice : 0 };
+  return { minPrice: Number.isFinite(minPrice) ? minPrice : 0, services };
 }
 
 async function ensureSchedule(providerId: string) {
@@ -300,6 +316,99 @@ async function ensureSchedule(providerId: string) {
         isActive: isWorkday,
         templateId: isWorkday ? template.id : null,
         scheduleMode: ScheduleMode.FLEXIBLE,
+      },
+    });
+  }
+}
+
+/**
+ * STUDIO-SEED-01 — the piece the bulk studio seed was missing.
+ *
+ * Studio cabinet access resolves through **StudioMembership** (canonical):
+ * `resolveCurrentStudioAccess()` reads ONLY that table and throws 403 when it
+ * finds no ACTIVE row. `StudioMember` is the legacy table — writing it alone
+ * (what this seed used to do) left every bulk studio owner with a 403 at
+ * `/cabinet/studio/*`, even though they owned the studio outright.
+ *
+ * Both tables are populated, mirroring `seed-showcase-studio.ts` (Vision).
+ */
+async function ensureStudioMemberships(args: {
+  studioId: string;
+  userId: string;
+  roles: StudioRole[];
+  legacyRole: StudioMemberRole;
+}) {
+  await prisma.studioMembership.upsert({
+    where: { userId_studioId: { userId: args.userId, studioId: args.studioId } },
+    update: { roles: args.roles, status: MembershipStatus.ACTIVE },
+    create: {
+      userId: args.userId,
+      studioId: args.studioId,
+      roles: args.roles,
+      status: MembershipStatus.ACTIVE,
+    },
+  });
+  await prisma.studioMember.upsert({
+    where: {
+      studioId_userId_role: {
+        studioId: args.studioId,
+        userId: args.userId,
+        role: args.legacyRole,
+      },
+    },
+    update: { status: StudioMemberStatus.ACTIVE },
+    create: {
+      studioId: args.studioId,
+      userId: args.userId,
+      role: args.legacyRole,
+      status: StudioMemberStatus.ACTIVE,
+    },
+  });
+}
+
+/**
+ * STUDIO-SEED-01 — studio masters don't own services; they *perform* the
+ * studio's services through `MasterService`. Without these rows the studio has
+ * services and masters but no bookable pairing.
+ *
+ * Distribution is deliberate so studio QA has both shapes:
+ *  - service[0] and service[1] → EVERY master (shared services; exercise the
+ *    Move / target-master-picker serviceId gating, which needs >1 candidate)
+ *  - the last service → only master 0 (exclusive; the picker must narrow to one)
+ *  - the rest → round-robin
+ */
+async function ensureMasterServiceLinks(args: {
+  studioId: string;
+  masterProviderId: string;
+  masterIndex: number;
+  teamSize: number;
+  services: Service[];
+}) {
+  if (args.services.length === 0) return;
+  const assigned = new Set<string>();
+  // Shared across the whole team (first two, when the studio has that many).
+  for (const shared of args.services.slice(0, 2)) assigned.add(shared.id);
+  if (args.masterIndex === 0 && args.services.length > 2) {
+    assigned.add(args.services[args.services.length - 1]!.id); // exclusive
+  }
+  for (let s = 2; s < args.services.length - 1; s++) {
+    if (s % args.teamSize === args.masterIndex) assigned.add(args.services[s]!.id);
+  }
+  for (const serviceId of assigned) {
+    await prisma.masterService.upsert({
+      where: {
+        masterProviderId_serviceId: {
+          masterProviderId: args.masterProviderId,
+          serviceId,
+        },
+      },
+      update: { isEnabled: true, studioId: args.studioId, masterId: args.masterProviderId },
+      create: {
+        masterProviderId: args.masterProviderId,
+        serviceId,
+        isEnabled: true,
+        studioId: args.studioId,
+        masterId: args.masterProviderId,
       },
     });
   }
@@ -434,6 +543,8 @@ export async function seedProviders(input: SeedProvidersInput): Promise<SeededPr
 
   // ---- Studios ----
   const studios: SeededStudio[] = [];
+  // Running ordinal across all studio teams → +79000000200, 201, 202, …
+  let teamMasterOrdinal = 0;
   for (let i = 0; i < STUDIO_COUNT; i++) {
     const studioName = STUDIO_NAMES[i % STUDIO_NAMES.length]!;
     const ownerFirst = FIRST_NAMES_F[(i + 5) % FIRST_NAMES_F.length]!;
@@ -470,44 +581,117 @@ export async function seedProviders(input: SeedProvidersInput): Promise<SeededPr
 
     const studio = await ensureStudioProfile(provider.id, ownerUser.id);
 
-    await prisma.studioMember.upsert({
-      where: { studioId_userId_role: { studioId: studio.id, userId: ownerUser.id, role: StudioMemberRole.OWNER } },
-      update: { status: StudioMemberStatus.ACTIVE },
-      create: {
-        studioId: studio.id,
-        userId: ownerUser.id,
-        role: StudioMemberRole.OWNER,
-        status: StudioMemberStatus.ACTIVE,
-      },
+    // Owner: canonical membership (OWNER+ADMIN) + legacy row. Without the
+    // StudioMembership row the cabinet 403s — see ensureStudioMemberships.
+    await ensureStudioMemberships({
+      studioId: studio.id,
+      userId: ownerUser.id,
+      roles: [StudioRole.OWNER, StudioRole.ADMIN],
+      legacyRole: StudioMemberRole.OWNER,
     });
 
-    // Pull existing seed masters (deterministically by index) into this studio.
-    const teamSize = MASTERS_PER_STUDIO[i] ?? 2;
-    const teamMembers = masters.slice(i * teamSize, i * teamSize + teamSize);
-    for (const m of teamMembers) {
-      await prisma.studioMember.upsert({
-        where: { studioId_userId_role: { studioId: studio.id, userId: m.user.id, role: StudioMemberRole.MASTER } },
-        update: { status: StudioMemberStatus.ACTIVE },
-        create: {
-          studioId: studio.id,
-          userId: m.user.id,
-          role: StudioMemberRole.MASTER,
-          status: StudioMemberStatus.ACTIVE,
-        },
-      });
-    }
-
-    const { minPrice } = await ensureServices({
+    // Studio services come BEFORE the team — masters are linked to them via
+    // MasterService as they're created.
+    const { minPrice, services: studioServices } = await ensureServices({
       providerId: provider.id,
       topCategorySlugs: ["nails", "hair"],
       categoriesBySlug,
       rng,
+      studioId: studio.id,
     });
     if (minPrice > 0) {
       await prisma.provider.update({ where: { id: provider.id }, data: { priceFrom: minPrice } });
     }
 
     await ensureSchedule(provider.id);
+
+    // ---- Dedicated team masters (STUDIO-SEED-01) ----
+    // `Provider.studioId` is the ONLY link the booking widget and the seat
+    // counter read (`{studioId, type: MASTER, ownerUserId: not null,
+    // isPublished: true}` — invariant #24). The old slice-the-standalone-
+    // masters approach never set it, so every studio had 0 ACTIVE masters:
+    // `isStudioUnbookable()` then bounced /booking back to the profile.
+    const teamSize = MASTERS_PER_STUDIO[i] ?? 2;
+    const teamUserIds: string[] = [ownerUser.id];
+    for (let t = 0; t < teamSize; t++) {
+      const ordinal = STUDIO_MASTER_PHONE_BASE + teamMasterOrdinal;
+      teamMasterOrdinal++;
+      const mFirst = FIRST_NAMES_F[(i * 3 + t + 11) % FIRST_NAMES_F.length]!;
+      const mLast = LAST_NAMES_F[(i * 2 + t + 13) % LAST_NAMES_F.length]!;
+      const mSlug = `${slug}-master-${t + 1}`;
+
+      const mUser = await ensureUser({
+        email: seedEmail("master", mSlug),
+        phone: seedPhone(ordinal),
+        firstName: mFirst,
+        lastName: mLast,
+        publicUsername: mSlug,
+        roles: [AccountType.CLIENT, AccountType.MASTER],
+      });
+      teamUserIds.push(mUser.id);
+
+      // Same city/timezone as the studio — a master in another city than the
+      // salon they work at is incoherent (and breaks salon-tz reasoning).
+      const mProvider = await prisma.provider.upsert({
+        where: { publicUsername: mSlug },
+        update: {
+          ownerUserId: mUser.id,
+          name: `${mFirst} ${mLast}`,
+          studioId: provider.id,
+          cityId: city.id,
+          timezone: city.timezone,
+          address,
+          district,
+          isPublished: true,
+          categories: ["nails", "hair"],
+        },
+        create: {
+          ownerUserId: mUser.id,
+          type: ProviderType.MASTER,
+          name: `${mFirst} ${mLast}`,
+          tagline: "Мастер студии",
+          publicUsername: mSlug,
+          description: `Мастер студии «${studioName}». Работаю с записью онлайн.`,
+          studioId: provider.id,
+          cityId: city.id,
+          timezone: city.timezone,
+          address,
+          district,
+          geoLat: jitterCoord(city.latitude, rng),
+          geoLng: jitterCoord(city.longitude, rng),
+          isPublished: true,
+          scheduleMode: ScheduleMode.FLEXIBLE,
+          categories: ["nails", "hair"],
+        },
+      });
+
+      await ensureMasterProfile(mUser.id, mProvider.id);
+      await ensureStudioMemberships({
+        studioId: studio.id,
+        userId: mUser.id,
+        roles: [StudioRole.MASTER],
+        legacyRole: StudioMemberRole.MASTER,
+      });
+      await ensureSchedule(mProvider.id);
+      await ensureMasterServiceLinks({
+        studioId: studio.id,
+        masterProviderId: mProvider.id,
+        masterIndex: t,
+        teamSize,
+        services: studioServices,
+      });
+    }
+
+    // Idempotency: drop membership rows left by an earlier seed shape (the
+    // standalone masters that used to be sliced in). Without this a re-run
+    // without `seed:test:reset` keeps stale team members that have no
+    // Provider.studioId and therefore never appear as ACTIVE masters.
+    await prisma.studioMembership.deleteMany({
+      where: { studioId: studio.id, userId: { notIn: teamUserIds } },
+    });
+    await prisma.studioMember.deleteMany({
+      where: { studioId: studio.id, userId: { notIn: teamUserIds } },
+    });
 
     const planCode = pickPlanCode(rng, "STUDIO");
     const plan = findPlan(input.plans, planCode);
@@ -521,7 +705,9 @@ export async function seedProviders(input: SeedProvidersInput): Promise<SeededPr
 
     studios.push({ ownerUser, provider });
   }
-  logSeed.ok(`${studios.length} studios created`);
+  logSeed.ok(
+    `${studios.length} studios created (${teamMasterOrdinal} dedicated studio masters, ACTIVE + linked)`,
+  );
 
   return { masters, studios };
 }

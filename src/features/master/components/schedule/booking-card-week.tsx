@@ -34,15 +34,27 @@ type Props = {
  *   - pending       → amber soft (border + tint, amber text)
  *   - confirmed     → solid brand gradient (white text + glow)
  *
- * Compact (height starts at 48px for a 30-min booking) so the menu trigger
- * lives in the corner with `group-hover` reveal — keeps the body legible
- * on long bookings and accessible on short ones.
+ * Height is dictated by the slot duration (1px/min at HOUR_PX=60 — a 30-min
+ * booking card is 26px), so the CONTENT adapts to the height, not the
+ * reverse (FIX-MASTER-01 item 3 — price used to clip mid-glyph on 75-min
+ * bookings, and the NEW badge overflowed compact cards). Three tiers, each
+ * budgeted against the real rendered row heights (`scrollHeight` measured):
+ *   - < 44px  (≤ ~40 мин): time row only
+ *   - < 68px  (≤ ~60 мин): + client name; new-client is conveyed by the
+ *     emerald variant alone (the Badge is taller than the mono time row and
+ *     was the compact-tier clip culprit)
+ *   - ≥ 68px  (75 мин+):   + ONE merged «service · price» line + Badge
+ * All information stays present on cards tall enough to hold it; nothing
+ * renders half-cut.
  */
 export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone }: Props) {
   const { left, width } = laneStyle(placement);
   const isPending = booking.runtimeStatus === "PENDING" || booking.runtimeStatus === "CHANGE_REQUESTED";
   const isNewClient = booking.isNewClient;
-  const compact = heightPx < 64;
+  // Row budgets (worst case, bordered variants): py 8 + time 12 (+badge 18)
+  // + name 17 + merged 17 — thresholds keep a few px of slack per tier.
+  const showName = heightPx >= 44;
+  const showDetails = heightPx >= 68;
 
   const variant: "confirmed" | "pending" | "new" = isPending
     ? "pending"
@@ -59,7 +71,7 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
 
   return (
     <article
-      className={`group absolute overflow-hidden rounded-lg px-2.5 py-1.5 ${cardClass}`}
+      className={`group absolute overflow-hidden rounded-lg px-2.5 py-1 ${cardClass}`}
       style={{
         top: topPx,
         left,
@@ -67,32 +79,34 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
         height: heightPx - 4,
       }}
     >
-      <div className="flex items-center justify-between gap-2 font-mono text-[10px] tabular-nums opacity-90">
-        <span>
+      <div className="flex items-center justify-between gap-2 font-mono text-[10px] leading-none tabular-nums opacity-90">
+        <span className="truncate">
           {formatLocalHm(booking.startAtUtc, timezone)}–{formatLocalHm(booking.endAtUtc, timezone)}
         </span>
         {isPending ? (
           <Clock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
         ) : null}
-        {isNewClient && !isPending ? (
+        {isNewClient && !isPending && showDetails ? (
           <Badge
             variant="default"
-            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 text-[9px] text-emerald-900 dark:text-emerald-100"
+            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 py-0 text-[9px] leading-tight text-emerald-900 dark:text-emerald-100"
           >
             {T.newBadge}
           </Badge>
         ) : null}
       </div>
 
-      <p className="mt-0.5 truncate text-xs font-semibold leading-tight">
-        {booking.clientName}
-      </p>
-      {!compact ? (
-        <p className="truncate text-[11px] opacity-80">{booking.serviceTitle}</p>
+      {showName ? (
+        <p className="mt-0.5 truncate text-xs font-semibold leading-tight">
+          {booking.clientName}
+        </p>
       ) : null}
-      {!compact ? (
-        <p className="mt-1 font-display text-xs tabular-nums">
-          {formatRub(booking.price)}
+      {showDetails ? (
+        <p className="flex items-baseline justify-between gap-2 text-[11px] leading-tight">
+          <span className="truncate opacity-80">{booking.serviceTitle}</span>
+          <span className="shrink-0 font-display text-xs leading-tight tabular-nums">
+            {formatRub(booking.price)}
+          </span>
         </p>
       ) : null}
 

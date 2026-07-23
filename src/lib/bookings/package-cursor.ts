@@ -19,10 +19,11 @@
  * boundary, so a change to the buffer semantics on either side fails a test
  * instead of a client's booking.
  *
- * NOTE the studio wizard uses the previous end with NO buffer — correct THERE
- * because its by-client guard (`intraPackageOverlapMultiMaster`) applies buffer
- * 0 to different-master pairs (the client just walks to another chair). Solo is
- * one master, so the master's own between-bookings buffer applies.
+ * The STUDIO wizard has the same contract with `intraPackageOverlapMultiMaster`
+ * but a conditional gap: buffer 0 between different masters (the client just
+ * walks to another chair), the master's own buffer between same-master
+ * components — see `studioNextComponentEarliestStart` below
+ * (PACKAGE-STUDIO-SAME-MASTER-BUFFER).
  */
 
 /**
@@ -35,4 +36,48 @@
 export function nextComponentEarliestStart(prevEndAtUtc: Date, bufferMin: number): Date {
   const buffer = Math.max(0, Math.floor(bufferMin)) * 60_000;
   return new Date(prevEndAtUtc.getTime() + buffer);
+}
+
+/** An already-placed studio package component, as the cursor needs it. */
+export type StudioPlacedComponent = {
+  masterProviderId: string;
+  endAtUtc: Date;
+};
+
+/**
+ * PACKAGE-STUDIO-SAME-MASTER-BUFFER — the STUDIO package wizard's cursor.
+ *
+ * The by-client guard the create runs (`intraPackageOverlapMultiMaster`)
+ * applies the master's buffer ONLY to same-master pairs (different masters →
+ * buffer 0: the client just walks to another chair). The old cursor was a
+ * flat `prevEnd`, which is exactly right for different-master pairs and
+ * exactly wrong for same-master ones — it offered the back-to-back slot the
+ * validator then 409'd at review.
+ *
+ * The earliest valid start is therefore the max over every constraint the
+ * validator will actually check, given components stay sequential:
+ *   - the previous component's end (client-timeline order, any master);
+ *   - for EVERY earlier component performed by the same chosen master:
+ *     its end + that master's buffer. Not just the adjacent one — an
+ *     A-B-A pattern (short B in the middle, large buffer) re-triggers the
+ *     same 409 through the non-adjacent (A, A) pair.
+ *
+ * @param input.prevEndAtUtc — the immediately previous component's end (UTC).
+ * @param input.placed — ALL earlier placed components (master + end).
+ * @param input.masterProviderId — the master chosen for the NEXT component.
+ * @param input.masterBufferMin — that master's between-bookings buffer, min.
+ */
+export function studioNextComponentEarliestStart(input: {
+  prevEndAtUtc: Date;
+  placed: StudioPlacedComponent[];
+  masterProviderId: string;
+  masterBufferMin: number;
+}): Date {
+  let earliestMs = input.prevEndAtUtc.getTime();
+  for (const component of input.placed) {
+    if (component.masterProviderId !== input.masterProviderId) continue;
+    const constraint = nextComponentEarliestStart(component.endAtUtc, input.masterBufferMin);
+    if (constraint.getTime() > earliestMs) earliestMs = constraint.getTime();
+  }
+  return new Date(earliestMs);
 }

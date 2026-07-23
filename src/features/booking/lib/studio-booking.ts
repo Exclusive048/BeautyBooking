@@ -11,6 +11,13 @@ export type StudioMaster = {
   // master who'd return 409 `SERVICE_INVALID`. Optional for back-compat with
   // any older payload shape; treated as "unknown → not assigned" when absent.
   serviceIds?: string[];
+  // PACKAGE-STUDIO-SAME-MASTER-BUFFER: the master's between-bookings buffer,
+  // pre-normalized server-side exactly as the create validator normalizes it.
+  // The package wizard's cursor applies it between SAME-master components
+  // (different masters keep buffer 0). Optional for back-compat; absent →
+  // treated as 0 (the pre-fix behavior — never stricter than the validator
+  // for different-master pairs).
+  bufferMin?: number;
 };
 export type SlotItem = { startAtUtc: string; endAtUtc: string; label: string };
 export type BookingUser = {

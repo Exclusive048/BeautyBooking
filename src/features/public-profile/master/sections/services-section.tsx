@@ -1,5 +1,6 @@
 import { getMasterPublicProfileView } from "@/lib/master/public-profile-view.service";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
+import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { ServicesSectionClient } from "@/features/public-profile/master/sections/services-section-client";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -11,6 +12,10 @@ type Props = {
 export async function ServicesSection({ providerId, initialServiceId }: Props) {
   let view = null;
   let hasError = false;
+  // FIX-MASTER-01 item 5: the owner must not be offered the package-booking
+  // CTA either — /book would hit the same self-booking server guard the
+  // hidden main widget would. `cache()` dedupes with the page-level call.
+  const isOwner = await isViewerProfileOwner(providerId);
 
   try {
     view = await getMasterPublicProfileView(providerId);
@@ -44,8 +49,9 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
         providerTimezone={view.provider.timezone}
         providerBufferMin={view.providerBufferMin}
         // PACKAGE-BOOKING-MVP-1: solo master only (studio masters book via
-        // the studio flow). Gates the "Записаться на пакет" CTA.
-        packageBookable={view.provider.type === "MASTER" && !view.provider.studioId}
+        // the studio flow). Gates the "Записаться на пакет" CTA. Owner view
+        // suppresses it too (self-booking is server-rejected).
+        packageBookable={view.provider.type === "MASTER" && !view.provider.studioId && !isOwner}
       />
     </div>
   );

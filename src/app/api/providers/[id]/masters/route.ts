@@ -1,4 +1,5 @@
 import { ok, fail } from "@/lib/api/response";
+import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { providerIdParamSchema } from "@/lib/providers/schemas";
 import { formatZodError } from "@/lib/api/validation";
 import { ProviderType } from "@prisma/client";
@@ -21,7 +22,14 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
     const provider = await resolveProviderBySlugOrId({
       key: id,
-      select: { id: true, type: true, name: true, publicUsername: true, isPublished: true },
+      select: {
+        id: true,
+        type: true,
+        name: true,
+        publicUsername: true,
+        isPublished: true,
+        bufferBetweenBookingsMin: true,
+      },
     });
 
     if (!provider || !provider.isPublished) {
@@ -43,6 +51,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
             name: provider.name,
             publicUsername: provider.publicUsername,
             serviceIds: soloServices.map((s) => s.id),
+            // PACKAGE-STUDIO-SAME-MASTER-BUFFER: normalized exactly as
+            // resolveBookingCore will normalize it, so the wizard's cursor
+            // and the create-side validator agree at the boundary.
+            bufferMin: normalizeBufferMinutes(provider.bufferBetweenBookingsMin),
           },
         ],
       });
@@ -59,6 +71,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
         id: true,
         name: true,
         publicUsername: true,
+        bufferBetweenBookingsMin: true,
         masterServices: {
           where: { isEnabled: true },
           select: { serviceId: true },
@@ -73,6 +86,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
         name: m.name,
         publicUsername: m.publicUsername,
         serviceIds: m.masterServices.map((s) => s.serviceId),
+        // PACKAGE-STUDIO-SAME-MASTER-BUFFER: the same normalization the
+        // create-side `resolveBookingCore` applies — the package wizard's
+        // same-master cursor must match the validator exactly.
+        bufferMin: normalizeBufferMinutes(m.bufferBetweenBookingsMin),
       })),
     });
   } catch (error) {

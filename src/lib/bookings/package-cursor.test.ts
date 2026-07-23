@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { nextComponentEarliestStart } from "@/lib/bookings/package-cursor";
-import { intraPackageOverlap } from "@/lib/bookings/package-math";
+import {
+  nextComponentEarliestStart,
+  studioNextComponentEarliestStart,
+} from "@/lib/bookings/package-cursor";
+import {
+  intraPackageOverlap,
+  intraPackageOverlapMultiMaster,
+  type PackageComponentSlot,
+} from "@/lib/bookings/package-math";
 
 /**
  * PACKAGE-SOLO-WIZARD-01 — the crux invariant of the solo package wizard.
@@ -65,5 +72,130 @@ describe("nextComponentEarliestStart", () => {
     expect(nextComponentEarliestStart(lateEnd, 15).toISOString()).toBe(
       "2026-07-21T00:05:00.000Z",
     );
+  });
+});
+
+/**
+ * PACKAGE-STUDIO-SAME-MASTER-BUFFER — the studio wizard's cursor pinned to
+ * `intraPackageOverlapMultiMaster`'s real acceptance boundary, mirroring the
+ * solo pin above. The guard's buffer is CONDITIONAL: the master's own buffer
+ * between same-master components, zero between different masters — so must be
+ * the cursor: too small re-creates the 409-at-review this fix removes; too
+ * large hides valid back-to-back different-master slots.
+ */
+describe("studioNextComponentEarliestStart", () => {
+  const MASTER_A = "master-a";
+  const MASTER_B = "master-b";
+
+  const component = (
+    masterProviderId: string,
+    startAtUtc: Date,
+    durationMin: number,
+    bufferMin: number,
+  ): PackageComponentSlot => ({
+    masterProviderId,
+    bufferMin,
+    startAtUtc,
+    endAtUtc: new Date(startAtUtc.getTime() + durationMin * 60_000),
+  });
+
+  it.each([5, 10, 15, 30])(
+    "same master: the cursor is exactly the earliest start the create accepts (buffer=%i)",
+    (bufferMin) => {
+      const first = component(MASTER_A, PREV_START, 60, bufferMin);
+      const cursor = studioNextComponentEarliestStart({
+        prevEndAtUtc: first.endAtUtc,
+        placed: [{ masterProviderId: MASTER_A, endAtUtc: first.endAtUtc }],
+        masterProviderId: MASTER_A,
+        masterBufferMin: bufferMin,
+      });
+
+      // The buffer is a real gap after the previous component…
+      expect(cursor.getTime()).toBe(first.endAtUtc.getTime() + bufferMin * 60_000);
+      // …at the cursor → accepted (the first slot the wizard now offers).
+      expect(
+        intraPackageOverlapMultiMaster([first, component(MASTER_A, cursor, 30, bufferMin)]),
+      ).toBe(false);
+      // One minute earlier → rejected. The old flat-prevEnd cursor offered
+      // exactly this class of slot and 409'd at review.
+      const tooEarly = new Date(cursor.getTime() - 60_000);
+      expect(
+        intraPackageOverlapMultiMaster([first, component(MASTER_A, tooEarly, 30, bufferMin)]),
+      ).toBe(true);
+    },
+  );
+
+  it("same master back-to-back is what the create rejects — the pre-fix offered slot", () => {
+    const first = component(MASTER_A, PREV_START, 60, 15);
+    // prevEnd (the old cursor) → guard trips.
+    expect(
+      intraPackageOverlapMultiMaster([first, component(MASTER_A, first.endAtUtc, 30, 15)]),
+    ).toBe(true);
+  });
+
+  it("different master: no spurious gap — back-to-back stays offered and stays valid", () => {
+    const first = component(MASTER_A, PREV_START, 60, 15);
+    const cursor = studioNextComponentEarliestStart({
+      prevEndAtUtc: first.endAtUtc,
+      placed: [{ masterProviderId: MASTER_A, endAtUtc: first.endAtUtc }],
+      masterProviderId: MASTER_B,
+      masterBufferMin: 15, // B's own buffer must NOT apply across masters
+    });
+
+    expect(cursor.getTime()).toBe(first.endAtUtc.getTime());
+    expect(
+      intraPackageOverlapMultiMaster([first, component(MASTER_B, cursor, 30, 15)]),
+    ).toBe(false);
+  });
+
+  it("A-B-A: the non-adjacent same-master pair still constrains the cursor", () => {
+    // A (60 min, buffer 30) → B (15 min, back-to-back) → A again. The
+    // adjacent prevEnd is B's end (A.end + 15 min), but the (A, A) pair
+    // needs A.end + 30 — the cursor must honour the LATER constraint.
+    const bufferA = 30;
+    const first = component(MASTER_A, PREV_START, 60, bufferA);
+    const second = component(MASTER_B, first.endAtUtc, 15, 15);
+    const cursor = studioNextComponentEarliestStart({
+      prevEndAtUtc: second.endAtUtc,
+      placed: [
+        { masterProviderId: MASTER_A, endAtUtc: first.endAtUtc },
+        { masterProviderId: MASTER_B, endAtUtc: second.endAtUtc },
+      ],
+      masterProviderId: MASTER_A,
+      masterBufferMin: bufferA,
+    });
+
+    expect(cursor.toISOString()).toBe(
+      nextComponentEarliestStart(first.endAtUtc, bufferA).toISOString(),
+    );
+    expect(
+      intraPackageOverlapMultiMaster([
+        first,
+        second,
+        component(MASTER_A, cursor, 30, bufferA),
+      ]),
+    ).toBe(false);
+    // At B's end (the naive adjacent cursor) the (A, A) pair still trips.
+    expect(
+      intraPackageOverlapMultiMaster([
+        first,
+        second,
+        component(MASTER_A, second.endAtUtc, 30, bufferA),
+      ]),
+    ).toBe(true);
+  });
+
+  it("zero buffer keeps same-master back-to-back valid (cursor = prevEnd)", () => {
+    const first = component(MASTER_A, PREV_START, 60, 0);
+    const cursor = studioNextComponentEarliestStart({
+      prevEndAtUtc: first.endAtUtc,
+      placed: [{ masterProviderId: MASTER_A, endAtUtc: first.endAtUtc }],
+      masterProviderId: MASTER_A,
+      masterBufferMin: 0,
+    });
+    expect(cursor.getTime()).toBe(first.endAtUtc.getTime());
+    expect(
+      intraPackageOverlapMultiMaster([first, component(MASTER_A, cursor, 30, 0)]),
+    ).toBe(false);
   });
 });

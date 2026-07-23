@@ -102,6 +102,7 @@ import { seedShowcaseAdmin } from "./seed-showcase-admin";
 import { seedShowcaseClient } from "./seed-showcase-client";
 import { seedShowcaseStudioClientBookings } from "./seed-showcase-studio-client-bookings";
 import { seedBillingFixtures } from "./seed-billing-fixtures";
+import { seedStudioQa } from "./seed-studio-qa";
 
 async function main() {
   if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
@@ -151,6 +152,12 @@ async function main() {
   // rigs otherwise, so it runs last.
   const billingFixtureCount = await seedBillingFixtures({ plans });
 
+  // STUDIO-SEED-01: QA detail (break / day off / package / status-spread
+  // bookings) on the bulk studio «Аура» — the studio-cabinet + public-booking
+  // fixture. Needs seedProviders (studio + team) and seedClients (a bookable
+  // client), so it runs after both.
+  const studioQaBookings = await seedStudioQa();
+
   logSeed.summary({
     cities: cities.length,
     categories: categories.length,
@@ -164,6 +171,7 @@ async function main() {
     modelOffers: offerCount,
     favorites: favCount,
     billingFixtures: billingFixtureCount,
+    studioQaBookings,
   });
 }
 
