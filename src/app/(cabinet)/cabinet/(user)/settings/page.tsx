@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { HeaderBlock } from "@/components/ui/header-block";
-import { isTelegramEnabled, isVkAuthEnabled } from "@/lib/env";
+import { isTelegramEnabled } from "@/lib/env";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
-import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
 import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
 import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
@@ -23,12 +22,12 @@ export default async function SettingsPage() {
       <div className="grid gap-4">
         {/* FIX-TELEGRAM-KILLSWITCH: absent when off (no mount, no status fetch). */}
         {isTelegramEnabled && <TelegramNotificationsSection />}
-        {/* FIX-EXTERNAL-GATING-01 (G-3): the VK section is a VK-OAuth *link*
-            affordance — gate it on `isVkAuthEnabled` (server-computed), mirroring
-            Telegram above. When VK auth is off it renders nothing (no dead-end
-            "Подключить" that 503s); a linked user still disconnects via the
-            profile card, which stays reachable. */}
-        {isVkAuthEnabled && <VkNotificationsSection />}
+        {/* CONSOLIDATE-EXTERNAL-LINKING-01: the VK notification section is hidden —
+            VK Bot delivery isn't built (VK-NOTIFICATIONS backlog), so a toggle
+            would promise delivery that can't happen. The component + settings
+            endpoint + `VkLink.isEnabled` field are preserved (un-hidden when
+            delivery ships). VK stays available as a login/identity provider in
+            the profile «Связанные аккаунты» card. */}
         <EmailNotificationsSection />
         <PushNotificationsSection />
       </div>

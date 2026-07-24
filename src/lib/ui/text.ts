@@ -1226,6 +1226,10 @@ export const UI_TEXT = {
         connected: "Подключено",
         notConnected: "Не подключено",
         connect: "Подключить",
+        // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect live ONLY in the
+        // profile «Связанные аккаунты» card. Notification surfaces toggle delivery
+        // and, when the account isn't linked yet, point to the canonical card.
+        connectInProfile: "Подключить в профиле →",
         hint: "Если уведомления прервались, откройте бота и нажмите Start.",
         connectFailed: "Не удалось подключить Telegram",
         updateFailed: "Не удалось обновить настройки Telegram",
@@ -3014,6 +3018,12 @@ export const UI_TEXT = {
         connectionsSubtitle: (providers: string[]) =>
           `Привяжите ${providers.join(" или ")} — для входа и оповещений.`,
         connectionsProviderNames: { telegram: "Telegram", vk: "ВКонтакте" },
+        // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect live in ONE place —
+        // the profile «Связанные аккаунты» card. The security tab points there;
+        // delivery toggles stay in the Notifications tab.
+        connectionsManageInProfile:
+          "Подключение и отключение аккаунтов — в вашем профиле, для входа и оповещений.",
+        connectionsOpenProfile: "Открыть профиль",
         sessionsHeading: "Активные сессии",
         sessionsCountTemplateOne: "{count} активная сессия",
         sessionsCountTemplateFew: "{count} активных сессии",
