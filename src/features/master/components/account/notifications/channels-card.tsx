@@ -3,7 +3,7 @@ import { EmailNotificationsSection } from "@/features/cabinet/components/email-n
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
-import { isTelegramEnabled } from "@/lib/env";
+import { isTelegramEnabled, isVkAuthEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.notifications;
@@ -38,14 +38,19 @@ export function ChannelsCard() {
             <TelegramNotificationsSection embedded />
           </FeatureGate>
         )}
-        <FeatureGate
-          feature="vkNotifications"
-          scope="MASTER"
-          variant="inline"
-          description={FG.vkLocked}
-        >
-          <VkNotificationsSection embedded />
-        </FeatureGate>
+        {/* FIX-EXTERNAL-GATING-01 (G-3): gate the VK link affordance on
+            `isVkAuthEnabled` (server-computed), mirroring Telegram above. Off →
+            no dead-end "Подключить"; disconnect stays in the profile card. */}
+        {isVkAuthEnabled && (
+          <FeatureGate
+            feature="vkNotifications"
+            scope="MASTER"
+            variant="inline"
+            description={FG.vkLocked}
+          >
+            <VkNotificationsSection embedded />
+          </FeatureGate>
+        )}
         <EmailNotificationsSection />
         <PushNotificationsSection />
       </div>

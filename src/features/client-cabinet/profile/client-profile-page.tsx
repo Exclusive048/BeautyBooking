@@ -53,6 +53,14 @@ type Props = {
    * fail-closes with 503 `SYSTEM_FEATURE_DISABLED`; this is the UI half.
    */
   emailEnabled?: boolean;
+  /**
+   * FIX-EXTERNAL-GATING-01 (G-3): server-resolved `isVkAuthEnabled` (needs the
+   * server-only `VK_CLIENT_ID`, so the client can't compute it). Gates the VK
+   * *connect* affordance in the linked-accounts card. Disconnect for a still-
+   * linked account is NEVER gated — a user must always be able to detach a
+   * provider that's been switched off.
+   */
+  vkAuthEnabled?: boolean;
 };
 
 const fetcher = (url: string) =>
@@ -80,7 +88,7 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
   }
 }
 
-export function ClientProfilePage({ userId, emailEnabled = false }: Props) {
+export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled = false }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
@@ -195,6 +203,7 @@ export function ClientProfilePage({ userId, emailEnabled = false }: Props) {
 
         <LinkedAccountsCard
           data={data}
+          vkAuthEnabled={vkAuthEnabled}
           onTelegramConnect={() => setTgModalOpen(true)}
           onTelegramUnlink={handleTelegramUnlink}
           onVkConnect={handleVkConnect}
@@ -515,12 +524,14 @@ function ContactsCard({
 
 function LinkedAccountsCard({
   data,
+  vkAuthEnabled,
   onTelegramConnect,
   onTelegramUnlink,
   onVkConnect,
   onVkUnlink,
 }: {
   data: ProfileDTO;
+  vkAuthEnabled: boolean;
   onTelegramConnect: () => void;
   onTelegramUnlink: () => void;
   onVkConnect: () => void;
@@ -555,19 +566,26 @@ function LinkedAccountsCard({
             onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
           />
         )}
-        <ConnectRow
-          icon={<Users className="h-5 w-5" aria-hidden />}
-          iconColor="#0077FF"
-          name="ВКонтакте"
-          connected={vk.connected}
-          status={
-            vk.connected
-              ? `подключён ${formatConnectedAt(vk.connectedAt)}`
-              : "Войти через VK и получать уведомления"
-          }
-          actionLabel={vk.connected ? T.linkedAccounts.vkDisconnect : T.linkedAccounts.vkConnect}
-          onAction={vk.connected ? onVkUnlink : onVkConnect}
-        />
+        {/* FIX-EXTERNAL-GATING-01 (G-3): the VK *connect* affordance gates on
+            `isVkAuthEnabled` (threaded from the server) — no dead-end connect
+            that 503s when VK auth is off. A still-LINKED account ALWAYS keeps
+            its disconnect control, so the row renders when linked OR when VK
+            auth is enabled; never strand a user on a switched-off provider. */}
+        {(vk.connected || vkAuthEnabled) && (
+          <ConnectRow
+            icon={<Users className="h-5 w-5" aria-hidden />}
+            iconColor="#0077FF"
+            name="ВКонтакте"
+            connected={vk.connected}
+            status={
+              vk.connected
+                ? `подключён ${formatConnectedAt(vk.connectedAt)}`
+                : "Войти через VK и получать уведомления"
+            }
+            actionLabel={vk.connected ? T.linkedAccounts.vkDisconnect : T.linkedAccounts.vkConnect}
+            onAction={vk.connected ? onVkUnlink : onVkConnect}
+          />
+        )}
       </div>
     </Card>
   );

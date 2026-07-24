@@ -11,7 +11,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getLoginHeroImageAsset } from "@/lib/media/queries";
 import { isEmailConfigured } from "@/lib/email/sender";
 import { getPublicStats, type PublicStats } from "@/lib/stats/public-stats";
-import { env, isYandexAuthEnabled } from "@/lib/env";
+import { env, isVkAuthEnabled, isYandexAuthEnabled } from "@/lib/env";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 
 export default async function LoginPage() {
@@ -42,7 +42,13 @@ export default async function LoginPage() {
         // in the RSC payload).
         telegramBotUsername={telegramEnabled ? (env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "") : ""}
         telegramEnabled={telegramEnabled}
-        vkEnabled={String(env.NEXT_PUBLIC_VK_ENABLED) === "true"}
+        // FIX-EXTERNAL-GATING-01 (G-5): gate VK on the full, server-computed
+        // `isVkAuthEnabled` (public flag AND a configured client id), symmetric
+        // with `yandexEnabled` below — the previous `NEXT_PUBLIC_VK_ENABLED`-only
+        // check would paint a VK button that 503s in a flag-on/no-client-id
+        // config. The client can't compute this (VK_CLIENT_ID is server-only),
+        // so it's resolved here and passed down.
+        vkEnabled={isVkAuthEnabled}
         // FIX-YANDEX-OAUTH: button absent until a Yandex OAuth app is registered
         // (isYandexAuthEnabled requires both the flag AND a client id).
         yandexEnabled={isYandexAuthEnabled}

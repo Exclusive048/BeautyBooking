@@ -1557,7 +1557,9 @@ export const UI_TEXT = {
       step2Title: "Запишитесь",
       step2Text: "За 30 секунд, без звонков",
       step3Title: "Получите",
-      step3Text: "Напоминания в Telegram, отзывы после визита",
+      // FIX-EXTERNAL-GATING-01 (G-1): provider-neutral marketing copy — don't
+      // advertise a specific (currently killed) delivery channel on the guest home.
+      step3Text: "Напоминания перед визитом, отзывы после",
     },
     categories: {
       title: "Что мы предлагаем",
@@ -1592,7 +1594,8 @@ export const UI_TEXT = {
         },
         {
           q: "Как я узнаю что запись подтверждена?",
-          a: "Уведомление придёт в Telegram сразу после подтверждения мастером, плюс напоминание за 24 часа и за 2 часа до визита.",
+          // FIX-EXTERNAL-GATING-01 (G-1): provider-neutral (was "в Telegram").
+          a: "Уведомление придёт сразу после подтверждения мастером, плюс напоминание за 24 часа и за 2 часа до визита.",
         },
         {
           q: "Что если мастер опаздывает или не вышел?",
@@ -2987,11 +2990,14 @@ export const UI_TEXT = {
       },
       notifications: {
         channelsHeading: "Каналы уведомлений",
+        // FIX-EXTERNAL-GATING-01 (G-2): provider-neutral — the individual
+        // channel rows below are each flag-gated, so the intro must not name a
+        // specific provider (which could be a killed/disabled one).
         channelsSubtitle:
-          "Включите Telegram, Email или Push, чтобы получать оповещения о записях, отзывах и платежах.",
+          "Включите нужные каналы, чтобы получать оповещения о записях, отзывах и платежах.",
         perEventTitle: "Настройки по типу события",
         perEventBody:
-          "Скоро здесь можно будет точечно выбирать, какие события приходят в Telegram, Email или Push отдельно.",
+          "Скоро здесь можно будет точечно выбирать, какие события приходят по каждому каналу отдельно.",
       },
       security: {
         identityHeading: "Идентификация",
@@ -3001,8 +3007,13 @@ export const UI_TEXT = {
         notSetLabel: "Не задан",
         changeSoonHint: "Скоро · потребуется подтверждение",
         connectionsHeading: "Связанные аккаунты",
-        connectionsSubtitle:
-          "Привяжите Telegram или ВКонтакте — для входа и оповещений.",
+        // FIX-EXTERNAL-GATING-01 (G-2): the subtitle names ONLY the external
+        // providers currently enabled — built from the same flags the rows gate
+        // on, so it can never advertise a killed/disabled provider. Joined with
+        // «или» when more than one is enabled.
+        connectionsSubtitle: (providers: string[]) =>
+          `Привяжите ${providers.join(" или ")} — для входа и оповещений.`,
+        connectionsProviderNames: { telegram: "Telegram", vk: "ВКонтакте" },
         sessionsHeading: "Активные сессии",
         sessionsCountTemplateOne: "{count} активная сессия",
         sessionsCountTemplateFew: "{count} активных сессии",
@@ -6752,8 +6763,11 @@ export const UI_TEXT = {
       },
       notifications: {
         channelsTitle: "Каналы уведомлений",
+        // FIX-EXTERNAL-GATING-01 (G-2): provider-neutral — each channel card
+        // below is flag-gated, so the description must not name a specific
+        // (possibly killed/disabled) provider.
         channelsDesc:
-          "События студии приходят в приложение, Telegram и VK. SMS пока недоступен — мы подключаем шлюз.",
+          "События студии приходят в приложение и по подключённым каналам. SMS пока недоступен — мы подключаем шлюз.",
         channelPush: "Push в приложении",
         pushEnabled: "Включены",
         pushDisabled: "Выключены",
