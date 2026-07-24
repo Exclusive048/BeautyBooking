@@ -1,5 +1,6 @@
 import { StudioHeroGallery } from "@/features/public-studio/studio-hero-gallery";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
+import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { serverApiFetch } from "@/lib/api/server-fetch";
@@ -20,15 +21,20 @@ async function fetchStudioPortfolio(studioId: string): Promise<MediaAssetDto[]> 
 export async function StudioHeroSection({ studioId }: Props) {
   let studio = null;
   let portfolio: MediaAssetDto[] = [];
+  // FIX-STUDIO-02 (owner parity): hide the hero booking CTA for the owner
+  // (self-booking is server-rejected). Cached helper, resolves in parallel.
+  let isOwner = false;
   let hasError = false;
 
   try {
     const result = await Promise.all([
       getStudioProfile(studioId),
       fetchStudioPortfolio(studioId),
+      isViewerProfileOwner(studioId),
     ]);
     studio = result[0];
     portfolio = result[1];
+    isOwner = result[2];
   } catch (error) {
     hasError = true;
     logPublicStudioBlockError("hero-section", error, [
@@ -71,7 +77,12 @@ export async function StudioHeroSection({ studioId }: Props) {
 
   return (
     <div className="fade-in-up">
-      <StudioHeroGallery studio={studio} imageItems={imageItems} bookingHref={bookingHref} />
+      <StudioHeroGallery
+        studio={studio}
+        imageItems={imageItems}
+        bookingHref={bookingHref}
+        hideBooking={isOwner}
+      />
     </div>
   );
 }

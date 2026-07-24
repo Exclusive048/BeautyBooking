@@ -6349,6 +6349,9 @@ export const UI_TEXT = {
       // the master side). Reuses `/confirm` + `/decline-reschedule`.
       reschedule: {
         title: "Клиент предложил новое время",
+        // FIX-STUDIO-02 (F4): show the CURRENT datetime alongside the proposed
+        // one (both with dates) so a cross-day move can't be accepted blindly.
+        currentLabel: "Текущее время",
         proposedLabel: "Новое время",
         accept: "Принять новое время",
         decline: "Отклонить перенос",
@@ -7121,6 +7124,8 @@ export const UI_TEXT = {
           publicProfile: "Публичный профиль",
           pause: "Поставить на паузу",
           activate: "Активировать",
+          // FIX-STUDIO-02 (F7): revoke a still-pending invite (INVITED status).
+          revoke: "Отозвать приглашение",
         },
         kpis: {
           revenue: "Выручка · 30д",
@@ -7169,12 +7174,30 @@ export const UI_TEXT = {
         confirm: "Активировать",
         submitting: "Сохраняем…",
       },
+      // FIX-STUDIO-02 (F7): confirm dialog for revoking a pending invite.
+      revokeDialog: {
+        title: "Отозвать приглашение",
+        bodyTemplate:
+          "Приглашение мастеру {name} будет отменено, а ссылка перестанет работать. Место в команде не освобождается — приглашение его не занимало.",
+        cancel: "Отмена",
+        confirm: "Отозвать приглашение",
+        submitting: "Отзываем…",
+      },
       errors: {
         phoneInvalid: "Укажите корректный номер телефона.",
         nameRequired: "Укажите имя мастера.",
         taglineRequired: "Укажите специализацию.",
         inviteFailed: "Не удалось отправить приглашение. Попробуйте ещё раз.",
         actionFailed: "Не удалось выполнить действие. Попробуйте ещё раз.",
+        // FIX-STUDIO-02 (F6): localized team-cap block. The enforcement
+        // (`ensureStudioTeamLimit`) is unchanged — only the message. Says what
+        // the limit is and how to raise it, instead of the raw «Limit reached».
+        teamCapReached:
+          "На вашем тарифе можно держать до {max} активных мастеров. Чтобы добавить больше, перейдите на тариф выше.",
+        teamCapReachedGeneric:
+          "Достигнут лимит активных мастеров на вашем тарифе. Чтобы добавить больше, перейдите на тариф выше.",
+        // FIX-STUDIO-02 (F7): revoke-invite failure.
+        revokeFailed: "Не удалось отозвать приглашение. Попробуйте ещё раз.",
       },
     },
     scheduleRequests: {
@@ -7227,6 +7250,15 @@ export const UI_TEXT = {
   },
   publicStudio: {
     heroBook: "Записаться онлайн",
+    // FIX-STUDIO-02 (known-open 1): honest label for the floating affordance
+    // that scrolls to services (was mislabelled «Записаться онлайн»).
+    toServices: "К услугам",
+    // FIX-STUDIO-02 (owner parity): shown in place of the booking CTAs when the
+    // viewer owns this studio (self-booking is server-rejected). Mirrors the
+    // master-side owner notice.
+    ownerViewTitle: "Это ваш профиль",
+    ownerViewHint: "Так вашу страницу видят клиенты. Запись к самому себе недоступна.",
+    ownerViewManageCta: "Управлять студией",
     slotBar: {
       label: "ЗАПИСЬ НА УСЛУГУ",
       headline: "Свободные окна сегодня и в ближайшие дни",

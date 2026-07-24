@@ -26,9 +26,11 @@ type Props = {
   studio: StudioHeroData;
   imageItems: HeroImageItem[];
   bookingHref: string;
+  /** FIX-STUDIO-02 (owner parity): suppress the hero booking CTA for the owner. */
+  hideBooking?: boolean;
 };
 
-export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
+export function StudioHeroGallery({ studio, imageItems, bookingHref, hideBooking }: Props) {
   const mapsHref = buildYandexMapsUrl({
     address: studio.address,
     lat: studio.geoLat ?? null,
@@ -106,9 +108,11 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref }: Props) {
             ) : null}
           </div>
 
-          <Button asChild>
-            <Link href={bookingUrl}>{UI_TEXT.publicStudio.heroBook}</Link>
-          </Button>
+          {hideBooking ? null : (
+            <Button asChild>
+              <Link href={bookingUrl}>{UI_TEXT.publicStudio.heroBook}</Link>
+            </Button>
+          )}
         </div>
       </div>
 

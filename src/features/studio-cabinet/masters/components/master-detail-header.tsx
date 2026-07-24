@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ExternalLink, Pause, Play } from "lucide-react";
+import { CalendarDays, ExternalLink, Pause, Play, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
@@ -13,6 +13,7 @@ import {
 } from "../lib/status-display";
 import type { StudioMasterDetail } from "../server/types";
 import { PauseMasterDialog } from "./pause-master-dialog";
+import { RevokeInviteDialog } from "./revoke-invite-dialog";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail;
 
@@ -43,7 +44,12 @@ export function MasterDetailHeader({
   detail: StudioMasterDetail;
 }) {
   const [pauseOpen, setPauseOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
   const tone = getStatusTone(detail.status);
+  // FIX-STUDIO-02 (F7): an INVITED master is an unclaimed stub — pausing it is
+  // meaningless (it accepts no bookings). Offer «Отозвать приглашение» instead;
+  // pause/activate stay for real (ACTIVE/DISABLED) masters.
+  const isInvited = detail.status === "INVITED";
   const mode: "pause" | "activate" = detail.status === "DISABLED" ? "activate" : "pause";
 
   return (
@@ -132,30 +138,51 @@ export function MasterDetailHeader({
               parked в backlog as a deferred feature requiring
               product + legal decision on the invariant evolution. */}
           <div className="ml-auto">
-            <Button
-              variant={mode === "pause" ? "secondary" : "primary"}
-              size="sm"
-              onClick={() => setPauseOpen(true)}
-            >
-              {mode === "pause" ? (
-                <Pause className="h-3.5 w-3.5" aria-hidden />
-              ) : (
-                <Play className="h-3.5 w-3.5" aria-hidden />
-              )}
-              {mode === "pause" ? T.actions.pause : T.actions.activate}
-            </Button>
+            {isInvited ? (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setRevokeOpen(true)}
+              >
+                <UserX className="h-3.5 w-3.5" aria-hidden />
+                {T.actions.revoke}
+              </Button>
+            ) : (
+              <Button
+                variant={mode === "pause" ? "secondary" : "primary"}
+                size="sm"
+                onClick={() => setPauseOpen(true)}
+              >
+                {mode === "pause" ? (
+                  <Pause className="h-3.5 w-3.5" aria-hidden />
+                ) : (
+                  <Play className="h-3.5 w-3.5" aria-hidden />
+                )}
+                {mode === "pause" ? T.actions.pause : T.actions.activate}
+              </Button>
+            )}
           </div>
         </div>
       </section>
 
-      <PauseMasterDialog
-        studioId={studioId}
-        masterId={detail.id}
-        masterName={detail.displayName}
-        mode={mode}
-        open={pauseOpen}
-        onClose={() => setPauseOpen(false)}
-      />
+      {isInvited ? (
+        <RevokeInviteDialog
+          studioId={studioId}
+          masterId={detail.id}
+          masterName={detail.displayName}
+          open={revokeOpen}
+          onClose={() => setRevokeOpen(false)}
+        />
+      ) : (
+        <PauseMasterDialog
+          studioId={studioId}
+          masterId={detail.id}
+          masterName={detail.displayName}
+          mode={mode}
+          open={pauseOpen}
+          onClose={() => setPauseOpen(false)}
+        />
+      )}
     </>
   );
 }

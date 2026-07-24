@@ -9,6 +9,8 @@ type Props = {
   bundle: StudioBundleView;
   studioTimezone: string;
   masters: StudioMaster[];
+  /** FIX-STUDIO-02 (owner parity): suppress the package booking CTA for the owner. */
+  hideBooking?: boolean;
 };
 
 const T = UI_TEXT.publicStudio.packages;
@@ -21,7 +23,7 @@ const T = UI_TEXT.publicStudio.packages;
  * INDICATIVE (catalog base) — the per-master authoritative price is shown on
  * the flow's review screen.
  */
-export function StudioBundleCard({ bundle, studioTimezone, masters }: Props) {
+export function StudioBundleCard({ bundle, studioTimezone, masters, hideBooking }: Props) {
   const savings = bundle.discountAmount > 0 ? UI_FMT.priceLabel(bundle.discountAmount) : null;
   return (
     <article className="bg-brand-gradient-soft relative overflow-hidden rounded-2xl border border-border-subtle/70 p-5">
@@ -64,11 +66,13 @@ export function StudioBundleCard({ bundle, studioTimezone, masters }: Props) {
           </div>
         </div>
 
-        <StudioPackageBookingButton
-          bundle={bundle}
-          studioTimezone={studioTimezone}
-          masters={masters}
-        />
+        {hideBooking ? null : (
+          <StudioPackageBookingButton
+            bundle={bundle}
+            studioTimezone={studioTimezone}
+            masters={masters}
+          />
+        )}
       </div>
     </article>
   );

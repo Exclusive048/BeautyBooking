@@ -316,3 +316,67 @@ export async function updateStudioMasterProfile(input: {
 
   return { id: master.id };
 }
+
+/**
+ * FIX-STUDIO-02 (F7) — revoke a still-pending master invite from the studio
+ * cabinet. Only an UNCLAIMED stub is revocable (`ownerUserId === null`); a
+ * claimed master (invite already accepted) must be paused/removed instead.
+ *
+ * Two effects, both required, mirroring {@link rejectStudioInvite}:
+ *  1. mark the PENDING `StudioInvite` as `LEFT` — blocks a later accept
+ *     (`acceptStudioInvite` returns `INVITE_REVOKED` for `LEFT`), so the SMS
+ *     link can't be used after revocation;
+ *  2. delete the unclaimed stub Provider (guarded `ownerUserId: null`) — the
+ *     team list derives `INVITED` for ANY owner-less stub, so marking the
+ *     invite alone would leave the card. The stub consumed no seat (ACTIVE-only
+ *     counting), so nothing is freed.
+ *
+ * @returns the revoked invite id (for the revoked-notification), or null when
+ *   no pending invite backed the stub.
+ * @throws 404 STUDIO_NOT_FOUND / MASTER_NOT_FOUND · 409 MASTER_NOT_INVITED
+ */
+export async function revokeStudioMasterInvite(input: {
+  studioId: string;
+  masterId: string;
+}): Promise<{ inviteId: string | null }> {
+  const studio = await getStudioContext(input.studioId);
+
+  const master = await prisma.provider.findFirst({
+    where: { id: input.masterId, type: ProviderType.MASTER, studioId: studio.providerId },
+    select: { id: true, ownerUserId: true, contactPhone: true },
+  });
+  if (!master) {
+    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+  }
+  if (master.ownerUserId) {
+    throw new AppError("Master is not a pending invite", 409, "MASTER_NOT_INVITED");
+  }
+
+  const invite = master.contactPhone
+    ? await prisma.studioInvite.findUnique({
+        where: { studioId_phone: { studioId: studio.id, phone: master.contactPhone } },
+        select: { id: true, status: true },
+      })
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    if (invite && invite.status === MembershipStatus.PENDING) {
+      await tx.studioInvite.update({
+        where: { id: invite.id },
+        data: { status: MembershipStatus.LEFT },
+        select: { id: true },
+      });
+    }
+    // Guarded on ownerUserId: null — never removes a claimed provider.
+    await tx.provider.deleteMany({
+      where: {
+        id: master.id,
+        type: ProviderType.MASTER,
+        studioId: studio.providerId,
+        ownerUserId: null,
+      },
+    });
+  });
+
+  return { inviteId: invite?.id ?? null };
+}

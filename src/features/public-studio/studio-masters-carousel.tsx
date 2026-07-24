@@ -30,6 +30,8 @@ type MasterExtra = {
 type Props = {
   studio: { id: string; publicUsername: string | null };
   masters: StudioMasterCard[];
+  /** FIX-STUDIO-02 (owner parity): suppress per-master booking CTAs for the owner. */
+  hideBooking?: boolean;
 };
 
 function gradeLabel(rating: number, reviews: number): string {
@@ -38,7 +40,7 @@ function gradeLabel(rating: number, reviews: number): string {
   return UI_TEXT.publicStudio.gradeNew;
 }
 
-export function StudioMastersCarousel({ studio, masters }: Props) {
+export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
   const [extras, setExtras] = useState<Record<string, MasterExtra>>({});
 
   useEffect(() => {
@@ -159,9 +161,11 @@ export function StudioMastersCarousel({ studio, masters }: Props) {
                   <Link href={masterHref} className="text-xs font-medium text-text underline underline-offset-2">
                     {UI_TEXT.publicStudio.openMaster}
                   </Link>
-                  <Button asChild size="sm" className="ml-auto h-8 rounded-lg px-2.5 text-xs">
-                    <Link href={bookingHref}>{UI_TEXT.publicStudio.book}</Link>
-                  </Button>
+                  {hideBooking ? null : (
+                    <Button asChild size="sm" className="ml-auto h-8 rounded-lg px-2.5 text-xs">
+                      <Link href={bookingHref}>{UI_TEXT.publicStudio.book}</Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             </article>
