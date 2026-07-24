@@ -1,4 +1,5 @@
 import { ProviderType } from "@prisma/client";
+import { resolveLinkState } from "@/lib/auth/link-state";
 import { getMasterProfileData, type MasterProfileData } from "@/lib/master/profile.service";
 import {
   computeProfileCompletion,
@@ -119,7 +120,10 @@ export async function getMasterProfileView(input: {
         phone: true,
         email: true,
         telegramUsername: true,
-        telegramLink: { select: { isEnabled: true } },
+        // FIX-LINK-STATE-CONSISTENCY-01: select the identity id (chatId is
+        // nullable) so the read-only "connected" badge means isLinked, not the
+        // orthogonal delivery flag — consistent with the VK row + the doc-comment.
+        telegramLink: { select: { chatId: true } },
         vkLink: { select: { vkUserId: true } },
       },
     }),
@@ -147,7 +151,7 @@ function composeView(input: {
     phone: string | null;
     email: string | null;
     telegramUsername: string | null;
-    telegramLink: { isEnabled: boolean } | null;
+    telegramLink: { chatId: string | null } | null;
     vkLink: { vkUserId: string } | null;
   } | null;
   cityName: string | null;
@@ -175,8 +179,11 @@ function composeView(input: {
     phone: user?.phone ?? null,
     email: user?.email ?? null,
     telegramUsername: user?.telegramUsername ?? null,
-    telegramConnected: Boolean(user?.telegramLink?.isEnabled),
-    vkConnected: Boolean(user?.vkLink),
+    // FIX-LINK-STATE-CONSISTENCY-01: both mean isLinked (identity) via the single
+    // predicate — previously telegram used `isEnabled` (delivery) and vk used
+    // row-existence, an internal inconsistency.
+    telegramConnected: resolveLinkState({ linkId: user?.telegramLink?.chatId, isEnabled: null }).isLinked,
+    vkConnected: resolveLinkState({ linkId: user?.vkLink?.vkUserId, isEnabled: null }).isLinked,
     vkUserId: user?.vkLink?.vkUserId ?? null,
   };
 

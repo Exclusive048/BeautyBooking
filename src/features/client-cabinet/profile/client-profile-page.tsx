@@ -547,43 +547,53 @@ function LinkedAccountsCard({
       />
 
       <div className="space-y-2.5">
-        {/* FIX-TELEGRAM-KILLSWITCH: the Telegram connect row is absent when the
-            flag is off (the connect modal + unlink handler are gated inert). */}
-        {isTelegramEnabled && (
+        {/* FIX-LINK-STATE-CONSISTENCY-01 + disconnect-gate split: the row shows
+            three states from the two orthogonal facts (linked / deliveryEnabled),
+            and NEVER offers «Подключить» for a linked account. The row renders
+            when LINKED or when Telegram is enabled; connect is reachable only
+            when enabled (else the row is absent). A linked account keeps
+            «Отключить» even when Telegram is killed — never strand a user. */}
+        {(tg.linked || isTelegramEnabled) && (
           <ConnectRow
             icon={<MessageCircle className="h-5 w-5" aria-hidden />}
             iconColor="#2AABEE"
             name="Telegram"
-            connected={tg.connected}
+            connected={tg.linked}
             status={
-              tg.connected
-                ? tg.username
-                  ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
-                  : `подключён ${formatConnectedAt(tg.connectedAt)}`
-                : "Войти через Telegram и получать уведомления"
+              !tg.linked
+                ? "Войти через Telegram и получать уведомления"
+                : !tg.deliveryEnabled
+                  ? tg.username
+                    ? `@${tg.username} · ${T.linkedAccounts.deliveryOff}`
+                    : T.linkedAccounts.linkedDeliveryOff
+                  : tg.username
+                    ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
+                    : `подключён ${formatConnectedAt(tg.connectedAt)}`
             }
-            actionLabel={tg.connected ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
-            onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
+            actionLabel={tg.linked ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
+            onAction={tg.linked ? onTelegramUnlink : onTelegramConnect}
           />
         )}
-        {/* FIX-EXTERNAL-GATING-01 (G-3): the VK *connect* affordance gates on
-            `isVkAuthEnabled` (threaded from the server) — no dead-end connect
-            that 503s when VK auth is off. A still-LINKED account ALWAYS keeps
-            its disconnect control, so the row renders when linked OR when VK
-            auth is enabled; never strand a user on a switched-off provider. */}
-        {(vk.connected || vkAuthEnabled) && (
+        {/* FIX-EXTERNAL-GATING-01 (G-3) + FIX-LINK-STATE-CONSISTENCY-01: the VK
+            connect affordance gates on `isVkAuthEnabled`; disconnect stays for a
+            linked account regardless. Three states from linked / deliveryEnabled
+            — a linked-but-notifications-off account shows «Подключено ·
+            уведомления выключены» + «Отключить», never «Не подключено». */}
+        {(vk.linked || vkAuthEnabled) && (
           <ConnectRow
             icon={<Users className="h-5 w-5" aria-hidden />}
             iconColor="#0077FF"
             name="ВКонтакте"
-            connected={vk.connected}
+            connected={vk.linked}
             status={
-              vk.connected
-                ? `подключён ${formatConnectedAt(vk.connectedAt)}`
-                : "Войти через VK и получать уведомления"
+              !vk.linked
+                ? "Войти через VK и получать уведомления"
+                : !vk.deliveryEnabled
+                  ? T.linkedAccounts.linkedDeliveryOff
+                  : `подключён ${formatConnectedAt(vk.connectedAt)}`
             }
-            actionLabel={vk.connected ? T.linkedAccounts.vkDisconnect : T.linkedAccounts.vkConnect}
-            onAction={vk.connected ? onVkUnlink : onVkConnect}
+            actionLabel={vk.linked ? T.linkedAccounts.vkDisconnect : T.linkedAccounts.vkConnect}
+            onAction={vk.linked ? onVkUnlink : onVkConnect}
           />
         )}
       </div>

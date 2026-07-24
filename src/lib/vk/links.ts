@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { resolveLinkState } from "@/lib/auth/link-state";
 
 export type VkLinkSummary = {
   linked: boolean;
@@ -12,13 +13,10 @@ export async function getVkLinkSummary(userId: string): Promise<VkLinkSummary> {
     select: { vkUserId: true, isEnabled: true },
   });
 
-  const linked = Boolean(link?.vkUserId);
-  const enabled = linked ? Boolean(link?.isEnabled) : false;
-
-  return {
-    linked,
-    enabled,
-  };
+  // FIX-LINK-STATE-CONSISTENCY-01: single predicate — `linked`=isLinked (identity),
+  // `enabled`=isDeliveryEnabled (delivery pref). Same helper the profile DTO uses.
+  const state = resolveLinkState({ linkId: link?.vkUserId, isEnabled: link?.isEnabled });
+  return { linked: state.isLinked, enabled: state.isDeliveryEnabled };
 }
 
 export async function setVkLinkEnabled(userId: string, enabled: boolean): Promise<{ enabled: boolean }> {

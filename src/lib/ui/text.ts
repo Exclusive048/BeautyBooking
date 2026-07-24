@@ -5358,6 +5358,12 @@ export const UI_TEXT = {
         vkNotConnected: "VK не привязан",
         vkConnect: "Подключить VK",
         vkDisconnect: "Отключить",
+        // FIX-LINK-STATE-CONSISTENCY-01: the linked-but-notifications-off state.
+        // Shown instead of «Не подключено» (which wrongly offered «Подключить»
+        // for an already-linked account). `deliveryOff` is the suffix after a
+        // «@username · »; `linkedDeliveryOff` the standalone form (no username).
+        deliveryOff: "уведомления выключены",
+        linkedDeliveryOff: "Подключено · уведомления выключены",
       },
       completion: {
         rail: "Заполнено профиля",

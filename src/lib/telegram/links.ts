@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import { resolveLinkState } from "@/lib/auth/link-state";
 
 export type TelegramLinkSummary = {
   linked: boolean;
@@ -13,12 +14,12 @@ export async function getTelegramLinkSummary(userId: string): Promise<TelegramLi
     select: { chatId: true, isEnabled: true },
   });
 
-  const linked = Boolean(link?.chatId);
-  const enabled = linked ? Boolean(link?.isEnabled) : false;
-
+  // FIX-LINK-STATE-CONSISTENCY-01: single predicate — `linked`=isLinked (identity),
+  // `enabled`=isDeliveryEnabled (delivery pref). Same helper the profile DTO uses.
+  const state = resolveLinkState({ linkId: link?.chatId, isEnabled: link?.isEnabled });
   return {
-    linked,
-    enabled,
+    linked: state.isLinked,
+    enabled: state.isDeliveryEnabled,
     chatId: link?.chatId ?? null,
   };
 }
