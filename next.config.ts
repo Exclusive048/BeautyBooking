@@ -77,6 +77,18 @@ const nextConfig = {
     "@prisma/client",
     "sharp",
     "@aws-sdk/client-s3",
+    // OBSERVABILITY-GLITCHTIP-01: `@sentry/node` statically imports
+    // `import-in-the-middle` (via @sentry/node-core's ESM-loader module), which
+    // `require()`s Node's `path`. Webpack bundles that graph for the
+    // `instrumentation` entry and fails with
+    // `Module not found: Can't resolve 'path'` — the same class as the 'net'
+    // failure in CLAUDE.md rule 13, and it breaks EVERY route, not just one.
+    // Marking these external leaves them as runtime requires. Needed even
+    // though `registerEsmLoaderHooks: false` disables the hooks at runtime:
+    // the import is static, so the bundler sees it regardless of the flag.
+    "@sentry/node",
+    "import-in-the-middle",
+    "require-in-the-middle",
   ],
   images: {
     // 🔁 Keep this host list in sync with
@@ -128,7 +140,32 @@ const nextConfig = {
         headers,
       },
     ];
-  }
+  },
+
+  // OBSERVABILITY-GLITCHTIP-01. `serverExternalPackages` above covers server
+  // components and route handlers, but Next compiles `src/instrumentation.ts`
+  // as its OWN entry with its own webpack config, and that entry ignores the
+  // list. `@sentry/node` statically imports `import-in-the-middle`, which
+  // `require()`s Node's `path` — so without this the instrumentation entry
+  // fails to compile and EVERY route 500s (verified: `GET / 500`,
+  // `Module not found: Can't resolve 'path'`). Same failure class as the 'net'
+  // error in CLAUDE.md rule 13.
+  //
+  // Externalising leaves these as runtime `require()`s, which is correct: they
+  // are Node-only packages that must never be bundled. Server-side only —
+  // the client bundle uses `@sentry/browser`, which is bundler-safe.
+  webpack: (config: { externals?: unknown[] }, { isServer }: { isServer: boolean }) => {
+    if (isServer) {
+      config.externals = [
+        ...(config.externals ?? []),
+        "@sentry/node",
+        "@sentry/node-core",
+        "import-in-the-middle",
+        "require-in-the-middle",
+      ];
+    }
+    return config;
+  },
 };
 
 module.exports = withBundleAnalyzer(withPWA(nextConfig));

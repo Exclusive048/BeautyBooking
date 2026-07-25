@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { ErrorCode } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { track5xxError } from "@/lib/monitoring/api-alerts";
+import { shouldReportFailure } from "@/lib/observability/noise";
+import { reportMessage } from "@/lib/observability/report";
 
 type ApiOk<T> = {
   ok: true;
@@ -32,6 +34,19 @@ export function fail(
   if (status >= 500) {
     logError(message, { status, code, requestId, __skipAlert: true });
     track5xxError("", requestId, message);
+    // OBSERVABILITY-GLITCHTIP-01: routes catch their own errors and convert
+    // them into a response here, so the throw never reaches `onRequestError`.
+    // This is the chokepoint for those. Reported as a message (the stack is
+    // already gone by this point) and filtered by `shouldReportFailure` — 4xx
+    // is the client's problem, and 503 is deliberate unavailability (the
+    // AUTH-KILLSWITCH provider gates), not a fault.
+    if (shouldReportFailure(status, code)) {
+      reportMessage(message, {
+        level: "error",
+        tags: { http_status: status, error_code: code },
+        extra: { requestId },
+      });
+    }
   }
   return NextResponse.json<ApiError>(
     { ok: false, requestId, error: { message, code, details } },

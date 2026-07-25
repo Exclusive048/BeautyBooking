@@ -180,6 +180,34 @@ const envSchema = z.object({
   MONITORING_TELEGRAM_BOT_TOKEN: z.string().optional(),
   MONITORING_TELEGRAM_CHAT_ID: z.string().optional(),
 
+  // ── Error tracking — GlitchTip (OBSERVABILITY-GLITCHTIP-01) ───────────────
+  // GlitchTip is a self-hosted, Sentry-ingest-compatible backend. Self-hosting
+  // keeps error payloads in-country (152-ФЗ), which SaaS Sentry cannot.
+  //
+  // Named GLITCHTIP_* rather than SENTRY_* deliberately: the Sentry SDK falls
+  // back to reading `SENTRY_DSN` / `SENTRY_ENVIRONMENT` / `SENTRY_RELEASE`
+  // straight from `process.env`, which would bypass this schema (rule 11).
+  // With these names the ONLY path into the SDK is `observability/config.ts`.
+  //
+  // Every var is optional and error tracking is OFF while the DSN is unset —
+  // dev and CI behave exactly as they did before this feature landed.
+  //
+  // Server + worker DSN. Unset → `Sentry.init` is never called server-side.
+  GLITCHTIP_DSN: z.string().optional(),
+  // Browser DSN — separate var (and can be a separate GlitchTip project) so
+  // frontend noise never buries backend failures, and so enabling backend
+  // tracking does not automatically ship a DSN to every visitor.
+  NEXT_PUBLIC_GLITCHTIP_DSN: z.string().optional(),
+  // Deployment label shown in GlitchTip. Defaults to NODE_ENV when unset.
+  NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT: z.string().optional(),
+  // Release identifier for grouping events by deploy (e.g. the git SHA).
+  // Optional: readable stacks from minified client code additionally need
+  // source-map upload, which is deferred to DevOps (see BACKLOG).
+  NEXT_PUBLIC_GLITCHTIP_RELEASE: z.string().optional(),
+  // Server-side error sampling. 1 = send everything (the right default for a
+  // pre-launch product); lower it only if event volume becomes a disk problem.
+  GLITCHTIP_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1),
+
   // ── Feature flags (boolean after transform) ───────────────────────────────
   VISUAL_SEARCH_ENABLED: boolFlag,
   AI_FEATURES_ENABLED: boolFlag,
@@ -298,6 +326,9 @@ const clientEnv = {
   NEXT_PUBLIC_YANDEX_MAPS_API_KEY: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY,
   NEXT_PUBLIC_LEGAL_INN: process.env.NEXT_PUBLIC_LEGAL_INN,
   NEXT_PUBLIC_VK_COMMUNITY_URL: process.env.NEXT_PUBLIC_VK_COMMUNITY_URL,
+  NEXT_PUBLIC_GLITCHTIP_DSN: process.env.NEXT_PUBLIC_GLITCHTIP_DSN,
+  NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT: process.env.NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT,
+  NEXT_PUBLIC_GLITCHTIP_RELEASE: process.env.NEXT_PUBLIC_GLITCHTIP_RELEASE,
 };
 
 export const env: AppEnv =
@@ -389,6 +420,13 @@ export const isSmsConfigured =
   env.SMS_PROVIDER_ENABLED &&
   Boolean(env.SMS_PROVIDER_LOGIN) &&
   Boolean(env.SMS_PROVIDER_PASSWORD);
+/**
+ * OBSERVABILITY-GLITCHTIP-01 — error tracking is enabled purely by the presence
+ * of a DSN. No DSN → `Sentry.init` is never called → zero behaviour change.
+ * Server and browser are gated independently (see the schema notes above).
+ */
+export const isServerErrorTrackingEnabled = Boolean(env.GLITCHTIP_DSN);
+export const isBrowserErrorTrackingEnabled = Boolean(env.NEXT_PUBLIC_GLITCHTIP_DSN);
 export const isS3Enabled = env.STORAGE_PROVIDER === "s3";
 export const isVisualSearchEnabled = env.VISUAL_SEARCH_ENABLED;
 export const isAiFeaturesEnabled = env.AI_FEATURES_ENABLED;
