@@ -1,7 +1,6 @@
 import { Smartphone } from "lucide-react";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
-import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
@@ -71,16 +70,11 @@ export function NotificationsSection({ data }: Props) {
         </SectionCard>
       )}
 
-      <SectionCard title={T.vkTitle} description={T.vkDesc}>
-        <FeatureGate
-          feature="vkNotifications"
-          scope="STUDIO"
-          variant="inline"
-          description={FG.vkLocked}
-        >
-          <VkNotificationsSection embedded />
-        </FeatureGate>
-      </SectionCard>
+      {/* CONSOLIDATE-EXTERNAL-LINKING-01: VK notification card hidden — VK Bot
+          delivery isn't built (VK-NOTIFICATIONS backlog), so a toggle would
+          promise delivery that can't happen. Component + endpoint + field
+          preserved; VK login/identity stays in the profile «Связанные
+          аккаунты» card. */}
     </div>
   );
 }

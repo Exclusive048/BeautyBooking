@@ -20,7 +20,7 @@ import {
   toMediaAssetDto,
   type MediaAssetDto,
 } from "@/lib/media/types";
-import { ensureCanManageMedia, ensureCanReadMedia } from "@/lib/media/access";
+import { canManageProvider, ensureCanManageMedia, ensureCanReadMedia } from "@/lib/media/access";
 import {
   SITE_LOGIN_HERO_FOCAL_SETTING_KEY,
   SITE_LOGIN_HERO_SETTING_KEY,
@@ -199,21 +199,114 @@ async function enforcePortfolioLimit(
   }
 }
 
+/**
+ * SECURITY-EXPOSURE-AUDIT-01 #3 — is a MASTER/STUDIO/SITE portfolio-or-avatar
+ * asset visible to an anonymous / non-owner caller?
+ *
+ *  - AVATAR / SITE: public by nature (a single profile image / admin-managed
+ *    site asset). Gating them would break authenticated surfaces that show a
+ *    provider's avatar without adding protection the finding is about.
+ *  - PORTFOLIO: visible ONLY when its provider is published AND a **public**
+ *    `PortfolioItem` still references it. This closes all three leaks — a hidden
+ *    item (`isPublic:false`), an unpublished provider, and a delete-orphaned
+ *    asset (whose PortfolioItem is gone) all resolve to `false`.
+ *
+ * The `PortfolioItem` ↔ asset link is by `mediaUrl` (there is no FK). `mediaUrl`
+ * is stored either relative (`/api/media/file/<id>`) or, for legacy rows,
+ * absolute, so we match on `contains: <assetId>` — the asset id is a cuid,
+ * globally unique, so this cannot false-match another item.
+ */
+export async function isProviderMediaPubliclyVisible(asset: {
+  id: string;
+  entityType: MediaEntityType;
+  entityId: string;
+  kind: MediaKind;
+}): Promise<boolean> {
+  if (asset.entityType === MediaEntityType.SITE) return true;
+  if (asset.kind === MediaKind.AVATAR) return true;
+  if (asset.kind !== MediaKind.PORTFOLIO) return false;
+  if (asset.entityType !== MediaEntityType.MASTER && asset.entityType !== MediaEntityType.STUDIO) {
+    return false;
+  }
+
+  const provider = await prisma.provider.findUnique({
+    where: { id: asset.entityId },
+    select: { isPublished: true },
+  });
+  if (!provider?.isPublished) return false;
+
+  const publicItem = await prisma.portfolioItem.findFirst({
+    where: { isPublic: true, mediaUrl: { contains: asset.id } },
+    select: { id: true },
+  });
+  return Boolean(publicItem);
+}
+
+/** Subset of `assetIds` referenced by a public `PortfolioItem` (see above). */
+async function filterPublicPortfolioAssetIds(assetIds: string[]): Promise<Set<string>> {
+  const visible = new Set<string>();
+  if (assetIds.length === 0) return visible;
+  const items = await prisma.portfolioItem.findMany({
+    where: { isPublic: true, OR: assetIds.map((id) => ({ mediaUrl: { contains: id } })) },
+    select: { mediaUrl: true },
+  });
+  for (const id of assetIds) {
+    if (items.some((item) => item.mediaUrl.includes(id))) visible.add(id);
+  }
+  return visible;
+}
+
 export async function listMediaAssets(
   user: UserProfile | null,
   input: { entityType: MediaEntityType; entityId: string; kind?: MediaKind }
 ): Promise<MediaAssetDto[]> {
   const entityId = normalizeEntityId(input.entityId);
-  await ensureCanReadMedia(user, input.entityType, entityId, input.kind);
+  const { entityType, kind } = input;
 
+  // Provider-owned public media (portfolio + avatar) is fetched by anonymous
+  // public profiles, so it cannot go through the strict private-read gate. A
+  // manager sees everything (incl. hidden items); everyone else sees only the
+  // publicly-visible subset. Deleted providers/items resolve to empty because
+  // the asset carries no public PortfolioItem (and a deleted provider is not
+  // published). SECURITY-EXPOSURE-AUDIT-01 #3.
+  const isProviderPublicSurface =
+    (kind === MediaKind.PORTFOLIO || kind === MediaKind.AVATAR) &&
+    (entityType === MediaEntityType.MASTER ||
+      entityType === MediaEntityType.STUDIO ||
+      entityType === MediaEntityType.SITE);
+
+  if (isProviderPublicSurface) {
+    const assets = await prisma.mediaAsset.findMany({
+      where: { entityType, entityId, kind, deletedAt: null, status: MediaAssetStatus.READY },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const isManager =
+      entityType !== MediaEntityType.SITE && user
+        ? await canManageProvider(entityId, user.id)
+        : false;
+    if (isManager || entityType === MediaEntityType.SITE) {
+      return assets.map(toMediaAssetDto);
+    }
+
+    // Non-manager: avatars are public; portfolio requires a published provider
+    // and a public PortfolioItem.
+    if (kind === MediaKind.AVATAR) return assets.map(toMediaAssetDto);
+
+    const provider = await prisma.provider.findUnique({
+      where: { id: entityId },
+      select: { isPublished: true },
+    });
+    if (!provider?.isPublished) return [];
+
+    const publicIds = await filterPublicPortfolioAssetIds(assets.map((a) => a.id));
+    return assets.filter((a) => publicIds.has(a.id)).map(toMediaAssetDto);
+  }
+
+  // Every other entity type keeps the strict per-entity read authorization.
+  await ensureCanReadMedia(user, entityType, entityId, kind);
   const assets = await prisma.mediaAsset.findMany({
-    where: {
-      entityType: input.entityType,
-      entityId,
-      kind: input.kind,
-      deletedAt: null,
-      status: MediaAssetStatus.READY,
-    },
+    where: { entityType, entityId, kind, deletedAt: null, status: MediaAssetStatus.READY },
     orderBy: { createdAt: "desc" },
   });
   return assets.map(toMediaAssetDto);

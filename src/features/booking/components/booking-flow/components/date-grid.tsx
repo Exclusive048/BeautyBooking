@@ -17,6 +17,13 @@ type Props = {
   providerTimezone: string;
   selectedDateKey: string | null;
   onSelect: (dateKey: string) => void;
+  /**
+   * PACKAGE-SOLO-WIZARD-01: earliest selectable day (provider-local dateKey).
+   * Days before it render disabled — used by the package wizard so component
+   * N+1 can't be placed on a day that ends before component N. Omitted for the
+   * single-service widget → every working day stays selectable (unchanged).
+   */
+  minDateKey?: string | null;
 };
 
 type DayCell = {
@@ -42,6 +49,13 @@ function decomposeDateKey(dateKey: string): {
     day: d ?? 1,
     weekdayIdx: jsDay === 0 ? 6 : jsDay - 1,
   };
+}
+
+/** Cell offset (in days) of `dateKey` from the strip's first cell. */
+function cellIndexOf(baseFromDate: Date, dateKey: string): number {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const target = Date.UTC(y ?? 2000, (m ?? 1) - 1, d ?? 1);
+  return Math.round((target - baseFromDate.getTime()) / 86_400_000);
 }
 
 function buildCells(
@@ -80,7 +94,13 @@ function buildCells(
  * those days off, so the user can't book them but still gets full
  * calendar continuity.
  */
-export function DateGrid({ providerId, providerTimezone, selectedDateKey, onSelect }: Props) {
+export function DateGrid({
+  providerId,
+  providerTimezone,
+  selectedDateKey,
+  onSelect,
+  minDateKey = null,
+}: Props) {
   const [workingDays, setWorkingDays] = useState<Set<string>>(new Set());
   // FIX-BATCH-C Defect 3: seed the strip from TODAY in the provider's salon
   // timezone, not the browser's UTC date. Using getUTCDate() offered a past day
@@ -134,6 +154,17 @@ export function DateGrid({ providerId, providerTimezone, selectedDateKey, onSele
     void loadDays();
   }, [loadDays]);
 
+  // PACKAGE-SOLO-WIZARD-01: when a floor day arrives (the previous package
+  // component ends later than today), page the strip forward to it — otherwise
+  // the client faces a week of greyed cells and has to hunt with the chevrons.
+  useEffect(() => {
+    if (!minDateKey) return;
+    const index = cellIndexOf(baseFromDate, minDateKey);
+    if (index <= 0) return;
+    const lastPage = Math.ceil(DAYS_BATCH_SIZE / PAGE_SIZE) - 1;
+    setPage(Math.min(Math.floor(index / PAGE_SIZE), lastPage));
+  }, [minDateKey, baseFromDate]);
+
   const cells = buildCells(workingDays, baseFromDate, DAYS_BATCH_SIZE);
   const totalPages = Math.max(1, Math.ceil(cells.length / PAGE_SIZE));
   const start = page * PAGE_SIZE;
@@ -180,7 +211,8 @@ export function DateGrid({ providerId, providerTimezone, selectedDateKey, onSele
       <div className="grid grid-cols-7 gap-1">
         {visibleCells.map((cell) => {
           const isSelected = cell.dateKey === selectedDateKey;
-          const isDisabled = !cell.isWorkingDay;
+          const isDisabled =
+            !cell.isWorkingDay || (minDateKey ? cell.dateKey < minDateKey : false);
           return (
             <button
               key={cell.dateKey}

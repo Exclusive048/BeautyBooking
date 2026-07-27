@@ -99,10 +99,6 @@ export const UI_FMT = {
     if (count <= 0) return UI_TEXT.publicProfile.hero.novice;
     return `⭐ ${rating.toFixed(1)} (${count})`;
   },
-  starsLabel(rating: number): string {
-    const rounded = Math.max(0, Math.min(5, Math.round(rating)));
-    return "*".repeat(rounded) + "-".repeat(5 - rounded);
-  },
   /**
    * Format a sum line as «Итого: X XXX ₽».
    * @param sumKopeks — sum in **kopeks** (DB convention).

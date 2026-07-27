@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
@@ -17,6 +17,24 @@ type Props = {
   providerTimezone: string;
   selectedSlot: BookingFlowSlot | null;
   onSelect: (slot: BookingFlowSlot) => void;
+  /**
+   * PACKAGE-SOLO-WIZARD-01: earliest acceptable start (ISO instant). Slots
+   * starting before it are dropped — the package wizard passes the previous
+   * component's end + the master's buffer, so the client can never pick a time
+   * that collides with their own earlier service. The slots API can't do this
+   * itself: the sibling isn't committed yet, so its window still reads free.
+   * Omitted for the single-service widget → no filtering (unchanged).
+   */
+  minStartAtUtc?: string | null;
+  /** Empty-state copy override — the package wizard explains the cursor. */
+  emptyLabel?: string;
+  /**
+   * Hot-slot badges. The package price comes from the package's own
+   * proportional split (`resolveBookingCore` applies no hot-slot discount), so
+   * the wizard hides the badge rather than promise a discount the package
+   * doesn't give. Defaults on for the single-service widget (unchanged).
+   */
+  showHotBadges?: boolean;
 };
 
 type SlotPayload = {
@@ -48,6 +66,9 @@ export function TimeGrid({
   providerTimezone,
   selectedSlot,
   onSelect,
+  minStartAtUtc = null,
+  emptyLabel,
+  showHotBadges = true,
 }: Props) {
   const [slots, setSlots] = useState<BookingFlowSlot[]>([]);
   const [loading, setLoading] = useState(false);
@@ -127,6 +148,15 @@ export function TimeGrid({
     void loadSlots();
   }, [loadSlots]);
 
+  // Cursor filter at render (not in the fetch) — the day's slots are the same
+  // regardless of the floor, so re-picking an earlier component doesn't refetch.
+  const visibleSlots = useMemo(() => {
+    if (!minStartAtUtc) return slots;
+    const floorMs = new Date(minStartAtUtc).getTime();
+    if (Number.isNaN(floorMs)) return slots;
+    return slots.filter((slot) => new Date(slot.startAtUtc).getTime() >= floorMs);
+  }, [slots, minStartAtUtc]);
+
   return (
     <div>
       <div className="mb-2.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-medium uppercase tracking-wider text-text-sec">
@@ -143,18 +173,21 @@ export function TimeGrid({
         </div>
       ) : error ? (
         <p className="text-sm text-text-sec">{error}</p>
-      ) : slots.length === 0 ? (
+      ) : visibleSlots.length === 0 ? (
         // QA-122 (FIX-10): accurate empty state. If the selected day is today
         // (provider tz) and 0 slots remain, the booking window has passed →
         // distinct copy from a generic fully-booked / day-off message.
+        // PACKAGE-SOLO-WIZARD-01: `emptyLabel` overrides both when the cursor
+        // (not availability) is what emptied the day.
         <p className="text-sm italic text-text-sec">
-          {dateKey === toLocalDateKey(new Date().toISOString(), providerTimezone)
-            ? T.emptyDayToday
-            : T.emptyDay}
+          {emptyLabel ??
+            (dateKey === toLocalDateKey(new Date().toISOString(), providerTimezone)
+              ? T.emptyDayToday
+              : T.emptyDay)}
         </p>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
-          {slots.map((slot) => {
+          {visibleSlots.map((slot) => {
             const isSelected = selectedSlot?.label === slot.label;
             return (
               <button
@@ -169,7 +202,7 @@ export function TimeGrid({
                 )}
               >
                 {slot.timeText}
-                {slot.isHot ? (
+                {showHotBadges && slot.isHot ? (
                   <span
                     aria-hidden
                     className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white"

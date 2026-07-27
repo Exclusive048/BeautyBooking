@@ -45,6 +45,22 @@ const T = UI_TEXT.clientCabinet.profilePage;
 type Props = {
   /** Server-loaded user id needed for the AvatarEditor (entityType=USER). */
   userId: string;
+  /**
+   * Server-resolved SMTP gate (`isEmailConfigured()`). When false the platform
+   * physically cannot send the verification code, so the affordance is hidden
+   * rather than offered as a dead end — the same treatment `/login` gives its
+   * email tab and the VK/Yandex/Telegram buttons. The route itself already
+   * fail-closes with 503 `SYSTEM_FEATURE_DISABLED`; this is the UI half.
+   */
+  emailEnabled?: boolean;
+  /**
+   * FIX-EXTERNAL-GATING-01 (G-3): server-resolved `isVkAuthEnabled` (needs the
+   * server-only `VK_CLIENT_ID`, so the client can't compute it). Gates the VK
+   * *connect* affordance in the linked-accounts card. Disconnect for a still-
+   * linked account is NEVER gated — a user must always be able to detach a
+   * provider that's been switched off.
+   */
+  vkAuthEnabled?: boolean;
 };
 
 const fetcher = (url: string) =>
@@ -72,7 +88,7 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
   }
 }
 
-export function ClientProfilePage({ userId }: Props) {
+export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled = false }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
@@ -181,11 +197,13 @@ export function ClientProfilePage({ userId }: Props) {
         <ContactsCard
           data={data}
           onPatch={applyPatch}
+          emailEnabled={emailEnabled}
           onEmailVerify={() => setEmailModalOpen(true)}
         />
 
         <LinkedAccountsCard
           data={data}
+          vkAuthEnabled={vkAuthEnabled}
           onTelegramConnect={() => setTgModalOpen(true)}
           onTelegramUnlink={handleTelegramUnlink}
           onVkConnect={handleVkConnect}
@@ -426,10 +444,12 @@ function PersonalCard({
 function ContactsCard({
   data,
   onPatch,
+  emailEnabled,
   onEmailVerify,
 }: {
   data: ProfileDTO;
   onPatch: (p: Partial<ProfileUpdatePatch>) => void;
+  emailEnabled: boolean;
   onEmailVerify: () => void;
 }) {
   return (
@@ -470,7 +490,9 @@ function ContactsCard({
               <Check className="mr-0.5 h-3 w-3" aria-hidden />
               {T.fields.emailVerified}
             </Badge>
-          ) : data.contacts.email ? (
+          ) : // `emailEnabled === false` → SMTP isn't configured, so the code can
+          // never arrive. Don't offer the button at all (see Props.emailEnabled).
+          data.contacts.email && emailEnabled ? (
             <Button variant="secondary" size="sm" onClick={onEmailVerify}>
               <Mail className="mr-1.5 h-3.5 w-3.5" aria-hidden />
               {T.fields.emailVerify}
@@ -502,12 +524,14 @@ function ContactsCard({
 
 function LinkedAccountsCard({
   data,
+  vkAuthEnabled,
   onTelegramConnect,
   onTelegramUnlink,
   onVkConnect,
   onVkUnlink,
 }: {
   data: ProfileDTO;
+  vkAuthEnabled: boolean;
   onTelegramConnect: () => void;
   onTelegramUnlink: () => void;
   onVkConnect: () => void;
@@ -523,38 +547,55 @@ function LinkedAccountsCard({
       />
 
       <div className="space-y-2.5">
-        {/* FIX-TELEGRAM-KILLSWITCH: the Telegram connect row is absent when the
-            flag is off (the connect modal + unlink handler are gated inert). */}
-        {isTelegramEnabled && (
+        {/* FIX-LINK-STATE-CONSISTENCY-01 + disconnect-gate split: the row shows
+            three states from the two orthogonal facts (linked / deliveryEnabled),
+            and NEVER offers «Подключить» for a linked account. The row renders
+            when LINKED or when Telegram is enabled; connect is reachable only
+            when enabled (else the row is absent). A linked account keeps
+            «Отключить» even when Telegram is killed — never strand a user. */}
+        {(tg.linked || isTelegramEnabled) && (
           <ConnectRow
             icon={<MessageCircle className="h-5 w-5" aria-hidden />}
             iconColor="#2AABEE"
             name="Telegram"
-            connected={tg.connected}
+            connected={tg.linked}
             status={
-              tg.connected
-                ? tg.username
-                  ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
-                  : `подключён ${formatConnectedAt(tg.connectedAt)}`
-                : "Войти через Telegram и получать уведомления"
+              !tg.linked
+                ? "Войти через Telegram и получать уведомления"
+                : !tg.deliveryEnabled
+                  ? tg.username
+                    ? `@${tg.username} · ${T.linkedAccounts.deliveryOff}`
+                    : T.linkedAccounts.linkedDeliveryOff
+                  : tg.username
+                    ? `@${tg.username} · подключён ${formatConnectedAt(tg.connectedAt)}`
+                    : `подключён ${formatConnectedAt(tg.connectedAt)}`
             }
-            actionLabel={tg.connected ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
-            onAction={tg.connected ? onTelegramUnlink : onTelegramConnect}
+            actionLabel={tg.linked ? T.linkedAccounts.telegramDisconnect : T.linkedAccounts.telegramConnect}
+            onAction={tg.linked ? onTelegramUnlink : onTelegramConnect}
           />
         )}
-        <ConnectRow
-          icon={<Users className="h-5 w-5" aria-hidden />}
-          iconColor="#0077FF"
-          name="ВКонтакте"
-          connected={vk.connected}
-          status={
-            vk.connected
-              ? `подключён ${formatConnectedAt(vk.connectedAt)}`
-              : "Войти через VK и получать уведомления"
-          }
-          actionLabel={vk.connected ? T.linkedAccounts.vkDisconnect : T.linkedAccounts.vkConnect}
-          onAction={vk.connected ? onVkUnlink : onVkConnect}
-        />
+        {/* FIX-EXTERNAL-GATING-01 (G-3) + FIX-LINK-STATE-CONSISTENCY-01: the VK
+            connect affordance gates on `isVkAuthEnabled`; disconnect stays for a
+            linked account regardless. Three states from linked / deliveryEnabled
+            — a linked-but-notifications-off account shows «Подключено ·
+            уведомления выключены» + «Отключить», never «Не подключено». */}
+        {(vk.linked || vkAuthEnabled) && (
+          <ConnectRow
+            icon={<Users className="h-5 w-5" aria-hidden />}
+            iconColor="#0077FF"
+            name="ВКонтакте"
+            connected={vk.linked}
+            status={
+              !vk.linked
+                ? "Войти через VK и получать уведомления"
+                : !vk.deliveryEnabled
+                  ? T.linkedAccounts.linkedDeliveryOff
+                  : `подключён ${formatConnectedAt(vk.connectedAt)}`
+            }
+            actionLabel={vk.linked ? T.linkedAccounts.vkDisconnect : T.linkedAccounts.vkConnect}
+            onAction={vk.linked ? onVkUnlink : onVkConnect}
+          />
+        )}
       </div>
     </Card>
   );

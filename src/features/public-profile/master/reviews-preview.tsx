@@ -5,7 +5,11 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ModalSurface } from "@/components/ui/modal-surface";
+import {
+  REVIEWS_PAGE_SIZE,
+  reviewsProbeLimit,
+} from "@/features/public-profile/master/reviews-constants";
+import { StarsDisplay } from "@/features/master/components/reviews/stars-display";
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { ReportReviewModal } from "@/features/reviews/components/report-review-modal";
 import type { ReviewDto } from "@/lib/reviews/types";
@@ -21,6 +25,9 @@ type Props = {
   rating: number;
   reviewsCount: number;
   initialReviews: ReviewDto[];
+  /** REVIEWS-LOADMORE-01: whether a page exists beyond `initialReviews`, from
+   *  the server's n+1 probe. */
+  initialHasMore: boolean;
   canReviewBookingId: string | null;
   onRatingRefresh?: () => Promise<void>;
   currentUserId?: string | null;
@@ -48,7 +55,7 @@ function ReviewCard({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-medium">{review.authorName}</div>
         <div className="flex items-center gap-2">
-          <div className="text-xs text-text-sec">{UI_FMT.starsLabel(review.rating)}</div>
+          <StarsDisplay rating={review.rating} size="sm" />
           {canReport ? (
             <button
               type="button"
@@ -93,6 +100,7 @@ export function ReviewsPreview({
   rating,
   reviewsCount,
   initialReviews,
+  initialHasMore,
   canReviewBookingId,
   onRatingRefresh,
   currentUserId = null,
@@ -103,10 +111,14 @@ export function ReviewsPreview({
 
   const [reviews, setReviews] = useState<ReviewDto[]>(initialReviews);
   const [showReviewForm, setShowReviewForm] = useState(false);
-  const [showAllModal, setShowAllModal] = useState(false);
-  const [allReviews, setAllReviews] = useState<ReviewDto[] | null>(null);
-  const [allReviewsLoading, setAllReviewsLoading] = useState(false);
-  const [allReviewsError, setAllReviewsError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  // «Is there more?» comes from the API's n+1 probe — never from the
+  // `reviewsCount` aggregate, which drifts from the real active-review count in
+  // both directions (seed: Анна 47 stored / 54 real; Марина 0 stored / 3 real).
+  // Gating on that aggregate would strand reviews behind a hidden button or
+  // spin on an empty one. Seeded from the server's probe on first paint.
+  const [hasMore, setHasMore] = useState(initialHasMore);
   const [reportingReviewId, setReportingReviewId] = useState<string | null>(null);
 
   const [summaryText, setSummaryText] = useState<string | null>(null);
@@ -114,28 +126,42 @@ export function ReviewsPreview({
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryVisible, setSummaryVisible] = useState(false);
 
-  const hasMoreThanPreview = reviewsCount > reviews.length;
   const ratingLabel = useMemo(() => UI_FMT.ratingLabel(rating, reviewsCount), [rating, reviewsCount]);
 
-  async function openAllReviews() {
-    setShowAllModal(true);
-    if (allReviews || allReviewsLoading) return;
-    setAllReviewsLoading(true);
-    setAllReviewsError(null);
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setLoadMoreError(null);
     try {
+      // Offset = what we already render. `listReviews` applies
+      // ACTIVE_REVIEW_FILTER (invariant #17) server-side, so soft-deleted
+      // reviews stay out of both the page and the offset arithmetic.
+      // Ask for one row beyond the page: its presence means another page exists.
       const res = await fetch(
-        `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}&limit=50&offset=0`,
+        `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}` +
+          `&limit=${reviewsProbeLimit(REVIEWS_PAGE_SIZE)}&offset=${reviews.length}`,
         { cache: "no-store" },
       );
       const json = (await res.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(t.loadFailed);
       }
-      setAllReviews(json.data.reviews);
+      const batch = json.data.reviews ?? [];
+      // The probe row is a signal only — drop it, so it isn't rendered twice
+      // (it returns as the first row of the next page).
+      const page = batch.slice(0, REVIEWS_PAGE_SIZE);
+      // Append, never replace. Dedupe by id because offset paging can repeat a
+      // row when a review is added/removed between pages (audit 4b flagged the
+      // boundary); duplicate ids would also collide as React keys.
+      setReviews((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...page.filter((r) => !seen.has(r.id))];
+      });
+      setHasMore(batch.length > REVIEWS_PAGE_SIZE);
     } catch {
-      setAllReviewsError(t.loadFailed);
+      setLoadMoreError(t.loadFailed);
     } finally {
-      setAllReviewsLoading(false);
+      setLoadingMore(false);
     }
   }
 
@@ -195,17 +221,6 @@ export function ReviewsPreview({
                 {t.summaryButton}
               </Button>
             ) : null}
-            {hasMoreThanPreview ? (
-              <Button
-                type="button"
-                onClick={() => void openAllReviews()}
-                variant="secondary"
-                size="sm"
-                className="rounded-lg"
-              >
-                {t.all}
-              </Button>
-            ) : null}
             {canReviewBookingId && !showReviewForm ? (
               <Button
                 type="button"
@@ -245,7 +260,10 @@ export function ReviewsPreview({
               onCancel={() => setShowReviewForm(false)}
               onSubmitted={async (created) => {
                 setShowReviewForm(false);
-                setReviews((prev) => [created, ...prev].slice(0, 3));
+                // No `.slice(0, 3)` here any more: the list is now progressive,
+                // so trimming to the preview size would throw away every page
+                // the visitor had already loaded.
+                setReviews((prev) => [created, ...prev]);
                 await onRatingRefresh?.();
               }}
             />
@@ -274,29 +292,28 @@ export function ReviewsPreview({
             ))
           )}
         </motion.div>
-      </CardContent>
 
-      {/* OVERLAY-PORTAL-REFACTOR-01: was a hand-rolled `fixed inset-0` overlay.
-          Now portals through <ModalSurface size="lg"> (max-w-2xl preserved).
-          `title` gains an id'd heading + aria-labelledby (previously absent);
-          gains focus-trap, scroll-lock + Escape close on top of the existing
-          backdrop-click close. */}
-      <ModalSurface
-        open={showAllModal}
-        onClose={() => setShowAllModal(false)}
-        size="lg"
-        title={t.all}
-      >
-        {allReviewsLoading ? <div className="text-sm text-text-sec">{UI_TEXT.common.loading}</div> : null}
-        {allReviewsError ? <div className="text-sm text-red-600">{allReviewsError}</div> : null}
-        {!allReviewsLoading && !allReviewsError ? (
-          <div className="max-h-[70vh] space-y-3 overflow-auto pr-1">
-            {(allReviews ?? []).map((review) => (
-              <ReviewCard key={review.id} review={review} currentUserId={currentUserId} onReport={setReportingReviewId} />
-            ))}
+        {/* REVIEWS-LOADMORE-01: replaces the «Все отзывы» dialog, which fetched
+            a single limit=50 page and silently dropped the tail. Reviews now
+            append in place until the API returns a short batch. */}
+        {hasMore && reviews.length > 0 ? (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <Button
+              type="button"
+              onClick={() => void loadMore()}
+              variant="secondary"
+              size="sm"
+              className="rounded-lg"
+              disabled={loadingMore}
+            >
+              {loadingMore ? t.loadMoreLoading : t.loadMore}
+            </Button>
+            {loadMoreError ? (
+              <div className="text-sm text-text-sec">{loadMoreError}</div>
+            ) : null}
           </div>
         ) : null}
-      </ModalSurface>
+      </CardContent>
 
       {reportingReviewId ? (
         <ReportReviewModal

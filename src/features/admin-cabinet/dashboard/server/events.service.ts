@@ -107,7 +107,6 @@ export async function getAdminEvents(
           firstName: true,
           lastName: true,
           roles: true,
-          address: true,
         },
       }),
       // Paid subscriptions (only non-FREE plans).
@@ -197,7 +196,10 @@ export async function getAdminEvents(
         ? T.eventTypes.registrationMaster
         : T.eventTypes.registrationClient,
       secondary: maskLastName(fullName),
-      amountText: u.address?.trim() ? u.address.trim() : null,
+      // SECURITY-EXPOSURE-AUDIT-01 · B6: the raw registrant address leaked into
+      // the admin feed while every name beside it is maskLastName'd. Dropped for
+      // a consistent PII posture (the surname mask is the feed's convention).
+      amountText: null,
       amountTone: "neutral",
       dotTone: "new",
     });

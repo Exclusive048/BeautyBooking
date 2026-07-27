@@ -4,6 +4,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   AlertCircle,
   AlertTriangle,
+  Lock,
+  Sparkles,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -13,6 +15,19 @@ import { cn } from "@/lib/cn";
 
 export type ErrorStateVariant = "default" | "danger" | "warning";
 
+// Icons are addressed by a string NAME, never by passing the component itself.
+// `not-found.tsx` / `403` are Server (or Server-adjacent) special files, and a
+// lucide component can't cross the RSC boundary — passing one crashes the page
+// («Only plain objects can be passed to Client Components»). A name union makes
+// that mistake unrepresentable (see CLAUDE.md — RSC serialization). Add a name
+// here when a caller needs a new icon.
+export type ErrorStateIconName = "sparkles" | "lock";
+
+const NAMED_ICONS: Record<ErrorStateIconName, LucideIcon> = {
+  sparkles: Sparkles,
+  lock: Lock,
+};
+
 export type ErrorStateAction = {
   label: string;
   onClick?: () => void;
@@ -20,7 +35,9 @@ export type ErrorStateAction = {
 };
 
 type Props = {
-  icon?: LucideIcon;
+  /** Icon by NAME (not component) — see `ErrorStateIconName`. Falls back to the
+   *  variant's default icon when omitted. */
+  icon?: ErrorStateIconName;
   title: string;
   description?: string;
   primaryAction?: ErrorStateAction;
@@ -85,7 +102,7 @@ export function ErrorState({
   variant = "default",
   className,
 }: Props) {
-  const Icon = icon ?? DEFAULT_ICONS[variant];
+  const Icon = icon ? NAMED_ICONS[icon] : DEFAULT_ICONS[variant];
   const reduce = useReducedMotion();
   const container = reduce ? undefined : containerVariants;
   const item = reduce ? undefined : itemVariants;

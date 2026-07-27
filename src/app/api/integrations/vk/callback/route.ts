@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { requireAuth } from "@/lib/auth/guards";
 import { fail } from "@/lib/api/response";
-import { AppError, toAppError } from "@/lib/api/errors";
+import { AppError } from "@/lib/api/errors";
+import { failOAuthCallback } from "@/lib/auth/oauth-callback-error";
 import { exchangeVkCodeForToken, fetchVkProfile, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { readSignedVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
 import { nextRedirect } from "@/lib/http/origin";
@@ -135,7 +136,6 @@ export async function GET(req: Request) {
     const redirectDecision = await resolveCabinetRedirect(auth.user.id);
     return nextRedirect(req, redirectDecision.target);
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    return failOAuthCallback(req, error);
   }
 }

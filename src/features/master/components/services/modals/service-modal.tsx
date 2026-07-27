@@ -35,9 +35,10 @@ type Props = {
 const DURATION_OPTIONS = [15, 30, 45, 60, 75, 90, 120, 150, 180, 240];
 
 /**
- * Service create/edit modal. Six fields (name, category, duration,
- * price, description, isEnabled, onlinePayment) — modal reads cleaner
- * than inline-edit for a composite form.
+ * Service create/edit modal. Fields: name, category, duration, price,
+ * description, isEnabled — modal reads cleaner than inline-edit for a
+ * composite form. (The onlinePayment control is hidden until online
+ * payments ship; the field round-trips untouched.)
  *
  * Submit is gated by name + duration + price > 0. Delete is offered in
  * edit mode only; the API surfaces a 409 when the service has bookings,
@@ -63,9 +64,13 @@ export function ServiceModal({
   );
   const [description, setDescription] = useState(service?.description ?? "");
   const [isEnabled, setIsEnabled] = useState(service?.isEnabled ?? true);
-  const [onlinePayment, setOnlinePayment] = useState(
-    service?.onlinePaymentEnabled ?? false
-  );
+  // FIX-MASTER-01 item 2: the online-payment toggle is deliberately NOT
+  // rendered — online payments aren't shipped (lateCancelAction="fine" /
+  // online-payment path is backlogged), so the dialog must not offer the
+  // control. The field, plan-gating and API contract are preserved for when
+  // the feature ships: edit re-sends the stored value untouched, create
+  // falls through to the schema default (false).
+  const onlinePayment = service?.onlinePaymentEnabled ?? false;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { confirm, modal: confirmModal } = useConfirm();
@@ -367,13 +372,9 @@ export function ServiceModal({
             checked={isEnabled}
             onChange={setIsEnabled}
           />
-          <Toggle
-            label={T.onlinePaymentLabel}
-            checked={onlinePayment && onlinePaymentsAvailable}
-            onChange={onlinePaymentsAvailable ? setOnlinePayment : () => {}}
-            disabled={!onlinePaymentsAvailable}
-            tooltip={onlinePaymentsAvailable ? undefined : T.onlinePaymentLockedHint}
-          />
+          {/* Online-payment toggle intentionally hidden — see the
+              `onlinePayment` const above. Restore the <Toggle> when online
+              payments ship. */}
         </div>
 
         {error ? (

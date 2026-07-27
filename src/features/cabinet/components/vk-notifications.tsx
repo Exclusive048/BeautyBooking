@@ -124,9 +124,11 @@ export function VkNotificationsSection({
             className="shrink-0"
           />
         ) : (
-          // The connect button stays enabled regardless of the flag —
-          // VK login is a separate concern and must keep working for
-          // users who want to link their account.
+          // FIX-EXTERNAL-GATING-01 (G-3): this is a VK-OAuth *link* action. It
+          // intentionally doesn't gate on the notifications-delivery flag
+          // (`isVkNotificationsEnabled`); the VK-auth gate (`isVkAuthEnabled`,
+          // server-only) is applied by every call-site that mounts this section,
+          // so an unlinked user only reaches this button when VK auth is on.
           <Button
             variant="secondary"
             onClick={onConnect}

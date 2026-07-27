@@ -35,7 +35,7 @@ async function isStudioAdminOrOwnerByStudioProviderId(studioProviderId: string, 
   return Boolean(membership);
 }
 
-async function canManageProvider(providerId: string, userId: string): Promise<boolean> {
+export async function canManageProvider(providerId: string, userId: string): Promise<boolean> {
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
     select: { id: true, type: true, ownerUserId: true, studioId: true },
@@ -281,9 +281,14 @@ export async function ensureCanReadMedia(
     }
     case MediaEntityType.MASTER:
     case MediaEntityType.STUDIO: {
-      if (kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO) {
-        return;
-      }
+      // SECURITY-EXPOSURE-AUDIT-01 #3: this is the PRIVATE/management read gate.
+      // It used to blanket-allow anyone (even anonymous) to read MASTER/STUDIO
+      // AVATAR/PORTFOLIO, so hidden, unpublished and delete-orphaned portfolio
+      // stayed fetchable. Public serving of *published + public* portfolio (and
+      // avatars) is now handled explicitly — the visibility-gated public branch
+      // in `/api/media/file/[id]` and the public filter in `listMediaAssets` —
+      // NOT here. Here, only the owner/studio-admin (and platform admin) may
+      // read, which is what the file route falls back to for a non-public asset.
       if (!user) {
         throw new AppError("Forbidden", 403, "FORBIDDEN");
       }

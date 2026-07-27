@@ -25,7 +25,7 @@ export function SortMenu({ value, onChange }: Props) {
 
   return (
     <details className="relative inline-block">
-      <summary className="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-xl border border-border-subtle bg-bg-card px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex h-9 shrink-0 cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-xl border border-border-subtle bg-bg-card px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input [&::-webkit-details-marker]:hidden">
         <span className="text-text-sec">{T.label}</span>
         <span>{current.label}</span>
         <ChevronDown className="h-3.5 w-3.5 text-text-sec" aria-hidden />

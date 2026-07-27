@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api/response";
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { env } from "@/lib/env";
 import { logError } from "@/lib/logging/logger";
 import { enqueue } from "@/lib/queue/queue";
@@ -34,7 +35,7 @@ function getCronToken(req: Request): string | null {
 export async function POST(req: Request) {
   const expected = env.MRR_SNAPSHOT_SECRET?.trim();
   const token = getCronToken(req);
-  if (!expected || token !== expected) {
+  if (!expected || !token || !timingSafeStringEqual(token, expected)) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");
   }
 

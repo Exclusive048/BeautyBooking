@@ -1,5 +1,6 @@
 import { BookingActionRequiredBy, BookingStatus } from "@prisma/client";
 import { cache } from "react";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -11,7 +12,9 @@ export const getPendingBookingsCountForMaster = cache(
   async (masterProviderId: string): Promise<number> => {
     return prisma.booking.count({
       where: {
-        providerId: masterProviderId,
+        // F1: performer predicate (studio bookings carry providerId=STUDIO).
+        // AND-wrapped: this query has its own OR for the actionable statuses.
+        AND: [masterPerformedBookingWhere(masterProviderId)],
         OR: [
           {
             status: BookingStatus.PENDING,

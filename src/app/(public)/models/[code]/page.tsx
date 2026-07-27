@@ -14,6 +14,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getPublicModelOffer } from "@/lib/model-offers/public.service";
 import { ModelOfferApplyForm } from "@/features/model-offers/components/public-model-offer-apply";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PageProps = {
@@ -48,9 +49,12 @@ export default async function ModelOfferPage({ params }: PageProps) {
   const user = await getSessionUser();
   const loginHref = `/login?next=${encodeURIComponent(`/models/${offer.publicCode}`)}`;
   const isFree = offer.price === null || offer.price === 0;
-  const priceLabel = isFree
-    ? UI_TEXT.pages.models.priceFree
-    : `${offer.price} ${UI_TEXT.common.currencyRub}`;
+  // FIX-MASTER-01 item 4: offer.price is KOPEKS — raw interpolation rendered
+  // «90000 ₽» for a 900 ₽ offer. Canonical ÷100 formatter, as everywhere.
+  const priceLabel =
+    offer.price === null || offer.price === 0
+      ? UI_TEXT.pages.models.priceFree
+      : UI_FMT.priceLabel(offer.price);
 
   return (
     <div className="min-h-dvh bg-background">
@@ -157,10 +161,10 @@ export default async function ModelOfferPage({ params }: PageProps) {
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <CalendarDays className="h-4 w-4" aria-hidden />
-                    {UI_TEXT.pages.modelOffer.dateTimeLabel}
+                    {UI_TEXT.pages.modelOffer.bookingWindowLabel}
                   </span>
                   <span className="font-medium text-foreground">
-                    {offer.dateLocal}
+                    {offer.dateLocal}, {offer.timeRangeStartLocal}–{offer.timeRangeEndLocal}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -169,10 +173,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                     {UI_TEXT.pages.modelOffer.durationLabel}
                   </span>
                   <span className="font-medium text-foreground">
-                    {offer.timeRangeStartLocal}–{offer.timeRangeEndLocal}
-                    <span className="ml-1 text-xs text-muted-foreground">
-                      ({offer.service.durationMin} {UI_TEXT.common.minutesShort})
-                    </span>
+                    {offer.service.durationMin} {UI_TEXT.common.minutesShort}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

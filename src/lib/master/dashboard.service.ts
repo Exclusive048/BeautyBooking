@@ -1,6 +1,7 @@
 import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { getPendingBookingsForMaster, type PendingBookingRow } from "@/lib/bookings/master-pending-list";
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { getUnansweredReviewsForMaster, type UnansweredReviewRow } from "@/lib/reviews/unanswered-list";
@@ -251,7 +252,8 @@ export const getMasterDashboardData = cache(
     ] = await Promise.all([
       prisma.booking.findMany({
         where: {
-          providerId: input.masterId,
+          // F1: performer predicate — see master-booking-scope.ts.
+          ...masterPerformedBookingWhere(input.masterId),
           startAtUtc: { gte: todayStart, lt: todayEnd },
           status: { notIn: [BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.NO_SHOW] },
         },
@@ -275,7 +277,7 @@ export const getMasterDashboardData = cache(
       }),
       prisma.booking.findMany({
         where: {
-          providerId: input.masterId,
+          ...masterPerformedBookingWhere(input.masterId),
           startAtUtc: { gte: weekStart, lt: todayEnd },
           status: { in: REVENUE_STATUSES },
         },
@@ -375,7 +377,7 @@ export const getMasterDashboardData = cache(
     const earlierBookings = clientIds.length
       ? await prisma.booking.findMany({
           where: {
-            providerId: input.masterId,
+            ...masterPerformedBookingWhere(input.masterId),
             clientUserId: { in: clientIds },
             startAtUtc: { lt: weekStart },
             status: { in: REVENUE_STATUSES },

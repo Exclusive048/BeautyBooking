@@ -2,19 +2,13 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
 import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
-
-type TelegramLinkResponse = {
-  url: string;
-  expiresAt: string;
-  alreadyLinked?: boolean;
-};
 
 type TelegramSettingsResponse = {
   enabled: boolean;
@@ -25,8 +19,6 @@ type Props = {
   leadingIcon?: ReactNode;
   title?: string;
   hint?: string;
-  connectLabel?: string;
-  connectButtonClassName?: string;
 };
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
@@ -38,8 +30,6 @@ export function TelegramNotificationsSection({
   leadingIcon,
   title,
   hint,
-  connectLabel,
-  connectButtonClassName,
 }: Props) {
   const t = UI_TEXT.settings.notifications.telegram;
   const { status, loading, error: statusError, reload } = useTelegramStatus();
@@ -52,22 +42,11 @@ export function TelegramNotificationsSection({
   // mounted; this guard covers any direct/legacy caller.
   if (!isTelegramEnabled) return null;
 
-  const onConnect = async () => {
-    setError(null);
-    setSaving(true);
-    try {
-      const res = await fetchWithAuth("/api/telegram/link", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<TelegramLinkResponse> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, t.connectFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.connectFailed));
-      window.open(json.data.url, "_blank", "noopener,noreferrer");
-      await reload();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t.connectFailed);
-    } finally {
-      setSaving(false);
-    }
-  };
+  // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect moved to the canonical
+  // profile «Связанные аккаунты» card. This surface is delivery-only — the old
+  // in-place «Подключить» (bot-DM link) affordance is gone; when unlinked we
+  // point to the profile instead. The `/api/telegram/link` endpoint is
+  // preserved (still used by the profile flow).
 
   const onToggle = async (enabled: boolean) => {
     if (!status?.linked) return;
@@ -102,7 +81,6 @@ export function TelegramNotificationsSection({
   const enabled = Boolean(status?.enabled);
   const titleText = title ?? t.title;
   const hintText = hint ?? t.hint;
-  const connectText = connectLabel ?? t.connect;
 
   return (
     <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
@@ -112,26 +90,28 @@ export function TelegramNotificationsSection({
           <p className="text-sm font-medium">{titleText}</p>
           <p className="mt-0.5 text-xs text-text-sec">{linked ? t.connected : t.notConnected}</p>
         </div>
-        {linked ? (
-          <Switch
-            checked={enabled}
-            onCheckedChange={(next) => void onToggle(next)}
-            disabled={saving}
-            className="shrink-0"
-          />
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={() => void onConnect()}
-            disabled={saving}
-            className={connectButtonClassName}
-          >
-            {connectText}
-          </Button>
-        )}
+        {/* CONSOLIDATE-EXTERNAL-LINKING-01: delivery toggle only. Inactive until
+            the account is linked (linking happens in the profile card); the
+            pointer below routes there. Never a «Подключить» here — connecting is
+            an identity act, not a notifications one. */}
+        <Switch
+          checked={linked ? enabled : false}
+          onCheckedChange={(next) => void onToggle(next)}
+          disabled={saving || !linked}
+          className="shrink-0"
+        />
       </div>
 
-      <p className="mt-2 text-xs text-text-sec">{hintText}</p>
+      {linked ? (
+        <p className="mt-2 text-xs text-text-sec">{hintText}</p>
+      ) : (
+        <Link
+          href="/cabinet/profile"
+          className="mt-2 inline-flex text-xs font-medium text-accent-text hover:underline"
+        >
+          {t.connectInProfile}
+        </Link>
+      )}
       {error ?? statusError ? <p className="mt-2 text-xs text-rose-400">{error ?? statusError}</p> : null}
     </div>
   );

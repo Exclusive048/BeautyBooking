@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
+import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 
 export type CalendarView = "day" | "week" | "month";
 
@@ -176,6 +177,10 @@ export async function createStudioBlock(input: {
   if (input.endAt <= input.startAt) {
     throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
   }
+
+  // SECURITY-EXPOSURE-AUDIT-01 #1 (R1a): the masterId was trusted — any studio
+  // could block any provider's calendar. Scope it to this studio.
+  await assertBelongsToStudio("master", input.masterId, input.studioId);
 
   const created = await prisma.timeBlock.create({
     data: {

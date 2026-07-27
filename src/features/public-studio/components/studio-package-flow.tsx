@@ -13,6 +13,10 @@ import {
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
 import type { StudioBundleView } from "@/features/public-studio/server/studio-packages.service";
+import {
+  studioNextComponentEarliestStart,
+  type StudioPlacedComponent,
+} from "@/lib/bookings/package-cursor";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -99,14 +103,43 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
 
   // Sequential along the CLIENT timeline: the active component's slots must
   // start at/after the previous component's end (gaps allowed).
+  //
+  // PACKAGE-STUDIO-SAME-MASTER-BUFFER: a flat `prevEnd` cursor is only right
+  // when the next component's master DIFFERS from the previous ones (the
+  // by-client guard `intraPackageOverlapMultiMaster` applies buffer 0 there).
+  // When the client picks the SAME master again, the guard demands that
+  // master's between-bookings buffer as a gap — so the cursor is the
+  // buffer-aware earliest start over every already-placed component of that
+  // master (not just the adjacent one: an A-B-A pattern re-triggers the 409
+  // through the non-adjacent pair). Depends on `selectedMasterId`: picking a
+  // different master relaxes the cursor back to `prevEnd`.
   const cursorMs = useMemo(() => {
     if (activeIndex <= 0) return null;
     const prev = components[activeIndex - 1];
     if (!prev) return null;
     const placement = placements[prev.serviceId];
     if (!placement) return null;
-    return new Date(placement.slot.endAtUtc).getTime();
-  }, [activeIndex, components, placements]);
+    const prevEnd = new Date(placement.slot.endAtUtc);
+    if (!selectedMasterId) return prevEnd.getTime();
+    const selectedBufferMin = masters.find((m) => m.id === selectedMasterId)?.bufferMin ?? 0;
+    const placed: StudioPlacedComponent[] = [];
+    for (let i = 0; i < activeIndex; i += 1) {
+      const c = components[i];
+      const p = c ? placements[c.serviceId] : undefined;
+      if (p) {
+        placed.push({
+          masterProviderId: p.masterProviderId,
+          endAtUtc: new Date(p.slot.endAtUtc),
+        });
+      }
+    }
+    return studioNextComponentEarliestStart({
+      prevEndAtUtc: prevEnd,
+      placed,
+      masterProviderId: selectedMasterId,
+      masterBufferMin: selectedBufferMin,
+    }).getTime();
+  }, [activeIndex, components, placements, selectedMasterId, masters]);
 
   // Masters who actually perform the active component's service (EXP-024).
   const assignedMasters = useMemo(() => {

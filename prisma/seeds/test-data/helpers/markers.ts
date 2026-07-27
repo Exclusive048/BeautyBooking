@@ -42,7 +42,9 @@ export function seedEmail(role: "master" | "studio" | "client" | "admin", slug: 
 /**
  * Sequential test phone in the +7900000XXXX range (4-digit suffix). The seed
  * uses ordinals 0001..0099 for masters, 0100..0149 for clients, 0150..0199
- * for studio owners. Don't reuse — collisions break upsert idempotency.
+ * for studio owners, 0200..0299 for studio TEAM masters (STUDIO-SEED-01 —
+ * dedicated per-studio masters that live in the studio's city and carry
+ * `Provider.studioId`). Don't reuse — collisions break upsert idempotency.
  */
 export function seedPhone(ordinal: number): string {
   if (ordinal < 1 || ordinal > 9999) {

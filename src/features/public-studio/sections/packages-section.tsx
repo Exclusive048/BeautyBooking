@@ -2,6 +2,7 @@ import { Section } from "@/components/ui/section";
 import { StudioBundleCard } from "@/features/public-studio/components/studio-bundle-card";
 import { getStudioProfile, getStudioMasters } from "@/features/public-studio/server/studio-query";
 import { getStudioBundles } from "@/features/public-studio/server/studio-packages.service";
+import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -29,9 +30,12 @@ export async function StudioPackagesSection({ studioId }: Props) {
     return null;
   }
 
-  const [bundles, masters] = await Promise.all([
+  const [bundles, masters, isOwner] = await Promise.all([
     getStudioBundles(studioProviderId),
     getStudioMasters(studioId),
+    // FIX-STUDIO-02 (owner parity): hide the package CTA for the owner — the
+    // master-side fix showed package CTAs hit the same self-booking guard.
+    isViewerProfileOwner(studioId),
   ]);
 
   if (bundles.length === 0) return null;
@@ -49,6 +53,7 @@ export async function StudioPackagesSection({ studioId }: Props) {
               bundle={bundle}
               studioTimezone={studioTimezone}
               masters={masters}
+              hideBooking={isOwner}
             />
           ))}
         </div>

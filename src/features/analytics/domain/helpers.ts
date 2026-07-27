@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { getDayOfWeek, toLocalDateKey } from "@/lib/schedule/timezone";
 import {
   addDaysToDateKey,
@@ -26,12 +27,9 @@ export type TimelineGranularity = "day" | "week" | "month";
  */
 export function buildScopeWhere(context: AnalyticsContext): Prisma.BookingWhereInput {
   if (context.scope === "MASTER") {
-    return {
-      OR: [
-        { masterProviderId: context.providerId },
-        { masterProviderId: null, providerId: context.providerId },
-      ],
-    };
+    // F1 (FIX-STUDIO-BLOCKERS-01): delegate to the shared performer
+    // predicate — one spelling across analytics and the master cabinet.
+    return masterPerformedBookingWhere(context.providerId);
   }
 
   const studioScope: Prisma.BookingWhereInput = context.studioId

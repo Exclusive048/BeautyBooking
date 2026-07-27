@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { formatZoneLabel } from "@/lib/ui/zone-label";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleBookingCell, ScheduleMasterColumn } from "../../server/types";
 import {
@@ -120,13 +121,31 @@ export function BookingActionMenu({
                   <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                   {T.reschedule.title}
                 </div>
-                <p className="text-sm font-semibold tabular-nums text-amber-900 dark:text-amber-100">
-                  {T.reschedule.proposedLabel}:{" "}
-                  {formatLocalHm(new Date(booking.proposedStartAtUtc), timezone)}
-                  {booking.proposedEndAtUtc
-                    ? ` — ${formatLocalHm(new Date(booking.proposedEndAtUtc), timezone)}`
-                    : ""}
-                </p>
+                {/* FIX-STUDIO-02 (F4): show the FULL proposed datetime (date +
+                    time) next to the current one so a cross-day move (e.g.
+                    26.07 → 28.07) can't be accepted as if it were same-day.
+                    Salon-tz (studio calendar surface) with an explicit
+                    «(город, GMT+N)» label — rule 17. */}
+                <div className="space-y-0.5 text-sm tabular-nums text-amber-900 dark:text-amber-100">
+                  <p>
+                    <span className="opacity-70">{T.reschedule.currentLabel}:</span>{" "}
+                    {UI_FMT.dateTimeShort(booking.startAtUtc, { timeZone: timezone })}
+                  </p>
+                  <p className="font-semibold">
+                    <span className="font-normal opacity-70">
+                      {T.reschedule.proposedLabel}:
+                    </span>{" "}
+                    {UI_FMT.dateTimeShort(booking.proposedStartAtUtc, { timeZone: timezone })}
+                    {booking.proposedEndAtUtc
+                      ? ` — ${UI_FMT.timeShort(booking.proposedEndAtUtc, { timeZone: timezone })}`
+                      : ""}
+                  </p>
+                  {formatZoneLabel({ iso: booking.proposedStartAtUtc, timeZone: timezone }) ? (
+                    <p className="text-xs opacity-70">
+                      {formatZoneLabel({ iso: booking.proposedStartAtUtc, timeZone: timezone })}
+                    </p>
+                  ) : null}
+                </div>
                 <div className="grid grid-cols-1 gap-2">
                   <Button
                     variant="primary"

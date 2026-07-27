@@ -2,6 +2,7 @@ import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
+import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { MembershipStatus, ProviderType } from "@prisma/client";
 
 export type StudioMasterServiceItem = {
@@ -242,6 +243,15 @@ export async function bulkUpdateMasterServices(input: {
 }): Promise<{ updated: number }> {
   if (input.items.length === 0) return { updated: 0 };
 
+  // SECURITY-EXPOSURE-AUDIT-01 #1 (R1c): the masterId was trusted (no scoping),
+  // so any studio could rewrite/disable another provider's service config.
+  // Scope the master to this studio, and each service to this studio's catalogue.
+  await assertBelongsToStudio("master", input.masterId, input.studioId);
+  const serviceIds = Array.from(new Set(input.items.map((item) => item.serviceId)));
+  await Promise.all(
+    serviceIds.map((serviceId) => assertBelongsToStudio("service", serviceId, input.studioId))
+  );
+
   await prisma.$transaction(
     input.items.map((item) =>
       prisma.masterService.upsert({
@@ -315,4 +325,68 @@ export async function updateStudioMasterProfile(input: {
   });
 
   return { id: master.id };
+}
+
+/**
+ * FIX-STUDIO-02 (F7) — revoke a still-pending master invite from the studio
+ * cabinet. Only an UNCLAIMED stub is revocable (`ownerUserId === null`); a
+ * claimed master (invite already accepted) must be paused/removed instead.
+ *
+ * Two effects, both required, mirroring {@link rejectStudioInvite}:
+ *  1. mark the PENDING `StudioInvite` as `LEFT` — blocks a later accept
+ *     (`acceptStudioInvite` returns `INVITE_REVOKED` for `LEFT`), so the SMS
+ *     link can't be used after revocation;
+ *  2. delete the unclaimed stub Provider (guarded `ownerUserId: null`) — the
+ *     team list derives `INVITED` for ANY owner-less stub, so marking the
+ *     invite alone would leave the card. The stub consumed no seat (ACTIVE-only
+ *     counting), so nothing is freed.
+ *
+ * @returns the revoked invite id (for the revoked-notification), or null when
+ *   no pending invite backed the stub.
+ * @throws 404 STUDIO_NOT_FOUND / MASTER_NOT_FOUND · 409 MASTER_NOT_INVITED
+ */
+export async function revokeStudioMasterInvite(input: {
+  studioId: string;
+  masterId: string;
+}): Promise<{ inviteId: string | null }> {
+  const studio = await getStudioContext(input.studioId);
+
+  const master = await prisma.provider.findFirst({
+    where: { id: input.masterId, type: ProviderType.MASTER, studioId: studio.providerId },
+    select: { id: true, ownerUserId: true, contactPhone: true },
+  });
+  if (!master) {
+    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+  }
+  if (master.ownerUserId) {
+    throw new AppError("Master is not a pending invite", 409, "MASTER_NOT_INVITED");
+  }
+
+  const invite = master.contactPhone
+    ? await prisma.studioInvite.findUnique({
+        where: { studioId_phone: { studioId: studio.id, phone: master.contactPhone } },
+        select: { id: true, status: true },
+      })
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    if (invite && invite.status === MembershipStatus.PENDING) {
+      await tx.studioInvite.update({
+        where: { id: invite.id },
+        data: { status: MembershipStatus.LEFT },
+        select: { id: true },
+      });
+    }
+    // Guarded on ownerUserId: null — never removes a claimed provider.
+    await tx.provider.deleteMany({
+      where: {
+        id: master.id,
+        type: ProviderType.MASTER,
+        studioId: studio.providerId,
+        ownerUserId: null,
+      },
+    });
+  });
+
+  return { inviteId: invite?.id ?? null };
 }

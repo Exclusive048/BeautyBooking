@@ -77,6 +77,21 @@ async function main() {
     );
   }
 
+  // STUDIO-SEED-01: `AdminAuditLog.adminUserId` is `onDelete: Restrict`
+  // (invariant #16 — compliance history must outlive the admin). That FK also
+  // makes the seed admin UNDELETABLE the moment anyone performs an admin action
+  // in a seeded environment, so `seed:test:reset` started failing with P2003
+  // after a QA pass touched /admin. Reset is dev-only (it refuses to run in
+  // production without ALLOW_TEST_SEED), and these rows are audit trails of
+  // *seed* admins acting on *seed* data — scoped strictly to seedUserIds so no
+  // real admin's history is ever in range.
+  const auditCleared = await prisma.adminAuditLog.deleteMany({
+    where: { adminUserId: { in: seedUserIds } },
+  });
+  if (auditCleared.count > 0) {
+    console.log(`Cleared ${auditCleared.count} AdminAuditLog rows for seed admins (FK is Restrict).`);
+  }
+
   console.log(`Deleting ${seedUsers.length} seed users (cascade clears remaining related rows)...`);
   const deleted = await prisma.userProfile.deleteMany({
     where: { id: { in: seedUserIds } },

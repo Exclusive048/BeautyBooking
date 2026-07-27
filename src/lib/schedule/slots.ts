@@ -16,6 +16,13 @@ type BuildSlotsInput = {
   serviceDurationMin: number;
   bufferMin: number;
   bookings: BookingRange[];
+  /**
+   * FIX-TIMEBLOCK-ENFORCEMENT-01: studio/master `TimeBlock` windows (UTC
+   * instants) that must be removed from availability. A HARD window — no buffer
+   * is applied (mirrors `dayPlan.breaks`); a booking may abut a block. Optional
+   * (defaults to none) so pure callers/tests that pass no blocks are unchanged.
+   */
+  blocks?: BookingRange[];
   now: Date;
   /**
    * Grid granularity in minutes (the master's saved `slotStepMin`, e.g. 15/30/60).
@@ -137,6 +144,14 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
 
       const startUtc = toUtcFromLocalDateTime(dateForLocal, Math.floor(t / 60), t % 60, input.timeZone);
       const endUtc = addMinutes(startUtc, input.serviceDurationMin);
+
+      // FIX-TIMEBLOCK-ENFORCEMENT-01: a slot overlapping a TimeBlock window is
+      // not offered. Instant-based UTC overlap (no buffer — hard window), the
+      // same overlap shape used for bookings just below.
+      const blockedByTimeBlock = input.blocks?.some(
+        (block) => startUtc < block.endAtUtc && endUtc > block.startAtUtc,
+      );
+      if (blockedByTimeBlock) continue;
 
       const hasConflict = mergedBookings
         ? (() => {

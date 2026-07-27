@@ -14,6 +14,7 @@ import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { maskEmail } from "@/lib/logging/masking";
 import { prisma } from "@/lib/prisma";
 import { parseBody } from "@/lib/validation";
+import { extractClientIp } from "@/lib/http/ip";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,10 @@ export async function POST(req: Request) {
 
     const normalizedEmail = profile.email.toLowerCase();
 
-    const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail);
+    // O2: scope verify lockout by (email + client IP) — see otp-rate-limit.ts.
+    const clientIp = extractClientIp(req);
+
+    const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail, clientIp);
     if (!lockCheck.ok) {
       return NextResponse.json(
         { ok: false, error: { message: lockCheck.error ?? "Locked", code: "RATE_LIMITED" } },
@@ -70,7 +74,7 @@ export async function POST(req: Request) {
     });
 
     if (!otp) {
-      const failResult = await registerOtpEmailVerifyFailure(normalizedEmail);
+      const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
       if (!failResult.ok) {
         return NextResponse.json(
           {
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
     }
 
     await Promise.all([
-      clearOtpEmailVerifyFailures(normalizedEmail),
+      clearOtpEmailVerifyFailures(normalizedEmail, clientIp),
       prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }),
       prisma.userProfile.update({
         where: { id: user.id },

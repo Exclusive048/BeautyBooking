@@ -1,6 +1,7 @@
 import { getQueueStats } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { env, isProduction } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -33,7 +34,7 @@ function verifyWorkerSecret(request: Request): Response | null {
   }
 
   const providedSecret = request.headers.get("x-worker-secret")?.trim() ?? "";
-  if (!providedSecret || providedSecret !== expectedSecret) {
+  if (!providedSecret || !timingSafeStringEqual(providedSecret, expectedSecret)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

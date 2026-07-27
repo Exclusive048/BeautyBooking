@@ -10,8 +10,7 @@ import {
   setCachedMeIdentity,
 } from "@/lib/users/me";
 import { Prisma } from "@prisma/client";
-import { linkGuestBookingsToUserByPhone } from "@/lib/bookings/link-guest-bookings";
-import { logError, logInfo } from "@/lib/logging/logger";
+import { logInfo } from "@/lib/logging/logger";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -64,21 +63,10 @@ export async function PATCH(req: Request) {
     const updated = await updateMeProfile(sessionUser.id, updatableData);
     logInfo("PATCH /api/me profile updated", { userId: sessionUser.id, ms: Date.now() - t0 });
 
-    const postUpdateTasks: Promise<void>[] = [invalidateMeIdentityCache(sessionUser.id)];
-    if (updatableData.phone !== undefined && updated.phone) {
-      postUpdateTasks.push(
-        linkGuestBookingsToUserByPhone({ userProfileId: updated.id, phoneRaw: updated.phone })
-          .then(() => undefined)
-          .catch((error) => {
-            logError("linkGuestBookingsToUserByPhone failed after profile update", {
-              userProfileId: updated.id,
-              error: error instanceof Error ? error.stack : error,
-            });
-          })
-      );
-    }
-
-    await Promise.all(postUpdateTasks);
+    // No phone-keyed adoption here: `phone` is no longer writable via this route
+    // (SECURITY-EXPOSURE-AUDIT-01 #2). Guest-booking adoption runs only in the
+    // OTP-verify route, where the user has proven control of the number.
+    await invalidateMeIdentityCache(sessionUser.id);
 
     return ok({ user: updated });
   } catch (error) {

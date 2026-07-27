@@ -15,7 +15,9 @@ import { prisma } from "@/lib/prisma";
 import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
+import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { resolveMoveDurationMin, resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 
 /**
@@ -273,6 +275,14 @@ export async function createStudioBooking(input: {
           );
         }
 
+        // FIX-TIMEBLOCK-ENFORCEMENT-01: studio admin create is direct authority
+        // (#22) but still cannot land on a TimeBlock the master is closed for.
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: master.id,
+          startAtUtc: input.startAt,
+          endAtUtc: endAt,
+        });
+
         const booking = await tx.booking.create({
           data: {
             providerId: studio.providerId,
@@ -366,9 +376,11 @@ export async function moveStudioBooking(input: {
   if (!booking) {
     throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
   }
-  if (booking.studioId && booking.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
-  }
+  // SECURITY-EXPOSURE-AUDIT-01 #1 (R1d): the guard was null-permissive
+  // (`booking.studioId && …`), so a solo-master booking (studioId === null)
+  // could be seized by any studio. Assert the booking belongs to this studio —
+  // a null / foreign studioId is rejected.
+  await assertBelongsToStudio("booking", input.bookingId, input.studioId);
 
   // STUDIO-BUGS-FIX-A bug #5: target master must be ACTIVE.
   const studio = await prisma.studio.findUnique({
@@ -529,6 +541,14 @@ export async function moveStudioBooking(input: {
             "SLOT_CONFLICT",
           );
         }
+
+        // FIX-TIMEBLOCK-ENFORCEMENT-01: a move must not drop the booking into a
+        // window the TARGET master is closed for (block owner = target master).
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: input.targetMasterId,
+          startAtUtc: newStart,
+          endAtUtc: newEnd,
+        });
 
         await tx.booking.update({
           where: { id: booking.id },

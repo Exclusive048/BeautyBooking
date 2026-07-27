@@ -46,6 +46,8 @@ export async function GET() {
         isSystem: true,
         visibleToAll: true,
         visualSearchSlug: true,
+        // Selected for the hierarchical-sort helper's input type; NOT returned
+        // (SECURITY-EXPOSURE-AUDIT-01 · Y10 — see the response map below).
         createdByUserId: true,
         createdByProviderId: true,
         createdAt: true,
@@ -68,7 +70,8 @@ export async function GET() {
         status: category.status,
         isPersonal: !category.visibleToAll,
         visibleToAll: category.visibleToAll,
-        createdByUserId: category.createdByUserId,
+        // SECURITY-EXPOSURE-AUDIT-01 · Y10: `createdByUserId` (a raw UserProfile
+        // CUID) was returned to anonymous callers with no consumer. Removed.
       })),
     });
   } catch (error) {

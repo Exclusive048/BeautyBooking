@@ -9,6 +9,7 @@ import {
   assertBookingWindow,
 } from "@/lib/bookings/policy-enforcement";
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -141,6 +142,19 @@ export async function ensureNoConflicts(
       "SLOT_CONFLICT"
     );
   }
+
+  // FIX-TIMEBLOCK-ENFORCEMENT-01: the same in-tx check must reject a booking
+  // overlapping a studio/master TimeBlock — otherwise a direct API call (or a
+  // TOCTOU race with a just-created block) lands inside blocked time. The owner
+  // is the performing master's Provider.id: `masterProviderId` for a studio
+  // booking, or `providerId` for a solo master (where they are the same id). A
+  // studio-level booking with no chosen master falls back to `providerId`, which
+  // matches no per-master block — correct (a block targets a specific master).
+  await assertNoTimeBlockConflict(db, {
+    masterProviderId: input.masterProviderId ?? input.providerId,
+    startAtUtc: input.startAtUtc,
+    endAtUtc: input.endAtUtc,
+  });
 }
 
 function mapAvailabilityError(code?: string): { message: string; status: number } {

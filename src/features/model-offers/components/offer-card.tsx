@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { PublicModelOfferItem } from "@/lib/model-offers/public.service";
 
@@ -9,9 +10,11 @@ type Props = { offer: PublicModelOfferItem };
 
 const T = UI_TEXT.models.card;
 
-function formatRub(value: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(Math.round(value))} ₽`;
-}
+// FIX-MASTER-01 item 4: offer.price is stored in KOPEKS (the app-wide money
+// convention — the create form posts Math.round(rubles*100)). The previous
+// local formatter skipped the ÷100 and rendered raw kopeks («90 000 ₽» for a
+// 900 ₽ offer). Display goes through the canonical kopeks→₽ formatter.
+const formatRub = (kopeks: number): string => UI_FMT.priceLabel(kopeks);
 
 function formatDuration(min: number): string {
   if (min <= 0) return "—";

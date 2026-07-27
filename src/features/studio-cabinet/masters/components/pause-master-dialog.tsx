@@ -52,9 +52,23 @@ export function PauseMasterDialog({
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
+          | { error?: { message?: string; code?: string; details?: { max?: number } } }
           | null;
-        setError(body?.error?.message ?? E.actionFailed);
+        const err = body?.error;
+        // FIX-STUDIO-02 (F6): the team-cap block returns a raw English
+        // «Limit reached» (`billing/guards.ts`, a generic helper shared with
+        // media/hot-slots). Localize it HERE by error code + `details.max` —
+        // never surface the raw message for LIMIT_REACHED. Enforcement is
+        // untouched; this is message-only.
+        if (err?.code === "LIMIT_REACHED") {
+          setError(
+            typeof err.details?.max === "number"
+              ? E.teamCapReached.replace("{max}", String(err.details.max))
+              : E.teamCapReachedGeneric,
+          );
+        } else {
+          setError(err?.message ?? E.actionFailed);
+        }
         return;
       }
       onClose();

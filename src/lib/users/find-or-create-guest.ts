@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/auth/otp";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { logInfo } from "@/lib/logging/logger";
+import { maskPhone } from "@/lib/logging/masking";
 
 /**
  * Phone-first guest user lookup/create for public booking (32b).
@@ -47,9 +48,11 @@ export async function findOrCreateGuestUserByPhone(input: {
       roles: [AccountType.CLIENT],
     },
   });
+  // SECURITY-EXPOSURE-AUDIT-01 · Y17: mask the phone in logs (the rest of the
+  // codebase does — raw PII in prod logs is a 152-ФЗ concern).
   logInfo("guest user auto-created via public booking", {
     userId: created.id,
-    phone,
+    phone: maskPhone(phone),
   });
   return { profile: created, wasCreated: true };
 }

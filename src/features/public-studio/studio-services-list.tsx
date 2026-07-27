@@ -15,6 +15,8 @@ const UNCATEGORIZED_CHIP_KEY = "__uncat__";
 type Props = {
   studio: { id: string; publicUsername: string | null };
   services: ProviderServiceDto[];
+  /** FIX-STUDIO-02 (owner parity): suppress per-service booking CTAs for the owner. */
+  hideBooking?: boolean;
 };
 
 /**
@@ -26,7 +28,7 @@ type Props = {
  * 12). The former homegrown name-substring grouping (`buildGroups`) is retired.
  * Presentational only — each service still deep-links into the booking flow.
  */
-export function StudioServicesList({ studio, services }: Props) {
+export function StudioServicesList({ studio, services, hideBooking }: Props) {
   // Same grouping as the wizard: category order asc, uncategorized bucket last,
   // empty groups omitted, input order preserved within a group.
   const groups = useMemo(() => groupServicesByCategory(services), [services]);
@@ -113,14 +115,16 @@ export function StudioServicesList({ studio, services }: Props) {
                           : UI_TEXT.publicStudio.servicePriceOnRequest}
                       </div>
                     </div>
-                    <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
-                      <Link
-                        href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services") ?? "#"}
-                        aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
-                      >
-                        {UI_TEXT.publicStudio.addService}
-                      </Link>
-                    </Button>
+                    {hideBooking ? null : (
+                      <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
+                        <Link
+                          href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services") ?? "#"}
+                          aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
+                        >
+                          {UI_TEXT.publicStudio.addService}
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </article>
               ))}

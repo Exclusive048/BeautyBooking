@@ -164,7 +164,6 @@
 /api/master/settings/auto-publish-stories
 /api/masters/me/services
 /api/masters/{id}/bookings
-/api/masters/{id}/schedule/overrides
 /api/me/delete
 /api/me/model-applications
 /api/me/plan

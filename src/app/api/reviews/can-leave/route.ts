@@ -23,7 +23,10 @@ export async function GET(req: Request) {
     });
     return jsonOk({
       canLeave: availability.canLeave,
-      reviewId: availability.reviewId,
+      // SECURITY-EXPOSURE-AUDIT-01 · Y13: `reviewId` (a raw Review CUID) was
+      // returned here but no client consumer reads it. Dropped rather than
+      // opaque-encoded — it's dead output. The existence-oracle aspect (whether
+      // a booking is reviewable) is inherent to the feature and left as-is.
       canDelete: availability.canDelete,
     });
   } catch (error) {

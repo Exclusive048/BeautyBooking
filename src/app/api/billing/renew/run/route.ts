@@ -1,4 +1,5 @@
 import { fail, ok } from "@/lib/api/response";
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { prisma } from "@/lib/prisma";
 import { createRecurringPayment } from "@/lib/payments/yookassa/client";
 import { addMonthsUtc, sha256 } from "@/lib/billing/utils";
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
   const token = getCronToken(req);
   const expected = env.BILLING_RENEW_SECRET?.trim();
 
-  if (!expected || token !== expected) {
+  if (!expected || !token || !timingSafeStringEqual(token, expected)) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");
   }
 

@@ -1,7 +1,4 @@
-import Link from "next/link";
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
-import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
 import { PortfolioSkeleton } from "@/components/blocks/skeletons/PortfolioSkeleton";
 import { ReviewsSkeleton } from "@/components/blocks/skeletons/ReviewsSkeleton";
@@ -12,50 +9,44 @@ import { StudioPhotosSection } from "@/features/public-studio/sections/photos-se
 import { StudioPackagesSection } from "@/features/public-studio/sections/packages-section";
 import { StudioReviewsSection } from "@/features/public-studio/sections/reviews-section";
 import { StudioServicesSection } from "@/features/public-studio/sections/services-section";
-import { StudioSlotBarSection } from "@/features/public-studio/sections/slot-bar-section";
 import { StudioTeamSection } from "@/features/public-studio/sections/team-section";
-import { UI_TEXT } from "@/lib/ui/text";
+import { StudioOwnerNotice } from "@/features/public-studio/sections/owner-notice-section";
+import { StudioStickyCta } from "@/features/public-studio/sections/sticky-cta-section";
 
 type Props = {
   studioId: string;
   // Kept on the prop interface for backwards-compat with route handlers
   // that still pass `?serviceId=` / `?master=` — those now flow straight
   // through to the booking widget (`/u/[username]/booking`) via the
-  // hero/slot-bar/sticky CTA deep links instead of opening an inline
-  // booking flow on this page.
+  // hero/sticky CTA deep links instead of opening an inline booking flow
+  // on this page.
   bookingParams?: { master?: string; masterId?: string; serviceId?: string; slotStartAt?: string };
 };
 
 /**
  * STUDIO-PUBLIC-PROFILE-A — public studio profile shell.
  *
- * What changed vs the legacy version:
- *   - Dropped the inline `<StudioBookingSection>` (full booking flow
- *     embedded on the profile). Per spec, booking is now strictly a
- *     deep link to `/u/[username]/booking` — the dedicated widget owns
- *     that surface, the profile stays a marketing page.
- *   - Added `<StudioSlotBarSection>` — accent CTA bar above services
- *     (audit-driven: no studio-scope slot aggregator exists, so the
- *     bar ships without a live counter; backlog item tracks it).
- *   - Reordered sections per spec: hero → slot bar → services → team →
- *     photos → reviews → contacts (was: hero → booking → details →
- *     photos → reviews → services → team).
+ * Booking is strictly a deep link to `/u/[username]/booking` — the dedicated
+ * widget owns that surface, the profile stays a marketing page.
  *
- * Performance posture (cross-ref audit on `/u/[username]`):
- *   - Each section is its own Suspense boundary with a real skeleton
- *     fallback (no `null` fallbacks). Heavy queries (photos, reviews)
- *     stream independently.
- *   - Sections internally use `Promise.all` for parallel data fetch
- *     (verified in hero-section.tsx). No new sequential awaits added.
+ * FIX-STUDIO-02 (known-open 1 — STUDIO-PROFILE-TRIPLE-BOOKING-CTA): the page
+ * used to expose THREE top-level booking CTAs — the hero «Записаться онлайн»
+ * (→ /booking), the slot-bar «Записаться» (→ /booking, a duplicate), and a
+ * floating «Записаться онлайн» that only scrolled to `#studio-services` (a
+ * book-labelled anchor that doesn't book). Now: the hero CTA is the single
+ * primary /booking entry; the redundant slot-bar section is removed; the
+ * floating affordance is an honest «К услугам» scroll (`StudioStickyCta`).
+ * Contextual CTAs (per-service, per-master, package) are legitimate and stay.
  *
- * Out of scope (backlog):
- *   - Owner toolbar / inline ProfileEditor — STUDIO-SETTINGS-A owns
- *     the studio's edit surface, no duplicate UI on the public page.
- *   - Page view + conversion analytics — no tracking infrastructure today.
- *   - FAQ section + history/values/philosophy — fields don't exist in
- *     the schema; description carries the long-form copy for now.
- *   - "Написать в студию" pre-booking chat — auth model blocks this
- *     (STUDIO-GAPS-FIX-A precedent).
+ * FIX-STUDIO-02 (owner parity — SELF-BOOKING-STUDIO-OWNER-PARITY): when the
+ * viewer owns this studio the self-booking guard rejects them at submit, so
+ * every booking CTA is a dead end. Each section suppresses its booking CTAs for
+ * the owner and `StudioOwnerNotice` shows the «это ваш профиль» card instead;
+ * the sticky is hidden. The server-side guard stays as defense in depth.
+ *
+ * Performance posture: each section is its own Suspense boundary with a real
+ * skeleton fallback; heavy queries stream independently. Ownership is resolved
+ * per-section via the cached `isViewerProfileOwner` (one query/request).
  */
 export function PublicStudioProfilePage({ studioId }: Props) {
   return (
@@ -64,8 +55,9 @@ export function PublicStudioProfilePage({ studioId }: Props) {
         <StudioHeroSection studioId={studioId} />
       </Suspense>
 
-      <Suspense fallback={<BookingSkeleton />}>
-        <StudioSlotBarSection studioId={studioId} />
+      {/* Owner-only notice; a normal viewer sees nothing here (hero → services). */}
+      <Suspense fallback={null}>
+        <StudioOwnerNotice studioId={studioId} />
       </Suspense>
 
       <Suspense fallback={<ServicesSkeleton />}>
@@ -92,13 +84,10 @@ export function PublicStudioProfilePage({ studioId }: Props) {
         <StudioDetailsSection studioId={studioId} />
       </Suspense>
 
-      <Button
-        asChild
-        className="fixed bottom-5 right-5 z-20 rounded-full px-5 py-3 shadow-hover"
-        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
-      >
-        <Link href="#studio-services">{UI_TEXT.publicStudio.heroBook}</Link>
-      </Button>
+      {/* Honest «К услугам» scroll (was a book-labelled anchor); hidden for owner. */}
+      <Suspense fallback={null}>
+        <StudioStickyCta studioId={studioId} />
+      </Suspense>
     </div>
   );
 }

@@ -197,17 +197,35 @@ function KpiCards({
         label={T.kpiAll}
         value={isLoading ? "—" : String(kpi?.totalCount ?? 0)}
       />
+      {/* FIX-POLISH-01 (walkthrough #6): the next-appointment card is the most
+          actionable KPI, so when there IS one it gets a brand-gradient CTA
+          treatment (fixed burgundy→raspberry in both themes → white text is
+          theme-stable, no dark-flip trap). Empty state stays a quiet plain
+          card. `bg-brand-gradient` is a background-IMAGE, so it paints over
+          Card's `bg-bg-card` regardless of cn order. */}
       <Card
-        className={`relative p-4 ${next ? "border-primary/40 bg-bg-input/30" : ""}`}
+        className={
+          next
+            ? "relative overflow-hidden bg-brand-gradient p-4 shadow-lg"
+            : "relative p-4"
+        }
       >
-        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <div
+          className={`font-mono text-[10px] uppercase tracking-[0.18em] ${
+            next ? "text-white/85" : "text-text-sec"
+          }`}
+        >
           {T.kpiUpcoming}
         </div>
-        <div className="mt-1 font-display text-base text-text-main">
+        <div
+          className={`mt-1 font-display text-base ${
+            next ? "font-semibold text-white" : "text-text-main"
+          }`}
+        >
           {isLoading ? "—" : next ? formatRelativeDateTime(next.whenIso, next.timeZone) : "—"}
         </div>
         {next ? (
-          <div className="mt-0.5 truncate text-xs text-text-sec">
+          <div className="mt-0.5 truncate text-xs text-white/75">
             {next.providerName}
           </div>
         ) : null}

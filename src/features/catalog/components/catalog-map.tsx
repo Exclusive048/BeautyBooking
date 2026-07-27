@@ -120,7 +120,16 @@ let geoRequestedOnce = false;
 let cachedGeoCoords: { lat: number; lng: number } | null = null;
 
 function svgDataUri(svg: string): string {
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  // `encodeURIComponent` deliberately leaves `(` and `)` unescaped, but these
+  // URIs are interpolated into an UNQUOTED CSS `url(...)` in the marker
+  // template below. The fallback SVGs reference their gradient via
+  // `fill="url(#g)"`, so a literal `)` closed the CSS `url()` early → the whole
+  // declaration was rejected → `background-image: none` (markers painted as
+  // empty circles). Percent-encode the parens so the value is url()-safe.
+  const encoded = encodeURIComponent(svg)
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+  return `data:image/svg+xml;utf8,${encoded}`;
 }
 
 const FALLBACK_MASTER_AVATAR = svgDataUri(

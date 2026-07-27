@@ -307,7 +307,12 @@ export const UI_TEXT = {
       saveTooltip: "Сохранить мастера",
       saveTodoToast: "Скоро будет доступно",
       distanceKm: "км",
-      reviewsLabel: "({count})",
+      // CATALOG-RANKING-01: was `"({count})"` → «4.9 (47)». The catalog now
+      // ranks by a Bayesian score weighted by review volume, so the volume is
+      // what the score rests on and must be legible: «4.9 · 47 отзывов» reads
+      // as earned, «5.0 · 1 отзыв» reads as provisional. Mirrors the existing
+      // `search-by-time` card, plus proper RU pluralisation.
+      reviewsLabel: (count: number) => `${count} ${pluralize(count, "отзыв", "отзыва", "отзывов")}`,
       newLabel: "Новый",
       availability: {
         nextSlotExact: "Ближайшее: {when}",
@@ -623,6 +628,27 @@ export const UI_TEXT = {
       emailNotConfigured: "Вход по email временно недоступен",
       brandSubtitle: "BEAUTY MARKETPLACE",
       heroTitleAccent: "30 секунд",
+      // LOGIN-REDESIGN-01 — brand-stage copy.
+      // Headline is split into words for the word-rise animation; the accented
+      // word carries the shimmer. Kept as one visible phrase.
+      brandHeadlineLead: "Красота начинается",
+      brandHeadlineWith: "со",
+      brandHeadlineAccent: "входа",
+      brandTagline: "Запись к мастеру за 30 секунд — без звонков и переписок. Выбирайте по работам, платите после процедуры.",
+      // Divider above the social-login buttons.
+      socialDividerLabel: "или войти через",
+      // Vertical marquee of benefit cards on the brand stage. These are product
+      // benefits (no invented person, no invented quote, no fabricated rating) —
+      // real trust framing, kept as a purely visual device.
+      marqueeAria: "Преимущества платформы",
+      marquee: [
+        { title: "Запись за 30 секунд", subtitle: "Без звонков и переписок", badge: "быстро" },
+        { title: "Оплата после визита", subtitle: "Никакой предоплаты", badge: "удобно" },
+        { title: "Выбор по портфолио", subtitle: "Смотрите работы и отзывы", badge: "" },
+        { title: "Напоминание о визите", subtitle: "Не забудете о записи", badge: "авто" },
+        { title: "Перенос в пару кликов", subtitle: "Планы меняются — это нормально", badge: "" },
+        { title: "Проверенные мастера", subtitle: "Только реальные записи", badge: "" },
+      ],
     },
     telegram: {
       loginButton: "Войти через Telegram",
@@ -1200,6 +1226,10 @@ export const UI_TEXT = {
         connected: "Подключено",
         notConnected: "Не подключено",
         connect: "Подключить",
+        // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect live ONLY in the
+        // profile «Связанные аккаунты» card. Notification surfaces toggle delivery
+        // and, when the account isn't linked yet, point to the canonical card.
+        connectInProfile: "Подключить в профиле →",
         hint: "Если уведомления прервались, откройте бота и нажмите Start.",
         connectFailed: "Не удалось подключить Telegram",
         updateFailed: "Не удалось обновить настройки Telegram",
@@ -1392,17 +1422,30 @@ export const UI_TEXT = {
     subtitle: "Единый центр приглашений и системных событий.",
     invitesTitle: "Приглашения в студии",
     timelineTitle: "Лента событий",
-    phoneRequired: "Добавьте номер телефона в профиль, чтобы получать приглашения.",
+    // `phoneRequired` removed (NOTIFICATIONS-REDESIGN-01): the invites card now
+    // renders only when there ARE invites, and invites are matched by phone
+    // server-side — so «добавьте телефон» was advice that could only ever show
+    // to someone who had no invites to see. Its only caller is gone.
     emptyTimeline: "По выбранному фильтру пока нет событий.",
     noActiveInvites: "Нет активных приглашений.",
     openAction: "Открыть",
+    // NOTIFICATIONS-REDESIGN-01: filters were channel-based (Все/Мастер/Студия/
+    // Система/Приглашения) and identical for every viewer — a pure client was
+    // offered «Студия» and «Приглашения» tabs that could never hold anything.
+    // Replaced with semantic type-groups; the page renders a pill only when the
+    // viewer's role admits the group AND it actually has items.
     filters: {
       all: "Все",
-      master: "Мастер",
+      bookings: "Записи",
+      reminders: "Напоминания",
+      reviews: "Отзывы",
+      promo: "Акции",
+      billing: "Оплаты",
       studio: "Студия",
+      models: "Модели",
       system: "Система",
-      invites: "Приглашения",
     },
+    onlyUnread: "Только непрочитанные",
     channels: {
       master: "Мастер",
       studio: "Студия",
@@ -1518,7 +1561,9 @@ export const UI_TEXT = {
       step2Title: "Запишитесь",
       step2Text: "За 30 секунд, без звонков",
       step3Title: "Получите",
-      step3Text: "Напоминания в Telegram, отзывы после визита",
+      // FIX-EXTERNAL-GATING-01 (G-1): provider-neutral marketing copy — don't
+      // advertise a specific (currently killed) delivery channel on the guest home.
+      step3Text: "Напоминания перед визитом, отзывы после",
     },
     categories: {
       title: "Что мы предлагаем",
@@ -1553,7 +1598,8 @@ export const UI_TEXT = {
         },
         {
           q: "Как я узнаю что запись подтверждена?",
-          a: "Уведомление придёт в Telegram сразу после подтверждения мастером, плюс напоминание за 24 часа и за 2 часа до визита.",
+          // FIX-EXTERNAL-GATING-01 (G-1): provider-neutral (was "в Telegram").
+          a: "Уведомление придёт сразу после подтверждения мастером, плюс напоминание за 24 часа и за 2 часа до визита.",
         },
         {
           q: "Что если мастер опаздывает или не вышел?",
@@ -2789,7 +2835,7 @@ export const UI_TEXT = {
         accountFootnoteText: "Эти поля редактируются в",
         accountFootnoteCta: "настройках аккаунта",
         phoneVerifyHint:
-          "Подтверждение по SMS — скоро. Пока что номер сохраняется без верификации.",
+          "Номер задаётся при входе по SMS-коду и здесь не меняется. Смена номера с подтверждением — скоро.",
       },
       about: {
         title: "О себе",
@@ -2948,11 +2994,14 @@ export const UI_TEXT = {
       },
       notifications: {
         channelsHeading: "Каналы уведомлений",
+        // FIX-EXTERNAL-GATING-01 (G-2): provider-neutral — the individual
+        // channel rows below are each flag-gated, so the intro must not name a
+        // specific provider (which could be a killed/disabled one).
         channelsSubtitle:
-          "Включите Telegram, Email или Push, чтобы получать оповещения о записях, отзывах и платежах.",
+          "Включите нужные каналы, чтобы получать оповещения о записях, отзывах и платежах.",
         perEventTitle: "Настройки по типу события",
         perEventBody:
-          "Скоро здесь можно будет точечно выбирать, какие события приходят в Telegram, Email или Push отдельно.",
+          "Скоро здесь можно будет точечно выбирать, какие события приходят по каждому каналу отдельно.",
       },
       security: {
         identityHeading: "Идентификация",
@@ -2962,8 +3011,19 @@ export const UI_TEXT = {
         notSetLabel: "Не задан",
         changeSoonHint: "Скоро · потребуется подтверждение",
         connectionsHeading: "Связанные аккаунты",
-        connectionsSubtitle:
-          "Привяжите Telegram или ВКонтакте — для входа и оповещений.",
+        // FIX-EXTERNAL-GATING-01 (G-2): the subtitle names ONLY the external
+        // providers currently enabled — built from the same flags the rows gate
+        // on, so it can never advertise a killed/disabled provider. Joined with
+        // «или» when more than one is enabled.
+        connectionsSubtitle: (providers: string[]) =>
+          `Привяжите ${providers.join(" или ")} — для входа и оповещений.`,
+        connectionsProviderNames: { telegram: "Telegram", vk: "ВКонтакте" },
+        // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect live in ONE place —
+        // the profile «Связанные аккаунты» card. The security tab points there;
+        // delivery toggles stay in the Notifications tab.
+        connectionsManageInProfile:
+          "Подключение и отключение аккаунтов — в вашем профиле, для входа и оповещений.",
+        connectionsOpenProfile: "Открыть профиль",
         sessionsHeading: "Активные сессии",
         sessionsCountTemplateOne: "{count} активная сессия",
         sessionsCountTemplateFew: "{count} активных сессии",
@@ -5308,6 +5368,12 @@ export const UI_TEXT = {
         vkNotConnected: "VK не привязан",
         vkConnect: "Подключить VK",
         vkDisconnect: "Отключить",
+        // FIX-LINK-STATE-CONSISTENCY-01: the linked-but-notifications-off state.
+        // Shown instead of «Не подключено» (which wrongly offered «Подключить»
+        // for an already-linked account). `deliveryOff` is the suffix after a
+        // «@username · »; `linkedDeliveryOff` the standalone form (no username).
+        deliveryOff: "уведомления выключены",
+        linkedDeliveryOff: "Подключено · уведомления выключены",
       },
       completion: {
         rail: "Заполнено профиля",
@@ -5338,7 +5404,10 @@ export const UI_TEXT = {
         confirm: "Подтвердить",
         success: "Email подтверждён",
         invalidCode: "Неверный код",
-        sendFailed: "Не удалось отправить код",
+        // FIX-POLISH-01 (walkthrough #7): «…Попробуйте ещё раз.» per the error
+        // convention — this is what the modal shows when the send genuinely
+        // fails (the route now returns EMAIL_SEND_FAILED instead of a false 200).
+        sendFailed: "Не удалось отправить код. Попробуйте ещё раз.",
         verifyFailed: "Не удалось подтвердить email",
       },
       danger: {
@@ -5394,6 +5463,9 @@ export const UI_TEXT = {
       studioBookingDescription: "Этот мастер принимает записи через студийный календарь.",
       studioBookingCta: "Открыть запись в студии",
       unknownError: "Неизвестная ошибка",
+      ownerViewTitle: "Это ваш профиль",
+      ownerViewHint: "Так вашу страницу видят клиенты. Запись к самому себе недоступна.",
+      ownerViewEditCta: "Редактировать профиль",
       bookNow: "Записаться",
       sectionServices: "Услуги",
       sectionPortfolio: "Портфолио",
@@ -5448,12 +5520,16 @@ export const UI_TEXT = {
     },
     packageBooking: {
       cta: "Записаться на пакет",
-      startHint: "Выберите начало — услуги пакета подберутся последовательно у одного мастера.",
-      startNote: "Все услуги пакета — в один визит, одна оплата со скидкой комплекта.",
-      slotsLoading: "Загружаем свободные окна…",
-      slotsError: "Не удалось загрузить окна. Попробуйте другой день.",
-      noSlots: "На этот день свободных окон нет.",
-      proposeError: "Не удалось подобрать время для пакета. Выберите другое начало.",
+      buildHint:
+        "Выберите дату и время для каждой услуги. Услуги идут одна за другой — одна оплата со скидкой комплекта.",
+      componentLabel: "Услуга {index} из {total}",
+      waitingPrevious: "Доступно после выбора предыдущих услуг",
+      change: "Изменить",
+      noSlotsAfterPrevious: "После предыдущей услуги в этот день окон не осталось. Выберите другой день.",
+      startNote: "Все услуги пакета — у одного мастера, одна оплата со скидкой комплекта.",
+      proposeError: "Не удалось рассчитать пакет. Проверьте выбранное время.",
+      proposing: "Рассчитываем…",
+      toReview: "Продолжить",
       networkError: "Не удалось связаться с сервером. Попробуйте ещё раз.",
       bookError: "Не удалось записать пакет. Попробуйте ещё раз.",
       back: "Назад",
@@ -5493,7 +5569,12 @@ export const UI_TEXT = {
     },
     reviews: {
       title: "Отзывы",
-      all: "Все отзывы",
+      // REVIEWS-LOADMORE-01: `all` («Все отзывы») removed with the dialog it
+      // opened — that dialog hard-capped limit=50 and silently truncated any
+      // provider with more reviews while claiming to show «все». Reviews now
+      // page inline via `loadMore`. No other caller referenced `all`.
+      loadMore: "Показать больше отзывов",
+      loadMoreLoading: "Загружаем...",
       leaveReview: "Оставить отзыв",
       noReviews: "Отзывов пока нет — станьте первым",
       loadFailed: "Не удалось загрузить отзывы",
@@ -6295,6 +6376,9 @@ export const UI_TEXT = {
       // the master side). Reuses `/confirm` + `/decline-reschedule`.
       reschedule: {
         title: "Клиент предложил новое время",
+        // FIX-STUDIO-02 (F4): show the CURRENT datetime alongside the proposed
+        // one (both with dates) so a cross-day move can't be accepted blindly.
+        currentLabel: "Текущее время",
         proposedLabel: "Новое время",
         accept: "Принять новое время",
         decline: "Отклонить перенос",
@@ -6695,8 +6779,11 @@ export const UI_TEXT = {
       },
       notifications: {
         channelsTitle: "Каналы уведомлений",
+        // FIX-EXTERNAL-GATING-01 (G-2): provider-neutral — each channel card
+        // below is flag-gated, so the description must not name a specific
+        // (possibly killed/disabled) provider.
         channelsDesc:
-          "События студии приходят в приложение, Telegram и VK. SMS пока недоступен — мы подключаем шлюз.",
+          "События студии приходят в приложение и по подключённым каналам. SMS пока недоступен — мы подключаем шлюз.",
         channelPush: "Push в приложении",
         pushEnabled: "Включены",
         pushDisabled: "Выключены",
@@ -7067,6 +7154,8 @@ export const UI_TEXT = {
           publicProfile: "Публичный профиль",
           pause: "Поставить на паузу",
           activate: "Активировать",
+          // FIX-STUDIO-02 (F7): revoke a still-pending invite (INVITED status).
+          revoke: "Отозвать приглашение",
         },
         kpis: {
           revenue: "Выручка · 30д",
@@ -7115,12 +7204,30 @@ export const UI_TEXT = {
         confirm: "Активировать",
         submitting: "Сохраняем…",
       },
+      // FIX-STUDIO-02 (F7): confirm dialog for revoking a pending invite.
+      revokeDialog: {
+        title: "Отозвать приглашение",
+        bodyTemplate:
+          "Приглашение мастеру {name} будет отменено, а ссылка перестанет работать. Место в команде не освобождается — приглашение его не занимало.",
+        cancel: "Отмена",
+        confirm: "Отозвать приглашение",
+        submitting: "Отзываем…",
+      },
       errors: {
         phoneInvalid: "Укажите корректный номер телефона.",
         nameRequired: "Укажите имя мастера.",
         taglineRequired: "Укажите специализацию.",
         inviteFailed: "Не удалось отправить приглашение. Попробуйте ещё раз.",
         actionFailed: "Не удалось выполнить действие. Попробуйте ещё раз.",
+        // FIX-STUDIO-02 (F6): localized team-cap block. The enforcement
+        // (`ensureStudioTeamLimit`) is unchanged — only the message. Says what
+        // the limit is and how to raise it, instead of the raw «Limit reached».
+        teamCapReached:
+          "На вашем тарифе можно держать до {max} активных мастеров. Чтобы добавить больше, перейдите на тариф выше.",
+        teamCapReachedGeneric:
+          "Достигнут лимит активных мастеров на вашем тарифе. Чтобы добавить больше, перейдите на тариф выше.",
+        // FIX-STUDIO-02 (F7): revoke-invite failure.
+        revokeFailed: "Не удалось отозвать приглашение. Попробуйте ещё раз.",
       },
     },
     scheduleRequests: {
@@ -7173,6 +7280,15 @@ export const UI_TEXT = {
   },
   publicStudio: {
     heroBook: "Записаться онлайн",
+    // FIX-STUDIO-02 (known-open 1): honest label for the floating affordance
+    // that scrolls to services (was mislabelled «Записаться онлайн»).
+    toServices: "К услугам",
+    // FIX-STUDIO-02 (owner parity): shown in place of the booking CTAs when the
+    // viewer owns this studio (self-booking is server-rejected). Mirrors the
+    // master-side owner notice.
+    ownerViewTitle: "Это ваш профиль",
+    ownerViewHint: "Так вашу страницу видят клиенты. Запись к самому себе недоступна.",
+    ownerViewManageCta: "Управлять студией",
     slotBar: {
       label: "ЗАПИСЬ НА УСЛУГУ",
       headline: "Свободные окна сегодня и в ближайшие дни",
@@ -7657,8 +7773,13 @@ export const UI_TEXT = {
       backToOffers: "← Все предложения",
       masterLabel: "Мастер",
       masterProfileCta: "Профиль мастера →",
-      dateTimeLabel: "Дата и время",
-      durationLabel: "Длительность",
+      // FIX-POLISH-01 (walkthrough #2): the offer carries a booking WINDOW (the
+      // range of start-times the master can take you) and a separate service
+      // DURATION. They used to share the «Длительность» row (window shown large,
+      // duration in parens) — reading like a 6-hour appointment claiming 2 hours.
+      // Split into two honest labels.
+      bookingWindowLabel: "Окно записи",
+      durationLabel: "Длительность услуги",
       priceLabel: "Стоимость",
       originalPriceLabel: "Обычная цена",
       requirementsTitle: "Требования к модели",

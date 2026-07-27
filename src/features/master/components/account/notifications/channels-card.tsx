@@ -1,7 +1,6 @@
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
-import { VkNotificationsSection } from "@/features/cabinet/components/vk-notifications";
 import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
 import { isTelegramEnabled } from "@/lib/env";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -38,14 +37,10 @@ export function ChannelsCard() {
             <TelegramNotificationsSection embedded />
           </FeatureGate>
         )}
-        <FeatureGate
-          feature="vkNotifications"
-          scope="MASTER"
-          variant="inline"
-          description={FG.vkLocked}
-        >
-          <VkNotificationsSection embedded />
-        </FeatureGate>
+        {/* CONSOLIDATE-EXTERNAL-LINKING-01: VK notification section hidden — VK
+            Bot delivery isn't built (VK-NOTIFICATIONS backlog). Component +
+            endpoint + field preserved; VK login/identity stays in the profile
+            «Связанные аккаунты» card. */}
         <EmailNotificationsSection />
         <PushNotificationsSection />
       </div>

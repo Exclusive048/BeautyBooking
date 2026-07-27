@@ -1,6 +1,7 @@
 import { BookingStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { z } from "zod";
 import { AppError } from "@/lib/api/errors";
+import { resolveLinkState } from "@/lib/auth/link-state";
 import { isTelegramEnabled } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
@@ -50,13 +51,18 @@ export type ProfileDTO = {
     url: string | null;
   };
   linked: {
+    // FIX-LINK-STATE-CONSISTENCY-01: two orthogonal states, never merged into a
+    // single `connected`. `linked` = identity (account attached); `deliveryEnabled`
+    // = notifications delivered through it (delivery preference).
     telegram: {
-      connected: boolean;
+      linked: boolean;
+      deliveryEnabled: boolean;
       username: string | null;
       connectedAt: string | null;
     };
     vk: {
-      connected: boolean;
+      linked: boolean;
+      deliveryEnabled: boolean;
       connectedAt: string | null;
     };
   };
@@ -191,14 +197,22 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
   // it (so an email change re-prompts confirmation).
   const emailVerified = Boolean(user.emailVerifiedAt);
 
+  // FIX-LINK-STATE-CONSISTENCY-01: resolve both link states via the single
+  // shared predicate — isLinked (identity: account attached) vs
+  // isDeliveryEnabled (delivery preference). Never merged into one boolean.
+  const telegramState = resolveLinkState({ linkId: tgLink?.chatId, isEnabled: tgLink?.isEnabled });
+  const vkState = resolveLinkState({ linkId: vkLink?.vkUserId, isEnabled: vkLink?.isEnabled });
+
   const completion = computeCompletion({
     firstName: user.firstName,
     lastName: user.lastName,
     phone: user.phone,
     emailVerified,
     birthDate: user.birthDate,
-    tgLinked: Boolean(tgLink?.chatId && tgLink.isEnabled),
-    vkLinked: Boolean(vkLink?.vkUserId && vkLink.isEnabled),
+    // Completion counts a LINKED account (identity) — delivery preference is
+    // orthogonal, so a linked-but-notifications-off account still counts.
+    tgLinked: telegramState.isLinked,
+    vkLinked: vkState.isLinked,
   });
 
   return {
@@ -217,13 +231,17 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
     },
     avatar: { url: avatarUrl },
     linked: {
+      // FIX-LINK-STATE-CONSISTENCY-01: expose BOTH states, never a merged
+      // `connected`. The card renders three states from these.
       telegram: {
-        connected: Boolean(tgLink?.chatId && tgLink.isEnabled),
+        linked: telegramState.isLinked,
+        deliveryEnabled: telegramState.isDeliveryEnabled,
         username: tgUsernameRow?.telegramUsername ?? null,
         connectedAt: tgLink?.linkedAt?.toISOString() ?? null,
       },
       vk: {
-        connected: Boolean(vkLink?.vkUserId && vkLink.isEnabled),
+        linked: vkState.isLinked,
+        deliveryEnabled: vkState.isDeliveryEnabled,
         connectedAt: vkLink?.linkedAt?.toISOString() ?? null,
       },
     },

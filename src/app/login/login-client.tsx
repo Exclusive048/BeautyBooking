@@ -3,17 +3,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
+import {
+  ArrowRight,
+  BellRing,
+  CalendarClock,
+  Check,
+  ChevronLeft,
+  Images,
+  Mail,
+  Phone,
+  ShieldCheck,
+  Wallet,
+  Zap,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
 import YandexLoginButton from "@/components/auth/yandex-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OtpInput } from "@/components/ui/otp-input";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
-import { cn } from "@/lib/cn";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
+import { parseInternalPath } from "@/lib/http/safe-redirect";
 import type { PublicStats } from "@/lib/stats/public-stats";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -54,11 +69,12 @@ function isEmailValid(input: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
 }
 
+// Post-login landing target. Delegates to the shared origin-resolving validator
+// (SECURITY-EXPOSURE-AUDIT-01 · O1) — the old "starts with `/`, not `//`" check
+// let `/\evil` and TAB-spliced forms through to window.location.replace. Returns
+// null for an invalid target so the caller falls back to the server's redirect.
 function safeNext(nextRaw: string | null) {
-  if (!nextRaw) return null;
-  if (!nextRaw.startsWith("/")) return null;
-  if (nextRaw.startsWith("//")) return null;
-  return nextRaw;
+  return parseInternalPath(nextRaw);
 }
 
 function formatStatNumber(value: number): string {
@@ -67,108 +83,7 @@ function formatStatNumber(value: number): string {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-// ---------- OTP digit input ----------
-
-type OtpInputProps = {
-  value: string;
-  onChange: (v: string) => void;
-  onComplete?: (v: string) => void;
-  disabled?: boolean;
-  autoFocus?: boolean;
-};
-
-function OtpInput({ value, onChange, onComplete, disabled, autoFocus = true }: OtpInputProps) {
-  const refs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    if (autoFocus) refs.current[0]?.focus();
-  }, [autoFocus]);
-
-  useEffect(() => {
-    if (value.length >= OTP_LENGTH) {
-      refs.current[OTP_LENGTH - 1]?.focus();
-    } else {
-      refs.current[value.length]?.focus();
-    }
-  }, [value]);
-
-  function handleChange(index: number, e: React.ChangeEvent<HTMLInputElement>) {
-    const digit = e.target.value.replace(/\D/g, "").slice(-1);
-    if (!digit) return;
-    const chars = value.split("").slice(0, OTP_LENGTH);
-    chars[index] = digit;
-    const next = chars.join("").slice(0, OTP_LENGTH);
-    onChange(next);
-    if (next.length === OTP_LENGTH) {
-      onComplete?.(next);
-    }
-  }
-
-  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Backspace") {
-      e.preventDefault();
-      if (value[index]) {
-        const chars = value.split("");
-        chars[index] = "";
-        onChange(chars.join(""));
-      } else if (index > 0) {
-        const chars = value.split("");
-        chars[index - 1] = "";
-        onChange(chars.join(""));
-        refs.current[index - 1]?.focus();
-      }
-    } else if (e.key === "ArrowLeft" && index > 0) {
-      refs.current[index - 1]?.focus();
-    } else if (e.key === "ArrowRight" && index < OTP_LENGTH - 1) {
-      refs.current[index + 1]?.focus();
-    }
-  }
-
-  function handlePaste(e: React.ClipboardEvent) {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
-    if (!pasted) return;
-    onChange(pasted);
-    if (pasted.length === OTP_LENGTH) {
-      onComplete?.(pasted);
-    }
-  }
-
-  return (
-    <div
-      className="grid w-full grid-cols-6 gap-1.5 sm:gap-2"
-      role="group"
-      aria-label={UI_TEXT.auth.loginPage.codeLabel}
-    >
-      {Array.from({ length: OTP_LENGTH }).map((_, i) => (
-        <input
-          key={i}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          type="text"
-          inputMode="numeric"
-          autoComplete={i === 0 ? "one-time-code" : "off"}
-          maxLength={2}
-          value={value[i] ?? ""}
-          onChange={(e) => handleChange(i, e)}
-          onKeyDown={(e) => handleKeyDown(i, e)}
-          onPaste={handlePaste}
-          disabled={disabled}
-          aria-label={`Цифра ${i + 1} из ${OTP_LENGTH}`}
-          className={cn(
-            "h-12 min-w-0 rounded-xl border bg-bg-card text-center text-lg font-semibold tabular-nums text-text-main shadow-sm sm:h-14 sm:text-xl",
-            "transition-all duration-150 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20",
-            "disabled:cursor-not-allowed disabled:opacity-50",
-            value[i] ? "border-primary bg-primary/5" : "border-border-subtle",
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ---------- Animation variants ----------
+// ---------- Animation variants (framer-motion — enter / stagger / step) ----------
 
 const panelVariants = {
   hidden: {},
@@ -199,6 +114,11 @@ const stepVariants = {
     transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
   },
 };
+
+// Marquee benefit cards — visual device only. Copy lives in UI_TEXT; the icons
+// are paired here by index (icons are not UI text). No invented person, quote
+// or rating (LOGIN-REDESIGN-01 marquee decision).
+const MARQUEE_ICONS: LucideIcon[] = [Zap, Wallet, Images, BellRing, CalendarClock, ShieldCheck];
 
 // ---------- Main component ----------
 
@@ -240,6 +160,8 @@ export default function LoginClient({
   const [shakeKey, setShakeKey] = useState(0);
 
   const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const paneRef = useRef<HTMLElement | null>(null);
+  const auroraRef = useRef<HTMLDivElement | null>(null);
   const phoneValid = isPhoneValid(phone);
   const emailValid = isEmailValid(email);
   const inputValid = mode === "phone" ? phoneValid : emailValid;
@@ -293,6 +215,22 @@ export default function LoginClient({
     setEmail("");
     setCode("");
     setErrorText(null);
+  }
+
+  // Cursor parallax on the aurora — decorative, honours reduced-motion.
+  function handlePaneMouseMove(event: React.MouseEvent<HTMLElement>) {
+    if (reduce) return;
+    const pane = paneRef.current;
+    const aurora = auroraRef.current;
+    if (!pane || !aurora) return;
+    const rect = pane.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+    aurora.style.transform = `translate(${x * 26}px, ${y * 22}px)`;
+  }
+
+  function handlePaneMouseLeave() {
+    if (auroraRef.current) auroraRef.current.style.transform = "";
   }
 
   async function requestPhoneOtp(normalized: string): Promise<void> {
@@ -437,30 +375,105 @@ export default function LoginClient({
 
   const T = UI_TEXT.auth.loginPage;
 
+  const marqueeCards = T.marquee.map((card, index) => ({
+    ...card,
+    Icon: MARQUEE_ICONS[index % MARQUEE_ICONS.length],
+  }));
+  const marqueeColA = marqueeCards.slice(0, 3);
+  const marqueeColB = marqueeCards.slice(3, 6);
+
+  const renderMarqueeCard = (
+    card: (typeof marqueeCards)[number],
+    key: string,
+  ) => {
+    const Icon = card.Icon;
+    return (
+      <div
+        key={key}
+        className="flex-none rounded-2xl border border-white/12 bg-white/[0.07] p-3.5 shadow-lg backdrop-blur-md"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-gradient text-white ring-1 ring-white/20">
+            <Icon className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-semibold text-white">{card.title}</div>
+            <div className="truncate text-[11px] text-white/60">{card.subtitle}</div>
+          </div>
+          {card.badge ? (
+            <span className="ml-auto flex-none rounded-full bg-white/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/75">
+              {card.badge}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
+  // Shine sweep injected into the CTA — the `Button`'s own focus ring is a
+  // box-shadow, so the button's `overflow-hidden` clips only this child, never
+  // the ring. Fixed-light highlight on the fixed burgundy gradient (both themes).
+  const ctaShine = (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
+    />
+  );
+
   return (
     <div className="min-h-[100dvh] overflow-y-auto bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-20 lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
       <div className="mx-auto grid h-full min-h-[100dvh] w-full max-w-6xl gap-8 px-4 py-6 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch lg:gap-10 lg:py-8">
 
-        {/* ── LEFT PANEL — brand (desktop only) ── */}
-        <aside className="relative hidden h-full max-h-[760px] min-h-0 overflow-hidden rounded-3xl bg-brand-gradient text-white lg:block">
-          {/* Decorative blobs */}
-          <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "radial-gradient(circle at 20% 30%, rgba(254,198,211,0.18), transparent 50%), radial-gradient(circle at 80% 70%, rgba(186,212,237,0.14), transparent 50%)",
-              }}
-            />
-            {/* Diagonal stripes overlay */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "repeating-linear-gradient(135deg, rgba(255,255,255,0.04) 0 1px, transparent 1px 80px)",
-              }}
-            />
+        {/* ── LEFT PANEL — brand stage (desktop only) ── */}
+        <aside
+          ref={paneRef}
+          onMouseMove={handlePaneMouseMove}
+          onMouseLeave={handlePaneMouseLeave}
+          className="login-grain login-sheen relative isolate hidden h-full max-h-[760px] min-h-0 flex-col overflow-hidden rounded-3xl bg-brand-pane text-white lg:flex"
+        >
+          {/* Layered animated aurora (parallax target) */}
+          <div ref={auroraRef} className="login-aurora" aria-hidden>
+            <i />
+            <i />
+            <i />
+            <i />
+            <i />
           </div>
+
+          {/* Twinkling sparkles */}
+          <svg
+            className="login-spark"
+            style={{ top: "16%", right: "12%", animationDelay: "0s" }}
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z" />
+          </svg>
+          <svg
+            className="login-spark"
+            style={{ top: "34%", left: "7%", animationDelay: "1.6s" }}
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z" />
+          </svg>
+          <svg
+            className="login-spark"
+            style={{ top: "9%", left: "40%", animationDelay: "3.1s" }}
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z" />
+          </svg>
 
           {/* Optional hero photo overlay */}
           {heroImageUrl ? (
@@ -472,88 +485,100 @@ export default function LoginClient({
             />
           ) : null}
 
-          {/* Bottom darken */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
-
           {/* Content */}
           <motion.div
             variants={panelAnim}
             initial="hidden"
             animate="visible"
-            className="relative flex h-full flex-col justify-between p-10"
+            className="relative z-[2] flex h-full flex-col justify-between p-10"
           >
-            {/* Brand block — gradient iconmark + white wordmark over the
-                dark hero. `textClassName="text-white"` overrides the
-                gradient bg-clip on the wordmark so it stays readable
-                on the burgundy backdrop; the iconmark itself keeps
-                its gradient for brand identity. Tagline sits under
-                the row as a separate <p>, matching the sidebar
-                pattern. */}
+            {/* Brand block — gradient iconmark + white wordmark over the dark
+                stage. `textClassName="text-white"` overrides the wordmark's
+                gradient text-clip so it stays readable on the burgundy backdrop;
+                the iconmark keeps its gradient for brand identity (proven
+                legible on this pane pre-redesign). */}
             <motion.div variants={panelItemAnim}>
-              <BrandLogo
-                variant="full"
-                size="md"
-                href={null}
-                textClassName="text-white"
-              />
-              <p className="mt-1.5 font-mono text-[10px] tracking-[0.08em] text-white/70">
+              <BrandLogo variant="full" size="md" href={null} textClassName="text-white" />
+              <p className="mt-1.5 font-mono text-[10px] tracking-[0.08em] text-white/60">
                 {UI_TEXT.brand.tagline}
               </p>
             </motion.div>
 
-            {/* Headline + sub */}
-            <div className="space-y-5">
-              <motion.h2
-                variants={panelItemAnim}
-                className="text-balance text-[2.4rem] font-bold leading-[1.05] tracking-tight xl:text-[3rem]"
-              >
-                {T.heroTitle}{" "}
-                <em className="font-medium italic text-white/90">{T.heroTitleAccent}</em>
-              </motion.h2>
+            {/* Badge + headline + subtitle */}
+            <div className="py-6">
+              {stats ? (
+                <motion.div
+                  variants={panelItemAnim}
+                  className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-[12.5px] backdrop-blur-md"
+                >
+                  <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+                  <span className="tabular-nums">
+                    {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
+                  </span>
+                </motion.div>
+              ) : null}
+
+              <h1 className="font-display text-[2.5rem] font-medium leading-[1.06] tracking-tight xl:text-[3rem]">
+                <span className="login-word-mask">
+                  <span className="login-word" style={{ animationDelay: "150ms" }}>
+                    {T.brandHeadlineLead}
+                  </span>
+                </span>
+                <br />
+                <span className="login-word-mask">
+                  <span className="login-word" style={{ animationDelay: "260ms" }}>
+                    {T.brandHeadlineWith}{" "}
+                    <em className="login-shimmer font-display font-semibold italic">
+                      {T.brandHeadlineAccent}
+                    </em>
+                  </span>
+                </span>
+              </h1>
 
               <motion.p
                 variants={panelItemAnim}
-                className="max-w-md text-base leading-relaxed text-white/82"
+                className="mt-5 max-w-md text-[15px] leading-relaxed text-white/80"
               >
-                {T.heroSubtitle}
+                {T.brandTagline}
               </motion.p>
             </div>
 
-            {/* Stats (only if API returned data) */}
-            {stats ? (
-              <motion.div variants={panelItemAnim} className="flex items-end gap-6">
-                <div>
-                  <div className="font-mono text-2xl font-semibold tabular-nums text-white">
-                    {formatStatNumber(stats.masters)}
-                  </div>
-                  <div className="mt-0.5 text-xs leading-tight text-white/70">
-                    {T.socialProofMastersLabel}
-                  </div>
-                </div>
-                <div className="mb-2 h-6 w-px bg-white/20" />
-                <div>
-                  <div className="font-mono text-2xl font-semibold tabular-nums text-white">
-                    {formatStatNumber(stats.bookings)}
-                  </div>
-                  <div className="mt-0.5 text-xs leading-tight text-white/70">
-                    {T.socialProofBookingsLabel}
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div variants={panelItemAnim} aria-hidden />
-            )}
+            {/* Marquee of benefit cards */}
+            <motion.div
+              variants={panelItemAnim}
+              className="login-mq-zone relative flex h-[224px] gap-4 overflow-hidden"
+              style={{
+                WebkitMaskImage:
+                  "linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent)",
+                maskImage:
+                  "linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent)",
+              }}
+              aria-hidden
+            >
+              <div className="login-mq-col flex-1">
+                {[...marqueeColA, ...marqueeColA].map((card, index) =>
+                  renderMarqueeCard(card, `a-${index}`),
+                )}
+              </div>
+              <div className="login-mq-col is-rev flex-1">
+                {[...marqueeColB, ...marqueeColB].map((card, index) =>
+                  renderMarqueeCard(card, `b-${index}`),
+                )}
+              </div>
+            </motion.div>
           </motion.div>
         </aside>
 
         {/* ── RIGHT PANEL — form ── */}
-        <main className="flex h-full min-h-0 items-center justify-center">
-          <div className="w-full max-w-[400px]">
+        {/* `lg:overflow-hidden` clips the decorative halo to this pane on desktop
+            (where the layout is fixed-height); on mobile there is no clip and no
+            halo, so a tall form step can never be cut off — the outer container
+            scrolls instead. */}
+        <main className="relative flex h-full min-h-0 items-center justify-center lg:overflow-hidden">
+          <div className="login-halo hidden lg:block" aria-hidden />
+          <div className="relative z-[1] w-full max-w-[400px]">
 
-            {/* Mobile brand hint — compact full BrandLogo + tagline.
-                On the light mobile surface the gradient-clipped
-                wordmark from BrandLogo is the intended treatment, so
-                no `textClassName` override here. */}
+            {/* Mobile brand hint — compact full BrandLogo + tagline. */}
             <div className="mb-6 lg:hidden">
               <BrandLogo variant="full" size="sm" href={null} />
               <p className="mt-1 font-mono text-[10px] tracking-[0.08em] text-text-sec">
@@ -563,7 +588,7 @@ export default function LoginClient({
 
             {/* Header */}
             <div className="mb-6">
-              <h1 className="text-2xl font-bold tracking-tight text-text-main sm:text-[1.75rem]">
+              <h1 className="font-display text-[1.75rem] font-medium tracking-tight text-text-main">
                 {step === "input" ? T.title : T.codeSentTo}
               </h1>
               <p className="mt-1.5 text-sm text-text-sec">
@@ -591,7 +616,7 @@ export default function LoginClient({
                   transition={reduce ? { duration: 0 } : { duration: 0.18 }}
                   role="alert"
                   aria-live="polite"
-                  className="animate-shake mb-4 rounded-xl border border-red-300/70 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+                  className="mb-4 rounded-2xl border border-red-300/70 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
                 >
                   {errorText}
                 </motion.div>
@@ -600,28 +625,25 @@ export default function LoginClient({
 
             {/* Mode tabs (only on input step + email enabled) */}
             {emailEnabled && step === "input" ? (
-              <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
-                {(["phone", "email"] as LoginMode[]).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => switchMode(m)}
-                    className={cn(
-                      "flex h-9 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all duration-150",
-                      mode === m
-                        ? "bg-bg-card text-text-main shadow-sm"
-                        : "text-text-sec hover:text-text-main",
-                    )}
-                  >
-                    {m === "phone" ? (
-                      <Phone className="h-3.5 w-3.5" aria-hidden />
-                    ) : (
-                      <Mail className="h-3.5 w-3.5" aria-hidden />
-                    )}
-                    {m === "phone" ? T.tabPhone : T.tabEmail}
-                  </button>
-                ))}
-              </div>
+              <SegmentedTabs<LoginMode>
+                value={mode}
+                onChange={switchMode}
+                className="mb-5"
+                options={[
+                  {
+                    value: "phone",
+                    label: T.tabPhone,
+                    icon: <Phone className="h-3.5 w-3.5" aria-hidden />,
+                    testId: "login-tab-phone",
+                  },
+                  {
+                    value: "email",
+                    label: T.tabEmail,
+                    icon: <Mail className="h-3.5 w-3.5" aria-hidden />,
+                    testId: "login-tab-email",
+                  },
+                ]}
+              />
             ) : null}
 
             {/* Form steps */}
@@ -637,17 +659,17 @@ export default function LoginClient({
                 >
                   {mode === "phone" ? (
                     <div className="space-y-1.5">
-                      <label htmlFor="phone-input" className="block text-sm font-medium text-text-main">
+                      <label htmlFor="phone-input" className="block text-sm font-medium text-text-label">
                         {T.phoneLabel}
                       </label>
-                      <div className="relative">
+                      <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
                         <Phone
-                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
+                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-primary"
                           aria-hidden
                         />
                         <Input
                           id="phone-input"
-                          className="h-12 pl-9 pr-4 text-base"
+                          className="h-[52px] rounded-2xl pl-10 pr-4 text-base"
                           placeholder={T.phonePlaceholderMask}
                           value={phone}
                           onChange={(ev) => setPhone(ev.target.value)}
@@ -659,17 +681,17 @@ export default function LoginClient({
                     </div>
                   ) : (
                     <div className="space-y-1.5">
-                      <label htmlFor="email-input" className="block text-sm font-medium text-text-main">
+                      <label htmlFor="email-input" className="block text-sm font-medium text-text-label">
                         {T.emailLabel}
                       </label>
-                      <div className="relative">
+                      <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
                         <Mail
-                          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
+                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-primary"
                           aria-hidden
                         />
                         <Input
                           id="email-input"
-                          className="h-12 pl-9 pr-4 text-base"
+                          className="h-[52px] rounded-2xl pl-10 pr-4 text-base"
                           placeholder={T.emailPlaceholder}
                           value={email}
                           onChange={(ev) => setEmail(ev.target.value)}
@@ -695,12 +717,15 @@ export default function LoginClient({
                     disabled={loading || !inputValid || (inputValid && !agreedToTerms)}
                     size="lg"
                     data-testid="login-send-code"
-                    className="w-full"
+                    className="group relative w-full overflow-hidden rounded-full"
                   >
-                    {loading ? T.sending : (
+                    {loading ? (
+                      T.sending
+                    ) : (
                       <>
+                        {ctaShine}
                         {T.sendCode}
-                        <ArrowRight className="h-4 w-4" aria-hidden />
+                        <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden />
                       </>
                     )}
                   </Button>
@@ -715,7 +740,7 @@ export default function LoginClient({
                   className="space-y-4"
                 >
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-text-main">
+                    <label className="block text-sm font-medium text-text-label">
                       {mode === "email" ? T.codeFromEmail : T.codeLabel}
                     </label>
                     <OtpInput
@@ -723,6 +748,9 @@ export default function LoginClient({
                       onChange={setCode}
                       onComplete={verifyCode}
                       disabled={loading}
+                      length={OTP_LENGTH}
+                      groupLabel={T.codeLabel}
+                      shakeSignal={shakeKey}
                       autoFocus
                     />
                   </div>
@@ -732,10 +760,13 @@ export default function LoginClient({
                     disabled={loading || code.length < OTP_LENGTH}
                     size="lg"
                     data-testid="login-verify"
-                    className="w-full"
+                    className="group relative w-full overflow-hidden rounded-full"
                   >
-                    {loading ? T.verifying : (
+                    {loading ? (
+                      T.verifying
+                    ) : (
                       <>
+                        {ctaShine}
                         {UI_TEXT.auth.login}
                         <Check className="h-4 w-4" aria-hidden />
                       </>
@@ -747,6 +778,7 @@ export default function LoginClient({
                       type="button"
                       onClick={goBackToInput}
                       disabled={loading}
+                      data-testid="login-back"
                       className="inline-flex items-center gap-1 text-sm text-text-sec transition-colors hover:text-text-main disabled:pointer-events-none disabled:opacity-50"
                     >
                       <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
@@ -764,6 +796,7 @@ export default function LoginClient({
                         type="button"
                         onClick={resendCode}
                         disabled={loading}
+                        data-testid="login-resend"
                         className="text-sm font-medium text-accent-text transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
                       >
                         {T.resendCode}
@@ -777,8 +810,8 @@ export default function LoginClient({
             {/* Divider */}
             <div className="my-6 flex items-center gap-3">
               <div className="h-px flex-1 bg-border-subtle" />
-              <span className="text-xs font-medium uppercase tracking-wider text-text-sec">
-                {T.or}
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-text-sec">
+                {T.socialDividerLabel}
               </span>
               <div className="h-px flex-1 bg-border-subtle" />
             </div>

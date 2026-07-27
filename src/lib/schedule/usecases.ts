@@ -27,6 +27,7 @@ import {
 } from "@/lib/schedule/dateKey";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
+import { bucketRangesByDateKey, loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
 
 type RangeInput = {
   from: Date;
@@ -350,6 +351,18 @@ export async function listAvailabilitySlotsPaginated(
     }
   }
 
+  // FIX-TIMEBLOCK-ENFORCEMENT-01: studio/master TimeBlocks removed from the
+  // engine output, same UTC-range treatment as bookings (bucketed to salon-local
+  // days, clamped to the requested window). Block CRUD already calls
+  // `invalidateSlotsForMaster`, so the per-day slot cache regenerates fresh.
+  const blockRanges = await loadTimeBlockRanges(providerId, rangeFromUtc, rangeToExclusiveUtc);
+  const blocksByDateKey = bucketRangesByDateKey(
+    blockRanges,
+    timezone,
+    requestedStartKey,
+    actualEndKeyExclusive,
+  );
+
   const slots: AvailabilitySlot[] = [];
   let cursorKey = requestedStartKey;
   const now = new Date();
@@ -379,6 +392,7 @@ export async function listAvailabilitySlotsPaginated(
         serviceDurationMin: durationMin,
         bufferMin,
         bookings: bookingsByDateKey.get(cursorKey) ?? [],
+        blocks: blocksByDateKey.get(cursorKey) ?? [],
         now,
         slotStepMin,
       });
@@ -483,6 +497,12 @@ export async function listAvailabilitySlots(
     }
   }
 
+  // FIX-TIMEBLOCK-ENFORCEMENT-01: TimeBlocks removed from availability (same
+  // UTC-range treatment as bookings). No clamp — only days the slot loop visits
+  // are consumed, exactly like the booking buckets above.
+  const blockRanges = await loadTimeBlockRanges(providerId, from, to);
+  const blocksByDateKey = bucketRangesByDateKey(blockRanges, timezone);
+
   const slots: AvailabilitySlot[] = [];
   let cursorKey = startKey;
   const now = new Date();
@@ -510,6 +530,7 @@ export async function listAvailabilitySlots(
         serviceDurationMin: durationMin,
         bufferMin,
         bookings: bookingsByDateKey.get(cursorKey) ?? [],
+        blocks: blocksByDateKey.get(cursorKey) ?? [],
         now,
         slotStepMin,
       });

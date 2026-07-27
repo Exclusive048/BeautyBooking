@@ -10,7 +10,7 @@ import {
 } from "@/lib/media/private-delivery";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
-import { getMediaFile } from "@/lib/media/service";
+import { getMediaFile, isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
 import { prisma } from "@/lib/prisma";
 
@@ -68,7 +68,15 @@ export async function GET(req: Request, ctx: RouteContext) {
       );
     }
 
-    if (PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType)) {
+    // SECURITY-EXPOSURE-AUDIT-01 #3: serve publicly ONLY when the asset is
+    // actually public. A hidden (`isPublic:false`), unpublished-provider, or
+    // delete-orphaned portfolio asset fails this and falls through to the
+    // session/token path below, where `getMediaFile` → `ensureCanReadMedia`
+    // restricts it to the owner/admin. (A soft-deleted asset is already 404'd
+    // above.) Avatars/site assets stay public.
+    const isPublicKind =
+      PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType);
+    if (isPublicKind && (await isProviderMediaPubliclyVisible(asset))) {
       const storage = getStorageProvider();
       const publicFile = await storage.getObject(asset.storageKey, asset.mimeType);
       if (!publicFile) {

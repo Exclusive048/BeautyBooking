@@ -122,6 +122,9 @@ export async function POST(req: Request) {
 
     // OTP-LOG-DEV-GUARD-A: `code` only in dev/staging (closes SEC-1
     // regression-gap vs SMS-GATEWAY-A — production logs never carry it).
+    // Rule 9: the failure log (with the dev-only code) is kept so testers can
+    // still complete the flow via the logged code — only the API contract
+    // changes below, not the logging.
     if (!sent) {
       logInfo("Cabinet email OTP requested (send failed)", {
         userId: user.id,
@@ -129,13 +132,25 @@ export async function POST(req: Request) {
         expiresAt: expiresAt.toISOString(),
         ...(isProduction ? {} : { code }),
       });
-    } else {
-      logInfo("Cabinet email OTP requested", {
-        userId: user.id,
-        email: maskEmail(normalizedEmail),
-        expiresAt: expiresAt.toISOString(),
-      });
+      // FIX-POLISH-01 (walkthrough #7): a failed send must NOT report success.
+      // This used to fall through to `jsonOk`, so the modal falsely advanced to
+      // «Код отправлен» and the user waited for mail that never arrives. Surface
+      // the failure so the UI stays on the email step and shows an honest error.
+      // The `email`/`emailVerifiedAt` mutation + OtpCode row above already
+      // persisted (retry re-sends) — the «…Попробуйте ещё раз.» copy doesn't
+      // imply nothing happened.
+      return jsonFail(
+        502,
+        "Не удалось отправить код на email. Попробуйте ещё раз.",
+        "EMAIL_SEND_FAILED",
+      );
     }
+
+    logInfo("Cabinet email OTP requested", {
+      userId: user.id,
+      email: maskEmail(normalizedEmail),
+      expiresAt: expiresAt.toISOString(),
+    });
 
     return jsonOk({ expiresAt: expiresAt.toISOString() });
   } catch (error) {

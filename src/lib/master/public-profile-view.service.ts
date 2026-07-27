@@ -12,6 +12,7 @@ import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { buildBookingOverlapWhere, bookingOverlapsRange } from "@/lib/schedule/overlap";
+import { loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
 import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { logError } from "@/lib/logging/logger";
@@ -56,6 +57,15 @@ export type MasterPublicProfileView = {
   planTier: PlanTier | null;
   experienceMonths: number | null;
   availability: AvailabilityHint;
+  /**
+   * PACKAGE-SOLO-WIZARD-01: the master's normalized between-bookings buffer, in
+   * minutes. The package wizard needs it client-side because
+   * `createSoloPackageBooking` requires this gap BETWEEN two package siblings
+   * (`intraPackageOverlap`), and the slots API can't express it — the sibling
+   * isn't committed yet, so its window still reads free. Without it the wizard
+   * would offer a slot the create then rejects with 409.
+   */
+  providerBufferMin: number;
   /**
    * QA-115 (FIX-06): studio affiliation when the master belongs to a studio.
    * `publicUsername` is the studio's *public* identifier for the profile link
@@ -239,6 +249,9 @@ export const getMasterPublicProfileView = cache(
       planTier,
       experienceMonths,
       availability,
+      // PACKAGE-SOLO-WIZARD-01 — same normalization the booking core applies,
+      // so the wizard's cursor matches the create's `intraPackageOverlap` gap.
+      providerBufferMin: normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
       studio,
     };
   },
@@ -305,6 +318,14 @@ async function computeAvailabilityHint(
       );
     };
 
+    // FIX-TIMEBLOCK-ENFORCEMENT-01: the "nearest slot" hint must skip TimeBlock
+    // windows too — same probe window + per-day overlap bucketing as bookings.
+    const blockRanges = await loadTimeBlockRanges(providerId, probeWindowStartUtc, probeWindowEndUtc);
+    const blocksForDay = (dateKey: string): Array<{ startAtUtc: Date; endAtUtc: Date }> => {
+      const { startUtc, endExclusiveUtc } = localDayRangeUtc(dateKey, timezone);
+      return blockRanges.filter((block) => bookingOverlapsRange(block, startUtc, endExclusiveUtc));
+    };
+
     let cursor = todayKey;
     for (let i = 0; i < AVAILABILITY_PROBE_DAYS; i += 1) {
       const plan = await ScheduleEngine.getDayPlanFromContext(ctx, cursor);
@@ -318,6 +339,7 @@ async function computeAvailabilityHint(
           // the probe pads existing bookings exactly as the widget does.
           bufferMin,
           bookings: bookingsForDay(cursor),
+          blocks: blocksForDay(cursor),
           now,
           slotStepMin,
         });

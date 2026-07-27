@@ -18,6 +18,8 @@ import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { alertDeadJobs } from "@/lib/monitoring/api-alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { env, isProduction } from "@/lib/env";
+import { initServerObservability } from "@/lib/observability/server";
+import { flushReports, reportError } from "@/lib/observability/report";
 import { processBookingReminder } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
@@ -56,6 +58,31 @@ import {
 
 ensureVisualSearchStartupConfig();
 
+// OBSERVABILITY-GLITCHTIP-01: initialise error tracking BEFORE the fatal
+// handlers below are registered, so a crash during startup is still reported.
+// No-op without `GLITCHTIP_DSN`; never throws (see `observability/server.ts`).
+//
+// The worker is the highest-value target for this: when a reminder, a webhook
+// or an availableToday sweep fails here, nobody sees it. There is no user
+// staring at a broken page — the failure is silent by construction.
+initServerObservability("worker");
+
+/**
+ * Report a worker-side failure that would otherwise only exist as a log line.
+ * Deliberately explicit rather than hooked into `logError`: `logError` also
+ * carries expected outcomes (retries, dead-letter bookkeeping, healthcheck
+ * ping misses) and already fans out to the ops Telegram channel — reporting all
+ * of it would bury the failures that matter.
+ */
+function reportWorkerFailure(scope: string, error: unknown, extra: Record<string, unknown> = {}): void {
+  reportError(error, { level: "error", tags: { worker_scope: scope }, extra });
+}
+
+/** Drain queued events, then exit. Always exits — `flushReports` never hangs. */
+function flushAndExit(code: number): void {
+  void flushReports(2000).finally(() => process.exit(code));
+}
+
 let isShuttingDown = false;
 let lastHealthcheckAt = 0;
 let jobsProcessed = 0;
@@ -93,7 +120,10 @@ process.on("uncaughtException", (error) => {
     error: error.message,
     stack: error.stack,
   });
-  process.exit(1);
+  reportWorkerFailure("uncaughtException", error, { fatal: true });
+  // Flush before exiting: the error we most want is exactly the one the
+  // process is dying on. Bounded at 2s, then exit regardless.
+  flushAndExit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
@@ -105,7 +135,8 @@ process.on("unhandledRejection", (reason) => {
     error: reason instanceof Error ? reason.message : String(reason),
     stack: reason instanceof Error ? reason.stack : undefined,
   });
-  process.exit(1);
+  reportWorkerFailure("unhandledRejection", reason, { fatal: true });
+  flushAndExit(1);
 });
 
 process.on("SIGTERM", () => {
@@ -136,6 +167,7 @@ function startPeriodicJobs() {
         logError("availableToday.recompute.failed", {
           error: error instanceof Error ? error.message : String(error),
         });
+        reportWorkerFailure("availableToday.recompute", error);
       });
   };
   // Startup run — non-blocking (fire-and-forget; never delays worker boot).
@@ -147,11 +179,13 @@ function startPeriodicJobs() {
       logError("Hot slot expiring job failed", {
         error: error instanceof Error ? error.message : String(error),
       });
+      reportWorkerFailure("hotSlots.expiring", error);
     });
     void runBookingReviewPromptJob().catch((error) => {
       logError("Booking review prompt job failed", {
         error: error instanceof Error ? error.message : String(error),
       });
+      reportWorkerFailure("bookings.reviewPrompts", error);
     });
     runAvailableTodaySweep();
   }, intervalMs);
@@ -162,6 +196,7 @@ function startPeriodicJobs() {
       logError("Failed to enqueue media cleanup job", {
         error: error instanceof Error ? error.message : String(error),
       });
+      reportWorkerFailure("media.cleanup.enqueue", error);
     });
   }, mediaCleanupIntervalMs);
 
@@ -171,6 +206,7 @@ function startPeriodicJobs() {
       logError("Weekly stats job failed", {
         error: error instanceof Error ? error.message : String(error),
       });
+      reportWorkerFailure("master.weeklyStats", error);
     });
   }, 60 * 60 * 1000);
 
@@ -180,6 +216,7 @@ function startPeriodicJobs() {
       logError("Smart price job failed", {
         error: error instanceof Error ? error.message : String(error),
       });
+      reportWorkerFailure("hotSlots.smartPrice", error);
     });
   }, 60 * 60 * 1000);
 }
@@ -293,9 +330,18 @@ function getJobScheduleAt(job: Job): number | null {
   return typeof scheduleAt === "number" ? scheduleAt : null;
 }
 
-async function moveToDeadQueue(job: Job): Promise<void> {
+async function moveToDeadQueue(job: Job, error?: unknown): Promise<void> {
   await enqueueDeadJob(normalizeJobMeta(job));
   alertDeadJobs(1);
+  // OBSERVABILITY-GLITCHTIP-01: a job that exhausted its retries is a permanent
+  // silent failure — an unsent reminder, an unprocessed YooKassa webhook, an
+  // unindexed asset. This is the single chokepoint for all of them; the
+  // per-attempt retries above stay unreported so the signal isn't diluted.
+  reportWorkerFailure(
+    "job.deadLetter",
+    error ?? new Error(`Job ${job.type} moved to dead-letter queue after ${getJobAttempts(job)} attempts`),
+    { jobId: job.id, jobType: job.type, attempts: getJobAttempts(job) }
+  );
 }
 
 async function processTelegramSend(
@@ -368,7 +414,7 @@ async function processBookingReminderJob(
       return;
     }
 
-    await moveToDeadQueue({ ...job, attempts });
+    await moveToDeadQueue({ ...job, attempts }, error);
     logError("Reminder job permanently failed after 3 attempts", {
       jobId: job.id,
       attempts,
@@ -422,7 +468,7 @@ async function processVisualSearchIndexJob(
       return;
     }
 
-    await moveToDeadQueue({ ...job, attempts: nextAttempts });
+    await moveToDeadQueue({ ...job, attempts: nextAttempts }, error);
     logError("Worker visual search job failed", {
       jobId: job.id,
       type: job.type,
@@ -590,7 +636,7 @@ async function processJob(job: Job): Promise<void> {
         })
       );
     } else {
-      await moveToDeadQueue({ ...job, attempts });
+      await moveToDeadQueue({ ...job, attempts }, error);
     }
   }
 
@@ -612,6 +658,7 @@ async function runLoop() {
           error: error instanceof Error ? error.message : String(error),
           __skipAlert: true,
         });
+        reportWorkerFailure("queue.recoverStuckJobs", error);
       });
   }, STUCK_RECOVERY_INTERVAL_MS);
 
@@ -653,11 +700,15 @@ async function startWorker() {
 
   logInfo("Worker started");
   await runLoop();
+  // Graceful SIGTERM/SIGINT path: drain queued events before the process goes
+  // away, otherwise a shutdown swallows whatever was captured last.
+  await flushReports(2000);
   process.exit(0);
 }
 
 startWorker().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   logError("Worker stopped", { error: message });
-  process.exit(1);
+  reportWorkerFailure("startup", error, { fatal: true });
+  flushAndExit(1);
 });

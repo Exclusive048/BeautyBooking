@@ -8,6 +8,8 @@ type Props = {
   bundle: PublicBundleView;
   providerId: string;
   providerTimezone: string;
+  /** PACKAGE-SOLO-WIZARD-01: the master's between-bookings buffer — the package wizard's cursor gap. */
+  providerBufferMin: number;
   /** PACKAGE-BOOKING-MVP-1: solo master only (studio masters book via studio). */
   bookable: boolean;
 };
@@ -20,7 +22,13 @@ const T = UI_TEXT.publicProfile.bundles;
  * package-booking flow. Otherwise it stays informational (studio packages →
  * MVP-2).
  */
-export function BundleCard({ bundle, providerId, providerTimezone, bookable }: Props) {
+export function BundleCard({
+  bundle,
+  providerId,
+  providerTimezone,
+  providerBufferMin,
+  bookable,
+}: Props) {
   const savings = bundle.discountAmount > 0 ? UI_FMT.priceLabel(bundle.discountAmount) : null;
   return (
     <article className="bg-brand-gradient-soft relative overflow-hidden rounded-2xl border border-border-subtle/70 p-5">
@@ -74,6 +82,7 @@ export function BundleCard({ bundle, providerId, providerTimezone, bookable }: P
             bundle={bundle}
             providerId={providerId}
             providerTimezone={providerTimezone}
+            providerBufferMin={providerBufferMin}
           />
         ) : (
           <p className="text-[11px] leading-relaxed text-text-sec/85">

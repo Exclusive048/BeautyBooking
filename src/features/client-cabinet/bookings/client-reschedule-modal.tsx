@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ClientBookingDTO } from "@/lib/client-cabinet/bookings.service";
 
 const T = UI_TEXT.clientCabinet.booking;
@@ -35,15 +37,6 @@ function todayDateKey(): string {
   ).padStart(2, "0")}`;
 }
 
-function nextDateKey(dateKey: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + 1));
-  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(
-    2,
-    "0",
-  )}-${String(dt.getUTCDate()).padStart(2, "0")}`;
-}
-
 type Props = {
   booking: ClientBookingDTO;
   onClose: () => void;
@@ -56,10 +49,16 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // FIX-STUDIO-02 (F5): request a SINGLE day. The `/slots` endpoint treats
+  // `to` as inclusive (it adds +1 internally to make the range exclusive), so
+  // the old `to=nextDateKey(date)` returned slots for BOTH `date` and the next
+  // day — and since the chips render only «HH:MM» (no date), every time showed
+  // up twice (the «34 кнопки / 17 уникальных» duplication). `to=date` pins the
+  // list to the day the user actually picked.
   const slotsUrl = date
     ? `/api/public/providers/${booking.provider.id}/slots?serviceId=${
         booking.service.id
-      }&from=${date}&to=${nextDateKey(date)}`
+      }&from=${date}&to=${date}`
     : null;
 
   const { data: slotsData, isLoading: slotsLoading } = useSWR<SlotsApiResponse>(
@@ -73,6 +72,22 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
   // slots endpoint returns the provider tz; `booking.provider.timezone` is a
   // stable fallback before the slots load.
   const salonTz = slotsData?.timezone ?? booking.provider.timezone;
+  // FIX-STUDIO-02 (F5): the slot chips are already salon-tz (correct), but the
+  // dialog carried NO «(город, GMT+N)» label — a Moscow client reading a
+  // Yekaterinburg studio's «15:00» couldn't tell whose clock it was. Show the
+  // same salon-tz note the «Мои записи» list carries, only when the viewer's
+  // zone actually differs. Anchor the offset on the booking's own instant.
+  const viewerTz = useViewerTimeZoneContext();
+  const showZone =
+    !!booking.startAtUtc &&
+    zonesDifferForViewer({
+      iso: booking.startAtUtc,
+      salonTimeZone: salonTz,
+      viewerTimeZone: viewerTz,
+    });
+  const zoneLabel = showZone
+    ? formatZoneLabel({ iso: booking.startAtUtc, timeZone: salonTz })
+    : "";
 
   async function handleSubmit() {
     if (!slotIso) return;
@@ -136,6 +151,14 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
           <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
             {T.chooseTime}
           </label>
+          {zoneLabel ? (
+            <div className="flex items-center gap-1 text-xs font-medium text-accent-text">
+              <CalendarIcon className="h-3 w-3 shrink-0" aria-hidden />
+              <span>
+                {UI_TEXT.clientCabinet.bookingsPage.salonTimeNote} {zoneLabel}
+              </span>
+            </div>
+          ) : null}
           {slotsLoading ? (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {[0, 1, 2, 3, 4, 5].map((i) => (

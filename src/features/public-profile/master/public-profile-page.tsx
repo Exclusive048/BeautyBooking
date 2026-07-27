@@ -6,8 +6,10 @@ import { ReviewsSection } from "@/features/public-profile/master/sections/review
 import { AboutSection } from "@/features/public-profile/master/sections/about-section";
 import { MapSection } from "@/features/public-profile/master/sections/map-section";
 import { BookingSection } from "@/features/public-profile/master/sections/booking-section";
+import { OwnerProfileNotice } from "@/features/public-profile/master/sections/owner-profile-notice";
 import { SectionNav } from "@/features/public-profile/master/section-nav";
 import { MobileBookingCta } from "@/features/public-profile/master/mobile-booking-cta";
+import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
 import { ServicesSkeleton } from "@/components/blocks/skeletons/ServicesSkeleton";
 import { PortfolioSkeleton } from "@/components/blocks/skeletons/PortfolioSkeleton";
@@ -34,12 +36,18 @@ type Props = {
  * so all sections de-duplicate to a single Prisma roundtrip per
  * request, while keeping their own Suspense boundaries for graceful
  * partial loads.
+ *
+ * Owner view (FIX-MASTER-01 item 5): when the viewer owns this profile the
+ * booking widget and the mobile booking CTA are replaced with an owner
+ * notice — self-booking is server-rejected anyway, so the affordance was a
+ * guaranteed dead end.
  */
-export function PublicMasterProfilePage({
+export async function PublicMasterProfilePage({
   providerId,
   initialServiceId,
   initialSlotStartAt,
 }: Props) {
+  const isOwner = await isViewerProfileOwner(providerId);
   return (
     <>
       <div className="space-y-5 pb-24 lg:pb-0">
@@ -95,17 +103,21 @@ export function PublicMasterProfilePage({
             id="booking"
             className="h-fit lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
           >
-            <Suspense fallback={<BookingSkeleton />}>
-              <BookingSection
-                providerId={providerId}
-                initialSlotStartAt={initialSlotStartAt}
-              />
-            </Suspense>
+            {isOwner ? (
+              <OwnerProfileNotice />
+            ) : (
+              <Suspense fallback={<BookingSkeleton />}>
+                <BookingSection
+                  providerId={providerId}
+                  initialSlotStartAt={initialSlotStartAt}
+                />
+              </Suspense>
+            )}
           </div>
         </div>
       </div>
 
-      <MobileBookingCta />
+      {isOwner ? null : <MobileBookingCta />}
     </>
   );
 }

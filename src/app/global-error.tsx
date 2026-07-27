@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportError } from "@/lib/observability/report";
 
 export default function GlobalError({
   error,
@@ -10,6 +11,13 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    // OBSERVABILITY-GLITCHTIP-01: a React render error caught by this boundary
+    // never reaches `window.onerror`, so the SDK's global handlers cannot see
+    // it — it has to be captured explicitly. The `/api/log-error` POST below
+    // stays as the structured-log channel; it does not report to GlitchTip, so
+    // there is no double-report.
+    reportError(error, { level: "error", extra: { digest: error.digest } });
+
     fetch("/api/log-error", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

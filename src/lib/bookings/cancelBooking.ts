@@ -77,12 +77,16 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     if (input.cancelledBy === "CLIENT") {
       ensureBookingActionWindow(booking.startAtUtc);
       ensureCancellationDeadline(booking.startAtUtc, booking.provider.cancellationDeadlineHours);
-    } else {
-      const reason = input.reason?.trim() ?? "";
-      if (reason.length === 0) {
-        throw new AppError("Comment is required", 400, "VALIDATION_ERROR");
-      }
     }
+    // FIX-STUDIO-02 (F3): provider-side cancellation reason is OPTIONAL. The
+    // studio cancel dialog labels it «необязательно» and `bookingCancelSchema`
+    // already marks `reason` optional — the old required-comment guard threw a
+    // raw English «Comment is required» that leaked straight into the dialog
+    // (an API/UI contract violation). Mirrors the reschedule precedent
+    // (fix-04a), which dropped the identical guard for the same reason; the
+    // client-cancel path never required one either. When a reason IS provided
+    // it still flows into `cancelReason` + the "cancelled by master"
+    // notification below.
   }
 
   const updated = await prisma.$transaction(async (tx) => {
