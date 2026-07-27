@@ -14,20 +14,59 @@ COPY . .
 # Generate Prisma client for the build
 RUN npx prisma generate
 
-# NEXT_PUBLIC_ vars are baked into the bundle at build time.
-# Pass them via --build-arg in CI (see deploy.yml).
+# ─── NEXT_PUBLIC_* — baked into the CLIENT bundle at BUILD time ───────────────
+# Every var read through src/lib/env.ts `clientEnv` is statically inlined by
+# webpack into the browser bundle during `npm run build`. A value provided only
+# at runtime (compose `env_file`) NEVER reaches the client. The FULL public set
+# must therefore be passed here as --build-arg (wired in deploy.yml). Omitting one
+# bakes it EMPTY and the feature is silently dead in the browser regardless of
+# .env.production — e.g. the legal ИНН footer (152-ФЗ), the Yandex login button,
+# and browser-side error reporting. Keep this list in lockstep with the
+# `clientEnv` object in src/lib/env.ts. See docs/DOCKER-READINESS.md (env table).
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
 ARG NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
+ARG NEXT_PUBLIC_TELEGRAM_ENABLED=false
 ARG NEXT_PUBLIC_VK_ENABLED=false
+ARG NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=false
+ARG NEXT_PUBLIC_YANDEX_ENABLED=false
 ARG NEXT_PUBLIC_YANDEX_MAPS_API_KEY
+ARG NEXT_PUBLIC_LEGAL_INN
+ARG NEXT_PUBLIC_VK_COMMUNITY_URL
+ARG NEXT_PUBLIC_GLITCHTIP_DSN
+ARG NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT=production
+ARG NEXT_PUBLIC_GLITCHTIP_RELEASE
 
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY \
     NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=$NEXT_PUBLIC_TELEGRAM_BOT_USERNAME \
+    NEXT_PUBLIC_TELEGRAM_ENABLED=$NEXT_PUBLIC_TELEGRAM_ENABLED \
     NEXT_PUBLIC_VK_ENABLED=$NEXT_PUBLIC_VK_ENABLED \
+    NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=$NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED \
+    NEXT_PUBLIC_YANDEX_ENABLED=$NEXT_PUBLIC_YANDEX_ENABLED \
     NEXT_PUBLIC_YANDEX_MAPS_API_KEY=$NEXT_PUBLIC_YANDEX_MAPS_API_KEY \
+    NEXT_PUBLIC_LEGAL_INN=$NEXT_PUBLIC_LEGAL_INN \
+    NEXT_PUBLIC_VK_COMMUNITY_URL=$NEXT_PUBLIC_VK_COMMUNITY_URL \
+    NEXT_PUBLIC_GLITCHTIP_DSN=$NEXT_PUBLIC_GLITCHTIP_DSN \
+    NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT=$NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT \
+    NEXT_PUBLIC_GLITCHTIP_RELEASE=$NEXT_PUBLIC_GLITCHTIP_RELEASE \
     NEXT_TELEMETRY_DISABLED=1
+
+# ─── Build-only placeholder server env (throwaway — NEVER in the final image) ─
+# `next build` collects page data by EVALUATING every route module. A few server
+# modules throw at IMPORT time when their env is absent — notably
+# src/lib/prisma-direct.ts (`throw "DIRECT_URL is required for prismaDirect client"`),
+# which aborts the whole build. These values exist ONLY to satisfy those
+# import-time presence checks: no database or Redis connection is made during the
+# build (127.0.0.1 refuses instantly), and because this is a multi-stage build
+# NONE of these ENV survive into the `runner` stage — the runner receives the real
+# values from .env.production at runtime. Real secrets are never baked in.
+# (App-level note: these import-time throws make the app build-hostile; a lazy-init
+# refactor is filed as an app finding in docs/DOCKER-READINESS.md — not fixed here.)
+ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public" \
+    DIRECT_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public" \
+    AUTH_JWT_SECRET="build-only-placeholder-not-used-at-runtime-0000000000000000" \
+    OTP_HMAC_SECRET="build-only-placeholder-0000000000000000"
 
 RUN npm run build
 

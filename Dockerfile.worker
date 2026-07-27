@@ -27,6 +27,14 @@ COPY src ./src
 
 ENV NODE_ENV=production
 
+# Drop root: run as the image's built-in unprivileged `node` user (uid 1000).
+# The worker only READS its code + the Prisma engine (all world-readable) and
+# talks to Postgres/Redis/S3 over the network — it never writes to the container
+# filesystem — so no chown of the root-owned copies is needed. Mirrors the app
+# image's non-root `nextjs` user (Dockerfile) so neither long-running process
+# runs as root.
+USER node
+
 # WORKER-BOOT-SERVER-ONLY-01: the worker is a legitimate server runtime that
 # transitively imports `server-only`-guarded modules (redis/connection, prisma).
 # Under plain Node (tsx), `server-only` resolves to its throwing `index.js` and

@@ -67,12 +67,24 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/beautyhub-app:${{ steps.tag.outputs.tag }}
             ${{ env.REGISTRY }}/beautyhub-app:latest
+          # ⚠️ EVERY NEXT_PUBLIC_* is inlined into the CLIENT bundle at build time
+          # (src/lib/env.ts `clientEnv`). Any one omitted here is baked EMPTY and
+          # cannot be fixed by .env.production at runtime. Keep this list complete
+          # and in lockstep with the Dockerfile ARG block. See docs/DOCKER-READINESS.md.
           build-args: |
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
             NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${{ secrets.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME }}
+            NEXT_PUBLIC_TELEGRAM_ENABLED=${{ vars.NEXT_PUBLIC_TELEGRAM_ENABLED || 'false' }}
             NEXT_PUBLIC_VK_ENABLED=${{ vars.NEXT_PUBLIC_VK_ENABLED || 'false' }}
+            NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=${{ vars.NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED || 'false' }}
+            NEXT_PUBLIC_YANDEX_ENABLED=${{ vars.NEXT_PUBLIC_YANDEX_ENABLED || 'false' }}
             NEXT_PUBLIC_YANDEX_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_YANDEX_MAPS_API_KEY }}
+            NEXT_PUBLIC_LEGAL_INN=${{ vars.NEXT_PUBLIC_LEGAL_INN }}
+            NEXT_PUBLIC_VK_COMMUNITY_URL=${{ vars.NEXT_PUBLIC_VK_COMMUNITY_URL }}
+            NEXT_PUBLIC_GLITCHTIP_DSN=${{ vars.NEXT_PUBLIC_GLITCHTIP_DSN }}
+            NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT=${{ vars.NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT || 'production' }}
+            NEXT_PUBLIC_GLITCHTIP_RELEASE=${{ steps.tag.outputs.tag }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/beautyhub-app:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/beautyhub-app:buildcache,mode=max
 
