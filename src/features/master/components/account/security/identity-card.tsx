@@ -11,28 +11,32 @@ type Props = {
 };
 
 /**
- * Phone + email inline-editable card (fix-02).
+ * Phone + email identity card.
  *
- * Mirrors the editable rows on the profile contacts section — both
- * paths PATCH `/api/me`, last write wins. The legacy disabled
- * «Скоро · потребуется подтверждение» button was removed; the
- * SMS-verify gap is documented in a single honest hint at the bottom.
- * Pre-launch blocker tracked in BACKLOG.
+ * Phone is **read-only** here (SECURITY-EXPOSURE-AUDIT-01 #2): it is the login
+ * identity and the key guest bookings + studio invites match on, so it must not
+ * be writable without OTP verification. `PATCH /api/me` no longer accepts it;
+ * the number is set at signup via the SMS OTP flow. A verified change flow is
+ * tracked in BACKLOG (PHONE-CHANGE-VERIFIED-FLOW). Email stays inline-editable
+ * via `/api/me`, which now resets verification on any change.
  */
 export function IdentityCard({ identity }: Props) {
+  const phoneValue = identity.phone?.trim();
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <h2 className="font-display text-base text-text-main">{T.identityHeading}</h2>
       <ul className="mt-2 divide-y divide-border-subtle">
         <li>
-          <EditableFieldRow
-            label={T.phoneLabel}
-            value={identity.phone ?? ""}
-            fieldKey="phone"
-            apiPath="/api/me"
-            placeholder={TC.phonePlaceholder}
-            maxLength={40}
-          />
+          <div className="flex items-start gap-3 py-3">
+            <div className="min-w-0 flex-1">
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+                {T.phoneLabel}
+              </span>
+              <p className={phoneValue ? "mt-1 text-sm text-text-main" : "mt-1 text-sm italic text-text-sec"}>
+                {phoneValue || T.notSetLabel}
+              </p>
+            </div>
+          </div>
         </li>
         <li>
           <EditableFieldRow

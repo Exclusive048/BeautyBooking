@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sanitizeInternalPath } from "@/lib/http/safe-redirect";
 
 const DEFAULT_REDIRECT_PATH = "/cabinet/profile";
 
@@ -21,20 +22,14 @@ export function getPublicOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
+/**
+ * Validate a caller-supplied internal redirect target, falling back to a safe
+ * default. Delegates to the shared, origin-resolving validator — the previous
+ * "starts with `/`, not `//`" string check let `/\evil` and TAB-spliced forms
+ * resolve off-origin (SECURITY-EXPOSURE-AUDIT-01 · O1).
+ */
 export function normalizeInternalPath(target: string): string {
-  if (!target) return DEFAULT_REDIRECT_PATH;
-  const trimmed = target.trim();
-  if (!trimmed) return DEFAULT_REDIRECT_PATH;
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    return DEFAULT_REDIRECT_PATH;
-  }
-
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return DEFAULT_REDIRECT_PATH;
-  }
-
-  return trimmed;
+  return sanitizeInternalPath(target, DEFAULT_REDIRECT_PATH);
 }
 
 export function buildSameOriginRedirectUrl(req: Request, targetPath: string): URL {

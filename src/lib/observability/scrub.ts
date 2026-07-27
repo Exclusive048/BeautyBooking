@@ -193,8 +193,13 @@ const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 /** Session/OAuth cookies by name, wherever a raw Cookie header leaks into text. */
 const COOKIE_PAIR_RE =
   /\b(bh_session|bh_refresh|tg_login_state|vk_oauth_state|vk_oauth_verifier|yandex_oauth_state|yandex_oauth_verifier)=[^;,\s"'[]+/gi;
-/** `user:password@host` in any connection string (Postgres, Redis, SMTP, S3). */
-const URI_CREDENTIALS_RE = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s:@/]+:[^\s:@/]+@/gi;
+/**
+ * `user:password@host` in any connection string (Postgres, Redis, SMTP, S3).
+ * The username is optional (`*`, not `+`): the common `redis://:password@host`
+ * form has an empty user and was previously missed (SECURITY-EXPOSURE-AUDIT-01
+ * · Y4). The password class stays `+` (a real secret is present).
+ */
+const URI_CREDENTIALS_RE = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s:@/]*:[^\s:@/]+@/gi;
 /**
  * `token=…`, `client_secret=…` in query strings and log lines. The value class
  * excludes `[` so a second pass never re-matches an already-inserted

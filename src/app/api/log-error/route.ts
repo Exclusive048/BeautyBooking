@@ -20,8 +20,12 @@ const RATE_MAX = 20;
 export async function POST(req: Request) {
   try {
     const ip = getClientIp(req);
-    const isLimited = await checkRateLimit(`log-error:${ip}`, RATE_MAX, RATE_WINDOW);
-    if (isLimited) {
+    // The legacy 3-arg checkRateLimit overload returns `true` = ALLOWED. This
+    // previously read the result as `isLimited`, inverting the check: the first
+    // 20 reports/min were rejected and everything past the limit was accepted
+    // (SECURITY-EXPOSURE-AUDIT-01 · Y2). Guard on `!allowed`.
+    const allowed = await checkRateLimit(`log-error:${ip}`, RATE_MAX, RATE_WINDOW);
+    if (!allowed) {
       return fail("Too many requests", 429);
     }
 

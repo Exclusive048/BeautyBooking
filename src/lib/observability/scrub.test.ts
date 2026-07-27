@@ -264,6 +264,35 @@ describe("scrubString", () => {
       "at observability.instrumentation.register"
     );
   });
+
+  // SECURITY-EXPOSURE-AUDIT-01 · Y4 — the generic URI-credential pattern must
+  // catch the password-only form (empty username), the shape REDIS_URL uses.
+  it("redacts a password-only connection string (redis://:pw@host)", () => {
+    const scrubbed = scrubString("connect ECONNREFUSED redis://:s3cretRedisPw@cache.internal:6379");
+    expect(scrubbed).not.toContain("s3cretRedisPw");
+    expect(scrubbed).toContain(`redis://${REDACTED}@`);
+  });
+
+  it("still redacts the user:password connection form", () => {
+    const scrubbed = scrubString("rediss://default:An0therPw@managed.example:6380/0");
+    expect(scrubbed).not.toContain("An0therPw");
+    expect(scrubbed).toContain(`rediss://${REDACTED}@`);
+  });
+});
+
+describe("REDIS_URL literal redaction (Y4)", () => {
+  // A realistic Redis connection error carrying the full URL must not survive,
+  // matching how DATABASE_URL is already covered — the credentials are killed
+  // by the literal redactor built from env, and the empty-user form is also
+  // caught by the generic URI pattern.
+  const REDIS_URL = "redis://:sup3rSecretRedisPass@redis.internal:6379/2";
+  const redact = createLiteralRedactor([REDIS_URL]);
+
+  it("removes the password from a Redis connection error message", () => {
+    const out = scrubString(`Redis connection failed: ${REDIS_URL}`, redact);
+    expect(out).not.toContain("sup3rSecretRedisPass");
+    expect(out).not.toContain(REDIS_URL);
+  });
 });
 
 describe("isSensitiveKey", () => {

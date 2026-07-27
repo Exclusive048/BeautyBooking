@@ -85,8 +85,14 @@ export async function updateMeProfile(
     where: { id: userId },
     data: {
       displayName: input.displayName,
-      phone: input.phone,
+      // `phone` is intentionally NOT written here — it is removed from the
+      // accepted schema (SECURITY-EXPOSURE-AUDIT-01 #2). Phone is set only via
+      // the OTP-verified login flow.
       email: input.email,
+      // Any email change resets verification (mirrors the client-cabinet path,
+      // profile.service.ts): an email set here is unverified until the
+      // email OTP flow confirms it, so it is never left flagged as verified.
+      ...(input.email !== undefined ? { emailVerifiedAt: null } : {}),
       firstName: input.firstName,
       lastName: input.lastName,
       middleName: input.middleName,

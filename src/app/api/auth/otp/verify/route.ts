@@ -30,7 +30,11 @@ export async function POST(req: Request) {
     }
     const { phone, code } = parsed.data;
 
-    const lockCheck = await checkOtpVerifyLock(phone);
+    // O2: verify lockout is scoped by (phone + client IP) so a third party who
+    // knows the number can't lock the owner out. Resolved once, up front.
+    const clientIp = extractClientIp(req);
+
+    const lockCheck = await checkOtpVerifyLock(phone, clientIp);
     if (!lockCheck.ok) {
       return NextResponse.json(
         { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
@@ -52,7 +56,7 @@ export async function POST(req: Request) {
     });
 
     if (!otp) {
-      const failResult = await registerOtpVerifyFailure(phone);
+      const failResult = await registerOtpVerifyFailure(phone, clientIp);
       if (!failResult.ok) {
         void recordSurfaceEvent({
           surface: "auth",
@@ -76,7 +80,7 @@ export async function POST(req: Request) {
 
     const verifyDbStartedAt = Date.now();
     const [, , existingProfile] = await Promise.all([
-      clearOtpVerifyFailures(phone),
+      clearOtpVerifyFailures(phone, clientIp),
       prisma.otpCode.update({
         where: { id: otp.id },
         data: { usedAt: now },
@@ -93,7 +97,7 @@ export async function POST(req: Request) {
       ms: Date.now() - verifyDbStartedAt,
     });
 
-    const ipAddress = extractClientIp(req);
+    const ipAddress = clientIp;
     const userAgent = req.headers.get("user-agent");
 
     const sideEffectsStartedAt = Date.now();

@@ -34,7 +34,10 @@ export async function POST(req: Request) {
     const { email, code } = parsed.data;
     const normalizedEmail = email.toLowerCase();
 
-    const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail);
+    // O2: scope verify lockout by (email + client IP) — see otp-rate-limit.ts.
+    const clientIp = extractClientIp(req);
+
+    const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail, clientIp);
     if (!lockCheck.ok) {
       return NextResponse.json(
         { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
@@ -57,7 +60,7 @@ export async function POST(req: Request) {
     });
 
     if (!otp) {
-      const failResult = await registerOtpEmailVerifyFailure(normalizedEmail);
+      const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
       if (!failResult.ok) {
         void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: failResult.error ?? "OTP_VERIFY_LOCKED" });
         return NextResponse.json(
@@ -70,7 +73,7 @@ export async function POST(req: Request) {
     }
 
     const [, , existingProfile] = await Promise.all([
-      clearOtpEmailVerifyFailures(normalizedEmail),
+      clearOtpEmailVerifyFailures(normalizedEmail, clientIp),
       prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }),
       prisma.userProfile.findUnique({ where: { email: normalizedEmail } }),
     ]);
@@ -80,7 +83,7 @@ export async function POST(req: Request) {
     // erroring (6th re-read-on-conflict site — see email-login-profile.ts).
     const profile = await resolveEmailLoginProfile(normalizedEmail, existingProfile);
 
-    const ipAddress = extractClientIp(req);
+    const ipAddress = clientIp;
     const userAgent = req.headers.get("user-agent");
 
     const consentPromise = prisma.userConsent

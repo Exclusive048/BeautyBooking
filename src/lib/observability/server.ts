@@ -54,6 +54,10 @@ function collectSecretLiterals(): LiteralRedactor | undefined {
   return createLiteralRedactor([
     env.DATABASE_URL,
     env.DIRECT_URL,
+    // SECURITY-EXPOSURE-AUDIT-01 · Y4: REDIS_URL carries a password in the
+    // common `redis://:pw@host` form and surfaces inside Redis connection
+    // errors. It was the one connection-string env var missing from this list.
+    env.REDIS_URL,
     env.AUTH_JWT_SECRET,
     env.OTP_HMAC_SECRET,
     env.MEDIA_DELIVERY_SECRET,

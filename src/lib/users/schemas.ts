@@ -20,7 +20,13 @@ const birthDateSchema = z.preprocess(
 
 export const profileUpdateSchema = z.object({
   displayName: optionalText(120),
-  phone: optionalText(32),
+  // SECURITY-EXPOSURE-AUDIT-01 #2: `phone` is the identity/login primitive and
+  // the key guest bookings + studio invites are matched on. It must NOT be
+  // writable here without OTP verification — an unverified write is an account-
+  // takeover vector. There is no verified phone-change flow yet; until one
+  // exists (backlog: PHONE-CHANGE-VERIFIED-FLOW), phone is only established at
+  // signup via the OTP login flow. Removed from the accepted fields entirely;
+  // Zod strips an incoming `phone` key rather than persisting it.
   email: optionalText(120),
   firstName: optionalText(80),
   lastName: optionalText(80),

@@ -7,6 +7,8 @@ import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
 import { resolveStoredSocialLink, type SocialKind } from "@/lib/providers/social-links";
+import { deleteAssetById } from "@/lib/media/service";
+import { logError } from "@/lib/logging/logger";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
 
 // FEAT-PROVIDER-SOCIALS: normalize a raw social input into the value to store
@@ -493,6 +495,19 @@ function uniqueIds(ids: string[]): string[] {
 }
 
 const MEDIA_FILE_PATH_PREFIX = "/api/media/file/";
+
+/**
+ * Extract the asset id from a stored `mediaUrl`, which may be relative
+ * (`/api/media/file/<id>`) OR absolute (legacy rows). `new URL()` throws on a
+ * relative string, so we locate the prefix directly instead.
+ */
+function assetIdFromMediaFileUrl(mediaUrl: string): string | null {
+  const idx = mediaUrl.indexOf(MEDIA_FILE_PATH_PREFIX);
+  if (idx === -1) return null;
+  const rest = mediaUrl.slice(idx + MEDIA_FILE_PATH_PREFIX.length);
+  const id = rest.split(/[/?#]/)[0];
+  return id || null;
+}
 
 function extractMediaAssetIdFromUrl(mediaUrl: string): string | null {
   try {
@@ -1073,6 +1088,7 @@ export async function deleteMasterPortfolioItem(
     select: {
       id: true,
       masterId: true,
+      mediaUrl: true,
       globalCategoryId: true,
       services: { select: { service: { select: { globalCategoryId: true } } } },
       tags: { select: { tagId: true } },
@@ -1107,6 +1123,23 @@ export async function deleteMasterPortfolioItem(
       });
     }
   });
+
+  // SECURITY-EXPOSURE-AUDIT-01 #3: deleting the portfolio item must actually
+  // stop the image being served. Previously only the PortfolioItem row was
+  // removed, leaving the MediaAsset live (`deletedAt: null`) and anonymously
+  // fetchable forever. Soft-delete the underlying asset (marks `deletedAt` so
+  // every serving path 404s it) and best-effort remove the stored bytes.
+  const assetId = assetIdFromMediaFileUrl(item.mediaUrl);
+  if (assetId) {
+    await deleteAssetById(assetId).catch((error) => {
+      logError("Failed to delete portfolio media asset after item removal", {
+        portfolioId: item.id,
+        assetId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
   await invalidateAdvisorCache(masterId);
   return { id: item.id };
 }

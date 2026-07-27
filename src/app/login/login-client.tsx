@@ -28,6 +28,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
+import { parseInternalPath } from "@/lib/http/safe-redirect";
 import type { PublicStats } from "@/lib/stats/public-stats";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -68,11 +69,12 @@ function isEmailValid(input: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
 }
 
+// Post-login landing target. Delegates to the shared origin-resolving validator
+// (SECURITY-EXPOSURE-AUDIT-01 · O1) — the old "starts with `/`, not `//`" check
+// let `/\evil` and TAB-spliced forms through to window.location.replace. Returns
+// null for an invalid target so the caller falls back to the server's redirect.
 function safeNext(nextRaw: string | null) {
-  if (!nextRaw) return null;
-  if (!nextRaw.startsWith("/")) return null;
-  if (nextRaw.startsWith("//")) return null;
-  return nextRaw;
+  return parseInternalPath(nextRaw);
 }
 
 function formatStatNumber(value: number): string {

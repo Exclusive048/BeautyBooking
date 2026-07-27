@@ -21,6 +21,29 @@ function hashKey(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
+/**
+ * Scope the verify-failure counter/lock by (identity + client IP), not by the
+ * identity (phone/email) alone.
+ *
+ * SECURITY-EXPOSURE-AUDIT-01 · O2: keying the lock on the victim's phone alone
+ * let a third party who knew the number burn the 5-attempt budget and lock that
+ * specific person out of logging in — a cheap targeted DoS. With the IP
+ * dimension an attacker locks only (victim-identity, attacker-IP); the victim
+ * from their own IP is never affected. Single-source brute-force stays bounded
+ * to exactly the same 5 attempts / 15 min as before, so brute-force protection
+ * is unchanged — only the cross-victim lockout is removed. Distributed
+ * brute-force is bounded instead by 6-digit code entropy × single-use × 5-min
+ * TTL × the request-side limits (3 codes / 5 min / phone), which is infeasible.
+ *
+ * ⚠️ Correctness depends on client-IP resolution. If TRUSTED_PROXY_HOPS is
+ * misconfigured in prod so every request resolves to the same edge IP, this
+ * degrades to per-identity — i.e. today's behaviour — never worse, and correct
+ * once the proxy hops are set. Flagged in the deploy checklist.
+ */
+function verifyScopeId(identity: string, ip: string | null): string {
+  return `${hashKey(identity)}:${hashKey(ip?.trim() || "unknown")}`;
+}
+
 async function incrWithWindow(
   key: string,
   windowSeconds: number
@@ -83,7 +106,7 @@ export async function checkOtpRequestRateLimit(input: {
   return { ok: true };
 }
 
-export async function checkOtpVerifyLock(phone: string): Promise<RateLimitResult> {
+export async function checkOtpVerifyLock(phone: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
     throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
@@ -92,7 +115,7 @@ export async function checkOtpVerifyLock(phone: string): Promise<RateLimitResult
   }
 
   try {
-    const lockKey = `otp:verify:lock:${hashKey(phone)}`;
+    const lockKey = `otp:verify:lock:${verifyScopeId(phone, ip)}`;
     const ttl = await client.ttl(lockKey);
     if (ttl > 0) {
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl };
@@ -109,7 +132,7 @@ export async function checkOtpVerifyLock(phone: string): Promise<RateLimitResult
   return { ok: true };
 }
 
-export async function registerOtpVerifyFailure(phone: string): Promise<RateLimitResult> {
+export async function registerOtpVerifyFailure(phone: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
     throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
@@ -118,14 +141,15 @@ export async function registerOtpVerifyFailure(phone: string): Promise<RateLimit
   }
 
   try {
-    const key = `otp:verify:fail:${hashKey(phone)}`;
+    const scope = verifyScopeId(phone, ip);
+    const key = `otp:verify:fail:${scope}`;
     const count = await client.incr(key);
     if (count === 1) {
       await client.expire(key, OTP_VERIFY_LOCK_SECONDS);
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
-      alertOtpRateLimitTriggered(null, phone);
-      const lockKey = `otp:verify:lock:${hashKey(phone)}`;
+      alertOtpRateLimitTriggered(ip, phone);
+      const lockKey = `otp:verify:lock:${scope}`;
       await client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS });
       const ttl = await client.ttl(lockKey);
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl > 0 ? ttl : OTP_VERIFY_LOCK_SECONDS };
@@ -142,13 +166,14 @@ export async function registerOtpVerifyFailure(phone: string): Promise<RateLimit
   return { ok: true };
 }
 
-export async function clearOtpVerifyFailures(phone: string): Promise<void> {
+export async function clearOtpVerifyFailures(phone: string, ip: string | null): Promise<void> {
   const client = await getRedisConnection();
   if (!client) return;
 
   try {
-    const failKey = `otp:verify:fail:${hashKey(phone)}`;
-    const lockKey = `otp:verify:lock:${hashKey(phone)}`;
+    const scope = verifyScopeId(phone, ip);
+    const failKey = `otp:verify:fail:${scope}`;
+    const lockKey = `otp:verify:lock:${scope}`;
     await Promise.all([client.del(failKey), client.del(lockKey)]);
   } catch (error) {
     logError("OTP verify lock cleanup failed", {
@@ -202,7 +227,7 @@ export async function checkOtpEmailRequestRateLimit(input: {
   return { ok: true };
 }
 
-export async function checkOtpEmailVerifyLock(email: string): Promise<RateLimitResult> {
+export async function checkOtpEmailVerifyLock(email: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
     throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
@@ -211,7 +236,7 @@ export async function checkOtpEmailVerifyLock(email: string): Promise<RateLimitR
   }
 
   try {
-    const lockKey = `otp:verify:email:lock:${hashKey(email.toLowerCase())}`;
+    const lockKey = `otp:verify:email:lock:${verifyScopeId(email.toLowerCase(), ip)}`;
     const ttl = await client.ttl(lockKey);
     if (ttl > 0) {
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl };
@@ -228,7 +253,7 @@ export async function checkOtpEmailVerifyLock(email: string): Promise<RateLimitR
   return { ok: true };
 }
 
-export async function registerOtpEmailVerifyFailure(email: string): Promise<RateLimitResult> {
+export async function registerOtpEmailVerifyFailure(email: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
     throw new AppError("Rate limit unavailable", 429, "RATE_LIMITED", {
@@ -237,14 +262,15 @@ export async function registerOtpEmailVerifyFailure(email: string): Promise<Rate
   }
 
   try {
-    const key = `otp:verify:email:fail:${hashKey(email.toLowerCase())}`;
+    const scope = verifyScopeId(email.toLowerCase(), ip);
+    const key = `otp:verify:email:fail:${scope}`;
     const count = await client.incr(key);
     if (count === 1) {
       await client.expire(key, OTP_VERIFY_LOCK_SECONDS);
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
-      alertOtpRateLimitTriggered(null, email);
-      const lockKey = `otp:verify:email:lock:${hashKey(email.toLowerCase())}`;
+      alertOtpRateLimitTriggered(ip, email);
+      const lockKey = `otp:verify:email:lock:${scope}`;
       await client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS });
       const ttl = await client.ttl(lockKey);
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl > 0 ? ttl : OTP_VERIFY_LOCK_SECONDS };
@@ -261,14 +287,14 @@ export async function registerOtpEmailVerifyFailure(email: string): Promise<Rate
   return { ok: true };
 }
 
-export async function clearOtpEmailVerifyFailures(email: string): Promise<void> {
+export async function clearOtpEmailVerifyFailures(email: string, ip: string | null): Promise<void> {
   const client = await getRedisConnection();
   if (!client) return;
 
   try {
-    const normalized = email.toLowerCase();
-    const failKey = `otp:verify:email:fail:${hashKey(normalized)}`;
-    const lockKey = `otp:verify:email:lock:${hashKey(normalized)}`;
+    const scope = verifyScopeId(email.toLowerCase(), ip);
+    const failKey = `otp:verify:email:fail:${scope}`;
+    const lockKey = `otp:verify:email:lock:${scope}`;
     await Promise.all([client.del(failKey), client.del(lockKey)]);
   } catch (error) {
     logError("OTP email verify lock cleanup failed", {
