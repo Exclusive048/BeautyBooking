@@ -2,6 +2,7 @@ import { CategoryStatus } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
+import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
 export type StudioServiceAssignedMaster = {
@@ -430,16 +431,11 @@ export async function assignMasterToService(input: {
   masterId: string;
   isEnabled?: boolean;
 }): Promise<{ serviceId: string; masterId: string }> {
-  const service = await prisma.service.findUnique({
-    where: { id: input.serviceId },
-    select: { id: true, studioId: true },
-  });
-  if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
-  }
-  if (service.studioId && service.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
-  }
+  // SECURITY-EXPOSURE-AUDIT-01 #1 (R1e): the service guard was null-permissive
+  // (`service.studioId && …`), so a solo provider's service (studioId === null)
+  // could be targeted from any studio. Scope the service to this studio; the
+  // master is scoped below by requireActiveStudioMaster.
+  await assertBelongsToStudio("service", input.serviceId, input.studioId);
 
   const studio = await getStudioContext(input.studioId);
   // STUDIO-BUGS-FIX-A bug #5: gate assignment on ACTIVE master status.
@@ -481,16 +477,10 @@ export async function unassignMasterFromService(input: {
   serviceId: string;
   masterId: string;
 }): Promise<{ serviceId: string; masterId: string }> {
-  const service = await prisma.service.findUnique({
-    where: { id: input.serviceId },
-    select: { id: true, studioId: true },
-  });
-  if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
-  }
-  if (service.studioId && service.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
-  }
+  // SECURITY-EXPOSURE-AUDIT-01 #1 (R1e): the service guard was null-permissive
+  // AND the master was never scoped (unlike assign). Scope BOTH to this studio.
+  await assertBelongsToStudio("service", input.serviceId, input.studioId);
+  await assertBelongsToStudio("master", input.masterId, input.studioId);
 
   await prisma.masterService.updateMany({
     where: {

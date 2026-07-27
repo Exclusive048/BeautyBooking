@@ -1,16 +1,21 @@
 import { z } from "zod";
 import { ok, fail } from "@/lib/api/response";
-import { toAppError } from "@/lib/api/errors";
 import { requireAuth } from "@/lib/auth/guards";
-import { prisma } from "@/lib/prisma";
-import { attachMasterToStudio, detachMasterFromStudio, listStudioMasters } from "@/lib/studios/masters";
+import { detachMasterFromStudio, listStudioMasters } from "@/lib/studios/masters";
 import { ensureStudioAdmin } from "@/lib/studios/access";
-import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
-import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 
-const attachSchema = z.object({
-  masterProviderId: z.string().min(1),
-});
+/**
+ * SECURITY-EXPOSURE-AUDIT-01 finding #1 (R1b): the `POST` direct-attach handler
+ * was removed. It authorized the caller's own studio but then re-parented ANY
+ * caller-supplied master (`attachMasterToStudio`'s null-permissive branch), so a
+ * throwaway studio could seize a solo master with no consent — and the victim
+ * could not leave. It had **no** frontend or server caller: a master only ever
+ * joins a studio via the invite flow (`POST /api/studios/[id]/invites` /
+ * `POST /api/studio/masters` → `acceptStudioInvite`), which verifies the
+ * accepting user's own phone (`hasInvitePhoneAccess`) before calling
+ * `attachMasterToStudio` internally. The primitive is intentionally kept for
+ * that consented path; only this unconsented HTTP surface is gone.
+ */
 
 const detachSchema = z.object({
   masterProviderId: z.string().min(1),
@@ -37,50 +42,6 @@ export async function GET(
   return ok({ masters: result.data });
 }
 
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
-) {
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
-
-  const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
-  if (accessError) return accessError;
-
-  const body = await req.json().catch(() => null);
-  const parsed = attachSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
-
-  // BC-CAP: attaching an already-ACTIVE master consumes a team seat. An
-  // inactive/unclaimed master doesn't count toward the ACTIVE-only cap, so gate
-  // only when the target is ACTIVE. `p.id` is the studio Provider id; the cap
-  // check keys on Studio.id.
-  const attachTarget = await prisma.provider.findUnique({
-    where: { id: parsed.data.masterProviderId },
-    select: { ownerUserId: true, isPublished: true },
-  });
-  if (attachTarget && isStudioMasterActive(attachTarget)) {
-    const studioRow = await prisma.studio.findUnique({
-      where: { providerId: p.id },
-      select: { id: true },
-    });
-    if (studioRow) {
-      try {
-        await ensureStudioTeamLimit(studioRow.id);
-      } catch (error) {
-        const appError = toAppError(error);
-        return fail(appError.message, appError.status, appError.code, appError.details);
-      }
-    }
-  }
-
-  const result = await attachMasterToStudio(p.id, parsed.data.masterProviderId);
-  if (!result.ok) return fail(result.message, result.status, result.code);
-
-  return ok({ master: result.data }, { status: 201 });
-}
-
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
@@ -96,6 +57,9 @@ export async function DELETE(
   const parsed = detachSchema.safeParse(body);
   if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
 
+  // `detachMasterFromStudio` is scoped: it only detaches a master whose
+  // `studioId` equals this studio's provider id (unconditional `!==`), so a
+  // foreign/solo master is rejected 404.
   const result = await detachMasterFromStudio(p.id, parsed.data.masterProviderId);
   if (!result.ok) return fail(result.message, result.status, result.code);
 

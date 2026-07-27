@@ -145,8 +145,12 @@ export const bulkMasterServicesSchema = z.object({
       z.object({
         serviceId: z.string().trim().min(1),
         isEnabled: z.boolean(),
-        priceOverride: z.number().int().nullable().optional(),
-        durationOverrideMin: z.number().int().nullable().optional(),
+        // SECURITY-EXPOSURE-AUDIT-01 #1 (R1c) defense-in-depth: bound the
+        // overrides so a hostile/buggy payload can't set a negative price or a
+        // calendar-blowing duration (the cross-tenant reach is closed by the
+        // master-scoping above; these keep the values sane for one's own team).
+        priceOverride: z.number().int().min(0).nullable().optional(),
+        durationOverrideMin: z.number().int().min(1).max(24 * 60).nullable().optional(),
         commissionPct: z.number().min(0).max(100).nullable().optional(),
       })
     )

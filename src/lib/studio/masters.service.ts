@@ -2,6 +2,7 @@ import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
+import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { MembershipStatus, ProviderType } from "@prisma/client";
 
 export type StudioMasterServiceItem = {
@@ -241,6 +242,15 @@ export async function bulkUpdateMasterServices(input: {
   }>;
 }): Promise<{ updated: number }> {
   if (input.items.length === 0) return { updated: 0 };
+
+  // SECURITY-EXPOSURE-AUDIT-01 #1 (R1c): the masterId was trusted (no scoping),
+  // so any studio could rewrite/disable another provider's service config.
+  // Scope the master to this studio, and each service to this studio's catalogue.
+  await assertBelongsToStudio("master", input.masterId, input.studioId);
+  const serviceIds = Array.from(new Set(input.items.map((item) => item.serviceId)));
+  await Promise.all(
+    serviceIds.map((serviceId) => assertBelongsToStudio("service", serviceId, input.studioId))
+  );
 
   await prisma.$transaction(
     input.items.map((item) =>
