@@ -259,10 +259,14 @@ export async function POST(req: Request) {
 
     return ok({ refund });
 
-  } catch {
-
+  } catch (error) {
+    // SECURITY-EXPOSURE-AUDIT-01 · B6: the bare catch discarded the real
+    // exception, so a post-createRefund failure (DB update / audit write) was
+    // invisible in triage — the refund may already have landed at YooKassa.
+    logError("admin.billing.refund.failed", {
+      error: error instanceof Error ? error.stack : String(error),
+    });
     return fail("Не удалось оформить возврат.", 500, "REFUND_ERROR");
-
   }
 
 }

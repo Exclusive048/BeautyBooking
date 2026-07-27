@@ -248,6 +248,14 @@ describe("scrubString", () => {
     expect(scrubString(`bh_session=${SESSION_JWT}; other=keep`)).toBe(`bh_session=${REDACTED}; other=keep`);
   });
 
+  // SECURITY-EXPOSURE-AUDIT-01 · B5: the denylist named non-existent
+  // `vk_oauth_*` cookies; the real VK OAuth cookies are `vk_id_state` /
+  // `vk_id_verifier` (src/lib/vk/cookies.ts).
+  it("redacts the real VK OAuth cookie names (vk_id_state / vk_id_verifier)", () => {
+    expect(scrubString("vk_id_state=abc123secret; keep=1")).toBe(`vk_id_state=${REDACTED}; keep=1`);
+    expect(scrubString("vk_id_verifier=xyz789secret")).toBe(`vk_id_verifier=${REDACTED}`);
+  });
+
   it("redacts secret-shaped key=value pairs but preserves error codes", () => {
     expect(scrubString("client_secret=abc123def")).toContain(REDACTED);
     expect(scrubString("code=BOOKING_CONFLICT")).toBe("code=BOOKING_CONFLICT");

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import type { ErrorCode } from "@/lib/api/errors";
-import { getRequestId } from "@/lib/logging/logger";
+import { getRequestId, logError } from "@/lib/logging/logger";
+import { track5xxError } from "@/lib/monitoring/api-alerts";
+import { shouldReportFailure } from "@/lib/observability/noise";
+import { reportMessage } from "@/lib/observability/report";
 
 export type ApiSuccess<T> = {
   ok: true;
@@ -58,5 +61,20 @@ export function jsonFail(
   fieldErrors?: ApiFieldErrors
 ) {
   const payload = fail(status, message, code, details, fieldErrors);
+  // SECURITY-EXPOSURE-AUDIT-01 · B2: the ~150 routes on this envelope never
+  // surfaced their 5xx to ops/error-tracking (only `response.ts` `fail()` did).
+  // Mirror it here — purely additive, no response-shape change. Details are
+  // NOT forwarded to the reporter (only message/code), matching `fail()`.
+  if (status >= 500) {
+    logError(message, { status, code, requestId: payload.response.requestId, __skipAlert: true });
+    track5xxError("", payload.response.requestId, message);
+    if (shouldReportFailure(status, code)) {
+      reportMessage(message, {
+        level: "error",
+        tags: { http_status: status, error_code: code },
+        extra: { requestId: payload.response.requestId },
+      });
+    }
+  }
   return NextResponse.json<ApiError>(payload.response, { status: payload.status });
 }

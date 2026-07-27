@@ -34,6 +34,11 @@ const SENSITIVE_ROUTE_PREFIXES = [
 ] as const;
 const SENSITIVE_KEY_PREFIXES = [
   "rate:createBooking:",
+  // SECURITY-EXPOSURE-AUDIT-01 · Y6: the public booking-write paths must fail
+  // CLOSED on a Redis outage like `rate:createBooking:` does, not fail open.
+  "rate:publicBooking:",
+  "rate:packageBook:",
+  "rate:studioPackageBook:",
   "rl:categories:propose:",
   "rl:/api/me/delete",
   "rl:/api/cabinet/master/delete",

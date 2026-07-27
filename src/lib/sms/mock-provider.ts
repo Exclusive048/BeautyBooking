@@ -1,4 +1,5 @@
 import { logInfo } from "@/lib/logging/logger";
+import { maskPhone } from "@/lib/logging/masking";
 import type { SmsProvider } from "./types";
 
 /**
@@ -15,8 +16,11 @@ export function createMockSmsProvider(): SmsProvider {
     name: "mock",
 
     async send(phone, message) {
+      // SECURITY-EXPOSURE-AUDIT-01 · Y21: mask the phone (152-ФЗ) as the rest of
+      // the SMS layer does. `message` carries the OTP by design (dev-only mock,
+      // CLAUDE.md rule 9) so it stays readable for local testing.
       logInfo("[MOCK SMS] would deliver", {
-        phone,
+        phone: maskPhone(phone),
         message,
       });
       return {

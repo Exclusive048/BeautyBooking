@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ProviderType } from "@prisma/client";
+import { isValidTimeZone } from "@/lib/schedule/timezone";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
@@ -38,7 +39,17 @@ const createSchema = z.object({
   nameGenitive: z.string().trim().min(2).max(80).optional().nullable(),
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
-  timezone: z.string().trim().min(3).max(64).optional(),
+  // SECURITY-EXPOSURE-AUDIT-01 · Y15: validate the IANA tz (as the studio/master
+  // PATCH paths do) so an invalid zone can't be persisted on City.timezone and
+  // inherited by providers. Read-time already degrades to Europe/Moscow; this is
+  // write-time defense-in-depth.
+  timezone: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .refine((value) => isValidTimeZone(value), { message: "Некорректный часовой пояс" })
+    .optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
   isActive: z.boolean().optional(),
 });

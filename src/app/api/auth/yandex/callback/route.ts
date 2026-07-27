@@ -3,7 +3,8 @@ import { AccountType } from "@prisma/client";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { withRequestContext } from "@/lib/api/with-request-context";
-import { AppError, toAppError } from "@/lib/api/errors";
+import { AppError } from "@/lib/api/errors";
+import { failOAuthCallback } from "@/lib/auth/oauth-callback-error";
 import { fail } from "@/lib/api/response";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
@@ -235,8 +236,7 @@ export async function GET(req: Request) {
       await setSessionCookies(response, { sub: user.id, phone: user.phone ?? null, roles: user.roles });
       return response;
     } catch (error) {
-      const appError = error instanceof AppError ? error : toAppError(error);
-      return fail(appError.message, appError.status, appError.code, appError.details);
+      return failOAuthCallback(req, error);
     }
   });
 }

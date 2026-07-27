@@ -58,10 +58,13 @@ export async function POST(req: Request) {
       // Fail-soft: provider outage never 500-s the auth route. The OTP row
       // is already persisted, so a successful retry within 5 min re-delivers
       // (rate-limit governs retry pacing).
+      // SECURITY-EXPOSURE-AUDIT-01 · Y16: `reason` echoed the raw SmsErrorCode
+      // (INSUFFICIENT_BALANCE / AUTH_FAILED / IP_BLOCKED), disclosing SMS-gateway
+      // account state to anonymous callers. The code is still logged server-side
+      // (sendOtpSms → logError); the client sees only a generic message.
       return NextResponse.json(
         {
           error: "SMS_DELIVERY_FAILED",
-          reason: smsResult.error,
           message:
             "Не удалось отправить SMS. Попробуйте ещё раз через минуту.",
         },

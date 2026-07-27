@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTimeZone } from "@/lib/schedule/timezone";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { createAdminAuditLog } from "@/lib/audit/admin-audit";
@@ -28,7 +29,15 @@ const patchSchema = z.object({
   nameGenitive: z.string().trim().max(80).nullable().optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
-  timezone: z.string().trim().min(3).max(64).optional(),
+  // SECURITY-EXPOSURE-AUDIT-01 · Y15: validate the IANA tz (write-time
+  // defense-in-depth) — see admin/cities/route.ts.
+  timezone: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .refine((value) => isValidTimeZone(value), { message: "Некорректный часовой пояс" })
+    .optional(),
   sortOrder: z.number().int().min(0).max(10_000).optional(),
   isActive: z.boolean().optional(),
   autoCreated: z.boolean().optional(),

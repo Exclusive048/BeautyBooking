@@ -77,6 +77,10 @@ export async function GET(req: Request) {
         isEnabled: true,
         provider: {
           type: "MASTER",
+          // SECURITY-EXPOSURE-AUDIT-01 · Y11: only published providers belong in
+          // the public hot-slots feed — an unpublished/paused master's discount
+          // rules were leaking (and advertising bookable slots that 409 later).
+          isPublished: true,
           publicUsername: { not: null },
           ...(query.category ? { categories: { has: query.category } } : {}),
         },

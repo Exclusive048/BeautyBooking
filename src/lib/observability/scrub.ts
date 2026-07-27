@@ -192,7 +192,7 @@ const JWT_RE = /\bey[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g;
 const AUTH_SCHEME_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 /** Session/OAuth cookies by name, wherever a raw Cookie header leaks into text. */
 const COOKIE_PAIR_RE =
-  /\b(bh_session|bh_refresh|tg_login_state|vk_oauth_state|vk_oauth_verifier|yandex_oauth_state|yandex_oauth_verifier)=[^;,\s"'[]+/gi;
+  /\b(bh_session|bh_refresh|tg_login_state|vk_id_state|vk_id_verifier|yandex_oauth_state|yandex_oauth_verifier)=[^;,\s"'[]+/gi;
 /**
  * `user:password@host` in any connection string (Postgres, Redis, SMTP, S3).
  * The username is optional (`*`, not `+`): the common `redis://:password@host`

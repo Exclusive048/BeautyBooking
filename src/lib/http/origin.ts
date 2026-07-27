@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
 import { sanitizeInternalPath } from "@/lib/http/safe-redirect";
 
 const DEFAULT_REDIRECT_PATH = "/cabinet/profile";
@@ -10,6 +11,20 @@ function firstHeaderValue(value: string | null): string | null {
 }
 
 export function getPublicOrigin(req: Request): string {
+  // SECURITY-EXPOSURE-AUDIT-01 · B4: prefer the configured canonical origin over
+  // attacker-controlled `x-forwarded-host`/`x-forwarded-proto` when building
+  // redirect bases (OAuth callbacks / logout). Production always sets
+  // NEXT_PUBLIC_APP_URL (env.ts requires it), so host-header injection is closed
+  // there; dev/test (env unset) fall back to the request headers as before.
+  const configured = env.NEXT_PUBLIC_APP_URL?.trim() || env.APP_PUBLIC_URL?.trim();
+  if (configured) {
+    try {
+      return new URL(configured).origin;
+    } catch {
+      /* malformed env — fall back to headers */
+    }
+  }
+
   const proto = firstHeaderValue(req.headers.get("x-forwarded-proto")) ?? "http";
   const host =
     firstHeaderValue(req.headers.get("x-forwarded-host")) ??
