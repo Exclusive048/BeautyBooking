@@ -3,37 +3,33 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import {
-  ArrowRight,
-  BellRing,
-  CalendarClock,
-  Check,
-  ChevronLeft,
-  Images,
-  Mail,
-  Phone,
-  ShieldCheck,
-  Wallet,
-  Zap,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
 import YandexLoginButton from "@/components/auth/yandex-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { OtpInput } from "@/components/ui/otp-input";
-import { ResilientImage } from "@/components/ui/resilient-image";
+import { OtpInput, type OtpState } from "@/components/ui/otp-input";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { parseInternalPath } from "@/lib/http/safe-redirect";
 import type { PublicStats } from "@/lib/stats/public-stats";
 import { UI_TEXT } from "@/lib/ui/text";
+import { LoginShowcase, formatStatNumber } from "./login-showcase";
 
 const RESEND_TIMEOUT = 60;
 const OTP_LENGTH = 6;
+
+/**
+ * How long the success beat holds before the redirect fires (LOGIN-WOW-01).
+ * The cascade itself runs 6 × 45 ms + 220 ms ≈ 490 ms, but it starts the moment
+ * the server answers and the redirect does not wait for it to finish — this is
+ * the *artificial* part of the delay and is deliberately kept under the ~400 ms
+ * budget. Reduced motion drops it to zero.
+ */
+const SUCCESS_HOLD_MS = 380;
 
 type LoginMode = "phone" | "email";
 
@@ -83,29 +79,7 @@ function safeNext(nextRaw: string | null) {
   return parseInternalPath(nextRaw);
 }
 
-function formatStatNumber(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  return new Intl.NumberFormat("ru-RU").format(value);
-}
-
-// ---------- Animation variants (framer-motion — enter / stagger / step) ----------
-
-const panelVariants = {
-  hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.09, delayChildren: 0.2 },
-  },
-};
-
-const panelItemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
-  },
-};
+// ---------- Animation variants (framer-motion — enter / step) ----------
 
 const stepVariants = {
   enter: { opacity: 0, x: 22 },
@@ -120,11 +94,6 @@ const stepVariants = {
     transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
   },
 };
-
-// Marquee benefit cards — visual device only. Copy lives in UI_TEXT; the icons
-// are paired here by index (icons are not UI text). No invented person, quote
-// or rating (LOGIN-REDESIGN-01 marquee decision).
-const MARQUEE_ICONS: LucideIcon[] = [Zap, Wallet, Images, BellRing, CalendarClock, ShieldCheck];
 
 // ---------- Main component ----------
 
@@ -151,8 +120,6 @@ export default function LoginClient({
     [searchParams],
   );
   const reduce = useReducedMotion();
-  const panelAnim = reduce ? undefined : panelVariants;
-  const panelItemAnim = reduce ? undefined : panelItemVariants;
   const stepAnim = reduce ? undefined : stepVariants;
 
   // AUTH-GATE-01: open on whichever OTP channel is actually available. The
@@ -168,10 +135,11 @@ export default function LoginClient({
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);
+  // LOGIN-WOW-01: the OTP grid's own lifecycle. Purely presentational — the
+  // auth calls below drive it, never the other way round.
+  const [otpState, setOtpState] = useState<OtpState>("idle");
 
   const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const paneRef = useRef<HTMLElement | null>(null);
-  const auroraRef = useRef<HTMLDivElement | null>(null);
   const phoneValid = isPhoneValid(phone);
   const emailValid = isEmailValid(email);
   const inputValid = mode === "phone" ? phoneValid : emailValid;
@@ -221,6 +189,9 @@ export default function LoginClient({
   // make sense. With neither (VK/Yandex-only config) the form, the tabs and the
   // "или войти через" divider are all dropped and the social grid stands alone.
   const otpEnabled = phoneEnabled || emailEnabled;
+  // Each social button self-gates, so this mirrors what the grid below will
+  // actually render.
+  const hasSocialProviders = Boolean(telegramEnabled || vkEnabled || yandexEnabled);
 
   function switchMode(newMode: LoginMode) {
     if (newMode === mode) return;
@@ -233,22 +204,7 @@ export default function LoginClient({
     setEmail("");
     setCode("");
     setErrorText(null);
-  }
-
-  // Cursor parallax on the aurora — decorative, honours reduced-motion.
-  function handlePaneMouseMove(event: React.MouseEvent<HTMLElement>) {
-    if (reduce) return;
-    const pane = paneRef.current;
-    const aurora = auroraRef.current;
-    if (!pane || !aurora) return;
-    const rect = pane.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width - 0.5;
-    const y = (event.clientY - rect.top) / rect.height - 0.5;
-    aurora.style.transform = `translate(${x * 26}px, ${y * 22}px)`;
-  }
-
-  function handlePaneMouseLeave() {
-    if (auroraRef.current) auroraRef.current.style.transform = "";
+    setOtpState("idle");
   }
 
   async function requestPhoneOtp(normalized: string): Promise<void> {
@@ -284,6 +240,7 @@ export default function LoginClient({
       try {
         await requestPhoneOtp(normalizePhone(phone));
         setCode("");
+        setOtpState("idle");
         setStep("code");
         startResendTimer();
       } catch (error) {
@@ -311,6 +268,7 @@ export default function LoginClient({
       try {
         await requestEmailOtp(email.trim().toLowerCase());
         setCode("");
+        setOtpState("idle");
         setStep("code");
         startResendTimer();
       } catch (error) {
@@ -332,9 +290,11 @@ export default function LoginClient({
     if (finalCode.length < OTP_LENGTH) {
       setErrorText(UI_TEXT.auth.loginPage.enterCode);
       triggerShake();
+      setOtpState("error");
       return;
     }
     setLoading(true);
+    setOtpState("verifying");
     try {
       const body =
         mode === "phone"
@@ -346,16 +306,35 @@ export default function LoginClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      window.location.replace(nextPath ?? result.redirect);
+      const target = nextPath ?? result.redirect;
+      setOtpState("success");
+      // The navigation is scheduled on a plain timer and is NEVER chained to an
+      // animation callback: if the success cascade were dropped (reduced
+      // motion, a stalled rAF, a low-end device throttling frames) the user
+      // would otherwise be stranded on a form that already logged them in.
+      // `loading` stays true through the beat so the form is inert meanwhile.
+      window.setTimeout(
+        () => {
+          window.location.replace(target);
+        },
+        reduce ? 0 : SUCCESS_HOLD_MS,
+      );
     } catch (error) {
+      // `CODE_NOT_FOUND` is what BOTH verify routes return for a wrong *or*
+      // expired code, and its server message is the English string "Code not
+      // found" — which this handler was passing straight through to a Russian
+      // UI on the product's front door (it is not in `getErrorMessageByCode`'s
+      // map, so `error.message` won). The curated string wins for that code.
       const msg =
         error instanceof ApiClientError
-          ? (getErrorMessageByCode(error.code) ?? error.message ?? UI_TEXT.auth.loginPage.invalidCode)
+          ? error.code === "CODE_NOT_FOUND"
+            ? UI_TEXT.auth.loginPage.invalidCode
+            : (getErrorMessageByCode(error.code) ?? error.message ?? UI_TEXT.auth.loginPage.invalidCode)
           : UI_TEXT.auth.loginPage.invalidCode;
       setErrorText(msg);
       triggerShake();
       setCode("");
-    } finally {
+      setOtpState("error");
       setLoading(false);
     }
   }
@@ -364,6 +343,7 @@ export default function LoginClient({
     if (resendTimer > 0) return;
     setErrorText(null);
     setCode("");
+    setOtpState("idle");
     setLoading(true);
     try {
       if (mode === "phone") {
@@ -389,44 +369,10 @@ export default function LoginClient({
     setStep("input");
     setCode("");
     setErrorText(null);
+    setOtpState("idle");
   }
 
   const T = UI_TEXT.auth.loginPage;
-
-  const marqueeCards = T.marquee.map((card, index) => ({
-    ...card,
-    Icon: MARQUEE_ICONS[index % MARQUEE_ICONS.length],
-  }));
-  const marqueeColA = marqueeCards.slice(0, 3);
-  const marqueeColB = marqueeCards.slice(3, 6);
-
-  const renderMarqueeCard = (
-    card: (typeof marqueeCards)[number],
-    key: string,
-  ) => {
-    const Icon = card.Icon;
-    return (
-      <div
-        key={key}
-        className="flex-none rounded-2xl border border-white/12 bg-white/[0.07] p-3.5 shadow-lg backdrop-blur-md"
-      >
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-brand-gradient text-white ring-1 ring-white/20">
-            <Icon className="h-4 w-4" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <div className="truncate text-[13px] font-semibold text-white">{card.title}</div>
-            <div className="truncate text-[11px] text-white/60">{card.subtitle}</div>
-          </div>
-          {card.badge ? (
-            <span className="ml-auto flex-none rounded-full bg-white/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/75">
-              {card.badge}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    );
-  };
 
   // Shine sweep injected into the CTA — the `Button`'s own focus ring is a
   // box-shadow, so the button's `overflow-hidden` clips only this child, never
@@ -440,152 +386,16 @@ export default function LoginClient({
 
   return (
     <div className="min-h-[100dvh] overflow-y-auto bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-20 lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
-      <div className="mx-auto grid h-full min-h-[100dvh] w-full max-w-6xl gap-8 px-4 py-6 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch lg:gap-10 lg:py-8">
+      {/* LOGIN-WOW-01 — `lg:items-center`, not `items-stretch`: the brand pane
+          is capped at `max-h-[760px]`, and a stretch item that cannot stretch
+          falls back to START alignment. On any viewport taller than the cap
+          that parked the pane at the top of the row with dead space beneath it,
+          while the form column centred itself — which is exactly the
+          off-centre reading. Centring the row aligns both columns on one axis. */}
+      <div className="mx-auto grid h-full min-h-[100dvh] w-full max-w-6xl gap-8 px-4 py-6 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-10 lg:py-8">
 
         {/* ── LEFT PANEL — brand stage (desktop only) ── */}
-        <aside
-          ref={paneRef}
-          onMouseMove={handlePaneMouseMove}
-          onMouseLeave={handlePaneMouseLeave}
-          className="login-grain login-sheen relative isolate hidden h-full max-h-[760px] min-h-0 flex-col overflow-hidden rounded-3xl bg-brand-pane text-white lg:flex"
-        >
-          {/* Layered animated aurora (parallax target) */}
-          <div ref={auroraRef} className="login-aurora" aria-hidden>
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
-
-          {/* Twinkling sparkles */}
-          <svg
-            className="login-spark"
-            style={{ top: "16%", right: "12%", animationDelay: "0s" }}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden
-          >
-            <path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z" />
-          </svg>
-          <svg
-            className="login-spark"
-            style={{ top: "34%", left: "7%", animationDelay: "1.6s" }}
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden
-          >
-            <path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z" />
-          </svg>
-          <svg
-            className="login-spark"
-            style={{ top: "9%", left: "40%", animationDelay: "3.1s" }}
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden
-          >
-            <path d="M12 0l2.4 9.6L24 12l-9.6 2.4L12 24l-2.4-9.6L0 12l9.6-2.4z" />
-          </svg>
-
-          {/* Optional hero photo overlay */}
-          {heroImageUrl ? (
-            <ResilientImage
-              src={heroImageUrl}
-              alt=""
-              sizes="(max-width: 1200px) 50vw, 600px"
-              className="object-cover opacity-15"
-            />
-          ) : null}
-
-          {/* Content */}
-          <motion.div
-            variants={panelAnim}
-            initial="hidden"
-            animate="visible"
-            className="relative z-[2] flex h-full flex-col justify-between p-10"
-          >
-            {/* Brand block — gradient iconmark + white wordmark over the dark
-                stage. `textClassName="text-white"` overrides the wordmark's
-                gradient text-clip so it stays readable on the burgundy backdrop;
-                the iconmark keeps its gradient for brand identity (proven
-                legible on this pane pre-redesign). */}
-            <motion.div variants={panelItemAnim}>
-              <BrandLogo variant="full" size="md" href={null} textClassName="text-white" />
-              <p className="mt-1.5 font-mono text-[10px] tracking-[0.08em] text-white/60">
-                {UI_TEXT.brand.tagline}
-              </p>
-            </motion.div>
-
-            {/* Badge + headline + subtitle */}
-            <div className="py-6">
-              {stats ? (
-                <motion.div
-                  variants={panelItemAnim}
-                  className="mb-7 inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-[12.5px] backdrop-blur-md"
-                >
-                  <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
-                  <span className="tabular-nums">
-                    {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
-                  </span>
-                </motion.div>
-              ) : null}
-
-              <h1 className="font-display text-[2.5rem] font-medium leading-[1.06] tracking-tight xl:text-[3rem]">
-                <span className="login-word-mask">
-                  <span className="login-word" style={{ animationDelay: "150ms" }}>
-                    {T.brandHeadlineLead}
-                  </span>
-                </span>
-                <br />
-                <span className="login-word-mask">
-                  <span className="login-word" style={{ animationDelay: "260ms" }}>
-                    {T.brandHeadlineWith}{" "}
-                    <em className="login-shimmer font-display font-semibold italic">
-                      {T.brandHeadlineAccent}
-                    </em>
-                  </span>
-                </span>
-              </h1>
-
-              <motion.p
-                variants={panelItemAnim}
-                className="mt-5 max-w-md text-[15px] leading-relaxed text-white/80"
-              >
-                {T.brandTagline}
-              </motion.p>
-            </div>
-
-            {/* Marquee of benefit cards */}
-            <motion.div
-              variants={panelItemAnim}
-              className="login-mq-zone relative flex h-[224px] gap-4 overflow-hidden"
-              style={{
-                WebkitMaskImage:
-                  "linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent)",
-                maskImage:
-                  "linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent)",
-              }}
-              aria-hidden
-            >
-              <div className="login-mq-col flex-1">
-                {[...marqueeColA, ...marqueeColA].map((card, index) =>
-                  renderMarqueeCard(card, `a-${index}`),
-                )}
-              </div>
-              <div className="login-mq-col is-rev flex-1">
-                {[...marqueeColB, ...marqueeColB].map((card, index) =>
-                  renderMarqueeCard(card, `b-${index}`),
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        </aside>
+        <LoginShowcase heroImageUrl={heroImageUrl} stats={stats} />
 
         {/* ── RIGHT PANEL — form ── */}
         {/* `lg:overflow-hidden` clips the decorative halo to this pane on desktop
@@ -594,14 +404,37 @@ export default function LoginClient({
             scrolls instead. */}
         <main className="relative flex h-full min-h-0 items-center justify-center lg:overflow-hidden">
           <div className="login-halo hidden lg:block" aria-hidden />
+          {/* Deliberately NOT wrapped in an entrance animation. A framer
+              `initial` is serialised into the SSR HTML as `opacity:0`, so an
+              entrance here would leave the login form invisible until
+              hydration finishes — on the product's front door that trades a
+              first impression for a blank screen. The form's motion language
+              is interaction-driven instead: step transitions, the tab thumb,
+              the CTA shine, the field focus-lift and the OTP choreography. */}
           <div className="relative z-[1] w-full max-w-[400px]">
 
-            {/* Mobile brand hint — compact full BrandLogo + tagline. */}
+            {/* Mobile brand hint — compact full BrandLogo + tagline. The brand
+                stage itself stays desktop-only (it is decorative and would push
+                the form below the fold), so the live-stat pill is the one piece
+                of it that also earns its place on a phone. */}
             <div className="mb-6 lg:hidden">
-              <BrandLogo variant="full" size="sm" href={null} />
+              {/* `dark:text-text-main`: the wordmark's default brand-gradient
+                  text-clip is burgundy in BOTH themes, so on the dark page
+                  (#1F1417) its tail («…дом») sank into the background. The
+                  dark: variant outranks the base `text-transparent`, so light
+                  keeps the gradient and dark gets a legible cream. */}
+              <BrandLogo variant="full" size="sm" href={null} textClassName="dark:text-text-main" />
               <p className="mt-1 font-mono text-[10px] tracking-[0.08em] text-text-sec">
                 {UI_TEXT.brand.tagline}
               </p>
+              {stats ? (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-[12px] text-text-sec">
+                  <span className="login-dot h-1.5 w-1.5 rounded-full" aria-hidden />
+                  <span className="tabular-nums">
+                    {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             {/* Header */}
@@ -676,9 +509,14 @@ export default function LoginClient({
               />
             ) : null}
 
-            {/* Form steps — dropped entirely when no OTP channel is live */}
+            {/* Form steps — dropped entirely when no OTP channel is live.
+                `initial={false}`: the step variants' `enter` state (opacity 0)
+                was being serialised into the SSR HTML, so the very first paint
+                of the form was invisible until hydration. Suppressing only the
+                MOUNT animation keeps every real step transition
+                (phone↔email, input↔code) animating exactly as before. */}
             {otpEnabled ? (
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="wait" initial={false}>
               {step === "input" ? (
                 <motion.div
                   key={`input-step-${mode}`}
@@ -776,15 +614,27 @@ export default function LoginClient({
                     </label>
                     <OtpInput
                       value={code}
-                      onChange={setCode}
+                      onChange={(next) => {
+                        setCode(next);
+                        // Typing after a rejection clears the error colour but
+                        // leaves the message until the next verify answers.
+                        if (otpState === "error") setOtpState("idle");
+                      }}
                       onComplete={verifyCode}
                       disabled={loading}
                       length={OTP_LENGTH}
                       groupLabel={T.codeLabel}
                       shakeSignal={shakeKey}
+                      state={otpState}
                       autoFocus
                     />
                   </div>
+
+                  {/* The success confirmation is a colour sweep on the grid —
+                      invisible to a screen reader, hence the live region. */}
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {otpState === "success" ? T.codeAccepted : ""}
+                  </span>
 
                   <Button
                     onClick={() => verifyCode()}
@@ -793,7 +643,17 @@ export default function LoginClient({
                     data-testid="login-verify"
                     className="group relative w-full overflow-hidden rounded-full"
                   >
-                    {loading ? (
+                    {otpState === "success" ? (
+                      <motion.span
+                        className="inline-flex items-center gap-2"
+                        initial={reduce ? false : { opacity: 0, scale: 0.94 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={reduce ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <Check className="h-4 w-4" aria-hidden />
+                        {T.codeAccepted}
+                      </motion.span>
+                    ) : loading ? (
                       T.verifying
                     ) : (
                       <>
@@ -840,8 +700,13 @@ export default function LoginClient({
             ) : null}
 
             {/* Divider — "или войти через" only reads correctly when there IS a
-                form above it. Without one, keep the vertical rhythm only. */}
-            {otpEnabled ? (
+                form above it AND at least one provider below it. Without a form
+                (social-only) it was already dropped; LOGIN-WOW-01 adds the
+                mirror case, because a config with OTP but no OAuth provider
+                (today's dev/launch config, where VK resolves to disabled) was
+                painting the divider over an empty grid. Both branches keep the
+                vertical rhythm with a plain spacer. */}
+            {otpEnabled && hasSocialProviders ? (
               <div className="my-6 flex items-center gap-3">
                 <div className="h-px flex-1 bg-border-subtle" />
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-text-sec">

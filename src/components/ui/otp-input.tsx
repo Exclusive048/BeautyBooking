@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
 
 const DEFAULT_LENGTH = 6;
+
+/**
+ * Verification lifecycle of the grid (LOGIN-WOW-01).
+ *
+ * `idle` — entry. `verifying` — the code is in flight (in-place progress on the
+ * grid itself, never a spinner that replaces the form). `success` — the server
+ * accepted it; the grid plays a short celebratory sweep while the caller
+ * redirects. `error` — rejected; the caller also bumps `shakeSignal` and clears
+ * the value, so this state only carries the colour.
+ */
+export type OtpState = "idle" | "verifying" | "success" | "error";
 
 type OtpInputProps = {
   value: string;
@@ -20,7 +32,44 @@ type OtpInputProps = {
    * feedback). Any change to a higher number replays the shake; `0` is inert.
    */
   shakeSignal?: number;
+  /**
+   * Verification stage. Drives the completion choreography (lock-in cascade →
+   * verifying sweep → success sweep). Defaults to `idle`, which is exactly the
+   * pre-LOGIN-WOW-01 behaviour, so callers that don't care stay unchanged.
+   */
+  state?: OtpState;
   className?: string;
+};
+
+/**
+ * Per-cell choreography. Framer variants (not inline `animate` objects) so a
+ * re-render with the same stage does NOT restart the keyframes — only a real
+ * stage change does. `custom` carries the cell index, which is what turns six
+ * identical animations into one cascade across the grid.
+ */
+const cellVariants = {
+  rest: { y: 0, scale: 1 },
+  // 6th digit landed: a quick settle that runs left→right — instant
+  // acknowledgment, before the network even answers.
+  lock: (index: number) => ({
+    y: [0, -3, 0],
+    scale: [1, 0.965, 1],
+    transition: {
+      duration: 0.3,
+      delay: index * 0.04,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  }),
+  // Accepted: a taller, slower cascade paired with the colour sweep below.
+  success: (index: number) => ({
+    y: [0, -5, 0],
+    scale: [1, 1.06, 1],
+    transition: {
+      duration: 0.36,
+      delay: index * 0.045,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
+  }),
 };
 
 /**
@@ -33,6 +82,12 @@ type OtpInputProps = {
  * `onComplete` fires as soon as the last box is filled (the login uses this to
  * auto-submit the code), so the caller need not wire a separate submit for the
  * common path.
+ *
+ * LOGIN-WOW-01 adds the completion choreography on top: the cells are wrapped
+ * in motion containers (the `<input>` itself is never transformed, so its
+ * `focus:-translate-y-0.5` lift and every keyboard/touch behaviour are
+ * untouched), and `state` drives lock-in → verifying → success. Every stage is
+ * gated on `useReducedMotion` and degrades to an instant state swap.
  */
 export function OtpInput({
   value,
@@ -43,10 +98,12 @@ export function OtpInput({
   length = DEFAULT_LENGTH,
   groupLabel,
   shakeSignal = 0,
+  state = "idle",
   className,
 }: OtpInputProps) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const gridRef = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (autoFocus) refs.current[0]?.focus();
@@ -117,42 +174,105 @@ export function OtpInput({
     }
   }
 
+  const complete = value.length >= length;
+  // Reduced motion collapses every stage to `rest` — the colour/ring changes
+  // below still communicate the stage, without translation or scale.
+  const cellStage = reduce ? "rest" : state === "success" ? "success" : complete ? "lock" : "rest";
+  const inFlight = state === "verifying" || state === "success";
+
   return (
     <div
       ref={gridRef}
       role="group"
       aria-label={groupLabel}
-      className={cn("grid w-full gap-1.5 sm:gap-2", className)}
+      aria-busy={state === "verifying" || undefined}
+      className={cn("relative grid w-full gap-1.5 sm:gap-2", className)}
       style={{ gridTemplateColumns: `repeat(${length}, minmax(0, 1fr))` }}
     >
       {Array.from({ length }).map((_, index) => {
         const filled = Boolean(value[index]);
         return (
-          <input
+          <motion.div
             key={index}
-            ref={(el) => {
-              refs.current[index] = el;
-            }}
-            type="text"
-            inputMode="numeric"
-            autoComplete={index === 0 ? "one-time-code" : "off"}
-            maxLength={2}
-            value={value[index] ?? ""}
-            onChange={(event) => handleChange(index, event)}
-            onKeyDown={(event) => handleKeyDown(index, event)}
-            onPaste={handlePaste}
-            disabled={disabled}
-            aria-label={`Цифра ${index + 1} из ${length}`}
-            className={cn(
-              "h-12 min-w-0 rounded-2xl border bg-bg-card text-center text-lg font-semibold tabular-nums text-text-main shadow-sm outline-none sm:h-14 sm:text-xl",
-              "transition-[border-color,box-shadow,transform,background-color] duration-200",
-              "focus:-translate-y-0.5 focus:border-primary focus:ring-2 focus:ring-primary/15",
-              "disabled:cursor-not-allowed disabled:opacity-50",
-              filled ? "login-otp-pop border-primary bg-primary/5" : "border-border-subtle",
-            )}
-          />
+            className="relative min-w-0"
+            custom={index}
+            variants={cellVariants}
+            initial={false}
+            animate={cellStage}
+          >
+            <input
+              ref={(el) => {
+                refs.current[index] = el;
+              }}
+              type="text"
+              inputMode="numeric"
+              autoComplete={index === 0 ? "one-time-code" : "off"}
+              maxLength={2}
+              value={value[index] ?? ""}
+              onChange={(event) => handleChange(index, event)}
+              onKeyDown={(event) => handleKeyDown(index, event)}
+              onPaste={handlePaste}
+              disabled={disabled}
+              aria-label={`Цифра ${index + 1} из ${length}`}
+              className={cn(
+                "h-12 w-full min-w-0 rounded-2xl border bg-bg-card text-center text-lg font-semibold tabular-nums text-text-main shadow-sm outline-none sm:h-14 sm:text-xl",
+                "transition-[border-color,box-shadow,transform,background-color] duration-200",
+                "focus:-translate-y-0.5 focus:border-primary focus:ring-2 focus:ring-primary/15",
+                "disabled:cursor-not-allowed",
+                // While a code is in flight the grid must read as "working", not
+                // as "dead form" — so the disabled dimming is dropped for those
+                // two stages only. Emitted as one branch (never both) because
+                // `cn` is a plain join and two competing `disabled:opacity-*`
+                // utilities would resolve by stylesheet order, not class order.
+                inFlight ? "disabled:opacity-100" : "disabled:opacity-50",
+                state === "error"
+                  ? "border-red-400/70 bg-red-50/60 dark:bg-red-950/30"
+                  : filled
+                    ? "login-otp-pop border-primary bg-primary/5"
+                    : "border-border-subtle",
+                // Reduced-motion fallback for the verifying sweep: a static
+                // tint, so the stage is still visible without any movement.
+                state === "verifying" ? "border-primary/60" : null,
+              )}
+            />
+
+            {/* Success colour sweep — one per cell, staggered left→right. Sits
+                over the digit at 10% alpha, so the code stays readable.
+                `primary-magenta` rather than `primary`: the burgundy `--primary`
+                is nearly the dark card's own value (#7A102C on #302026) and the
+                beat would be invisible in dark, whereas magenta reads in both
+                themes and is the brand gradient's own end stop. */}
+            <motion.span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-2xl bg-primary-magenta/10 ring-2 ring-inset ring-primary-magenta"
+              initial={false}
+              animate={{ opacity: state === "success" ? 1 : 0 }}
+              transition={
+                reduce
+                  ? { duration: 0 }
+                  : { duration: 0.22, delay: state === "success" ? index * 0.045 : 0 }
+              }
+            />
+          </motion.div>
         );
       })}
+
+      {/* Verifying: a light sweep travelling across the grid in place of a
+          spinner. Motion-only, so reduced-motion drops it entirely (the static
+          `border-primary/60` above carries the stage instead). */}
+      {state === "verifying" && !reduce ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-2xl"
+        >
+          <motion.span
+            className="absolute inset-y-0 block w-1/3 bg-gradient-to-r from-transparent via-primary-magenta/25 to-transparent"
+            initial={{ x: "-120%" }}
+            animate={{ x: "320%" }}
+            transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </span>
+      ) : null}
     </div>
   );
 }

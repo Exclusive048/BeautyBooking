@@ -607,6 +607,10 @@ export const UI_TEXT = {
       sending: "Отправляем...",
       codeSentTo: "Код отправлен на",
       verifying: "Проверяем...",
+      // LOGIN-WOW-01 — the success beat between "code accepted" and the
+      // redirect. Also announced via an aria-live region, since the visual
+      // confirmation is a colour sweep on the code grid.
+      codeAccepted: "Код принят",
       changePhone: "Отправить еще раз",
       returnAfterLogin: "После входа вы вернётесь на:",
       or: "ИЛИ",

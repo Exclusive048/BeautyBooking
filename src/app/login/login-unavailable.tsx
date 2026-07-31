@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
 import { Clock3 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
@@ -23,18 +20,19 @@ const T = UI_TEXT.auth.loginPage.unavailable;
  * results once the flag is flipped back on.
  */
 export default function LoginUnavailable() {
-  const reduce = useReducedMotion();
-
   return (
     <div className="flex min-h-[calc(100dvh-var(--topbar-h))] items-center justify-center bg-bg-page px-4 py-10">
-      <motion.div
-        initial={reduce ? false : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={reduce ? { duration: 0 } : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-[440px] rounded-3xl border border-border-subtle bg-bg-card p-8 text-center shadow-brand"
-      >
+      {/* LOGIN-WOW-01: the entrance is the CSS `.login-rise` class, not a
+          framer `initial` — framer serialises `opacity:0` into the SSR HTML, so
+          this page rendered BLANK until hydration finished. It is a terminal
+          state a visitor may land on with a cold cache; it has to paint on the
+          first frame. Removing framer here also drops the last reason for this
+          file to be a client component. */}
+      <div className="login-rise w-full max-w-[440px] rounded-3xl border border-border-subtle bg-bg-card p-8 text-center shadow-brand">
         <div className="mb-6 flex justify-center">
-          <BrandLogo variant="full" size="sm" href={null} />
+          {/* See the login form's mobile hint: the gradient wordmark is
+              burgundy in both themes and loses contrast on the dark card. */}
+          <BrandLogo variant="full" size="sm" href={null} textClassName="dark:text-text-main" />
         </div>
 
         <span className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-white">
@@ -54,7 +52,7 @@ export default function LoginUnavailable() {
             <Link href="/">{T.homeCta}</Link>
           </Button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

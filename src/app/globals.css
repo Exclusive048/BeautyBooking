@@ -421,13 +421,21 @@
    ============================================================ */
 
 /* — Brand-pane decoration — */
+/* Parallax plane (LOGIN-WOW-01). The pointer handler writes `transform`
+   directly on these; the easing lives here so a move never needs JS animation.
+   Under reduced motion the handler returns early and nothing is ever written,
+   so the planes stay at rest. */
+.login-layer {
+  transition: transform 400ms ease-out;
+  will-change: transform;
+}
+
 .login-aurora {
   position: absolute;
   inset: -30%;
   z-index: -2;
   filter: blur(70px) saturate(1.15);
   pointer-events: none;
-  transition: transform 400ms ease-out;
 }
 .login-aurora > i {
   position: absolute;
@@ -466,8 +474,21 @@
   pointer-events: none;
   opacity: 0;
 }
+/* Live-stat dot. The fill is set here because there is no `success` colour in
+   tailwind.config.js — the old `bg-success` utility on this element compiled to
+   nothing, so the dot was invisible and only its pulse ring showed
+   (LOGIN-WOW-01). */
 .login-dot {
+  background: rgb(var(--success));
   box-shadow: 0 0 0 0 rgb(var(--success) / 0.5);
+}
+
+/* Photo plate — plane 3 of the showcase stack. Sits behind the frosted benefit
+   cards and drifts on its own slow cycle, so the stack is never fully at rest
+   even when the pointer is away. */
+.login-plate {
+  transform: rotate(-2.5deg);
+  will-change: transform;
 }
 
 /* Shimmer italic word — gradient text-clip over the dark pane. Fixed pink →
@@ -479,6 +500,18 @@
   background-clip: text;
   color: transparent;
   padding-right: 0.05em;
+}
+
+/* Staggered entrance for the brand stage (LOGIN-WOW-01). CSS, not framer, on
+   purpose: a framer `initial` is serialised into the SSR HTML as
+   `style="opacity:0"`, so the whole stage stayed blank until hydration
+   finished — on a cold/slow client that is a blank first impression on the
+   product's front door. A CSS animation starts at first paint instead, and
+   `both` holds the hidden `from` through the per-item delay. Base state is
+   VISIBLE, so a reduced-motion user (where the animation never applies) sees
+   the composition at rest rather than an invisible one. */
+.login-rise {
+  opacity: 1;
 }
 
 /* Word-rise headline — each word sits below its mask until it rises.
@@ -517,7 +550,9 @@
   .login-dot { animation: login-pulse-dot 2.2s ease-in-out infinite; }
   .login-shimmer { animation: login-text-shimmer 4.5s ease-in-out infinite; }
   .login-word { animation: login-word-up 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .login-rise { animation: login-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
   .login-halo { animation: login-halo 8s ease-in-out infinite; }
+  .login-plate { animation: login-plate-drift 22s ease-in-out infinite alternate; }
   .login-mq-col { animation: login-marquee-up 26s linear infinite; }
   .login-mq-col.is-rev { animation: login-marquee-down 30s linear infinite; }
   .login-mq-zone:hover .login-mq-col { animation-play-state: paused; }
@@ -533,7 +568,14 @@
 @keyframes login-pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 rgb(var(--success) / 0.5); } 50% { box-shadow: 0 0 0 7px rgb(var(--success) / 0); } }
 @keyframes login-text-shimmer { 0%, 100% { background-position: 110% 0; } 50% { background-position: -10% 0; } }
 @keyframes login-word-up { from { transform: translateY(110%); } to { transform: translateY(0); } }
+@keyframes login-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes login-halo { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.12); } }
+/* Keeps the base rotation in both stops — an `animation` on `transform` fully
+   replaces the static value while it plays. */
+@keyframes login-plate-drift {
+  from { transform: rotate(-2.5deg) translate3d(0, 0, 0) scale(1); }
+  to   { transform: rotate(-1.1deg) translate3d(0, -9px, 0) scale(1.035); }
+}
 @keyframes login-marquee-up { from { transform: translateY(0); } to { transform: translateY(-50%); } }
 @keyframes login-marquee-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
 @keyframes login-digit-pop { 0% { transform: scale(0.92); } 60% { transform: scale(1.05); } 100% { transform: scale(1); } }
