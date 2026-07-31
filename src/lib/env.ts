@@ -32,6 +32,27 @@ const envSchema = z.object({
   // ── Auth ──────────────────────────────────────────────────────────────────
   AUTH_COOKIE_NAME: z.string().min(1).default("bh_session"),
 
+  // AUTH-GATE-01 — phone (OTP) auth kill-switch. The SMS gateway is not wired
+  // to a live account yet, so production must be able to run with phone login
+  // hidden AND with no user-facing claim that we send SMS.
+  //
+  // Deliberately NOT `boolFlag`: this flag is TRI-state, because unset must
+  // mean different things per environment —
+  //   unset  → ON in dev/test (seed accounts + `.qa/` harness log in by phone),
+  //            OFF in production (fail-safe: never ship a login that silently
+  //            drops OTPs into logs instead of delivering them).
+  //   "true" → ON everywhere (flip this once SMSC is live and funded).
+  //   anything else → OFF.
+  // The resolver is `isPhoneAuthEnabled` below.
+  //
+  // Server-only on purpose (no NEXT_PUBLIC_ prefix): a public var is baked at
+  // BUILD time, and this repo has already shipped a production incident where
+  // eight NEXT_PUBLIC_* vars were never passed as Docker build args and baked
+  // empty (DOCKER-READINESS-AUDIT-01). Client surfaces receive the resolved
+  // value as a prop from a server component instead — see
+  // `src/lib/auth/auth-methods.ts`.
+  PHONE_AUTH_ENABLED: z.string().optional(),
+
   // ── Trusted proxy / client-IP derivation (HARDENING-08 FIX-17) ────────────
   // Number of trusted reverse-proxy hops in front of the app. The client IP is
   // taken `TRUSTED_PROXY_HOPS` entries from the RIGHT of X-Forwarded-For (never
@@ -407,6 +428,34 @@ export const isEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.S
  *   `logInfo("...", { ..., ...(isProduction ? {} : { code }) });`
  */
 export const isProduction = env.NODE_ENV === "production";
+/**
+ * AUTH-GATE-01 — phone (OTP) auth gate. Resolves the tri-state
+ * `PHONE_AUTH_ENABLED` (see the schema note above):
+ *
+ *   unset → `!isProduction` (ON in dev/test, OFF in production)
+ *   "true" (case-insensitive) → ON
+ *   anything else → OFF
+ *
+ * OFF means: no phone tab on `/login`, no phone-login CTA when it is the last
+ * remaining method, and `POST /api/auth/otp/request` + `/verify` refuse with
+ * 503 `SYSTEM_FEATURE_DISABLED` BEFORE any OTP is generated, persisted or
+ * logged. Existing sessions are untouched — this gates ISSUANCE only, never
+ * validation, refresh or logout.
+ *
+ * 🔴 SERVER-ONLY. `PHONE_AUTH_ENABLED` is intentionally absent from
+ * `clientEnv`, so in a client bundle this expression degrades to
+ * `!isProduction` and would disagree with the server → hydration mismatch.
+ * Never import it from a `"use client"` module. Client surfaces get the
+ * resolved value as a prop from a server component — resolve it through
+ * `resolveAuthMethods()` (src/lib/auth/auth-methods.ts), which is the single
+ * place that decides which auth methods a visitor may see. Same server-only
+ * shape as `isVkAuthEnabled` (VK_CLIENT_ID) and `isEmailConfigured` (SMTP_*).
+ */
+export const isPhoneAuthEnabled = ((): boolean => {
+  const raw = env.PHONE_AUTH_ENABLED;
+  if (raw === undefined || String(raw).trim() === "") return env.NODE_ENV !== "production";
+  return String(raw).trim().toLowerCase() === "true";
+})();
 /**
  * SMS-GATEWAY-A: SMSC.ru provider gate. Both the toggle and the
  * credentials must be present — otherwise the factory in `src/lib/sms`

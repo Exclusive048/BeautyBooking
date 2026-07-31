@@ -8,12 +8,24 @@ import { checkOtpRequestRateLimit } from "@/lib/auth/otp-rate-limit";
 import { otpRequestSchema } from "@/lib/auth/schemas";
 import { logInfo } from "@/lib/logging/logger";
 import { maskPhone } from "@/lib/logging/masking";
-import { isProduction } from "@/lib/env";
+import { isPhoneAuthEnabled, isProduction } from "@/lib/env";
 import { sendOtpSms } from "@/lib/sms";
 import { extractClientIp } from "@/lib/http/ip";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
+    // AUTH-GATE-01: refuse before ANY work when phone auth is off — no OTP
+    // generated, no OtpCode row, no log line, no SMS attempt. Mirrors the
+    // AUTH-KILLSWITCH-ENFORCE-01 shape (gate first, then the flow), so hiding
+    // the phone tab in the UI is defence-in-depth rather than the only guard.
+    // The response is constant for every input, so it leaks nothing about
+    // whether a number is registered; the `publicApi` rate-limit tier in
+    // `proxy.ts` still applies (middleware runs ahead of this handler), so a
+    // disabled endpoint is not a free probing surface.
+    if (!isPhoneAuthEnabled) {
+      return fail("Phone login is temporarily unavailable", 503, "SYSTEM_FEATURE_DISABLED");
+    }
+
     const body = await req.json().catch(() => null);
     const parsed = otpRequestSchema.safeParse(body);
     if (!parsed.success) {

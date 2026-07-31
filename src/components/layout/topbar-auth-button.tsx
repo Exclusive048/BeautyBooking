@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
 import { UI_TEXT } from "@/lib/ui/text";
 
-export function TopbarAuthButton() {
+/**
+ * AUTH-GATE-01 — `authEnabled` comes from the server (`resolveAuthMethods().any`
+ * in topbar.tsx); the flags behind it are server-only. Defaults to `true` so a
+ * missed call site degrades to today's behaviour, not to a hidden login button.
+ */
+export function TopbarAuthButton({ authEnabled = true }: { authEnabled?: boolean }) {
   const { user, isLoading } = useMe();
 
   if (isLoading && !user) {
@@ -28,14 +33,19 @@ export function TopbarAuthButton() {
     );
   }
 
+  // AUTH-GATE-01: with no login method available the «Вход» CTA is dropped;
+  // «Стать мастером» stays (it is a marketing page, not an auth entry point).
+  // Its own sign-up CTA lands on /login, which renders the graceful state.
   return (
     <div className="flex items-center gap-2">
       <Button asChild variant="secondary" size="sm" className="hidden sm:inline-flex">
         <Link href="/become-master">{UI_TEXT.nav.becomeMaster}</Link>
       </Button>
-      <Button asChild size="sm">
-        <Link href="/login">{UI_TEXT.auth.login}</Link>
-      </Button>
+      {authEnabled ? (
+        <Button asChild size="sm">
+          <Link href="/login">{UI_TEXT.auth.login}</Link>
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { CitySelector } from "@/features/cities/components/city-selector";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
+import { resolveAuthMethods } from "@/lib/auth/auth-methods";
 import { getAvailableCabinets, type CabinetKind } from "@/lib/auth/available-cabinets";
 import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { hasAdminRole } from "@/lib/auth/guards";
@@ -133,6 +134,9 @@ export const NAV_LINKS: ReadonlyArray<{ href: string; label: string }> = [
 export async function Topbar() {
   const user = await getSessionUser();
   const siteLogo = await getSiteLogoAsset();
+  // AUTH-GATE-01: resolved here (server) because the method flags are
+  // server-only; the guest CTAs below receive the boolean as a prop.
+  const { any: authEnabled } = await resolveAuthMethods();
 
   let userLabel: string = UI_TEXT.auth.menu;
   let showAdminLink = false;
@@ -230,13 +234,14 @@ export async function Topbar() {
           ) : (
             <>
               <ThemeToggle />
-              <TopbarAuthButton />
+              <TopbarAuthButton authEnabled={authEnabled} />
               <AuthMobileMenu
                 userLabel={UI_TEXT.auth.menu}
                 showAdminLink={false}
                 masterWorkspace={null}
                 studioWorkspace={null}
                 isGuest
+                authEnabled={authEnabled}
               />
             </>
           )}

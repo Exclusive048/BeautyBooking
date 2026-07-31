@@ -23,6 +23,13 @@ type Props = {
   masterWorkspace: WorkspaceMenuLink | null;
   studioWorkspace: WorkspaceMenuLink | null;
   isGuest?: boolean;
+  /**
+   * AUTH-GATE-01 — server-resolved `resolveAuthMethods().any`. Only affects the
+   * guest branch: with no login method available the «Вход» CTA is dropped.
+   * Defaults to `true` so the signed-in menu and any missed call site are
+   * unaffected.
+   */
+  authEnabled?: boolean;
 };
 
 function WorkspaceMenuItem({
@@ -76,6 +83,7 @@ export function AuthMobileMenu({
   masterWorkspace,
   studioWorkspace,
   isGuest = false,
+  authEnabled = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -187,9 +195,12 @@ export function AuthMobileMenu({
 
             {isGuest ? (
               <div className="space-y-2 px-1 pb-1">
-                <Button asChild className="w-full" size="sm">
-                  <Link href="/login" onClick={closeMenu}>{UI_TEXT.auth.login}</Link>
-                </Button>
+                {/* AUTH-GATE-01: no login method available → no «Вход» CTA. */}
+                {authEnabled ? (
+                  <Button asChild className="w-full" size="sm">
+                    <Link href="/login" onClick={closeMenu}>{UI_TEXT.auth.login}</Link>
+                  </Button>
+                ) : null}
                 <Button asChild variant="secondary" className="w-full" size="sm">
                   <Link href="/become-master" onClick={closeMenu}>{UI_TEXT.nav.becomeMaster}</Link>
                 </Button>

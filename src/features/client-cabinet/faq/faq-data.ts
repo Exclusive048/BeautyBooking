@@ -72,13 +72,20 @@ export const FAQ_DATA: readonly FaqItem[] = [
     id: "acc-1",
     category: "account",
     q: "Как изменить телефон?",
-    a: "Откройте «Профиль» → раздел «Контакты» → кнопка рядом с телефоном. Мы пришлём код подтверждения на новый номер.",
+    // AUTH-GATE-01: the old answer described a flow that does not exist — the
+    // phone field on «Профиль» is rendered `disabled` and `PATCH /api/me` no
+    // longer accepts `phone` — and promised a code «на новый номер», which the
+    // product never sends. Answer now matches the shipped behaviour.
+    a: "Сейчас номер изменить нельзя — он привязан к аккаунту и в профиле показан только для справки. Смена номера с подтверждением появится в одном из ближайших обновлений; если номер нужно поменять раньше, напишите в поддержку.",
   },
   {
     id: "acc-2",
     category: "account",
     q: "Что делать, если потерял доступ к телефону?",
-    a: "Свяжите VK в разделе «Привязанные аккаунты» — он позволит войти без SMS. Если это не настроено, напишите в поддержку.",
+    // AUTH-GATE-01: channel-neutral — «войти без SMS» named a delivery channel
+    // that may be gated off. Also mentions Яндекс ID, which is a supported
+    // provider alongside VK.
+    a: "Свяжите VK или Яндекс ID в разделе «Привязанные аккаунты» — они позволят войти без номера телефона. Если это не настроено, напишите в поддержку.",
   },
   {
     id: "acc-3",

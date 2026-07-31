@@ -17,11 +17,22 @@ import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { extractClientIp } from "@/lib/http/ip";
+import { isPhoneAuthEnabled } from "@/lib/env";
 
 const CONSENT_DOCUMENT_VERSION = "1.0";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
+    // AUTH-GATE-01: gating `/request` alone is not enough — unused OtpCode rows
+    // issued before the flag was flipped stay valid for 5 minutes, and this is
+    // the endpoint that actually mints a session. Refuse here too, before any
+    // lookup, so phone auth cannot issue NEW sessions while it is off.
+    // Session VALIDATION, refresh and logout are deliberately untouched:
+    // everyone already signed in stays signed in.
+    if (!isPhoneAuthEnabled) {
+      return fail("Phone login is temporarily unavailable", 503, "SYSTEM_FEATURE_DISABLED");
+    }
+
     const routeStartedAt = Date.now();
     const body = await req.json().catch(() => null);
     const parsed = otpVerifySchema.safeParse(body);

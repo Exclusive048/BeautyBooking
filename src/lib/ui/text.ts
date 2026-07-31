@@ -582,6 +582,18 @@ export const UI_TEXT = {
       heroSubtitle: "Выбирайте по фото и отзывам, а время бронируйте онлайн",
       title: "Вход по номеру телефона",
       subtitle: "Введите номер — пришлём код. Без пароля.",
+      // AUTH-GATE-01: the heading used to say «Вход по номеру телефона» even
+      // when the email tab was selected. With phone auth gated off the form can
+      // open directly on email, so the email-mode heading is now required — and
+      // it fixes that pre-existing mismatch for the both-enabled case too.
+      titleEmail: "Вход по email",
+      subtitleEmail: "Введите адрес — пришлём код. Без пароля.",
+      // AUTH-GATE-01: heading for a config where BOTH OTP channels are off but
+      // an OAuth provider is on (e.g. VK-only). The code form is hidden and the
+      // social buttons carry the whole page, so the heading must not promise a
+      // code that nothing will send.
+      titleSocial: "Вход в аккаунт",
+      subtitleSocial: "Выберите сервис, через который хотите войти.",
       phoneLabel: "Телефон",
       phonePlaceholder: "+77001234567",
       phonePlaceholderMask: "+7 (___) ___-__-__",
@@ -641,6 +653,17 @@ export const UI_TEXT = {
       // benefits (no invented person, no invented quote, no fabricated rating) —
       // real trust framing, kept as a purely visual device.
       marqueeAria: "Преимущества платформы",
+      // AUTH-GATE-01 — graceful state for a direct hit on /login when NO login
+      // method is enabled (phone gated off and no email/VK/Yandex/Telegram).
+      // Deliberately not an error: nothing is broken, the door is just not open
+      // yet — so the copy points at what does work (каталог) instead of
+      // apologising. Never promises a channel we cannot deliver on.
+      unavailable: {
+        title: "Вход скоро будет доступен",
+        body: "Мы заканчиваем подключение входа. Каталог мастеров и запись уже работают — войти в личный кабинет можно будет чуть позже.",
+        catalogCta: "Открыть каталог",
+        homeCta: "На главную",
+      },
       marquee: [
         { title: "Запись за 30 секунд", subtitle: "Без звонков и переписок", badge: "быстро" },
         { title: "Оплата после визита", subtitle: "Никакой предоплаты", badge: "удобно" },
@@ -2834,8 +2857,12 @@ export const UI_TEXT = {
         notSetLabel: "Не задан",
         accountFootnoteText: "Эти поля редактируются в",
         accountFootnoteCta: "настройках аккаунта",
+        // AUTH-GATE-01: was «Номер задаётся при входе по SMS-коду…». Names a
+        // login channel that may be gated off, and is simply wrong for anyone
+        // who signed in via email/VK/Yandex. Now describes the field, not the
+        // channel that populated it.
         phoneVerifyHint:
-          "Номер задаётся при входе по SMS-коду и здесь не меняется. Смена номера с подтверждением — скоро.",
+          "Номер подставляется из вашего аккаунта и здесь не меняется. Смена номера с подтверждением — скоро.",
       },
       about: {
         title: "О себе",
@@ -5722,7 +5749,12 @@ export const UI_TEXT = {
       summaryDateTimePending: "Выберите дату и время",
       continueCta: "Продолжить",
       submitCta: "Записаться",
-      footnoteSelectionSms: "Подтверждение придёт SMS",
+      // AUTH-GATE-01: was «Подтверждение придёт SMS». That claim was never
+      // true — `sendOtpSms` is the ONLY SMS call site in the codebase (login
+      // OTP), so a booking has never triggered an SMS, for guests or for
+      // registered clients. Replaced with what the flow actually does: the
+      // success phase renders the full booking card immediately.
+      footnoteSelectionConfirm: "Детали записи покажем сразу после оформления",
       footnoteSelectionPay: "Оплата на месте",
       footnoteFormPrefix: "Нажимая, вы соглашаетесь с",
       footnoteFormTermsLink: "условиями",
@@ -6782,8 +6814,14 @@ export const UI_TEXT = {
         // FIX-EXTERNAL-GATING-01 (G-2): provider-neutral — each channel card
         // below is flag-gated, so the description must not name a specific
         // (possibly killed/disabled) provider.
+        // AUTH-GATE-01: dropped the trailing «SMS пока недоступен — мы
+        // подключаем шлюз.» Naming an unshipped channel is still a delivery
+        // promise, and the sentence contradicted itself on a surface that is
+        // supposed to describe channels that exist. The remaining wording is
+        // provider-neutral (FIX-EXTERNAL-GATING-01 G-2) and stays correct
+        // whichever channels are enabled.
         channelsDesc:
-          "События студии приходят в приложение и по подключённым каналам. SMS пока недоступен — мы подключаем шлюз.",
+          "События студии приходят в приложение и по подключённым каналам.",
         channelPush: "Push в приложении",
         pushEnabled: "Включены",
         pushDisabled: "Выключены",
@@ -7134,7 +7172,12 @@ export const UI_TEXT = {
       },
       inviteCard: {
         title: "Пригласить ещё мастера",
-        subtitle: "По телефону — мастер получит SMS со ссылкой",
+        // AUTH-GATE-01: was «По телефону — мастер получит SMS со ссылкой».
+        // No SMS is sent — `notifyStudioInviteReceived` delivers an in-app
+        // notification and ONLY when the phone already belongs to a registered
+        // user (it early-returns otherwise). Copy now states the part that is
+        // always true: the master appears in the team as «Приглашён».
+        subtitle: "Добавьте мастера по номеру телефона",
       },
       detail: {
         empty: {
@@ -7179,7 +7222,8 @@ export const UI_TEXT = {
       },
       inviteDialog: {
         title: "Пригласить мастера",
-        subtitle: "Введите номер телефона — мастер получит SMS со ссылкой.",
+        // AUTH-GATE-01: see inviteCard.subtitle — no SMS is sent for invites.
+        subtitle: "Введите номер телефона — мастер появится в команде со статусом «Приглашён».",
         phoneLabel: "Телефон",
         phonePlaceholder: "+7 999 123-45-67",
         nameLabel: "Имя",

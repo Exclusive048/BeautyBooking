@@ -267,7 +267,13 @@ function RoleSwitcherDrawer({
 
 // ── Main BottomNav ────────────────────────────────────────────────────────────
 
-export function BottomNav() {
+/**
+ * AUTH-GATE-01 — `authEnabled` is resolved server-side in the root layout
+ * (`resolveAuthMethods().any`) and passed down, because the underlying flags
+ * are server-only. Defaults to `true` so any caller that forgets it keeps the
+ * pre-gate behaviour rather than silently losing the login tab.
+ */
+export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
   const pathname = usePathname();
   const { user } = useMe();
   const { activeRole, availableRoles, hydrated } = useActiveRole();
@@ -279,13 +285,15 @@ export function BottomNav() {
 
   const items = useMemo<NavItem[]>(() => {
     if (isAdmin) return NAV_ADMIN;
-    if (isGuest) return NAV_GUEST;
+    // AUTH-GATE-01: guests lose the «Войти» tab when no login method is
+    // available. Catalog + booking stay — neither needs an account.
+    if (isGuest) return authEnabled ? NAV_GUEST : NAV_GUEST.filter((item) => item.href !== "/login");
     if (!hydrated) return NAV_CLIENT; // default while hydrating
 
     if (activeRole === "MASTER") return NAV_MASTER;
     if (activeRole === "STUDIO") return NAV_STUDIO;
     return NAV_CLIENT;
-  }, [isAdmin, isGuest, hydrated, activeRole]);
+  }, [isAdmin, isGuest, hydrated, activeRole, authEnabled]);
 
   const hiddenPrefixes = ["/auth", "/login", "/logout", "/book"];
   const isHidden = hiddenPrefixes.some(

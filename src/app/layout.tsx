@@ -21,6 +21,7 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { CookieConsent } from "@/components/layout/cookie-consent";
 import { PushManager } from "@/components/pwa/push-manager";
 import { SWRProvider } from "@/components/providers/swr-provider";
+import { resolveAuthMethods } from "@/lib/auth/auth-methods";
 import { getNonce } from "@/lib/csp/nonce";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
@@ -175,6 +176,9 @@ const SITE_JSON_LD = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = await getNonce();
+  // AUTH-GATE-01: the guest bottom-nav «Войти» tab follows the same
+  // server-resolved availability as the topbar CTAs.
+  const { any: authEnabled } = await resolveAuthMethods();
   return (
     <html lang="ru" className={playfair.variable} suppressHydrationWarning>
       <head>
@@ -194,7 +198,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <PWAUpdatePrompt />
             <PWAInstallPrompt />
             <AppShell>{children}</AppShell>
-            <BottomNav />
+            <BottomNav authEnabled={authEnabled} />
             <CookieConsent />
             <PushManager />
           </ViewerTimeZoneProvider>

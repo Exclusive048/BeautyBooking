@@ -39,6 +39,12 @@ type LoginMode = "phone" | "email";
 
 type LoginClientProps = {
   heroImageUrl: string | null;
+  // AUTH-GATE-01: server-resolved `isPhoneAuthEnabled`. False → the phone tab
+  // and phone field are absent and the form opens on email. Passed as a prop
+  // (never imported here) because PHONE_AUTH_ENABLED is server-only — reading
+  // it in this bundle would resolve to a different value than the server used
+  // and desync hydration.
+  phoneEnabled?: boolean;
   emailEnabled?: boolean;
   stats?: PublicStats | null;
   // QA-001: resolved server-side in page.tsx and passed down so the social
@@ -124,6 +130,7 @@ const MARQUEE_ICONS: LucideIcon[] = [Zap, Wallet, Images, BellRing, CalendarCloc
 
 export default function LoginClient({
   heroImageUrl,
+  phoneEnabled = true,
   emailEnabled = false,
   stats = null,
   telegramBotUsername,
@@ -148,7 +155,10 @@ export default function LoginClient({
   const panelItemAnim = reduce ? undefined : panelItemVariants;
   const stepAnim = reduce ? undefined : stepVariants;
 
-  const [mode, setMode] = useState<LoginMode>("phone");
+  // AUTH-GATE-01: open on whichever OTP channel is actually available. The
+  // page only renders this component when at least one method is on, so with
+  // phone gated off the form starts (and stays) on email.
+  const [mode, setMode] = useState<LoginMode>(phoneEnabled ? "phone" : "email");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -207,8 +217,16 @@ export default function LoginClient({
     setShakeKey((k) => k + 1);
   }
 
+  // AUTH-GATE-01: at least one OTP channel must be live for the code form to
+  // make sense. With neither (VK/Yandex-only config) the form, the tabs and the
+  // "или войти через" divider are all dropped and the social grid stands alone.
+  const otpEnabled = phoneEnabled || emailEnabled;
+
   function switchMode(newMode: LoginMode) {
     if (newMode === mode) return;
+    // Guard the gated channel even if a stale tab somehow fires.
+    if (newMode === "phone" && !phoneEnabled) return;
+    if (newMode === "email" && !emailEnabled) return;
     setMode(newMode);
     setStep("input");
     setPhone("");
@@ -589,11 +607,21 @@ export default function LoginClient({
             {/* Header */}
             <div className="mb-6">
               <h1 className="font-display text-[1.75rem] font-medium tracking-tight text-text-main">
-                {step === "input" ? T.title : T.codeSentTo}
+                {step === "input"
+                  ? !otpEnabled
+                    ? T.titleSocial
+                    : mode === "email"
+                      ? T.titleEmail
+                      : T.title
+                  : T.codeSentTo}
               </h1>
               <p className="mt-1.5 text-sm text-text-sec">
                 {step === "input"
-                  ? T.subtitle
+                  ? !otpEnabled
+                    ? T.subtitleSocial
+                    : mode === "email"
+                      ? T.subtitleEmail
+                      : T.subtitle
                   : (
                     <span>
                       {mode === "email" ? T.codeSentToEmail : T.codeSentTo}{" "}
@@ -623,8 +651,10 @@ export default function LoginClient({
               ) : null}
             </AnimatePresence>
 
-            {/* Mode tabs (only on input step + email enabled) */}
-            {emailEnabled && step === "input" ? (
+            {/* Mode tabs — only when there is a real choice to make (both OTP
+                channels live) and we're on the input step. AUTH-GATE-01: a
+                single-channel config renders no tabs at all. */}
+            {phoneEnabled && emailEnabled && step === "input" ? (
               <SegmentedTabs<LoginMode>
                 value={mode}
                 onChange={switchMode}
@@ -646,7 +676,8 @@ export default function LoginClient({
               />
             ) : null}
 
-            {/* Form steps */}
+            {/* Form steps — dropped entirely when no OTP channel is live */}
+            {otpEnabled ? (
             <AnimatePresence mode="wait">
               {step === "input" ? (
                 <motion.div
@@ -806,15 +837,21 @@ export default function LoginClient({
                 </motion.div>
               )}
             </AnimatePresence>
+            ) : null}
 
-            {/* Divider */}
-            <div className="my-6 flex items-center gap-3">
-              <div className="h-px flex-1 bg-border-subtle" />
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-text-sec">
-                {T.socialDividerLabel}
-              </span>
-              <div className="h-px flex-1 bg-border-subtle" />
-            </div>
+            {/* Divider — "или войти через" only reads correctly when there IS a
+                form above it. Without one, keep the vertical rhythm only. */}
+            {otpEnabled ? (
+              <div className="my-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border-subtle" />
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-text-sec">
+                  {T.socialDividerLabel}
+                </span>
+                <div className="h-px flex-1 bg-border-subtle" />
+              </div>
+            ) : (
+              <div className="mb-6" />
+            )}
 
             {/* Social login — grid columns adapt to the number of enabled
                 providers (Telegram gated by FIX-TELEGRAM-KILLSWITCH; VK + Yandex
