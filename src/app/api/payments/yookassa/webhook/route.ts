@@ -31,13 +31,18 @@ export const runtime = "nodejs";
  * makes YooKassa retry (its 24h redelivery window is the delivery safety net).
  */
 
-// HARDENING-08 FIX-17: `extractClientIp` now peels `TRUSTED_PROXY_HOPS` trusted
-// hops from the RIGHT of X-Forwarded-For (no longer the spoofable leftmost), so
-// the allowlist CAN enforce. It stays deploy-GATED: `YOOKASSA_IP_ALLOWLIST_ENFORCED`
-// defaults false (log-only) — enforcing before the prod hop count is confirmed
-// would reject real YooKassa notifications. Flip the env to true at deploy once
-// TRUSTED_PROXY_HOPS matches the edge. The worker API re-fetch remains the
-// authenticity anchor regardless.
+// HARDENING-08 FIX-17: `extractClientIp` peels `TRUSTED_PROXY_HOPS` trusted hops
+// from the RIGHT of X-Forwarded-For (no longer the spoofable leftmost), so the
+// allowlist CAN enforce correctly when switched on.
+//
+// PAY-SEC-01 (2026-07-31) — but it deliberately STAYS OFF in production. It is
+// defence-in-depth, never the authenticity anchor: a wrong `TRUSTED_PROXY_HOPS`
+// or an unannounced change to YooKassa's published ranges would drop LEGITIMATE
+// payment notifications, and IP checks buy nothing the worker's API re-fetch
+// does not already guarantee. Log-only keeps the signal (unexpected source IPs
+// are still recorded + surfaced) without the false-negative risk. Flipping it on
+// remains a one-env-var, no-code-change decision if the proxy chain ever
+// stabilises enough to want the extra layer.
 const IP_ALLOWLIST_ENFORCED = env.YOOKASSA_IP_ALLOWLIST_ENFORCED;
 
 // Warn at most once per process when the optional URL secret is unset in prod —

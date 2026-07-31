@@ -63,9 +63,20 @@ const envSchema = z.object({
   // Optional dedicated real-IP header the edge OVERWRITES (e.g. "x-real-ip").
   // Only set when the edge is confirmed to set it — otherwise it's spoofable.
   TRUSTED_REAL_IP_HEADER: z.string().trim().default(""),
-  // Flip the YooKassa webhook IP allowlist from log-only to REJECT. Leave false
-  // until TRUSTED_PROXY_HOPS is confirmed for prod — enforcing with a wrong hop
-  // count rejects real notifications. (Worker API re-fetch is the anchor either way.)
+  // Flip the YooKassa webhook IP allowlist from log-only to REJECT.
+  //
+  // PAY-SEC-01 (2026-07-31) — default false is the ACCEPTED PRODUCTION POSTURE,
+  // not a temporary "until we confirm the hop count" state. Two failure modes
+  // make IP enforcement fragile behind an ALB: a wrong `TRUSTED_PROXY_HOPS`
+  // resolves every request to an edge IP, and YooKassa can change its published
+  // ranges without notice. Either one silently drops LEGITIMATE payment
+  // notifications — the worst available outcome for a billing webhook.
+  //
+  // This is only safe because authenticity does NOT rest on the source IP:
+  // `webhook-processor.ts` re-fetches the object from the YooKassa API and acts
+  // solely on the API-reported status/amount/metadata (invariant #5). The
+  // allowlist is cheap, reversible defence-in-depth on top of that — kept in
+  // the code path, off by default, flippable per-env with no redeploy of logic.
   YOOKASSA_IP_ALLOWLIST_ENFORCED: boolFlag,
 
   // ── Redis ─────────────────────────────────────────────────────────────────

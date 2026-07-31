@@ -1,4 +1,4 @@
-﻿# МастерРядом
+# МастерРядом
 
 **Online booking marketplace for beauty services** — a single platform for clients, solo masters, and studios.
 
@@ -251,11 +251,33 @@ Currently in-memory (single process). Redis client is already wired — switchin
 
 ### YooKassa
 
-`/api/payments/yookassa/webhook` expects the token in the `Authorization` header:
+**YooKassa does not sign its notifications** — there is no HMAC and no signature
+header (verified against the official docs). So the notification body is treated
+as an untrusted *hint*, and authenticity is established server-to-server.
 
-```
-Authorization: Bearer <YOOKASSA_WEBHOOK_TOKEN>
-```
+**Trust chain**
+
+1. **Optional URL secret.** When `YOOKASSA_WEBHOOK_TOKEN` is set, configure the
+   webhook URL in the ЛК as
+   `https://<host>/api/payments/yookassa/webhook?token=<value>` — the token is a
+   **query parameter**, not an `Authorization: Bearer` header. It is compared in
+   constant time and never written to application logs. It is a cheap
+   pre-filter, not the authenticity guarantee; unset simply skips this step.
+2. **IP allowlist — log-only.** `YOOKASSA_IP_ALLOWLIST_ENFORCED` defaults to
+   `false` and is intended to stay off in production (PAY-SEC-01): enforcement
+   depends on a correct `TRUSTED_PROXY_HOPS` and on YooKassa's published ranges,
+   and getting either wrong drops real payment notifications.
+3. **API re-fetch — the actual anchor.** The route forwards only
+   `{ event, object.id }` to the queue. The worker
+   (`src/lib/payments/yookassa/webhook-processor.ts`) re-fetches the object via
+   `GET /v3/payments|refunds/{id}` with the shop credentials and mutates billing
+   state **only** from the API-reported `status` / `amount` / `metadata`. A
+   forged notification costs one lookup that finds nothing; a body claiming
+   `succeeded` for a payment the API reports as `canceled` never activates
+   anything.
+
+Grants are idempotent — a payment already `SUCCEEDED` (or `REFUNDED`) short-
+circuits, so YooKassa's 24h redelivery window cannot double-apply state.
 
 ---
 
