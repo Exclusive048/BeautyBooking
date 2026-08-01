@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { env } from "@/lib/env";
@@ -8,6 +9,13 @@ import { env } from "@/lib/env";
 type VkLoginButtonProps = {
   iconOnly?: boolean;
   className?: string;
+  /**
+   * RKN-FIX-01: VK login can CREATE an account, so it is a registration path
+   * and needs consent like any other. Omitted → legacy plain link (the only
+   * consent-free case the server allows is an already-signed-in user linking
+   * VK to an existing account).
+   */
+  consent?: SocialConsent;
   /**
    * QA-001: VK-enabled flag resolved SERVER-side and passed down so server +
    * client render the same branch (env-via-alias is `undefined` on the client →
@@ -25,12 +33,38 @@ function VkIcon({ className }: { className?: string }) {
   );
 }
 
-export default function VkLoginButton({ iconOnly = false, className, enabled }: VkLoginButtonProps) {
+export default function VkLoginButton({
+  iconOnly = false,
+  className,
+  enabled,
+  consent,
+}: VkLoginButtonProps) {
   // QA-001: prefer the server-passed prop (deterministic across SSR/CSR).
   const vkEnabled = enabled !== undefined ? enabled : String(env.NEXT_PUBLIC_VK_ENABLED) === "true";
   if (!vkEnabled) return null;
 
   const label = UI_TEXT.auth.vk.loginButton;
+  const blockedByConsent = consent !== undefined && !consent.granted;
+  const href = withConsentQuery("/api/auth/vk/start", consent);
+
+  // Consent not yet given → a real disabled control, not a link that would be
+  // refused server-side. Same treatment on both variants.
+  if (blockedByConsent) {
+    if (iconOnly) {
+      return (
+        <button type="button" disabled aria-label={label} title={label} className={cn(className, "opacity-50")}>
+          <VkIcon className="h-5 w-5 text-[#0077FF]" />
+          <span className="sr-only">{label}</span>
+        </button>
+      );
+    }
+    return (
+      <Button variant="secondary" size="lg" className="w-full gap-2" disabled aria-label={label}>
+        <VkIcon className="h-4 w-4 text-[#0077FF]" />
+        {label}
+      </Button>
+    );
+  }
 
   // FIX-24 (Item 3): plain <a>, NOT next/link. `/api/auth/vk/start` 302s to
   // id.vk.ru — a next/link RSC-prefetches it (cross-origin fetch → CORS error),
@@ -39,7 +73,7 @@ export default function VkLoginButton({ iconOnly = false, className, enabled }: 
   // is never prefetched.
   if (iconOnly) {
     return (
-      <a href="/api/auth/vk/start" aria-label={label} title={label} className={cn(className)}>
+      <a href={href} aria-label={label} title={label} className={cn(className)}>
         <VkIcon className="h-5 w-5 text-[#0077FF]" />
         <span className="sr-only">{label}</span>
       </a>
@@ -48,7 +82,7 @@ export default function VkLoginButton({ iconOnly = false, className, enabled }: 
 
   return (
     <Button asChild variant="secondary" size="lg" className="w-full gap-2">
-      <a href="/api/auth/vk/start" aria-label={label}>
+      <a href={href} aria-label={label}>
         <VkIcon className="h-4 w-4 text-[#0077FF]" />
         {label}
       </a>

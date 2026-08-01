@@ -4,10 +4,14 @@ import { NextResponse } from "next/server";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { getSessionUser } from "@/lib/auth/session";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
 import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
+import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { signConsentCookieValue, VK_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
 import { isProduction, isVkAuthEnabled } from "@/lib/env";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const VK_NOT_CONFIGURED_CODES = new Set([
   "VK_CLIENT_ID_MISSING",
@@ -27,6 +31,21 @@ export async function GET(req: Request) {
       return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
     }
 
+    // RKN-FIX-01: the consent the visitor ticked on /login travels with the
+    // flow. It is validated HERE (before any OAuth work) and then signed into a
+    // state-bound cookie the callback can trust — see `oauth-consent-cookie.ts`
+    // for why that, and not a query param on the callback, is the trustworthy
+    // vehicle in this codebase.
+    //
+    // A session-linking round-trip (an already-signed-in user attaching VK)
+    // carries no flags and needs none: it registers nobody. So the refusal is
+    // scoped to visitors who could end up creating an account.
+    const consentFlags = consentFlagsFromParams(new URL(req.url).searchParams);
+    const isLinkingSession = Boolean(await getSessionUser());
+    if (!isLinkingSession && !hasRequiredConsents(consentFlags)) {
+      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+    }
+
     try {
       const state = crypto.randomBytes(32).toString("hex");
       const codeVerifier = generateCodeVerifier();
@@ -35,6 +54,13 @@ export async function GET(req: Request) {
       const authUrl = buildVkAuthorizeUrl({ state, codeChallenge, redirectUri });
 
       const cookieStore = await cookies();
+      cookieStore.set(VK_CONSENT_COOKIE, signConsentCookieValue(state, consentFlags), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: isProduction,
+        path: "/",
+        maxAge: VK_ID_STATE_TTL_SECONDS,
+      });
       cookieStore.set(VK_ID_STATE_COOKIE, signVkCookieValue(state), {
         httpOnly: true,
         sameSite: "lax",

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AccountType } from "@prisma/client";
 import { normalizePhone } from "@/lib/auth/otp";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags";
 
 const phoneSchema = z.preprocess(
   (value) => (typeof value === "string" ? normalizePhone(value) : value),
@@ -11,9 +12,20 @@ export const otpRequestSchema = z.object({
   phone: phoneSchema,
 });
 
+/**
+ * RKN-FIX-01: the ticked consent boxes ride the verify call — this is the
+ * request that creates the account, so this is where consent has to be proven.
+ *
+ * Optional in the SHAPE, mandatory in EFFECT: a login by an already-registered
+ * user (or by a client that predates this field) still works and simply writes
+ * no new rows, while creating a NEW profile without `terms` + `pdProcessing`
+ * is refused by the route (`assertRequiredConsents`). Making the field itself
+ * required would lock out existing sessions/clients for no legal gain.
+ */
 export const otpVerifySchema = z.object({
   phone: phoneSchema,
   code: z.string().trim().min(4, "Code is too short"),
+  consent: consentFlagsSchema.optional(),
 });
 
 export const otpEmailRequestSchema = z.object({
@@ -23,6 +35,8 @@ export const otpEmailRequestSchema = z.object({
 export const otpEmailVerifySchema = z.object({
   email: z.string().trim().email("Invalid email"),
   code: z.string().trim().min(4, "Code is too short"),
+  // RKN-FIX-01 — mirrors `otpVerifySchema.consent`, same enforcement rule.
+  consent: consentFlagsSchema.optional(),
 });
 
 const telegramIdSchema = z.preprocess(

@@ -23,7 +23,16 @@ enum AccountType {
 enum ConsentType {
   TERMS
 
+  /// Acknowledgement of the privacy policy. RKN-FIX-01: no longer written —
+  /// the policy is an informational disclosure, the consent act is
+  /// PD_PROCESSING. Kept for the pre-fix rows and for a future explicit
+  /// "policy acknowledged" record if counsel asks for one.
   PRIVACY
+
+  /// RKN-FIX-01 (152-ФЗ ст. 9 в ред. 156-ФЗ): consent to personal-data
+  /// processing, recorded against the SEPARATE PD-consent document (`/consent`),
+  /// not against the privacy policy and not bundled with the offer.
+  PD_PROCESSING
 
   MARKETING
 

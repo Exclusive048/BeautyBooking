@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ConsentType, OtpChannel } from "@prisma/client";
+import { OtpChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
@@ -20,8 +20,9 @@ import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { invalidateMeIdentityCache } from "@/lib/users/me";
 import { extractClientIp } from "@/lib/http/ip";
-
-const CONSENT_DOCUMENT_VERSION = "1.0";
+import { hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { recordUserConsents } from "@/lib/legal/consent";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
 
-    const { email, code } = parsed.data;
+    const { email, code, consent } = parsed.data;
     const normalizedEmail = email.toLowerCase();
 
     // O2: scope verify lockout by (email + client IP) — see otp-rate-limit.ts.
@@ -72,10 +73,23 @@ export async function POST(req: Request) {
       return fail("Code not found", 401, "CODE_NOT_FOUND");
     }
 
-    const [, , existingProfile] = await Promise.all([
+    // RKN-FIX-01 (mirrors the phone route): resolve new-vs-existing BEFORE the
+    // code is consumed, so a consent refusal doesn't burn the user's code.
+    const existingProfile = await prisma.userProfile.findUnique({ where: { email: normalizedEmail } });
+
+    if (!existingProfile && !hasRequiredConsents(consent)) {
+      void recordSurfaceEvent({
+        surface: "auth",
+        outcome: "denied",
+        operation: "otp-email-verify",
+        code: "CONSENT_REQUIRED",
+      });
+      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+    }
+
+    await Promise.all([
       clearOtpEmailVerifyFailures(normalizedEmail, clientIp),
       prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }),
-      prisma.userProfile.findUnique({ where: { email: normalizedEmail } }),
     ]);
 
     // OTP-EMAIL-LOGIN-RACE: create-or-recover is delegated so a P2002 from two
@@ -86,20 +100,10 @@ export async function POST(req: Request) {
     const ipAddress = clientIp;
     const userAgent = req.headers.get("user-agent");
 
-    const consentPromise = prisma.userConsent
-      .createMany({
-        data: [
-          { userId: profile.id, consentType: ConsentType.TERMS, documentVersion: CONSENT_DOCUMENT_VERSION, ipAddress, userAgent },
-          { userId: profile.id, consentType: ConsentType.PRIVACY, documentVersion: CONSENT_DOCUMENT_VERSION, ipAddress, userAgent },
-        ],
-        skipDuplicates: true,
-      })
-      .catch((error) => {
-        logError("Failed to save user consents (email otp)", {
-          userId: profile.id,
-          error: error instanceof Error ? error.stack : String(error),
-        });
-      });
+    // RKN-FIX-01 — same single writer as every other registration path.
+    const consentPromise = consent
+      ? recordUserConsents({ userId: profile.id, flags: consent, ipAddress, userAgent })
+      : Promise.resolve();
 
     const redirectDecision = await resolveCabinetRedirect(profile.id);
     await consentPromise;

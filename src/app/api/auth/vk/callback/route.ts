@@ -12,10 +12,14 @@ import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { getSessionUser, setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { nextRedirect } from "@/lib/http/origin";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { exchangeVkCodeForToken, fetchVkProfile, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { readSignedVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
+import { hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { readConsentCookieValue, VK_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
+import { recordUserConsents } from "@/lib/legal/consent";
+import { extractClientIp } from "@/lib/http/ip";
 import { isProduction, isVkAuthEnabled } from "@/lib/env";
 
 const callbackSchema = z.object({
@@ -26,20 +30,17 @@ const callbackSchema = z.object({
 });
 
 function clearVkCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
-  cookieStore.set(VK_ID_STATE_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProduction,
-    path: "/",
-    maxAge: 0,
-  });
-  cookieStore.set(VK_ID_VERIFIER_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProduction,
-    path: "/",
-    maxAge: 0,
-  });
+  // RKN-FIX-01: the consent cookie is single-use like the state/verifier pair —
+  // cleared on every exit path so it can never be reused by a later flow.
+  for (const name of [VK_ID_STATE_COOKIE, VK_ID_VERIFIER_COOKIE, VK_CONSENT_COOKIE]) {
+    cookieStore.set(name, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
+      path: "/",
+      maxAge: 0,
+    });
+  }
 }
 
 function buildDisplayName(firstName?: string | null, lastName?: string | null) {
@@ -135,6 +136,7 @@ export async function GET(req: Request) {
       const parsedCallback = parseVkCallback(url);
       const expectedState = readSignedVkCookieValue(cookieStore.get(VK_ID_STATE_COOKIE)?.value);
       const codeVerifier = readSignedVkCookieValue(cookieStore.get(VK_ID_VERIFIER_COOKIE)?.value);
+      const rawConsentCookie = cookieStore.get(VK_CONSENT_COOKIE)?.value;
 
       clearVkCookies(cookieStore);
 
@@ -144,6 +146,14 @@ export async function GET(req: Request) {
       if (!codeVerifier) {
         return fail("VK code verifier is missing", 400, "VALIDATION_ERROR");
       }
+
+      // RKN-FIX-01: the flags are trusted only after the signature AND the
+      // state binding check — a cookie from another flow, a tampered one, or
+      // one whose 10-minute TTL lapsed mid-round-trip all resolve to `null`,
+      // which reads as "no consent captured" (never as consent granted).
+      const consentFlags = readConsentCookieValue(rawConsentCookie, expectedState);
+      const ipAddress = extractClientIp(req);
+      const userAgent = req.headers.get("user-agent");
 
       const redirectUri = requireVkRedirectUri("auth");
       const token = await exchangeVkCodeForToken({
@@ -166,6 +176,13 @@ export async function GET(req: Request) {
           refreshToken: token.refreshToken,
           deviceId: token.deviceId,
         });
+
+        // Linking VK to an account that already exists registers nobody, so it
+        // is never blocked; flags are still honoured if the visitor happened to
+        // come through the login form.
+        if (consentFlags) {
+          await recordUserConsents({ userId: sessionUser.id, flags: consentFlags, ipAddress, userAgent });
+        }
 
         try {
           await ensureFreeSubscriptionsForRoles(sessionUser.id, sessionUser.roles);
@@ -206,6 +223,18 @@ export async function GET(req: Request) {
       }
 
       if (!user) {
+        // RKN-FIX-01 — the fail-safe. An OAuth visitor must never end up with a
+        // created account and zero consent rows: without provable consent the
+        // account is simply not created, and the visitor is sent back to the
+        // login form to tick the boxes again (the usual cause is a consent
+        // cookie that expired during a slow round-trip).
+        if (!hasRequiredConsents(consentFlags)) {
+          // No provider id in the line: this is an unregistered visitor and the
+          // id is the only identifier we hold for them.
+          logInfo("VK auth refused: required consents missing", { stage: "new-user" });
+          return nextRedirect(req, "/login?error=consent");
+        }
+
         user = await prisma.userProfile.create({
           data: {
             firstName: profile.firstName,
@@ -264,6 +293,13 @@ export async function GET(req: Request) {
         refreshToken: token.refreshToken,
         deviceId: token.deviceId,
       });
+
+      // Registration and repeat login share this write: on a fresh account it
+      // records the proof, on a returning one `recordUserConsents` no-ops
+      // unless a document version moved on.
+      if (consentFlags) {
+        await recordUserConsents({ userId: user.id, flags: consentFlags, ipAddress, userAgent });
+      }
 
       const redirectDecision = await resolveCabinetRedirect(user.id);
       const response = nextRedirect(req, redirectDecision.target);

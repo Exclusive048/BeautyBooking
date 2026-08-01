@@ -54,6 +54,24 @@ export const UI_TEXT = {
   },
   legal: {
     lastUpdated: "Последнее обновление:",
+    // RKN-FIX-01: documents are versioned (src/lib/legal/documents.ts) and the
+    // version is what lands in UserConsent.documentVersion — so the page has to
+    // show which version the reader is looking at.
+    versionLabel: "Версия",
+    // Consent form (login). Each row is ONE purpose with ONE document — the
+    // 152-ФЗ ст. 9 (ред. 156-ФЗ) requirement that killed the merged checkbox.
+    consent: {
+      termsPrefix: "Я принимаю",
+      termsLink: "Пользовательское соглашение",
+      pdPrefix: "Я даю",
+      pdLink: "согласие на обработку персональных данных",
+      pdMiddle: "и ознакомлен(а) с",
+      privacyLink: "Политикой конфиденциальности",
+      marketingLabel: "Хочу получать новости, персональные подборки и акции",
+      requiredMark: "обязательно",
+      optionalMark: "необязательно",
+      groupLabel: "Согласия",
+    },
     toc: {
       heading: "На этой странице",
       label: "Содержание документа",
@@ -618,7 +636,13 @@ export const UI_TEXT = {
       noAccountHint: "Аккаунт создадим автоматически при первом входе",
       telegramSectionTitle: "Войти через Telegram",
       vkSectionTitle: "Войти через VK",
-      consentRequired: "Необходимо согласие с условиями и политикой конфиденциальности.",
+      // RKN-FIX-01: two separate required consents now — the wording no longer
+      // names the privacy policy (an informational document), but the offer and
+      // the personal-data consent, which is what actually gates registration.
+      consentRequired: "Отметьте согласие с соглашением и с обработкой персональных данных.",
+      // Shown when an OAuth round-trip comes back without a valid consent
+      // record (typically the 10-минутный consent cookie expired mid-flow).
+      consentExpired: "Подтвердите согласия ещё раз — предыдущие данные устарели.",
       heroFeature1: "Находите мастеров по портфолио и отзывам",
       heroFeature2: "Бронируйте время онлайн — без звонков",
       heroFeature3: "Напоминания и перенос в пару кликов",

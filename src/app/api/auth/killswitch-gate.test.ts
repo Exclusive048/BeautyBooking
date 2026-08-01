@@ -43,7 +43,13 @@ vi.mock("@/lib/env", () => ({
     return flags.yandex;
   },
   isProduction: false,
-  env: { TELEGRAM_BOT_TOKEN: "bot-token", NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: "mybot" },
+  env: {
+    TELEGRAM_BOT_TOKEN: "bot-token",
+    NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: "mybot",
+    // RKN-FIX-01: the start routes now also sign a consent cookie (HMAC over
+    // this secret), so the mocked env has to carry it.
+    AUTH_JWT_SECRET: "x".repeat(64),
+  },
 }));
 
 vi.mock("@/lib/telegram/feature", () => ({
@@ -178,7 +184,9 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
 
     it("enabled → NOT short-circuited (redirects to VK, gate doesn't leak)", async () => {
       flags.vk = true;
-      const res = await vkStart(req());
+      // RKN-FIX-01 added a consent gate to `start`; this test is about the
+      // kill-switch, so it supplies the consent the login form would.
+      const res = await vkStart(req("http://localhost/api/auth/vk/start?terms=1&pd=1&marketing=0"));
       expect(spies.buildVkAuthorizeUrl).toHaveBeenCalledOnce();
       expect([302, 307, 308]).toContain(res.status);
       expect(res.headers.get("location")).toContain("vk.com");
@@ -210,7 +218,8 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
 
     it("enabled → NOT short-circuited (redirects to Yandex)", async () => {
       flags.yandex = true;
-      const res = await yandexStart(req());
+      // RKN-FIX-01 consent params — see the VK case above.
+      const res = await yandexStart(req("http://localhost/api/auth/yandex/start?terms=1&pd=1&marketing=0"));
       expect(spies.buildYandexAuthorizeUrl).toHaveBeenCalledOnce();
       expect([302, 307, 308]).toContain(res.status);
       expect(res.headers.get("location")).toContain("yandex.ru");

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { isYandexAuthEnabled } from "@/lib/env";
@@ -9,6 +10,8 @@ import { isYandexAuthEnabled } from "@/lib/env";
 type YandexLoginButtonProps = {
   iconOnly?: boolean;
   className?: string;
+  /** RKN-FIX-01 — see `VkLoginButton.consent`; identical contract. */
+  consent?: SocialConsent;
   /**
    * QA-001: Yandex-enabled flag resolved SERVER-side and passed down so server +
    * client render the same branch (avoids the env-via-alias hydration mismatch).
@@ -25,19 +28,44 @@ function YandexIcon({ className }: { className?: string }) {
   );
 }
 
-export default function YandexLoginButton({ iconOnly = false, className, enabled }: YandexLoginButtonProps) {
+export default function YandexLoginButton({
+  iconOnly = false,
+  className,
+  enabled,
+  consent,
+}: YandexLoginButtonProps) {
   // QA-001: prefer the server-passed prop (deterministic across SSR/CSR).
   const yandexEnabled = enabled !== undefined ? enabled : isYandexAuthEnabled;
   if (!yandexEnabled) return null;
 
   const label = UI_TEXT.auth.yandex.loginButton;
+  const blockedByConsent = consent !== undefined && !consent.granted;
+  const href = withConsentQuery("/api/auth/yandex/start", consent);
+
+  // RKN-FIX-01 — inert until the required boxes are ticked (VK parity).
+  if (blockedByConsent) {
+    if (iconOnly) {
+      return (
+        <button type="button" disabled aria-label={label} title={label} className={cn(className, "opacity-50")}>
+          <YandexIcon className="h-5 w-5 text-[#FC3F1D]" />
+          <span className="sr-only">{label}</span>
+        </button>
+      );
+    }
+    return (
+      <Button variant="secondary" size="lg" className="w-full gap-2" disabled aria-label={label}>
+        <YandexIcon className="h-4 w-4 text-[#FC3F1D]" />
+        {label}
+      </Button>
+    );
+  }
 
   // FIX-24 parity: plain <a>, NOT next/link. `/api/auth/yandex/start` 302s to
   // oauth.yandex.ru — a next/link would RSC-prefetch it (cross-origin → CORS)
   // and can't follow the external redirect. A top-level anchor follows cleanly.
   if (iconOnly) {
     return (
-      <a href="/api/auth/yandex/start" aria-label={label} title={label} className={cn(className)}>
+      <a href={href} aria-label={label} title={label} className={cn(className)}>
         <YandexIcon className="h-5 w-5 text-[#FC3F1D]" />
         <span className="sr-only">{label}</span>
       </a>
@@ -46,7 +74,7 @@ export default function YandexLoginButton({ iconOnly = false, className, enabled
 
   return (
     <Button asChild variant="secondary" size="lg" className="w-full gap-2">
-      <a href="/api/auth/yandex/start" aria-label={label}>
+      <a href={href} aria-label={label}>
         <YandexIcon className="h-4 w-4 text-[#FC3F1D]" />
         {label}
       </a>

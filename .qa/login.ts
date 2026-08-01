@@ -74,7 +74,15 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   // Retrying the type until the consent checkbox (which only renders for a
   // valid phone) becomes visible is deterministic against the hydration race.
   const phoneInput = page.getByRole("textbox", { name: /Телефон/ });
-  const consent = page.getByRole("checkbox");
+  // RKN-FIX-01: consent is no longer ONE checkbox. The form now carries three
+  // independent purposes — offer, PD processing (both required) and marketing
+  // (optional) — so `getByRole("checkbox")` is a strict-mode violation. The
+  // harness ticks exactly the two required ones and deliberately leaves
+  // marketing alone: that is the shape a real registration takes, and it keeps
+  // the seed accounts free of a marketing consent nothing asked for.
+  const consentGroup = page.getByRole("group", { name: "Согласия" });
+  const requiredConsents = consentGroup.getByRole("checkbox").nth(0);
+  const requiredConsentsPd = consentGroup.getByRole("checkbox").nth(1);
   // Fold type -> consent-appears -> check -> assert-checked into ONE retry unit
   // (40 s for cold compiles). The QA-003 hydration race can wipe the tree
   // between "consent visible" and a separate `.check()`, which failed ~20% of
@@ -82,11 +90,14 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   await expect(async () => {
     await phoneInput.click({ clickCount: 3 });
     await phoneInput.pressSequentially(role.phone, { delay: 25 });
-    await expect(consent).toBeVisible({ timeout: 2000 });
-    if (!(await consent.isChecked().catch(() => false))) {
-      await consent.check({ timeout: 2000 });
+    await expect(requiredConsents).toBeVisible({ timeout: 2000 });
+    for (const box of [requiredConsents, requiredConsentsPd]) {
+      if (!(await box.isChecked().catch(() => false))) {
+        await box.check({ timeout: 2000 });
+      }
     }
-    await expect(consent).toBeChecked({ timeout: 1000 });
+    await expect(requiredConsents).toBeChecked({ timeout: 1000 });
+    await expect(requiredConsentsPd).toBeChecked({ timeout: 1000 });
   }).toPass({ timeout: 40_000 });
 
   // Step 3 — request the code.

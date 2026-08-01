@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { ConsentType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
@@ -17,9 +16,10 @@ import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { extractClientIp } from "@/lib/http/ip";
+import { hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { recordUserConsents } from "@/lib/legal/consent";
 import { isPhoneAuthEnabled } from "@/lib/env";
-
-const CONSENT_DOCUMENT_VERSION = "1.0";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
-    const { phone, code } = parsed.data;
+    const { phone, code, consent } = parsed.data;
 
     // O2: verify lockout is scoped by (phone + client IP) so a third party who
     // knows the number can't lock the owner out. Resolved once, up front.
@@ -90,13 +90,32 @@ export async function POST(req: Request) {
     }
 
     const verifyDbStartedAt = Date.now();
-    const [, , existingProfile] = await Promise.all([
+    // RKN-FIX-01: the "is this a registration?" answer is needed BEFORE the
+    // code is burned — refusing a first-time login for missing consent must not
+    // cost the user their one-time code. So this lookup is pulled out of the
+    // side-effect batch below and awaited first.
+    const existingProfile = await prisma.userProfile.findUnique({ where: { phone } });
+
+    // Server-side enforcement, not just UI gating: creating an account without
+    // consent to the offer AND to PD processing is exactly what 152-ФЗ ст. 9
+    // (ред. 156-ФЗ) forbids. Existing users are never blocked — their consent
+    // is already on record and a login is not a new registration.
+    if (!existingProfile && !hasRequiredConsents(consent)) {
+      void recordSurfaceEvent({
+        surface: "auth",
+        outcome: "denied",
+        operation: "otp-verify",
+        code: "CONSENT_REQUIRED",
+      });
+      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+    }
+
+    await Promise.all([
       clearOtpVerifyFailures(phone, clientIp),
       prisma.otpCode.update({
         where: { id: otp.id },
         data: { usedAt: now },
       }),
-      prisma.userProfile.findUnique({ where: { phone } }),
     ]);
 
     // OTP-PHONE-LOGIN-RACE: create-or-recover is delegated so a P2002 from two
@@ -120,32 +139,13 @@ export async function POST(req: Request) {
           });
         })
       : Promise.resolve();
-    const consentPromise = prisma.userConsent
-      .createMany({
-        data: [
-          {
-            userId: profile.id,
-            consentType: ConsentType.TERMS,
-            documentVersion: CONSENT_DOCUMENT_VERSION,
-            ipAddress,
-            userAgent,
-          },
-          {
-            userId: profile.id,
-            consentType: ConsentType.PRIVACY,
-            documentVersion: CONSENT_DOCUMENT_VERSION,
-            ipAddress,
-            userAgent,
-          },
-        ],
-        skipDuplicates: true,
-      })
-      .catch((error) => {
-        logError("Failed to save user consents", {
-          userId: profile.id,
-          error: error instanceof Error ? error.stack : String(error),
-        });
-      });
+    // RKN-FIX-01: one writer for every path, versions from the legal source of
+    // truth, no row spam on repeat logins (see `recordUserConsents`). Nothing
+    // is written when the client sent no flags — an unticked box must never
+    // materialise as consent.
+    const consentPromise = consent
+      ? recordUserConsents({ userId: profile.id, flags: consent, ipAddress, userAgent })
+      : Promise.resolve();
 
     const redirectDecision = await resolveCabinetRedirect(profile.id);
     await Promise.all([linkBookingsPromise, consentPromise]);

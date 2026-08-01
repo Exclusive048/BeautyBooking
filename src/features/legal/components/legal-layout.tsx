@@ -14,9 +14,16 @@ type Props = {
   children: ReactNode;
   /** When true, shows the "Черновик" banner above the title. */
   isDraft?: boolean;
+  /**
+   * RKN-FIX-01: document version from `src/lib/legal/documents.ts` — the same
+   * string stored in `UserConsent.documentVersion`, so a reader can tell which
+   * redaction they agreed to. Omitted → only the date is shown (unversioned
+   * informational pages).
+   */
+  version?: string;
 };
 
-export function LegalLayout({ title, lastUpdated, sections, children, isDraft = true }: Props) {
+export function LegalLayout({ title, lastUpdated, sections, children, isDraft = true, version }: Props) {
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null);
 
   // Scroll-spy: track which section is at the top of the viewport.
@@ -51,6 +58,14 @@ export function LegalLayout({ title, lastUpdated, sections, children, isDraft = 
         <header className="mb-8 lg:mb-12">
           <h1 className="mb-2 font-display text-3xl text-text-main lg:text-4xl">{title}</h1>
           <p className="text-sm text-text-sec">
+            {version ? (
+              <>
+                <span className="font-mono text-xs uppercase tracking-[0.08em] text-text-label">
+                  {UI_TEXT.legal.versionLabel} {version}
+                </span>
+                <span aria-hidden> · </span>
+              </>
+            ) : null}
             {UI_TEXT.legal.lastUpdated} {formatDate(lastUpdated)}
           </p>
         </header>

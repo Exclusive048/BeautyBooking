@@ -7,7 +7,10 @@ import {
   TELEGRAM_LOGIN_STATE_COOKIE,
   TELEGRAM_LOGIN_STATE_TTL_SECONDS,
 } from "@/lib/auth/telegram-login-state";
+import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { signConsentCookieValue, TELEGRAM_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
 import { isProduction } from "@/lib/env";
+import { UI_TEXT } from "@/lib/ui/text";
 
 /**
  * FIX-9 (HARDENING-06) — Telegram login "start" step. The widget fetches this
@@ -22,9 +25,25 @@ export async function GET(req: Request) {
       return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
     }
 
+    // RKN-FIX-01 — parity with the VK/Yandex start routes. The widget only
+    // initialises after the required boxes are ticked, and passes the flags
+    // here; they are bound to the same single-use nonce that already binds the
+    // flow to this browser, so `/telegram/login` can trust them.
+    const consentFlags = consentFlagsFromParams(new URL(req.url).searchParams);
+    if (!hasRequiredConsents(consentFlags)) {
+      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+    }
+
     const { state, cookieValue } = createTelegramLoginState();
     const cookieStore = await cookies();
     cookieStore.set(TELEGRAM_LOGIN_STATE_COOKIE, cookieValue, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
+      path: "/",
+      maxAge: TELEGRAM_LOGIN_STATE_TTL_SECONDS,
+    });
+    cookieStore.set(TELEGRAM_CONSENT_COOKIE, signConsentCookieValue(state, consentFlags), {
       httpOnly: true,
       sameSite: "lax",
       secure: isProduction,

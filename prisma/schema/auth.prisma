@@ -133,6 +133,9 @@ model UserProfile {
   @@index([blockedAt])
 }
 
+/// RKN-FIX-01: proof of consent per 152-ФЗ ст. 9 (ред. 156-ФЗ) — who agreed, to
+/// which purpose, against which document VERSION, when, from where. Written
+/// only by `src/lib/legal/consent.ts`.
 model UserConsent {
   id String @id @default(cuid())
 
@@ -156,7 +159,11 @@ model UserConsent {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, consentType])
+  /// Version-scoped: one row per (user, purpose, document version). A version
+  /// bump therefore yields a NEW row on the next login instead of overwriting
+  /// the earlier proof — the history of "what was agreed to, and when" is the
+  /// evidence. Repeat logins on an unchanged version write nothing.
+  @@unique([userId, consentType, documentVersion])
   @@index([userId])
 }
 

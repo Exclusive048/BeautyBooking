@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
+import { getSessionUser } from "@/lib/auth/session";
 import { buildYandexAuthorizeUrl, requireYandexRedirectUri } from "@/lib/yandex/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/yandex/pkce";
 import {
@@ -12,7 +13,10 @@ import {
   YANDEX_STATE_TTL_SECONDS,
   YANDEX_VERIFIER_COOKIE,
 } from "@/lib/yandex/cookies";
+import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { signConsentCookieValue, YANDEX_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
 import { isProduction, isYandexAuthEnabled } from "@/lib/env";
+import { UI_TEXT } from "@/lib/ui/text";
 
 // FIX-YANDEX-OAUTH — start route, bespoke-parallel to api/auth/vk/start.
 const YANDEX_NOT_CONFIGURED_CODES = new Set([
@@ -29,6 +33,14 @@ export async function GET(req: Request) {
       return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
     }
 
+    // RKN-FIX-01 — identical consent capture to the VK start route (see there
+    // for the rationale); linking an already-signed-in account needs no flags.
+    const consentFlags = consentFlagsFromParams(new URL(req.url).searchParams);
+    const isLinkingSession = Boolean(await getSessionUser());
+    if (!isLinkingSession && !hasRequiredConsents(consentFlags)) {
+      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+    }
+
     try {
       const state = crypto.randomBytes(32).toString("hex");
       const codeVerifier = generateCodeVerifier();
@@ -37,6 +49,13 @@ export async function GET(req: Request) {
       const authUrl = buildYandexAuthorizeUrl({ state, codeChallenge, redirectUri });
 
       const cookieStore = await cookies();
+      cookieStore.set(YANDEX_CONSENT_COOKIE, signConsentCookieValue(state, consentFlags), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: isProduction,
+        path: "/",
+        maxAge: YANDEX_STATE_TTL_SECONDS,
+      });
       cookieStore.set(YANDEX_STATE_COOKIE, signYandexCookieValue(state), {
         httpOnly: true,
         sameSite: "lax",

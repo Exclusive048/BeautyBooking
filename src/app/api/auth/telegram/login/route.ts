@@ -11,6 +11,10 @@ import {
   verifyTelegramLoginState,
 } from "@/lib/auth/telegram-login-state";
 import { setSessionCookies } from "@/lib/auth/session";
+import { hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { readConsentCookieValue, TELEGRAM_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
+import { recordUserConsents } from "@/lib/legal/consent";
+import { extractClientIp } from "@/lib/http/ip";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { logError } from "@/lib/logging/logger";
@@ -63,13 +67,18 @@ export async function GET(req: NextRequest) {
     // here: the victim's browser never holds the attacker's nonce.
     const cookieStore = await cookies();
     const stateCookie = cookieStore.get(TELEGRAM_LOGIN_STATE_COOKIE)?.value;
-    cookieStore.set(TELEGRAM_LOGIN_STATE_COOKIE, "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: isProduction,
-      path: "/",
-      maxAge: 0,
-    });
+    // RKN-FIX-01: the consent cookie is minted together with the nonce and read
+    // back here, then cleared on every path exactly like the state cookie.
+    const rawConsentCookie = cookieStore.get(TELEGRAM_CONSENT_COOKIE)?.value;
+    for (const name of [TELEGRAM_LOGIN_STATE_COOKIE, TELEGRAM_CONSENT_COOKIE]) {
+      cookieStore.set(name, "", {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: isProduction,
+        path: "/",
+        maxAge: 0,
+      });
+    }
     if (!verifyTelegramLoginState(stateCookie, params.get("s"))) {
       void recordSurfaceEvent({
         surface: "auth",
@@ -78,6 +87,23 @@ export async function GET(req: NextRequest) {
         code: "STATE_MISMATCH",
       });
       return loginRedirect("telegram");
+    }
+
+    // RKN-FIX-01 — consent is checked BEFORE `authenticateTelegramLogin`,
+    // because that helper creates the profile: after it, refusing would already
+    // have registered someone. `/login-init` refuses to mint a nonce without
+    // the required boxes, so a valid nonce paired with a missing/foreign
+    // consent cookie means the flow was tampered with or the cookie lapsed —
+    // either way, back to the form.
+    const consentFlags = readConsentCookieValue(rawConsentCookie, params.get("s") ?? "");
+    if (!hasRequiredConsents(consentFlags)) {
+      void recordSurfaceEvent({
+        surface: "auth",
+        outcome: "denied",
+        operation: "telegram-login",
+        code: "CONSENT_REQUIRED",
+      });
+      return loginRedirect("consent");
     }
 
     const candidate = {
@@ -128,6 +154,13 @@ export async function GET(req: NextRequest) {
       });
       return loginRedirect("telegram");
     }
+
+    await recordUserConsents({
+      userId: result.user.id,
+      flags: consentFlags,
+      ipAddress: extractClientIp(req),
+      userAgent: req.headers.get("user-agent"),
+    });
 
     try {
       await ensureFreeSubscriptionsForRoles(result.user.id, result.user.roles);

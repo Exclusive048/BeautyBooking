@@ -12,9 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OtpInput, type OtpState } from "@/components/ui/otp-input";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
-import { LegalConsentCheckbox } from "@/features/auth/components/LegalConsentCheckbox";
+import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { parseInternalPath } from "@/lib/http/safe-redirect";
+import {
+  consentFlagsToQuery,
+  EMPTY_CONSENT_FLAGS,
+  hasRequiredConsents,
+  type ConsentFlags,
+} from "@/lib/legal/consent-flags";
 import type { PublicStats } from "@/lib/stats/public-stats";
 import { UI_TEXT } from "@/lib/ui/text";
 import { LoginShowcase, formatStatNumber } from "./login-showcase";
@@ -112,13 +118,16 @@ export default function LoginClient({
   // FIX-23: the Telegram widget now uses redirect mode (`data-auth-url`) to
   // avoid the CSP `unsafe-eval`; auth failures bounce back here with
   // `?error=telegram`, surfaced once on mount via the initial error state.
-  const initialTelegramError = useMemo(
-    () =>
-      (searchParams.get("error") ?? "").startsWith("telegram")
-        ? UI_TEXT.auth.telegram.loginFailed
-        : null,
-    [searchParams],
-  );
+  // RKN-FIX-01 adds `?error=consent`: an OAuth callback bounced the visitor
+  // back because the consent captured at `/start` was missing or expired by the
+  // time the provider returned. Re-prompting is the fail-safe — an account is
+  // never created without provable consent.
+  const initialError = useMemo(() => {
+    const code = searchParams.get("error") ?? "";
+    if (code.startsWith("telegram")) return UI_TEXT.auth.telegram.loginFailed;
+    if (code === "consent") return UI_TEXT.auth.loginPage.consentExpired;
+    return null;
+  }, [searchParams]);
   const reduce = useReducedMotion();
   const stepAnim = reduce ? undefined : stepVariants;
 
@@ -131,8 +140,17 @@ export default function LoginClient({
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"input" | "code">("input");
   const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(initialTelegramError);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(initialError);
+  // RKN-FIX-01: three independent purposes, none pre-ticked (a pre-checked box
+  // is void consent). Required = terms + pdProcessing; marketing never gates.
+  const [consent, setConsent] = useState<ConsentFlags>(EMPTY_CONSENT_FLAGS);
+  const requiredConsentsGiven = hasRequiredConsents(consent);
+  // What the social buttons need: whether they may fire at all, and the flags
+  // to hand to `/api/auth/*/start` (which re-validates them server-side).
+  const socialConsent = useMemo(
+    () => ({ granted: requiredConsentsGiven, query: consentFlagsToQuery(consent) }),
+    [consent, requiredConsentsGiven],
+  );
   const [resendTimer, setResendTimer] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);
   // LOGIN-WOW-01: the OTP grid's own lifecycle. Purely presentational — the
@@ -231,7 +249,7 @@ export default function LoginClient({
         triggerShake();
         return;
       }
-      if (!agreedToTerms) {
+      if (!requiredConsentsGiven) {
         setErrorText(UI_TEXT.auth.loginPage.consentRequired);
         triggerShake();
         return;
@@ -259,7 +277,7 @@ export default function LoginClient({
         triggerShake();
         return;
       }
-      if (!agreedToTerms) {
+      if (!requiredConsentsGiven) {
         setErrorText(UI_TEXT.auth.loginPage.consentRequired);
         triggerShake();
         return;
@@ -296,10 +314,13 @@ export default function LoginClient({
     setLoading(true);
     setOtpState("verifying");
     try {
+      // RKN-FIX-01: the ticked boxes travel with the request that creates the
+      // account. The server re-checks them (UI gating alone proves nothing) and
+      // records one UserConsent row per granted purpose.
       const body =
         mode === "phone"
-          ? { phone: normalizePhone(phone), code: finalCode }
-          : { email: email.trim().toLowerCase(), code: finalCode };
+          ? { phone: normalizePhone(phone), code: finalCode, consent }
+          : { email: email.trim().toLowerCase(), code: finalCode, consent };
       const endpoint = mode === "phone" ? "/api/auth/otp/verify" : "/api/auth/otp/email/verify";
       const result = await fetchJson<{ redirect: string }>(endpoint, {
         method: "POST",
@@ -573,17 +594,19 @@ export default function LoginClient({
                     </div>
                   )}
 
-                  {inputValid ? (
-                    <LegalConsentCheckbox
-                      checked={agreedToTerms}
-                      onCheckedChange={setAgreedToTerms}
-                      variant="short"
-                    />
+                  {/* Consent appears once the identifier is valid — the same
+                      progressive-disclosure beat the single checkbox had, so
+                      the form still opens as one field + one CTA. With social
+                      providers on screen it shows immediately instead: those
+                      buttons are gated by the same boxes and must not sit next
+                      to an invisible gate. */}
+                  {inputValid || hasSocialProviders ? (
+                    <LegalConsentGroup value={consent} onChange={setConsent} />
                   ) : null}
 
                   <Button
                     onClick={sendCode}
-                    disabled={loading || !inputValid || (inputValid && !agreedToTerms)}
+                    disabled={loading || !inputValid || (inputValid && !requiredConsentsGiven)}
                     size="lg"
                     data-testid="login-send-code"
                     className="group relative w-full overflow-hidden rounded-full"
@@ -718,9 +741,18 @@ export default function LoginClient({
               <div className="mb-6" />
             )}
 
+            {/* Social-only config: no form to hang the consent group under, so
+                it stands on its own above the provider grid. */}
+            {!otpEnabled && hasSocialProviders ? (
+              <LegalConsentGroup value={consent} onChange={setConsent} className="mb-4" />
+            ) : null}
+
             {/* Social login — grid columns adapt to the number of enabled
                 providers (Telegram gated by FIX-TELEGRAM-KILLSWITCH; VK + Yandex
-                self-gate). Launch config = VK + Yandex → 2 columns. */}
+                self-gate). Launch config = VK + Yandex → 2 columns.
+                RKN-FIX-01: every provider is a registration path, so each button
+                is inert until the required boxes are ticked and carries the
+                ticked purposes into `/start`. */}
             <div
               className={`grid gap-2.5${
                 [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length >= 3
@@ -731,10 +763,14 @@ export default function LoginClient({
               }`}
             >
               {telegramEnabled && (
-                <TelegramLoginButton showConfigError={false} botUsername={telegramBotUsername} />
+                <TelegramLoginButton
+                  showConfigError={false}
+                  botUsername={telegramBotUsername}
+                  consent={socialConsent}
+                />
               )}
-              <VkLoginButton enabled={vkEnabled} />
-              <YandexLoginButton enabled={yandexEnabled} />
+              <VkLoginButton enabled={vkEnabled} consent={socialConsent} />
+              <YandexLoginButton enabled={yandexEnabled} consent={socialConsent} />
             </div>
 
             {/* Bottom hint */}

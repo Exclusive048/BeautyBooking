@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { env } from "@/lib/env";
@@ -9,6 +10,14 @@ type TelegramLoginButtonProps = {
   iconOnly?: boolean;
   className?: string;
   showConfigError?: boolean;
+  /**
+   * RKN-FIX-01 — parity with VK/Yandex. Telegram login creates profiles too
+   * (`authenticateTelegramLogin`), so the widget is not initialised until the
+   * required boxes are ticked, and the flags ride the `login-init` fetch that
+   * mints the single-use nonce. Telegram itself stays kill-switched off
+   * (FZ-199); this keeps the gap from reopening if it is ever re-enabled.
+   */
+  consent?: SocialConsent;
   /**
    * QA-001: bot username resolved SERVER-side and passed down, so the rendered
    * branch is identical on server + client (no hydration mismatch). Reading
@@ -34,9 +43,14 @@ export default function TelegramLoginButton({
   className,
   showConfigError = true,
   botUsername: botUsernameProp,
+  consent,
 }: TelegramLoginButtonProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const didInitRef = useRef(false);
+  // Omitted prop → legacy behaviour (no consent gate); provided → the widget
+  // waits for the required boxes.
+  const consentGranted = consent === undefined || consent.granted;
+  const consentQuery = consent?.query ?? "";
 
   // QA-001: prefer the server-passed prop (deterministic across SSR/CSR); fall
   // back to env only for callers that don't pass it.
@@ -46,6 +60,10 @@ export default function TelegramLoginButton({
 
   useEffect(() => {
     if (!botUsername) return;
+    // RKN-FIX-01: no consent → no nonce → no widget. `/login-init` refuses
+    // without the required flags anyway, so initialising early would just burn
+    // a 400 and leave a widget wired to a nonce-less auth URL.
+    if (!consentGranted) return;
     const container = containerRef.current;
     if (!container) return;
     if (didInitRef.current) return;
@@ -60,7 +78,7 @@ export default function TelegramLoginButton({
     void (async () => {
       let authUrl = "/api/auth/telegram/login";
       try {
-        const res = await fetch("/api/auth/telegram/login-init", {
+        const res = await fetch(withConsentQuery("/api/auth/telegram/login-init", consentQuery ? { granted: true, query: consentQuery } : undefined), {
           method: "GET",
           credentials: "same-origin",
           cache: "no-store",
@@ -99,7 +117,7 @@ export default function TelegramLoginButton({
     return () => {
       cancelled = true;
     };
-  }, [botUsername]);
+  }, [botUsername, consentGranted, consentQuery]);
 
   function handleClick() {
     const iframe = containerRef.current?.querySelector("iframe") as HTMLIFrameElement | null;
@@ -117,8 +135,8 @@ export default function TelegramLoginButton({
   const iconOnlyButton = (
     <button
       type="button"
-      onClick={botUsername ? handleClick : undefined}
-      disabled={!botUsername}
+      onClick={botUsername && consentGranted ? handleClick : undefined}
+      disabled={!botUsername || !consentGranted}
       aria-label={label}
       title={botUsername ? label : UI_TEXT.auth.telegram.botNotConfigured}
       className={cn(className, !botUsername && "opacity-50")}
@@ -128,7 +146,9 @@ export default function TelegramLoginButton({
     </button>
   );
 
-  if (!botUsername) {
+  // Not configured, or consent not yet given → the same inert control. The
+  // config error message stays scoped to the missing-bot case.
+  if (!botUsername || !consentGranted) {
     if (iconOnly) return iconOnlyButton;
 
     return (
@@ -142,7 +162,9 @@ export default function TelegramLoginButton({
           <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
           {label}
         </button>
-        {showConfigError ? <div className="text-xs text-red-500">{UI_TEXT.auth.telegram.botNotConfigured}</div> : null}
+        {!botUsername && showConfigError ? (
+          <div className="text-xs text-red-500">{UI_TEXT.auth.telegram.botNotConfigured}</div>
+        ) : null}
       </div>
     );
   }

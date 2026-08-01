@@ -87,10 +87,14 @@
 > remains the canonical login path and does not depend on these testids — they are
 > additional stable hooks for asserting the login surface directly. The **phone
 > input** is located by `getByRole("textbox", { name: /Телефон/ })`, the **consent
-> checkbox** by `getByRole("checkbox")` (single, renders only for a valid phone),
-> the **send CTA** by `/Отправить код/`, and the **social-login buttons** by their
-> accessible names (`/Telegram/`, `/VK/`, `/Яндекс/`) — each present only when its
-> provider flag is enabled.
+> boxes** inside `getByRole("group", { name: "Согласия" })` — RKN-FIX-01 split the
+> single checkbox into three (`0` = Пользовательское соглашение, `1` = обработка
+> ПДн, both required; `2` = маркетинг, optional), so a bare
+> `getByRole("checkbox")` is now a strict-mode violation — the **send CTA** by
+> `/Отправить код/`, and the **social-login buttons** by their accessible names
+> (`/Telegram/`, `/VK/`, `/Яндекс/`) — each present only when its provider flag is
+> enabled, and each rendered as a **disabled button** (not a link) until the two
+> required consents are ticked.
 
 ## Not covered yet (incremental breadth — `QA-TESTID-COVERAGE`)
 

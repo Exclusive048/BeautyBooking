@@ -11,7 +11,7 @@ import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { getSessionUser, setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { nextRedirect } from "@/lib/http/origin";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
 import { exchangeYandexCodeForToken, fetchYandexProfile, requireYandexRedirectUri } from "@/lib/yandex/oauth";
 import { yandexCallbackSchema } from "@/lib/yandex/schemas";
@@ -20,6 +20,10 @@ import {
   YANDEX_STATE_COOKIE,
   YANDEX_VERIFIER_COOKIE,
 } from "@/lib/yandex/cookies";
+import { hasRequiredConsents } from "@/lib/legal/consent-flags";
+import { readConsentCookieValue, YANDEX_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
+import { recordUserConsents } from "@/lib/legal/consent";
+import { extractClientIp } from "@/lib/http/ip";
 import { isProduction, isYandexAuthEnabled } from "@/lib/env";
 
 // FIX-YANDEX-OAUTH — callback route. Account-linking logic mirrors
@@ -27,20 +31,16 @@ import { isProduction, isYandexAuthEnabled } from "@/lib/env";
 // branch + the "already linked to another user" 409 guard).
 
 function clearYandexCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
-  cookieStore.set(YANDEX_STATE_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProduction,
-    path: "/",
-    maxAge: 0,
-  });
-  cookieStore.set(YANDEX_VERIFIER_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: isProduction,
-    path: "/",
-    maxAge: 0,
-  });
+  // RKN-FIX-01: consent cookie is single-use alongside state/verifier.
+  for (const name of [YANDEX_STATE_COOKIE, YANDEX_VERIFIER_COOKIE, YANDEX_CONSENT_COOKIE]) {
+    cookieStore.set(name, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
+      path: "/",
+      maxAge: 0,
+    });
+  }
 }
 
 function buildDisplayName(firstName?: string | null, lastName?: string | null) {
@@ -105,6 +105,7 @@ export async function GET(req: Request) {
 
       const expectedState = readSignedYandexCookieValue(cookieStore.get(YANDEX_STATE_COOKIE)?.value);
       const codeVerifier = readSignedYandexCookieValue(cookieStore.get(YANDEX_VERIFIER_COOKIE)?.value);
+      const rawConsentCookie = cookieStore.get(YANDEX_CONSENT_COOKIE)?.value;
 
       clearYandexCookies(cookieStore);
 
@@ -114,6 +115,12 @@ export async function GET(req: Request) {
       if (!codeVerifier) {
         return fail("Yandex code verifier is missing", 400, "VALIDATION_ERROR");
       }
+
+      // RKN-FIX-01 — signature + state binding gate the flags (see the VK
+      // callback and `oauth-consent-cookie.ts`).
+      const consentFlags = readConsentCookieValue(rawConsentCookie, expectedState);
+      const ipAddress = extractClientIp(req);
+      const userAgent = req.headers.get("user-agent");
 
       const redirectUri = requireYandexRedirectUri();
       const token = await exchangeYandexCodeForToken({
@@ -133,6 +140,12 @@ export async function GET(req: Request) {
           accessToken: token.accessToken,
           refreshToken: token.refreshToken,
         });
+
+        // Session-link: registers nobody, so never blocked — flags honoured if
+        // the visitor came through the login form.
+        if (consentFlags) {
+          await recordUserConsents({ userId: sessionUser.id, flags: consentFlags, ipAddress, userAgent });
+        }
 
         try {
           await ensureFreeSubscriptionsForRoles(sessionUser.id, sessionUser.roles);
@@ -173,6 +186,12 @@ export async function GET(req: Request) {
       }
 
       if (!user) {
+        // RKN-FIX-01 fail-safe — no consent, no account (see VK callback).
+        if (!hasRequiredConsents(consentFlags)) {
+          logInfo("Yandex auth refused: required consents missing", { stage: "new-user" });
+          return nextRedirect(req, "/login?error=consent");
+        }
+
         user = await prisma.userProfile.create({
           data: {
             firstName: profile.firstName,
@@ -230,6 +249,12 @@ export async function GET(req: Request) {
         accessToken: token.accessToken,
         refreshToken: token.refreshToken,
       });
+
+      // Registration + repeat login share this write (no-op unless a document
+      // version moved on).
+      if (consentFlags) {
+        await recordUserConsents({ userId: user.id, flags: consentFlags, ipAddress, userAgent });
+      }
 
       const redirectDecision = await resolveCabinetRedirect(user.id);
       const response = nextRedirect(req, redirectDecision.target);

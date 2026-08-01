@@ -399,7 +399,27 @@ export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
  */
 export const isTelegramEnabled =
   String(env.NEXT_PUBLIC_TELEGRAM_ENABLED) === "true";
-export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(env.VK_CLIENT_ID);
+/**
+ * VK-CLIENT-ID-ALIAS-GATE-MISMATCH — ONE resolved VK client id for both the
+ * gate and the runtime resolver.
+ *
+ * VK creds ship under two name sets (canonical `VK_*`, VK-ID-console `VK_ID_*`).
+ * `vk/config.ts` has always resolved them alias-first, but `isVkAuthEnabled`
+ * used to read the canonical name ONLY — so an alias-configured deploy (which
+ * is exactly what `.env`/`.env.local` look like) rendered no VK button and got
+ * a 503 from `/api/auth/vk/start`, with working credentials sitting right
+ * there. Resolving once here and having BOTH consumers read this value is what
+ * keeps the gate and the resolver from disagreeing.
+ *
+ * Precedence is unchanged (alias first, then canonical) and this does NOT turn
+ * VK on anywhere: `NEXT_PUBLIC_VK_ENABLED` still has to be true, and production
+ * keeps it false.
+ */
+export const vkClientId: string | null =
+  [env.VK_ID_CLIENT_ID, env.VK_CLIENT_ID]
+    .map((value) => value?.trim())
+    .find((value) => Boolean(value)) ?? null;
+export const isVkAuthEnabled = env.NEXT_PUBLIC_VK_ENABLED && Boolean(vkClientId);
 /**
  * FIX-YANDEX-OAUTH — Yandex ID auth provider gate. Mirrors `isVkAuthEnabled`:
  * both the public enable flag AND a configured client id must be present.
