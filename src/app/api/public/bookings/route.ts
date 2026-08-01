@@ -20,6 +20,7 @@ import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { normalizePhone } from "@/lib/auth/otp";
 import { prisma } from "@/lib/prisma";
 import { getClientIp } from "@/lib/http/ip";
+import { assertRequiredConsents, recordGuestConsents } from "@/lib/legal/consent";
 
 /**
  * Public (no-auth) booking creation endpoint (32b).
@@ -87,6 +88,12 @@ export async function POST(req: Request) {
     if (session) {
       clientUserId = session.id;
     } else {
+      // RKN-FIX-02: a guest hands over phone + name here, so consent has to be
+      // proven BEFORE anything is created — implied consent («нажимая, вы
+      // соглашаетесь») is void since 01.09.2025. Throws CONSENT_REQUIRED, which
+      // the outer catch turns into a 400 with nothing written.
+      assertRequiredConsents(body.consent);
+
       const { profile, wasCreated } = await findOrCreateGuestUserByPhone({
         phone: body.clientPhone,
         displayName: body.clientName,
@@ -98,6 +105,14 @@ export async function POST(req: Request) {
           userId: profile.id,
         });
       }
+
+      await recordGuestConsents({
+        userId: profile.id,
+        wasCreated,
+        flags: body.consent,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
     }
 
     const created = await createBooking({

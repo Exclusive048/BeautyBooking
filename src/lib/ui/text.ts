@@ -5784,8 +5784,11 @@ export const UI_TEXT = {
       // success phase renders the full booking card immediately.
       footnoteSelectionConfirm: "Детали записи покажем сразу после оформления",
       footnoteSelectionPay: "Оплата на месте",
-      footnoteFormPrefix: "Нажимая, вы соглашаетесь с",
-      footnoteFormTermsLink: "условиями",
+      // RKN-FIX-02: the old copy («Нажимая, вы соглашаетесь с условиями») was
+      // конклюдентное consent — void since 01.09.2025. Consent is now a real
+      // act (checkboxes above the CTA); what remains is an informational line
+      // for people who are already signed in, and it claims nothing legal.
+      footnoteFormPay: "Оплата на месте — картой или наличными",
       formContactsEyebrow: "Ваши контакты",
       formBackToSelection: "Изменить время",
       phoneLabel: "Телефон",

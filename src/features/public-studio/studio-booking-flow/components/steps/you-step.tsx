@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { UI_TEXT } from "@/lib/ui/text";
+import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
+import type { ConsentFlags } from "@/lib/legal/consent-flags";
 import type { BookingUser } from "@/features/booking/lib/studio-booking";
 
 type Props = {
@@ -15,6 +17,9 @@ type Props = {
   guestPhone: string;
   onGuestNameChange: (value: string) => void;
   onGuestPhoneChange: (value: string) => void;
+  /** RKN-FIX-02 — guest consent; not rendered for signed-in clients. */
+  consent: ConsentFlags;
+  onConsentChange: (next: ConsentFlags) => void;
   comment: string;
   onCommentChange: (value: string) => void;
   silentMode: boolean;
@@ -30,6 +35,8 @@ export function YouStep({
   guestPhone,
   onGuestNameChange,
   onGuestPhoneChange,
+  consent,
+  onConsentChange,
   comment,
   onCommentChange,
   silentMode,
@@ -95,6 +102,11 @@ export function YouStep({
               {UI_TEXT.bookingWidget.youStep.loginCta}
             </Link>
           </div>
+
+          {/* RKN-FIX-02 — explicit per-purpose consent for guests; the server
+              refuses to create a profile or a booking without the required
+              two (152-ФЗ ст. 9 в ред. 156-ФЗ). */}
+          <LegalConsentGroup compact value={consent} onChange={onConsentChange} />
         </div>
       ) : me ? (
         <div className="rounded-xl border border-border-subtle bg-bg-card p-4 text-sm">

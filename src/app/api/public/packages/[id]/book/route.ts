@@ -10,6 +10,8 @@ import { normalizePhone } from "@/lib/auth/otp";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags";
+import { assertRequiredConsents, recordGuestConsents } from "@/lib/legal/consent";
 
 /**
  * PACKAGE-BOOKING-MVP-1 — atomic solo package booking. Mirrors
@@ -34,6 +36,8 @@ const packageBookSchema = z.object({
     )
     .min(2, "В пакете должно быть минимум 2 услуги.")
     .max(12),
+  // RKN-FIX-02 — guest consent (same contract as the single-service routes).
+  consent: consentFlagsSchema.optional(),
 });
 
 export async function POST(
@@ -71,6 +75,9 @@ export async function POST(
     if (session) {
       clientUserId = session.id;
     } else {
+      // RKN-FIX-02 — consent before creation, nothing written on refusal.
+      assertRequiredConsents(body.consent);
+
       const { profile, wasCreated } = await findOrCreateGuestUserByPhone({
         phone: body.clientPhone,
         displayName: body.clientName,
@@ -79,6 +86,14 @@ export async function POST(
       if (wasCreated) {
         logInfo("package booking · guest profile created", { requestId, userId: profile.id });
       }
+
+      await recordGuestConsents({
+        userId: profile.id,
+        wasCreated,
+        flags: body.consent,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
     }
 
     const result = await createSoloPackageBooking({

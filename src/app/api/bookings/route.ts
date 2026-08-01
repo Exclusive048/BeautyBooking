@@ -16,6 +16,9 @@ import { listProviderBookingsForOwner } from "@/lib/bookings/list";
 import { loadBookingWithRelations, notifyBookingConfirmed, notifyBookingCreated } from "@/lib/notifications/booking-notifications";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { invalidateRecentMastersCache } from "@/lib/bookings/recent-masters";
+import { assertRequiredConsents, recordGuestConsents } from "@/lib/legal/consent";
+import { findOrCreateGuestUserByPhone } from "@/lib/users/find-or-create-guest";
+import { getClientIp } from "@/lib/http/ip";
 
 export async function GET(req: Request) {
   try {
@@ -79,8 +82,40 @@ export async function POST(req: Request) {
       silentMode,
       referencePhotoAssetId,
       bookingAnswers,
+      consent,
     } = await parseBody(req, bookingCreateSchema);
-    const effectiveClientUserId: string | null = sessionUser?.id ?? null;
+
+    // RKN-FIX-02 — the public STUDIO booking flow posts guest bookings here
+    // (`features/booking/lib/studio-booking.ts`), so this endpoint is a real
+    // guest surface, not just the mobile contract. Two things follow:
+    //
+    //  1. consent is required before anything is created (implied consent is
+    //     void since 01.09.2025), and
+    //  2. the guest gets the same passive profile the other guest endpoints
+    //     create — consent proof needs a subject to attach to, and
+    //     `clientUserId: null` gave it none. This converges the endpoint on
+    //     what `/api/public/bookings` has always done; the end state was
+    //     already identical, since `linkGuestBookingsToUserByPhone` attached
+    //     these bookings to the very same phone-keyed profile at the guest's
+    //     next login.
+    let effectiveClientUserId: string | null = sessionUser?.id ?? null;
+    if (!sessionUser) {
+      assertRequiredConsents(consent);
+
+      const { profile, wasCreated } = await findOrCreateGuestUserByPhone({
+        phone: clientPhone,
+        displayName: clientName,
+      });
+      effectiveClientUserId = profile.id;
+
+      await recordGuestConsents({
+        userId: profile.id,
+        wasCreated,
+        flags: consent,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers.get("user-agent"),
+      });
+    }
 
     const idempotencyKeyRaw = req.headers.get("x-idempotency-key");
     const idempotencyKey = idempotencyKeyRaw ? idempotencyKeyRaw.trim() : "";
@@ -140,11 +175,15 @@ export async function POST(req: Request) {
     // because `createClientBooking` was not adapted for guests in this
     // commit (scope: foundation only). The booking widget always sends
     // startAtUtc/endAtUtc so this branch isn't reached in practice.
-    if (!effectiveClientUserId) {
+    // RKN-FIX-02: the guard now keys off the SESSION, not off
+    // `effectiveClientUserId` — a guest resolves to a passive profile id since
+    // this change, which would otherwise have let a guest slip into a path
+    // that was never adapted for them.
+    if (!sessionUser) {
       return jsonFail(400, "startAtUtc/endAtUtc обязательны для гостевой брони.", "VALIDATION_ERROR");
     }
 
-    const booking = await createClientBooking(effectiveClientUserId, {
+    const booking = await createClientBooking(sessionUser.id, {
       providerId,
       serviceId,
       hotSlotId: hotSlotId ?? null,

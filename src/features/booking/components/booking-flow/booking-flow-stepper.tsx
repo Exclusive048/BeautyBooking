@@ -23,6 +23,7 @@ import {
   writeBookingIdToUrl,
 } from "@/features/booking/components/booking-flow/lib/url-state";
 import { toCanonicalPhone, maskRussianPhone } from "@/features/booking/components/booking-flow/lib/format-phone";
+import { EMPTY_CONSENT_FLAGS, type ConsentFlags } from "@/lib/legal/consent-flags";
 import type {
   ConfirmedBooking,
 } from "@/features/booking/components/booking-flow/types";
@@ -137,6 +138,10 @@ export function BookingFlowStepper({
   const [referenceUploadError, setReferenceUploadError] = useState<string | null>(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // RKN-FIX-02 — guest consent, kept out of the booking-draft reducer: it is a
+  // separate legal act, not part of the booking payload the user is editing.
+  // Nothing is pre-ticked (a pre-checked box is void consent).
+  const [consent, setConsent] = useState<ConsentFlags>(EMPTY_CONSENT_FLAGS);
 
   // FIX-EXP-CHAT-UX (EXP-022): the post-submit success-card enrich fetch is a
   // detached fire-and-forget async task — guard its dispatch so it can't update
@@ -345,6 +350,10 @@ export function BookingFlowStepper({
           silentMode: state.silentMode,
           referencePhotoAssetId: state.referencePhotoAssetId,
           bookingAnswers: answersPayload,
+          // RKN-FIX-02: guests only — the server re-validates and refuses to
+          // create anything without both required consents. A signed-in client
+          // sends nothing and is not asked again.
+          consent: me ? undefined : consent,
         }),
       });
 
@@ -429,6 +438,9 @@ export function BookingFlowStepper({
     }
   }, [
     bookingConfig,
+    // RKN-FIX-02: without `consent` in the deps the submit handler would close
+    // over the initial all-false flags and every guest booking would 400.
+    consent,
     me,
     providerId,
     providerTimezone,
@@ -508,6 +520,8 @@ export function BookingFlowStepper({
               onChangeAnswer={(questionId, value) =>
                 dispatch({ type: "setAnswer", questionId, value })
               }
+              consent={consent}
+              onChangeConsent={setConsent}
               bookingConfig={bookingConfig}
               bookingConfigLoading={bookingConfigLoading}
               bookingConfigError={bookingConfigError}

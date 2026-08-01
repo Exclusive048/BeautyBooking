@@ -1,8 +1,8 @@
 import "server-only";
 
-import { ConsentType } from "@prisma/client";
+import { AccountType, ConsentType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { LEGAL_DOCUMENTS, type LegalDocumentKey } from "@/lib/legal/documents";
 import { hasRequiredConsents, type ConsentFlags } from "@/lib/legal/consent-flags";
@@ -142,4 +142,99 @@ export async function recordUserConsents(input: RecordConsentsInput): Promise<vo
       error: error instanceof Error ? error.stack : String(error),
     });
   }
+}
+
+/**
+ * RKN-FIX-02 — may an UNAUTHENTICATED actor cause consent rows on this profile?
+ *
+ * Guest checkout resolves the client by phone, and `findOrCreateGuestUserByPhone`
+ * happily returns an EXISTING profile when that phone is already known — which
+ * may be a real, registered person. Writing consent rows in that branch would
+ * manufacture legal proof the account owner never gave, from a request they
+ * never made. That is worse than having no proof at all.
+ *
+ * So rows are written only for a profile that has never been an account:
+ *   • no `RefreshSession` row ever (logout REVOKES rather than deletes, so this
+ *     stays true forever once someone has logged in — a reliable "was an
+ *     account" marker, not a "currently signed in" one);
+ *   • no email / verified email, no Telegram / VK / Yandex link — every one of
+ *     those can only come from an authenticated flow;
+ *   • roles are exactly `[CLIENT]` — a MASTER/STUDIO/ADMIN profile is by
+ *     definition established.
+ *
+ * A freshly created guest profile (`wasCreated`) trivially satisfies all of it
+ * and skips the query.
+ */
+export async function isGuestClassProfile(userId: string): Promise<boolean> {
+  const profile = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: {
+      roles: true,
+      email: true,
+      emailVerifiedAt: true,
+      telegramId: true,
+      vkLink: { select: { id: true } },
+      yandexLink: { select: { id: true } },
+      _count: { select: { refreshSessions: true } },
+    },
+  });
+  if (!profile) return false;
+
+  return (
+    profile._count.refreshSessions === 0 &&
+    !profile.email &&
+    !profile.emailVerifiedAt &&
+    !profile.telegramId &&
+    !profile.vkLink &&
+    !profile.yandexLink &&
+    profile.roles.length === 1 &&
+    profile.roles[0] === AccountType.CLIENT
+  );
+}
+
+/**
+ * Consent recorded from a guest (unauthenticated) checkout, against the profile
+ * the booking is attributed to. Same writer, same versions, same idempotency —
+ * plus the "never forge proof on someone else's account" guard above.
+ */
+export async function recordGuestConsents(input: {
+  userId: string;
+  /** True when the guest path just created this profile — no lookup needed. */
+  wasCreated: boolean;
+  flags: ConsentFlags;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}): Promise<void> {
+  if (!input.wasCreated) {
+    let writable = false;
+    try {
+      writable = await isGuestClassProfile(input.userId);
+    } catch (error) {
+      // Can't establish WHOSE profile this is → don't write. Mirrors
+      // `recordUserConsents`: consent bookkeeping never takes the caller's
+      // flow down with it, but the gap is loud in the logs.
+      logError("Guest consent skipped — profile class could not be resolved", {
+        userId: input.userId,
+        error: error instanceof Error ? error.stack : String(error),
+      });
+      return;
+    }
+
+    if (!writable) {
+      // Not an error: the booking still goes through. The person whose phone
+      // this is consented when they registered; an anonymous booker cannot
+      // re-consent on their behalf.
+      logInfo("Guest consent not recorded — phone belongs to an established account", {
+        userId: input.userId,
+      });
+      return;
+    }
+  }
+
+  await recordUserConsents({
+    userId: input.userId,
+    flags: input.flags,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  });
 }

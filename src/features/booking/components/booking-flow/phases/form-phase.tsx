@@ -12,6 +12,8 @@ import { cn } from "@/lib/cn";
 import { PhoneInput } from "@/features/booking/components/booking-flow/components/phone-input";
 import { SummaryBlock } from "@/features/booking/components/booking-flow/components/summary-block";
 import { Footnote } from "@/features/booking/components/booking-flow/components/footnote";
+import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
+import { hasRequiredConsents, type ConsentFlags } from "@/lib/legal/consent-flags";
 import type { ServiceBookingConfig } from "@/features/booking/lib/booking-config";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 
@@ -53,6 +55,12 @@ type Props = {
   referenceUploading: boolean;
   referenceUploadError: string | null;
   onReferenceUpload: (file: File) => void;
+
+  // RKN-FIX-02 — guest consent (152-ФЗ ст. 9 в ред. 156-ФЗ). Shown only to
+  // guests: a signed-in client consented at registration, and re-consent on a
+  // document bump happens at login, not mid-booking.
+  consent: ConsentFlags;
+  onChangeConsent: (next: ConsentFlags) => void;
 
   // Submit
   submitLoading: boolean;
@@ -97,6 +105,8 @@ export function FormPhase({
   referenceUploading,
   referenceUploadError,
   onReferenceUpload,
+  consent,
+  onChangeConsent,
   submitLoading,
   submitError,
   onBack,
@@ -106,7 +116,12 @@ export function FormPhase({
   const isAuthPhone = Boolean(me?.phone);
   const hasName = clientName.trim().length > 0;
   const hasPhone = clientPhone.trim().length >= 10;
-  const canSubmit = hasName && hasPhone && !submitLoading && !referenceUploading;
+  // A guest is anyone without a session — `me` is resolved before this phase
+  // renders (`meLoading` guards the flicker).
+  const isGuest = !meLoading && !me;
+  const consentReady = !isGuest || hasRequiredConsents(consent);
+  const canSubmit =
+    hasName && hasPhone && consentReady && !submitLoading && !referenceUploading;
 
   return (
     <div className="space-y-4 p-5">
@@ -263,6 +278,12 @@ export function FormPhase({
         dateKey={selectedDateKey}
         providerTimezone={providerTimezone}
       />
+
+      {/* RKN-FIX-02 — directly above the CTA, so the act of consenting and the
+          act of booking read as one decision. Guests only. */}
+      {isGuest ? (
+        <LegalConsentGroup compact value={consent} onChange={onChangeConsent} />
+      ) : null}
 
       {submitError ? (
         <p role="alert" className="text-sm text-rose-600 dark:text-rose-300">

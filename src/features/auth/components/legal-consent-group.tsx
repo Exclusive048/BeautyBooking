@@ -26,6 +26,13 @@ type LegalConsentGroupProps = {
   value: ConsentFlags;
   onChange: (next: ConsentFlags) => void;
   className?: string;
+  /**
+   * RKN-FIX-02 — booking-widget density. Same three purposes, same wording, same
+   * hit targets; tighter padding and 11px type so the group fits a 380 px
+   * sidebar without pushing the CTA below the fold. Legal content is never what
+   * gets compacted.
+   */
+  compact?: boolean;
 };
 
 const T = UI_TEXT.legal.consent;
@@ -37,16 +44,18 @@ function ConsentRow({
   checked,
   onCheckedChange,
   required,
+  compact,
   children,
 }: {
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
   required?: boolean;
+  compact?: boolean;
   children: React.ReactNode;
 }) {
   const inputId = useId();
   return (
-    <div className="flex items-start gap-3 px-3 py-2.5">
+    <div className={cn("flex items-start gap-3 px-3", compact ? "py-2" : "py-2.5")}>
       <input
         id={inputId}
         type="checkbox"
@@ -73,18 +82,20 @@ function ConsentRow({
   );
 }
 
-export function LegalConsentGroup({ value, onChange, className }: LegalConsentGroupProps) {
+export function LegalConsentGroup({ value, onChange, className, compact }: LegalConsentGroupProps) {
   return (
     <div
       role="group"
       aria-label={T.groupLabel}
       className={cn(
-        "divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-bg-input/70 text-xs text-text-sec",
+        "divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-bg-input/70 text-text-sec",
+        compact ? "text-[11px] leading-relaxed" : "text-xs",
         className,
       )}
     >
       <ConsentRow
         required
+        compact={compact}
         checked={value.terms}
         onCheckedChange={(terms) => onChange({ ...value, terms })}
       >
@@ -96,6 +107,7 @@ export function LegalConsentGroup({ value, onChange, className }: LegalConsentGr
 
       <ConsentRow
         required
+        compact={compact}
         checked={value.pdProcessing}
         onCheckedChange={(pdProcessing) => onChange({ ...value, pdProcessing })}
       >
@@ -112,6 +124,7 @@ export function LegalConsentGroup({ value, onChange, className }: LegalConsentGr
       </ConsentRow>
 
       <ConsentRow
+        compact={compact}
         checked={value.marketing}
         onCheckedChange={(marketing) => onChange({ ...value, marketing })}
       >

@@ -58,6 +58,12 @@ async function book(
       serviceId: SERVICE_ID,
       clientName: "QA Guest",
       clientPhone: "+79990000300",
+      // RKN-FIX-02: these are GUEST bookings, and a guest booking without the
+      // two required consents is now refused (400 CONSENT_REQUIRED) before
+      // anything is created — so the harness ticks what a real guest ticks.
+      // Marketing stays false: optional by law, and the QA phones should not
+      // accumulate a marketing consent nobody asked for.
+      consent: { terms: true, pdProcessing: true, marketing: false },
       ...body,
     },
   });

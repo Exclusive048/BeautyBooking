@@ -16,6 +16,11 @@ import {
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
 import {
+  EMPTY_CONSENT_FLAGS,
+  hasRequiredConsents,
+  type ConsentFlags,
+} from "@/lib/legal/consent-flags";
+import {
   fetchPublicServiceBookingConfig,
   uploadBookingReference,
   type ServiceBookingConfig,
@@ -79,6 +84,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [silentMode, setSilentMode] = useState(false);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  // RKN-FIX-02 — guest consent (nothing pre-ticked); signed-in clients never
+  // see it and never send it.
+  const [consent, setConsent] = useState<ConsentFlags>(EMPTY_CONSENT_FLAGS);
   const [bookingConfig, setBookingConfig] = useState<ServiceBookingConfig | null>(null);
   const [bookingConfigLoading, setBookingConfigLoading] = useState(false);
   const [bookingConfigError, setBookingConfigError] = useState<string | null>(null);
@@ -371,7 +379,11 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   }
 
   const isGuest = !meLoading && !me;
-  const guestValid = guestName.trim().length > 0 && guestPhone.trim().length > 0;
+  // RKN-FIX-02: for a guest, "contacts ready" now includes the two required
+  // consents — the same condition the server enforces, so the CTA never
+  // promises a booking the API will refuse.
+  const guestValid =
+    guestName.trim().length > 0 && guestPhone.trim().length > 0 && hasRequiredConsents(consent);
   const contactsReady = isGuest ? guestValid : !!me;
 
   const submitDisabled =
@@ -424,6 +436,13 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           setSubmitLoading(false);
           return;
         }
+        // RKN-FIX-02 — mirrors the server check; the CTA is already gated, this
+        // is the belt for a stale click.
+        if (!hasRequiredConsents(consent)) {
+          setSubmitError(UI_TEXT.auth.loginPage.consentRequired);
+          setSubmitLoading(false);
+          return;
+        }
       }
 
       if (bookingConfig?.requiresReferencePhoto && !referencePhotoAssetId) {
@@ -465,6 +484,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         silentMode,
         referencePhotoAssetId,
         bookingAnswers: answersPayload,
+        // Guests only — the server refuses a guest booking without it.
+        consent: isGuest ? consent : undefined,
       });
 
       if (!result.ok) {
@@ -617,6 +638,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                 guestPhone={guestPhone}
                 onGuestNameChange={setGuestName}
                 onGuestPhoneChange={setGuestPhone}
+                consent={consent}
+                onConsentChange={setConsent}
                 comment={comment}
                 onCommentChange={setComment}
                 silentMode={silentMode}

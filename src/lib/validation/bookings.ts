@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags";
 
 const dateString = z
   .string()
@@ -27,6 +28,10 @@ export const bookingCreateSchema = z
     silentMode: z.boolean().optional(),
     referencePhotoAssetId: z.string().trim().min(1).nullable().optional(),
     bookingAnswers: z.array(bookingAnswerSchema).max(5).optional(),
+    // RKN-FIX-02 — this endpoint also serves GUEST bookings (the public studio
+    // flow posts here). Same optional-in-shape / required-for-guests contract
+    // as `publicBookingCreateSchema`.
+    consent: consentFlagsSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.endAtUtc && !value.startAtUtc) {

@@ -5,6 +5,12 @@ import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles } from "lucide-react
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
+import {
+  EMPTY_CONSENT_FLAGS,
+  hasRequiredConsents,
+  type ConsentFlags,
+} from "@/lib/legal/consent-flags";
 import { DateGrid } from "@/features/booking/components/booking-flow/components/date-grid";
 import { TimeGrid } from "@/features/booking/components/booking-flow/components/time-grid";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
@@ -101,6 +107,8 @@ export function PackageBookingFlow({
   const [error, setError] = useState<string | null>(null);
 
   const [me, setMe] = useState<SessionUser | null>(null);
+  // RKN-FIX-02 — guest consent (nothing pre-ticked).
+  const [consent, setConsent] = useState<ConsentFlags>(EMPTY_CONSENT_FLAGS);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
@@ -280,6 +288,11 @@ export function PackageBookingFlow({
       setError(T.phoneInvalid);
       return;
     }
+    // RKN-FIX-02 — guests must have consented; mirrors the server check.
+    if (!me && !hasRequiredConsents(consent)) {
+      setError(UI_TEXT.auth.loginPage.consentRequired);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -291,6 +304,7 @@ export function PackageBookingFlow({
           clientPhone: trimmedPhone,
           comment: comment.trim() || null,
           slots: buildSlots(),
+          consent: me ? undefined : consent,
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -313,7 +327,9 @@ export function PackageBookingFlow({
     } finally {
       setSubmitting(false);
     }
-  }, [bundle.id, buildSlots, comment, me, name, phone, proposal]);
+    // `consent` belongs here: without it the handler would close over the
+    // initial (all-false) flags and every guest submit would be refused.
+  }, [bundle.id, buildSlots, comment, consent, me, name, phone, proposal]);
 
   if (components.length === 0) return null;
 
@@ -538,6 +554,9 @@ export function PackageBookingFlow({
               {T.bookingAs.replace("{name}", me.displayName ?? name)}
             </div>
           )}
+          {/* RKN-FIX-02 — guests give consent per purpose; the server refuses
+              the package booking without both required ones. */}
+          {!me ? <LegalConsentGroup compact value={consent} onChange={setConsent} /> : null}
           <label className="block text-sm">
             <span className="mb-1 block text-text-sec">{T.commentLabel}</span>
             <Input

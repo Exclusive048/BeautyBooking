@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags";
 
 const isoDateString = z
   .string()
@@ -35,6 +36,14 @@ export const publicBookingCreateSchema = z
     silentMode: z.boolean().optional(),
     referencePhotoAssetId: z.string().trim().min(1).nullable().optional(),
     bookingAnswers: z.array(answerSchema).max(5).optional(),
+    /**
+     * RKN-FIX-02 — consent ticked in the widget (152-ФЗ ст. 9 в ред. 156-ФЗ).
+     * Optional in SHAPE, mandatory in EFFECT: an authenticated client already
+     * consented at registration and sends nothing, while a guest without both
+     * required flags is refused by the route before any profile or booking is
+     * created. Same contract as the login routes (`consentFlagsSchema`).
+     */
+    consent: consentFlagsSchema.optional(),
   })
   .superRefine((value, ctx) => {
     const start = Date.parse(value.startAtUtc);

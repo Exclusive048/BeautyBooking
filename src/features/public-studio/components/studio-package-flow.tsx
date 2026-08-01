@@ -5,6 +5,12 @@ import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles, User } from "lucide
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
+import {
+  EMPTY_CONSENT_FLAGS,
+  hasRequiredConsents,
+  type ConsentFlags,
+} from "@/lib/legal/consent-flags";
 import {
   fetchBookingMe,
   fetchMasterAvailability,
@@ -79,6 +85,8 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   const [error, setError] = useState<string | null>(null);
 
   const [me, setMe] = useState<SessionUser | null>(null);
+  // RKN-FIX-02 — guest consent (nothing pre-ticked).
+  const [consent, setConsent] = useState<ConsentFlags>(EMPTY_CONSENT_FLAGS);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
@@ -301,6 +309,11 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       setError(T.phoneInvalid);
       return;
     }
+    // RKN-FIX-02 — guests must have consented; mirrors the server check.
+    if (!me && !hasRequiredConsents(consent)) {
+      setError(UI_TEXT.auth.loginPage.consentRequired);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -312,6 +325,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           clientPhone: trimmedPhone,
           comment: comment.trim() || null,
           selections: buildSelections(),
+          consent: me ? undefined : consent,
         }),
       });
       const json = (await res.json().catch(() => null)) as
@@ -333,7 +347,9 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
     } finally {
       setSubmitting(false);
     }
-  }, [bundle.id, buildSelections, comment, me, name, phone, proposal]);
+    // `consent` must be in the deps — a stale closure would submit the initial
+    // all-false flags and the server would refuse every guest booking.
+  }, [bundle.id, buildSelections, comment, consent, me, name, phone, proposal]);
 
   if (components.length === 0) return null;
 
@@ -571,6 +587,8 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
               {T.bookingAs.replace("{name}", me.displayName ?? name)}
             </div>
           )}
+          {/* RKN-FIX-02 — guest consent per purpose (server-enforced). */}
+          {!me ? <LegalConsentGroup compact value={consent} onChange={setConsent} /> : null}
           <label className="block text-sm">
             <span className="mb-1 block text-text-sec">{T.commentLabel}</span>
             <Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={T.commentPlaceholder} />

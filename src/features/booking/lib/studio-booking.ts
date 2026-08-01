@@ -1,5 +1,6 @@
 import type { ApiResponse } from "@/lib/types/api";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
+import type { ConsentFlags } from "@/lib/legal/consent-flags";
 
 export type StudioMaster = {
   id: string;
@@ -41,6 +42,12 @@ export type BookingCreateInput = {
   silentMode?: boolean;
   referencePhotoAssetId?: string | null;
   bookingAnswers?: BookingAnswerPayload[] | null;
+  /**
+   * RKN-FIX-02 — guest consent (152-ФЗ ст. 9 в ред. 156-ФЗ). Sent only for
+   * guests; `POST /api/bookings` refuses to create a guest profile or booking
+   * without both required purposes.
+   */
+  consent?: ConsentFlags;
 };
 
 export type BookingAnswerPayload = {
