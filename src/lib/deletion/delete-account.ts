@@ -71,6 +71,10 @@ export async function deleteUserAccount(userId: string): Promise<void> {
       await tx.otpCode.deleteMany({ where: { phone: user.phone } });
     }
 
+    // RKN-FIX-03-A: what this list covers (and, just as importantly, what it
+    // deliberately doesn't) is declared in `user-data-disposition.ts` and
+    // enforced by a DMMF-driven test — the previous hand-maintained list went
+    // stale silently when new relations were added.
     await Promise.all([
       tx.pushSubscription.deleteMany({ where: { userId } }),
       tx.notification.deleteMany({
@@ -79,8 +83,32 @@ export async function deleteUserAccount(userId: string): Promise<void> {
       tx.telegramLinkToken.deleteMany({ where: { userId } }),
       tx.telegramLink.deleteMany({ where: { userId } }),
       tx.vkLink.deleteMany({ where: { userId } }),
+      // The gap this fix was filed for: Yandex OAuth shipped after this list was
+      // written, so the link — with its plaintext access/refresh tokens and the
+      // `yandexUserId` the account can be re-identified by — outlived deletion.
+      tx.yandexLink.deleteMany({ where: { userId } }),
       tx.publicUsernameAlias.deleteMany({ where: { clientUserId: userId } }),
       tx.favorite.deleteMany({ where: { userId } }),
+      // Same decay, newer twin: catalog hearts were added after `favorite` and
+      // never joined the list.
+      tx.userFavorite.deleteMany({ where: { userId } }),
+      // Left behind, these kept `notifyHotSlotSubscribers` writing notification
+      // rows to a deleted account indefinitely.
+      tx.hotSlotSubscription.deleteMany({ where: { userId } }),
+      // Cleaned by `delete-master` only — so a studio ADMIN with no master
+      // cabinet stayed an ACTIVE member of a live studio after deleting.
+      tx.studioMembership.deleteMany({ where: { userId } }),
+      tx.studioMember.deleteMany({ where: { userId } }),
+      // Terminate every session explicitly. Revoked rather than deleted: the
+      // rows hold no PD, revocation is what actually ends access, and the
+      // surviving row keeps the "was an account" marker that
+      // `isGuestClassProfile` (RKN-FIX-02) reads. Session RESOLUTION already
+      // refuses a deleted profile (`isDeleted: false` in session.ts), so this
+      // closes the window rather than opening one.
+      tx.refreshSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      }),
     ]);
 
     const subscriptions = await tx.userSubscription.findMany({
