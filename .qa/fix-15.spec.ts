@@ -43,11 +43,13 @@ test("Surface 1 — portfolio favorite toggles via opaque token (200, idempotent
 
 test("Surface 2 — stories feed clean + view-tracking records the opaque id", async ({ page, baseURL }) => {
   const base = baseURL ?? "http://localhost:3000";
-  await page.context().addCookies([{ name: "mr-city-slug", value: "moscow", url: base }]);
+  await page.context().addCookies([
+    { name: "mr-city-slug", value: "moscow", url: base },
+    { name: "mr_cookie_notice", value: "1.0:n", url: base },
+  ]);
   await page.addInitScript(() => {
     try {
-      window.localStorage.setItem("mr-city-slug", "moscow");
-      window.localStorage.setItem("cookie-consent", "accepted");
+      window.localStorage.setItem("mr-city-slug", "moscow");
     } catch {
       /* cookie still suppresses the city prompt */
     }

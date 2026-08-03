@@ -45,17 +45,20 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
 
   // Suppress the two first-visit overlays that otherwise sit over the login
   // form on a fresh context: the city-prompt modal (fixed inset-0 z-50, the
-  // real blocker) and the cookie banner. Pre-seeding storage is more
+  // real blocker) and the cookie notice. Pre-seeding storage is more
   // deterministic than clicking through them. Keys mirror client-city.ts
-  // (mr-city-slug, localStorage-primary + cookie mirror) and
-  // cookie-consent.tsx (localStorage "cookie-consent").
+  // (mr-city-slug, localStorage-primary + cookie mirror) and legal/cookie-notice.ts.
+  //
+  // RKN-FIX-06: the notice moved localStorage → cookie, and it is now suppressed
+  // SERVER-side. A localStorage seed no longer works — it would only be honoured
+  // after mount, i.e. the banner would render in the SSR HTML first.
   await page.context().addCookies([
     { name: "mr-city-slug", value: "moscow", url: baseURL },
+    { name: "mr_cookie_notice", value: "1.0:n", url: baseURL },
   ]);
   await page.addInitScript(() => {
     try {
       window.localStorage.setItem("mr-city-slug", "moscow");
-      window.localStorage.setItem("cookie-consent", "accepted");
     } catch {
       // localStorage unavailable — cookie still suppresses the city prompt.
     }

@@ -51,6 +51,24 @@ export const LEGAL_DOCUMENTS = {
    * forcing everyone to re-consent to PD processing.
    */
   MARKETING: { version: "1.0", updatedAt: "2026-08-01", href: "/consent#consent-marketing" },
+  /**
+   * RKN-FIX-06 — the cookie NOTICE (`cookie-notice.ts` + the banner).
+   *
+   * Its own entry rather than riding `PRIVACY`, deliberately: the two change for
+   * different reasons and a shared version would couple them the wrong way.
+   * Rewording the banner would otherwise stamp a new privacy-policy version on
+   * every consent row recorded afterwards (a version event that never happened),
+   * and conversely an unrelated privacy-policy edit would pop the banner back up
+   * for every visitor. Separate versions, separate triggers.
+   *
+   * `href` points into the policy's cookie section — the notice has no page of
+   * its own, exactly like MARKETING lives inside the PD-consent document.
+   *
+   * NOTE: this version is NOT a `ConsentType` and never lands in `UserConsent`
+   * (`consent.ts` maps only the three real consent purposes). It versions an
+   * informational disclosure — see the rationale header in `cookie-notice.ts`.
+   */
+  COOKIE_NOTICE: { version: "1.0", updatedAt: "2026-08-03", href: "/privacy#privacy-cookies" },
 } as const satisfies Record<string, LegalDocument>;
 
 export type LegalDocumentKey = keyof typeof LEGAL_DOCUMENTS;

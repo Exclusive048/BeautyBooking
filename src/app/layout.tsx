@@ -1,5 +1,6 @@
 import "@/lib/startup";
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Playfair_Display } from "next/font/google";
 import "./globals.css";
 
@@ -18,11 +19,12 @@ import { PWAUpdatePrompt } from "@/components/pwa/update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { DevServiceWorkerReset } from "@/components/pwa/dev-sw-reset";
 import { BottomNav } from "@/components/layout/bottom-nav";
-import { CookieConsent } from "@/components/layout/cookie-consent";
+import { CookieNotice } from "@/components/layout/cookie-notice";
 import { PushManager } from "@/components/pwa/push-manager";
 import { SWRProvider } from "@/components/providers/swr-provider";
 import { resolveAuthMethods } from "@/lib/auth/auth-methods";
 import { getNonce } from "@/lib/csp/nonce";
+import { COOKIE_NOTICE_COOKIE, hasAcknowledgedCookieNotice } from "@/lib/legal/cookie-notice";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
 import { env } from "@/lib/env";
@@ -179,6 +181,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // AUTH-GATE-01: the guest bottom-nav «Войти» tab follows the same
   // server-resolved availability as the topbar CTAs.
   const { any: authEnabled } = await resolveAuthMethods();
+  // RKN-FIX-06: the cookie notice is suppressed SERVER-side for visitors who
+  // already acknowledged it, so its markup never reaches them and there is no
+  // hydration flash. Free of cost here — this layout is already dynamic
+  // (`getNonce()` reads headers), so reading a cookie adds no rendering mode change.
+  const cookieNoticeAcknowledged = hasAcknowledgedCookieNotice(
+    (await cookies()).get(COOKIE_NOTICE_COOKIE)?.value,
+  );
   return (
     <html lang="ru" className={playfair.variable} suppressHydrationWarning>
       <head>
@@ -199,7 +208,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <PWAInstallPrompt />
             <AppShell>{children}</AppShell>
             <BottomNav authEnabled={authEnabled} />
-            <CookieConsent />
+            {cookieNoticeAcknowledged ? null : <CookieNotice />}
             <PushManager />
           </ViewerTimeZoneProvider>
         </ThemeProvider>

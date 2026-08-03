@@ -264,13 +264,43 @@ export function PrivacyContent() {
           входа без повторной аутентификации.
         </li>
         <li>
+          <strong>
+            <code>vk_id_state</code>, <code>vk_id_verifier</code>,{" "}
+            <code>yandex_oauth_state</code>, <code>yandex_oauth_verifier</code>
+          </strong>{" "}
+          — защита входа через VK ID и Яндекс ID от подмены запроса (CSRF и PKCE). Свойство
+          httpOnly, срок жизни — несколько минут, удаляются сразу после возврата с сайта
+          провайдера.
+        </li>
+        <li>
+          <strong>
+            <code>vk_id_consent</code>, <code>yandex_oauth_consent</code>
+          </strong>{" "}
+          — переносят отмеченные вами на странице входа согласия через переход на сайт провайдера
+          и обратно. Свойство httpOnly, подписаны, срок жизни — несколько минут.
+        </li>
+        <li>
           <strong><code>mr-city-slug</code></strong> — выбор города для отображения каталога.
           Функциональный cookie, срок жизни 1 год. Не httpOnly (читается в том числе клиентским
           кодом).
         </li>
         <li>
+          <strong><code>mr_cookie_notice</code></strong> — отметка о том, что вам было показано
+          уведомление об использовании cookie, и о его версии. Нужен, чтобы уведомление не
+          появлялось повторно. Функциональный cookie, срок жизни 1 год, не httpOnly.
+        </li>
+        <li>
+          <strong><code>models-intro-seen</code></strong> — отметка о том, что вы уже видели
+          вводный экран раздела «Модели». Функциональный cookie, срок жизни 1 год, не httpOnly.
+        </li>
+        <li>
           <strong>Service Worker и push subscription endpoint</strong> — для работы PWA-версии и
           push-уведомлений. Сохраняются в IndexedDB и Cache Storage браузера.
+        </li>
+        <li>
+          <strong>Локальное хранилище браузера (localStorage)</strong> — выбранный город,
+          просмотренные истории, последняя выбранная роль в кабинете и скрытие подсказок
+          интерфейса. Эти данные не передаются на сервер.
         </li>
       </ul>
       <p>

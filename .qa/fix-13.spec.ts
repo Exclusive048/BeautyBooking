@@ -16,11 +16,13 @@ const OUT = process.env.FIX13_OUT ?? ".qa/diagnostics/fix-13";
 const client = ROLES.find((r) => r.key === "client")!;
 
 async function suppressOverlays(page: Page, base: string): Promise<void> {
-  await page.context().addCookies([{ name: "mr-city-slug", value: "moscow", url: base }]);
+  await page.context().addCookies([
+    { name: "mr-city-slug", value: "moscow", url: base },
+    { name: "mr_cookie_notice", value: "1.0:n", url: base },
+  ]);
   await page.addInitScript(() => {
     try {
-      window.localStorage.setItem("mr-city-slug", "moscow");
-      window.localStorage.setItem("cookie-consent", "accepted");
+      window.localStorage.setItem("mr-city-slug", "moscow");
     } catch {
       /* cookie still suppresses the city prompt */
     }

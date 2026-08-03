@@ -19,11 +19,13 @@ async function prep(page: Page, base: string, errors: string[]): Promise<void> {
     if (m.type() === "error") errors.push(m.text());
   });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
-  await page.context().addCookies([{ name: "mr-city-slug", value: "moscow", url: base }]);
+  await page.context().addCookies([
+    { name: "mr-city-slug", value: "moscow", url: base },
+    { name: "mr_cookie_notice", value: "1.0:n", url: base },
+  ]);
   await page.addInitScript(() => {
     try {
-      window.localStorage.setItem("mr-city-slug", "moscow");
-      window.localStorage.setItem("cookie-consent", "accepted");
+      window.localStorage.setItem("mr-city-slug", "moscow");
     } catch {
       /* cookie still suppresses the city prompt */
     }
