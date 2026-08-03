@@ -176,8 +176,6 @@ export async function seedShowcaseStudioClientBookings(): Promise<number> {
       clientUserId: client.id,
       startAtUtc: plan.start,
       endAtUtc: endAt,
-      startAt: plan.start,
-      endAt,
       slotLabel: plan.start.toISOString(),
       clientName,
       clientPhone,

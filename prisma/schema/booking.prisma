@@ -19,7 +19,19 @@ model Booking {
 
   clientUser UserProfile? @relation("BookingClient", fields: [clientUserId], references: [id], onDelete: SetNull)
 
-  // UTC instants only. Use these for all scheduling logic and UI formatting.
+  // UTC instants only — ЕДИНСТВЕННЫЙ источник времени брони (инв. #1, rule 8).
+  //
+  // BOOKING-TIME-COLUMNS-01 (2026-08-03): здесь же лежала legacy-пара
+  // `startAt`/`endAt`, дублировавшая эти колонки. Она удалена. Аудит показал,
+  // что разойтись пары не могли — КАЖДЫЙ из 9 write-путей писал обе из одного
+  // выражения, — а функциональных читателей у legacy не было вообще (один
+  // мёртвый select). Сиды не заполняли её уже давно: 101 из 167 строк имели
+  // `startAt = NULL` без единого последствия. Ноль расхождений в значениях.
+  //
+  // ⚠️ НЕ путать с тремя другими парами: `TimeBlock.startAt/endAt` и
+  // `ScheduleBreak.endAt` — их СОБСТВЕННЫЕ канонические поля (Utc-близнецов
+  // нет), а `Booking.proposedStartAt/proposedEndAt` — предложение переноса,
+  // отдельная сущность.
 
   startAtUtc DateTime?
 
@@ -32,12 +44,6 @@ model Booking {
   masterId String?
 
   clientId String?
-
-  // Legacy fields (deprecated). Do not use for formatting or logic.
-
-  startAt DateTime?
-
-  endAt DateTime?
 
   slotLabel String
 

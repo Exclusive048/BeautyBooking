@@ -292,8 +292,6 @@ export async function createStudioBooking(input: {
             masterId: master.id,
             startAtUtc: input.startAt,
             endAtUtc: endAt,
-            startAt: input.startAt,
-            endAt,
             slotLabel: input.startAt.toISOString(),
             clientName: input.clientName.trim(),
             clientNameSnapshot: input.clientName.trim(),
@@ -558,8 +556,6 @@ export async function moveStudioBooking(input: {
             masterId: input.targetMasterId,
             startAtUtc: input.targetStartAt,
             endAtUtc: endAt,
-            startAt: input.targetStartAt,
-            endAt,
           },
         });
 

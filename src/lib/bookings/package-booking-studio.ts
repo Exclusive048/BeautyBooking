@@ -319,8 +319,6 @@ export async function createStudioPackageBooking(input: {
               masterId: core.resolvedMasterProviderId ?? pkg.providerId,
               startAtUtc: core.startAtUtc,
               endAtUtc: core.endAtUtc,
-              startAt: core.startAtUtc,
-              endAt: core.endAtUtc,
               slotLabel: core.startAtUtc.toISOString(),
               clientName: input.clientName,
               clientPhone: input.clientPhone,

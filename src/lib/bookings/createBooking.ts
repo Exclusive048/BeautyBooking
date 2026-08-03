@@ -203,8 +203,6 @@ export async function createBooking(input: {
             masterId: resolvedMasterProviderId ?? provider.id,
             startAtUtc,
             endAtUtc,
-            startAt: startAtUtc,
-            endAt: endAtUtc,
             slotLabel: input.slotLabel,
             clientName: input.clientName,
             clientPhone: input.clientPhone,

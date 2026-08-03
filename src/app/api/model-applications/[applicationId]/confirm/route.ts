@@ -283,8 +283,6 @@ export async function POST(req: Request, ctx: RouteContext) {
             masterId: application.offer.masterId,
             startAtUtc,
             endAtUtc,
-            startAt: startAtUtc,
-            endAt: endAtUtc,
             slotLabel,
             clientName: resolveClientName(user),
             clientPhone: user.phone?.trim() || "",

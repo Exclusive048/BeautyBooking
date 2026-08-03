@@ -260,8 +260,6 @@ export async function seedStudioQa(): Promise<number> {
       clientUserId: client.id,
       startAtUtc: plan.start,
       endAtUtc: endAt,
-      startAt: plan.start,
-      endAt,
       slotLabel: plan.start.toISOString(),
       clientName,
       clientPhone,

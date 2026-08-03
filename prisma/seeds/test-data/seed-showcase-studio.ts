@@ -818,8 +818,6 @@ async function ensureBookings(args: {
       clientUserId: client.id,
       startAtUtc: baseStart,
       endAtUtc: endAt,
-      startAt: baseStart,
-      endAt,
       slotLabel,
       clientName: client.displayName ?? `${client.firstName ?? ""} ${client.lastName ?? ""}`.trim(),
       clientPhone: client.phone ?? "",

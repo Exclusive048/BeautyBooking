@@ -484,8 +484,6 @@ export async function createSoloMasterBooking(input: {
           serviceId: service.id,
           startAtUtc: input.startAt,
           endAtUtc: endAt,
-          startAt: input.startAt,
-          endAt,
           slotLabel: input.startAt.toISOString(),
           clientName: input.clientName.trim(),
           clientPhone: input.clientPhone?.trim() || "",

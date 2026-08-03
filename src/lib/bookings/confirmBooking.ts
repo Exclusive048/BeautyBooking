@@ -67,8 +67,6 @@ export async function confirmBooking(
       masterProviderId: true,
       startAtUtc: true,
       endAtUtc: true,
-      startAt: true,
-      endAt: true,
       proposedStartAt: true,
       proposedEndAt: true,
       actionRequiredBy: true,
@@ -193,8 +191,6 @@ export async function confirmBooking(
               ? {
                   startAtUtc,
                   endAtUtc,
-                  startAt: startAtUtc,
-                  endAt: endAtUtc,
                   slotLabel: startAtUtc.toISOString(),
                   reminder24hSentAt: null,
                   reminder2hSentAt: null,

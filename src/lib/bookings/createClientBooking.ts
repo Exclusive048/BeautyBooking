@@ -184,8 +184,6 @@ export async function createClientBooking(
               masterId: resolvedMasterProviderId ?? provider.id,
               startAtUtc,
               endAtUtc,
-              startAt: startAtUtc,
-              endAt: endAtUtc,
               slotLabel: data.slotLabel,
               clientName: data.clientName,
               clientPhone: data.clientPhone,
