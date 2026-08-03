@@ -38,11 +38,15 @@ const prismaMock = vi.hoisted(() => ({
   userProfile: { findUnique: vi.fn() },
   masterProfile: { findUnique: vi.fn(async () => null) },
   studio: { findFirst: vi.fn(async () => null) },
+  // DELETION-02: снимок медиа берётся ВНЕ транзакции, до неё.
+  mediaAsset: { findMany: vi.fn(async () => []) },
   $transaction: vi.fn(async (cb: (t: typeof tx) => Promise<void>) => cb(tx)),
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/logging/logger", () => ({ logInfo: vi.fn(), logError: vi.fn() }));
+// DELETION-02: постановка задачи на удаление медиа — отдельный модуль, здесь не проверяется.
+vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: vi.fn() }));
 vi.mock("@/lib/monitoring", () => ({ alertWarning: vi.fn() }));
 vi.mock("@/lib/deletion/delete-master", () => ({ deleteMasterCabinet: vi.fn() }));
 vi.mock("@/lib/deletion/delete-studio", () => ({ deleteStudioCabinet: vi.fn() }));

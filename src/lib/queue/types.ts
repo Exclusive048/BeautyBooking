@@ -30,6 +30,25 @@ export type SlotFreedPayload = {
 
 export type MediaCleanupPayload = Record<string, never>;
 
+/**
+ * DELETION-02 — покомпонентный снимок медиа, подлежащего удалению из хранилища
+ * после удаления аккаунта/кабинета.
+ *
+ * Почему в payload лежат `storageKey`, а не только id: к моменту обработки
+ * строки `MediaAsset` могут уже не существовать (или быть анонимизированы), и
+ * джоба, знающая только id, потеряет указатели на объекты в бакете. Снимок
+ * делает джобу самодостаточной и, как следствие, идемпотентной: повторный
+ * прогон удаляет те же ключи, а удаление уже удалённого объекта — no-op.
+ *
+ * `reason` + `actorUserId` — для аудита: список ключей логируется на enqueue,
+ * а удаление из S3 необратимо, поэтому «кто и почему» должно быть видно.
+ */
+export type MediaPurgePayload = {
+  assets: Array<{ id: string; storageKey: string }>;
+  reason: "account-deletion" | "master-cabinet-deletion" | "studio-cabinet-deletion";
+  actorUserId: string | null;
+};
+
 export type MrrSnapshotDailyPayload = Record<string, never>;
 
 /**
@@ -112,6 +131,12 @@ export type MediaCleanupJob = {
   payload: MediaCleanupPayload;
 } & JobMeta;
 
+export type MediaPurgeJob = {
+  id: string;
+  type: "media.purge";
+  payload: MediaPurgePayload;
+} & JobMeta;
+
 export type MrrSnapshotDailyJob = {
   id: string;
   type: "mrr.snapshot.daily";
@@ -136,6 +161,7 @@ export type Job =
   | VisualSearchIndexJob
   | SlotFreedJob
   | MediaCleanupJob
+  | MediaPurgeJob
   | YookassaWebhookJob
   | MrrSnapshotDailyJob
   | AvailableTodayRecomputeJob
@@ -146,6 +172,7 @@ export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
 export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
 export const SLOT_FREED_JOB_TYPE = "slot.freed";
 export const MEDIA_CLEANUP_JOB_TYPE = "media.cleanup";
+export const MEDIA_PURGE_JOB_TYPE = "media.purge";
 export const YOOKASSA_WEBHOOK_JOB_TYPE = "yookassa.webhook";
 export const MRR_SNAPSHOT_DAILY_JOB_TYPE = "mrr.snapshot.daily";
 export const AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE = "availableToday.recompute";
@@ -199,6 +226,15 @@ function isSlotFreedPayload(value: unknown): value is SlotFreedPayload {
 
 function isMediaCleanupPayload(value: unknown): value is MediaCleanupPayload {
   return isRecord(value);
+}
+
+function isMediaPurgePayload(value: unknown): value is MediaPurgePayload {
+  if (!isRecord(value)) return false;
+  if (!Array.isArray(value.assets)) return false;
+  const assetsOk = value.assets.every(
+    (a) => isRecord(a) && typeof a.id === "string" && typeof a.storageKey === "string",
+  );
+  return assetsOk && typeof value.reason === "string";
 }
 
 function isMrrSnapshotDailyPayload(value: unknown): value is MrrSnapshotDailyPayload {
@@ -265,6 +301,10 @@ export function isJob(value: unknown): value is Job {
 
   if (value.type === MEDIA_CLEANUP_JOB_TYPE) {
     return isMediaCleanupPayload(value.payload);
+  }
+
+  if (value.type === MEDIA_PURGE_JOB_TYPE) {
+    return isMediaPurgePayload(value.payload);
   }
 
   if (value.type === YOOKASSA_WEBHOOK_JOB_TYPE) {

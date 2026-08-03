@@ -1,6 +1,8 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { logInfo } from "@/lib/logging/logger";
+import { collectAccountMedia } from "@/lib/media/purge";
+import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { alertWarning } from "@/lib/monitoring";
 import { deleteMasterCabinet } from "@/lib/deletion/delete-master";
 import { deleteStudioCabinet } from "@/lib/deletion/delete-studio";
@@ -65,6 +67,13 @@ export async function deleteUserAccount(userId: string): Promise<void> {
 
   const cutoffDate = daysAgo(NOTIFICATION_RETENTION_DAYS);
   const now = new Date();
+
+  // DELETION-02: снимок медиа делается ДО транзакции — иначе к моменту enqueue
+  // указателей на объекты в бакете может уже не быть. Сам enqueue — ПОСЛЕ
+  // коммита (ниже): очередь не участвует в транзакции, и поставить задачу на
+  // удаление байтов раньше, чем удаление данных зафиксировано, значило бы
+  // рискнуть удалить объекты у откатившегося удаления.
+  const mediaToPurge = await collectAccountMedia(userId);
 
   await prisma.$transaction(async (tx) => {
     if (user.phone) {
@@ -145,6 +154,12 @@ export async function deleteUserAccount(userId: string): Promise<void> {
       },
     });
   });
+
+  // DELETION-02 — байты в хранилище удаляет воркер: операция сетевая, медленная
+  // и требующая ретраев, а запрос пользователя на удаление не должен от неё
+  // зависеть. Список ключей логируется здесь: удаление из S3 необратимо, и
+  // «что именно было заявлено к удалению» должно остаться в аудите.
+  await enqueueMediaPurge(mediaToPurge, "account-deletion", userId);
 
   logInfo("User account deleted", { userId });
   await alertWarning("User account deleted", { userId });

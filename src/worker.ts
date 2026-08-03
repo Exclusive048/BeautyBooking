@@ -27,6 +27,7 @@ import {
   BOOKING_REMINDER_JOB_TYPE,
   DEFAULT_JOB_MAX_ATTEMPTS,
   MEDIA_CLEANUP_JOB_TYPE,
+  MEDIA_PURGE_JOB_TYPE,
   MRR_SNAPSHOT_DAILY_JOB_TYPE,
   PLAN_EDITED_NOTIFY_JOB_TYPE,
   SLOT_FREED_JOB_TYPE,
@@ -47,6 +48,7 @@ import {
 import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
 import { runMediaCleanup } from "@/lib/media/cleanup";
+import { runMediaPurge } from "@/lib/media/purge";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
 import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
@@ -532,6 +534,26 @@ async function processMediaCleanupJob(
   await runMediaCleanup();
 }
 
+/**
+ * DELETION-02 — удаление медиа из хранилища при удалении аккаунта/кабинета.
+ *
+ * Намеренно НЕ глотает ошибку: `runMediaPurge` бросает, если хоть один объект
+ * не удалился, и это поднимает штатные ретраи очереди (до 3 попыток → dead
+ * letter). Недоудалённая ПДн обязана быть заметной — в отличие от
+ * `media.cleanup`, где речь о мусорных PENDING-загрузках и best-effort уместен.
+ */
+async function processMediaPurgeJob(
+  job: Extract<Job, { type: typeof MEDIA_PURGE_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  await runMediaPurge(job.payload);
+}
+
 async function processMrrSnapshotDailyJob(
   job: Extract<Job, { type: typeof MRR_SNAPSHOT_DAILY_JOB_TYPE }>
 ): Promise<void> {
@@ -602,6 +624,8 @@ async function processJob(job: Job): Promise<void> {
       await processYookassaWebhookJob(job);
     } else if (job.type === MEDIA_CLEANUP_JOB_TYPE) {
       await processMediaCleanupJob(job);
+    } else if (job.type === MEDIA_PURGE_JOB_TYPE) {
+      await processMediaPurgeJob(job);
     } else if (job.type === MRR_SNAPSHOT_DAILY_JOB_TYPE) {
       await processMrrSnapshotDailyJob(job);
     } else if (job.type === AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE) {

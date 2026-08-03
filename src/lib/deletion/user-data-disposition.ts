@@ -196,11 +196,16 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
       "booking link — business correspondence, same family as bookings",
   },
   mediaAssetsCreated: {
-    kind: "POLICY_PENDING",
+    kind: "DELETED",
     reason:
-      "MEDIA-PURGE-ON-DELETE (backlog): avatars and uploads survive as MediaAsset rows + S3 " +
-      "objects. Needs storage-side deletion (see `deleteAssetById`), not just a row delete — " +
-      "deliberately out of Phase A",
+      "DELETION-02 (MEDIA-PURGE-ON-DELETE) — реализовано: снимок ключей делается ДО " +
+      "транзакции, после коммита ставится задача `media.purge`, воркер удаляет объект в " +
+      "хранилище и только затем строку. Покрываются AVATAR (entityType USER) и " +
+      "AVATAR/PORTFOLIO кабинета. ⚠️ ЧАСТИЧНО: CLIENT_CARD_PHOTO, MODEL_APPLICATION_PHOTO, " +
+      "BOOKING_REFERENCE и CHAT_ATTACHMENT намеренно НЕ удаляются — они едут за своими " +
+      "POLICY_PENDING-связями (clientCards/clientNotes, modelApplications, bookings), и " +
+      "решить за юриста здесь было бы подменой RKN-FIX-03-B. Механизм для них уже есть: " +
+      "фазе B остаётся классифицировать и позвать, а не строить",
   },
 };
 

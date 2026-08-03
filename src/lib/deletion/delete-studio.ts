@@ -8,7 +8,10 @@ import {
   StudioRole,
 } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { MediaEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { collectProviderMedia } from "@/lib/media/purge";
+import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { logError, logInfo } from "@/lib/logging/logger";
 
@@ -26,6 +29,15 @@ type StudioDeletionResult = {
 };
 
 export async function deleteStudioCabinet(userId: string): Promise<void> {
+  // DELETION-02: снимок ДО транзакции (см. delete-master).
+  const owned = await prisma.studio.findFirst({
+    where: { ownerUserId: userId },
+    select: { providerId: true },
+  });
+  const mediaToPurge = owned?.providerId
+    ? await collectProviderMedia(MediaEntityType.STUDIO, owned.providerId)
+    : [];
+
   const result = await prisma.$transaction(async (tx): Promise<StudioDeletionResult> => {
     const studio = await tx.studio.findFirst({
       where: {
@@ -117,6 +129,11 @@ export async function deleteStudioCabinet(userId: string): Promise<void> {
       tx.serviceCategory.deleteMany({ where: { studioId: studio.id } }),
       tx.masterService.deleteMany({ where: { studioId: studio.id } }),
       tx.publicUsernameAlias.deleteMany({ where: { providerId: studio.providerId } }),
+      // DELETION-02 (PROVIDER-DANGLING-ROWS): те же три указателя на провайдера,
+      // что и в delete-master — каскад не срабатывает, строка Provider выживает.
+      tx.hotSlotSubscription.deleteMany({ where: { providerId: studio.providerId } }),
+      tx.userFavorite.deleteMany({ where: { providerId: studio.providerId } }),
+      tx.discountRule.deleteMany({ where: { providerId: studio.providerId } }),
       tx.service.deleteMany({
         where: {
           providerId: studio.providerId,
@@ -176,6 +193,8 @@ export async function deleteStudioCabinet(userId: string): Promise<void> {
       });
     }
   }
+
+  await enqueueMediaPurge(mediaToPurge, "studio-cabinet-deletion", userId);
 
   logInfo("Studio cabinet deleted", { userId, studioId: result.studioId });
 }
