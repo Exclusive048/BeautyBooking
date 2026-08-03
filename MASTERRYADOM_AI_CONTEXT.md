@@ -1,6 +1,6 @@
 # МастерРядом — Контекст проекта для ИИ
 
-> Дата аудита: **8 июля 2026** (рефактор DOCS-CONTEXT-REFACTOR-01 — файл переструктурирован и облегчён; предыдущие полные рефреши: R2 — 23 июня, V3 — 29 мая, V2 — 13 мая 2026).
+> Дата аудита: **3 августа 2026** (CONTEXT-REFRESH-V3 — полная пересинхронизация после RKN/pre-launch волны из 9 коммитов: AUTH-GATE-01, PAY-SEC-01, LOGIN-WOW-01, RKN-AUDIT-01, RKN-FIX-01/-02/-03-A/-06/-12. Предыдущие: DOCS-CONTEXT-REFACTOR-01 — 8 июля, R2 — 23 июня, V3 — 29 мая, V2 — 13 мая 2026).
 >
 > **Что это.** Снапшот текущего состояния проекта: (а) рабочий гайд для ИИ-агента (грузится в каждую сессию через `@`-импорт в `CLAUDE.md`), (б) обзор продукта и его состояния для человека. **Это НЕ changelog** — история коммитов живёт в git + [`BACKLOG-DONE.md`](BACKLOG-DONE.md).
 >
@@ -8,12 +8,12 @@
 >
 > **Смежные документы (этот файл их НЕ дублирует, а ссылается):** правила кода — [`CLAUDE.md`](CLAUDE.md); чеклист коммита — [`docs/QUALITY-GATES.md`](docs/QUALITY-GATES.md); мета-уроки процесса — [`docs/SPRINT-PATTERNS.md`](docs/SPRINT-PATTERNS.md); дизайн — `.claude/skills/ui-ux-pro-max/SKILL.md`; открытые задачи — [`BACKLOG.md`](BACKLOG.md); QA-ledger — [`QA-FINDINGS.md`](QA-FINDINGS.md).
 >
-> **Счётчики (примерно; сверять с исходниками):** моделей ~67 · enum'ов 37 · миграций 27 (последняя `20260803094523_rkn_fix_12_drop_oauth_tokens`; источник — `prisma/schema/migrations/`) · test-файлов ~158 (~1478 тестов; `npm run test`) · error-codes ~130 (`src/lib/api/errors.ts`).
+> **Счётчики (пересчитаны 2026-08-03):** моделей **67** · enum'ов **37** · миграций **27** (последняя `20260803094523_rkn_fix_12_drop_oauth_tokens`; источник — `prisma/schema/migrations/`) · test-файлов **158** (**1478** тестов; 157 в `src/` + 1 в `scripts/`) · error-codes **138** (`src/lib/api/errors.ts`) · инвариантов **35** (§12) · API-роутов **287** · страниц **88**.
 >
-> **Стадия:** MVP-plus, активная pre-launch подготовка. Ветка `predeploy`. Round 1 + Round 2 self-QA пройдены (booking / billing / catalog / timezone / auth-CSP закрыты). Остаток до launch — преимущественно **operational** (deploy/ops — см. §8).
+> **Стадия:** MVP-plus, активная pre-launch подготовка. Рабочая ветка — **`main`** (волна RKN влита туда решением владельца; про `predeploy`-дисциплину в смежных доках — см. §8 «Расхождения в доках»). Round 1 + Round 2 self-QA пройдены (booking / billing / catalog / timezone / auth-CSP закрыты). Остаток до launch — преимущественно **operational** (deploy/ops — см. §8) плюс юридический пакет (§8).
 >
-> **Построено и живо:** Cabinet Master · Cabinet Client · Cabinet Studio · Admin Panel · публичные профили мастера/студии + booking-widget (гостевой checkout) · чат · мультигород · trial-подписки · email-OTP · package-booking (solo + studio) · Yandex/VK OAuth (Telegram-login gated OFF, см. §1) · available-today pipeline · opt-in renewal.
-> **В работе / отложено:** SMS-шлюз (код готов — нужен prod-env), Sentry/APM (нет), полный per-viewer-tz рендеринг, visual-search reactivation.
+> **Построено и живо:** Cabinet Master · Cabinet Client · Cabinet Studio · Admin Panel · публичные профили мастера/студии + booking-widget (гостевой checkout) · чат · мультигород · trial-подписки · email-OTP · package-booking (solo + studio) · Yandex/VK OAuth (Telegram-login gated OFF, см. §1) · available-today pipeline · opt-in renewal · **правовой слой** (согласия по целям на всех путях регистрации + гостевой брони, версионируемые документы `/terms` `/privacy` `/consent`, cookie-уведомление) · **error-tracking (GlitchTip)**.
+> **В работе / отложено:** SMS-шлюз (код готов — нужен prod-env), полный per-viewer-tz рендеринг, visual-search reactivation, retention-политика (RKN-FIX-04), отзыв согласия (RKN-FIX-18).
 
 ## Оглавление
 
@@ -115,7 +115,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 
 > Источник истины — `prisma/schema/*.prisma`. Схема меняется **только** через `npx prisma migrate dev` (`db push` запрещён — CLAUDE.md rule 16). Ниже — карта, не автогенерация.
 
-Модели (~67), enum'ы (37), поля, связи и индексы **читаются из `prisma/schema/*.prisma`** — не дублируем их здесь. Центральные модели: `UserProfile`, `Provider` (+ `MasterProfile` / `Studio`), `Booking` (+ `BookingPackage` / `BookingServiceItem`), `Service` / `MasterService` / `ServicePackage`, `UserSubscription` / `BillingPlan` / `BillingPayment`, `Schedule*`, `Review`, `MediaAsset`, `City`.
+Модели (67), enum'ы (37), поля, связи и индексы **читаются из `prisma/schema/*.prisma`** — не дублируем их здесь. Центральные модели: `UserProfile`, `Provider` (+ `MasterProfile` / `Studio`), `Booking` (+ `BookingPackage` / `BookingServiceItem`), `Service` / `MasterService` / `ServicePackage`, `UserSubscription` / `BillingPlan` / `BillingPayment`, `Schedule*`, `Review`, `MediaAsset`, `City`, **`UserConsent`**.
 
 ### Заметки, которых в схеме не видно
 - **`StudioMember` / `StudioMembership`** — обе таблицы популируются для совместимости; canonical state-machine — **Membership**.
@@ -124,6 +124,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **`City`** — auto-grow из геокодера (`autoCreated`); `Provider.cityId` — `onDelete: Restrict`.
 - **`Provider`** — дублирующие rating-поля (`rating`/`ratingAvg`, `reviews`/`ratingCount`) — техдолг, см. §8.
 - **`Booking.startAt`/`endAt`** — deprecated, канон `startAtUtc`/`endAtUtc` (инв. #1).
+- **`UserConsent`** (RKN-FIX-01, миграция `20260801223527_rkn_fix_01_consent_purposes`) — доказательство согласия по 152-ФЗ ст. 9. Уникальность **`[userId, consentType, documentVersion]`**: это не «одна строка на пользователя», а **одна на версию документа** — bump версии в `lib/legal/documents.ts` даёт **новую** строку при следующем входе, старое доказательство сохраняется (в этом и смысл). Повторный вход на неизменной версии не пишет ничего. Цель **`ConsentType.PD_PROCESSING`** — отдельная от `PRIVACY`: политика **информирует**, согласие на обработку — самостоятельный акт против отдельного документа `/consent`. `PRIVACY` больше не пишется вообще. Пишет ТОЛЬКО `src/lib/legal/consent.ts` (§10).
 - **`VkLink` / `YandexLink` — токенов провайдера НЕ хранят** (RKN-FIX-12, миграция `20260803094523`). Только identity: `vkUserId` + `deviceId` / `yandexUserId` + `isEnabled`. Токен из code-exchange живёт в локальной переменной callback'а (им дёргается профиль) и никуда не пишется. Возвращать колонки нельзя — пин `src/lib/auth/provider-tokens-at-rest.test.ts`.
 - Уникальности и каскады, на которые опираются инварианты: #2 `OtpCode.codeHash` · #3 `RefreshSession.jti` · #4 `BillingPayment.idempotenceKey` · #7 `MasterService` · #8 `UserSubscription` · #9 `HotSlot` · #12 `MediaAssetEmbedding.vector(256)` · #16 `AdminAuditLog.adminUserId onDelete Restrict` · #17 `Review` soft-delete. Полные определения — §12 + схема.
 
@@ -132,11 +133,18 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 ## 5. РЕАЛИЗОВАННАЯ БИЗНЕС-ЛОГИКА (core flows)
 
 ### Аутентификация
-`src/lib/auth/{jwt,otp,session,guards}.ts`. Кастомный JWT HS256 (без библиотек, `timingSafeEqual` — инв. #10). Access-token 2ч (cookie `bh_session`), refresh 30д (cookie `bh_refresh`, ротация цепочкой через `rotatedToSessionId`, single-use jti). Провайдеры входа: **OTP** (`OtpCode.codeHash` HMAC; SMS-шлюз не подключён → в dev код пишется в логи), **Yandex ID OAuth** (`src/lib/yandex/*`, account-linking зеркалит VK: session-link / new-vs-existing-by-yandexUserId / anti-hijack 409; PKCE S256 + HMAC-signed state/verifier cookies), **VK OAuth**. **Telegram-login gated OFF** (env `NEXT_PUBLIC_TELEGRAM_ENABLED`); при re-enable — CSRF-defence через single-use signed `tg_login_state` cookie + nonce (см. §10).
+`src/lib/auth/{jwt,otp,session,guards}.ts`. Кастомный JWT HS256 (без библиотек, `timingSafeEqual` — инв. #10). Access-token 2ч (cookie `bh_session`), refresh 30д (cookie `bh_refresh`, ротация цепочкой через `rotatedToSessionId`, single-use jti).
+
+**Методы входа резолвит ОДНО место — `resolveAuthMethods()` (`src/lib/auth/auth-methods.ts`)**; клиентские поверхности получают результат пропом с сервера, сами флаги не читают (AUTH-GATE-01). Методы:
+- **phone-OTP** — за server-only tri-state `PHONE_AUTH_ENABLED` (§7): в проде по умолчанию **выключен**. OFF = нет вкладки телефона на `/login` и `POST /api/auth/otp/{request,verify}` → 503 `SYSTEM_FEATURE_DISABLED` **до** генерации кода. Гейтится только **выпуск**, не валидация/refresh/logout.
+- **email-OTP** (`EMAIL_AUTH_ENABLED` + SMTP), **Yandex ID OAuth** (`src/lib/yandex/*`, account-linking зеркалит VK: session-link / new-vs-existing-by-yandexUserId / anti-hijack 409; PKCE S256 + HMAC-signed state/verifier cookies), **VK OAuth**. **Telegram-login gated OFF** (`NEXT_PUBLIC_TELEGRAM_ENABLED`); при re-enable — CSRF-defence через single-use signed `tg_login_state` cookie + nonce (см. §10).
+
+**Согласия (RKN-FIX-01) — часть флоу регистрации, не UI-деталь.** Три независимые цели (оферта + обработка ПДн — обязательные, маркетинг — опциональный и регистрацию не гейтит) снимаются на **всех** путях создания пользователя: phone-OTP, email-OTP, VK, Yandex, Telegram. Без обязательных — **аккаунт не создаётся** (`assertRequiredConsents` → 400 `CONSENT_REQUIRED` / редирект `/login?error=consent`). Через OAuth-round-trip флаги едут в **подписанной state-bound cookie** (`lib/legal/oauth-consent-cookie.ts`: HMAC над `AUTH_JWT_SECRET` + привязка к `state`, single-use) — подделать/переставить в чужой флоу нельзя. Версии документов — из `lib/legal/documents.ts` (единственный источник), они же попадают в `UserConsent.documentVersion` (§4).
 
 ### Бронирования
 `src/lib/bookings/{createBooking,booking-core,flow,policy-enforcement}.ts`, `src/lib/studio/bookings.service.ts`.
-- **Гостевой checkout:** `/api/bookings` POST принимает гостя (nullable `clientUserId`); пост-signup link по телефону.
+- **Гостевой checkout:** четыре эндпоинта принимают гостя — `POST /api/bookings`, `POST /api/public/bookings`, `POST /api/public/packages/[id]/book`, `…/studio/book`. **Гость больше не создаёт бронь с `clientUserId: null`** (RKN-FIX-02): все четыре резолвят один и тот же passive-профиль по телефону (иначе согласию не к чему привязаться); конечное состояние то же, что раньше давал пост-signup link.
+- **Согласие гостя — server-enforced на всех четырёх** (RKN-FIX-02): без `consent: {terms, pdProcessing, marketing}` → 400 `CONSENT_REQUIRED` **до** создания профиля и брони. Поле опционально в схеме — авторизованные клиенты его не шлют и чекбоксов не видят. **Anti-forgery:** аноним пишет согласие ТОЛЬКО на профиль, который никогда не был аккаунтом (`isGuestClassProfile`, §10) — телефон зарегистрированного пользователя даёт 0 строк.
 - **Единая in-tx Serializable conflict-дисциплина на ВСЕХ write-путях** (funnel · solo-master manual · studio create/move · reschedule): `ensureNoConflicts`/exclude-self re-check **внутри** `$transaction` (`isolationLevel: Serializable`) + commit-time P2034/P2002 → чистый 409 `SLOT_CONFLICT` (инв. #31).
 - **Policy enforcement** (`policy-enforcement.ts`): `assertBookingWindow` (minBookingHoursAhead / maxBookingDaysAhead / acceptNewClients / visibleSlotDays — defense-in-depth на slots-endpoint + `resolveBookingCore`); `assertMasterPerformsService` (same-service при move); studio work-hours guard в **salon-tz** (`resolveSalonLocalParts`, engine-matching — не `getUTCHours`).
 - **Reschedule = two-sided approval (инв. #32):** сторона предлагает → `CHANGE_REQUESTED` + `proposedStartAt` + `actionRequiredBy`; другая сторона confirm (`/confirm`) или decline (`/decline-reschedule`, revert). Solo-master и studio-admin делят один backend (`requireBookingConfirmAccess` → `actor:"MASTER"`). Studio-admin **Move** — отдельное direct-authority действие (инв. #22).
@@ -168,6 +176,8 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **Очередь задач** (`queue/*`, `worker.ts`): Redis Lists `queue:{jobs,processing,dead}` + heartbeat side-hash; **atomic dequeue + lease** (краш-safe, `recoverStuckJobs` adopt по staleness 5мин, heartbeat 30с); до 3 попыток → dead-letter. Джобы: telegram.send, booking.reminder, visual_search_index, yookassa.webhook, media.cleanup, mrr.snapshot.daily. Health `/api/health/worker` (`WORKER_SECRET`).
 - **Визуальный поиск** (`visual-search/*`, ⚠️ dormant): Yandex AI Studio vision (`qwen3.6-35b-a3b`) + `text-search-doc`/`text-search-query` embeddings (256, native) + pgvector `vector(256)` cosine; chokepoint `provider.ts`. `VISUAL_SEARCH_ENABLED=false`, 0 векторов. Включение: `migrate deploy` + `scripts/backfill-visual-embeddings.mts --apply` + флаг on.
 - **CRM** (`crm/*`): ClientCard/ClientNote, мастер видит только своих (инв. #25).
+- **Удаление аккаунта** (`deletion/{delete-account,user-data-disposition}.ts`): `DELETE /api/me/delete` чистит связи, анонимизирует профиль и **явно отзывает сессии** (`revokedAt`, строки `RefreshSession` НЕ удаляются намеренно — ПДн в них нет, а их наличие держит маркер «это был аккаунт» для `isGuestClassProfile`). RKN-FIX-03-A закрыл 5 пропущенных связей (`yandexLink`, `UserFavorite`, `HotSlotSubscription`, `StudioMembership`/`StudioMember`) и сделал класс невозможным: **карта диспозиций** `user-data-disposition.ts` (DELETED / ANONYMIZED / RETAINED / POLICY_PENDING на каждую связь `UserProfile`) + DMMF-guard, который валит CI на неклассифицированной связи (инв. #35). `POLICY_PENDING`-строки — готовый input для юриста (RKN-FIX-03-B).
+- **Правовые документы и cookie** (`lib/legal/*`, `features/legal/content/*`): `/terms` · `/privacy` · `/consent`, версии — из `documents.ts`, страницы рендерят «Версия N · Последнее обновление» оттуда же. Cookie-баннер — **информационное уведомление**, не согласие (аналитики в проекте нет, гейтить нечего): `lib/legal/cookie-notice.ts` владеет механикой (first-party cookie `mr_cookie_notice`, версионированное значение, category-API где `necessary` всегда true), SSR подавляет баннер подтвердившему посетителю. Первый сторонний скрипт обязан пройти через этот гейт — триггер в BACKLOG.
 - **Аналитика** (`api/analytics/*`): dashboard/revenue/clients/cohorts/bookings; единый tenant-scope `buildScopeWhere` (§10); plan-gated фичами.
 - **Model Offers / Советник (Advisor, AI)** — офферы моделям; AI-рекомендации мастеру (YandexGPT, кэш Redis).
 - **Provider socials** (`providers/social-links.ts`): free-text VK + Instagram community-links (НЕ OAuth) для обеих ролей; server нормализует + reconstruct'ит из hardcoded `https://<allowed-host>/` base (host-allowlist vk.com/instagram.com) → `INVALID_SOCIAL_LINK` на hostile input; рендер на публичных профилях master + studio.
@@ -185,11 +195,19 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **User/Client** — `/cabinet` это редирект по роли; страницы клиента лежат в route-группе `(user)`.
 - **Admin** (`/admin/*`) — все мутирующие действия audit-logged (инв. #18/#19).
 
+### Правовые страницы
+`/terms` · `/privacy` · `/consent` — три **отдельных** документа. `/consent` (RKN-FIX-01) — согласие на обработку ПДн, намеренно НЕ политика конфиденциальности (§4). Все три версионируются из `lib/legal/documents.ts` и на 2026-08-03 несут плашку «Черновик» до юрревью (§8).
+
 ### API — заметки, которых в дереве нет
 - **Cron/секретные эндпоинты** (fail-closed по токену): `/api/billing/renew/run` · `/api/billing/mrr/snapshot/run` · `/api/catalog/available-today/run` · `/api/health/worker`.
 - **`/api/payments/yookassa/webhook`** — тело untrusted; authenticity держит worker API re-fetch (инв. #5), не подпись.
 - **Публичные пакеты:** `/api/public/packages/[id]/{propose,book}` + `…/studio/{propose,book}` — `propose` advisory, брони материализуются только на `/book`.
 - **Reschedule** — `/api/bookings/[id]/{confirm,decline-reschedule}`, общий backend для solo-мастера и studio-admin (инв. #32).
+- **Четыре гостевых booking-эндпоинта требуют `consent`** (§5, RKN-FIX-02) — 400 `CONSENT_REQUIRED` без него. Клиенты вне веба (мобильные) должны его слать: `MOBILE-API` в BACKLOG.
+- **`POST /api/auth/otp/{request,verify}`** — 503 `SYSTEM_FEATURE_DISABLED` при `PHONE_AUTH_ENABLED` off (§5/§7), до генерации кода.
+- **Auth-провайдеры гейтятся и на `start`, и на `callback`** (AUTH-KILLSWITCH-ENFORCE-01, §10) — `unlink`/`status` намеренно нет.
+
+> Волна RKN добавила ровно **один** роут (`/consent`); остальные её изменения — модификации существующих (сверено `git diff --name-status` по девяти коммитам).
 
 ---
 
@@ -197,20 +215,26 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 
 > Все env-вары идут через **`src/lib/env.ts`** (Zod). `process.env.*` напрямую запрещён в `src/` (исключения: `env.ts`, Prisma-config, тесты, `startup.ts`, `proxy.ts`) — CLAUDE.md rule 11. Computed-флаги (`isPushEnabled`, `isPaymentsEnabled`, `isTelegramEnabled`, `isYandexAuthEnabled`, `isVkAuthEnabled`, `isSmsConfigured`, `isProduction` и пр.) — из того же модуля.
 
-Полный список переменных с типами и дефолтами — **`src/lib/env.ts`** (Zod-схема) + templates `.env.example` / `.env.production.example`. Ниже — только семантика, которой в схеме нет.
+Полный список переменных (их **78** на 2026-08-03) с типами и дефолтами — **`src/lib/env.ts`** (Zod-схема) + templates `.env.example` / `.env.production.example`. **Ниже — НЕ инвентарь, а только семантика, которой в схеме нет.** Обычные креды (`S3_*`, `SMTP_*`, `VAPID_*`, `YANDEX_*_API_KEY`, `*_REDIRECT_URI` и пр.) сюда намеренно не попадают — их назначение читается из имени и Zod-описания.
 
 **Обязательные (иначе Error на старте):** `AUTH_JWT_SECRET`, `OTP_HMAC_SECRET`, `YOOKASSA_SHOP_ID` + `YOOKASSA_SECRET_KEY`, `DATABASE_URL`.
 
 **Флаги с нетривиальным поведением:**
-- `NEXT_PUBLIC_TELEGRAM_ENABLED` — **legal kill-switch (152-ФЗ)**, unset → `false`, hard-ceiling над admin-toggle. НЕ влияет на `MONITORING_TELEGRAM_*` (ops-алерты — отдельная система).
+- **`PHONE_AUTH_ENABLED` (AUTH-GATE-01) — tri-state и 🔴 SERVER-ONLY.** unset → `!isProduction` (в dev ON, **в проде OFF**); `"true"` → ON; всё остальное → OFF. Намеренно отсутствует в `clientEnv`: в клиентском бандле выражение выродится в `!isProduction` и разойдётся с сервером → hydration mismatch. Никогда не импортировать из `"use client"` — клиент получает результат `resolveAuthMethods()` пропом. **Порядок флипа в проде:** сначала SMS-провайдер (`SMS_PROVIDER_ENABLED` + баланс + smoke), только потом `PHONE_AUTH_ENABLED=true` — иначе вход по телефону включится без канала доставки кода.
+- `EMAIL_AUTH_ENABLED` — аналогично гейтит email-OTP; требует настроенного SMTP (`isEmailConfigured`).
+- `NEXT_PUBLIC_TELEGRAM_ENABLED` — **legal kill-switch (152-ФЗ / FZ-199)**, unset → `false`, hard-ceiling над admin-toggle. НЕ влияет на `MONITORING_TELEGRAM_*` (ops-алерты — отдельная система).
 - `SMS_PROVIDER_ENABLED` — default OFF → mock, OTP пишется в логи. В prod: включить + пополнить баланс SMSC.
 - `VISUAL_SEARCH_ENABLED` — dormant, default false; требует `YANDEX_API_KEY` + `YANDEX_FOLDER_ID`.
 - `REDIS_URL` — без него memory-fallback (в dev). Sensitive-роуты при этом fail-closed (инв. #6).
 - `YOOKASSA_WEBHOOK_TOKEN` — optional URL `?token=`, **не подпись**; authenticity держит worker re-fetch.
-- `YOOKASSA_IP_ALLOWLIST_ENFORCED` — default log-only; в `true` только после подтверждённого `TRUSTED_PROXY_HOPS`.
-- `TRUSTED_PROXY_HOPS` / `TRUSTED_REAL_IP_HEADER` — client-IP берётся из XFF **справа** (default hops=1); выставить под prod-edge.
+- **`YOOKASSA_IP_ALLOWLIST_ENFORCED` — остаётся `false` в проде (ратифицировано PAY-SEC-01, 2026-07-31).** Это не «ещё не включили», а принятая позиция: подлинность вебхука якорится worker API re-fetch (инв. #5), а не source-IP; за ALB enforce хрупок и зависит от proxy-chain. Возврат к нему как defense-in-depth — после launch (`PAY-SEC-01-REVISIT` в BACKLOG).
+- `TRUSTED_PROXY_HOPS` / `TRUSTED_REAL_IP_HEADER` — client-IP берётся из XFF **справа** (default hops=1); выставить под prod-edge (влияет на rate-limit, не на вебхук).
+- `GLITCHTIP_DSN` (сервер) / `NEXT_PUBLIC_GLITCHTIP_DSN` (браузер) — **два независимых гейта**: без DSN SDK не инициализируется и в браузере даже не догружается (динамический импорт за build-time флагом, чтобы ~90KB не ехали каждому посетителю). `GLITCHTIP_SAMPLE_RATE`, `NEXT_PUBLIC_GLITCHTIP_{ENVIRONMENT,RELEASE}` — опциональны. Tracing и session-replay намеренно выключены.
+- `STORAGE_PROVIDER` + `MEDIA_LOCAL_ROOT` / `MEDIA_LOCAL_PUBLIC_URL` — переключение S3 ↔ локальный диск для медиа; `MEDIA_DELIVERY_SECRET` подписывает delivery-токены.
+- `AI_FEATURES_ENABLED` — общий выключатель AI-поверхностей (§11) поверх наличия `YANDEX_API_KEY`.
+- `NEXT_PUBLIC_LEGAL_INN` — ИНН в футере; без него блок реквизитов деградирует. **В проде до сих пор не задан** (§8).
 - `BILLING_RENEW_SECRET` / `MRR_SNAPSHOT_SECRET` / `AVAILABILITY_CRON_TOKEN` / `WORKER_SECRET` — fail-closed cron/health эндпоинты.
-- `VK_CLIENT_ID` имеет alias `VK_ID_CLIENT_ID` — оба имени читаются в `env.ts`.
+- `VK_CLIENT_ID` имеет alias `VK_ID_CLIENT_ID` — оба имени читаются в `env.ts`, и гейт, и резолвер берут **один** резолв (`vkClientId`), рассинхрон невозможен.
 - Дефолты: tz `Europe/Moscow`, cookie `bh_session`.
 
 > **Удалён:** `AI_PROVIDER` (был vestigial; `ai/client.ts` — Yandex-only).
@@ -223,27 +247,36 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 
 **Pre-launch / deploy-чеклист (operational):**
 - **SMS-шлюз** — код готов (`src/lib/sms/`, fail-soft 503), нужно в prod-env: `SMS_PROVIDER_ENABLED=true` + login/password, пополнить SMSC-баланс, smoke-test RU-операторы + IP-whitelist.
-- **Применить миграции на проде** через `prisma migrate deploy` — в частности `20260702000000_add_provider_social_links` создана `--create-only` (pending); держать порядок; после — regen seed-snapshot.
+- **Применить миграции на проде** через `prisma migrate deploy` — держать порядок; после — regen seed-snapshot. **Среди них есть деструктивные** (`vector(256)` и `20260803094523_rkn_fix_12_drop_oauth_tokens` — `DROP COLUMN`), поэтому снимок БД перед прогоном обязателен: точка невозврата. Актуальный список и порядок — в BACKLOG (PRE-DEPLOY-CHECKLIST).
 - **VAPID prod-ключи** для push; **backfill-trial-conversion** (`scripts/backfill-trial-conversion.ts --apply` на staging/prod до launch); **cleanup-duplicate-billing-plans** (если в prod есть дубликаты low-case планов).
 - **Telegram** — держать `NEXT_PUBLIC_TELEGRAM_ENABLED` unset/false до юр-ревью privacy/terms.
-- **Инфра-решения (DevOps, не Claude):** Postgres hosting (Yandex Managed vs self-hosted; Supabase НЕ используется — недоступен из РФ), TLS termination, DB backup target, deploy rollback policy. Блокируют runbooks DR-2/3/6.
+- **`PHONE_AUTH_ENABLED`** — в проде по умолчанию OFF; включать **после** SMS-провайдера (§7).
+- **`NEXT_PUBLIC_LEGAL_INN`** в проде не задан — футер деградирует без реквизитов.
+- **Юридический пакет (блокирует launch, не код):** `/terms`, `/privacy`, `/consent` опубликованы с плашкой «Черновик» — нужно юрревью и снятие плашки (RKN-FIX-05); уведомление РКН об обработке ПДн (ст. 22); вердикт по трансграничности Web Push; retention-политика (RKN-FIX-04). Подробности — `RKN-COMPLIANCE-REPORT.md` + BACKLOG.
+- **Инфра-решения (DevOps, не Claude):** Postgres hosting, TLS termination, DB backup target, deploy rollback policy. Блокируют runbooks DR-2/3/6. *(Supabase не используется — в `.env` остались только неиспользуемые `SUPA*`-строки; целевая площадка деплоя — вопрос к владельцу, см. «Расхождения в доках».)*
 
 **Открытые технические риски:**
 - Rate-limit **fail-open в dev** при отсутствии Redis (в prod sensitive-роуты fail-closed — приемлемо).
 - Воркер — отдельный процесс; авто-рестарт зависит от docker/supervisor конфигурации деплоя.
 - Нет явного глобального auth-middleware — каждый route проверяет сам (`proxy.ts` делает CORS/CSP/rate-limit-tier).
 - JWT реализован вручную (HS256, `timingSafeEqual`); нет kid / ротации нескольких секретов.
-- Нет Sentry/APM (только структурные логи) — `OBSERVABILITY-SENTRY` в бэклоге.
+- **Error-tracking есть** (GlitchTip, `lib/observability/*` + `instrumentation{,-client}.ts`; §11). Чего нет: APM/tracing (намеренно — `tracesSampleRate` выключен), source-maps для читаемых prod-стеков (нужен DevOps-шаг).
+- **`npm run check:schema-drift` красный на чистом HEAD** — pgvector HNSW-индекс живёт в сыром SQL и не выражается в датамодели, поэтому гейт всегда видит «дрейф», а `migrate dev` подмешивает `DROP INDEX` в каждую новую миграцию. Пока visual-search dormant — не опасно, но гейт бесполезен. Подробности и план — в BACKLOG.
 
-**Технический долг (компактно):** legacy `createClientBooking` slotLabel-путь; deprecated `Booking.startAt/endAt`; дублирующие rating-поля Provider (`rating`/`ratingAvg`, `reviews`/`ratingCount`); ~22 `eslint-disable`; OpenAPI/smoke не в CI; `slotPrecision` полный per-viewer-tz рендеринг (частично); `lateCancelAction="fine"` без enforcement (нет платёжных штрафов).
+**Технический долг (компактно):** legacy `createClientBooking` slotLabel-путь; deprecated `Booking.startAt/endAt`; `VkLink.deviceId` (единственный потребитель удалён в RKN-FIX-12 — мёртвые данные); дублирующие rating-поля Provider (`rating`/`ratingAvg`, `reviews`/`ratingCount`); ~22 `eslint-disable`; OpenAPI/smoke не в CI; `slotPrecision` полный per-viewer-tz рендеринг (частично); `lateCancelAction="fine"` без enforcement (нет платёжных штрафов).
+
+**Расхождения в доках (решает владелец, не doc-sync):**
+- **Ветка.** Волна RKN влита в **`main`**. `CLAUDE.md` и `docs/QUALITY-GATES.md` про ветки вообще не говорят (проверено — 0 упоминаний), так что дисциплину они не навязывают. `predeploy` остаётся в футерах двух **скиллов** (`playwright-qa`, `timezone-correctness`: «ссылки verified против кода ветки `predeploy`») — это живые справочники, и там строка вводит в заблуждение. В датированных аудитах (`QA-FINDINGS-*`, `RKN-COMPLIANCE-REPORT`, `WALKTHROUGH-AUDIT`, `VISUAL-SEARCH-AUDIT`) `predeploy` **корректен** — это фотография на дату, её не трогаем.
+- **Площадка деплоя.** Реестр образов в `.github/workflows/deploy.yml` — **`cr.yandex`** (Yandex Container Registry), деплой оттуда по SSH; §11 это и описывает. Но `RKN-COMPLIANCE-REPORT.md` (§ локализация) называет прод-VM **cloud.ru**. Регистри и хостинг VM — разные вещи, так что формального противоречия может и не быть, но для ответа РКН про 152-ФЗ ст. 18 ч. 5 нужно **одно** подтверждённое утверждение о том, где физически стоит Postgres. Вопрос к владельцу/DevOps.
 
 ---
 
 ## 9. ТЕСТИРОВАНИЕ
 
 - Framework: **Vitest** (v4), env node, alias `@/` через vite-tsconfig-paths. Запуск в CI (`quality-gates.yml`).
-- **~117 test-файлов / ~875 тестов** (сверять `npm run test`). Плотность в `src/lib/`: booking, schedule, billing (pure helpers), sms, chat/media, cities.
-- **Покрыто:** booking state-machine (`flow.test.ts`) + policy/reschedule enforcement + action-state; billing pure helpers (features/marketing/trial/utils/guards/mrr); schedule pure logic (slots/overlap/dateKey/booking-days/studio-slot-aggregation); auth pure (jwt/otp); sms + masking; package-math; **инварианты regression** — #25 CRM privacy (`client-privacy.test.ts`), #26 chat ACL (`chat-attachment-acl/token.test.ts`).
+- **158 test-файлов / 1478 тестов** (2026-08-03; 157 в `src/` + `scripts/check-include-where.test.ts`). Плотность в `src/lib/`: booking, schedule, billing (pure helpers), sms, chat/media, cities, **legal/deletion**.
+- **Покрыто:** booking state-machine (`flow.test.ts`) + policy/reschedule enforcement + action-state; billing pure helpers (features/marketing/trial/utils/guards/mrr); schedule pure logic (slots/overlap/dateKey/booking-days/studio-slot-aggregation); auth pure (jwt/otp); sms + masking; package-math; **правовой слой** — consent-flags/OAuth-cookie/recorder + route-level отказ без согласия на каждом пути, guest anti-forgery, cookie-notice (формат/версия/миграция); **инварианты regression** — #25 CRM privacy (`client-privacy.test.ts`), #26 chat ACL (`chat-attachment-acl/token.test.ts`), **#35 disposition-map DMMF-guard** (`user-data-disposition.test.ts`), **no-token-columns** (`provider-tokens-at-rest.test.ts`).
+- **Паттерн «guard, доказанный не-вакуумным»:** для структурных инвариантов (#35, no-token-columns) тест не только проверяет текущее состояние, но и был прогнан с намеренно сломанным входом, чтобы убедиться, что он падает. Новые guard-тесты писать так же.
 - **НЕ покрыто (нужна integration-инфра):** createBooking/cancelBooking integration, rate-limit/session/role-guards (Prisma/Redis-bound), OAuth flows, аналитика/платежи end-to-end. Нет coverage-tooling (c8), нет E2E (Playwright/Cypress) — ожидаемо для MVP. Live-QA — через Playwright MCP + `.qa/` harness (см. `playwright-qa` skill).
 
 ---
@@ -259,6 +292,8 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **PII в логах** — phone/email через `maskPhone`/`maskEmail`; OTP/secrets в prod-логах никогда (guard `isProduction`). См. §13.
 - **Telegram-login CSRF** (до re-enable): single-use signed `tg_login_state` cookie + nonce round-trip + `getTelegramEnabled()` gate.
 - **Auth-provider enabled-flag route enforcement (AUTH-KILLSWITCH-ENFORCE-01)** — все mechanism-invoking auth-entry-points (VK/Yandex OAuth `start`+`callback`, VK integrations connect, Telegram connect `link`) отказывают server-side, когда provider disabled (`isVkAuthEnabled` / `isYandexAuthEnabled` / `getTelegramEnabled()`), **до** любого cred-read/OAuth/session — не только скрыты в UI. Callback гейтится вместе со start (session-issuing leg — иначе gate на start обходится). Removal (`unlink`) и read/pref (`status`/`settings`) намеренно НЕ гейтятся (не invoke механизма). FZ-199 kill-switch теперь route-level, не только UI.
+- **Согласия — единственный writer + anti-forgery (RKN-FIX-01/-02).** Строки `UserConsent` пишет ТОЛЬКО `src/lib/legal/consent.ts` (`recordUserConsents` / `recordGuestConsents`) — с реальными версиями документов, IP/UA, идемпотентно. Два правила, которые нельзя ослаблять: (1) **enforcement до создания** — `assertRequiredConsents` отказывает **прежде** чем появится профиль/бронь, UI-гейтинга недостаточно; (2) **нельзя фабриковать доказательство за другого** — анонимный гость пишет согласие только на профиль, который никогда не был аккаунтом (`isGuestClassProfile`: нет `RefreshSession`, нет email/verified-email, нет Telegram/VK/Yandex-линка, роли ровно `[CLIENT]`); телефон зарегистрированного пользователя → 0 строк, бронь при этом проходит. Через OAuth флаги едут в подписанной **state-bound** cookie (HMAC + привязка к `state`, single-use) — не в query-параметре callback'а. Незатронутое: **отзыв** согласия — отдельный акт со своим UI, никогда побочный эффект формы (RKN-FIX-18, ещё не построен).
+- **Секреты at-rest** — см. отдельную строку ниже (перепись RKN-FIX-12).
 - **Timezone validation** — write-time `.refine(isValidTimeZone)` на studio/master PATCH; read-time fallback `Europe/Moscow` (закрывает stored-DoS через пустую tz).
 - **Идемпотентность** — bookings (`x-idempotency-key`+Redis lock), `BillingPayment.idempotenceKey` (@unique), YooKassa Idempotence-Key.
 - **P2002 re-read-on-conflict** — параллельные create'ы на `@unique` полях восстанавливаются re-read'ом winner-строки, не падают: `detect-city` · `conversation-slug` · email-OTP login (`resolveEmailLoginProfile`, 6-й site — `UserProfile.email`) · phone-OTP login (`resolvePhoneLoginProfile`, 7-й site — `UserProfile.phone`; идемпотентно, mirror email — QA-PREP-01).
@@ -319,6 +354,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 | 32 | **Reschedule = two-sided approval; solo-master и studio-admin делят один путь** | `confirmBooking.ts` + `decline-reschedule.ts` + `requireBookingConfirmAccess` — `/confirm` + `/decline-reschedule` | Перенос вступает при согласии обеих сторон (`actionRequiredBy === actor`). Один backend для solo+studio (auth admits обоих как `actor:"MASTER"`) — нельзя дублировать в studio-копию. Studio-admin **Move** (#22) — отдельное direct-action. |
 | 33 | **Self-review запрещён server-side** | `reviews/service.ts` (`isBookingProviderSide` в `createReview`, 403 `REVIEW_NOT_ALLOWED`) | Отзыв отклоняется, если `authorId` — provider-side ЭТОЙ брони (solo master / master-in-studio / studio owner-admin). Ключ — linkage конкретной брони, не глобальный «is a provider». |
 | 34 | **Package booking атомарен (all-or-none) + proportional discount Σ-exact + cancel целиком** | `bookings/package-booking.ts` + `package-booking-studio.ts` + `package-math.ts` + `cancelBooking` guard | Пакет — ОДНА Serializable-транзакция: per-component `resolveBookingCore` + `ensureNoConflicts(tx)` + intra-package pairwise overlap → BookingPackage + N Booking + N BookingServiceItem; конфликт → весь rollback; P2034/P2002→409. Σ child `priceSnapshot` == `totalKopeks` точно (largest-remainder). Cancel только целиком; lone-child → 409 `PACKAGE_CANCEL_WHOLE`; reschedule части — обычный move (`bookingPackageId` не трогается). Studio (multi-master): мастер на компонент (только assigned), sequential по timeline клиента, by-client `intraPackageOverlapMultiMaster`. |
+| 35 | **Каждая связь `UserProfile` классифицирована при удалении аккаунта; неклассифицированная связь валит CI** | `deletion/user-data-disposition.ts` (`USER_RELATION_DISPOSITION`) + DMMF-guard `user-data-disposition.test.ts` | Ручной список связей в `delete-account.ts` дважды протухал незаметно (`yandexLink` с токенами пережил удаление; `UserFavorite`, `HotSlotSubscription`, `StudioMembership`). Ни один тест не падал, потому что никто не сравнивал список со схемой. Теперь guard обходит Prisma DMMF: **новая модель `SomethingLink` не пройдёт CI**, пока человек не выберет диспозицию (DELETED / ANONYMIZED / RETAINED / POLICY_PENDING) — а `POLICY_PENDING` фиксирует «ждёт юриста», а не «забыли». Инвариант — не про конкретный список, а про **невозможность молча его недосмотреть**. |
 
 ---
 

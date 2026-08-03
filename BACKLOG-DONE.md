@@ -779,3 +779,40 @@
 - ✅ **SCHEMA-DRIFT-CI-CHECK** — `scripts/check-schema-drift.mjs` существует + wired в `npm run check` (MIGRATION-RECONCILIATION-BATCH)
 - ✅ **FEED-PORTFOLIO-N1-FIX-A** — landed (`src/lib/feed/portfolio.service.ts` `loadMasterServiceOverridesMap` + regression test)
 - ✅ **MODAL-FOCUS-TRAP-FIX-A** — закрыт MODAL-A11Y-BATCH-A (инвариант #27 `use-modal-a11y`)
+
+## Волна RKN / pre-launch + перенос накопленного (CONTEXT-REFRESH-V3, 2026-08-03)
+
+Перенесено из `BACKLOG.md` по конвенции CLAUDE.md rule 15 (одна строка на закрытый пункт; развёрнутые разборы — в git-истории и отчётах по коммитам). Маркеры «pending commit» сняты: всё перечисленное закоммичено.
+
+- ✅ **RKN-FIX-01** — согласия расщеплены по трём целям и снимаются на ВСЕХ путях регистрации (phone/email-OTP, VK, Yandex, Telegram); без обязательных аккаунт не создаётся; версии документов — из `lib/legal/documents.ts`; через OAuth флаги едут в подписанной state-bound cookie. Миграция `20260801223527`, `ConsentType.PD_PROCESSING`. 🔴 launch-blocker закрыт. Коммит `7836e18`.
+- ✅ **RKN-FIX-02** — гостевая бронь: явные чекбоксы вместо конклюдентного согласия, server-enforced на всех четырёх гостевых эндпоинтах (400 `CONSENT_REQUIRED` до создания профиля и брони). Anti-forgery `isGuestClassProfile` — согласие нельзя сфабриковать на чужой аккаунт. Гость больше не создаёт бронь с `clientUserId: null`. 🔴 launch-blocker закрыт. Коммит `3dadd6e`.
+- ✅ **RKN-FIX-03-A** — удаление аккаунта: закрыт пропуск `yandexLink` + ещё 4 связи того же класса (`UserFavorite`, `HotSlotSubscription`, `StudioMembership`/`StudioMember`); сессии явно отзываются. Карта диспозиций `user-data-disposition.ts` + DMMF-guard делают класс «список протух незаметно» невозможным → **инвариант #35**. Коммит `beecf63`.
+- ✅ **WORKER-BOOT-SERVER-ONLY-01** — воркер не стартовал из-за транзитивного `import "server-only"` под plain-Node резолвом; починено через `--conditions=react-server`. Был 🔴 launch-blocker.
+- ✅ **AUDIT-WORKER-CONDITION-01** — проаудирован риск process-global `--conditions=react-server`; вердикт: **оставить**, изменений кода нет.
+- ✅ **VK-CLIENT-ID-ALIAS-GATE-MISMATCH** — `isVkAuthEnabled` и `getVkClientId()` разъезжались на alias-именах (`VK_ID_*`) → 503 при валидных кредах. Client id резолвится один раз в `env.ts`; рассинхрон невозможен. 7 тестов.
+- ✅ **RKN-FIX-12** — OAuth-токены провайдеров больше не хранятся вообще: аудит показал write-only использование, колонки `VkLink`/`YandexLink.{accessToken,refreshToken}` дропнуты (минимизация вместо шифрования). Удалены `refreshVkToken`/`logoutVkSession`. Guard `provider-tokens-at-rest.test.ts` (DMMF + source-level). Миграция `20260803094523`. Коммит `b3a140f`.
+- ✅ **RKN-FIX-06** — cookie-баннер стал честным информационным уведомлением (аналитики в проекте нет — гейтить нечего, фиктивный «Отклонить» убран); хранение `localStorage` → версионированная first-party cookie `mr_cookie_notice`; SSR-подавление вместо флеша после гидратации; `lib/legal/cookie-notice.ts` — точка входа для первого стороннего скрипта. Коммит `6dac86e`.
+- ✅ **FIX-STUDIO-BLOCKERS-01** — два 🔴 из `QA-FINDINGS-STUDIO.md`: кабинет студийного мастера был слеп к своим студийным записям (ключевание `providerId`=студия) + вторая блокирующая деградация.
+- ✅ **FIX-TIMEBLOCK-ENFORCEMENT-01** — перерыв/блок студии не блокировал запись: `TimeBlock` читался не на всех путях; закрывает TIMEBLOCK-DOES-NOT-BLOCK-BOOKING.
+- ✅ **FIX-MASTER-01** — пять master-side фиксов из прохода (в т.ч. подтверждение, что категории портфолио — не баг).
+- ✅ **FIX-STUDIO-02** — пять 🟠🟡-деградаций F3–F7 из `QA-FINDINGS-STUDIO.md` + оба known-open пункта.
+- ✅ **SELF-BOOKING-STUDIO-OWNER-PARITY** — booking- и пакет-CTA подавлены для владельца на публичном профиле студии (закрыто внутри FIX-STUDIO-02).
+- ✅ **STUDIO-SEED-01** — разблокировал весь studio-QA; обе поломки оказались данными, не кодом.
+- ✅ **STUDIO-PROFILE-TRIPLE-BOOKING-CTA** — три top-level CTA сведены к одному primary (закрыто внутри FIX-STUDIO-02).
+- ✅ **PACKAGE-SOLO-WIZARD-01** — solo-пакет переведён на визард «дата→время на каждый компонент»; жадный single-anchor auto-sequencer удалён, компоненты могут быть в разные дни.
+- ✅ **PACKAGE-STUDIO-SAME-MASTER-BUFFER** — курсор studio-визарда не учитывал буфер, когда один мастер делает оба компонента.
+- ✅ **SUPPORT-PAGE-DYNAMIC-SERVER-USAGE** — `try/catch` глотал Next-овский `DynamicServerError` на `/support` → ложный ops-alert; фикс `export const dynamic`.
+- ✅ **CTA-CONTRAST-PARTNER-BANNER** — CTA партнёр-баннера рендерился поверх brand-градиента и терял контраст.
+- ✅ **INVERTED-CTA-DARK-INVISIBLE** — четыре inverted-CTA давали контраст 1.1:1 в тёмной теме; введён отдельный `Button variant="inverted"`.
+- ✅ **QA-TESTID booking-row (client bookings)** — **не баг**: 13/13 строк несут testid, PASS-отчёт «0» был measurement-артефактом (читали SWR-скелет).
+- ✅ **OBSERVABILITY-SENTRY-A → OBSERVABILITY-GLITCHTIP-01** — error-tracking на self-hosted **GlitchTip** (payload'ы остаются в РФ, 152-ФЗ); `@sentry/{node,browser}` напрямую, браузерный SDK за динамическим импортом; tracing и replay намеренно выключены.
+- ✅ **FIX-SECURITY-STUDIO-AUTHZ-01** — cross-tenant write cluster: 5 роутов авторизовали свой `studioId`, но доверяли второму caller-id → любой CLIENT писал в данные любого провайдера. 🔴 launch-blocker закрыт.
+- ✅ **FIX-SECURITY-IDENTITY-MEDIA-01** — `PATCH /api/me` писал `phone` без OTP (account-takeover класс, телефон — login-identity и ключ матчинга гостевых броней) + media-exposure.
+- ✅ **FIX-SECURITY-MISC-01** — open-redirect (`next=/\evil`) сведён в один shared client-safe валидатор + вторая 🟠 и два 🟡.
+- ✅ **FIX-SECURITY-RESIDUE-01** — дешёвые 🟡/🔵 из security-аудита; VK/Yandex token-exchange «incomplete»-ветки перегрейжены 🟡→🟠 (client-reachable token/PII).
+- ✅ **FIX-DEAD-AUTHZ-ROUTES-01** — legacy `masters/[id]/schedule/overrides` пропускал `assertScheduleEditable` (обход approval-flow) → роут удалён.
+- ✅ **FIX-LEGACY-BILLING-ROUTE-01** — legacy `POST`/`PATCH` на `/api/admin/billing` → 410 `ENDPOINT_RETIRED` (опция A, выбрана Артёмом).
+- ✅ **SEED-FRESHNESS-01** — разблокировал QA-flows на stale-seed; премисса «frozen literals» оказалась неверной, реальный блокер — не перезапущенный dev-seed.
+- ✅ **VK-CONNECT-UI-KILLSWITCH-GATE → FIX-EXTERNAL-GATING-01** — оказалось шире зафайленного: 5 точек одного VK-OAuth-link-действия гейтятся на server-computed `isVkAuthEnabled`; disconnect остаётся доступен при выключенном провайдере.
+- ✅ **FIX-LINK-STATE-CONSISTENCY-01** — «connected» считалось двумя способами; введён один предикат `resolveLinkState` (`isLinked` / `isDeliveryEnabled`), три согласованных состояния карточки.
+- ✅ **CONSOLIDATE-EXTERNAL-LINKING-01** — одна точка линковки: канон `/cabinet/profile` `LinkedAccountsCard`; notification-поверхности стали toggle-only с указателем на канон.
