@@ -474,12 +474,12 @@
   pointer-events: none;
   opacity: 0;
 }
-/* Live-stat dot. The fill is set here because there is no `success` colour in
-   tailwind.config.js — the old `bg-success` utility on this element compiled to
-   nothing, so the dot was invisible and only its pulse ring showed
-   (LOGIN-WOW-01). */
+/* Live-stat dot.
+   HARDENING-MISC-01: заливка вернулась к токену — `bg-success` теперь
+   действительно компилируется (мост добавлен в tailwind.config.js). Здесь
+   остаётся только то, что утилитой не выражается: стартовое состояние
+   pulse-ring для CSS-анимации. Обходной путь LOGIN-WOW-01 снят. */
 .login-dot {
-  background: rgb(var(--success));
   box-shadow: 0 0 0 0 rgb(var(--success) / 0.5);
 }
 

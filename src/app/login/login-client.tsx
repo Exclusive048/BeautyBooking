@@ -450,7 +450,7 @@ export default function LoginClient({
               </p>
               {stats ? (
                 <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-[12px] text-text-sec">
-                  <span className="login-dot h-1.5 w-1.5 rounded-full" aria-hidden />
+                  <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
                   <span className="tabular-nums">
                     {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
                   </span>

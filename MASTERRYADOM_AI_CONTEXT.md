@@ -80,6 +80,8 @@
 ### Версии и зависимости
 Источник — `package.json`. Пины, которые нельзя менять без согласования: **Next.js не апгрейдить** (16.x, webpack, не turbopack), **Prisma не до v7**. БД — PostgreSQL + pgvector (dev-образ `pgvector/pgvector:pg16`), кэш/очередь — Redis, валидация — Zod, стили — Tailwind (только токены, см. дизайн-скилл).
 
+> ⚠️ **Токен живёт в ДВУХ местах** (HARDENING-MISC-01): CSS-переменная в `src/app/globals.css` **и** мост в `tailwind.config.js`. Переменная без моста — это класс, который компилируется **в ничто**: разметка выглядит правильной, стиля нет, ошибки нет. Так «пропала» точка статуса на `/login`, и так же молча не работали `shadow-brand` (7 сайтов) и `bg/text-destructive` (3). Добавляя состояние или тень — проверяйте обе половины.
+
 ### Интеграции
 YooKassa (платежи) · Яндекс S3 / Геокодер / Suggest (медиа, адреса) · Yandex ID OAuth · VK OAuth · Telegram Bot API (gated OFF, + monitoring) · YandexGPT (chat AI, §11) · Yandex AI Studio (visual-search vision `qwen3.6-35b-a3b` + `text-search` embeddings, §11; dormant) · web-push VAPID (push) · nodemailer SMTP (email) · SMSC.ru (SMS, код готов — не подключён) · Sharp (изображения) · AWS SDK S3. *(OpenAI полностью удалён из кодбазы — VISUAL-SEARCH-YANDEX-MIGRATION-01 2026-07-13.)*
 
@@ -230,7 +232,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - `SMS_PROVIDER_ENABLED` — default OFF → mock, OTP пишется в логи. В prod: включить + пополнить баланс SMSC.
 - `VISUAL_SEARCH_ENABLED` — dormant, default false; требует `YANDEX_API_KEY` + `YANDEX_FOLDER_ID`.
 - `REDIS_URL` — без него memory-fallback (в dev). Sensitive-роуты при этом fail-closed (инв. #6).
-- `YOOKASSA_WEBHOOK_TOKEN` — optional URL `?token=`, **не подпись**; authenticity держит worker re-fetch.
+- **`YOOKASSA_WEBHOOK_TOKEN` — обязателен в production, когда включены платежи** (заданы `YOOKASSA_SHOP_ID` + `YOOKASSA_SECRET_KEY`): без него приложение **не стартует** (HARDENING-MISC-01; раньше молча деградировало до одного warn'а). Это URL `?token=`, **не подпись**: authenticity держит worker re-fetch (инв. #5), а требование существует, чтобы дешёвый pre-filter не выключался незаметно. Рефайн гейтится по `NODE_ENV=production` — в dev платёжные креды заданы, и безусловное требование сломало бы локальную разработку, ничего не улучшив.
 - **`YOOKASSA_IP_ALLOWLIST_ENFORCED` — остаётся `false` в проде (ратифицировано PAY-SEC-01, 2026-07-31).** Это не «ещё не включили», а принятая позиция: подлинность вебхука якорится worker API re-fetch (инв. #5), а не source-IP; за ALB enforce хрупок и зависит от proxy-chain. Возврат к нему как defense-in-depth — после launch (`PAY-SEC-01-REVISIT` в BACKLOG).
 - `TRUSTED_PROXY_HOPS` / `TRUSTED_REAL_IP_HEADER` — client-IP берётся из XFF **справа** (default hops=1); выставить под prod-edge (влияет на rate-limit, не на вебхук).
 - `GLITCHTIP_DSN` (сервер) / `NEXT_PUBLIC_GLITCHTIP_DSN` (браузер) — **два независимых гейта**: без DSN SDK не инициализируется и в браузере даже не догружается (динамический импорт за build-time флагом, чтобы ~90KB не ехали каждому посетителю). `GLITCHTIP_SAMPLE_RATE`, `NEXT_PUBLIC_GLITCHTIP_{ENVIRONMENT,RELEASE}` — опциональны. Tracing и session-replay намеренно выключены.
@@ -265,6 +267,8 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - Нет явного глобального auth-middleware — каждый route проверяет сам (`proxy.ts` делает CORS/CSP/rate-limit-tier).
 - JWT реализован вручную (HS256, `timingSafeEqual`); нет kid / ротации нескольких секретов.
 - **Error-tracking есть** (GlitchTip, `lib/observability/*` + `instrumentation{,-client}.ts`; §11). Чего нет: APM/tracing (намеренно — `tracesSampleRate` выключен), source-maps для читаемых prod-стеков (нужен DevOps-шаг).
+- **Fingerprint'ы compliance-сбоев (HARDENING-MISC-01) — контракт с alert-rules.** Три ветки намеренно глотают ошибку записи ради доступности запроса, и каждая шлёт сгруппированное событие со **стабильным** именем: `compliance.consent-write-failed` · `compliance.pd-access-write-failed` · `compliance.media-purge-enqueue-failed`. Плюс уже существовавший `job.deadLetter` (тег `jobType`) покрывает провал самой задачи `media.purge` после ретраев. **Переименование fingerprint'а осиротит alert-rule в GlitchTip** — молчание будет выглядеть как «всё хорошо». Значения зафиксированы в `lib/observability/compliance.ts`, менять только вместе с правилами.
+- **Deploy-порядок:** прод-инстанс с платежами и без `YOOKASSA_WEBHOOK_TOKEN` теперь **падает на старте** (§7). Это и есть цель, но провизионить токен надо **до** деплоя.
 - **Известных красных гейтов нет** (GATES-FIX-01, 2026-08-03): `npm run check` проходит целиком на чистом дереве. До этого два гейта краснели на HEAD — `check:schema-drift` (с 13 июля) и `check:openapi-routes`, — то есть «✅»-таблицы в отчётах несли два молчаливых ❌. Устройство фикса и почему это важно — §9.
 
 **Технический долг (компактно):** legacy `createClientBooking` slotLabel-путь; deprecated `Booking.startAt/endAt`; `VkLink.deviceId` (единственный потребитель удалён в RKN-FIX-12 — мёртвые данные); дублирующие rating-поля Provider (`rating`/`ratingAvg`, `reviews`/`ratingCount`); ~22 `eslint-disable`; OpenAPI/smoke не в CI; `slotPrecision` полный per-viewer-tz рендеринг (частично); `lateCancelAction="fine"` без enforcement (нет платёжных штрафов).

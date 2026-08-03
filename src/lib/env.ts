@@ -290,6 +290,30 @@ const refinedSchema = envSchema
       !e.SMS_PROVIDER_ENABLED ||
       (Boolean(e.SMS_PROVIDER_LOGIN) && Boolean(e.SMS_PROVIDER_PASSWORD)),
     "SMS_PROVIDER_LOGIN and SMS_PROVIDER_PASSWORD are required when SMS_PROVIDER_ENABLED=true"
+  )
+  // HARDENING-MISC-01 (из PAY-SEC-01) — раньше незаданный вебхук-токен просто
+  // отключал URL-проверку с однократным warn'ом в проде: тихая деградация
+  // конфига, которую никто не замечал. Теперь это отказ на старте.
+  //
+  // Гейт по production (как у REDIS_URL / WORKER_SECRET / MEDIA_DELIVERY_SECRET
+  // выше), а НЕ по одному лишь `isPaymentsEnabled`: платёжные креды заданы и в
+  // dev (`YOOKASSA_SHOP_ID` есть в `.env`), поэтому безусловное требование
+  // уронило бы локальную разработку, ничего не улучшив — вебхук туда всё равно
+  // не приходит.
+  //
+  // ⚠️ Формулировка намеренная: токен — **не** якорь подлинности. Подлинность
+  // держит worker API re-fetch (инв. #5), а `?token=` — дешёвый pre-filter.
+  // Требуем его, чтобы pre-filter не выключался молча, а не потому, что на нём
+  // что-то держится.
+  .refine(
+    (e) =>
+      e.NODE_ENV !== "production" ||
+      !(e.YOOKASSA_SHOP_ID && e.YOOKASSA_SECRET_KEY) ||
+      Boolean(e.YOOKASSA_WEBHOOK_TOKEN?.trim()),
+    "YOOKASSA_WEBHOOK_TOKEN is required in production when payments are enabled " +
+      "(YOOKASSA_SHOP_ID + YOOKASSA_SECRET_KEY set). It is a cheap URL pre-filter, " +
+      "NOT the authenticity anchor — authenticity is the worker API re-fetch (invariant #5). " +
+      "Set it, or unset the YooKassa credentials to run without payments."
   );
 
 // ── Parse ─────────────────────────────────────────────────────────────────────
@@ -331,6 +355,15 @@ if (isServerRuntime && _parsed && !_parsed.success) {
 }
 
 export type AppEnv = z.infer<typeof refinedSchema>;
+
+/**
+ * HARDENING-MISC-01 — экспорт СХЕМЫ (не значений) для тестов рефайнов.
+ *
+ * Модуль намеренно не падает под vitest (`isTestEnv`), поэтому проверить
+ * «упадёт ли старт в проде» через импорт нельзя — нужен доступ к самой схеме.
+ * Экспортируется только она; на рантайм это не влияет.
+ */
+export const envSchemaForTests = refinedSchema;
 
 // QA-001 / FIX-09 — client env must reference each public var as a LITERAL
 // `process.env.NEXT_PUBLIC_X`. Next/webpack only statically inlines that exact

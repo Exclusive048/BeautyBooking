@@ -3,6 +3,10 @@ import "server-only";
 import { AccountType, ConsentType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { logError, logInfo } from "@/lib/logging/logger";
+import {
+  COMPLIANCE_FINGERPRINTS,
+  reportComplianceWriteFailure,
+} from "@/lib/observability/compliance";
 import { prisma } from "@/lib/prisma";
 import { LEGAL_DOCUMENTS, type LegalDocumentKey } from "@/lib/legal/documents";
 import { hasRequiredConsents, type ConsentFlags } from "@/lib/legal/consent-flags";
@@ -140,6 +144,11 @@ export async function recordUserConsents(input: RecordConsentsInput): Promise<vo
     logError("Failed to record user consents", {
       userId: input.userId,
       error: error instanceof Error ? error.stack : String(error),
+    });
+    // HARDENING-MISC-01: тот же факт — но как сгруппированное событие, на
+    // которое можно повесить alert-rule. logError выше остаётся.
+    reportComplianceWriteFailure(COMPLIANCE_FINGERPRINTS.consentWrite, error, {
+      purposes: types.length,
     });
   }
 }

@@ -2,6 +2,10 @@ import "server-only";
 
 import { PdAccessActorType } from "@prisma/client";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import {
+  COMPLIANCE_FINGERPRINTS,
+  reportComplianceWriteFailure,
+} from "@/lib/observability/compliance";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -128,6 +132,12 @@ export async function recordPdAccess(input: RecordPdAccessInput): Promise<void> 
       actorType: input.actorType,
       rowCount: input.rowCount,
       error: error instanceof Error ? error.stack : String(error),
+    });
+    // HARDENING-MISC-01: устойчивый сбой здесь = журнал, заведённый ради
+    // 24/72 ч, в нужные дни был дырявым. Это обязано быть алертопригодным.
+    reportComplianceWriteFailure(COMPLIANCE_FINGERPRINTS.pdAccessWrite, error, {
+      surface: input.surface,
+      rowCount: input.rowCount,
     });
   }
 }

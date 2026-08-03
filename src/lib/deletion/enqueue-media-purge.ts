@@ -3,6 +3,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { logError, logInfo } from "@/lib/logging/logger";
+import {
+  COMPLIANCE_FINGERPRINTS,
+  reportComplianceWriteFailure,
+} from "@/lib/observability/compliance";
 import { enqueue } from "@/lib/queue/queue";
 import { MEDIA_PURGE_JOB_TYPE, type MediaPurgePayload } from "@/lib/queue/types";
 
@@ -43,6 +47,13 @@ export async function enqueueMediaPurge(
       actorUserId,
       assetIds: assets.map((a) => a.id),
       error: error instanceof Error ? error.message : String(error),
+    });
+    // HARDENING-MISC-01: аккаунт уже удалён, а байты остались — и без сигнала
+    // об этом никто не узнает. (Провал САМОЙ задачи после ретраев ловится
+    // отдельно: `moveToDeadQueue` шлёт `job.deadLetter` с jobType=media.purge.)
+    reportComplianceWriteFailure(COMPLIANCE_FINGERPRINTS.mediaPurgeEnqueue, error, {
+      reason,
+      assetCount: assets.length,
     });
   }
 }

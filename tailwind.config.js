@@ -57,6 +57,18 @@ module.exports = {
         "brand-deep": "rgb(var(--brand-deep) / <alpha-value>)",
         "brand-pane": "rgb(var(--brand-pane) / <alpha-value>)",
         "brand-accent": "rgb(var(--brand-accent) / <alpha-value>)",
+        // HARDENING-MISC-01 — мост для СОСТОЯНИЙ. CSS-переменные для них давно
+        // объявлены в globals.css (и в светлой, и в тёмной теме), а вот моста в
+        // tailwind не было — поэтому `bg-success` / `text-destructive` и т.п.
+        // компилировались В НИЧТО: класс в разметке есть, стиля нет, ошибки нет.
+        // Именно так «пропала» точка статуса на /login (LOGIN-WOW-01).
+        // Значения — из globals.css, здесь только проброс.
+        success: "rgb(var(--success) / <alpha-value>)",
+        warning: "rgb(var(--warning) / <alpha-value>)",
+        destructive: {
+          DEFAULT: "rgb(var(--destructive) / <alpha-value>)",
+          foreground: "rgb(var(--destructive-foreground) / <alpha-value>)",
+        },
       },
       backgroundImage: {
         "brand-gradient":
@@ -74,6 +86,10 @@ module.exports = {
         card: "var(--shadow-card)",
         hover: "var(--shadow-hover)",
         glow: "0 0 0 1px rgb(var(--primary-glow) / 0.26), 0 14px 28px rgb(var(--primary-glow) / 0.22)",
+        // HARDENING-MISC-01: `--shadow-brand` объявлена в обеих темах
+        // (светлая — бордовая тень, тёмная — бордовое свечение), но моста не
+        // было: 7 сайтов с `shadow-brand` рендерили тень в никуда.
+        brand: "var(--shadow-brand)",
       },
     },
   },

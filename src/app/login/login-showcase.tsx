@@ -247,7 +247,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
               className="login-rise mb-7 inline-flex items-center gap-2.5 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-[12.5px] backdrop-blur-md"
               style={{ animationDelay: RISE_DELAY.stat }}
             >
-              <span className="login-dot h-1.5 w-1.5 rounded-full" aria-hidden />
+              <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
               <span className="tabular-nums">
                 {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
               </span>
