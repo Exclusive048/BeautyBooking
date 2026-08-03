@@ -2,11 +2,13 @@ import "server-only";
 
 import {
   AccountType,
+  PdAccessActorType,
   PlanTier,
   SubscriptionScope,
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import { resolvePrimaryRole } from "@/features/admin-cabinet/users/lib/primary-role";
 import { ROLE_GROUP_ACCOUNT_TYPES } from "@/features/admin-cabinet/users/lib/role-grouping";
 import type {
@@ -28,6 +30,14 @@ type ListOpts = {
   search?: string;
   cursor?: string | null;
   pageSize?: number;
+  /**
+   * RKN-FIX-10 — кто читает. Прокидывается со страницы (она уже держит
+   * админскую сессию), чтобы сервис не лез в auth-контекст сам: так его
+   * по-прежнему можно звать из тестов и скриптов, а след остаётся честным.
+   * `null`/absent = актор неизвестен, событие всё равно пишется.
+   */
+  actorUserId?: string | null;
+  actorIp?: string | null;
 };
 
 function buildRoleWhere(group: AdminUserRoleGroup): Prisma.UserProfileWhereInput | undefined {
@@ -227,6 +237,27 @@ export async function listAdminUsers(
       cityName: user.providers[0]?.city?.name ?? null,
       createdAt: user.createdAt.toISOString(),
     };
+  });
+
+  // RKN-FIX-10 — самая ценная для злоумышленника поверхность в продукте:
+  // телефоны и email ВСЕХ пользователей, с поиском и курсорной пагинацией.
+  // Одно событие на ответ (не на строку), значения фильтров не пишем.
+  await recordPdAccess({
+    surface: "admin.users.list",
+    actorType: PdAccessActorType.ADMIN,
+    actorUserId: opts.actorUserId ?? null,
+    entityType: "UserProfile",
+    rowCount: mapped.length,
+    filterFingerprint: buildFilterFingerprint(
+      {
+        search: Boolean(needle),
+        roleGroup: roleGroup !== "all",
+        planTier: planTier !== "all",
+        cursor: Boolean(opts.cursor),
+      },
+      { limit: pageSize },
+    ),
+    ipAddress: opts.actorIp ?? null,
   });
 
   return { users: mapped, counts, nextCursor };

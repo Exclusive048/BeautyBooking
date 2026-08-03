@@ -126,6 +126,9 @@ model UserProfile {
   /// fully drop an admin account until their trail is reassigned.
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditLogActor")
 
+  /// RKN-FIX-10: массовые чтения ПДн, выполненные этим пользователем.
+  pdAccessLogs PdAccessLog[] @relation("PdAccessLogActor")
+
   /// Reviews this user (acting as admin) soft-deleted. Backed by the
   /// optional `Review.deletedBy` relation added in the same commit.
   reviewsDeleted Review[] @relation("ReviewDeletedBy")

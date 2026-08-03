@@ -34,7 +34,15 @@ function firstNonEmpty(value: string | null | undefined): string | null {
  * returns the SAME value as the old leftmost logic — only spoofed leftmost
  * entries stop working.
  */
-export function extractClientIp(req: Request, options?: ClientIpOptions): string | null {
+/**
+ * Структурный минимум, который нужен резолверу: что-то с `headers.get()`.
+ * `Request` ему удовлетворяет, поэтому все существующие вызовы не меняются;
+ * Server Component может передать `{ headers: await headers() }` (RKN-FIX-10 —
+ * там `Request` недоступен, а IP для следа чтений нужен).
+ */
+export type HeaderCarrier = { headers: Pick<Headers, "get"> };
+
+export function extractClientIp(req: HeaderCarrier, options?: ClientIpOptions): string | null {
   // 1. Dedicated trusted header — only if the operator confirms the edge SETS it
   //    (an overwrite-mode edge that passes client XFF through). Preferred when set.
   const realIpHeader = (options?.realIpHeader ?? env.TRUSTED_REAL_IP_HEADER)?.trim();
@@ -67,6 +75,6 @@ export function extractClientIp(req: Request, options?: ClientIpOptions): string
 }
 
 /** String variant with an `"unknown"` fallback — convenient for rate-limit keys. */
-export function getClientIp(req: Request): string {
+export function getClientIp(req: HeaderCarrier): string {
   return extractClientIp(req) ?? "unknown";
 }

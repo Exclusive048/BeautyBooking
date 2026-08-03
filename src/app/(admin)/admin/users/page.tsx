@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { AdminUsers } from "@/features/admin-cabinet/users/components/admin-users";
 import {
   listAdminPlans,
@@ -7,6 +8,8 @@ import type {
   AdminUserPlanFilter,
   AdminUserRoleGroup,
 } from "@/features/admin-cabinet/users/types";
+import { getSessionUser } from "@/lib/auth/session";
+import { extractClientIp } from "@/lib/http/ip";
 
 export const dynamic = "force-dynamic";
 
@@ -48,8 +51,20 @@ export default async function AdminUsersPage({
   const search = (params.q ?? "").trim();
   const cursor = params.cursor?.trim() || null;
 
+  // RKN-FIX-10: чей это просмотр — решает страница (сессия уже здесь), сервис
+  // остаётся вызываемым из тестов/скриптов. Route-group layout уже отсёк
+  // не-админов, так что getSessionUser здесь — идентификация, а не гейт.
+  const actor = await getSessionUser();
+
   const [list, plans] = await Promise.all([
-    listAdminUsers({ roleGroup: role, planTier, search, cursor }),
+    listAdminUsers({
+      roleGroup: role,
+      planTier,
+      search,
+      cursor,
+      actorUserId: actor?.id ?? null,
+      actorIp: extractClientIp({ headers: await headers() }),
+    }),
     listAdminPlans(),
   ]);
 

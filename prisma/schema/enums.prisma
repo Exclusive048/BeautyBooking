@@ -467,3 +467,13 @@ enum AdminAuditAction {
 
   SETTINGS_APP_SETTING_UPDATED
 }
+
+/// RKN-FIX-10 — кто выполнил массовое чтение ПДн. Не роль пользователя, а
+/// КЛАСС доступа: один и тот же человек может быть и MASTER, и ADMIN, и при
+/// разборе инцидента важно, в каком качестве он читал.
+enum PdAccessActorType {
+  ADMIN
+  MASTER
+  STUDIO
+  SYSTEM
+}

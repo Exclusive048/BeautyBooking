@@ -126,6 +126,18 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
     kind: "RETAINED",
     reason: "инв. #16 — admin action history is compliance evidence (onDelete: Restrict)",
   },
+  pdAccessLogs: {
+    kind: "ANONYMIZED",
+    reason:
+      "RKN-FIX-10 — след массовых чтений ПДн. `onDelete: SetNull` (НЕ Restrict, как у " +
+      "adminAuditLogs): удаление аккаунта не должно блокироваться тем, что человек " +
+      "когда-то открывал список своих клиентов, но и стирать след нельзя — это " +
+      "доказательная база для scoping инцидента (152-ФЗ ст. 21 ч. 3.1, 24/72 ч). " +
+      "Обнуляется `actorUserId`; строка живёт дальше с actorType/surface/rowCount/IP. " +
+      "⚠️ POLICY-вход для RKN-FIX-04: в осиротевшей строке остаётся IP удалённого " +
+      "пользователя — у этой таблицы ОБЯЗАН быть конечный срок хранения, иначе " +
+      "«право на забвение» протекает через журнал, который его же и защищает",
+  },
   reviewsDeleted: {
     kind: "RETAINED",
     reason: "Moderation trail: which admin soft-deleted which review (инв. #17)",

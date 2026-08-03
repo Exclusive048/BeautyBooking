@@ -1,6 +1,8 @@
 import { AppError } from "@/lib/api/errors";
 import { applyProfileNames, calculateDaysSinceLastVisit, groupBookings, type BookingClientRow } from "@/lib/crm/clients";
 import { prisma } from "@/lib/prisma";
+import { PdAccessActorType } from "@prisma/client";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import type { Prisma } from "@prisma/client";
 
 export type ClientCardSummary = {
@@ -30,6 +32,12 @@ export type ClientsPageInput = {
   includeCardSummary?: boolean;
   cursor?: string;
   limit?: number;
+  /**
+   * RKN-FIX-10 — кто читает клиентскую базу студии. Прокидывается вызывающим;
+   * доступ этим НЕ расширяется, только наблюдается.
+   */
+  actorUserId?: string | null;
+  actorIp?: string | null;
 };
 
 export type ClientsPageResult<T> = {
@@ -173,6 +181,20 @@ export async function getStudioClients(input: ClientsPageInput): Promise<StudioC
     totalAmount: item.totalAmount,
     card: includeCardSummary ? cardMap.get(item.key) ?? null : null,
   }));
+
+  await recordPdAccess({
+    surface: "studio.clients.list",
+    actorType: PdAccessActorType.STUDIO,
+    actorUserId: input.actorUserId ?? null,
+    entityType: "ClientCard",
+    rowCount: clients.length,
+    filterFingerprint: buildFilterFingerprint(
+      { sort: Boolean(input.sort), cardSummary: Boolean(input.includeCardSummary), cursor: Boolean(input.cursor) },
+      { limit },
+    ),
+    scopeStudioId: input.studioId,
+    ipAddress: input.actorIp ?? null,
+  });
 
   return { items: clients, nextCursor };
 }

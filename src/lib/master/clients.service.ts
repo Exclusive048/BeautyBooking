@@ -1,6 +1,8 @@
 import { AppError } from "@/lib/api/errors";
 import { applyProfileNames, calculateDaysSinceLastVisit, groupBookings, type BookingClientRow } from "@/lib/crm/clients";
 import { prisma } from "@/lib/prisma";
+import { PdAccessActorType } from "@prisma/client";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import type { Prisma } from "@prisma/client";
 
 export type ClientCardSummary = {
@@ -30,6 +32,14 @@ export type ClientsPageInput = {
   includeCardSummary?: boolean;
   cursor?: string;
   limit?: number;
+  /**
+   * RKN-FIX-10 — кто читает клиентскую базу. Прокидывается вызывающим (он
+   * держит сессию); сервис не лезет в auth-контекст сам, чтобы оставаться
+   * вызываемым из тестов. Доступ этим НЕ расширяется — только наблюдается
+   * (инв. #25 не тронут).
+   */
+  actorUserId?: string | null;
+  actorIp?: string | null;
 };
 
 export type ClientsPageResult<T> = {
@@ -179,6 +189,20 @@ export async function getMasterClients(input: ClientsPageInput): Promise<MasterC
     totalAmount: item.totalAmount,
     card: includeCardSummary ? cardMap.get(item.key) ?? null : null,
   }));
+
+  await recordPdAccess({
+    surface: "master.clients.list",
+    actorType: PdAccessActorType.MASTER,
+    actorUserId: input.actorUserId ?? null,
+    entityType: "ClientCard",
+    rowCount: clients.length,
+    filterFingerprint: buildFilterFingerprint(
+      { sort: Boolean(input.sort), cardSummary: Boolean(input.includeCardSummary), cursor: Boolean(input.cursor) },
+      { limit },
+    ),
+    scopeProviderId: input.providerId,
+    ipAddress: input.actorIp ?? null,
+  });
 
   return { items: clients, nextCursor };
 }

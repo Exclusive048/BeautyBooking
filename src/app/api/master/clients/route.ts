@@ -8,6 +8,7 @@ import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterClients } from "@/lib/master/clients.service";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { canAccessClientCards } from "@/lib/crm/guards";
+import { extractClientIp } from "@/lib/http/ip";
 import { parseQuery } from "@/lib/validation";
 
 const querySchema = z.object({
@@ -33,6 +34,9 @@ export async function GET(req: Request) {
       includeCardSummary: canAccessClientCards(plan.features),
       cursor: query.cursor,
       limit: query.limit,
+      // RKN-FIX-10: наблюдение, не расширение доступа (инв. #25 не тронут).
+      actorUserId: user.id,
+      actorIp: extractClientIp(req),
     });
     return jsonOk(data);
   } catch (error) {

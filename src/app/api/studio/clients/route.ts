@@ -9,6 +9,7 @@ import { canAccessClientCards } from "@/lib/crm/guards";
 import { ensureStudioRole } from "@/lib/studio/access";
 import { getStudioClients } from "@/lib/studio/clients.service";
 import { studioClientsQuerySchema } from "@/lib/studio/schemas";
+import { extractClientIp } from "@/lib/http/ip";
 import { parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -32,6 +33,9 @@ export async function GET(req: Request) {
       includeCardSummary: canAccessClientCards(plan.features),
       cursor: query.cursor,
       limit: query.limit,
+      // RKN-FIX-10: наблюдение, не расширение доступа.
+      actorUserId: user.id,
+      actorIp: extractClientIp(req),
     });
     return jsonOk(data);
   } catch (error) {

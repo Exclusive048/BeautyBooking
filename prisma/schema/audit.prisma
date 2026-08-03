@@ -49,3 +49,65 @@ model AdminAuditLog {
   @@index([action, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
 }
+
+// === DOMAIN: PD access trail (RKN-FIX-10) ===
+//
+// 152-ФЗ ст. 21 ч. 3.1 даёт 24 часа на уведомление РКН об инциденте и 72 на
+// результаты расследования. Мутации у нас аудируются (инв. #16/#18/#19),
+// auth-события логируются — а **массовые чтения невидимы**: скомпрометированный
+// аккаунт мог пролистать всю клиентскую базу, и через сутки нечем ответить на
+// вопрос «чьи данные утекли и сколько».
+//
+// Назначение этой таблицы — **scoping**, а не детект. Она отвечает ровно на
+// один вопрос: «что читал актор X в окне Y». Пороги и алерты на аномальный
+// объём — отдельная задача (BACKLOG), сознательно вне RKN-FIX-10.
+//
+// 🔴 Тут НЕТ прочитанных данных. Только личность актора, форма запроса и
+// счётчик. Иначе журнал защиты ПДн сам стал бы второй копией этих ПДн —
+// удвоив, а не сузив поверхность утечки.
+model PdAccessLog {
+  id String @id @default(cuid())
+
+  /// Nullable: SYSTEM-акторы (cron/worker) не имеют профиля, а при удалении
+  /// аккаунта ссылка обнуляется (SetNull) — след инцидента переживает
+  /// удаление, привязка к удалённому человеку — нет. См. карту диспозиций.
+  actorUserId String?
+
+  actor UserProfile? @relation("PdAccessLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  actorType PdAccessActorType
+
+  /// Стабильный ключ поверхности: "admin.users.list", "master.clients.list", …
+  /// Именно ключ, а не URL — путь меняется при рефакторе, вопрос «что читали»
+  /// не меняется.
+  surface String
+
+  /// Какая сущность перечислялась: "UserProfile" / "Booking" / "ClientCard" / …
+  entityType String
+
+  /// Сколько строк ушло в ответе. Одно событие на ответ, не на строку.
+  rowCount Int
+
+  /// ФОРМА запроса (нормализованные имена фильтров + признак наличия поиска),
+  /// НИКОГДА не значения и не результат: по ней видно «листали всё» против
+  /// «искали одного», и при этом сама она не является ПДн.
+  filterFingerprint String?
+
+  /// Арендатор, в чьих данных читали, — чтобы при инциденте у провайдера
+  /// сузить выборку без джойнов.
+  scopeProviderId String?
+
+  scopeStudioId String?
+
+  requestId String?
+
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+
+  /// Главный индекс — под вопрос инцидента «что читал актор X в окне Y».
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([surface, createdAt(sort: Desc)])
+  @@index([scopeProviderId, createdAt(sort: Desc)])
+}
