@@ -1,15 +1,29 @@
-// QA harness — reusable phone+OTP login routine.
+// QA harness — reusable OTP login routine (phone AND email).
 //
-// Deterministic Playwright login: drives the real /login UI (phone -> consent
-// -> request OTP -> recover code from DB -> type code -> land). Uses web-first
-// locators (getByRole / getByLabel) and auto-waiting assertions only — no
-// fixed sleeps. Returns the landed URL plus any console errors / failed
+// Deterministic Playwright login: drives the real /login UI (identity ->
+// consent -> request OTP -> recover code from DB -> type code -> land). Uses
+// web-first locators (getByRole / getByLabel) and auto-waiting assertions only
+// — no fixed sleeps. Returns the landed URL plus any console errors / failed
 // network requests observed during login + first paint, so the smoke can
 // report defects even when login itself "works".
+//
+// QA-HARNESS-EMAIL-01 — the channel is taken FROM THE PAGE, not hardcoded.
+// QA-003 §9 ratified this: dev and prod expose different channels (dev opens on
+// phone, prod on email, because `PHONE_AUTH_ENABLED` is a server-only tri-state
+// that is OFF in production), so a spec that hardcodes a channel passes in one
+// environment and fails in the other for reasons that have nothing to do with
+// what it was testing. `channel: "auto"` (the default) uses whatever the page
+// opened on; asking for a specific channel clicks its tab and fails loudly if
+// that channel is not live — which is the honest outcome, not a silent skip.
 
 import { expect, type Page, type Browser } from "@playwright/test";
 import { recoverOtp } from "./otp";
 import type { Role } from "./roles";
+
+/** Which OTP channel to drive. `auto` = whatever /login opened on. */
+export type LoginChannel = "auto" | "phone" | "email";
+
+export type LoginOptions = { channel?: LoginChannel };
 
 export type ConsoleError = { type: string; text: string };
 export type FailedRequest = { method: string; url: string; status: number };
@@ -19,6 +33,8 @@ export type LoginResult = {
   landedPath: string;
   consoleErrors: ConsoleError[];
   failedRequests: FailedRequest[];
+  /** Which channel actually drove this login — useful when `auto` chose it. */
+  channel: "phone" | "email";
 };
 
 function attachObservers(page: Page, consoleErrors: ConsoleError[], failedRequests: FailedRequest[]): void {
@@ -38,7 +54,61 @@ function attachObservers(page: Page, consoleErrors: ConsoleError[], failedReques
   });
 }
 
-export async function loginAs(page: Page, role: Role, baseURL: string): Promise<LoginResult> {
+/**
+ * Resolve which channel to drive, on the page as it actually rendered.
+ *
+ * The tabs only exist when BOTH channels are live (`login-client.tsx`:
+ * `phoneEnabled && emailEnabled && step === "input"`), so their absence is not
+ * an error — it means the config is single-channel and the visible input tells
+ * us which one. Switching tabs clears the identifier field (`switchMode`
+ * resets phone/email/code), so this must run BEFORE anything is typed.
+ */
+async function resolveChannel(page: Page, want: LoginChannel): Promise<"phone" | "email"> {
+  const emailTab = page.getByTestId("login-tab-email");
+  const phoneTab = page.getByTestId("login-tab-phone");
+  const emailInput = page.locator("#email-input");
+  const phoneInput = page.locator("#phone-input");
+
+  // Wait for the form to exist at all before deciding anything.
+  await expect(emailInput.or(phoneInput).first()).toBeVisible({ timeout: 30_000 });
+
+  if (want === "auto") {
+    return (await emailInput.isVisible().catch(() => false)) ? "email" : "phone";
+  }
+
+  const target = want === "email" ? emailInput : phoneInput;
+  if (await target.isVisible().catch(() => false)) return want;
+
+  const tab = want === "email" ? emailTab : phoneTab;
+  if (!(await tab.isVisible().catch(() => false))) {
+    // No tab and no input for the requested channel ⇒ it is gated off server-side.
+    // Fail with the reason rather than quietly logging in through the other one.
+    throw new Error(
+      `loginAs: channel "${want}" is not available on /login (no tab, no input) — ` +
+        `it is gated off in this environment (see resolveAuthMethods / PHONE_AUTH_ENABLED).`,
+    );
+  }
+
+  // The tab is a plain `<button role="tab" onClick>` (SegmentedTabs), so a click
+  // that lands BEFORE hydration is a silent no-op — the button is in the SSR
+  // HTML, `onChange` is not wired yet. That reproduced immediately on the first
+  // acceptance run: click succeeded, `#email-input` never appeared. Same class
+  // as the QA-003 race, same remedy as GATES-FIX-01 — click and confirm inside
+  // ONE retry unit, so a no-op click just costs another iteration.
+  await expect(async () => {
+    if (await target.isVisible().catch(() => false)) return;
+    await tab.click();
+    await expect(target).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 60_000 });
+  return want;
+}
+
+export async function loginAs(
+  page: Page,
+  role: Role,
+  baseURL: string,
+  options: LoginOptions = {},
+): Promise<LoginResult> {
   const consoleErrors: ConsoleError[] = [];
   const failedRequests: FailedRequest[] = [];
   attachObservers(page, consoleErrors, failedRequests);
@@ -66,7 +136,11 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
 
   await page.goto(`${baseURL}/login`, { waitUntil: "domcontentloaded" });
 
-  // Steps 1+2 — phone + consent, retried until the value sticks.
+  // Decide the channel BEFORE typing: `switchMode` clears the identifier.
+  const channel = await resolveChannel(page, options.channel ?? "auto");
+  const identity = channel === "email" ? role.email : role.phone;
+
+  // Steps 1+2 — identity + consent, retried until the value sticks.
   // Two interacting facts force this shape:
   //   (a) the controlled React <Input> only updates its state from real input
   //       events, so .fill() sets the DOM value without firing onChange and
@@ -75,8 +149,12 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   //       see QA-003) that regenerates the tree shortly after load and can
   //       wipe input typed too early.
   // Retrying the type until the consent checkbox (which only renders for a
-  // valid phone) becomes visible is deterministic against the hydration race.
-  const phoneInput = page.getByRole("textbox", { name: /Телефон/ });
+  // valid identifier) becomes visible is deterministic against the hydration race.
+  //
+  // Both channels use `#id` here rather than the accessible name: the email
+  // field's aria-label is the bare word "Email", which also matches the social
+  // buttons' text on the same screen.
+  const identityInput = page.locator(channel === "email" ? "#email-input" : "#phone-input");
   // RKN-FIX-01: consent is no longer ONE checkbox. The form now carries three
   // independent purposes — offer, PD processing (both required) and marketing
   // (optional) — so `getByRole("checkbox")` is a strict-mode violation. The
@@ -112,8 +190,8 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
     // Уже дошли до OTP-шага на предыдущей итерации — второй код не запрашиваем.
     if (await otpFirstBox.isVisible().catch(() => false)) return;
 
-    await phoneInput.click({ clickCount: 3 });
-    await phoneInput.pressSequentially(role.phone, { delay: 25 });
+    await identityInput.click({ clickCount: 3 });
+    await identityInput.pressSequentially(identity, { delay: 25 });
     await expect(requiredConsents).toBeVisible({ timeout: 2000 });
     for (const box of [requiredConsents, requiredConsentsPd]) {
       if (!(await box.isChecked().catch(() => false))) {
@@ -138,6 +216,12 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
 
     // Steps 3+4 — отправить и дождаться 6-боксового OTP-шага. Внутри той же
     // попытки: если форму сбросило, следующая итерация начнёт с чистого ввода.
+    //
+    // QA-HARNESS-EMAIL-01 — окно ожидания OTP-шага держим широким намеренно.
+    // Email-роут пишет строку `OtpCode` ДО отправки, но HTTP-ответ (и только по
+    // нему UI переключает шаг) ждёт `await sendEmail`. С поднятым dev-синком
+    // это миллисекунды; без него, на недостижимом внешнем SMTP, замерено
+    // **21–23 с** — и это не флейк, а окружение. 30 с покрывают оба случая.
     await sendCodeButton.click();
     await expect(otpFirstBox).toBeVisible({ timeout: 30_000 });
   }).toPass({ timeout: 120_000 });
@@ -145,7 +229,8 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   // Step 5 — recover the plaintext code from the DB and type it. Typing
   // char-by-char lets the component's focus cascade move between boxes
   // exactly like a real user; the 6th digit auto-submits (onComplete).
-  const code = await recoverOtp(role.phone);
+  // `recoverOtp` classifies the identity itself (phone vs email).
+  const code = await recoverOtp(identity);
   await page.getByLabel("Цифра 1 из 6").click();
   await page.keyboard.type(code, { delay: 80 });
 
@@ -178,6 +263,7 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
     landedPath: new URL(landedUrl).pathname,
     consoleErrors,
     failedRequests,
+    channel,
   };
 }
 
@@ -196,13 +282,14 @@ export async function loginResilient(
   role: Role,
   baseURL: string,
   attempts = 3,
+  options: LoginOptions = {},
 ): Promise<{ page: Page; result: LoginResult; attempt: number }> {
   let lastErr: unknown;
   for (let i = 1; i <= attempts; i += 1) {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await ctx.newPage();
     try {
-      const result = await loginAs(page, role, baseURL);
+      const result = await loginAs(page, role, baseURL, options);
       return { page, result, attempt: i };
     } catch (e) {
       lastErr = e;

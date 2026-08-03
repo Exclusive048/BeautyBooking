@@ -1,12 +1,25 @@
 // QA harness — deterministic OTP recovery + rate-limit reset.
 //
 // The OtpCode table stores only `codeHash` = HMAC-SHA256(OTP_HMAC_SECRET,
-// `${phone}:${code}`) — never the plaintext. SMS is not wired in dev, and
+// `${identity}:${code}`) — never the plaintext. SMS is not wired in dev, and
 // the dev-server log (which does print the code) is the user's own stdout
 // that the harness cannot tail. So we recover the plaintext deterministically
 // by brute-forcing the 6-digit space (100000..999999, ~900k HMAC ops, <2s)
-// against the latest unused codeHash for the phone. Self-contained, no log
+// against the latest unused codeHash for that identity. Self-contained, no log
 // stream, no new runtime dependency.
+//
+// QA-HARNESS-EMAIL-01 — **email is a first-class identity here, not a variant.**
+// The closed deploy runs email-only (`PHONE_AUTH_ENABLED` tri-state is OFF in
+// production), so a harness that can only recover phone codes cannot log into
+// the thing we are about to ship. QA-003 worked around it with a local copy
+// inside a gitignored diagnostic spec; that copy is now folded in and deleted.
+//
+// The product hashes BOTH channels with the same helper (`hashOtpCode` in
+// `src/lib/auth/otp.ts`) — only the identity string differs:
+//   phone → the normalized phone as sent (`+7999…`)
+//   email → `email.trim().toLowerCase()`  (Zod `.trim().email()` then `.toLowerCase()`)
+// Getting that normalization wrong yields a silent 900k-iteration miss, so it
+// is mirrored exactly rather than approximated.
 
 import { execFileSync } from "node:child_process";
 import { createHmac, createHash } from "node:crypto";
@@ -89,47 +102,100 @@ function psql(sql: string): string {
   return stdout.trim();
 }
 
-function hashOtp(phone: string, code: string, secret: string): string {
-  return createHmac("sha256", secret).update(`${phone}:${code}`).digest("hex");
+function hashOtp(identity: string, code: string, secret: string): string {
+  return createHmac("sha256", secret).update(`${identity}:${code}`).digest("hex");
 }
 
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function latestUnusedCodeHash(phone: string): string | null {
-  const safePhone = phone.replace(/'/g, "''");
-  const sql = `SELECT "codeHash" FROM "OtpCode" WHERE phone = '${safePhone}' AND "usedAt" IS NULL AND "expiresAt" > now() ORDER BY "createdAt" DESC LIMIT 1;`;
+/**
+ * Who is logging in. A bare string stays valid so every existing call site
+ * compiles untouched (`recoverOtp(role.phone)`, `clearOtpRateLimit([phone])`);
+ * it is classified by `@` — phones here always start with `+`, emails always
+ * contain `@`, so the two spaces cannot collide. The object forms exist for
+ * call sites that would rather be explicit than rely on that.
+ */
+export type OtpIdentity = string | { phone: string } | { email: string };
+
+export type ResolvedIdentity =
+  | { channel: "phone"; value: string }
+  | { channel: "email"; value: string };
+
+/**
+ * Normalizes an identity **the way the product does** — this is the part that
+ * must not drift, because a wrong preimage looks exactly like "no code yet".
+ * Email: `.trim().toLowerCase()` (Zod `.trim().email()` → route `.toLowerCase()`).
+ * Phone: passed through as the caller sends it, matching today's behaviour.
+ */
+export function resolveIdentity(identity: OtpIdentity): ResolvedIdentity {
+  if (typeof identity === "string") {
+    return identity.includes("@")
+      ? { channel: "email", value: identity.trim().toLowerCase() }
+      : { channel: "phone", value: identity };
+  }
+  if ("email" in identity) {
+    return { channel: "email", value: identity.email.trim().toLowerCase() };
+  }
+  return { channel: "phone", value: identity.phone };
+}
+
+function latestUnusedCodeHash(id: ResolvedIdentity): string | null {
+  const safe = id.value.replace(/'/g, "''");
+  // Each branch mirrors the corresponding product query verbatim:
+  //   phone → `otp/verify/route.ts`      (no channel filter)
+  //   email → `otp/email/verify/route.ts` (channel = 'EMAIL')
+  // The email channel filter is not cosmetic: `OtpCode` rows keyed by email are
+  // ALSO written by the cabinet email-verification flow
+  // (`/api/cabinet/user/profile/email/request-verify`), and both carry
+  // `channel = EMAIL`. `ORDER BY createdAt DESC` is what disambiguates them —
+  // same rule the product applies, so the harness can never pick a code the
+  // product would have rejected.
+  const where =
+    id.channel === "phone"
+      ? `phone = '${safe}'`
+      : `email = '${safe}' AND channel = 'EMAIL'`;
+  const sql = `SELECT "codeHash" FROM "OtpCode" WHERE ${where} AND "usedAt" IS NULL AND "expiresAt" > now() ORDER BY "createdAt" DESC LIMIT 1;`;
   const value = psql(sql);
   return value.length > 0 ? value : null;
 }
 
 /**
- * Recovers the plaintext OTP for `phone` by brute-forcing the latest unused
- * codeHash. Retries the DB read briefly in case the request just landed.
+ * Recovers the plaintext OTP for a phone OR an email by brute-forcing the
+ * latest unused codeHash. Retries the DB read briefly in case the request just
+ * landed.
+ *
+ * ⚠️ Email timing note (QA-HARNESS-EMAIL-01): the request route writes the
+ * `OtpCode` row BEFORE it awaits `sendEmail`, so the row is readable ~1.5 s in
+ * even when SMTP hangs — but the HTTP response (and therefore the UI's OTP
+ * step) waits for the send. With the dev mail sink running that wait is
+ * milliseconds; without it, ~21 s. See `docker-compose.dev.yml` (mailpit).
  */
-export async function recoverOtp(phone: string): Promise<string> {
+export async function recoverOtp(identity: OtpIdentity): Promise<string> {
   const secret = env.OTP_HMAC_SECRET;
   if (!secret) {
     throw new Error("OTP_HMAC_SECRET not found in .env / .env.local");
   }
 
+  const id = resolveIdentity(identity);
+
   let target: string | null = null;
   for (let attempt = 0; attempt < 10 && !target; attempt += 1) {
-    target = latestUnusedCodeHash(phone);
+    target = latestUnusedCodeHash(id);
     if (!target) await new Promise((r) => setTimeout(r, 250));
   }
   if (!target) {
-    throw new Error(`No unused OtpCode row found for ${phone}`);
+    throw new Error(`No unused OtpCode row found for ${id.channel} ${id.value}`);
   }
 
   for (let code = 100000; code <= 999999; code += 1) {
     const candidate = String(code);
-    if (hashOtp(phone, candidate, secret) === target) {
+    if (hashOtp(id.value, candidate, secret) === target) {
       return candidate;
     }
   }
-  throw new Error(`Could not recover OTP for ${phone} (no 6-digit match)`);
+  throw new Error(`Could not recover OTP for ${id.channel} ${id.value} (no 6-digit match)`);
 }
 
 /**
@@ -150,19 +216,43 @@ export async function recoverOtp(phone: string): Promise<string> {
  * Это харнесс-домен: продуктовые лимиты не трогаются, dev-only обхода в
  * `src/` не появляется. Мы лишь возвращаем окно в исходное состояние между
  * независимыми логинами — как если бы они шли от разных людей в разное время.
+ *
+ * ⚠️ QA-HARNESS-EMAIL-01 — у email СВОИ ключи, и это ровно тот же класс бага,
+ * что чинил GATES-FIX-01, только на втором канале. Verify-тир у email лежит под
+ * ДРУГИМ префиксом — `otp:verify:email:lock:` против фонового
+ * `otp:verify:lock:` — так что «почистили телефон» не чистит email ничего.
+ * Полная карта (источник — `src/lib/auth/otp-rate-limit.ts`):
+ *
+ *   request/IP     otp:request:ip:<sha256(ip)>            ← ОБЩИЙ для обоих каналов
+ *   request/phone  otp:request:phone:<sha256(phone)>       3 / 5 мин
+ *   request/email  otp:request:email:<sha256(email))>      3 / 5 мин
+ *   verify/phone   otp:verify:{lock,fail}:<scope>
+ *   verify/email   otp:verify:email:{lock,fail}:<scope>
+ *   где scope = `${sha256(identity)}:${sha256(ip)}`
+ *
+ * Общий request/IP-ключ (5 / 60 с) — причина, по которой смешанный прогон
+ * «смоук по телефонам + email-спека» упирается в 429 быстрее, чем ожидаешь:
+ * бюджет один на оба канала.
  */
-export function clearOtpRateLimit(phones: string[], ip = "unknown"): void {
+export function clearOtpRateLimit(identities: OtpIdentity[], ip = "unknown"): void {
   const keys = new Set<string>();
   const ipHash = sha256(ip);
   // Счётчик запросов по IP. На localhost XFF нет → extractClientIp вернёт null
-  // → продукт хеширует строку "unknown".
+  // → продукт хеширует строку "unknown". Общий для phone и email.
   keys.add(`otp:request:ip:${ipHash}`);
-  for (const phone of phones) {
-    const h = sha256(phone);
-    keys.add(`otp:request:phone:${h}`);
-    // verifyScopeId = `${sha256(identity)}:${sha256(ip)}` — обе половины.
-    keys.add(`otp:verify:lock:${h}:${ipHash}`);
-    keys.add(`otp:verify:fail:${h}:${ipHash}`);
+  for (const identity of identities) {
+    const id = resolveIdentity(identity);
+    const h = sha256(id.value);
+    if (id.channel === "phone") {
+      keys.add(`otp:request:phone:${h}`);
+      // verifyScopeId = `${sha256(identity)}:${sha256(ip)}` — обе половины.
+      keys.add(`otp:verify:lock:${h}:${ipHash}`);
+      keys.add(`otp:verify:fail:${h}:${ipHash}`);
+    } else {
+      keys.add(`otp:request:email:${h}`);
+      keys.add(`otp:verify:email:lock:${h}:${ipHash}`);
+      keys.add(`otp:verify:email:fail:${h}:${ipHash}`);
+    }
   }
   try {
     execFileSync(

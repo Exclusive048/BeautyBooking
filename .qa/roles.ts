@@ -28,6 +28,21 @@ export type Role = {
   index: number;
   label: string;
   phone: string;
+  /**
+   * QA-HARNESS-EMAIL-01 — the SAME account's email identity.
+   *
+   * These are not new fixtures: every showcase account already carries an
+   * email in the seeds (`UserProfile.email`), so the registry only surfaces
+   * what is on disk — `prisma/seeds/` is untouched. That matters because email
+   * login resolves the profile by `UserProfile.email` @unique, i.e. logging in
+   * by email lands on the very same row (and the same `expectedLanding`) as
+   * logging in by phone. `emailVerifiedAt` is NOT required by the login path.
+   *
+   * Elena's is a real-looking external address rather than a
+   * `@test.masterryadom.local` one — that is what makes the dev mail sink a
+   * safety property and not just a speed one (see docker-compose.dev.yml).
+   */
+  email: string;
   roles: string;
   expectedLanding: string;
   landingNote?: string;
@@ -39,6 +54,7 @@ export const ROLES: Role[] = [
     index: 1,
     label: "Master (independent)",
     phone: "+79991000000",
+    email: "seed-master-anna-sokolova@test.masterryadom.local",
     roles: "CLIENT, MASTER",
     expectedLanding: "/cabinet/master/dashboard",
     landingNote: "Anna Sokolova — Provider type MASTER, studioId NULL.",
@@ -48,6 +64,7 @@ export const ROLES: Role[] = [
     index: 2,
     label: "Studio admin",
     phone: "+79992000000",
+    email: "seed-studio-vision@test.masterryadom.local",
     roles: "CLIENT, STUDIO, STUDIO_ADMIN",
     expectedLanding: "/cabinet/studio",
     landingNote: "Victoria Almazova — owner of Vision studio.",
@@ -57,6 +74,7 @@ export const ROLES: Role[] = [
     index: 3,
     label: "Master in studio",
     phone: "+79993000000",
+    email: "seed-master-vision-marina-lebedeva-1@test.masterryadom.local",
     roles: "CLIENT, MASTER",
     expectedLanding: "/cabinet/master/dashboard",
     landingNote:
@@ -67,6 +85,7 @@ export const ROLES: Role[] = [
     index: 4,
     label: "Client",
     phone: "+79995000000",
+    email: "elena.petrova.91@yandex.ru",
     roles: "CLIENT",
     expectedLanding: "/cabinet/profile",
     landingNote: "Elena Petrova — pure client.",
@@ -76,6 +95,7 @@ export const ROLES: Role[] = [
     index: 5,
     label: "Site admin",
     phone: "+79994000000",
+    email: "seed-admin-platform@test.masterryadom.local",
     roles: "CLIENT, ADMIN",
     expectedLanding: "/admin",
     landingNote:
@@ -88,6 +108,7 @@ export const ROLES: Role[] = [
     index: 6,
     label: "Billing FREE master",
     phone: "+79000009001",
+    email: "seed-master-billing-free-master@test.masterryadom.local",
     roles: "CLIENT, MASTER",
     expectedLanding: "/cabinet/master/dashboard",
     landingNote: "MASTER_FREE ACTIVE — lower-tier gating baseline (billing-free-master).",
@@ -97,6 +118,7 @@ export const ROLES: Role[] = [
     index: 7,
     label: "Billing PREMIUM master",
     phone: "+79000009002",
+    email: "seed-master-billing-premium-master@test.masterryadom.local",
     roles: "CLIENT, MASTER",
     expectedLanding: "/cabinet/master/dashboard",
     landingNote: "MASTER_PREMIUM ACTIVE — completes FREE/PRO(Anna)/PREMIUM triad (billing-premium-master).",
@@ -106,6 +128,7 @@ export const ROLES: Role[] = [
     index: 8,
     label: "Billing grace master",
     phone: "+79000009003",
+    email: "seed-master-billing-grace-master@test.masterryadom.local",
     roles: "CLIENT, MASTER",
     expectedLanding: "/cabinet/master/dashboard",
     landingNote: "MASTER_PRO PAST_DUE + graceUntil>now — HARDENING-03 grace KEEPS access (billing-grace-master).",
@@ -115,6 +138,7 @@ export const ROLES: Role[] = [
     index: 9,
     label: "Billing expired master",
     phone: "+79000009004",
+    email: "seed-master-billing-expired-master@test.masterryadom.local",
     roles: "CLIENT, MASTER",
     expectedLanding: "/cabinet/master/dashboard",
     landingNote: "MASTER_PRO EXPIRED — access LOST (billing-expired-master).",

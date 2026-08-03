@@ -37,6 +37,48 @@ services:
     volumes:
       - redis_dev_data:/data
 
+  # QA-HARNESS-EMAIL-01 — local mail sink (mailhog-class). Dev/QA only; the
+  # production stack is unaffected (real SMTP is a provisioning item there).
+  #
+  # Why this exists at all — two measured facts, not a preference:
+  #
+  #  1. **Speed.** `POST /api/auth/otp/email/request` writes the `OtpCode` row
+  #     BEFORE it `await`s `sendEmail`, but it awaits it before responding — and
+  #     `login-client.tsx` only advances to the OTP step on that response. With
+  #     an unreachable SMTP host the request measured **23.0 s / 21.1 s**, so
+  #     every cold email login paid ~21 s of dead wait. The closed deploy is
+  #     email-only, so that is the cost of *every* prod-like QA login.
+  #
+  #  2. **Safety.** `.env` points SMTP at a REAL public host (smtp.yandex.ru)
+  #     with real credentials. On any dev machine where that host IS reachable,
+  #     cold email QA runs would send real mail — and one seeded identity
+  #     (`elena.petrova.91@yandex.ru`) is an external-looking address, not a
+  #     `@test.masterryadom.local` one. A sink makes dev delivery inert by
+  #     construction rather than by luck of the network.
+  #
+  # Point dev SMTP at it (`.env.local`, gitignored — no auth, no TLS):
+  #   SMTP_HOST=localhost
+  #   SMTP_PORT=1025
+  #   SMTP_USER=dev
+  #   SMTP_PASS=dev
+  # `isEmailConfigured()` requires HOST+USER+PASS to be non-empty, hence the
+  # dummy credentials — mailpit accepts anything by default.
+  #
+  # Web UI: http://localhost:8025 (inspect delivered mail; the QA harness does
+  # NOT read it — `recoverOtp` brute-forces the codeHash from Postgres and stays
+  # independent of both logs and mailbox).
+  mailpit:
+    container_name: masterryadom-mailpit
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "500"
+
 volumes:
   pgdata:
     name: pgdata
