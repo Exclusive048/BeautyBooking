@@ -8,8 +8,9 @@ export const runtime = "nodejs";
 
 /**
  * FIX-YANDEX-OAUTH — disconnect Yandex, bespoke-parallel to api/auth/vk/unlink.
- * Disable rather than delete (audit re-connects); tokens zeroed to prevent
- * stale refreshes.
+ * Disable rather than delete (audit re-connects).
+ *
+ * RKN-FIX-12: token-zeroing removed — no token columns remain to zero.
  */
 export async function POST(req: Request) {
   try {
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
 
     await prisma.yandexLink.updateMany({
       where: { userId: user.id },
-      data: { isEnabled: false, accessToken: "", refreshToken: "" },
+      data: { isEnabled: false },
     });
 
     return jsonOk({ unlinked: true });

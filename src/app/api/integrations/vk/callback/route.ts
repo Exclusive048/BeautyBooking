@@ -34,13 +34,8 @@ function clearVkCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   });
 }
 
-async function upsertVkLink(params: {
-  userId: string;
-  vkUserId: string;
-  accessToken: string;
-  refreshToken: string;
-  deviceId: string;
-}) {
+/** RKN-FIX-12: identity only — provider tokens are never persisted. */
+async function upsertVkLink(params: { userId: string; vkUserId: string; deviceId: string }) {
   const existing = await prisma.vkLink.findUnique({
     where: { vkUserId: params.vkUserId },
     select: { userId: true },
@@ -55,15 +50,11 @@ async function upsertVkLink(params: {
     create: {
       userId: params.userId,
       vkUserId: params.vkUserId,
-      accessToken: params.accessToken,
-      refreshToken: params.refreshToken,
       deviceId: params.deviceId,
       isEnabled: true,
     },
     update: {
       vkUserId: params.vkUserId,
-      accessToken: params.accessToken,
-      refreshToken: params.refreshToken,
       deviceId: params.deviceId,
       isEnabled: true,
     },
@@ -128,8 +119,6 @@ export async function GET(req: Request) {
     await upsertVkLink({
       userId: auth.user.id,
       vkUserId: profile.id,
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
       deviceId: token.deviceId,
     });
 

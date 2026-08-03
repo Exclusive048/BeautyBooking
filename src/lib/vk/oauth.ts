@@ -4,7 +4,8 @@ import { getVkClientId, getVkClientSecret, getVkRedirectUri } from "@/lib/vk/con
 const VK_ID_AUTHORIZE_URL = "https://id.vk.ru/authorize";
 const VK_ID_TOKEN_URL = "https://id.vk.ru/oauth2/auth";
 const VK_ID_USER_INFO_URL = "https://id.vk.ru/oauth2/user_info";
-const VK_ID_LOGOUT_URL = "https://id.vk.ru/oauth2/logout";
+// RKN-FIX-12: the logout endpoint constant went with `logoutVkSession` — see
+// the note at the bottom of this file.
 
 type VkIdTokenSuccess = {
   access_token: string;
@@ -213,68 +214,19 @@ export async function fetchVkProfile(accessToken: string): Promise<VkProfile> {
   };
 }
 
-export async function refreshVkToken(input: {
-  refreshToken: string;
-  deviceId: string;
-  state: string;
-}): Promise<VkTokenPayload> {
-  const clientId = getVkClientId();
-  if (!clientId) {
-    throw new AppError("VK ID client id is not configured", 500, "VK_ID_CLIENT_ID_MISSING");
-  }
-
-  const body = new URLSearchParams();
-  body.set("grant_type", "refresh_token");
-  body.set("refresh_token", input.refreshToken);
-  body.set("client_id", clientId);
-  body.set("device_id", input.deviceId);
-  body.set("state", input.state);
-
-  const res = await fetch(VK_ID_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  const json = (await res.json().catch(() => null)) as VkIdTokenResponse | null;
-  if (!json) {
-    throw new AppError("VK ID refresh failed", 502, "VK_ID_TOKEN_REFRESH_FAILED");
-  }
-
-  if ("error" in json) {
-    throw resolveTokenError(json);
-  }
-
-  if (!res.ok) {
-    throw new AppError("VK ID refresh failed", 502, "VK_ID_TOKEN_REFRESH_FAILED", json);
-  }
-
-  if (!json.access_token || !json.refresh_token) {
-    throw new AppError("VK ID refresh response is incomplete", 502, "VK_ID_TOKEN_REFRESH_FAILED", json);
-  }
-
-  return {
-    accessToken: json.access_token,
-    refreshToken: json.refresh_token,
-    deviceId: json.device_id ?? input.deviceId,
-    expiresIn: json.expires_in,
-  };
-}
-
-export async function logoutVkSession(input: { accessToken: string }): Promise<boolean> {
-  const clientId = getVkClientId();
-  if (!clientId) {
-    throw new AppError("VK ID client id is not configured", 500, "VK_ID_CLIENT_ID_MISSING");
-  }
-
-  const body = new URLSearchParams();
-  body.set("client_id", clientId);
-  body.set("access_token", input.accessToken);
-
-  const res = await fetch(VK_ID_LOGOUT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-
-  return res.ok;
-}
+/**
+ * RKN-FIX-12 — `refreshVkToken` and `logoutVkSession` were removed here.
+ *
+ * Both took a STORED provider token as input, and `VkLink` no longer keeps
+ * one. `refreshVkToken` already had zero callers when the audit ran (dead
+ * since it was written); `logoutVkSession` had exactly one, a best-effort call
+ * on integration-disable whose only purpose was revoking the token we
+ * ourselves persisted. Deleting them keeps the "no provider token at rest"
+ * property enforceable: there is no longer a helper whose signature invites
+ * someone to store one again.
+ *
+ * If a future feature genuinely needs to act on a user's behalf (e.g. a VK
+ * flow that is NOT the planned Bot-API delivery, which runs on a community
+ * token), re-introduce them together with encryption at rest — see the
+ * RKN-FIX-12 report and the key-rotation backlog item.
+ */

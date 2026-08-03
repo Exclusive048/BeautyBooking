@@ -2,8 +2,20 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
-import { logoutVkSession } from "@/lib/vk/oauth";
 
+/**
+ * RKN-FIX-12 — this route used to follow the local disable with a best-effort
+ * `logoutVkSession(link.accessToken)`, and that call was the ONLY reader of a
+ * stored provider token anywhere in the codebase.
+ *
+ * It was dropped together with the column, because its purpose was circular:
+ * the VK-side session it revoked was the one belonging to the access token WE
+ * were holding. With nothing held, there is nothing to revoke — and the leak
+ * surface it created (a live third-party credential at rest, for every linked
+ * user, forever, never refreshed) far outweighed a courtesy call that was
+ * already declared optional and swallowed on failure. The user's own VK
+ * authorization remains revocable from VK's app settings, as before.
+ */
 export async function POST() {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
@@ -11,7 +23,7 @@ export async function POST() {
   try {
     const link = await prisma.vkLink.findUnique({
       where: { userId: auth.user.id },
-      select: { id: true, accessToken: true, isEnabled: true },
+      select: { id: true, isEnabled: true },
     });
 
     if (!link) {
@@ -23,12 +35,6 @@ export async function POST() {
         where: { id: link.id },
         data: { isEnabled: false },
       });
-    }
-
-    try {
-      await logoutVkSession({ accessToken: link.accessToken });
-    } catch {
-      // optional logout, ignore errors
     }
 
     return ok({ enabled: false });

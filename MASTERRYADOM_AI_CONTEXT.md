@@ -8,7 +8,7 @@
 >
 > **Смежные документы (этот файл их НЕ дублирует, а ссылается):** правила кода — [`CLAUDE.md`](CLAUDE.md); чеклист коммита — [`docs/QUALITY-GATES.md`](docs/QUALITY-GATES.md); мета-уроки процесса — [`docs/SPRINT-PATTERNS.md`](docs/SPRINT-PATTERNS.md); дизайн — `.claude/skills/ui-ux-pro-max/SKILL.md`; открытые задачи — [`BACKLOG.md`](BACKLOG.md); QA-ledger — [`QA-FINDINGS.md`](QA-FINDINGS.md).
 >
-> **Счётчики (примерно; сверять с исходниками):** моделей ~67 · enum'ов 37 · миграций 24 (последняя `20260707221738_renewal_price_optin`; источник — `prisma/schema/migrations/`) · test-файлов ~117 (~875 тестов; `npm run test`) · error-codes ~130 (`src/lib/api/errors.ts`).
+> **Счётчики (примерно; сверять с исходниками):** моделей ~67 · enum'ов 37 · миграций 27 (последняя `20260803094523_rkn_fix_12_drop_oauth_tokens`; источник — `prisma/schema/migrations/`) · test-файлов ~158 (~1478 тестов; `npm run test`) · error-codes ~130 (`src/lib/api/errors.ts`).
 >
 > **Стадия:** MVP-plus, активная pre-launch подготовка. Ветка `predeploy`. Round 1 + Round 2 self-QA пройдены (booking / billing / catalog / timezone / auth-CSP закрыты). Остаток до launch — преимущественно **operational** (deploy/ops — см. §8).
 >
@@ -124,6 +124,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **`City`** — auto-grow из геокодера (`autoCreated`); `Provider.cityId` — `onDelete: Restrict`.
 - **`Provider`** — дублирующие rating-поля (`rating`/`ratingAvg`, `reviews`/`ratingCount`) — техдолг, см. §8.
 - **`Booking.startAt`/`endAt`** — deprecated, канон `startAtUtc`/`endAtUtc` (инв. #1).
+- **`VkLink` / `YandexLink` — токенов провайдера НЕ хранят** (RKN-FIX-12, миграция `20260803094523`). Только identity: `vkUserId` + `deviceId` / `yandexUserId` + `isEnabled`. Токен из code-exchange живёт в локальной переменной callback'а (им дёргается профиль) и никуда не пишется. Возвращать колонки нельзя — пин `src/lib/auth/provider-tokens-at-rest.test.ts`.
 - Уникальности и каскады, на которые опираются инварианты: #2 `OtpCode.codeHash` · #3 `RefreshSession.jti` · #4 `BillingPayment.idempotenceKey` · #7 `MasterService` · #8 `UserSubscription` · #9 `HotSlot` · #12 `MediaAssetEmbedding.vector(256)` · #16 `AdminAuditLog.adminUserId onDelete Restrict` · #17 `Review` soft-delete. Полные определения — §12 + схема.
 
 ---
@@ -263,6 +264,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **P2002 re-read-on-conflict** — параллельные create'ы на `@unique` полях восстанавливаются re-read'ом winner-строки, не падают: `detect-city` · `conversation-slug` · email-OTP login (`resolveEmailLoginProfile`, 6-й site — `UserProfile.email`) · phone-OTP login (`resolvePhoneLoginProfile`, 7-й site — `UserProfile.phone`; идемпотентно, mirror email — QA-PREP-01).
 - **Security headers / CSP** (`next.config.ts` + `proxy.ts`): X-Frame-Options DENY, nosniff, Referrer-Policy, Permissions-Policy; prod — HSTS + CSP (nonce + strict-dynamic, без unsafe-inline/eval); JSON-LD экранирует `<` (`safeJsonLd`).
 - **Секреты** — JWT/OTP HMAC-SHA256; refresh в БД (jti), cookie httpOnly+SameSite=lax+secure.
+- **Секреты at-rest (RKN-FIX-12, перепись всех колонок)** — **OAuth-токенов провайдеров в БД нет вообще**: `VkLink`/`YandexLink` держат только identity, токен из code-exchange не персистится (минимизация вместо шифрования — колонки дропнуты, а не зашифрованы; guard `provider-tokens-at-rest.test.ts`). Остальное: `OtpCode.codeHash` HMAC (инв. #2) · `TelegramLinkToken.tokenHash` SHA-256 от 32 случайных байт, TTL 20 мин · `RefreshSession.jti` — идентификатор, не bearer · `PushSubscription.{p256dh,auth}` — сырые по необходимости web-push (p256dh публичный; `auth` нужен на каждое сообщение), импакт утечки — спуфинг push на устройство, не доступ к аккаунту.
 - Остаточно: нет kid/ротации JWT-секрета; IP-allowlist webhook пока log-only.
 
 ---

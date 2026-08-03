@@ -254,16 +254,24 @@ model TelegramLinkToken {
   user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// RKN-FIX-12: identity link only — NO provider tokens are stored.
+///
+/// `accessToken`/`refreshToken` used to live here in plaintext. The audit found
+/// them write-only: the profile fetch during the callback uses the FRESH token
+/// from the code exchange (a local variable), `refreshVkToken` had zero callers,
+/// and the single reader — a best-effort `logoutVkSession` on integration
+/// disable — only existed to revoke the very token we were storing. Circular:
+/// remove the storage and there is nothing left to revoke. Not storing a live
+/// third-party credential beats encrypting one.
+///
+/// `deviceId` is retained: it is not a secret, and it is the VK-ID device
+/// binding that a future refresh flow would need re-issued alongside a token.
 model VkLink {
   id String @id @default(cuid())
 
   userId String @unique
 
   vkUserId String @unique
-
-  accessToken String
-
-  refreshToken String
 
   deviceId String
 
@@ -277,18 +285,16 @@ model VkLink {
 }
 
 // FIX-YANDEX-OAUTH: Yandex ID auth link, bespoke-parallel to VkLink. No
-// deviceId (Yandex OAuth2 has none). isEnabled kept for parity (unlink = disable
-// + zeroed tokens, same as VK).
+// deviceId (Yandex OAuth2 has none). isEnabled kept for parity.
+/// RKN-FIX-12: identity link only — NO provider tokens are stored (same
+/// reasoning as VkLink above; Yandex tokens had zero read sites at all, and
+/// there is no Yandex refresh/logout helper in the codebase).
 model YandexLink {
   id String @id @default(cuid())
 
   userId String @unique
 
   yandexUserId String @unique
-
-  accessToken String
-
-  refreshToken String
 
   isEnabled Boolean @default(true)
 

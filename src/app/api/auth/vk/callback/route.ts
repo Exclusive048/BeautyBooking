@@ -48,13 +48,12 @@ function buildDisplayName(firstName?: string | null, lastName?: string | null) {
   return fullName || null;
 }
 
-async function upsertVkLink(params: {
-  userId: string;
-  vkUserId: string;
-  accessToken: string;
-  refreshToken: string;
-  deviceId: string;
-}) {
+/**
+ * RKN-FIX-12: persists the IDENTITY of the link only. The provider tokens from
+ * the code exchange stay in the caller's local scope (they are what
+ * `fetchVkProfile` is called with) and are never written to the database.
+ */
+async function upsertVkLink(params: { userId: string; vkUserId: string; deviceId: string }) {
   const existing = await prisma.vkLink.findUnique({
     where: { vkUserId: params.vkUserId },
     select: { userId: true },
@@ -69,15 +68,11 @@ async function upsertVkLink(params: {
     create: {
       userId: params.userId,
       vkUserId: params.vkUserId,
-      accessToken: params.accessToken,
-      refreshToken: params.refreshToken,
       deviceId: params.deviceId,
       isEnabled: true,
     },
     update: {
       vkUserId: params.vkUserId,
-      accessToken: params.accessToken,
-      refreshToken: params.refreshToken,
       deviceId: params.deviceId,
       isEnabled: true,
     },
@@ -172,8 +167,6 @@ export async function GET(req: Request) {
         await upsertVkLink({
           userId: sessionUser.id,
           vkUserId,
-          accessToken: token.accessToken,
-          refreshToken: token.refreshToken,
           deviceId: token.deviceId,
         });
 
@@ -289,8 +282,6 @@ export async function GET(req: Request) {
       await upsertVkLink({
         userId: user.id,
         vkUserId,
-        accessToken: token.accessToken,
-        refreshToken: token.refreshToken,
         deviceId: token.deviceId,
       });
 

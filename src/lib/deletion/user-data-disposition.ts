@@ -50,12 +50,19 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
   // ── Auth artefacts and tokens: nothing here has a retention justification ──
   telegramLink: { kind: "DELETED", reason: "delete-account: OAuth-adjacent link + tokens" },
   telegramLinkTokens: { kind: "DELETED", reason: "delete-account: single-use linking tokens" },
-  vkLink: { kind: "DELETED", reason: "delete-account: VK id + access/refresh tokens" },
+  vkLink: {
+    kind: "DELETED",
+    reason:
+      "delete-account: VK id + device binding. RKN-FIX-12 removed the access/refresh " +
+      "token columns entirely (write-only in practice), so this row no longer carries " +
+      "a third-party credential — only the link identity",
+  },
   yandexLink: {
     kind: "DELETED",
     reason:
-      "delete-account: Yandex id + access/refresh tokens. RKN-FIX-03-A closed this gap — " +
-      "it was the only link left behind when Yandex OAuth was added",
+      "delete-account: Yandex id. RKN-FIX-03-A closed this gap — it was the only link " +
+      "left behind when Yandex OAuth was added; RKN-FIX-12 then dropped its token " +
+      "columns (zero read sites), shrinking what deletion has to reach",
   },
   refreshSessions: {
     kind: "ANONYMIZED",

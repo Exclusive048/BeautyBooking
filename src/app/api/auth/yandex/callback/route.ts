@@ -48,12 +48,11 @@ function buildDisplayName(firstName?: string | null, lastName?: string | null) {
   return fullName || null;
 }
 
-async function upsertYandexLink(params: {
-  userId: string;
-  yandexUserId: string;
-  accessToken: string;
-  refreshToken: string;
-}) {
+/**
+ * RKN-FIX-12: identity only — the token from the code exchange is used for
+ * `fetchYandexProfile` in the caller's scope and never persisted.
+ */
+async function upsertYandexLink(params: { userId: string; yandexUserId: string }) {
   const existing = await prisma.yandexLink.findUnique({
     where: { yandexUserId: params.yandexUserId },
     select: { userId: true },
@@ -68,14 +67,10 @@ async function upsertYandexLink(params: {
     create: {
       userId: params.userId,
       yandexUserId: params.yandexUserId,
-      accessToken: params.accessToken,
-      refreshToken: params.refreshToken,
       isEnabled: true,
     },
     update: {
       yandexUserId: params.yandexUserId,
-      accessToken: params.accessToken,
-      refreshToken: params.refreshToken,
       isEnabled: true,
     },
   });
@@ -137,8 +132,6 @@ export async function GET(req: Request) {
         await upsertYandexLink({
           userId: sessionUser.id,
           yandexUserId,
-          accessToken: token.accessToken,
-          refreshToken: token.refreshToken,
         });
 
         // Session-link: registers nobody, so never blocked — flags honoured if
@@ -246,8 +239,6 @@ export async function GET(req: Request) {
       await upsertYandexLink({
         userId: user.id,
         yandexUserId,
-        accessToken: token.accessToken,
-        refreshToken: token.refreshToken,
       });
 
       // Registration + repeat login share this write (no-op unless a document

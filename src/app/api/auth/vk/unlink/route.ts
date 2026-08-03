@@ -8,8 +8,10 @@ export const runtime = "nodejs";
 
 /**
  * Disconnect VK. We disable rather than delete so we can audit
- * subsequent re-connects. Tokens are zeroed to prevent stale refreshes
- * from succeeding.
+ * subsequent re-connects.
+ *
+ * RKN-FIX-12: the token-zeroing that used to accompany this is gone — there
+ * are no token columns left to zero. Nothing else about the flow changed.
  */
 export async function POST(req: Request) {
   try {
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
 
     await prisma.vkLink.updateMany({
       where: { userId: user.id },
-      data: { isEnabled: false, accessToken: "", refreshToken: "" },
+      data: { isEnabled: false },
     });
 
     return jsonOk({ unlinked: true });
