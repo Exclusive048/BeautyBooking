@@ -30,6 +30,7 @@
 
 - **🚩 `YOOKASSA_WEBHOOK_TOKEN` — ДО первого старта.** Прод-инстанс с включёнными платежами (`YOOKASSA_SHOP_ID` + `YOOKASSA_SECRET_KEY` заданы) и без токена **не стартует** — это by design (раньше молча деградировал до одного warn'а). Порядок: завести секрет → прописать `?token=<value>` в URL вебхука в ЛК ЮКассы → деплоить. Поднять прод **без** платежей можно, сняв обе YooKassa-переменные. ⚠️ Токен — дешёвый URL pre-filter, **не** якорь подлинности (её держит worker API re-fetch, инв. #5). *(Источник: HARDENING-MISC-01, коммит `e36d9d1`.)*
 - **🚩 SMS → PHONE_AUTH, именно в этом порядке.** Сначала `SMS_PROVIDER_ENABLED=true` + `SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` + баланс SMSC + smoke по RU-операторам; **только потом** `PHONE_AUTH_ENABLED=true`. Обратный порядок включит вход по телефону без канала доставки кода. *(Источник: AUTH-GATE-01.)*
+  > ✅ **Порядок теперь ПРИНУДИТЕЛЬНЫЙ (QA-003, 2026-08-03):** `PHONE_AUTH_ENABLED=true` в production при ненастроенном SMS-провайдере → **отказ на старте** (env-refine в `src/lib/env.ts`, тесты `src/lib/env/phone-auth-sms-guard.test.ts`). Override-флага нет. Ниже — почему.
   > ⚠️ **И это не только про UX.** Mock-SMS-провайдер (`src/lib/sms/mock-provider.ts`) логирует тело сообщения **вместе с OTP и без прод-гварда** — он выбирается флагом `SMS_PROVIDER_ENABLED=false`, а не проверкой окружения. Сам роут `otp/request` код в проде уже не пишет (`...(isProduction ? {} : { code })`), так что сегодня утечки нет — её предотвращает **только** то, что `PHONE_AUTH_ENABLED` по умолчанию выключен в проде. Комбинация «прод + SMS off + PHONE_AUTH on» = plaintext-OTP в проде. Не включать `PHONE_AUTH_ENABLED`, пока SMS-провайдер не настоящий. *(Источник: BACKLOG-TRIAGE-01, sweep-находка.)*
 - **🚩 `TRUSTED_PROXY_HOPS`** (+ опц. `TRUSTED_REAL_IP_HEADER`) — под реальный prod-edge. **Не YooKassa-специфично:** переменная кормит `extractClientIp` → ключи rate-limit на всех sensitive-роутах (OTP request/verify, delete-account, catalog search, favorites). Плюс OTP verify-lockout scoped на (identity + client-IP): при мисконфиге всё деградирует до per-identity (не хуже прежнего), но targeted-lockout-защита работает только при корректном IP. **Флип `YOOKASSA_IP_ALLOWLIST_ENFORCED=true` из чеклиста УБРАН** — ратифицировано PAY-SEC-01: allowlist остаётся log-only навсегда. *(Источник: HARDENING-08 / FIX-SECURITY-MISC-01 O2 / PAY-SEC-01.)*
 
@@ -89,6 +90,23 @@
 - **Source-maps для GlitchTip** — server-стеки без них нечитаемы (deferred DevOps-шаг).
 - **Мониторинг** — по разделу из `DEPLOY_GUIDE.md` (см. предупреждение о его устарелости в шапке).
 - **Snapshot `.qa/snapshots/post-seed.dump`** — local-only dev-baseline, **не прод-артефакт**, в коммиты не попадает. Регенерировать локально только после изменения схемы/seed.
+
+---
+
+## 3.1. Базовый прогон production-билда — есть (QA-003, 2026-08-03)
+
+Собранный артефакт **впервые прогнан вживую** (`npm run build` → `output: standalone` → `node .next/standalone/server.js`). Что покрыто и зелено:
+
+- `/login` — рендер, cookie-уведомление (SSR-гейт), обе темы; единственный канал — email (phone выключен tri-state'ом, как и задумано в проде);
+- публичные поверхности: `/`, `/catalog`, `/pricing`, `/privacy`, `/terms`, `/consent`, `/models` — все < 400, `<main>` виден;
+- **полный вход по email-OTP** до приземления в `/cabinet/profile`, затем `/cabinet/settings` с тумблером маркетингового согласия;
+- гостевая бронь без согласия → отказ (FIX-02 работает и в прод-рантайме); `GuestConsentInput` отдаётся в `/api/openapi`.
+
+**Ноль** console-ошибок, page-ошибок и 5xx за весь прогон.
+
+⚠️ **Две особенности локального прод-прогона, которые надо знать:**
+1. **Запуск только через standalone.** `next start` не работает при `output: standalone` — нужен `node .next/standalone/server.js`, и рядом надо положить `.next/static` и `public/` (иначе 404 на ассетах).
+2. **SMTP в локальном `.env` недостижим** → `POST /api/auth/otp/email/request` детерминированно висит **~21 с** (замерено: 21.05/21.03/21.06). На прод-конфиге это не воспроизведётся, но локальные прогоны надо закладывать с запасом по таймауту.
 
 ---
 

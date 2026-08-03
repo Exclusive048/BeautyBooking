@@ -25,6 +25,14 @@ const BASE_ENV: Record<string, string> = {
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
   NEXT_PUBLIC_APP_URL: "https://example.com",
+  // QA-003 pre-step: включённый в проде phone-auth теперь ТРЕБУЕТ настроенного
+  // SMS-провайдера (иначе mock логировал бы plaintext-OTP). Эти тесты про
+  // резолв самого флага, а не про валидность env целиком, поэтому провайдер
+  // добавлен в базовую фикстуру — иначе прод-кейсы падают на новом refine.
+  // Отдельно этот refine покрыт в `env/phone-auth-sms-guard.test.ts`.
+  SMS_PROVIDER_ENABLED: "true",
+  SMS_PROVIDER_LOGIN: "sms-login",
+  SMS_PROVIDER_PASSWORD: "sms-password",
 };
 
 const originalEnv = { ...process.env };

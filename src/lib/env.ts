@@ -305,6 +305,37 @@ const refinedSchema = envSchema
   // держит worker API re-fetch (инв. #5), а `?token=` — дешёвый pre-filter.
   // Требуем его, чтобы pre-filter не выключался молча, а не потому, что на нём
   // что-то держится.
+  // QA-003 pre-step — mock-SMS-провайдер логирует ТЕЛО сообщения вместе с
+  // plaintext-OTP (`src/lib/sms/mock-provider.ts`) и выбирается по
+  // `!isSmsConfigured`, то есть по КОНФИГУ, а не по окружению. Значит связка
+  // «прод + вход по телефону включён + SMS не настроен» = коды подтверждения в
+  // проде уезжают в логи.
+  //
+  // До сих пор от этого защищал только дефолт tri-state `PHONE_AUTH_ENABLED`
+  // (в проде unset ⇒ OFF) плюс строка в чеклисте. Строка в чеклисте — не
+  // enforcement; предыдущая волна ровно этому и научила. Теперь — отказ на старте.
+  //
+  // Override-флага «я знаю, что делаю» намеренно НЕТ: сценарий, в котором
+  // осмысленно хотеть plaintext-OTP в проде, не существует.
+  .refine(
+    (e) => {
+      if (e.NODE_ENV !== "production") return true;
+      // В проде phone-auth включается ТОЛЬКО явным "true" (unset ⇒ OFF).
+      const phoneAuthOn = String(e.PHONE_AUTH_ENABLED ?? "").trim().toLowerCase() === "true";
+      if (!phoneAuthOn) return true;
+      // Зеркалит `isSmsConfigured`: флаг И логин И пароль.
+      const smsConfigured =
+        Boolean(e.SMS_PROVIDER_ENABLED) &&
+        Boolean(e.SMS_PROVIDER_LOGIN) &&
+        Boolean(e.SMS_PROVIDER_PASSWORD);
+      return smsConfigured;
+    },
+    "PHONE_AUTH_ENABLED=true in production requires a configured SMS provider " +
+      "(SMS_PROVIDER_ENABLED=true + SMS_PROVIDER_LOGIN + SMS_PROVIDER_PASSWORD). " +
+      "Without it the app falls back to the MOCK provider, which logs the message body " +
+      "INCLUDING THE PLAINTEXT OTP — a 152-ФЗ secret-in-logs incident. " +
+      "Correct order: configure the SMS provider first, then flip PHONE_AUTH_ENABLED."
+  )
   .refine(
     (e) =>
       e.NODE_ENV !== "production" ||
