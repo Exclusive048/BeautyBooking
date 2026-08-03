@@ -133,18 +133,36 @@ export async function recoverOtp(phone: string): Promise<string> {
 }
 
 /**
- * Clears the OTP request/verify rate-limit keys in Redis so a 5-role serial
- * run never trips OTP_REQUEST_IP_LIMIT (5/60s). Keys mirror otp-rate-limit.ts.
+ * Сбрасывает ключи OTP-рейт-лимита в Redis. Зеркалит `src/lib/auth/otp-rate-limit.ts`.
+ *
+ * ⚠️ GATES-FIX-01 — здесь были ДВА бага, из-за которых сброс работал наполовину:
+ *
+ * 1. **verify-ключи строились без IP-компоненты.** Продукт использует
+ *    `verifyScopeId(identity, ip)` = `sha256(phone) + ":" + sha256(ip)`, а
+ *    харнесс удалял `otp:verify:lock:sha256(phone)` — ключ, которого не
+ *    существует. То есть lock/fail-счётчики не чистились вообще, просто это
+ *    редко всплывало (истекали по TTL).
+ * 2. **Вызов был один на весь прогон.** `OTP_REQUEST_IP_LIMIT = 5/60s`, а
+ *    ролей девять — с шестой роли прогон гарантированно ловил 429. Ровно этот
+ *    симптом и был зафайлен (роли billing-*), и он же убил спеку в RKN-FIX-10.
+ *    Лечится вызовом ПЕРЕД КАЖДЫМ логином (см. `.qa/smoke.spec.ts`).
+ *
+ * Это харнесс-домен: продуктовые лимиты не трогаются, dev-only обхода в
+ * `src/` не появляется. Мы лишь возвращаем окно в исходное состояние между
+ * независимыми логинами — как если бы они шли от разных людей в разное время.
  */
-export function clearOtpRateLimit(phones: string[]): void {
+export function clearOtpRateLimit(phones: string[], ip = "unknown"): void {
   const keys = new Set<string>();
-  // IP counter for localhost (no x-forwarded-for -> "unknown").
-  keys.add(`otp:request:ip:${sha256("unknown")}`);
+  const ipHash = sha256(ip);
+  // Счётчик запросов по IP. На localhost XFF нет → extractClientIp вернёт null
+  // → продукт хеширует строку "unknown".
+  keys.add(`otp:request:ip:${ipHash}`);
   for (const phone of phones) {
     const h = sha256(phone);
     keys.add(`otp:request:phone:${h}`);
-    keys.add(`otp:verify:lock:${h}`);
-    keys.add(`otp:verify:fail:${h}`);
+    // verifyScopeId = `${sha256(identity)}:${sha256(ip)}` — обе половины.
+    keys.add(`otp:verify:lock:${h}:${ipHash}`);
+    keys.add(`otp:verify:fail:${h}:${ipHash}`);
   }
   try {
     execFileSync(

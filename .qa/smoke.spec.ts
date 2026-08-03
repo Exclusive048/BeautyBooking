@@ -1,6 +1,6 @@
-// QA harness — login smoke for all five roles.
+// QA harness — login smoke for every role in the registry.
 //
-// One serial test loops every role so all five are ALWAYS attempted (a single
+// One serial test loops every role so all of them are ALWAYS attempted (a single
 // role's failure never skips the rest). Each role gets a fresh 1440x900
 // context: log in, assert it lands on its correct surface, screenshot, and on
 // success persist storage-state to .qa/auth/<role>.json for reuse by the
@@ -34,7 +34,7 @@ type RoleResult = {
   error?: string;
 };
 
-test("login smoke — all 5 roles", async ({ browser }) => {
+test("login smoke — all roles", async ({ browser }) => {
   mkdirSync(AUTH_DIR, { recursive: true });
   mkdirSync(SHOTS_DIR, { recursive: true });
   clearOtpRateLimit(ROLES.map((r) => r.phone));
@@ -42,6 +42,12 @@ test("login smoke — all 5 roles", async ({ browser }) => {
   const results: RoleResult[] = [];
 
   for (const role of ROLES) {
+    // GATES-FIX-01: сброс окна ПЕРЕД КАЖДОЙ ролью, а не один раз на прогон.
+    // OTP_REQUEST_IP_LIMIT = 5/60s, ролей девять — с шестой прогон гарантированно
+    // ловил 429 (зафайлено как флейк billing-* ролей). Продуктовый лимит не
+    // трогаем: сбрасываем только состояние окна между независимыми логинами.
+    clearOtpRateLimit([role.phone]);
+
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
     const shotRel = path.join(".qa", "screenshots", `${role.key}.png`);

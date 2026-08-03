@@ -34,6 +34,9 @@ const ERROR_CODES = [
   "BUFFER_INVALID",
   "CONFLICT",
   "CONSENT_REQUIRED",
+  // RKN-FIX-18: цель обработки, которую нельзя отозвать тумблером (ПДн/оферта)
+  // — такое намерение маршрутизируется в удаление аккаунта, а не исполняется.
+  "CONSENT_NOT_SELF_REVOCABLE",
   "DATE_INVALID",
   "DAY_INVALID",
   "DURATION_INVALID",

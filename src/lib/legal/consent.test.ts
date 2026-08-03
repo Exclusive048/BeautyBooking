@@ -13,6 +13,7 @@ import { ConsentType } from "@prisma/client";
 const prismaMock = vi.hoisted(() => ({
   userConsent: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
     createMany: vi.fn(),
     updateMany: vi.fn(),
   },
@@ -21,7 +22,13 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
 
-import { recordUserConsents, consentDocumentVersion } from "@/lib/legal/consent";
+import {
+  recordUserConsents,
+  consentDocumentVersion,
+  revokeConsent,
+  isSelfRevocable,
+  getActiveConsent,
+} from "@/lib/legal/consent";
 import { LEGAL_DOCUMENTS } from "@/lib/legal/documents";
 
 const ALL = { terms: true, pdProcessing: true, marketing: true };
@@ -121,7 +128,11 @@ describe("recordUserConsents", () => {
     expect(prismaMock.userConsent.updateMany).not.toHaveBeenCalled();
   });
 
-  it("re-consent after a withdrawal revives the revoked row with a fresh timestamp", async () => {
+  it("re-consent after a withdrawal inserts a NEW row and leaves the revoked one untouched", async () => {
+    // RKN-FIX-18 — этот тест раньше пинил ПРОТИВОПОЛОЖНОЕ поведение
+    // («оживить отозванную строку со свежим agreedAt»). Оживление стирало
+    // исходную дату согласия и сам факт отзыва, то есть ровно то, что
+    // journal и должен доказывать. Теперь отозванная строка неприкосновенна.
     prismaMock.userConsent.findMany.mockResolvedValue([
       {
         id: "c1",
@@ -138,11 +149,38 @@ describe("recordUserConsents", () => {
       userAgent: "UA2",
     });
 
+    // Новая строка — с новыми IP/UA и текущей версией документа.
+    expect(createdRows()).toEqual([
+      expect.objectContaining({
+        consentType: ConsentType.MARKETING,
+        documentVersion: LEGAL_DOCUMENTS.MARKETING.version,
+        ipAddress: "9.9.9.9",
+        userAgent: "UA2",
+      }),
+    ]);
+    // И НИ ОДНОГО update: история отзыва остаётся как была.
+    expect(prismaMock.userConsent.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("активная строка блокирует повторную запись, отозванная — нет", async () => {
+    // Обе строки одной цели: активная свежей версии + отозванная той же версии.
+    prismaMock.userConsent.findMany.mockResolvedValue([
+      {
+        id: "active",
+        consentType: ConsentType.MARKETING,
+        documentVersion: LEGAL_DOCUMENTS.MARKETING.version,
+        revokedAt: null,
+      },
+    ]);
+
+    await recordUserConsents({
+      userId: "u1",
+      flags: { terms: false, pdProcessing: false, marketing: true },
+    });
+
+    // Уже согласен и не отзывал — писать нечего.
     expect(prismaMock.userConsent.createMany).not.toHaveBeenCalled();
-    const [call] = prismaMock.userConsent.updateMany.mock.calls;
-    expect(call[0].where).toEqual({ id: { in: ["c1"] } });
-    expect(call[0].data).toMatchObject({ revokedAt: null, ipAddress: "9.9.9.9", userAgent: "UA2" });
-    expect(call[0].data.agreedAt).toBeInstanceOf(Date);
+    expect(prismaMock.userConsent.updateMany).not.toHaveBeenCalled();
   });
 
   it("never throws into the login flow when the write fails", async () => {
@@ -163,5 +201,97 @@ describe("consentDocumentVersion", () => {
     // consent act is PD_PROCESSING. Recording it would be a silent mistake.
     expect(() => consentDocumentVersion(ConsentType.PRIVACY)).toThrow();
     expect(() => consentDocumentVersion(ConsentType.PUBLIC_PROFILE)).toThrow();
+  });
+});
+
+/* ------------------------------------------------------------------------- *
+ * RKN-FIX-18 — отзыв
+ * ------------------------------------------------------------------------- */
+
+describe("revokeConsent", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.userConsent.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("проставляет revokedAt, НЕ удаляя строку", async () => {
+    const count = await revokeConsent({ userId: "u1", consentType: ConsentType.MARKETING });
+
+    expect(count).toBe(1);
+    const [call] = prismaMock.userConsent.updateMany.mock.calls;
+    // Целятся только АКТИВНЫЕ строки этой цели.
+    expect(call[0].where).toEqual({
+      userId: "u1",
+      consentType: ConsentType.MARKETING,
+      revokedAt: null,
+    });
+    // Пишется ТОЛЬКО revokedAt: agreedAt/IP/UA исходного согласия — это и есть
+    // доказательство, их трогать нельзя.
+    expect(Object.keys(call[0].data)).toEqual(["revokedAt"]);
+    expect(call[0].data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("идемпотентен: повторный отзыв не находит активных строк", async () => {
+    prismaMock.userConsent.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      revokeConsent({ userId: "u1", consentType: ConsentType.MARKETING }),
+    ).resolves.toBe(0);
+  });
+
+  it("отзывает ВСЕ активные версии цели, а не одну", async () => {
+    // Документ бампался — активных строк могло остаться несколько.
+    prismaMock.userConsent.updateMany.mockResolvedValue({ count: 2 });
+    await expect(
+      revokeConsent({ userId: "u1", consentType: ConsentType.MARKETING }),
+    ).resolves.toBe(2);
+    // where не сужается версией — отзывается ЦЕЛЬ.
+    expect(prismaMock.userConsent.updateMany.mock.calls[0][0].where).not.toHaveProperty(
+      "documentVersion",
+    );
+  });
+
+  it("ОТКАЗЫВАЕТ для PD_PROCESSING и TERMS — и бросает, а не молчит", async () => {
+    for (const type of [ConsentType.PD_PROCESSING, ConsentType.TERMS]) {
+      await expect(revokeConsent({ userId: "u1", consentType: type })).rejects.toMatchObject({
+        code: "CONSENT_NOT_SELF_REVOCABLE",
+        status: 400,
+      });
+    }
+    // Ни одной записи не произошло.
+    expect(prismaMock.userConsent.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("isSelfRevocable — только MARKETING", () => {
+    expect(isSelfRevocable(ConsentType.MARKETING)).toBe(true);
+    expect(isSelfRevocable(ConsentType.PD_PROCESSING)).toBe(false);
+    expect(isSelfRevocable(ConsentType.TERMS)).toBe(false);
+    expect(isSelfRevocable(ConsentType.PRIVACY)).toBe(false);
+  });
+});
+
+describe("getActiveConsent", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("ищет только неотозванные и берёт самое свежее согласие", async () => {
+    prismaMock.userConsent.findFirst.mockResolvedValue({
+      documentVersion: "1.0",
+      agreedAt: new Date("2026-02-02"),
+    });
+
+    const row = await getActiveConsent("u1", ConsentType.MARKETING);
+    expect(row?.documentVersion).toBe("1.0");
+
+    const [call] = prismaMock.userConsent.findFirst.mock.calls;
+    expect(call[0].where).toEqual({
+      userId: "u1",
+      consentType: ConsentType.MARKETING,
+      revokedAt: null,
+    });
+    expect(call[0].orderBy).toEqual({ agreedAt: "desc" });
+  });
+
+  it("отозванное согласие читается как отсутствующее", async () => {
+    prismaMock.userConsent.findFirst.mockResolvedValue(null);
+    await expect(getActiveConsent("u1", ConsentType.MARKETING)).resolves.toBeNull();
   });
 });

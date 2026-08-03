@@ -234,3 +234,19 @@
 /api/support/partnership
 /api/support/tickets
 /api/visual-search
+
+# ── GATES-FIX-01 (2026-08-03): доведение гейта до зелёного на чистом дереве ──
+# Гейт краснел на HEAD, то есть был выключен де-факто. 8 из 11 роутов
+# задокументированы в spec.ts; эти три — waived, каждый по образцу уже
+# заваленного соседа, чтобы политика была одинаковой для близнецов.
+#
+# reason: internal CSRF handshake для Telegram-логина, который погашен
+# kill-switch'ом (FZ-199). Соседи /auth/telegram/{link,login,unlink} уже здесь.
+/api/auth/telegram/login-init
+# reason: снятие привязки провайдера — не клиентский контракт; ровно так же
+# waived близнец /api/auth/vk/unlink (строка 83).
+/api/auth/yandex/unlink
+# reason: cron-эндпоинт за AVAILABILITY_CRON_TOKEN, вызывается планировщиком,
+# не клиентом. Соседи /billing/renew/run, /billing/mrr/snapshot/run,
+# /health/worker уже здесь.
+/api/catalog/available-today/run

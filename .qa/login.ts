@@ -90,7 +90,28 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
   // (40 s for cold compiles). The QA-003 hydration race can wipe the tree
   // between "consent visible" and a separate `.check()`, which failed ~20% of
   // logins in the PASS-02 stability run; retrying the whole unit absorbs it.
+  const sendCodeButton = page.getByRole("button", { name: /Отправить код/ });
+  const otpFirstBox = page.getByLabel("Цифра 1 из 6");
+
+  // GATES-FIX-01 — ОДНА retry-единица на «ввести телефон → отметить согласия →
+  // отправить код → дождаться OTP-шага».
+  //
+  // Раньше это были два независимых блока, и между ними оставалось окно, в
+  // которое попадала гонка гидратации QA-003:
+  //   • дерево перестраивалось ПЕРЕД кликом → кнопка снова disabled →
+  //     «locator.click: Timeout 20000ms» (роли 1-3, 6-8 в прогоне 2026-08-03);
+  //   • дерево перестраивалось ПОСЛЕ клика → форма сбрасывалась, запрос не
+  //     уходил → OTP-шаг не появлялся, и при этом НИ ОДНОГО HTTP-фейла в
+  //     логе (роль `client` в следующем прогоне) — то есть на 429 это не
+  //     списать, окно лимита было чистым.
+  // Пока обе стадии не пройдены подряд, попытка не засчитывается.
+  //
+  // Повторная отправка безопасна: `recoverOtp` берёт ПОСЛЕДНИЙ неиспользованный
+  // код, а лимит по телефону (3 / 5 мин) ограничивает число попыток сам.
   await expect(async () => {
+    // Уже дошли до OTP-шага на предыдущей итерации — второй код не запрашиваем.
+    if (await otpFirstBox.isVisible().catch(() => false)) return;
+
     await phoneInput.click({ clickCount: 3 });
     await phoneInput.pressSequentially(role.phone, { delay: 25 });
     await expect(requiredConsents).toBeVisible({ timeout: 2000 });
@@ -101,14 +122,25 @@ export async function loginAs(page: Page, role: Role, baseURL: string): Promise<
     }
     await expect(requiredConsents).toBeChecked({ timeout: 1000 });
     await expect(requiredConsentsPd).toBeChecked({ timeout: 1000 });
-  }).toPass({ timeout: 40_000 });
+    // GATES-FIX-01: и, ГЛАВНОЕ, кнопка должна быть РАЗБЛОКИРОВАНА — это
+    // единственный признак того, что React-состояние действительно приняло и
+    // телефон, и оба согласия.
+    //
+    // Раньше проверка заканчивалась на `toBeChecked`, а клик жил ЗА пределами
+    // retry-блока. Гонка гидратации QA-003 успевала перестроить дерево между
+    // этими двумя шагами: чекбоксы сбрасывались, кнопка оставалась disabled, и
+    // клик 20 секунд ждал элемент, который сам по себе уже не включится.
+    // Симптом — «locator.click: Timeout 20000ms exceeded» на роли, у которой с
+    // рейт-лимитом всё в порядке (в прогоне 2026-08-03 так падали роли 1-3 и
+    // 6-8, а 4, 5 и 9 проходили — разброс, несовместимый с версией «кончилось
+    // окно лимита»). Ассерт внутри блока превращает это в обычный ретрай.
+    await expect(sendCodeButton).toBeEnabled({ timeout: 1000 });
 
-  // Step 3 — request the code.
-  await page.getByRole("button", { name: /Отправить код/ }).click();
-
-  // Step 4 — wait for the 6-box OTP step (30 s: the request round-trips and a
-  // cold dev compile of the verify step can be slow).
-  await expect(page.getByLabel("Цифра 1 из 6")).toBeVisible({ timeout: 30_000 });
+    // Steps 3+4 — отправить и дождаться 6-боксового OTP-шага. Внутри той же
+    // попытки: если форму сбросило, следующая итерация начнёт с чистого ввода.
+    await sendCodeButton.click();
+    await expect(otpFirstBox).toBeVisible({ timeout: 30_000 });
+  }).toPass({ timeout: 120_000 });
 
   // Step 5 — recover the plaintext code from the DB and type it. Typing
   // char-by-char lets the component's focus cascade move between boxes

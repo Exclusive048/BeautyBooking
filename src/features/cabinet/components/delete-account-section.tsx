@@ -37,7 +37,12 @@ export function DeleteAccountSection({ phone }: Props) {
 
   return (
     <>
-      <section className="mt-12 border-t border-red-200/40 pt-8 dark:border-red-400/20">
+      {/* RKN-FIX-18: якорь — сюда ведёт указатель из блока согласий, где отзыв
+          ПДн намеренно НЕ сделан тумблером. */}
+      <section
+        id="delete-account"
+        className="mt-12 scroll-mt-24 border-t border-red-200/40 pt-8 dark:border-red-400/20"
+      >
         <h2 className="text-sm font-semibold text-red-500 dark:text-red-400">Удаление аккаунта</h2>
         <p className="mt-1 text-xs text-text-sec">
           Все ваши личные данные будут удалены с платформы безвозвратно в соответствии с

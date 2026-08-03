@@ -94,4 +94,33 @@ describe("инвариант #37 — UserConsent single writer", () => {
     expect(source).toContain("export async function recordGuestConsents");
     expect(source).toContain("isGuestClassProfile");
   });
+
+  it("отзыв — тоже часть единственного writer'а (RKN-FIX-18)", () => {
+    // Отзыв мутирует ту же таблицу, значит на него распространяется тот же
+    // инвариант: снаружи `consent.ts` никто не проставляет `revokedAt`.
+    const source = readFileSync(resolve(WRITER), "utf8");
+    expect(source).toContain("export async function revokeConsent");
+    expect(source).toContain("export function isSelfRevocable");
+    // Граница скоупа зашита в writer, а не в UI: маркетинг отзывается,
+    // ПДн/оферта — нет (это запрос на удаление, FIX-03-B).
+    expect(source).toContain("CONSENT_NOT_SELF_REVOCABLE");
+  });
+
+  it("НИКТО, кроме writer'а, не проставляет revokedAt на UserConsent", () => {
+    // Отдельная проверка от общей: `revokedAt` можно записать и через
+    // `update`, и через `updateMany`, и это ровно тот путь, которым легко
+    // «выключить рассылку» мимо журнала.
+    const offenders: string[] = [];
+    for (const file of files) {
+      const rel = file.slice(resolve(".").length + 1).split(sep).join("/");
+      if (rel === WRITER || isTestFile(rel)) continue;
+      const code = stripComments(readFileSync(file, "utf8"));
+      // Грубо, но по делу: упоминание revokedAt рядом с userConsent-мутацией.
+      if (WRITE_RE.test(code) && /revokedAt/.test(code)) offenders.push(rel);
+    }
+    expect(
+      offenders,
+      `Проставление revokedAt вне ${WRITER}: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
 });

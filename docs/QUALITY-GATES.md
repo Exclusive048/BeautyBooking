@@ -116,7 +116,21 @@ npx prisma migrate dev --name <descriptive_name>   # обязательно: с�
 npx prisma validate
 npx prisma generate
 npm run check:schema-drift                          # обязательно: drift-гейт
+npm run check:migration-drops                       # обязательно: незаявленные DROP
 ```
+
+> 🚨 **ПРОЧИТАЙТЕ СГЕНЕРИРОВАННЫЙ `migration.sql` ЦЕЛИКОМ, прежде чем применять.**
+> `prisma migrate dev` дописывает в **каждую** новую миграцию `DROP INDEX` для
+> объектов, которые Prisma не выражает в датамодели (реестр —
+> `scripts/raw-sql-objects.mjs`). Такое уже происходило трижды подряд
+> (RKN-FIX-12, RKN-FIX-10, RKN-FIX-18), каждый раз строку снимали руками.
+> Гейт `check:migration-drops` теперь ловит это в CI, но прочитать файл дешевле,
+> чем разбираться с красным CI.
+>
+> 🚩 **Любой маркер `-- ALLOW-DROP:` в миграции — красный флаг на ревью:
+> остановиться и проверить обоснование.** Маркер отключает защиту для
+> конкретного объекта в конкретном файле; он законен (осознанный дроп должен
+> быть возможен), но по умолчанию его там быть не должно.
 
 > 🚨 **`prisma db push` ЗАПРЕЩЁН** — обходит migration history и вызывает silent schema drift.
 > Проект попал на 24-операционный drift в мае 2026 (см. MIGRATION-RECONCILIATION-BATCH).

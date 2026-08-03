@@ -149,12 +149,39 @@ describe("buildFilterFingerprint — форма запроса, но не дан
 describe("инструментирование: где след есть и где его намеренно нет", () => {
   const read = (p: string) => readFileSync(resolve(p), "utf8");
 
-  it("четыре bulk-поверхности инструментированы", () => {
+  it("все bulk-поверхности инструментированы (вкл. billing — RKN-FIX-18 pre-step)", () => {
     expect(read("src/features/admin-cabinet/users/server/users.service.ts")).toContain(
       "recordPdAccess",
     );
     expect(read("src/lib/master/clients.service.ts")).toContain("recordPdAccess");
     expect(read("src/lib/studio/clients.service.ts")).toContain("recordPdAccess");
+    // Обе billing-выдачи несут displayName+email+phone плательщика — в
+    // RKN-FIX-10 остались с пометкой ⚠️, закрыты здесь.
+    expect(read("src/features/admin-cabinet/billing/server/payments.service.ts")).toContain(
+      "recordPdAccess",
+    );
+    expect(read("src/features/admin-cabinet/billing/server/subscriptions.service.ts")).toContain(
+      "recordPdAccess",
+    );
+  });
+
+  it("каждый ключ PdAccessSurface действительно используется", () => {
+    // Иначе тип обрастает «обещанными» поверхностями, которых нет в коде —
+    // ровно то состояние, в котором billing-ключи прожили RKN-FIX-10.
+    const owner = read("src/lib/audit/pd-access.ts");
+    const keys = [...owner.matchAll(/\|\s*"([a-z]+\.[a-z.]+)"/g)].map((m) => m[1]);
+    expect(keys.length).toBeGreaterThanOrEqual(5);
+
+    const sources = [
+      "src/features/admin-cabinet/users/server/users.service.ts",
+      "src/lib/master/clients.service.ts",
+      "src/lib/studio/clients.service.ts",
+      "src/features/admin-cabinet/billing/server/payments.service.ts",
+      "src/features/admin-cabinet/billing/server/subscriptions.service.ts",
+    ].map(read).join("\n");
+
+    const unused = keys.filter((k) => !sources.includes(`"${k}"`));
+    expect(unused, `Ключи поверхностей без вызова: ${unused.join(", ")}`).toEqual([]);
   });
 
   it("публичный каталог НЕ инструментирован — это данные, опубликованные самим провайдером", () => {

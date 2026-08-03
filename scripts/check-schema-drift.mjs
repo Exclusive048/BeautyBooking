@@ -17,6 +17,21 @@
  *
  * Mechanism
  * ─────────
+ * GATES-FIX-01 (2026-08-03) — фильтр фантомного дрейфа
+ * ────────────────────────────────────────────────────
+ * Гейт краснел НА ЧИСТОМ HEAD с 2026-07-13: pgvector-индекс `hnsw` живёт в
+ * сыром SQL (Prisma не умеет тип `Hnsw`, см. scripts/raw-sql-objects.mjs), и
+ * diff видел его как «лишний» объект. Всегда-красный гейт — это выключенный
+ * гейт: два месяца отчёты писали «✅» рядом с фактическим ❌.
+ *
+ * Поэтому теперь diff берётся в форме SQL (`--script`), из него выбрасываются
+ * statement'ы, относящиеся к объектам из явного реестра, и дрейфом считается
+ * только ОСТАТОК. Реестр — короткий список ТОЧНЫХ имён, не паттернов.
+ *
+ * Что этот фильтр НЕ покрывает: `migrate dev` всё равно продолжит дописывать
+ * `DROP INDEX` в новые миграции — это ловится вторым гейтом
+ * `check:migration-drops` (scripts/check-migration-drops.mjs).
+ *
  * `npx prisma migrate diff --from-migrations <dir> --to-schema-datamodel <dir> --exit-code`
  *   • exit 0 → no drift (schema matches what migrations would produce)
  *   • exit 2 → drift detected (one or more SQL ops would be needed to align)
@@ -32,6 +47,7 @@
  */
 
 import { execSync } from "node:child_process";
+import { RAW_SQL_OBJECTS, matchesRawSqlObject } from "./raw-sql-objects.mjs";
 
 const SHADOW_URL =
   process.env.SHADOW_DATABASE_URL ||
@@ -44,6 +60,41 @@ function runDiff() {
     `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url "${SHADOW_URL}" --exit-code`,
     { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }
   );
+}
+
+/** Тот же diff, но в виде SQL — единственная форма, которую можно надёжно фильтровать. */
+function runDiffScript() {
+  return execSync(
+    `npx prisma migrate diff --from-migrations prisma/schema/migrations --to-schema-datamodel prisma/schema --shadow-database-url "${SHADOW_URL}" --script`,
+    { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }
+  );
+}
+
+/**
+ * Режет SQL на statement'ы и делит их на «объяснимые реестром» и «настоящий
+ * дрейф». Комментарии (`-- CreateIndex` и пр.) сами по себе statement'ами не
+ * считаются — они приклеиваются к следующему.
+ */
+function classifyDriftSql(sql) {
+  const statements = sql
+    .split(";")
+    .map((chunk) =>
+      chunk
+        .split(/\r?\n/)
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n")
+        .trim()
+    )
+    .filter((chunk) => chunk.length > 0);
+
+  const explained = [];
+  const real = [];
+  for (const statement of statements) {
+    const match = matchesRawSqlObject(statement);
+    if (match) explained.push({ statement, object: match });
+    else real.push(statement);
+  }
+  return { explained, real };
 }
 
 try {
@@ -61,8 +112,40 @@ try {
   const stdout = (error.stdout || "").toString();
 
   if (code === 2) {
+    // GATES-FIX-01: прежде чем кричать — выяснить, весь ли дрейф объясняется
+    // реестром сырых SQL-объектов. Если да, настоящего дрейфа нет.
+    let classified = null;
+    try {
+      classified = classifyDriftSql(runDiffScript());
+    } catch {
+      // Не смогли получить SQL-форму — падаем по-старому, на полном диффе.
+    }
+
+    if (classified && classified.real.length === 0 && classified.explained.length > 0) {
+      console.log(
+        "SCHEMA-DRIFT: OK — расхождений нет; весь дифф объясняется объектами, которые существуют только в сыром SQL:"
+      );
+      for (const { object } of classified.explained) {
+        console.log(`  • ${object.name} (${object.table}) — ${object.why}`);
+        console.log(`    источник: ${object.migration}`);
+      }
+      console.log(
+        `  Реестр: scripts/raw-sql-objects.mjs (${RAW_SQL_OBJECTS.length} объект(ов), точные имена).`
+      );
+      console.log(
+        "  Дроп такого объекта в новой миграции ловит отдельный гейт: npm run check:migration-drops"
+      );
+      process.exit(0);
+    }
+
     console.error("");
     console.error("🚨 SCHEMA DRIFT DETECTED");
+    if (classified && classified.explained.length > 0) {
+      console.error("");
+      console.error(
+        `(${classified.explained.length} statement(s) объяснены реестром сырых SQL-объектов и НЕ учитывались; ниже — настоящий дрейф.)`
+      );
+    }
     console.error("");
     console.error(
       "schema.prisma diverges from migrations history. This typically means"

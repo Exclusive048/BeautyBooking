@@ -6,6 +6,8 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { PdAccessActorType } from "@prisma/client";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import { paymentMethodFromMetadata } from "@/features/admin-cabinet/billing/lib/payment-method-display";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
 
@@ -16,6 +18,12 @@ type ListOpts = {
   cursor?: string | null;
   limit?: number;
   statuses?: SubscriptionStatus[];
+  /**
+   * RKN-FIX-10 / RKN-FIX-18 pre-step — кто читает. Прокидывается страницей
+   * (она держит админскую сессию); сервис не лезет в auth-контекст сам.
+   */
+  actorUserId?: string | null;
+  actorIp?: string | null;
 };
 
 function resolveDisplayName(user: {
@@ -125,6 +133,20 @@ export async function listAdminSubscriptions(
         ? paymentMethodFromMetadata(lastPayment.metadata)
         : null,
     };
+  });
+
+  // RKN-FIX-18 pre-step: подписка несёт идентичность владельца.
+  await recordPdAccess({
+    surface: "admin.billing.subscriptions.list",
+    actorType: PdAccessActorType.ADMIN,
+    actorUserId: opts.actorUserId ?? null,
+    entityType: "UserSubscription",
+    rowCount: items.length,
+    filterFingerprint: buildFilterFingerprint(
+      { cursor: Boolean(opts.cursor), statuses: Boolean(opts.statuses) },
+      { limit },
+    ),
+    ipAddress: opts.actorIp ?? null,
   });
 
   return { items, nextCursor };

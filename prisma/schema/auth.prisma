@@ -162,11 +162,26 @@ model UserConsent {
 
   updatedAt DateTime @updatedAt
 
-  /// Version-scoped: one row per (user, purpose, document version). A version
-  /// bump therefore yields a NEW row on the next login instead of overwriting
-  /// the earlier proof — the history of "what was agreed to, and when" is the
-  /// evidence. Repeat logins on an unchanged version write nothing.
-  @@unique([userId, consentType, documentVersion])
+  /// RKN-FIX-18 — уникальность СНЯТА со схемы и заменена на **partial unique
+  /// index в сыром SQL**: `UNIQUE (userId, consentType, documentVersion)
+  /// WHERE "revokedAt" IS NULL` (миграция `20260803..._rkn_fix_18_consent_withdrawal`,
+  /// реестр `scripts/raw-sql-objects.mjs`).
+  ///
+  /// Почему. Прежний полный `@@unique` разрешал ровно одну строку на версию
+  /// документа — и это заставляло повторное согласие ОЖИВЛЯТЬ отозванную
+  /// строку (revokedAt=null + свежий agreedAt). Оживление стирало историю:
+  /// исходная дата согласия и сам факт отзыва исчезали из доказательной базы,
+  /// хотя именно они и есть предмет доказывания.
+  ///
+  /// Теперь: строки НИКОГДА не оживляются. Отзыв проставляет `revokedAt`
+  /// (строка остаётся), повторное согласие вставляет НОВУЮ строку. Partial
+  /// unique гарантирует на уровне БД «не более одной АКТИВНОЙ строки на
+  /// (user, purpose, version)», а исторических (отозванных) может быть сколько
+  /// угодно — таймлайн «согласился → отозвал → согласился снова»
+  /// восстанавливается полностью.
+  ///
+  /// Prisma partial unique не выражает — отсюда сырой SQL и запись в реестре.
+  @@index([userId, consentType, documentVersion])
   @@index([userId])
 }
 

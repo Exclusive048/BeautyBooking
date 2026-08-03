@@ -5,6 +5,7 @@ import { TelegramNotificationsSection } from "@/features/cabinet/components/tele
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
 import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
 import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
+import { MarketingConsentSection } from "@/features/cabinet/components/marketing-consent";
 import { getSessionUser } from "@/lib/auth/session";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -30,6 +31,11 @@ export default async function SettingsPage() {
             the profile «Связанные аккаунты» card. */}
         <EmailNotificationsSection />
         <PushNotificationsSection />
+        {/* RKN-FIX-18: согласие на маркетинг — ОДИН компонент на все роли
+            (/cabinet/settings в глобальном topbar-меню, как и /cabinet/profile).
+            Стоит рядом с удалением аккаунта намеренно: именно туда
+            маршрутизируется отзыв ПДн, который тумблером не делается. */}
+        <MarketingConsentSection />
       </div>
 
       <DeleteAccountSection phone={user.phone ?? null} />

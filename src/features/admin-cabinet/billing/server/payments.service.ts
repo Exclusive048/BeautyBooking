@@ -5,6 +5,8 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { PdAccessActorType } from "@prisma/client";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import { paymentMethodFromMetadata } from "@/features/admin-cabinet/billing/lib/payment-method-display";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
 
@@ -16,6 +18,12 @@ type ListOpts = {
    * returned in full — typically a handful of rows). */
   historyCursor?: string | null;
   historyLimit?: number;
+  /**
+   * RKN-FIX-10 / RKN-FIX-18 pre-step — кто читает. Прокидывается страницей
+   * (она держит админскую сессию); сервис не лезет в auth-контекст сам.
+   */
+  actorUserId?: string | null;
+  actorIp?: string | null;
 };
 
 function resolveDisplayName(user: {
@@ -140,9 +148,27 @@ export async function listAdminPayments(opts: ListOpts = {}): Promise<{
     ? (historyPage[historyPage.length - 1]?.id ?? null)
     : null;
 
+  const pending = pendingRows.map(toRow);
+  const history = historyPage.map(toRow);
+
+  // RKN-FIX-18 pre-step: платёж несёт идентичность плательщика
+  // (displayName + email + phone), значит это чтение ПДн коллекцией.
+  await recordPdAccess({
+    surface: "admin.billing.payments.list",
+    actorType: PdAccessActorType.ADMIN,
+    actorUserId: opts.actorUserId ?? null,
+    entityType: "BillingPayment",
+    rowCount: pending.length + history.length,
+    filterFingerprint: buildFilterFingerprint(
+      { historyCursor: Boolean(opts.historyCursor) },
+      { limit: historyLimit },
+    ),
+    ipAddress: opts.actorIp ?? null,
+  });
+
   return {
-    pending: pendingRows.map(toRow),
-    history: historyPage.map(toRow),
+    pending,
+    history,
     nextHistoryCursor,
   };
 }

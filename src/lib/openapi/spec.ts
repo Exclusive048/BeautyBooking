@@ -9,6 +9,8 @@ type SchemaObject = {
   maximum?: number;
   maxLength?: number;
   description?: string;
+  /** GATES-FIX-01: валидный OpenAPI-ключ, понадобился для GuestConsentInput.marketing. */
+  default?: string | number | boolean;
   nullable?: boolean;
   oneOf?: SchemaObject[];
   allOf?: SchemaObject[];
@@ -40,6 +42,12 @@ type ResponseObject = {
 
 type OperationObject = {
   summary?: string;
+  /**
+   * GATES-FIX-01: длинное пояснение к эндпоинту. `summary` — одна строка для
+   * списка, `description` — место, где можно сказать то, что клиент обязан
+   * знать (например: «consent обязателен для гостя, хотя поле optional»).
+   */
+  description?: string;
   tags?: string[];
   parameters?: ParameterObject[];
   requestBody?: RequestBodyObject;
@@ -550,6 +558,37 @@ export const openApiSpec = {
           },
         },
       },
+      /**
+       * RKN-FIX-02 — согласия гостя. ВАЖНО про «optional»: поле опционально
+       * потому, что авторизованные клиенты его не шлют (их согласие снято при
+       * регистрации). Для ГОСТЯ оно фактически обязательно — сервер требует
+       * его отдельной проверкой и без обязательных целей отвечает
+       * 400 CONSENT_REQUIRED **до** создания профиля и брони.
+       * Источник истины: `src/lib/legal/consent-flags.ts`.
+       */
+      MarketingConsentState: {
+        type: "object",
+        required: ["enabled", "currentVersion"],
+        properties: {
+          enabled: { type: "boolean", description: "Есть активная (не отозванная) строка согласия" },
+          documentVersion: { type: "string", nullable: true, description: "Версия документа действующего согласия" },
+          agreedAt: { type: "string", format: "date-time", nullable: true },
+          currentVersion: { type: "string", description: "Актуальная версия документа маркетингового согласия" },
+        },
+      },
+      GuestConsentInput: {
+        type: "object",
+        required: ["terms", "pdProcessing"],
+        properties: {
+          terms: { type: "boolean", description: "Пользовательское соглашение (оферта) — обязательно" },
+          pdProcessing: { type: "boolean", description: "Согласие на обработку персональных данных — обязательно" },
+          marketing: {
+            type: "boolean",
+            default: false,
+            description: "Маркетинговые коммуникации — опционально, регистрацию/бронь не гейтит",
+          },
+        },
+      },
       BookingCreateInput: {
         type: "object",
         required: ["providerId", "serviceId", "slotLabel", "clientName", "clientPhone"],
@@ -563,6 +602,30 @@ export const openApiSpec = {
           clientName: { type: "string" },
           clientPhone: { type: "string" },
           comment: { type: "string", nullable: true },
+          consent: { $ref: "#/components/schemas/GuestConsentInput" },
+        },
+      },
+      PackageBookInput: {
+        type: "object",
+        required: ["components", "clientName", "clientPhone"],
+        properties: {
+          components: {
+            type: "array",
+            description: "Слот на КАЖДЫЙ компонент пакета — размещение выбирает клиент, компоненты могут быть в разные дни",
+            items: {
+              type: "object",
+              required: ["serviceId", "startAtUtc"],
+              properties: {
+                serviceId: { type: "string" },
+                masterProviderId: { type: "string", description: "Только для студийного пакета: мастер на этот компонент" },
+                startAtUtc: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          clientName: { type: "string" },
+          clientPhone: { type: "string" },
+          comment: { type: "string", nullable: true },
+          consent: { $ref: "#/components/schemas/GuestConsentInput" },
         },
       },
       BookingCancelInput: {
@@ -2137,6 +2200,44 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/bookings/{id}/decline-reschedule": {
+      post: {
+        summary: "Decline a proposed reschedule (reverts the booking)",
+        description: "Вторая половина двустороннего согласования переноса (инв. #32): другая сторона либо подтверждает через /confirm, либо отклоняет здесь и бронь возвращается к прежнему времени. Один backend для соло-мастера и studio-admin.",
+        tags: ["bookings"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BookingData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Booking not found"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/bookings/package/{id}/cancel": {
+      post: {
+        summary: "Cancel a booking package (whole package only)",
+        description: "Инв. #34: пакет отменяется ТОЛЬКО целиком. Попытка отменить одну составляющую бронь отдельным вызовом даёт 409 PACKAGE_CANCEL_WHOLE.",
+        tags: ["bookings"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/BookingCancelInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/BookingData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Package not found"),
+          "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     "/api/bookings/{id}/confirm": {
       post: {
         summary: "Confirm booking",
@@ -2306,6 +2407,32 @@ export const openApiSpec = {
           "307": { description: "Redirect to cabinet" },
           "400": errorResponse("Validation error"),
           "409": errorResponse("Conflict"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/auth/yandex/start": {
+      get: {
+        summary: "Start Yandex ID authorization flow",
+        description: "Bespoke-parallel к VK (PKCE S256 + HMAC-signed state/verifier cookies). Согласия из формы входа едут через подписанную state-bound cookie — см. RKN-FIX-01.",
+        tags: ["auth", "yandex"],
+        responses: {
+          "307": { description: "Redirect to Yandex ID" },
+          "503": errorResponse("Auth method not configured"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/auth/yandex/callback": {
+      get: {
+        summary: "Yandex ID authorization callback",
+        description: "Гейтится тем же флагом, что и start (session-issuing leg). Новый аккаунт без обязательных согласий не создаётся — редирект на /login?error=consent.",
+        tags: ["auth", "yandex"],
+        responses: {
+          "307": { description: "Redirect to cabinet" },
+          "400": errorResponse("Validation error"),
+          "409": errorResponse("Conflict"),
+          "503": errorResponse("Auth method not configured"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -3504,6 +3631,117 @@ export const openApiSpec = {
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/packages/{id}/propose": {
+      post: {
+        summary: "Propose slots for a solo-master package (advisory)",
+        description: "ADVISORY: считает цену и раскладку для экрана review, НИЧЕГО не создаёт. Брони материализуются только на /book. Согласия здесь не требуются — их снимает /book.",
+        tags: ["public"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ type: "object" }),
+          "400": errorResponse("Validation error"),
+          "404": errorResponse("Package not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/packages/{id}/studio/propose": {
+      post: {
+        summary: "Propose slots for a studio (multi-master) package (advisory)",
+        description: "Как соло-propose: advisory, ничего не создаёт.",
+        tags: ["public"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ type: "object" }),
+          "400": errorResponse("Validation error"),
+          "404": errorResponse("Package not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/packages/{id}/book": {
+      post: {
+        summary: "Book a solo-master service package (guest checkout)",
+        description:
+          "Атомарно материализует весь пакет (инв. #34): все компоненты создаются одной Serializable-транзакцией, all-or-none. Гость обязан передать `consent` — без обязательных целей 400 CONSENT_REQUIRED до создания чего-либо.",
+        tags: ["public"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/PackageBookInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/BookingData" }, "Created"),
+          "400": errorResponse("Validation error / CONSENT_REQUIRED"),
+          "404": errorResponse("Package not found"),
+          "409": errorResponse("Slot conflict"),
+          "429": errorResponse("Rate limited"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/packages/{id}/studio/book": {
+      post: {
+        summary: "Book a studio (multi-master) service package (guest checkout)",
+        description:
+          "Как соло-пакет, но мастер назначается на каждый компонент отдельно; порядок держит виджет, сервер enforce'ит только non-overlap по таймлайну клиента. Тот же обязательный для гостя `consent`.",
+        tags: ["public"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/PackageBookInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/BookingData" }, "Created"),
+          "400": errorResponse("Validation error / CONSENT_REQUIRED"),
+          "404": errorResponse("Package not found"),
+          "409": errorResponse("Slot conflict"),
+          "429": errorResponse("Rate limited"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/me/consents/marketing": {
+      get: {
+        summary: "Read the current marketing-consent state",
+        description:
+          "RKN-FIX-18. `enabled` = есть АКТИВНАЯ (не отозванная) строка UserConsent цели MARKETING. `agreedAt` — момент действующего согласия, `documentVersion` — версия документа, на которую соглашались; если она отличается от `currentVersion`, при следующем включении будет записана новая строка на актуальную версию.",
+        tags: ["me", "legal"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MarketingConsentState" }),
+          "401": errorResponse("Unauthorized"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        summary: "Grant or withdraw marketing consent",
+        description:
+          "Только цель MARKETING. `enabled:false` — ОТЗЫВ: строка не удаляется, ей проставляется `revokedAt`, история сохраняется. `enabled:true` — новое согласие: вставляется НОВАЯ строка с текущей версией документа и свежими IP/UA (отозванная НЕ оживляется). Отзыв согласия на обработку ПДн или оферту здесь невозможен — это запрос на удаление аккаунта; попытка вернёт 400 `CONSENT_NOT_SELF_REVOCABLE`. На сервисные уведомления (подтверждения записей, напоминания) не влияет.",
+        tags: ["me", "legal"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["enabled"],
+                properties: { enabled: { type: "boolean" } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MarketingConsentState" }),
+          "400": errorResponse("Validation error / CONSENT_NOT_SELF_REVOCABLE"),
+          "401": errorResponse("Unauthorized"),
           "500": errorResponse("Internal error"),
         },
       },
