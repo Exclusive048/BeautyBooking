@@ -30,9 +30,9 @@ describe("getZoneOffsetMinutes", () => {
 
   it("returns null for bad tz / bad instant (caller must flag, never host-fallback)", () => {
     expect(getZoneOffsetMinutes(summerIso, "Not/AZone")).toBeNull();
-    expect(getZoneOffsetMinutes("not-a-date", "Asia/Almaty")).toBeNull();
+    expect(getZoneOffsetMinutes("not-a-date", "Asia/Yekaterinburg")).toBeNull();
     expect(getZoneOffsetMinutes(summerIso, null)).toBeNull();
-    expect(getZoneOffsetMinutes(null, "Asia/Almaty")).toBeNull();
+    expect(getZoneOffsetMinutes(null, "Asia/Yekaterinburg")).toBeNull();
   });
 });
 
@@ -59,12 +59,15 @@ describe("formatZoneLabel", () => {
   });
 
   it("honors an explicit city override (for exact profile city)", () => {
-    expect(formatZoneLabel({ iso, timeZone: "Asia/Almaty", city: "Астана" })).toBe("(Астана, GMT+5)");
+    // The zone IS mapped («Екатеринбург»); the explicit city still wins.
+    expect(formatZoneLabel({ iso, timeZone: "Asia/Yekaterinburg", city: "Первоуральск" })).toBe(
+      "(Первоуральск, GMT+5)",
+    );
   });
 
   it("returns '' when tz/instant cannot be resolved (no silent host fallback)", () => {
     expect(formatZoneLabel({ iso, timeZone: "Bad/Zone" })).toBe("");
-    expect(formatZoneLabel({ iso: "nope", timeZone: "Asia/Almaty" })).toBe("");
+    expect(formatZoneLabel({ iso: "nope", timeZone: "Asia/Yekaterinburg" })).toBe("");
   });
 });
 
@@ -72,16 +75,16 @@ describe("zonesDifferForViewer (emphasis decision)", () => {
   const iso = "2026-07-15T09:00:00.000Z";
 
   it("false when viewer offset matches salon (same displayed time → label can be omitted)", () => {
-    // Almaty (+5) and Yekaterinburg (+5) share the offset → identical wall clock.
-    expect(zonesDifferForViewer({ iso, salonTimeZone: "Asia/Almaty", viewerTimeZone: "Asia/Yekaterinburg" })).toBe(false);
+    // Moscow (+3) and Kirov (+3) are distinct zones sharing the offset → identical wall clock.
+    expect(zonesDifferForViewer({ iso, salonTimeZone: "Europe/Moscow", viewerTimeZone: "Europe/Kirov" })).toBe(false);
     expect(zonesDifferForViewer({ iso, salonTimeZone: "Europe/Moscow", viewerTimeZone: "Europe/Moscow" })).toBe(false);
   });
 
   it("true when offsets differ (must emphasize the label)", () => {
-    expect(zonesDifferForViewer({ iso, salonTimeZone: "Asia/Almaty", viewerTimeZone: "Europe/Moscow" })).toBe(true);
+    expect(zonesDifferForViewer({ iso, salonTimeZone: "Asia/Yekaterinburg", viewerTimeZone: "Europe/Moscow" })).toBe(true);
   });
 
   it("errs toward showing the label when a side can't be resolved", () => {
-    expect(zonesDifferForViewer({ iso, salonTimeZone: "Asia/Almaty", viewerTimeZone: "Bad/Zone" })).toBe(true);
+    expect(zonesDifferForViewer({ iso, salonTimeZone: "Asia/Yekaterinburg", viewerTimeZone: "Bad/Zone" })).toBe(true);
   });
 });

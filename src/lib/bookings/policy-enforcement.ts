@@ -224,7 +224,7 @@ export function assertWithinMasterWorkHours(input: {
  * `endLocal` strings like "10:00") is **salon-local**, so the hour,
  * weekday, AND override-date must all be read in the salon timezone,
  * NOT in UTC. Reading them in UTC offsets the whole comparison by the
- * salon's UTC offset → wrong window for every non-UTC (RU/CIS) studio.
+ * salon's UTC offset → wrong window for every non-UTC (RU) studio.
  *
  * This mirrors how the slot engine (`schedule/slots.ts`,
  * `schedule/engine-context.ts`) and the booking-label formatters

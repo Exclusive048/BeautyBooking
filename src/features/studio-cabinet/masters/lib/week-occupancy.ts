@@ -87,7 +87,7 @@ export async function getMasterWeekOccupancy(input: {
   // UTC. UTC date keys mis-bucket near-midnight bookings and mis-highlight the
   // "today" column for a non-UTC studio (+5/+7 etc.), the same divergence class
   // the master/client cabinets already closed (EXP-013/EXP-020). The week anchor
-  // stays UTC-Monday; for the platform's RU/CIS (non-negative offset) market the
+  // stays UTC-Monday; for the platform's RU (non-negative offset) market the
   // 7 UTC-midnight instants resolve to the correct Mon..Sun local dates.
   const timeZone = provider?.timezone ?? "Europe/Moscow";
   const todayKey = toLocalDateKey(now, timeZone);

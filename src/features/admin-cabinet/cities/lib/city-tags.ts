@@ -1,8 +1,12 @@
 /**
  * 3-letter display tag for cities. Hard-coded map covers the top-30
- * Russian cities (plus Astana / Almaty for KZ) so well-known cities
- * get the familiar airport-style code; everything else falls back to
+ * Russian cities so well-known cities get the familiar airport-style
+ * code; everything else falls back to
  * `slug.replace(/-/g, "").slice(0,3).toUpperCase()`.
+ *
+ * RF-ONLY-SCOPE-01: the market is Russia only, so the map carries no
+ * non-RF entries. A locality outside that set still renders — the
+ * fallback above never fails, it just isn't airport-style.
  *
  * Display-only — never persisted. If admins eventually need custom
  * codes, a `City.tag` column needs to be added (see BACKLOG.md).
@@ -39,9 +43,6 @@ const CITY_TAG_MAP: Readonly<Record<string, string>> = {
   makhachkala: "MKH",
   tomsk: "TMS",
   orenburg: "ORE",
-  // CIS — kept for symmetry with the seed-cities set.
-  astana: "AST",
-  almaty: "ALA",
 };
 
 export function getCityTag(slug: string): string {

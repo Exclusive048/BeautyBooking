@@ -75,7 +75,7 @@ export function formatShortDate(iso: string | null): string {
 }
 
 /**
- * Cosmetic phone formatter for Russian / Kazakhstan numbers. Falls back
+ * Cosmetic phone formatter for Russian +7 / 8 numbers. Falls back
  * to the raw string when it doesn't look like an 11-digit E.164 — we
  * never lie about a number we couldn't parse.
  */

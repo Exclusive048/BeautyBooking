@@ -28,7 +28,6 @@
     "redis:flush:dev": "node scripts/dev-redis-flush.mjs",
     "worker:build": "npx tsc --noEmit",
     "worker": "npx --yes tsx --conditions=react-server src/worker.ts",
-    "seed:sql": "bash prisma/seed.sh",
     "seed:test": "npx tsx prisma/seeds/test-data/index.ts",
     "seed:test:reset": "npx tsx prisma/seeds/test-data/reset.ts",
     "seed:billing": "npx tsx scripts/seed-billing-plans.ts",
