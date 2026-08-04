@@ -1,3 +1,4 @@
+import { assertSeedAllowed } from "../guard";
 import { prisma } from "./helpers/prisma";
 import {
   SEED_EMAIL_DOMAIN,
@@ -25,14 +26,13 @@ import {
  * survives even if a showcase user lost its email marker. Real users
  * never use these prefixes — they're reserved for seed.
  *
- * Safe in dev. Refuses to run in production unless ALLOW_TEST_SEED is
- * set.
+ * Safe in dev. Refuses to run in production unless ALLOW_TEST_SEED is set —
+ * shared with `seed:test` via `prisma/seeds/guard.ts` (SEED-DEFUSE-01), so the
+ * two entrypoints can no longer drift apart on what "allowed" means.
  */
 async function main() {
-  if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
-    console.error("⚠ Reset запрещён в production без ALLOW_TEST_SEED=true");
-    process.exit(1);
-  }
+  // SEED-DEFUSE-01 — первой строкой, до любого обращения к БД (см. prisma/seeds/guard.ts).
+  assertSeedAllowed("seed:test:reset");
 
   const phoneFilters = [
     { phone: { startsWith: SEED_PHONE_PREFIX } },

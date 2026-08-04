@@ -84,7 +84,7 @@ export function pluralize(n: number, one: string, few: string, many: string): st
 
 function parseLocalDate(dateLocal: string): Date | null {
   // dateLocal is YYYY-MM-DD per ModelOffer schema. Construct as local time
-  // so weekday math matches what the user sees in Asia/Almaty / their tz.
+  // so weekday math matches what the user sees in Asia/Yekaterinburg / their tz.
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateLocal);
   if (!match) return null;
   const year = Number(match[1]);

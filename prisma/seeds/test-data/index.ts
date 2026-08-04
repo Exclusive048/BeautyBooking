@@ -84,6 +84,7 @@
  * ============================================================
  */
 
+import { assertSeedAllowed } from "../guard";
 import { prisma } from "./helpers/prisma";
 import { logSeed } from "./helpers/log";
 import { seedCities } from "./seed-cities";
@@ -105,12 +106,8 @@ import { seedBillingFixtures } from "./seed-billing-fixtures";
 import { seedStudioQa } from "./seed-studio-qa";
 
 async function main() {
-  if (process.env.NODE_ENV === "production" && !process.env.ALLOW_TEST_SEED) {
-    console.error(
-      "⚠ Test seed запрещён в production. Установите ALLOW_TEST_SEED=true для override.",
-    );
-    process.exit(1);
-  }
+  // SEED-DEFUSE-01 — первой строкой, до любого обращения к БД (см. prisma/seeds/guard.ts).
+  assertSeedAllowed("seed:test");
 
   logSeed.start("МастерРядом — test data seed");
 

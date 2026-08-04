@@ -92,7 +92,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
             {formatRange(booking.startAtUtc, booking.endAtUtc, booking.timezone)}
             {/* FIX-EXP-CONTENT-GRAMMAR (EXP-004): a real space char (not just an
                 `ml-1` margin) before the zone label — otherwise the range and
-                «(Алматы, GMT+5)» run together in text / screen-reader output. */}
+                «(Екатеринбург, GMT+5)» run together in text / screen-reader output. */}
             {zoneLabel ? (
               <>
                 {" "}

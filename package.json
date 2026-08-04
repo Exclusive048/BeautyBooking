@@ -44,7 +44,6 @@
     "check:migration-drops": "node scripts/check-migration-drops.mjs"
   },
   "prisma": {
-    "seed": "node prisma/seed.mjs",
     "schema": "prisma/schema"
   },
   "dependencies": {
