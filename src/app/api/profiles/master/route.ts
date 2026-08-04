@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const result = await createMasterProfile({ userId: auth.user.id, roles: auth.user.roles });
 
   if (result.status === "already-exists") {
-    return fail("Master profile already exists", 409, "ALREADY_EXISTS");
+    return fail("Профиль мастера уже создан.", 409, "ALREADY_EXISTS");
   }
 
   return ok(

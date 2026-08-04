@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const profile = await getClientProfile(user.id);
     return jsonOk(profile);
   } catch (error) {
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await parseBody(req, updateProfileSchema);
     const profile = await updateClientProfile(user.id, body);

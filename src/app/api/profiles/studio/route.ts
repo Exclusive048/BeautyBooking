@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const result = await createStudioProfile({ userId: auth.user.id, roles: auth.user.roles });
 
   if (result.status === "already-exists") {
-    return fail("Studio profile already exists", 409, "ALREADY_EXISTS");
+    return fail("Профиль студии уже создан.", 409, "ALREADY_EXISTS");
   }
 
   return ok(

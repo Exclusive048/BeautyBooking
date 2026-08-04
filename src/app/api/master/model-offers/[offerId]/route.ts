@@ -38,14 +38,14 @@ function validateTimeRange(start: string, end: string): boolean {
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     if (!canAccessMasterOffers(user.roles)) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const params = await ctx.params;
     const offerId = params.offerId;
-    if (!offerId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!offerId) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const body = await parseBody(req, updateModelOfferSchema);
     const offer = await prisma.modelOffer.findUnique({
@@ -58,12 +58,12 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         timeRangeEndLocal: true,
       },
     });
-    if (!offer) return jsonFail(404, "Offer not found", "NOT_FOUND");
+    if (!offer) return jsonFail(404, "Предложение не найдено.", "NOT_FOUND");
 
     await resolveMasterAccess(offer.masterId, user.id);
 
     if (body.status && body.status !== "CLOSED" && body.status !== "ARCHIVED") {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     // Distinguish "status-only" updates from full edits. Status changes
@@ -80,7 +80,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         select: { id: true },
       });
       if (anyApplication) {
-        return jsonFail(409, "Offer is locked", "CONFLICT");
+        return jsonFail(409, "Предложение уже занято.", "CONFLICT");
       }
     } else {
       // Status-only updates retain the original guard against changing
@@ -93,14 +93,14 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         select: { id: true },
       });
       if (hasConfirmed) {
-        return jsonFail(409, "Offer is locked", "CONFLICT");
+        return jsonFail(409, "Предложение уже занято.", "CONFLICT");
       }
     }
 
     const nextStart = body.timeRangeStartLocal ?? offer.timeRangeStartLocal;
     const nextEnd = body.timeRangeEndLocal ?? offer.timeRangeEndLocal;
     if (!validateTimeRange(nextStart, nextEnd)) {
-      return jsonFail(400, "Validation error", "TIME_RANGE_INVALID");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "TIME_RANGE_INVALID");
     }
 
     // status: CLOSED triggers cascade-reject of pending/approved-waiting

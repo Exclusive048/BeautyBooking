@@ -56,9 +56,9 @@ function uniqueStringIds(input: string[]): string[] {
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     if (!canAccessMasterOffers(user.roles)) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const query = parseQuery(new URL(req.url), querySchema);
@@ -402,9 +402,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     if (!canAccessMasterOffers(user.roles)) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const body = await parseBody(req, createModelOfferSchema);
@@ -439,7 +439,7 @@ export async function POST(req: Request) {
 
     if (masterService) {
       if (!masterService.isEnabled) {
-        return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+        return jsonFail(404, "Услуга не найдена.", "SERVICE_NOT_FOUND");
       }
 
       const master = await resolveMasterAccess(masterService.masterProviderId, user.id);
@@ -469,7 +469,7 @@ export async function POST(req: Request) {
       const requestedServiceIds = uniqueStringIds(body.serviceIds ?? []);
       const invalidServiceIds = requestedServiceIds.filter((serviceId) => !availableServiceIds.has(serviceId));
       if (invalidServiceIds.length > 0) {
-        return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+        return jsonFail(404, "Услуга не найдена.", "SERVICE_NOT_FOUND");
       }
       const selectedServiceIds = uniqueStringIds([...requestedServiceIds, masterService.service.id]);
 
@@ -578,7 +578,7 @@ export async function POST(req: Request) {
     const master = await resolveMasterAccess(masterId, user.id);
     const context = await getMasterContext(master.id);
     if (!context.isSolo) {
-      return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+      return jsonFail(404, "Услуга не найдена.", "SERVICE_NOT_FOUND");
     }
 
     const service = await prisma.service.findFirst({
@@ -599,7 +599,7 @@ export async function POST(req: Request) {
       },
     });
     if (!service) {
-      return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+      return jsonFail(404, "Услуга не найдена.", "SERVICE_NOT_FOUND");
     }
 
     const availableServices = await prisma.service.findMany({
@@ -620,7 +620,7 @@ export async function POST(req: Request) {
     const requestedServiceIds = uniqueStringIds(body.serviceIds ?? []);
     const invalidServiceIds = requestedServiceIds.filter((serviceId) => !availableServiceIds.has(serviceId));
     if (invalidServiceIds.length > 0) {
-      return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+      return jsonFail(404, "Услуга не найдена.", "SERVICE_NOT_FOUND");
     }
     const selectedServiceIds = uniqueStringIds([...requestedServiceIds, service.id]);
 

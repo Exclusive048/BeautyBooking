@@ -53,7 +53,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const result = await createProviderService(provider.data.id, parsed.data);
   if (!result.ok) return fail(result.message, result.status, result.code);
@@ -72,7 +72,7 @@ export async function PUT(req: Request) {
 
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const { serviceId, ...input } = parsed.data;
   const result = await updateProviderService(provider.data.id, serviceId, input);
@@ -92,7 +92,7 @@ export async function PATCH(req: Request) {
 
   const body = await req.json().catch(() => null);
   const parsed = toggleSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const result = await setProviderServiceEnabled(
     provider.data.id,

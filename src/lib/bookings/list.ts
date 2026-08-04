@@ -24,7 +24,7 @@ async function requireStudioAdmin(userId: string, studioId: string): Promise<voi
     select: { id: true },
   });
   if (!membership) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 }
 
@@ -38,7 +38,7 @@ export async function listProviderBookingsForOwner(
   });
 
   if (!provider) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   // F1 (FIX-STUDIO-BLOCKERS-01): for a MASTER provider the listing must use
@@ -88,7 +88,7 @@ export async function listProviderBookingsForOwner(
   }
 
   if (!studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   await requireStudioAdmin(userId, studioId);

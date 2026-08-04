@@ -93,7 +93,7 @@ function requireReviewTarget(booking: BookingForCreate): { targetType: ReviewTar
   if (booking.provider.type === "STUDIO") {
     return { targetType: "studio", targetId: booking.provider.id };
   }
-  throw new AppError("Review target not found", 404, "REVIEW_TARGET_NOT_FOUND");
+  throw new AppError("Профиль для отзыва не найден.", 404, "REVIEW_TARGET_NOT_FOUND");
 }
 
 function isAdminUser(user: Pick<UserProfile, "roles">): boolean {
@@ -105,7 +105,7 @@ function dedupeTagIds(values: string[]): string[] {
 }
 
 function throwTagValidation(field: "publicTagIds" | "privateTagIds", message: string): never {
-  throw new AppError("Validation error", 400, "VALIDATION_ERROR", {
+  throw new AppError("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR", {
     fieldErrors: { [field]: message },
   });
 }
@@ -254,7 +254,7 @@ async function recalculateTargetRatings(
       select: { id: true },
     });
     if (!studio) {
-      throw new AppError("Review target not found", 404, "REVIEW_TARGET_NOT_FOUND");
+      throw new AppError("Профиль для отзыва не найден.", 404, "REVIEW_TARGET_NOT_FOUND");
     }
     await tx.studio.update({
       where: { id: studio.id },
@@ -268,7 +268,7 @@ async function ensureMasterReviewAccess(review: {
   targetId: string;
 }, currentUserId: string): Promise<void> {
   if (review.targetType !== "provider") {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const provider = await prisma.provider.findUnique({
@@ -286,7 +286,7 @@ async function ensureMasterReviewAccess(review: {
   });
 
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (provider.ownerUserId === currentUserId) return;
@@ -311,7 +311,7 @@ async function ensureMasterReviewAccess(review: {
     }
   }
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
 type ProviderSideRef = {
@@ -408,14 +408,14 @@ export async function createReview(input: {
   });
 
   if (!booking) {
-    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+    throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
 
   // R2-06-I: a provider must not review their own booking. Reject server-side
   // (the source of truth) for every provider-side role: solo master, the
   // master-in-studio who performed it, and the studio owner/admins.
   if (await isBookingProviderSide(booking, input.currentUserId)) {
-    throw new AppError("You cannot review your own booking", 403, "REVIEW_NOT_ALLOWED");
+    throw new AppError("Нельзя оставить отзыв на собственную запись.", 403, "REVIEW_NOT_ALLOWED");
   }
 
   const isAllowed = canLeaveReview({
@@ -424,7 +424,7 @@ export async function createReview(input: {
     nowUtc: input.nowUtc ?? new Date(),
   });
   if (!isAllowed) {
-    throw new AppError("Review not allowed", 403, "REVIEW_NOT_ALLOWED");
+    throw new AppError("Оставить отзыв нельзя.", 403, "REVIEW_NOT_ALLOWED");
   }
 
   const target = requireReviewTarget(booking);
@@ -433,7 +433,7 @@ export async function createReview(input: {
     select: { id: true, deletedAt: true },
   });
   if (existing && existing.deletedAt === null) {
-    throw new AppError("Review already exists", 409, "REVIEW_ALREADY_EXISTS");
+    throw new AppError("Отзыв уже оставлен.", 409, "REVIEW_ALREADY_EXISTS");
   }
   // A soft-deleted review for this booking is treated as if it doesn't
   // exist — the unique constraint on `bookingId` still blocks insert
@@ -457,7 +457,7 @@ export async function createReview(input: {
           select: { id: true },
         });
         if (!studio) {
-          throw new AppError("Review target not found", 404, "REVIEW_TARGET_NOT_FOUND");
+          throw new AppError("Профиль для отзыва не найден.", 404, "REVIEW_TARGET_NOT_FOUND");
         }
       }
 
@@ -484,7 +484,7 @@ export async function createReview(input: {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw new AppError("Review already exists", 409, "REVIEW_ALREADY_EXISTS");
+      throw new AppError("Отзыв уже оставлен.", 409, "REVIEW_ALREADY_EXISTS");
     }
     throw error;
   }
@@ -549,7 +549,7 @@ export async function getReviewAvailabilityForBooking(input: {
   });
 
   if (!booking) {
-    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+    throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
 
   if (booking.review) {
@@ -595,13 +595,13 @@ export async function replyToReview(input: {
   });
 
   if (!review) {
-    throw new AppError("Review not found", 404, "NOT_FOUND");
+    throw new AppError("Отзыв не найден.", 404, "NOT_FOUND");
   }
 
   await ensureMasterReviewAccess(review, input.currentUserId);
 
   if (review.replyText || review.repliedAt) {
-    throw new AppError("Review already has a reply", 409, "CONFLICT");
+    throw new AppError("На отзыв уже есть ответ.", 409, "CONFLICT");
   }
 
   const updated = await prisma.review.update({
@@ -641,14 +641,14 @@ export async function editReviewReply(input: {
   });
 
   if (!review) {
-    throw new AppError("Review not found", 404, "NOT_FOUND");
+    throw new AppError("Отзыв не найден.", 404, "NOT_FOUND");
   }
 
   await ensureMasterReviewAccess(review, input.currentUserId);
 
   if (!review.replyText && !review.repliedAt) {
     // No prior reply — caller should POST instead.
-    throw new AppError("Reply not found", 404, "NOT_FOUND");
+    throw new AppError("Ответ на отзыв не найден.", 404, "NOT_FOUND");
   }
 
   const updated = await prisma.review.update({
@@ -683,15 +683,15 @@ export async function reportReview(input: {
   });
 
   if (!review) {
-    throw new AppError("Review not found", 404, "NOT_FOUND");
+    throw new AppError("Отзыв не найден.", 404, "NOT_FOUND");
   }
 
   if (review.authorId === input.currentUserId) {
-    throw new AppError("Cannot report own review", 400, "FORBIDDEN");
+    throw new AppError("Нельзя пожаловаться на собственный отзыв.", 400, "FORBIDDEN");
   }
 
   if (review.reportedAt) {
-    throw new AppError("Review already reported", 409, "CONFLICT");
+    throw new AppError("Жалоба на отзыв уже отправлена.", 409, "CONFLICT");
   }
 
   await prisma.review.update({
@@ -732,10 +732,10 @@ export async function updateReview(input: {
     },
   });
   if (!review) {
-    throw new AppError("Review not found", 404, "NOT_FOUND");
+    throw new AppError("Отзыв не найден.", 404, "NOT_FOUND");
   }
   if (review.authorId !== input.currentUser.id) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   const age = Date.now() - review.createdAt.getTime();
   if (age > EDIT_WINDOW_MS) {
@@ -746,7 +746,7 @@ export async function updateReview(input: {
     );
   }
   if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
-    throw new AppError("Invalid rating", 400, "VALIDATION_ERROR");
+    throw new AppError("Некорректная оценка.", 400, "VALIDATION_ERROR");
   }
 
   const trimmed = input.text?.trim();
@@ -786,7 +786,7 @@ export async function deleteReview(input: {
   });
 
   if (!review) {
-    throw new AppError("Review not found", 404, "NOT_FOUND");
+    throw new AppError("Отзыв не найден.", 404, "NOT_FOUND");
   }
 
   // Idempotent: already soft-deleted reviews short-circuit instead of
@@ -801,14 +801,14 @@ export async function deleteReview(input: {
 
   if (isAuthor) {
     if (review.replyText || review.repliedAt) {
-      throw new AppError("Review cannot be deleted after master reply", 409, "CONFLICT");
+      throw new AppError("Отзыв нельзя удалить после ответа мастера.", 409, "CONFLICT");
     }
   } else if (isAdmin) {
     if (!review.reportedAt) {
-      throw new AppError("Admin can delete only reported reviews", 409, "CONFLICT");
+      throw new AppError("Удалять можно только отзывы с жалобой.", 409, "CONFLICT");
     }
   } else {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   // Soft delete: preserve the row for audit/compliance. `deletedByUserId`

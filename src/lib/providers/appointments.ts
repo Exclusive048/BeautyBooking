@@ -30,7 +30,7 @@ export async function listProviderAppointmentsForDate(input: {
     select: { timezone: true },
   });
   if (!provider) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   const start = dateFromLocalDateKey(input.date, provider.timezone, 0, 0);

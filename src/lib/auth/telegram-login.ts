@@ -33,12 +33,12 @@ export async function authenticateTelegramLogin(
 ): Promise<TelegramAuthResult> {
   const isValid = verifyTelegramLogin(payload, botToken);
   if (!isValid) {
-    return { ok: false, status: 401, message: "Invalid telegram hash", code: "INVALID_HASH" };
+    return { ok: false, status: 401, message: "Не удалось проверить данные Telegram.", code: "INVALID_HASH" };
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (!isAuthDateFresh(payload.auth_date, nowSeconds)) {
-    return { ok: false, status: 401, message: "Auth data expired", code: "AUTH_DATE_EXPIRED" };
+    return { ok: false, status: 401, message: "Данные входа устарели. Попробуйте ещё раз.", code: "AUTH_DATE_EXPIRED" };
   }
 
   const telegramId = String(payload.id);

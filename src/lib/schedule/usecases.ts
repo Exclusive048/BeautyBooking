@@ -49,13 +49,13 @@ function clampPageSize(value: number | null | undefined): number {
 
 function validateBufferMinutes(value: number): Result<number> {
   if (!Number.isInteger(value)) {
-    return { ok: false, status: 400, message: "Invalid buffer", code: "BUFFER_INVALID" };
+    return { ok: false, status: 400, message: "Некорректный перерыв между записями.", code: "BUFFER_INVALID" };
   }
   if (value < 0 || value > 30) {
-    return { ok: false, status: 400, message: "Buffer out of range", code: "BUFFER_INVALID" };
+    return { ok: false, status: 400, message: "Перерыв между записями вне допустимого диапазона.", code: "BUFFER_INVALID" };
   }
   if (value % 5 !== 0) {
-    return { ok: false, status: 400, message: "Invalid buffer", code: "BUFFER_INVALID" };
+    return { ok: false, status: 400, message: "Некорректный перерыв между записями.", code: "BUFFER_INVALID" };
   }
   return { ok: true, data: value };
 }
@@ -78,7 +78,7 @@ function validateBreaks(
 ): Result<ScheduleBreakInterval[] | undefined> {
   if (!breaks) return { ok: true, data: undefined };
   if (breaks.length > 3) {
-    return { ok: false, status: 400, message: "Too many breaks", code: "BREAKS_LIMIT" };
+    return { ok: false, status: 400, message: "Слишком много перерывов.", code: "BREAKS_LIMIT" };
   }
 
   const normalized = breaks.map((b) => {
@@ -89,10 +89,10 @@ function validateBreaks(
 
   for (const b of normalized) {
     if (b.start === null || b.end === null || b.start >= b.end) {
-      return { ok: false, status: 400, message: "Invalid break time", code: "BREAK_INVALID" };
+      return { ok: false, status: 400, message: "Некорректное время перерыва.", code: "BREAK_INVALID" };
     }
     if (b.start <= dayStart || b.end >= dayEnd) {
-      return { ok: false, status: 400, message: "Break out of range", code: "BREAK_RANGE" };
+      return { ok: false, status: 400, message: "Перерыв выходит за рабочие часы.", code: "BREAK_RANGE" };
     }
   }
 
@@ -106,7 +106,7 @@ function validateBreaks(
       continue;
     }
     if (curr.start < prev.end) {
-      return { ok: false, status: 400, message: "Breaks overlap", code: "BREAK_OVERLAP" };
+      return { ok: false, status: 400, message: "Перерывы пересекаются.", code: "BREAK_OVERLAP" };
     }
   }
 
@@ -131,7 +131,7 @@ function validateOverride(input: ScheduleOverride): Result<ScheduleOverride> {
   const start = input.startLocal ? timeToMinutes(input.startLocal) : null;
   const end = input.endLocal ? timeToMinutes(input.endLocal) : null;
   if (start === null || end === null || start >= end) {
-    return { ok: false, status: 400, message: "Invalid time range", code: "TIME_RANGE_INVALID" };
+    return { ok: false, status: 400, message: "Некорректный диапазон времени.", code: "TIME_RANGE_INVALID" };
   }
 
   const breaksResult = validateBreaks(input.breaks, start, end);
@@ -254,31 +254,31 @@ export async function listAvailabilitySlotsPaginated(
   const startedAt = Date.now();
 
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
-    return { ok: false, status: 400, message: "Invalid duration", code: "DURATION_INVALID" };
+    return { ok: false, status: 400, message: "Некорректная длительность.", code: "DURATION_INVALID" };
   }
 
   if (!serviceId) {
-    return { ok: false, status: 400, message: "Service id is required", code: "SERVICE_REQUIRED" };
+    return { ok: false, status: 400, message: "Укажите услугу.", code: "SERVICE_REQUIRED" };
   }
 
   const requestedStartKey = input.fromKey;
   if (!isDateKey(requestedStartKey)) {
-    return { ok: false, status: 400, message: "Invalid from", code: "DATE_INVALID" };
+    return { ok: false, status: 400, message: "Некорректная дата начала.", code: "DATE_INVALID" };
   }
 
   if (input.toKeyExclusive && !isDateKey(input.toKeyExclusive)) {
-    return { ok: false, status: 400, message: "Invalid to", code: "DATE_INVALID" };
+    return { ok: false, status: 400, message: "Некорректная дата окончания.", code: "DATE_INVALID" };
   }
 
   const maxEndKeyExclusive = addDaysToDateKey(requestedStartKey, MAX_BOOKING_WINDOW_DAYS);
   const requestedEndKeyExclusive = input.toKeyExclusive ?? maxEndKeyExclusive;
 
   if (compareDateKeys(requestedEndKeyExclusive, requestedStartKey) < 0) {
-    return { ok: false, status: 400, message: "Invalid range", code: "RANGE_INVALID" };
+    return { ok: false, status: 400, message: "Некорректный диапазон.", code: "RANGE_INVALID" };
   }
 
   if (compareDateKeys(requestedEndKeyExclusive, maxEndKeyExclusive) > 0) {
-    return { ok: false, status: 400, message: "Range too large", code: "RANGE_INVALID" };
+    return { ok: false, status: 400, message: "Слишком большой диапазон дат.", code: "RANGE_INVALID" };
   }
 
   const pageSize = clampPageSize(input.limit);
@@ -292,7 +292,7 @@ export async function listAvailabilitySlotsPaginated(
     where: { id: providerId },
     select: { id: true, timezone: true, bufferBetweenBookingsMin: true, slotStepMin: true },
   });
-  if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+  if (!provider) return { ok: false, status: 404, message: "Профиль не найден.", code: "PROVIDER_NOT_FOUND" };
 
   const timezone = provider.timezone;
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
@@ -435,24 +435,24 @@ export async function listAvailabilitySlots(
   range: RangeInput
 ): Promise<Result<AvailabilitySlot[]>> {
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
-    return { ok: false, status: 400, message: "Invalid duration", code: "DURATION_INVALID" };
+    return { ok: false, status: 400, message: "Некорректная длительность.", code: "DURATION_INVALID" };
   }
 
   if (!serviceId) {
-    return { ok: false, status: 400, message: "Service id is required", code: "SERVICE_REQUIRED" };
+    return { ok: false, status: 400, message: "Укажите услугу.", code: "SERVICE_REQUIRED" };
   }
 
   const from = range.from;
   const to = range.to;
   if (from > to) {
-    return { ok: false, status: 400, message: "Invalid range", code: "RANGE_INVALID" };
+    return { ok: false, status: 400, message: "Некорректный диапазон.", code: "RANGE_INVALID" };
   }
 
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },
     select: { id: true, timezone: true, bufferBetweenBookingsMin: true, slotStepMin: true },
   });
-  if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+  if (!provider) return { ok: false, status: 404, message: "Профиль не найден.", code: "PROVIDER_NOT_FOUND" };
 
   const timezone = provider.timezone;
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
@@ -564,7 +564,7 @@ export async function getProviderBuffer(
     select: { bufferBetweenBookingsMin: true },
   });
   if (!provider) {
-    return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Профиль не найден.", code: "PROVIDER_NOT_FOUND" };
   }
   return { ok: true, data: { bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin } };
 }
@@ -584,6 +584,6 @@ export async function setProviderBuffer(
     });
     return { ok: true, data: { bufferBetweenBookingsMin: updated.bufferBetweenBookingsMin } };
   } catch {
-    return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Профиль не найден.", code: "PROVIDER_NOT_FOUND" };
   }
 }

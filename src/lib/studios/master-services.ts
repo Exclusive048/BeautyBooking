@@ -19,7 +19,7 @@ function isPositiveInt(value: number): boolean {
 function validateOverride(input: MasterServiceOverride): Result<MasterServiceOverride> {
   if (input.priceOverride !== undefined && input.priceOverride !== null) {
     if (!isPositiveInt(input.priceOverride)) {
-      return { ok: false, status: 400, message: "Price must be a positive integer", code: "PRICE_INVALID" };
+      return { ok: false, status: 400, message: "Цена должна быть положительным числом.", code: "PRICE_INVALID" };
     }
   }
 
@@ -28,7 +28,7 @@ function validateOverride(input: MasterServiceOverride): Result<MasterServiceOve
       return {
         ok: false,
         status: 400,
-        message: "Duration must be a positive multiple of 5",
+        message: "Длительность должна быть кратна 5 минутам.",
         code: "DURATION_INVALID",
       };
     }
@@ -46,7 +46,7 @@ export async function listMasterServiceOverrides(
     select: { id: true, type: true, studioId: true },
   });
   if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioId) {
-    return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
 
   const overrides = await prisma.masterService.findMany({
@@ -71,7 +71,7 @@ export async function setMasterServiceOverride(
     select: { id: true, type: true },
   });
   if (!studio || studio.type !== ProviderType.STUDIO) {
-    return { ok: false, status: 404, message: "Studio not found", code: "STUDIO_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
   }
 
   const master = await prisma.provider.findUnique({
@@ -79,7 +79,7 @@ export async function setMasterServiceOverride(
     select: { id: true, type: true, studioId: true },
   });
   if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioId) {
-    return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
 
   const service = await prisma.service.findUnique({
@@ -87,7 +87,7 @@ export async function setMasterServiceOverride(
     select: { id: true, providerId: true },
   });
   if (!service || service.providerId !== studioId) {
-    return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
   }
 
   const upserted = await prisma.masterService.upsert({

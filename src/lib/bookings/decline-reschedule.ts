@@ -32,7 +32,7 @@ export async function declineClientRescheduleRequest(
       requestedBy: true,
     },
   });
-  if (!booking) throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+  if (!booking) throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
 
   const runtimeStatus = resolveBookingRuntimeStatus({
     status: booking.status,
@@ -40,10 +40,10 @@ export async function declineClientRescheduleRequest(
     endAtUtc: booking.endAtUtc,
   });
   if (runtimeStatus !== "CHANGE_REQUESTED") {
-    throw new AppError("Booking has no pending reschedule", 409, "CONFLICT");
+    throw new AppError("По записи нет запроса на перенос.", 409, "CONFLICT");
   }
   if (!booking.actionRequiredBy || booking.actionRequiredBy !== actor) {
-    throw new AppError("Action is required from another side", 409, "CONFLICT");
+    throw new AppError("Сейчас ход за другой стороной.", 409, "CONFLICT");
   }
 
   const updated = await prisma.booking.update({

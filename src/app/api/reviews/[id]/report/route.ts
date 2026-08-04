@@ -17,13 +17,13 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const params = await ctx.params;
     const parsedParams = reviewIdParamSchema.safeParse(params);
     if (!parsedParams.success) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     const body = await parseBody(req, reviewReportSchema);

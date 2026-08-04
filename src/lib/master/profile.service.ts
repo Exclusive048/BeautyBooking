@@ -74,7 +74,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     },
   });
   if (!master || master.type !== "MASTER") {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   if (!master.studioId) {
@@ -106,7 +106,7 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     select: { id: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   return {
@@ -551,7 +551,7 @@ async function resolvePortfolioMediaUrl(input: {
       asset.entityId !== input.masterId ||
       asset.kind !== MediaKind.PORTFOLIO
     ) {
-      throw new AppError("Invalid media asset", 400, "FORBIDDEN");
+      throw new AppError("Некорректный файл.", 400, "FORBIDDEN");
     }
 
     return `${MEDIA_FILE_PATH_PREFIX}${asset.id}`;
@@ -559,7 +559,7 @@ async function resolvePortfolioMediaUrl(input: {
 
   const mediaUrl = input.mediaUrl?.trim();
   if (!mediaUrl) {
-    throw new AppError("Invalid media URL", 400, "VALIDATION_ERROR");
+    throw new AppError("Некорректная ссылка на файл.", 400, "VALIDATION_ERROR");
   }
 
   const allowedS3Endpoint = env.S3_ENDPOINT?.trim();
@@ -567,7 +567,7 @@ async function resolvePortfolioMediaUrl(input: {
     return mediaUrl;
   }
 
-  throw new AppError("Invalid media URL", 400, "VALIDATION_ERROR");
+  throw new AppError("Некорректная ссылка на файл.", 400, "VALIDATION_ERROR");
 }
 
 export async function upsertMasterServices(
@@ -592,7 +592,7 @@ export async function upsertMasterServices(
       select: { id: true, globalCategoryId: true },
     });
     if (existing.length !== serviceIds.length) {
-      throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+      throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
     }
     const existingById = new Map(existing.map((service) => [service.id, service]));
 
@@ -678,7 +678,7 @@ export async function upsertMasterServices(
     select: { id: true },
   });
   if (services.length !== serviceIds.length) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
 
   await prisma.$transaction(
@@ -734,12 +734,12 @@ export async function createSoloMasterService(
 ): Promise<{ id: string }> {
   const context = await getMasterContext(masterId);
   if (!context.isSolo) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const normalizedTitle = input.title.trim();
   if (!normalizedTitle) {
-    throw new AppError("Validation error", 400, "VALIDATION_ERROR", {
+    throw new AppError("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR", {
       fieldErrors: { title: "Title is required" },
     });
   }
@@ -775,7 +775,7 @@ export async function createSoloMasterService(
     select: { id: true },
   });
   if (duplicate) {
-    throw new AppError("Service already added", 409, "ALREADY_EXISTS", {
+    throw new AppError("Услуга уже добавлена.", 409, "ALREADY_EXISTS", {
       fieldErrors: { title: "Service with this name already exists" },
     });
   }
@@ -817,7 +817,7 @@ export async function createSoloMasterService(
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      throw new AppError("Service already added", 409, "ALREADY_EXISTS", {
+      throw new AppError("Услуга уже добавлена.", 409, "ALREADY_EXISTS", {
         fieldErrors: { title: "Service with this name already exists" },
       });
     }
@@ -877,7 +877,7 @@ export async function createMasterPortfolioItem(
       select: { id: true, globalCategoryId: true },
     });
     if (services.length !== uniqueServiceIds.length) {
-      throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+      throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
     }
     serviceCategoryIds.push(
       ...uniqueIds(
@@ -905,7 +905,7 @@ export async function createMasterPortfolioItem(
       select: { id: true, status: true, visualSearchSlug: true },
     });
     if (!category || category.visualSearchSlug === "hot") {
-      throw new AppError("Global category not found", 404, "NOT_FOUND");
+      throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
     }
   }
 
@@ -1019,7 +1019,7 @@ export async function updateMasterPortfolioCategory(
     select: { id: true, masterId: true, globalCategoryId: true },
   });
   if (!item || item.masterId !== masterId) {
-    throw new AppError("Not found", 404, "NOT_FOUND");
+    throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
 
   const nextGlobalCategoryId = globalCategoryId?.trim() || null;
@@ -1040,7 +1040,7 @@ export async function updateMasterPortfolioCategory(
       select: { id: true, status: true, visualSearchSlug: true },
     });
     if (!category || category.visualSearchSlug === "hot") {
-      throw new AppError("Global category not found", 404, "NOT_FOUND");
+      throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
     }
   }
 
@@ -1095,7 +1095,7 @@ export async function deleteMasterPortfolioItem(
     },
   });
   if (!item || item.masterId !== masterId) {
-    throw new AppError("Not found", 404, "NOT_FOUND");
+    throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
   const categoryIds = uniqueIds([
     ...item.services

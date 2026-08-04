@@ -59,7 +59,7 @@ async function upsertYandexLink(params: { userId: string; yandexUserId: string }
   });
 
   if (existing && existing.userId !== params.userId) {
-    throw new AppError("Yandex already linked to another user", 409, "YANDEX_ALREADY_LINKED");
+    throw new AppError("Этот аккаунт Яндекс ID уже привязан к другому пользователю.", 409, "YANDEX_ALREADY_LINKED");
   }
 
   await prisma.yandexLink.upsert({
@@ -81,7 +81,7 @@ export async function GET(req: Request) {
     // AUTH-KILLSWITCH-ENFORCE-01: gate the callback too (the session-issuing
     // leg) — a gate on `start` alone is bypassable by hitting `callback`.
     if (!isYandexAuthEnabled) {
-      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     const cookieStore = await cookies();
@@ -94,7 +94,7 @@ export async function GET(req: Request) {
       });
       if (!parsed.success) {
         clearYandexCookies(cookieStore);
-        return fail("Yandex callback is missing required params", 400, "VALIDATION_ERROR");
+        return fail("Не удалось войти через Яндекс. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
       }
       const parsedCallback = parsed.data;
 
@@ -105,10 +105,10 @@ export async function GET(req: Request) {
       clearYandexCookies(cookieStore);
 
       if (!expectedState || parsedCallback.state !== expectedState) {
-        return fail("Invalid state", 400, "YANDEX_STATE_INVALID");
+        return fail("Некорректное состояние запроса.", 400, "YANDEX_STATE_INVALID");
       }
       if (!codeVerifier) {
-        return fail("Yandex code verifier is missing", 400, "VALIDATION_ERROR");
+        return fail("Сессия входа через Яндекс истекла. Начните заново.", 400, "VALIDATION_ERROR");
       }
 
       // RKN-FIX-01 — signature + state binding gate the flags (see the VK
@@ -175,7 +175,7 @@ export async function GET(req: Request) {
         : null;
 
       if (!user && link) {
-        throw new AppError("Yandex already linked to another user", 409, "YANDEX_ALREADY_LINKED");
+        throw new AppError("Этот аккаунт Яндекс ID уже привязан к другому пользователю.", 409, "YANDEX_ALREADY_LINKED");
       }
 
       if (!user) {

@@ -43,7 +43,7 @@ async function loadService(serviceId: string): Promise<ServiceAccessContext> {
     },
   });
   if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
   return service;
 }
@@ -65,7 +65,7 @@ async function ensureServiceBookingConfigAccess(service: ServiceAccessContext, u
         return;
       }
     }
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const studioId =
@@ -77,7 +77,7 @@ async function ensureServiceBookingConfigAccess(service: ServiceAccessContext, u
     null;
 
   if (!studioId) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   await ensureStudioRole({
@@ -99,7 +99,7 @@ async function loadServiceConfig(serviceId: string): Promise<ServiceBookingConfi
     },
   });
   if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
   return {
     requiresReferencePhoto: service.requiresReferencePhoto,
@@ -148,7 +148,7 @@ export async function updateServiceBookingConfig(input: {
 
     for (const id of incomingIds) {
       if (!existingIds.has(id)) {
-        throw new AppError("Booking question not found", 404, "BOOKING_QUESTION_NOT_FOUND");
+        throw new AppError("Вопрос анкеты не найден.", 404, "BOOKING_QUESTION_NOT_FOUND");
       }
     }
 

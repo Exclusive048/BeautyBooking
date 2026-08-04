@@ -51,13 +51,13 @@ export async function transferMasterOutOfStudio(
         },
       });
       if (!master || master.type !== ProviderType.MASTER) {
-        throw new AppError("Master not found in studio", 404, "NOT_FOUND");
+        throw new AppError("Мастер не найден в студии.", 404, "NOT_FOUND");
       }
       if (!master.studioId) {
-        throw new AppError("Master already left studio", 409, "CONFLICT", { reason: "ALREADY_LEFT_STUDIO" });
+        throw new AppError("Мастер уже покинул студию.", 409, "CONFLICT", { reason: "ALREADY_LEFT_STUDIO" });
       }
       if (master.studioId !== studioProviderId) {
-        throw new AppError("Master belongs to another studio", 409, "CONFLICT", { reason: "STUDIO_MISMATCH" });
+        throw new AppError("Мастер состоит в другой студии.", 409, "CONFLICT", { reason: "STUDIO_MISMATCH" });
       }
 
       const studio = await tx.studio.findUnique({
@@ -65,7 +65,7 @@ export async function transferMasterOutOfStudio(
         select: { id: true },
       });
       if (!studio) {
-        throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+        throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
       }
 
       const masterServices = await tx.masterService.findMany({

@@ -39,7 +39,7 @@ export async function GET(req: Request) {
       select: { id: true, timezone: true },
     });
     if (!provider) {
-      return jsonFail(404, "Master not found", "MASTER_NOT_FOUND");
+      return jsonFail(404, "Мастер не найден.", "MASTER_NOT_FOUND");
     }
 
     const now = new Date();

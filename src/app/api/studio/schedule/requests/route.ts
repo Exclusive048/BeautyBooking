@@ -60,7 +60,7 @@ export async function GET(req: Request) {
         route: "GET /api/studio/schedule/requests",
         status: query.status ?? null,
       });
-      return jsonFail(400, "Invalid status", "VALIDATION_ERROR", { allowed: ALLOWED_STATUS_VALUES });
+      return jsonFail(400, "Некорректный статус.", "VALIDATION_ERROR", { allowed: ALLOWED_STATUS_VALUES });
     }
 
     const where: Prisma.ScheduleChangeRequestWhereInput = {

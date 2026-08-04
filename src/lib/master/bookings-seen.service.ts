@@ -9,10 +9,10 @@ export async function markMasterBookingsSeen(masterId: string): Promise<{ lastBo
     select: { id: true, ownerUserId: true, type: true },
   });
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
   if (!provider.ownerUserId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const now = new Date();

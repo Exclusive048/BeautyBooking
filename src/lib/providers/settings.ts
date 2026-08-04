@@ -32,11 +32,11 @@ export async function getProviderSettings(userId: string): Promise<ProviderSetti
   });
 
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (!isSoloMaster(provider)) {
-    throw new AppError("Settings are not allowed for studio masters", 403, "FORBIDDEN");
+    throw new AppError("Эти настройки недоступны мастерам студии.", 403, "FORBIDDEN");
   }
 
   return {
@@ -61,11 +61,11 @@ export async function updateProviderSettings(
   });
 
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (!isSoloMaster(provider)) {
-    throw new AppError("Settings are not allowed for studio masters", 403, "FORBIDDEN");
+    throw new AppError("Эти настройки недоступны мастерам студии.", 403, "FORBIDDEN");
   }
 
   const data: {

@@ -137,7 +137,7 @@ async function canReadBookingMedia(user: UserProfile, bookingId: string): Promis
     },
   });
   if (!booking) {
-    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+    throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
 
   if (booking.clientUserId && booking.clientUserId === user.id) return true;
@@ -164,7 +164,7 @@ export async function ensureCanManageMedia(
   if (entityType === MediaEntityType.SITE) {
     const isAllowedSiteKind = kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO;
     if (entityId !== "site" || !isAllowedSiteKind || !isSiteAdmin(user)) {
-      throw new AppError("Forbidden", 403, "FORBIDDEN");
+      throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     }
     return;
   }
@@ -172,7 +172,7 @@ export async function ensureCanManageMedia(
   if (entityType === MediaEntityType.USER) {
     const isAllowedUserKind = kind === MediaKind.AVATAR || kind === MediaKind.MODEL_APPLICATION_PHOTO;
     if (!isAllowedUserKind || entityId !== user.id) {
-      throw new AppError("Forbidden", 403, "FORBIDDEN");
+      throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     }
     return;
   }
@@ -183,7 +183,7 @@ export async function ensureCanManageMedia(
       select: { id: true, clientUserId: true, offer: { select: { masterId: true } } },
     });
     if (!application) {
-      throw new AppError("Not found", 404, "NOT_FOUND");
+      throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
     }
     if (application.clientUserId === user.id) return;
     await resolveMasterAccess(application.offer.masterId, user.id);
@@ -196,36 +196,36 @@ export async function ensureCanManageMedia(
       select: { id: true, type: true, ownerUserId: true, studioId: true },
     });
     if (!master || master.type !== ProviderType.MASTER) {
-      throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+      throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
     }
     if (master.ownerUserId === user.id) return;
     if (master.studioId && (await isStudioAdminOrOwnerByStudioProviderId(master.studioId, user.id))) return;
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (entityType === MediaEntityType.STUDIO) {
     const canManage = await isStudioAdminOrOwnerByStudioProviderId(entityId, user.id);
-    if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    if (!canManage) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     return;
   }
 
   if (entityType === MediaEntityType.CLIENT_CARD) {
     if (kind !== MediaKind.CLIENT_CARD_PHOTO) {
-      throw new AppError("Forbidden", 403, "FORBIDDEN");
+      throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     }
     const card = await prisma.clientCard.findUnique({
       where: { id: entityId },
       select: { id: true, providerId: true },
     });
     if (!card) {
-      throw new AppError("Client card not found", 404, "CLIENT_CARD_NOT_FOUND");
+      throw new AppError("Карточка клиента не найдена.", 404, "CLIENT_CARD_NOT_FOUND");
     }
     const canManage = await canManageProvider(card.providerId, user.id);
-    if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
+    if (!canManage) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     return;
   }
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
 export async function ensureCanReadMedia(
@@ -257,25 +257,25 @@ export async function ensureCanReadMedia(
   })();
 
   if (!kindAllowedForEntity) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   switch (entityType) {
     case MediaEntityType.USER: {
       if (!user || (user.id !== entityId && !isSiteAdmin(user))) {
-        throw new AppError("Forbidden", 403, "FORBIDDEN");
+        throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       }
       return;
     }
     case MediaEntityType.SITE: {
       if (entityId !== "site") {
-        throw new AppError("Not found", 404, "NOT_FOUND");
+        throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
       }
       if (kind === MediaKind.AVATAR || kind === MediaKind.PORTFOLIO) {
         return;
       }
       if (!user || !isSiteAdmin(user)) {
-        throw new AppError("Forbidden", 403, "FORBIDDEN");
+        throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       }
       return;
     }
@@ -290,44 +290,44 @@ export async function ensureCanReadMedia(
       // NOT here. Here, only the owner/studio-admin (and platform admin) may
       // read, which is what the file route falls back to for a non-public asset.
       if (!user) {
-        throw new AppError("Forbidden", 403, "FORBIDDEN");
+        throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       }
       const canManage = await canManageProvider(entityId, user.id);
       if (!canManage) {
-        throw new AppError("Forbidden", 403, "FORBIDDEN");
+        throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       }
       return;
     }
     case MediaEntityType.MODEL_APPLICATION: {
-      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!user) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       const application = await prisma.modelApplication.findUnique({
         where: { id: entityId },
         select: { id: true, clientUserId: true, offer: { select: { masterId: true } } },
       });
       if (!application) {
-        throw new AppError("Not found", 404, "NOT_FOUND");
+        throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
       }
       if (application.clientUserId === user.id) return;
       await resolveMasterAccess(application.offer.masterId, user.id);
       return;
     }
     case MediaEntityType.CLIENT_CARD: {
-      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!user) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       const card = await prisma.clientCard.findUnique({
         where: { id: entityId },
         select: { id: true, providerId: true },
       });
       if (!card) {
-        throw new AppError("Client card not found", 404, "CLIENT_CARD_NOT_FOUND");
+        throw new AppError("Карточка клиента не найдена.", 404, "CLIENT_CARD_NOT_FOUND");
       }
       const canManage = await canManageProvider(card.providerId, user.id);
-      if (!canManage) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!canManage) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       return;
     }
     case MediaEntityType.BOOKING: {
-      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!user) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       const allowed = await canReadBookingMedia(user, entityId);
-      if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!allowed) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       return;
     }
     case MediaEntityType.CHAT_MESSAGE: {
@@ -335,13 +335,13 @@ export async function ensureCanReadMedia(
       // for the two chat participants only. Studio admins explicitly
       // not admitted (privacy 152-ФЗ invariant — chat is 1:1
       // client↔master only, see resolveChatAccess).
-      if (!user) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!user) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       const allowed = await canReadChatAttachmentMedia(user, entityId);
-      if (!allowed) throw new AppError("Forbidden", 403, "FORBIDDEN");
+      if (!allowed) throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       return;
     }
     default:
-      throw new AppError("Forbidden", 403, "FORBIDDEN");
+      throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
 }

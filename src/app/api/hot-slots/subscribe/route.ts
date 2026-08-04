@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const items = await listHotSlotSubscriptions(user.id);
     return jsonOk({ items });
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await parseBody(req, hotSlotSubscriptionSchema);
     await subscribeHotSlots(user.id, body.providerId);
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await parseBody(req, hotSlotSubscriptionSchema);
     await unsubscribeHotSlots(user.id, body.providerId);

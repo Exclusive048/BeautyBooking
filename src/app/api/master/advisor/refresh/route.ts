@@ -16,14 +16,14 @@ const ADVISOR_REFRESH_RATE_LIMIT = {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const allowed = await checkRateLimit(
       `rate:advisorRefresh:${user.id}`,
       ADVISOR_REFRESH_RATE_LIMIT.limit,
       ADVISOR_REFRESH_RATE_LIMIT.windowSeconds
     );
     if (!allowed) {
-      return jsonFail(429, "Too many requests", "RATE_LIMITED");
+      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
     }
     const masterId = await getCurrentMasterProviderId(user.id);
     const data = await refreshAdvisorInsights(masterId);

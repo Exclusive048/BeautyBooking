@@ -26,25 +26,25 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
     const clientKey = params.clientKey ? decodeURIComponent(params.clientKey) : "";
-    if (!clientKey) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const provider = await prisma.provider.findUnique({
       where: { id: providerId },
       select: { timezone: true },
     });
-    if (!provider) return jsonFail(404, "Master not found", "MASTER_NOT_FOUND");
+    if (!provider) return jsonFail(404, "Мастер не найден.", "MASTER_NOT_FOUND");
 
     const detail = await getMasterClientDetail({
       providerId,
       timezone: provider.timezone,
       clientKey,
     });
-    if (!detail) return jsonFail(404, "Client not found", "NOT_FOUND");
+    if (!detail) return jsonFail(404, "Клиент не найден.", "NOT_FOUND");
 
     return jsonOk(detail);
   } catch (error) {

@@ -21,7 +21,7 @@ export async function updateStudioMasterProfile(
     master.type !== ProviderType.MASTER ||
     master.studioId !== studioProviderId
   ) {
-    return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
 
   const updated = await prisma.provider.update({

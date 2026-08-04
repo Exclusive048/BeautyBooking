@@ -49,7 +49,7 @@ function writeCachedMasterDay(masterId: string, date: string, data: Awaited<Retu
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const query = parseQuery(new URL(req.url), masterDayQuerySchema);
     const masterId = await getCurrentMasterProviderId(user.id);
     const cached = readCachedMasterDay(masterId, query.date);

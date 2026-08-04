@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     Object.fromEntries(req.nextUrl.searchParams),
   );
   if (!parsed.success) {
-    return fail("Invalid query", 400, "INVALID_QUERY");
+    return fail("Некорректные параметры запроса.", 400, "INVALID_QUERY");
   }
 
   try {

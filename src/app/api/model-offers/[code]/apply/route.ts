@@ -17,14 +17,14 @@ export const runtime = "nodejs";
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     if (!user.roles.includes(AccountType.CLIENT)) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const params = await ctx.params;
     const offerCode = params.code;
-    if (!offerCode) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!offerCode) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const body = await parseBody(req, applyModelOfferSchema);
 
@@ -75,13 +75,13 @@ export async function POST(req: Request, ctx: RouteContext) {
       select: { id: true, entityType: true, entityId: true },
     });
     if (mediaAssets.length !== body.mediaIds.length) {
-      return jsonFail(400, "Invalid media assets", "MEDIA_ASSET_NOT_FOUND");
+      return jsonFail(400, "Некорректные файлы.", "MEDIA_ASSET_NOT_FOUND");
     }
     const invalidAsset = mediaAssets.find(
       (asset) => asset.entityType !== "USER" || asset.entityId !== user.id
     );
     if (invalidAsset) {
-      return jsonFail(409, "Media asset already in use", "CONFLICT");
+      return jsonFail(409, "Файл уже используется.", "CONFLICT");
     }
 
     const created = await prisma.modelApplication.create({

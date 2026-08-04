@@ -26,10 +26,10 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
-    if (!params.clientKey) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!params.clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const query = parseQuery(new URL(req.url), querySchema);
     await ensureStudioRole({
@@ -70,10 +70,10 @@ export async function GET(req: Request, ctx: RouteContext) {
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
-    if (!params.clientKey) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!params.clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const query = parseQuery(new URL(req.url), querySchema);
     await ensureStudioRole({

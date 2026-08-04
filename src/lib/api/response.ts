@@ -61,7 +61,7 @@ export function tooManyRequests(retryAfterSeconds: number, message?: string, cod
       ok: false,
       requestId,
       error: {
-        message: message ?? "Too many requests",
+        message: message ?? "Слишком много запросов. Попробуйте позже.",
         code: code ?? "RATE_LIMITED",
         details: { retryAfterSeconds },
       },

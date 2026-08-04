@@ -43,7 +43,7 @@ async function isAuthorized(request: Request): Promise<boolean> {
 export async function GET(request: Request) {
   return withRequestContext(request, async () => {
     if (!(await isAuthorized(request))) {
-      return fail("Unauthorized", 401, "UNAUTHORIZED");
+      return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
     }
 
     const [surfaceStatuses, queueStats] = await Promise.all([

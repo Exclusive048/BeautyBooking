@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     const sessionUser = await getSessionUserFromRequest(req);
     if (sessionUser) {
       if (!hasAnyRole(sessionUser, [AccountType.CLIENT])) {
-        return jsonFail(403, "Forbidden", "FORBIDDEN");
+        return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
       }
       userId = sessionUser.id;
     }

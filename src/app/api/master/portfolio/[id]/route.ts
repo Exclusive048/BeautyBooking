@@ -16,9 +16,9 @@ export const runtime = "nodejs";
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const { id } = await ctx.params;
-    if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!id) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const body = await parseBody(req, updateMasterPortfolioItemSchema);
     const masterId = await getCurrentMasterProviderId(user.id);
@@ -40,9 +40,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 export async function DELETE(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const { id } = await ctx.params;
-    if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!id) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     const masterId = await getCurrentMasterProviderId(user.id);
     const data = await deleteMasterPortfolioItem(masterId, id);
     return jsonOk(data);

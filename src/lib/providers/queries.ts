@@ -24,7 +24,7 @@ export async function listProviderCards(input: ListProviderCardsInput = {}) {
       select: { id: true },
     });
     if (!cursorProvider) {
-      throw new AppError("Invalid cursor", 400, "VALIDATION_ERROR");
+      throw new AppError("Некорректный курсор пагинации.", 400, "VALIDATION_ERROR");
     }
   }
 

@@ -29,11 +29,11 @@ export async function serverApiFetch<T>(
   const json = (await res.json().catch(() => null)) as ApiResponse<T> | null;
 
   if (!res.ok) {
-    return { ok: false, error: { message: `API error: ${res.status}` } };
+    return { ok: false, error: { message: `Ошибка запроса к сервису: ${res.status}.` } };
   }
 
   if (!json) {
-    return { ok: false, error: { message: "Invalid API response" } };
+    return { ok: false, error: { message: "Некорректный ответ сервиса." } };
   }
 
   return json;

@@ -32,7 +32,7 @@ export async function GET(req: Request) {
 
     const appUrl = resolvePublicAppUrl(req.url);
     if (!appUrl) {
-      throw new AppError("APP_PUBLIC_URL is not configured", 500, "APP_PUBLIC_URL_MISSING");
+      throw new AppError("Не настроен APP_PUBLIC_URL.", 500, "APP_PUBLIC_URL_MISSING");
     }
 
     const providerId = await getCurrentMasterProviderId(auth.user.id);
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
 
     const appUrl = resolvePublicAppUrl(req.url);
     if (!appUrl) {
-      throw new AppError("APP_PUBLIC_URL is not configured", 500, "APP_PUBLIC_URL_MISSING");
+      throw new AppError("Не настроен APP_PUBLIC_URL.", 500, "APP_PUBLIC_URL_MISSING");
     }
 
     const body = await parseBody(req, bodySchema);
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
       select: { publicUsername: true },
     });
     if (!current) {
-      throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+      throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
     }
 
     if (current.publicUsername && current.publicUsername !== normalized) {

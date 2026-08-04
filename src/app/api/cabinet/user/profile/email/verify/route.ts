@@ -31,7 +31,7 @@ const verifySchema = z.object({
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await parseBody(req, verifySchema);
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail, clientIp);
     if (!lockCheck.ok) {
       return NextResponse.json(
-        { ok: false, error: { message: lockCheck.error ?? "Locked", code: "RATE_LIMITED" } },
+        { ok: false, error: { message: lockCheck.error ?? "Слишком много попыток. Попробуйте позже.", code: "RATE_LIMITED" } },
         {
           status: lockCheck.status,
           headers: { "Retry-After": String(lockCheck.retryAfterSec) },
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           {
             ok: false,
-            error: { message: failResult.error ?? "Locked", code: "RATE_LIMITED" },
+            error: { message: failResult.error ?? "Слишком много попыток. Попробуйте позже.", code: "RATE_LIMITED" },
           },
           {
             status: failResult.status,

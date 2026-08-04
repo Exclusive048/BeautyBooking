@@ -51,7 +51,7 @@ export async function GET(
     select: { id: true, type: true },
   });
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const studio = await prisma.studio.findUnique({
@@ -59,7 +59,7 @@ export async function GET(
     select: { id: true },
   });
   if (!studio) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const invites = await prisma.studioInvite.findMany({
@@ -87,15 +87,15 @@ export async function POST(
     select: { id: true, type: true, ownerUserId: true },
   });
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
   const phone = normalizeInvitePhone(parsed.data.phone);
   if (!phone || phone.length < 8) {
-    return fail("Invalid phone", 400, "VALIDATION_ERROR");
+    return fail("Некорректный номер телефона.", 400, "VALIDATION_ERROR");
   }
 
   const studio = await prisma.studio.findUnique({
@@ -103,7 +103,7 @@ export async function POST(
     select: { id: true },
   });
   if (!studio) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   try {
@@ -165,7 +165,7 @@ export async function DELETE(
     select: { id: true, type: true },
   });
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const studio = await prisma.studio.findUnique({
@@ -173,12 +173,12 @@ export async function DELETE(
     select: { id: true },
   });
   if (!studio) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const body = await req.json().catch(() => null);
   const parsed = revokeSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const phone = parsed.data.phone ? normalizeInvitePhone(parsed.data.phone) : null;
 
@@ -192,7 +192,7 @@ export async function DELETE(
   });
 
   if (!invite) {
-    return fail("Invite not found", 404, "INVITE_NOT_FOUND");
+    return fail("Приглашение не найдено.", 404, "INVITE_NOT_FOUND");
   }
 
   if (invite.status !== MembershipStatus.PENDING) {

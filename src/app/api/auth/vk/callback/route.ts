@@ -60,7 +60,7 @@ async function upsertVkLink(params: { userId: string; vkUserId: string; deviceId
   });
 
   if (existing && existing.userId !== params.userId) {
-    throw new AppError("VK already linked to another user", 409, "VK_ALREADY_LINKED");
+    throw new AppError("Этот аккаунт VK уже привязан к другому пользователю.", 409, "VK_ALREADY_LINKED");
   }
 
   await prisma.vkLink.upsert({
@@ -91,13 +91,13 @@ function parseVkCallback(url: URL): z.infer<typeof callbackSchema> {
       try {
         payloadValue = JSON.parse(decodeURIComponent(payloadRaw));
       } catch {
-        throw new AppError("VK payload is invalid", 400, "VALIDATION_ERROR");
+        throw new AppError("Не удалось войти через VK. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
       }
     }
 
     const parsed = callbackSchema.safeParse(payloadValue);
     if (!parsed.success) {
-      throw new AppError("VK payload is invalid", 400, "VALIDATION_ERROR");
+      throw new AppError("Не удалось войти через VK. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
     }
     return parsed.data;
   }
@@ -110,7 +110,7 @@ function parseVkCallback(url: URL): z.infer<typeof callbackSchema> {
   };
   const parsed = callbackSchema.safeParse(directValue);
   if (!parsed.success) {
-    throw new AppError("VK callback is missing required params", 400, "VALIDATION_ERROR");
+    throw new AppError("Не удалось войти через VK. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
   }
   return parsed.data;
 }
@@ -121,7 +121,7 @@ export async function GET(req: Request) {
     // is bypassable by hitting `callback` directly (this is the leg that issues
     // the session). Refuse before touching cookies / creds / OAuth exchange.
     if (!isVkAuthEnabled) {
-      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     const cookieStore = await cookies();
@@ -136,10 +136,10 @@ export async function GET(req: Request) {
       clearVkCookies(cookieStore);
 
       if (!expectedState || parsedCallback.state !== expectedState) {
-        return fail("Invalid state", 400, "VK_STATE_INVALID");
+        return fail("Некорректное состояние запроса.", 400, "VK_STATE_INVALID");
       }
       if (!codeVerifier) {
-        return fail("VK code verifier is missing", 400, "VALIDATION_ERROR");
+        return fail("Сессия входа через VK истекла. Начните заново.", 400, "VALIDATION_ERROR");
       }
 
       // RKN-FIX-01: the flags are trusted only after the signature AND the
@@ -212,7 +212,7 @@ export async function GET(req: Request) {
         : null;
 
       if (!user && link) {
-        throw new AppError("VK already linked to another user", 409, "VK_ALREADY_LINKED");
+        throw new AppError("Этот аккаунт VK уже привязан к другому пользователю.", 409, "VK_ALREADY_LINKED");
       }
 
       if (!user) {

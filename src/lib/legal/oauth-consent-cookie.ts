@@ -39,7 +39,7 @@ export const TELEGRAM_CONSENT_COOKIE = "tg_login_consent";
 function requireSigningSecret(): string {
   const secret = env.AUTH_JWT_SECRET;
   if (!secret) {
-    throw new AppError("AUTH_JWT_SECRET is not configured", 500, "INTERNAL_ERROR");
+    throw new AppError("Не настроен AUTH_JWT_SECRET.", 500, "INTERNAL_ERROR");
   }
   return secret;
 }

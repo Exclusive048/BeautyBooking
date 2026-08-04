@@ -262,7 +262,7 @@ async function resolveTargetProvider(req: Request, userId: string): Promise<Acto
   }
 
   if (!studioId || !masterId) {
-    throw new AppError("Validation error", 400, "VALIDATION_ERROR");
+    throw new AppError("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
   }
 
   await ensureStudioRole({
@@ -276,7 +276,7 @@ async function resolveTargetProvider(req: Request, userId: string): Promise<Acto
     select: { providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const master = await prisma.provider.findFirst({
@@ -288,7 +288,7 @@ async function resolveTargetProvider(req: Request, userId: string): Promise<Acto
     select: { id: true },
   });
   if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   return {
@@ -386,7 +386,7 @@ function applyPatchToState(
   // legacy single-row mutations are applied on top of this.
   if (body.bookingExceptions !== undefined) {
     if (!Array.isArray(body.bookingExceptions)) {
-      throw new AppError("Invalid body", 400, "INVALID_BODY");
+      throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
     }
     nextExceptions = body.bookingExceptions.map((raw) => {
       const normalized = normalizeExceptionInput(raw);
@@ -419,7 +419,7 @@ function applyPatchToState(
 
   if (body.bufferBetweenBookingsMin !== undefined) {
     if (typeof body.bufferBetweenBookingsMin !== "number") {
-      throw new AppError("Invalid body", 400, "INVALID_BODY");
+      throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
     }
     nextBuffer = body.bufferBetweenBookingsMin;
   }
@@ -466,7 +466,7 @@ async function upsertStudioMasterRequest(input: {
     select: { id: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const pending = await prisma.scheduleChangeRequest.findFirst({
@@ -526,7 +526,7 @@ async function buildResponse(input: {
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const actor = await resolveTargetProvider(req, user.id);
     const data = await buildResponse({
@@ -550,12 +550,12 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const actor = await resolveTargetProvider(req, user.id);
 
     const body = (await req.json().catch(() => null)) as PatchBody | null;
     if (!body || typeof body !== "object") {
-      throw new AppError("Invalid body", 400, "INVALID_BODY");
+      throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
     }
 
     const currentSnapshot = await buildScheduleSnapshot(actor.providerId);
@@ -615,7 +615,7 @@ export async function PATCH(req: Request) {
 
     if (actor.mode === "STUDIO_MASTER") {
       if (!actor.studioProviderId) {
-        throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+        throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
       }
       const requestPayload = toScheduleEditorRequestPayload(nextState);
       const requestResult = await upsertStudioMasterRequest({

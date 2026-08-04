@@ -95,7 +95,7 @@ export async function validateReferenceAsset(input: {
     throw new AppError("Некорректный референс.", 400, "REFERENCE_PHOTO_INVALID");
   }
   if (asset.createdByUserId && asset.createdByUserId !== input.clientUserId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   if (asset.entityType !== MediaEntityType.BOOKING || !asset.entityId.startsWith("pending:")) {
     throw new AppError("Референс уже используется.", 409, "REFERENCE_PHOTO_USED");
@@ -126,7 +126,7 @@ export async function resolveBookingExtras(input: {
     },
   });
   if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
 
   const answers = input.bookingAnswers ?? [];
@@ -148,7 +148,7 @@ export async function resolveBookingExtras(input: {
   // Guest cannot attach a reference (uploads are auth-only). If a guest
   // submits an asset id, reject with FORBIDDEN — they should log in.
   if (input.referencePhotoAssetId && !input.clientUserId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const referencePhotoAssetId =

@@ -20,12 +20,12 @@ export async function PATCH(
   const params = await context.params;
   const index = parseIndex(params.index);
   if (index === null) {
-    return fail("Invalid index", 400, "VALIDATION_ERROR");
+    return fail("Некорректный индекс.", 400, "VALIDATION_ERROR");
   }
 
   const moved = await retryDeadJobByIndex(index);
   if (!moved) {
-    return fail("Dead queue item not found", 404, "NOT_FOUND");
+    return fail("Задача в очереди не найдена.", 404, "NOT_FOUND");
   }
 
   return ok({ ok: true, index });
@@ -41,12 +41,12 @@ export async function DELETE(
   const params = await context.params;
   const index = parseIndex(params.index);
   if (index === null) {
-    return fail("Invalid index", 400, "VALIDATION_ERROR");
+    return fail("Некорректный индекс.", 400, "VALIDATION_ERROR");
   }
 
   const removed = await deleteDeadJobByIndex(index);
   if (!removed) {
-    return fail("Dead queue item not found", 404, "NOT_FOUND");
+    return fail("Задача в очереди не найдена.", 404, "NOT_FOUND");
   }
 
   return ok({ ok: true, index });

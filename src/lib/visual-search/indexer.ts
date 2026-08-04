@@ -41,11 +41,11 @@ type PortfolioAsset = {
 
 function toVectorLiteral(embedding: number[]): string {
   if (embedding.length !== EMBEDDING_DIMENSIONS) {
-    throw new AppError("Invalid embedding dimensions", 500, "INTERNAL_ERROR");
+    throw new AppError("Некорректная размерность вектора.", 500, "INTERNAL_ERROR");
   }
   const items = embedding.map((value) => {
     if (!Number.isFinite(value)) {
-      throw new AppError("Embedding contains non-finite value", 500, "INTERNAL_ERROR");
+      throw new AppError("Вектор содержит недопустимое значение.", 500, "INTERNAL_ERROR");
     }
     return Number(value).toString();
   });
@@ -56,7 +56,7 @@ async function readStorageBytes(storageKey: string, mimeType: string): Promise<U
   const storage = getStorageProvider();
   const object = await storage.getObject(storageKey, mimeType);
   if (!object) {
-    throw new AppError("Media asset file not found in storage", 404, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Файл не найден в хранилище.", 404, "MEDIA_ASSET_NOT_FOUND");
   }
 
   const chunks: Uint8Array[] = [];

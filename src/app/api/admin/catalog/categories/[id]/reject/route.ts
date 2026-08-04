@@ -25,14 +25,14 @@ export async function POST(req: Request, ctx: RouteContext) {
 
   try {
     const { id } = await ctx.params;
-    if (!id) return fail("Not found", 404, "NOT_FOUND");
+    if (!id) return fail("Ничего не найдено.", 404, "NOT_FOUND");
 
     // Body is optional for backwards compatibility with the legacy UI
     // that didn't send one. New admin catalog UI always sends a reason.
     const rawBody = await req.json().catch(() => undefined);
     const parsed = bodySchema.safeParse(rawBody);
     if (!parsed.success) {
-      return fail("Invalid reason", 400, "VALIDATION_ERROR");
+      return fail("Некорректная причина.", 400, "VALIDATION_ERROR");
     }
     const reason = parsed.data?.reason;
 
@@ -41,10 +41,10 @@ export async function POST(req: Request, ctx: RouteContext) {
       select: { id: true, name: true, slug: true, proposedBy: true, status: true },
     });
     if (!category) {
-      return fail("Not found", 404, "NOT_FOUND");
+      return fail("Ничего не найдено.", 404, "NOT_FOUND");
     }
     if (category.status !== CategoryStatus.PENDING) {
-      return fail("Category is not pending moderation", 409, "CONFLICT");
+      return fail("Категория не находится на модерации.", 409, "CONFLICT");
     }
 
     const updated = await prisma.$transaction(async (tx) => {

@@ -69,7 +69,7 @@ export async function POST(
 
   const body = await req.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const result = await createProviderService(p.id, parsed.data);
   if (!result.ok) return fail(result.message, result.status, result.code);
@@ -90,7 +90,7 @@ export async function PATCH(
 
   const body = await req.json().catch(() => null);
   const parsed = toggleSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const result = await setProviderServiceEnabled(p.id, parsed.data.serviceId, parsed.data.isEnabled);
   if (!result.ok) return fail(result.message, result.status, result.code);
@@ -111,18 +111,18 @@ export async function PUT(
 
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   if (parsed.data.onlinePaymentEnabled === true) {
     const plan = await getCurrentPlan(auth.user.id, SubscriptionScope.STUDIO);
     if (!plan.features.onlinePayments) {
-      return fail("Feature not available", 403, "FEATURE_GATE", {
+      return fail("Функция недоступна на текущем тарифе.", 403, "FEATURE_GATE", {
         feature: "onlinePayments",
         requiredPlan: "PRO",
       });
     }
     if (!plan.system.onlinePaymentsEnabled) {
-      return fail("Feature disabled by system", 403, "SYSTEM_FEATURE_DISABLED", {
+      return fail("Функция отключена администратором.", 403, "SYSTEM_FEATURE_DISABLED", {
         feature: "onlinePayments",
       });
     }
@@ -148,7 +148,7 @@ export async function DELETE(
 
   const body = await req.json().catch(() => null);
   const parsed = deleteSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const result = await deleteProviderService(p.id, parsed.data.serviceId);
   if (!result.ok) return fail(result.message, result.status, result.code);

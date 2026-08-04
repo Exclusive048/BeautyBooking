@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const body = await parseBody(req, createReviewSchema);

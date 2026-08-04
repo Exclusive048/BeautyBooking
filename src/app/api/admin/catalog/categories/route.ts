@@ -223,7 +223,7 @@ export async function POST(req: Request) {
       }
       const hasCycle = await wouldCreateCycle(null, parentId);
       if (hasCycle) {
-        return fail("Circular category reference", 400, "BAD_REQUEST");
+        return fail("Категория не может быть вложена сама в себя.", 400, "BAD_REQUEST");
       }
     }
 

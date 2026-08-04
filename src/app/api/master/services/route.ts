@@ -19,7 +19,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const masterId = await getCurrentMasterProviderId(user.id);
     const data = await getMasterProfileData(masterId);
@@ -94,7 +94,7 @@ function extractFieldErrors(details: unknown): Record<string, string> | undefine
 export async function PUT(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, upsertMasterServicesSchema);
 
@@ -137,7 +137,7 @@ export async function PATCH(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, createMasterServiceSchema);
     if (body.onlinePaymentEnabled === true) {

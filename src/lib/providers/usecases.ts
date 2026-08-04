@@ -62,10 +62,10 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
   });
 
   if (!provider) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
   if (!provider.isPublished) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   const profile = mapProviderProfile(provider);

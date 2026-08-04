@@ -252,7 +252,7 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
     },
   });
   if (!provider) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const discountRule = await prisma.discountRule.findUnique({

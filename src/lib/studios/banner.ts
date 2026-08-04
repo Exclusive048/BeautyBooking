@@ -25,7 +25,7 @@ async function validateStudioBannerAsset(studioProviderId: string, assetId: stri
     asset.entityId !== studioProviderId ||
     asset.kind !== MediaKind.PORTFOLIO
   ) {
-    throw new AppError("Banner asset is invalid", 400, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Некорректное изображение баннера.", 400, "MEDIA_ASSET_NOT_FOUND");
   }
 }
 

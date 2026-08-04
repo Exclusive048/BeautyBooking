@@ -69,13 +69,13 @@ async function clearSystemConfigFocal(key: string): Promise<void> {
 
 function validateUploadBasics(input: UploadMediaInput): void {
   if (!input.entityId.trim()) {
-    throw new AppError("entityId is required", 400, "MEDIA_ENTITY_ID_REQUIRED");
+    throw new AppError("Не указан идентификатор объекта.", 400, "MEDIA_ENTITY_ID_REQUIRED");
   }
   if (!MEDIA_ALLOWED_MIME_TYPES.includes(input.mimeType as (typeof MEDIA_ALLOWED_MIME_TYPES)[number])) {
-    throw new AppError("Unsupported image type", 400, "MEDIA_INVALID_MIME");
+    throw new AppError("Неподдерживаемый формат изображения.", 400, "MEDIA_INVALID_MIME");
   }
   if (input.sizeBytes <= 0 || input.sizeBytes > MEDIA_MAX_FILE_SIZE_BYTES) {
-    throw new AppError("File is too large", 400, "MEDIA_FILE_TOO_LARGE");
+    throw new AppError("Файл слишком большой.", 400, "MEDIA_FILE_TOO_LARGE");
   }
 }
 
@@ -195,7 +195,7 @@ async function enforcePortfolioLimit(
     if (limitKey) {
       throw createLimitReachedError(limitKey, limit, count);
     }
-    throw new AppError("Portfolio limit reached", 409, "MEDIA_PORTFOLIO_LIMIT_REACHED");
+    throw new AppError("Достигнут лимит работ в портфолио.", 409, "MEDIA_PORTFOLIO_LIMIT_REACHED");
   }
 }
 
@@ -333,7 +333,7 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
       replaceAsset.entityId !== entityId ||
       replaceAsset.kind !== input.kind
     ) {
-      throw new AppError("replaceAssetId mismatch", 400, "MEDIA_REPLACE_ASSET_MISMATCH");
+      throw new AppError("Заменяемый файл не совпадает.", 400, "MEDIA_REPLACE_ASSET_MISMATCH");
     }
     await deleteAssetById(replaceAsset.id);
   }
@@ -605,7 +605,7 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
     where: { id: assetId },
   });
   if (!asset || asset.deletedAt) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Файл не найден.", 404, "MEDIA_ASSET_NOT_FOUND");
   }
 
   await ensureCanManageMedia(user, asset.entityType, asset.entityId, asset.kind);
@@ -686,7 +686,7 @@ export async function updateMediaCrop(
     where: { id: assetId },
   });
   if (!asset || asset.deletedAt) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Файл не найден.", 404, "MEDIA_ASSET_NOT_FOUND");
   }
 
   await ensureCanManageMedia(user, asset.entityType, asset.entityId, asset.kind);
@@ -712,10 +712,10 @@ export async function getMediaFile(
     where: { id: assetId },
   });
   if (!asset || asset.deletedAt) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Файл не найден.", 404, "MEDIA_ASSET_NOT_FOUND");
   }
   if (asset.status !== MediaAssetStatus.READY) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND");
+    throw new AppError("Файл не найден.", 404, "MEDIA_ASSET_NOT_FOUND");
   }
 
   await ensureCanReadMedia(user, asset.entityType, asset.entityId, asset.kind);
@@ -723,7 +723,7 @@ export async function getMediaFile(
   const storage = getStorageProvider();
   const file = await storage.getObject(asset.storageKey, asset.mimeType);
   if (!file) {
-    throw new AppError("Media asset not found", 404, "MEDIA_ASSET_NOT_FOUND", {
+    throw new AppError("Файл не найден.", 404, "MEDIA_ASSET_NOT_FOUND", {
       reason: "STORAGE_MISSING",
       assetId: asset.id,
     });

@@ -58,10 +58,10 @@ export function mapEmailAlreadyUsedConflict(error: unknown): AppError | null {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     if (!isEmailConfigured()) {
-      return jsonFail(503, "Email login is not configured", "SYSTEM_FEATURE_DISABLED");
+      return jsonFail(503, "Вход по email не настроен.", "SYSTEM_FEATURE_DISABLED");
     }
 
     const body = await parseBody(req, requestSchema);
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     });
     if (!rateLimit.ok) {
       return NextResponse.json(
-        { ok: false, error: { message: rateLimit.error ?? "Rate limited", code: "RATE_LIMITED" } },
+        { ok: false, error: { message: rateLimit.error ?? "Слишком много запросов. Попробуйте позже.", code: "RATE_LIMITED" } },
         {
           status: rateLimit.status,
           headers: { "Retry-After": String(rateLimit.retryAfterSec) },

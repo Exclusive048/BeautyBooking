@@ -20,12 +20,12 @@ const subscribeBodySchema = z.object({
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await req.json().catch(() => null);
     const parsed = subscribeBodySchema.safeParse(body);
     if (!parsed.success) {
-      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
+      return fail("Проверьте правильность заполнения полей.", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
     const { endpoint, keys } = parsed.data;
     const { p256dh, auth } = keys;

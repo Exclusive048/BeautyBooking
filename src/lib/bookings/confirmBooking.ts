@@ -73,7 +73,7 @@ export async function confirmBooking(
       requestedBy: true,
     },
   });
-  if (!booking) throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+  if (!booking) throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
 
   const runtimeStatus = resolveBookingRuntimeStatus({
     status: booking.status,
@@ -82,11 +82,11 @@ export async function confirmBooking(
   });
 
   if (runtimeStatus === "REJECTED") {
-    throw new AppError("Booking rejected", 409, "BOOKING_CANCELLED");
+    throw new AppError("Запись отклонена.", 409, "BOOKING_CANCELLED");
   }
 
   if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
-    throw new AppError("Booking already started", 409, "CONFLICT");
+    throw new AppError("Запись уже началась.", 409, "CONFLICT");
   }
 
   if (runtimeStatus === "CONFIRMED") {
@@ -102,21 +102,21 @@ export async function confirmBooking(
 
   if (runtimeStatus === "PENDING") {
     if (actor !== "MASTER") {
-      throw new AppError("Forbidden", 403, "FORBIDDEN");
+      throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     }
   } else if (runtimeStatus === "CHANGE_REQUESTED") {
     if (!booking.actionRequiredBy || booking.actionRequiredBy !== actor) {
-      throw new AppError("Action is required from another side", 409, "CONFLICT");
+      throw new AppError("Сейчас ход за другой стороной.", 409, "CONFLICT");
     }
     startAtUtc = booking.proposedStartAt;
     endAtUtc = booking.proposedEndAt;
     appliesRequestedChange = true;
   } else {
-    throw new AppError("Booking cannot be confirmed in current state", 409, "CONFLICT");
+    throw new AppError("Запись нельзя подтвердить в текущем статусе.", 409, "CONFLICT");
   }
 
   if (!isValidDate(startAtUtc) || !isValidDate(endAtUtc)) {
-    throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Укажите время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
 
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
@@ -163,7 +163,7 @@ export async function confirmBooking(
           return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
         });
         if (conflict) {
-          throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
+          throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
         }
 
         // FIX-TIMEBLOCK-ENFORCEMENT-01: confirming a reschedule applies the
@@ -212,7 +212,7 @@ export async function confirmBooking(
       error instanceof Prisma.PrismaClientKnownRequestError &&
       (error.code === "P2034" || error.code === "P2002")
     ) {
-      throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
+      throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
     }
     throw error;
   }

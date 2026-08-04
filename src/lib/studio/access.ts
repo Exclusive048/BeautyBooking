@@ -20,7 +20,7 @@ export async function ensureStudioRole(input: {
     },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const isOwner =
@@ -37,7 +37,7 @@ export async function ensureStudioRole(input: {
   });
 
   if (!membership || !hasAllowedRole(membership.roles, input.allowed)) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 }
 

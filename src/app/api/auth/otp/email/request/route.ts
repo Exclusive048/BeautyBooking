@@ -17,7 +17,7 @@ import { extractClientIp } from "@/lib/http/ip";
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
     if (!isEmailConfigured()) {
-      return fail("Email login is not configured", 503, "EMAIL_NOT_CONFIGURED");
+      return fail("Вход по email не настроен.", 503, "EMAIL_NOT_CONFIGURED");
     }
 
     const body = await req.json().catch(() => null);

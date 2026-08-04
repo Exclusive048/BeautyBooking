@@ -109,7 +109,7 @@ export async function getMasterClients(input: ClientsPageInput): Promise<MasterC
     select: { id: true, type: true, timezone: true },
   });
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const bookings = await prisma.booking.findMany({

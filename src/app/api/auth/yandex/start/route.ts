@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     // AUTH-KILLSWITCH-ENFORCE-01: refuse when Yandex auth is disabled
     // server-side (FZ-199 kill-switch), before any cred read / OAuth work.
     if (!isYandexAuthEnabled) {
-      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     // RKN-FIX-01 — identical consent capture to the VK start route (see there
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     } catch (error) {
       const appError = error instanceof AppError ? error : toAppError(error);
       if (YANDEX_NOT_CONFIGURED_CODES.has(appError.code)) {
-        return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+        return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
       }
       return fail(appError.message, appError.status, appError.code, appError.details);
     }

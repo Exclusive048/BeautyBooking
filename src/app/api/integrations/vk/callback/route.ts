@@ -66,7 +66,7 @@ export async function GET(req: Request) {
     // AUTH-KILLSWITCH-ENFORCE-01: gate the connect callback too (issues the VK
     // link) — a gate on `start` alone is bypassable by hitting `callback`.
     if (!isVkAuthEnabled) {
-      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     const auth = await requireAuth();
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const payloadRaw = url.searchParams.get("payload");
     if (!payloadRaw) {
-      return fail("VK payload is missing", 400, "VALIDATION_ERROR");
+      return fail("Не удалось войти через VK. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
     }
 
     let payloadValue: unknown;
@@ -85,13 +85,13 @@ export async function GET(req: Request) {
       try {
         payloadValue = JSON.parse(decodeURIComponent(payloadRaw));
       } catch {
-        return fail("VK payload is invalid", 400, "VALIDATION_ERROR");
+        return fail("Не удалось войти через VK. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
       }
     }
 
     const parsedPayload = payloadSchema.safeParse(payloadValue);
     if (!parsedPayload.success) {
-      return fail("VK payload is invalid", 400, "VALIDATION_ERROR");
+      return fail("Не удалось войти через VK. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
     }
 
     const cookieStore = await cookies();
@@ -100,10 +100,10 @@ export async function GET(req: Request) {
     clearVkCookies(cookieStore);
 
     if (!expectedState || parsedPayload.data.state !== expectedState) {
-      return fail("Invalid state", 400, "VK_STATE_INVALID");
+      return fail("Некорректное состояние запроса.", 400, "VK_STATE_INVALID");
     }
     if (!codeVerifier) {
-      return fail("VK code verifier is missing", 400, "VALIDATION_ERROR");
+      return fail("Сессия входа через VK истекла. Начните заново.", 400, "VALIDATION_ERROR");
     }
 
     const redirectUri = requireVkRedirectUri("integrations");

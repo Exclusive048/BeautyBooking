@@ -10,7 +10,7 @@ type AuthResult =
 export async function requireAuth(): Promise<AuthResult> {
   const user = await getSessionUser();
   if (!user) {
-    return { ok: false, response: fail("Unauthorized", 401, "UNAUTHORIZED") };
+    return { ok: false, response: fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED") };
   }
   return { ok: true, user };
 }
@@ -22,7 +22,7 @@ export async function requireSession(): Promise<AuthResult> {
 export async function requireAuthFromRequest(req: Request): Promise<AuthResult> {
   const user = await getSessionUserFromRequest(req);
   if (!user) {
-    return { ok: false, response: fail("Unauthorized", 401, "UNAUTHORIZED") };
+    return { ok: false, response: fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED") };
   }
   return { ok: true, user };
 }
@@ -43,14 +43,14 @@ export function hasAdminRole(user: RoleAware): boolean {
 
 export function requireAdmin(user: RoleAware) {
   if (!hasAdminRole(user)) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   return null;
 }
 
 export function requireAnyRole(user: RoleAware, roles: readonly AccountType[]) {
   if (!hasAnyRole(user, roles)) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   return null;
 }

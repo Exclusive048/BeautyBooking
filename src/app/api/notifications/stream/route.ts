@@ -79,7 +79,7 @@ export async function GET(req: Request) {
         operation: "stream-connect",
         code: "UNAUTHORIZED",
       });
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const lastEventId = req.headers.get("last-event-id")?.trim() ?? "";
@@ -118,7 +118,7 @@ export async function GET(req: Request) {
         operation: "stream-connect",
         code: "NOTIFIER_UNAVAILABLE",
       });
-      return jsonFail(503, "Service unavailable", "INTERNAL_ERROR");
+      return jsonFail(503, "Сервис временно недоступен. Попробуйте позже.", "INTERNAL_ERROR");
     }
     const unsubscribe = notifier.subscribe(user.id, (event) => {
       send(event, event.id);

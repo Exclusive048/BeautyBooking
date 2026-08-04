@@ -26,7 +26,7 @@ function getSuggestKey(): string {
   const key = env.YANDEX_SUGGEST_API_KEY ?? "";
   const trimmed = key.trim();
   if (!trimmed) {
-    throw new AppError("Address suggestions unavailable", 503, "INTERNAL_ERROR");
+    throw new AppError("Подсказки адресов временно недоступны.", 503, "INTERNAL_ERROR");
   }
   return trimmed;
 }
@@ -71,11 +71,11 @@ export async function suggestAddresses(input: {
       signal: input.signal,
     });
   } catch {
-    throw new AppError("Address suggestions unavailable", 503, "INTERNAL_ERROR");
+    throw new AppError("Подсказки адресов временно недоступны.", 503, "INTERNAL_ERROR");
   }
 
   if (!response.ok) {
-    throw new AppError("Address suggestions unavailable", 503, "INTERNAL_ERROR");
+    throw new AppError("Подсказки адресов временно недоступны.", 503, "INTERNAL_ERROR");
   }
 
   let payload: YandexSuggestResponse | null = null;
@@ -85,7 +85,7 @@ export async function suggestAddresses(input: {
     payload = null;
   }
   if (!payload || !Array.isArray(payload.results)) {
-    throw new AppError("Address suggestions unavailable", 503, "INTERNAL_ERROR");
+    throw new AppError("Подсказки адресов временно недоступны.", 503, "INTERNAL_ERROR");
   }
 
   const unique = new Map<string, AddressSuggestion>();

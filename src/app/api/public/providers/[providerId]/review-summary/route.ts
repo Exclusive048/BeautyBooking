@@ -15,13 +15,13 @@ export async function GET(
 
   const enabled = await getAiFeaturesEnabled();
   if (!enabled) {
-    return fail("AI features are disabled", 503, "SYSTEM_FEATURE_DISABLED");
+    return fail("AI-функции отключены.", 503, "SYSTEM_FEATURE_DISABLED");
   }
 
   const ip = getClientIp(req);
   const limit = await checkRateLimit(`rl:ai:review-summary:${ip}`, RATE_LIMITS.aiReviewSummary);
   if (limit.limited) {
-    return fail("Too many requests", 429, "RATE_LIMITED");
+    return fail("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
   const provider = await resolveProviderBySlugOrId({
@@ -31,7 +31,7 @@ export async function GET(
   });
 
   if (!provider) {
-    return fail("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    return fail("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   try {
@@ -42,6 +42,6 @@ export async function GET(
       providerId,
       error: error instanceof Error ? error.message : String(error),
     });
-    return fail("Failed to generate review summary", 500, "INTERNAL_ERROR");
+    return fail("Не удалось составить сводку отзывов. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
   }
 }

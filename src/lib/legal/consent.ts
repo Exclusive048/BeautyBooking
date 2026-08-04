@@ -61,7 +61,7 @@ export function consentTypesFromFlags(flags: ConsentFlags): ConsentType[] {
 export function assertRequiredConsents(flags: ConsentFlags | null | undefined): asserts flags is ConsentFlags {
   if (!hasRequiredConsents(flags)) {
     throw new AppError(
-      "Consent to the user agreement and to personal-data processing is required",
+      "Необходимо согласие с офертой и с обработкой персональных данных.",
       400,
       "CONSENT_REQUIRED",
     );

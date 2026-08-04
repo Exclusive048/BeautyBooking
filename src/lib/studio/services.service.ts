@@ -42,7 +42,7 @@ async function getStudioContext(studioId: string): Promise<StudioContext> {
     select: { id: true, providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
   return studio;
 }
@@ -162,10 +162,10 @@ export async function updateStudioCategory(input: {
     select: { id: true, studioId: true },
   });
   if (!category) {
-    throw new AppError("Category not found", 404, "NOT_FOUND");
+    throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
   }
   if (category.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   await prisma.serviceCategory.update({
     where: { id: input.categoryId },
@@ -183,7 +183,7 @@ export async function reorderStudioCategories(input: {
     select: { id: true },
   });
   if (existing.length !== input.orderedIds.length) {
-    throw new AppError("Some categories were not found", 404, "NOT_FOUND");
+    throw new AppError("Часть категорий не найдена.", 404, "NOT_FOUND");
   }
 
   await prisma.$transaction(
@@ -226,7 +226,7 @@ export async function createStudioService(input: {
       select: { studioId: true },
     });
     if (!category || category.studioId !== studio.id) {
-      throw new AppError("Category not found", 404, "NOT_FOUND");
+      throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
     }
   }
 
@@ -315,10 +315,10 @@ export async function updateStudioService(input: {
     select: { id: true, studioId: true, globalCategoryId: true },
   });
   if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
   if (service.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (input.categoryId) {
@@ -327,7 +327,7 @@ export async function updateStudioService(input: {
       select: { studioId: true },
     });
     if (!category || category.studioId !== input.studioId) {
-      throw new AppError("Category not found", 404, "NOT_FOUND");
+      throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
     }
   }
 
@@ -411,7 +411,7 @@ export async function reorderStudioServices(input: {
     select: { id: true },
   });
   if (services.length !== input.orderedIds.length) {
-    throw new AppError("Some services were not found", 404, "NOT_FOUND");
+    throw new AppError("Часть услуг не найдена.", 404, "NOT_FOUND");
   }
 
   await prisma.$transaction(
@@ -509,10 +509,10 @@ export async function deleteStudioService(input: {
     select: { id: true, studioId: true },
   });
   if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
   if (service.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   await prisma.service.delete({ where: { id: service.id } });
   return { id: service.id };

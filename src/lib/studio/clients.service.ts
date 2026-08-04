@@ -96,7 +96,7 @@ export async function getStudioClients(input: ClientsPageInput): Promise<StudioC
     select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const bookings = await prisma.booking.findMany({

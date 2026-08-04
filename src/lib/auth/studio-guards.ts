@@ -34,7 +34,7 @@ export async function ensureStudioMembership(
   allowedRoles: StudioRole[]
 ): Promise<GuardResult> {
   const { studio, isOwner } = await getStudioOwnership(studioId, userId);
-  if (!studio) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  if (!studio) return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
 
   if (isOwner) return null;
 
@@ -48,7 +48,7 @@ export async function ensureStudioMembership(
   });
 
   if (!membership || !hasAnyRole(membership.roles, allowedRoles)) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   return null;

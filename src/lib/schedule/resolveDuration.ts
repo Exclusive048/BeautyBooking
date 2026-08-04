@@ -11,7 +11,7 @@ export async function resolveServiceDuration(masterId: string, serviceId: string
     select: { id: true, type: true, studioId: true },
   });
   if (!master || master.type !== ProviderType.MASTER) {
-    return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
 
   const service = await prisma.service.findUnique({
@@ -25,15 +25,15 @@ export async function resolveServiceDuration(masterId: string, serviceId: string
     },
   });
   if (!service) {
-    return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
   }
   if (!service.isEnabled || !service.isActive) {
-    return { ok: false, status: 409, message: "Service unavailable", code: "SERVICE_DISABLED" };
+    return { ok: false, status: 409, message: "Сервис временно недоступен. Попробуйте позже.", code: "SERVICE_DISABLED" };
   }
 
   if (master.studioId) {
     if (service.providerId !== master.studioId) {
-      return { ok: false, status: 400, message: "Service not in studio", code: "SERVICE_INVALID" };
+      return { ok: false, status: 400, message: "Услуга не принадлежит студии.", code: "SERVICE_INVALID" };
     }
 
     const override = await prisma.masterService.findUnique({
@@ -47,14 +47,14 @@ export async function resolveServiceDuration(masterId: string, serviceId: string
     });
 
     if (!override || override.isEnabled === false) {
-      return { ok: false, status: 409, message: "Service not assigned to master", code: "SERVICE_INVALID" };
+      return { ok: false, status: 409, message: "Услуга не назначена мастеру.", code: "SERVICE_INVALID" };
     }
 
     return { ok: true, data: override?.durationOverrideMin ?? service.durationMin };
   }
 
   if (service.providerId !== master.id) {
-    return { ok: false, status: 400, message: "Service not in provider", code: "SERVICE_INVALID" };
+    return { ok: false, status: 400, message: "Услуга не принадлежит профилю.", code: "SERVICE_INVALID" };
   }
 
   return { ok: true, data: service.durationMin };

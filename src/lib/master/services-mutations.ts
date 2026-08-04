@@ -61,7 +61,7 @@ export async function updateMasterService(
     select: { id: true, providerId: true, globalCategoryId: true },
   });
   if (!service || service.providerId !== masterId) {
-    throw new AppError("Service not found", 404, "NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "NOT_FOUND");
   }
 
   const context = await getMasterContext(masterId);
@@ -82,14 +82,14 @@ export async function updateMasterService(
       select: { id: true, visualSearchSlug: true },
     });
     if (!category || category.visualSearchSlug === "hot") {
-      throw new AppError("Global category not found", 404, "NOT_FOUND");
+      throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
     }
   }
 
   const data: Prisma.ServiceUpdateInput = {};
   if (input.name !== undefined) {
     const trimmed = input.name.trim();
-    if (!trimmed) throw new AppError("Name is required", 400, "VALIDATION_ERROR");
+    if (!trimmed) throw new AppError("Укажите название.", 400, "VALIDATION_ERROR");
     data.name = trimmed;
     // Keep `title` in sync when not explicitly overridden — solo masters
     // typically don't distinguish; downstream `title || name` fallback
@@ -157,7 +157,7 @@ export async function deleteMasterService(
     },
   });
   if (!service || service.providerId !== masterId) {
-    throw new AppError("Service not found", 404, "NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "NOT_FOUND");
   }
   if (service._count.bookings > 0) {
     throw new AppError(
@@ -234,11 +234,11 @@ async function reorderRow(input: {
               select: { id: true, masterId: true, sortOrder: true, createdAt: true },
             });
       if (!target) {
-        throw new AppError("Not found", 404, "NOT_FOUND");
+        throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
       }
       const ownerId = "providerId" in target ? target.providerId : target.masterId;
       if (ownerId !== input.masterId) {
-        throw new AppError("Not found", 404, "NOT_FOUND");
+        throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
       }
 
       const neighbourWhere =
@@ -314,11 +314,11 @@ export async function createMasterPackage(
 ): Promise<{ id: string }> {
   const trimmedName = input.name.trim();
   if (!trimmedName) {
-    throw new AppError("Name is required", 400, "VALIDATION_ERROR");
+    throw new AppError("Укажите название.", 400, "VALIDATION_ERROR");
   }
   const uniqueServiceIds = uniqueIds(input.serviceIds);
   if (uniqueServiceIds.length < 2) {
-    throw new AppError("Bundle requires at least 2 services", 400, "VALIDATION_ERROR");
+    throw new AppError("В пакет нужно добавить минимум 2 услуги.", 400, "VALIDATION_ERROR");
   }
 
   await ensureServicesBelongToMaster(masterId, uniqueServiceIds);
@@ -364,13 +364,13 @@ export async function updateMasterPackage(
     },
   });
   if (!pkg || pkg.masterId !== masterId) {
-    throw new AppError("Package not found", 404, "NOT_FOUND");
+    throw new AppError("Пакет услуг не найден.", 404, "NOT_FOUND");
   }
 
   const data: Prisma.ServicePackageUpdateInput = {};
   if (input.name !== undefined) {
     const trimmed = input.name.trim();
-    if (!trimmed) throw new AppError("Name is required", 400, "VALIDATION_ERROR");
+    if (!trimmed) throw new AppError("Укажите название.", 400, "VALIDATION_ERROR");
     data.name = trimmed;
   }
   if (input.discountType !== undefined) data.discountType = input.discountType;
@@ -384,7 +384,7 @@ export async function updateMasterPackage(
     : null;
   if (desiredServiceIds !== null) {
     if (desiredServiceIds.length < 2) {
-      throw new AppError("Bundle requires at least 2 services", 400, "VALIDATION_ERROR");
+      throw new AppError("В пакет нужно добавить минимум 2 услуги.", 400, "VALIDATION_ERROR");
     }
     await ensureServicesBelongToMaster(masterId, desiredServiceIds);
   }
@@ -422,7 +422,7 @@ export async function deleteMasterPackage(
     select: { id: true, masterId: true },
   });
   if (!pkg || pkg.masterId !== masterId) {
-    throw new AppError("Package not found", 404, "NOT_FOUND");
+    throw new AppError("Пакет услуг не найден.", 404, "NOT_FOUND");
   }
   await prisma.servicePackage.delete({ where: { id: packageId } });
   return { id: packageId, deleted: true };
@@ -434,7 +434,7 @@ async function ensureServicesBelongToMaster(masterId: string, serviceIds: string
     select: { id: true },
   });
   if (services.length !== serviceIds.length) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
 }
 

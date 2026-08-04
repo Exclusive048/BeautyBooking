@@ -65,7 +65,7 @@ const updateSchema = z
       data.bannerAssetId !== undefined ||
       data.cancellationDeadlineHours !== undefined ||
       data.remindersEnabled !== undefined,
-    { message: "At least one field is required" }
+    { message: "Заполните хотя бы одно поле." }
   );
 
 function coordsRequired() {
@@ -87,7 +87,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
   if (accessError) return accessError;
 
   const studio = await getStudioProviderById(id);
-  if (!studio) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  if (!studio) return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
 
   return ok({ studio });
 }
@@ -140,7 +140,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     const appError = error instanceof AppError ? error : toAppError(error);
     return fail(appError.message, appError.status, appError.code, appError.details);
   }
-  if (!updated) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  if (!updated) return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
 
   return ok({ studio: updated });
 }

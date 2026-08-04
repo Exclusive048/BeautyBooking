@@ -56,7 +56,7 @@ export async function ensureStudioTeamLimit(studioId: string): Promise<void> {
     },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const ownerUserId = studio.ownerUserId ?? studio.provider.ownerUserId;

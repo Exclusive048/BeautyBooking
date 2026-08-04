@@ -693,7 +693,7 @@ export async function markNotificationRead(
     select: { id: true, userId: true, deletedAt: true },
   });
   if (!notification || notification.userId !== userId || notification.deletedAt) {
-    throw new AppError("Notification not found", 404, "NOT_FOUND");
+    throw new AppError("Уведомление не найдено.", 404, "NOT_FOUND");
   }
 
   await prisma.notification.update({
@@ -783,7 +783,7 @@ export async function setNotificationRead(
     select: { id: true, userId: true, deletedAt: true },
   });
   if (!notification || notification.userId !== userId || notification.deletedAt) {
-    throw new AppError("Notification not found", 404, "NOT_FOUND");
+    throw new AppError("Уведомление не найдено.", 404, "NOT_FOUND");
   }
   await prisma.notification.update({
     where: { id: notificationId },

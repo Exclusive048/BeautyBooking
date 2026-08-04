@@ -78,7 +78,7 @@ export async function POST(req: Request) {
           code: "INVALID_WEBHOOK_TOKEN",
         });
         alertWebhookFailure("yookassa", "INVALID_WEBHOOK_TOKEN");
-        return fail("Unauthorized", 401, "UNAUTHORIZED");
+        return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
       }
     } else if (env.NODE_ENV === "production" && !warnedUnsetTokenInProd) {
       warnedUnsetTokenInProd = true;
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       });
       if (IP_ALLOWLIST_ENFORCED) {
         alertWebhookFailure("yookassa", "IP_NOT_ALLOWED", { ip: allowlistCheck.ip });
-        return fail("Forbidden", 403, "FORBIDDEN");
+        return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       }
     }
 
@@ -119,7 +119,7 @@ export async function POST(req: Request) {
         operation: "yookassa-ingress",
         code: "BAD_PAYLOAD",
       });
-      return fail("Bad request", 400, "BAD_REQUEST");
+      return fail("Некорректный запрос.", 400, "BAD_REQUEST");
     }
 
     // ── 4. Enqueue — 200 only after the job is durably queued ───────────────
@@ -141,7 +141,7 @@ export async function POST(req: Request) {
         code: "QUEUE_ENQUEUE_FAILED",
       });
       // 5xx → YooKassa retries (24h redelivery window).
-      return fail("Service unavailable", 503, "SERVICE_UNAVAILABLE");
+      return fail("Сервис временно недоступен. Попробуйте позже.", 503, "SERVICE_UNAVAILABLE");
     }
 
     logInfo("YooKassa webhook accepted and queued", { event: parsed.data.event });

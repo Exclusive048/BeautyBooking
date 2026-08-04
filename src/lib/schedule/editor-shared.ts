@@ -347,7 +347,7 @@ function normalizeBreaks(values: unknown, startTime: string, endTime: string): B
 
   for (let index = 1; index < rows.length; index += 1) {
     if (rows[index].startMinutes < rows[index - 1].endMinutes) {
-      throw new AppError("Breaks overlap", 400, "BREAK_OVERLAP");
+      throw new AppError("Перерывы пересекаются.", 400, "BREAK_OVERLAP");
     }
   }
   return rows.map((row) => ({ start: row.start, end: row.end, title: row.title }));
@@ -356,7 +356,7 @@ function normalizeBreaks(values: unknown, startTime: string, endTime: string): B
 export function parseDateKeyToUtcStart(dateKey: string): Date {
   const parts = parseDateKeyParts(dateKey);
   if (!parts) {
-    throw new AppError("Invalid date", 400, "DATE_INVALID");
+    throw new AppError("Некорректная дата.", 400, "DATE_INVALID");
   }
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0));
 }
@@ -379,13 +379,13 @@ export function buildDefaultWeekSchedule(): DayScheduleDto[] {
 
 export function normalizeWeekScheduleInput(value: unknown): DayScheduleDto[] {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new AppError("Invalid body", 400, "INVALID_BODY");
+    throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
   }
 
   const byDay = new Map<number, DayScheduleDto>();
   for (const row of value) {
     if (!row || typeof row !== "object") {
-      throw new AppError("Invalid body", 400, "INVALID_BODY");
+      throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
     }
 
     const record = row as Record<string, unknown>;
@@ -396,11 +396,11 @@ export function normalizeWeekScheduleInput(value: unknown): DayScheduleDto[] {
       dayOfWeekRaw < 0 ||
       dayOfWeekRaw > 6
     ) {
-      throw new AppError("Invalid day of week", 400, "DAY_INVALID");
+      throw new AppError("Некорректный день недели.", 400, "DAY_INVALID");
     }
     const dayOfWeek = dayOfWeekRaw as number;
     if (byDay.has(dayOfWeek)) {
-      throw new AppError("Duplicate day", 400, "VALIDATION_ERROR");
+      throw new AppError("День недели указан дважды.", 400, "VALIDATION_ERROR");
     }
 
     const scheduleMode = parseScheduleMode(record.scheduleMode);
@@ -411,7 +411,7 @@ export function normalizeWeekScheduleInput(value: unknown): DayScheduleDto[] {
     const startTime = normalizeTime(record.startTime) ?? fallbackStart;
     const endTime = normalizeTime(record.endTime) ?? fallbackEnd;
     if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-      throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
+      throw new AppError("Некорректный диапазон времени.", 400, "TIME_RANGE_INVALID");
     }
     const breaks =
       isWorkday && scheduleMode === "FLEXIBLE"
@@ -430,13 +430,13 @@ export function normalizeWeekScheduleInput(value: unknown): DayScheduleDto[] {
   }
 
   if (byDay.size !== 7) {
-    throw new AppError("Week schedule must contain 7 days", 400, "VALIDATION_ERROR");
+    throw new AppError("Расписание недели должно содержать 7 дней.", 400, "VALIDATION_ERROR");
   }
 
   return Array.from({ length: 7 }, (_, dayOfWeek) => {
     const day = byDay.get(dayOfWeek);
     if (!day) {
-      throw new AppError("Week schedule must contain 7 days", 400, "VALIDATION_ERROR");
+      throw new AppError("Расписание недели должно содержать 7 дней.", 400, "VALIDATION_ERROR");
     }
     return day;
   });
@@ -444,11 +444,11 @@ export function normalizeWeekScheduleInput(value: unknown): DayScheduleDto[] {
 
 export function normalizeExceptionInput(value: unknown): EditorExceptionInput {
   if (!value || typeof value !== "object") {
-    throw new AppError("Invalid body", 400, "INVALID_BODY");
+    throw new AppError("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
   }
   const record = value as Record<string, unknown>;
   if (typeof record.date !== "string") {
-    throw new AppError("Invalid date", 400, "DATE_INVALID");
+    throw new AppError("Некорректная дата.", 400, "DATE_INVALID");
   }
 
   const scheduleMode = parseScheduleMode(record.scheduleMode);
@@ -459,7 +459,7 @@ export function normalizeExceptionInput(value: unknown): EditorExceptionInput {
 
   if (isWorkday && scheduleMode === "FLEXIBLE") {
     if (!startTime || !endTime || timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-      throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
+      throw new AppError("Некорректный диапазон времени.", 400, "TIME_RANGE_INVALID");
     }
   }
 
@@ -558,7 +558,7 @@ export function isScheduleEditorRequestPayload(value: unknown): value is Schedul
 
 export function normalizeScheduleEditorRequestPayload(value: unknown): NormalizedScheduleState {
   if (!isScheduleEditorRequestPayload(value)) {
-    throw new AppError("Invalid schedule payload", 400, "INVALID_BODY");
+    throw new AppError("Некорректные данные расписания.", 400, "INVALID_BODY");
   }
   return normalizeScheduleState({
     weekSchedule: value.weekSchedule,

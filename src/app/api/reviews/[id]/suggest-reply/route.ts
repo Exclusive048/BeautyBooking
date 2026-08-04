@@ -21,12 +21,12 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const enabled = await getAiFeaturesEnabled();
     if (!enabled) {
-      return jsonFail(503, "AI features are disabled", "SYSTEM_FEATURE_DISABLED");
+      return jsonFail(503, "AI-функции отключены.", "SYSTEM_FEATURE_DISABLED");
     }
 
     const limit = await checkRateLimit(
@@ -34,13 +34,13 @@ export async function POST(req: Request, ctx: RouteContext) {
       RATE_LIMITS.aiSuggestReply,
     );
     if (limit.limited) {
-      return jsonFail(429, "Too many requests", "RATE_LIMITED");
+      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
     }
 
     const params = await ctx.params;
     const parsedParams = reviewIdParamSchema.safeParse(params);
     if (!parsedParams.success) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     // `findFirst` lets us combine the unique id with the soft-delete
@@ -66,11 +66,11 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     if (!review) {
-      return jsonFail(404, "Review not found", "NOT_FOUND");
+      return jsonFail(404, "Отзыв не найден.", "NOT_FOUND");
     }
 
     if (review.replyText) {
-      return jsonFail(400, "Review already has a reply", "ALREADY_EXISTS");
+      return jsonFail(400, "На отзыв уже есть ответ.", "ALREADY_EXISTS");
     }
 
     const provider = await prisma.provider.findFirst({
@@ -82,7 +82,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     if (!provider) {
-      return jsonFail(404, "Provider not found", "PROVIDER_NOT_FOUND");
+      return jsonFail(404, "Профиль не найден.", "PROVIDER_NOT_FOUND");
     }
 
     const isOwner =
@@ -90,7 +90,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       provider.masterProfile?.userId === user.id;
 
     if (!isOwner) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const suggestion = await suggestReviewReply({
@@ -101,7 +101,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     if (!suggestion) {
-      return jsonFail(500, "Failed to generate suggestion", "INTERNAL_ERROR");
+      return jsonFail(500, "Не удалось составить подсказку. Попробуйте ещё раз.", "INTERNAL_ERROR");
     }
 
     return jsonOk({ suggestion });

@@ -67,15 +67,15 @@ export function minutesUntilStart(startAtUtc: Date | null, now: Date = new Date(
 
 export function ensureBookingActionWindow(startAtUtc: Date | null, now: Date = new Date()): void {
   if (!startAtUtc) {
-    throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Укажите время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
   const minutesLeft = minutesUntilStart(startAtUtc, now);
   if (minutesLeft === null) {
-    throw new AppError("Booking time is invalid", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Некорректное время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
   if (minutesLeft < BOOKING_ACTION_WINDOW_MINUTES) {
     throw new AppError(
-      "Cancellation and reschedule are unavailable less than 60 minutes before start",
+      "Отменить или перенести запись можно не позднее чем за 60 минут до начала.",
       409,
       "CONFLICT"
     );
@@ -89,11 +89,11 @@ export function ensureCancellationDeadline(
 ): void {
   if (deadlineHours === null || deadlineHours === undefined) return;
   if (!startAtUtc) {
-    throw new AppError("Booking time is missing", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Укажите время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
   const startMs = startAtUtc.getTime();
   if (!Number.isFinite(startMs)) {
-    throw new AppError("Booking time is invalid", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Некорректное время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
 
   if (deadlineHours <= 0) {

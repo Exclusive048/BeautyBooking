@@ -14,7 +14,7 @@ export async function GET() {
   // VK OAuth mechanism as login — gate it on the same `isVkAuthEnabled` so a
   // disabled VK provider can't be reached via the integrations entry point.
   if (!isVkAuthEnabled) {
-    return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+    return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
   }
 
   const auth = await requireAuth();

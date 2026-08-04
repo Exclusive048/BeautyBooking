@@ -18,13 +18,13 @@ export async function GET(
     const toKey = url.searchParams.get("to") ?? "";
     const limitRaw = url.searchParams.get("limit");
 
-    if (!serviceId) return fail("Service id is required", 400, "SERVICE_REQUIRED");
-    if (!isDateKey(fromKey)) return fail("Invalid from", 400, "DATE_INVALID");
-    if (toKey && !isDateKey(toKey)) return fail("Invalid to", 400, "DATE_INVALID");
+    if (!serviceId) return fail("Укажите услугу.", 400, "SERVICE_REQUIRED");
+    if (!isDateKey(fromKey)) return fail("Некорректная дата начала.", 400, "DATE_INVALID");
+    if (toKey && !isDateKey(toKey)) return fail("Некорректная дата окончания.", 400, "DATE_INVALID");
 
     const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
     if (limitRaw && !Number.isFinite(limit)) {
-      return fail("Invalid limit", 400, "LIMIT_INVALID");
+      return fail("Некорректное значение limit.", 400, "LIMIT_INVALID");
     }
 
     const provider = await prisma.provider.findUnique({
@@ -34,7 +34,7 @@ export async function GET(
       // this endpoint previously skipped (vs `/slots`).
       select: { id: true, timezone: true, minBookingHoursAhead: true },
     });
-    if (!provider) return fail("Master not found", 404, "MASTER_NOT_FOUND");
+    if (!provider) return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
 
     const duration = await resolveServiceDuration(p.id, serviceId);
     if (!duration.ok) return fail(duration.message, duration.status, duration.code);

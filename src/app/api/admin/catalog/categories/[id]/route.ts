@@ -96,7 +96,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         }
         const hasCycle = await wouldCreateCycle(id, parentId);
         if (hasCycle) {
-          return fail("Circular category reference", 400, "BAD_REQUEST");
+          return fail("Категория не может быть вложена сама в себя.", 400, "BAD_REQUEST");
         }
       }
       data.parentId = parentId;

@@ -17,11 +17,11 @@ export const runtime = "nodejs";
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
     const applicationId = params.applicationId;
-    if (!applicationId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!applicationId) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const body = await parseBody(req, rejectApplicationSchema);
 
@@ -43,12 +43,12 @@ export async function POST(req: Request, ctx: RouteContext) {
         },
       },
     });
-    if (!application) return jsonFail(404, "Application not found", "NOT_FOUND");
+    if (!application) return jsonFail(404, "Заявка не найдена.", "NOT_FOUND");
 
     await resolveMasterAccess(application.offer.masterId, user.id);
 
     if (application.status === "CONFIRMED") {
-      return jsonFail(409, "Application already confirmed", "CONFLICT");
+      return jsonFail(409, "Заявка уже подтверждена.", "CONFLICT");
     }
 
     const updated = await prisma.modelApplication.update({

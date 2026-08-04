@@ -18,12 +18,12 @@ export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const enabled = await getAiFeaturesEnabled();
     if (!enabled) {
-      return jsonFail(503, "AI features are disabled", "SYSTEM_FEATURE_DISABLED");
+      return jsonFail(503, "AI-функции отключены.", "SYSTEM_FEATURE_DISABLED");
     }
 
     const limit = await checkRateLimit(
@@ -31,7 +31,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       RATE_LIMITS.aiSuggestDescription,
     );
     if (limit.limited) {
-      return jsonFail(429, "Too many requests", "RATE_LIMITED");
+      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
     }
 
     const { id: serviceId } = await ctx.params;
@@ -55,7 +55,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     if (!service) {
-      return jsonFail(404, "Service not found", "SERVICE_NOT_FOUND");
+      return jsonFail(404, "Услуга не найдена.", "SERVICE_NOT_FOUND");
     }
 
     const isOwner =
@@ -63,7 +63,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       service.provider.masterProfile?.userId === user.id;
 
     if (!isOwner) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const suggestion = await suggestServiceDescription({
@@ -74,7 +74,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     if (!suggestion) {
-      return jsonFail(500, "Failed to generate description", "INTERNAL_ERROR");
+      return jsonFail(500, "Не удалось составить описание. Попробуйте ещё раз.", "INTERNAL_ERROR");
     }
 
     return jsonOk({ suggestion });

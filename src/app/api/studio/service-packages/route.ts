@@ -26,7 +26,7 @@ const bodySchema = createMasterPackageSchema.extend({
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await parseBody(req, bodySchema);
     await ensureStudioRole({
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       where: { id: body.studioId },
       select: { providerId: true },
     });
-    if (!studio) return jsonFail(404, "Studio not found", "STUDIO_NOT_FOUND");
+    if (!studio) return jsonFail(404, "Студия не найдена.", "STUDIO_NOT_FOUND");
 
     const data = await createMasterPackage(studio.providerId, {
       name: body.name,

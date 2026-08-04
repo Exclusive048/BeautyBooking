@@ -24,7 +24,7 @@ export async function resolveStudioMasterProvider(
     select: { id: true, type: true },
   });
   if (!studioProvider || studioProvider.type !== ProviderType.STUDIO) {
-    return { ok: false, status: 404, message: "Studio not found", code: "STUDIO_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
   }
 
   const masterProvider = await prisma.provider.findFirst({
@@ -40,7 +40,7 @@ export async function resolveStudioMasterProvider(
     return {
       ok: false,
       status: 404,
-      message: "Master profile not found",
+      message: "Профиль мастера не найден.",
       code: "MASTER_PROFILE_NOT_FOUND",
     };
   }
@@ -57,7 +57,7 @@ export async function listStudioMemberServices(
     select: { id: true, type: true },
   });
   if (!studioProvider || studioProvider.type !== ProviderType.STUDIO) {
-    return { ok: false, status: 404, message: "Studio not found", code: "STUDIO_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
   }
 
   const services = await prisma.service.findMany({
@@ -106,7 +106,7 @@ export async function setStudioMemberServiceEnabled(
     select: { id: true, providerId: true },
   });
   if (!service || service.providerId !== studioProviderId) {
-    return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
   }
 
   await prisma.masterService.upsert({

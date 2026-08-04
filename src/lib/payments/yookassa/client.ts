@@ -106,7 +106,7 @@ async function yookassaFetch<T>(url: string, body: unknown, idempotenceKey: stri
       (error instanceof DOMException && error.name === "AbortError") ||
       (error instanceof Error && error.name === "AbortError")
     ) {
-      throw new AppError("Payment service timeout", 503, "PAYMENT_TIMEOUT");
+      throw new AppError("Платёжный сервис не отвечает. Попробуйте ещё раз.", 503, "PAYMENT_TIMEOUT");
     }
     throw error;
   } finally {
@@ -224,7 +224,7 @@ async function yookassaGet<T>(url: string): Promise<T | null> {
       (error instanceof DOMException && error.name === "AbortError") ||
       (error instanceof Error && error.name === "AbortError")
     ) {
-      throw new AppError("Payment service timeout", 503, "PAYMENT_TIMEOUT");
+      throw new AppError("Платёжный сервис не отвечает. Попробуйте ещё раз.", 503, "PAYMENT_TIMEOUT");
     }
     throw error;
   } finally {

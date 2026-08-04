@@ -60,10 +60,12 @@ describe("authenticateTelegramLogin — new-vs-existing + guards (characterizati
   it("rejects an invalid Telegram hash → 401 INVALID_HASH (no DB touch)", async () => {
     verifyMock.mockReturnValue(false);
     const result = await authenticateTelegramLogin(makePayload(), "token");
-    expect(result).toEqual({
+    // ERR-LOCALIZATION-01: предмет теста — решение (401 + код), а не текст.
+    // `toMatchObject` вместо `toEqual` c `message` — как в соседнем тесте
+    // «future-skewed auth_date», который и раньше проверял только код.
+    expect(result).toMatchObject({
       ok: false,
       status: 401,
-      message: "Invalid telegram hash",
       code: "INVALID_HASH",
     });
     expect(userFindUnique).not.toHaveBeenCalled();
@@ -73,10 +75,9 @@ describe("authenticateTelegramLogin — new-vs-existing + guards (characterizati
     verifyMock.mockReturnValue(true);
     const stale = NOW_SECONDS() - 3601; // just past the 1h freshness window
     const result = await authenticateTelegramLogin(makePayload({ auth_date: stale }), "token");
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       status: 401,
-      message: "Auth data expired",
       code: "AUTH_DATE_EXPIRED",
     });
   });

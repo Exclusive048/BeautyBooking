@@ -180,7 +180,7 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
   ]);
 
   if (!user) {
-    throw new AppError("User not found", 404, "NOT_FOUND");
+    throw new AppError("Пользователь не найден.", 404, "NOT_FOUND");
   }
 
   // We expose `telegramUsername` on UserProfile (carried from initial login)

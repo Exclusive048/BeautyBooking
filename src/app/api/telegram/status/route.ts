@@ -9,7 +9,7 @@ export async function GET() {
 
   const botUsername = getTelegramBotUsername();
   if (!botUsername) {
-    return fail("Telegram bot username is not configured", 500, "TELEGRAM_BOT_USERNAME_MISSING");
+    return fail("Не настроено имя Telegram-бота.", 500, "TELEGRAM_BOT_USERNAME_MISSING");
   }
 
   const status = await getTelegramLinkSummary(auth.user.id);

@@ -24,10 +24,10 @@ export async function GET(
   const limit = Number.parseInt(limitRaw, 10);
 
   if (!isDateKey(fromKey)) {
-    return fail("Invalid from", 400, "DATE_INVALID");
+    return fail("Некорректная дата начала.", 400, "DATE_INVALID");
   }
   if (!Number.isInteger(limit) || limit <= 0 || limit > 14) {
-    return fail("Invalid limit", 400, "LIMIT_INVALID");
+    return fail("Некорректное значение limit.", 400, "LIMIT_INVALID");
   }
 
   const provider = await resolveProviderBySlugOrId({
@@ -36,7 +36,7 @@ export async function GET(
     requirePublished: true,
   });
   if (!provider || provider.type !== "MASTER") {
-    return fail("Master not found", 404, "MASTER_NOT_FOUND");
+    return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const scanToKeyExclusive = addDaysToDateKey(fromKey, MAX_SCAN_DAYS);

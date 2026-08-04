@@ -33,7 +33,7 @@ async function loadBookingAccess(bookingId: string): Promise<BookingAccess> {
     },
   });
   if (!booking) {
-    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+    throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
   return booking;
 }
@@ -91,14 +91,14 @@ export async function requireProviderOwner(
     where: { id: providerId },
     select: { id: true, type: true, ownerUserId: true, studioId: true },
   });
-  if (!provider) throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+  if (!provider) throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
 
   if (provider.ownerUserId === user.userId) return;
 
   const studioId = await resolveStudioIdForProvider(provider);
   if (studioId && (await isStudioAdmin(user.userId, studioId))) return;
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
 export async function requireBookingCancelAccess(
@@ -124,7 +124,7 @@ export async function requireBookingCancelAccess(
     return { cancelledBy: "PROVIDER" };
   }
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
 export async function requireBookingConfirmAccess(
@@ -144,7 +144,7 @@ export async function requireBookingConfirmAccess(
   const studioId = await resolveStudioIdForProvider(booking.provider);
   if (studioId && (await isStudioAdmin(user.userId, studioId))) return { actor: "MASTER" };
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
 export async function requireBookingRescheduleAccess(
@@ -161,7 +161,7 @@ export async function requireBookingRescheduleAccess(
   const studioId = await resolveStudioIdForProvider(booking.provider);
   if (studioId && (await isStudioAdmin(user.userId, studioId))) return { actor: "MASTER" };
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
 export async function requireMasterOwner(userId: string, masterId: string): Promise<void> {
@@ -170,9 +170,9 @@ export async function requireMasterOwner(userId: string, masterId: string): Prom
     select: { id: true, type: true, ownerUserId: true },
   });
   if (!master || master.type !== ProviderType.MASTER) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
   if (master.ownerUserId !== userId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 }

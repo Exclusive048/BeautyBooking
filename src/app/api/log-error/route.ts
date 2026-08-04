@@ -26,19 +26,19 @@ export async function POST(req: Request) {
     // (SECURITY-EXPOSURE-AUDIT-01 · Y2). Guard on `!allowed`.
     const allowed = await checkRateLimit(`log-error:${ip}`, RATE_MAX, RATE_WINDOW);
     if (!allowed) {
-      return fail("Too many requests", 429);
+      return fail("Слишком много запросов. Попробуйте позже.", 429);
     }
 
     let body: unknown;
     try {
       body = await req.json();
     } catch {
-      return fail("Invalid JSON", 400);
+      return fail("Некорректный формат запроса.", 400);
     }
 
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      return fail("Invalid payload", 400);
+      return fail("Проверьте правильность заполнения полей.", 400);
     }
 
     const { message, digest, url, userAgent } = parsed.data;

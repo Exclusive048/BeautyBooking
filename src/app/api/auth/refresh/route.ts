@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         operation: "refresh-post",
         code: "NO_REFRESH_TOKEN",
       });
-      return fail("No refresh token", 401, "UNAUTHORIZED");
+      return fail("Сессия не найдена. Войдите заново.", 401, "UNAUTHORIZED");
     }
 
     const response = ok({ ok: true });
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         operation: "refresh-post",
         code: "INVALID_REFRESH_TOKEN",
       });
-      const unauthorized = fail("Invalid refresh token", 401, "UNAUTHORIZED");
+      const unauthorized = fail("Сессия истекла. Войдите заново.", 401, "UNAUTHORIZED");
       clearSessionCookies(unauthorized);
       unauthorized.headers.set("Cache-Control", "no-store");
       return unauthorized;

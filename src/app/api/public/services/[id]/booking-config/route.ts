@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: RouteContext) {
   try {
     const { id } = await ctx.params;
-    if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!id) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const config = await getPublicServiceBookingConfig(id);
     return jsonOk(config);

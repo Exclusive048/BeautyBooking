@@ -79,7 +79,7 @@ function buildRedirectUri(base: string, mode: "auth" | "integrations"): string {
 export function requireVkRedirectUri(mode: "auth" | "integrations"): string {
   const redirectUri = getVkRedirectUri();
   if (!redirectUri) {
-    throw new AppError("VK ID redirect uri is not configured", 500, "VK_ID_REDIRECT_URI_MISSING");
+    throw new AppError("Не настроен VK_REDIRECT_URI.", 500, "VK_ID_REDIRECT_URI_MISSING");
   }
   return buildRedirectUri(redirectUri, mode);
 }
@@ -91,7 +91,7 @@ export function buildVkAuthorizeUrl(input: {
 }): string {
   const clientId = getVkClientId();
   if (!clientId) {
-    throw new AppError("VK ID client id is not configured", 500, "VK_ID_CLIENT_ID_MISSING");
+    throw new AppError("Не настроен VK_CLIENT_ID.", 500, "VK_ID_CLIENT_ID_MISSING");
   }
 
   const url = new URL(VK_ID_AUTHORIZE_URL);
@@ -125,10 +125,10 @@ export async function exchangeVkCodeForToken(input: {
   const clientId = getVkClientId();
   const clientSecret = getVkClientSecret();
   if (!clientId) {
-    throw new AppError("VK ID client id is not configured", 500, "VK_ID_CLIENT_ID_MISSING");
+    throw new AppError("Не настроен VK_CLIENT_ID.", 500, "VK_ID_CLIENT_ID_MISSING");
   }
   if (!clientSecret) {
-    throw new AppError("VK ID client secret is not configured", 500, "VK_ID_CLIENT_SECRET_MISSING");
+    throw new AppError("Не настроен VK_CLIENT_SECRET.", 500, "VK_ID_CLIENT_SECRET_MISSING");
   }
 
   const body = new URLSearchParams();
@@ -148,7 +148,7 @@ export async function exchangeVkCodeForToken(input: {
   });
   const json = (await res.json().catch(() => null)) as VkIdTokenResponse | null;
   if (!json) {
-    throw new AppError("VK ID token request failed", 502, "VK_ID_OAUTH_FAILED");
+    throw new AppError("Не удалось войти через VK. Попробуйте ещё раз.", 502, "VK_ID_OAUTH_FAILED");
   }
 
   if ("error" in json) {
@@ -156,11 +156,11 @@ export async function exchangeVkCodeForToken(input: {
   }
 
   if (!res.ok) {
-    throw new AppError("VK ID token request failed", 502, "VK_ID_OAUTH_FAILED", json);
+    throw new AppError("Не удалось войти через VK. Попробуйте ещё раз.", 502, "VK_ID_OAUTH_FAILED", json);
   }
 
   if (!json.access_token || !json.refresh_token) {
-    throw new AppError("VK ID token response is incomplete", 502, "VK_ID_OAUTH_FAILED", json);
+    throw new AppError("Не удалось войти через VK. Попробуйте ещё раз.", 502, "VK_ID_OAUTH_FAILED", json);
   }
 
   return {
@@ -174,7 +174,7 @@ export async function exchangeVkCodeForToken(input: {
 export async function fetchVkProfile(accessToken: string): Promise<VkProfile> {
   const clientId = getVkClientId();
   if (!clientId) {
-    throw new AppError("VK ID client id is not configured", 500, "VK_ID_CLIENT_ID_MISSING");
+    throw new AppError("Не настроен VK_CLIENT_ID.", 500, "VK_ID_CLIENT_ID_MISSING");
   }
 
   const body = new URLSearchParams();
@@ -188,20 +188,20 @@ export async function fetchVkProfile(accessToken: string): Promise<VkProfile> {
   });
   const json = (await res.json().catch(() => null)) as VkIdUserInfoResponse | null;
   if (!json) {
-    throw new AppError("VK ID profile request failed", 502, "VK_ID_PROFILE_FAILED");
+    throw new AppError("Не удалось получить профиль VK. Попробуйте ещё раз.", 502, "VK_ID_PROFILE_FAILED");
   }
 
   if ("error" in json && json.error) {
-    throw new AppError(json.error_description ?? "VK ID profile request failed", 502, "VK_ID_PROFILE_FAILED", json);
+    throw new AppError(json.error_description ?? "Не удалось получить профиль VK. Попробуйте ещё раз.", 502, "VK_ID_PROFILE_FAILED", json);
   }
 
   if (!res.ok) {
-    throw new AppError("VK ID profile request failed", 502, "VK_ID_PROFILE_FAILED", json);
+    throw new AppError("Не удалось получить профиль VK. Попробуйте ещё раз.", 502, "VK_ID_PROFILE_FAILED", json);
   }
 
   const user = "user" in json ? json.user : null;
   if (!user || !user.user_id) {
-    throw new AppError("VK ID profile is missing", 502, "VK_ID_PROFILE_FAILED", json);
+    throw new AppError("Не удалось получить профиль VK. Попробуйте ещё раз.", 502, "VK_ID_PROFILE_FAILED", json);
   }
 
   return {

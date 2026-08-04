@@ -25,7 +25,7 @@ async function buildMasterAnalyticsContext(providerId: string): Promise<Analytic
     select: { id: true, type: true, timezone: true },
   });
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   return {
@@ -110,7 +110,7 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
     },
   });
   if (!provider || provider.type !== "MASTER") {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const context = await buildMasterAnalyticsContext(provider.id);

@@ -22,9 +22,9 @@ export const runtime = "nodejs";
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const { id } = await ctx.params;
-    if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!id) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const body = await parseBody(req, bodySchema);
     await ensureStudioRole({

@@ -36,26 +36,26 @@ export async function POST(req: Request) {
     // effective kill-switch as login — a disabled provider must not link, even
     // with a bot token present. Refuse before touching session / hash / DB.
     if (!(await getTelegramEnabled())) {
-      return jsonFail(503, "Telegram not configured", "SYSTEM_FEATURE_DISABLED");
+      return jsonFail(503, "Вход через Telegram не настроен.", "SYSTEM_FEATURE_DISABLED");
     }
 
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const body = await parseBody(req, telegramLoginSchema);
 
     const botToken = env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
-      return jsonFail(503, "Telegram not configured", "SYSTEM_FEATURE_DISABLED");
+      return jsonFail(503, "Вход через Telegram не настроен.", "SYSTEM_FEATURE_DISABLED");
     }
 
     if (!verifyTelegramLogin(body, botToken)) {
-      return jsonFail(401, "Invalid telegram hash", "INVALID_HASH");
+      return jsonFail(401, "Не удалось проверить данные Telegram.", "INVALID_HASH");
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     if (!isAuthDateFresh(body.auth_date, nowSeconds)) {
-      return jsonFail(401, "Auth data expired", "AUTH_DATE_EXPIRED");
+      return jsonFail(401, "Данные входа устарели. Попробуйте ещё раз.", "AUTH_DATE_EXPIRED");
     }
 
     const telegramId = String(body.id);

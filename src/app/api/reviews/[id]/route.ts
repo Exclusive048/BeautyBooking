@@ -23,13 +23,13 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const params = await ctx.params;
     const parsedParam = reviewIdParamSchema.safeParse(params);
     if (!parsedParam.success) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     const body = await parseBody(req, updateReviewBodySchema);
@@ -61,13 +61,13 @@ export async function DELETE(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+      return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     }
 
     const params = await ctx.params;
     const parsed = reviewIdParamSchema.safeParse(params);
     if (!parsed.success) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     const result = await deleteReview({

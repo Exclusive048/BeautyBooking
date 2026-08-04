@@ -147,7 +147,10 @@ describe("rescheduleBooking — policy enforcement (MASTER-RESCHEDULE-FIX-A)", (
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("CONFLICT");
-      expect(result.message).toContain("pending change request");
+      // ERR-LOCALIZATION-01: `code` уже проверен строкой выше — этот ассерт
+      // различает, КАКОЙ именно CONFLICT вернулся (их несколько на этом пути),
+      // поэтому проверяем курируемый текст, а не выкидываем проверку.
+      expect(result.message).toContain("запрос на перенос");
     }
   });
 });

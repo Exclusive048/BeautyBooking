@@ -23,7 +23,7 @@ export async function toggleProviderFavorite(
     select: { id: true, isPublished: true },
   });
   if (!provider || !provider.isPublished) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
   const providerId = provider.id;
 

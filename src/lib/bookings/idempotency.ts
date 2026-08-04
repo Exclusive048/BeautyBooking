@@ -95,7 +95,7 @@ export async function resolveBookingIdempotency(input: {
   try {
     acquired = await setIdempotencyPending(input.key, input.ttlSeconds);
   } catch {
-    throw new AppError("Service temporarily unavailable", 503, "INTERNAL_ERROR");
+    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 503, "INTERNAL_ERROR");
   }
   if (!acquired) {
     const booking = await waitForIdempotencyResult(input.key, input.userId);

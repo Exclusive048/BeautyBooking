@@ -39,7 +39,7 @@ export async function POST(
       provider: { select: { name: true, ownerUserId: true } },
     },
   });
-  if (!studio) return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+  if (!studio) return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
 
   const membership = await prisma.studioMembership.findFirst({
     where: {
@@ -51,11 +51,11 @@ export async function POST(
   });
 
   if (!membership) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (membership.roles.includes(StudioRole.OWNER)) {
-    return fail("Owner cannot leave studio", 403, "OWNER_CANNOT_LEAVE");
+    return fail("Владелец не может покинуть свою студию.", 403, "OWNER_CANNOT_LEAVE");
   }
 
   const canLeave =
@@ -63,7 +63,7 @@ export async function POST(
     membership.roles.includes(StudioRole.ADMIN);
 
   if (!canLeave) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   await prisma.studioMembership.update({

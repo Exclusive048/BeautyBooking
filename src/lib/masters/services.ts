@@ -12,7 +12,7 @@ export async function resolveGlobalMasterProvider(userId: string): Promise<Resul
     return {
       ok: false,
       status: 404,
-      message: "Master profile not found",
+      message: "Профиль мастера не найден.",
       code: "MASTER_PROFILE_NOT_FOUND",
     };
   }

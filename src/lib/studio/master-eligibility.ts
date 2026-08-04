@@ -67,7 +67,7 @@ export async function requireActiveStudioMaster(input: {
     select: { id: true, ownerUserId: true, isPublished: true, timezone: true },
   });
   if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
   if (!isStudioMasterActive(master)) {
     throw new AppError(

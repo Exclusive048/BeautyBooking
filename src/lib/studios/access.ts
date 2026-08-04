@@ -12,7 +12,7 @@ export async function ensureStudioAccess(
   });
 
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   if (provider.ownerUserId === userId) return null;
@@ -23,7 +23,7 @@ export async function ensureStudioAccess(
   });
 
   if (!studio) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (studio.ownerUserId === userId) return null;
@@ -34,7 +34,7 @@ export async function ensureStudioAccess(
   });
 
   if (!membership) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   return null;
@@ -50,7 +50,7 @@ export async function ensureStudioAdmin(
   });
 
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   if (provider.ownerUserId === userId) return null;
@@ -61,7 +61,7 @@ export async function ensureStudioAdmin(
   });
 
   if (!studio) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (studio.ownerUserId === userId) return null;
@@ -77,7 +77,7 @@ export async function ensureStudioAdmin(
   });
 
   if (!membership) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   return null;
@@ -93,7 +93,7 @@ export async function ensureStudioOwner(
   });
 
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   if (provider.ownerUserId === userId) return null;
@@ -104,7 +104,7 @@ export async function ensureStudioOwner(
   });
 
   if (!studio) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (studio.ownerUserId === userId) return null;
@@ -120,7 +120,7 @@ export async function ensureStudioOwner(
   });
 
   if (!membership) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   return null;
@@ -137,7 +137,7 @@ export async function ensureStudioAdminOrMasterSelf(
   });
 
   if (!provider || provider.type !== ProviderType.STUDIO) {
-    return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+    return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   if (provider.ownerUserId === userId) return null;
@@ -148,7 +148,7 @@ export async function ensureStudioAdminOrMasterSelf(
   });
 
   if (!studio) {
-    return fail("Forbidden", 403, "FORBIDDEN");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   if (studio.ownerUserId === userId) return null;
@@ -179,5 +179,5 @@ export async function ensureStudioAdminOrMasterSelf(
     return null;
   }
 
-  return fail("Forbidden", 403, "FORBIDDEN");
+  return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }

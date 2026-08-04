@@ -8,12 +8,12 @@ function isPositiveInt(value: number): boolean {
 
 function validateCreate(input: ServiceInput): Result<ServiceInput> {
   const name = input.name.trim();
-  if (!name) return { ok: false, status: 400, message: "Service name is required", code: "NAME_REQUIRED" };
+  if (!name) return { ok: false, status: 400, message: "Укажите название услуги.", code: "NAME_REQUIRED" };
   if (!isPositiveInt(input.durationMin) || input.durationMin % 5 !== 0) {
-    return { ok: false, status: 400, message: "Duration must be a positive multiple of 5", code: "DURATION_INVALID" };
+    return { ok: false, status: 400, message: "Длительность должна быть кратна 5 минутам.", code: "DURATION_INVALID" };
   }
   if (!isPositiveInt(input.price)) {
-    return { ok: false, status: 400, message: "Price must be a positive integer", code: "PRICE_INVALID" };
+    return { ok: false, status: 400, message: "Цена должна быть положительным числом.", code: "PRICE_INVALID" };
   }
 
   return { ok: true, data: { ...input, name } };
@@ -22,17 +22,17 @@ function validateCreate(input: ServiceInput): Result<ServiceInput> {
 function validateUpdate(input: ServiceUpdate): Result<ServiceUpdate> {
   if (input.name !== undefined) {
     const name = input.name.trim();
-    if (!name) return { ok: false, status: 400, message: "Service name is required", code: "NAME_REQUIRED" };
+    if (!name) return { ok: false, status: 400, message: "Укажите название услуги.", code: "NAME_REQUIRED" };
     input = { ...input, name };
   }
   if (input.durationMin !== undefined) {
     if (!isPositiveInt(input.durationMin) || input.durationMin % 5 !== 0) {
-      return { ok: false, status: 400, message: "Duration must be a positive multiple of 5", code: "DURATION_INVALID" };
+      return { ok: false, status: 400, message: "Длительность должна быть кратна 5 минутам.", code: "DURATION_INVALID" };
     }
   }
   if (input.price !== undefined) {
     if (!isPositiveInt(input.price)) {
-      return { ok: false, status: 400, message: "Price must be a positive integer", code: "PRICE_INVALID" };
+      return { ok: false, status: 400, message: "Цена должна быть положительным числом.", code: "PRICE_INVALID" };
     }
   }
 
@@ -64,7 +64,7 @@ export async function listProviderServices(providerId: string): Promise<Result<S
     where: { id: providerId },
     select: { id: true },
   });
-  if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+  if (!provider) return { ok: false, status: 404, message: "Профиль не найден.", code: "PROVIDER_NOT_FOUND" };
 
   const services = await prisma.service.findMany({
     where: { providerId },
@@ -85,7 +85,7 @@ export async function createProviderService(
     where: { id: providerId },
     select: { id: true },
   });
-  if (!provider) return { ok: false, status: 404, message: "Provider not found", code: "PROVIDER_NOT_FOUND" };
+  if (!provider) return { ok: false, status: 404, message: "Профиль не найден.", code: "PROVIDER_NOT_FOUND" };
 
   const service = await prisma.service.create({
     data: { providerId, ...validated.data },
@@ -105,7 +105,7 @@ export async function updateProviderService(
   const existing = await prisma.service.findFirst({
     where: { id: serviceId, providerId },
   });
-  if (!existing) return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+  if (!existing) return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
 
   const service = await prisma.service.update({
     where: { id: serviceId },
@@ -123,7 +123,7 @@ export async function deleteProviderService(
     where: { id: serviceId, providerId },
     select: { id: true },
   });
-  if (!existing) return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+  if (!existing) return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
 
   await prisma.$transaction(async (tx) => {
     await tx.modelOffer.updateMany({
@@ -155,7 +155,7 @@ export async function setProviderServiceEnabled(
   const existing = await prisma.service.findFirst({
     where: { id: serviceId, providerId },
   });
-  if (!existing) return { ok: false, status: 404, message: "Service not found", code: "SERVICE_NOT_FOUND" };
+  if (!existing) return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
 
   const service = await prisma.service.update({
     where: { id: serviceId },

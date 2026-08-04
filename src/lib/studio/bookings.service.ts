@@ -138,7 +138,7 @@ export async function createStudioBooking(input: {
     select: { id: true, providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const service = await prisma.service.findFirst({
@@ -158,7 +158,7 @@ export async function createStudioBooking(input: {
     },
   });
   if (!service || !service.isActive) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
 
   // STUDIO-BUGS-FIX-A bug #5: only ACTIVE master can accept bookings.
@@ -181,7 +181,7 @@ export async function createStudioBooking(input: {
     },
   });
   if (!override || !override.isEnabled) {
-    throw new AppError("Master does not provide this service", 409, "SERVICE_INVALID");
+    throw new AppError("Мастер не выполняет эту услугу.", 409, "SERVICE_INVALID");
   }
 
   const durationMin = override.durationOverrideMin ?? service.baseDurationMin ?? service.durationMin;
@@ -372,7 +372,7 @@ export async function moveStudioBooking(input: {
     },
   });
   if (!booking) {
-    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+    throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
   // SECURITY-EXPOSURE-AUDIT-01 #1 (R1d): the guard was null-permissive
   // (`booking.studioId && …`), so a solo-master booking (studioId === null)
@@ -386,7 +386,7 @@ export async function moveStudioBooking(input: {
     select: { providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
   const targetMaster = await requireActiveStudioMaster({
     studioProviderId: studio.providerId,
@@ -650,13 +650,13 @@ export async function updateMasterBookingStatus(input: {
     },
   });
   if (!booking) {
-    throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+    throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
   const belongsToMaster =
     booking.masterProviderId === input.masterId ||
     (booking.masterProviderId === null && booking.providerId === input.masterId);
   if (!belongsToMaster) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const runtimeStatus = resolveBookingRuntimeStatus({
@@ -671,11 +671,11 @@ export async function updateMasterBookingStatus(input: {
   }
 
   if (runtimeStatus === "REJECTED") {
-    throw new AppError("Booking is in terminal state", 409, "VALIDATION_ERROR");
+    throw new AppError("Запись уже завершена — изменить её нельзя.", 409, "VALIDATION_ERROR");
   }
 
   if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
-    throw new AppError("Booking already started", 409, "CONFLICT");
+    throw new AppError("Запись уже началась.", 409, "CONFLICT");
   }
 
   const isRejectAction = input.status === "REJECTED";
@@ -699,7 +699,7 @@ export async function updateMasterBookingStatus(input: {
   }
 
   if ((isRejectAction || isCancelAction) && comment.length === 0) {
-    throw new AppError("Comment is required", 400, "VALIDATION_ERROR");
+    throw new AppError("Укажите комментарий.", 400, "VALIDATION_ERROR");
   }
 
   const updated = await prisma.$transaction(async (tx) => {

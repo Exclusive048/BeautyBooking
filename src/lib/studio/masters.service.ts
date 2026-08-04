@@ -33,7 +33,7 @@ async function getStudioContext(studioId: string): Promise<StudioContext> {
     select: { id: true, providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
   return studio;
 }
@@ -112,7 +112,7 @@ export async function createStudioMaster(input: {
     });
 
     if (existing?.ownerUserId) {
-      throw new AppError("Master with this phone already exists", 409, "ALREADY_EXISTS");
+      throw new AppError("Мастер с таким телефоном уже добавлен.", 409, "ALREADY_EXISTS");
     }
 
     const master = existing
@@ -211,7 +211,7 @@ export async function getStudioMasterDetails(input: {
   });
 
   if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   return {
@@ -303,7 +303,7 @@ export async function updateStudioMasterProfile(input: {
     select: { id: true, ownerUserId: true, isPublished: true },
   });
   if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   // BC-CAP: re-activating a claimed-but-paused master (ownerUserId set,
@@ -356,10 +356,10 @@ export async function revokeStudioMasterInvite(input: {
     select: { id: true, ownerUserId: true, contactPhone: true },
   });
   if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
   if (master.ownerUserId) {
-    throw new AppError("Master is not a pending invite", 409, "MASTER_NOT_INVITED");
+    throw new AppError("У мастера нет активного приглашения.", 409, "MASTER_NOT_INVITED");
   }
 
   const invite = master.contactPhone

@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     });
 
     if (!studio || studio.provider.type !== ProviderType.STUDIO) {
-      return fail("Studio not found", 404, "STUDIO_NOT_FOUND");
+      return fail("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
     }
 
     if (studio.provider.ownerUserId !== user.id) {
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
       });
 
       if (!membership) {
-        return fail("Forbidden", 403, "FORBIDDEN");
+        return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
       }
     }
 
@@ -101,7 +101,7 @@ export async function GET(req: Request) {
     }
 
     if (memberships.length > 1) {
-      return fail("Studio selection required", 409, "STUDIO_SELECTION_REQUIRED");
+      return fail("Выберите студию.", 409, "STUDIO_SELECTION_REQUIRED");
     }
 
     return ok({ provider: null });
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
 
   const pType = providerTypeFromRoles(user.roles);
   if (!pType) {
-    return fail("Forbidden", 403, "FORBIDDEN_ROLE");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN_ROLE");
   }
 
   const existing = await prisma.provider.findFirst({

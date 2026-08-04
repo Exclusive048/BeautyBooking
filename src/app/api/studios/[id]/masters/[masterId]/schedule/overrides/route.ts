@@ -37,7 +37,7 @@ async function ensureMasterInStudio(masterId: string, studioId: string) {
     select: { id: true, type: true, studioId: true },
   });
   if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioId) {
-    return fail("Master not found", 404, "MASTER_NOT_FOUND");
+    return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
   return null;
 }
@@ -127,7 +127,7 @@ export async function PUT(
 
     const body = await req.json().catch(() => null);
     const parsed = overrideSchema.safeParse(body);
-    if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+    if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
     const date = parseISOToUTC(parsed.data.date, "date");
 
@@ -174,7 +174,7 @@ export async function DELETE(
 
     const body = await req.json().catch(() => null);
     const parsed = deleteSchema.safeParse(body);
-    if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+    if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
     const date = parseISOToUTC(parsed.data.date, "date");
 

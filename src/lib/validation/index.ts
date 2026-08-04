@@ -29,14 +29,14 @@ export async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<
   try {
     body = await req.json();
   } catch {
-    throw validationError("Invalid JSON body", {
-      issues: [{ path: "body", message: "Invalid JSON", code: "invalid_json" }],
+    throw validationError("Некорректный формат запроса.", {
+      issues: [{ path: "body", message: "Некорректный формат запроса.", code: "invalid_json" }],
     });
   }
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw validationError("Validation error", formatZodIssues(parsed.error));
+    throw validationError("Проверьте правильность заполнения полей.", formatZodIssues(parsed.error));
   }
   return parsed.data;
 }
@@ -48,7 +48,7 @@ export function parseQuery<T>(url: URL, schema: z.ZodType<T>): T {
   }
   const parsed = schema.safeParse(query);
   if (!parsed.success) {
-    throw validationError("Validation error", formatZodIssues(parsed.error));
+    throw validationError("Проверьте правильность заполнения полей.", formatZodIssues(parsed.error));
   }
   return parsed.data;
 }

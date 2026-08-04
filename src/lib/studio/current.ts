@@ -34,7 +34,7 @@ export async function resolveCurrentStudioAccess(userId: string): Promise<{
   });
 
   if (memberships.length === 0) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const ranked = [...memberships].sort((a, b) => {

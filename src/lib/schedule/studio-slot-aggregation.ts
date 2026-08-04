@@ -79,10 +79,10 @@ export async function aggregateStudioSlots(
   input: AggregateStudioSlotsInput
 ): Promise<AggregateStudioSlotsResult> {
   if (!isDateKey(input.fromKey)) {
-    return { ok: false, code: "DATE_INVALID", message: "Invalid fromKey" };
+    return { ok: false, code: "DATE_INVALID", message: "Некорректная дата начала." };
   }
   if (input.toKeyExclusive && !isDateKey(input.toKeyExclusive)) {
-    return { ok: false, code: "DATE_INVALID", message: "Invalid toKeyExclusive" };
+    return { ok: false, code: "DATE_INVALID", message: "Некорректная дата окончания." };
   }
 
   const masterIds = await loadEligibleMasterIds({

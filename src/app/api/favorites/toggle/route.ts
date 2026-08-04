@@ -19,7 +19,7 @@ const FAVORITE_TOGGLE_RATE_LIMIT = {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     // Per-user rate limit; IP fallback when session is somehow missing isn't
     // needed because we already require auth above. 30/min is generous for

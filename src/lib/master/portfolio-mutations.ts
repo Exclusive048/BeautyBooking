@@ -38,7 +38,7 @@ export async function updateMasterPortfolioItem(
     },
   });
   if (!item || item.masterId !== masterId) {
-    throw new AppError("Not found", 404, "NOT_FOUND");
+    throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
 
   const context = await getMasterContext(masterId);
@@ -60,7 +60,7 @@ export async function updateMasterPortfolioItem(
       select: { id: true, visualSearchSlug: true },
     });
     if (!category || category.visualSearchSlug === "hot") {
-      throw new AppError("Global category not found", 404, "NOT_FOUND");
+      throw new AppError("Категория не найдена.", 404, "NOT_FOUND");
     }
   }
 
@@ -72,7 +72,7 @@ export async function updateMasterPortfolioItem(
       select: { id: true },
     });
     if (services.length !== desiredServiceIds.length) {
-      throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+      throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
     }
   }
 
@@ -84,7 +84,7 @@ export async function updateMasterPortfolioItem(
       select: { id: true },
     });
     if (tags.length !== desiredTagIds.length) {
-      throw new AppError("Tag not found", 404, "NOT_FOUND");
+      throw new AppError("Тег не найден.", 404, "NOT_FOUND");
     }
   }
 
@@ -181,7 +181,7 @@ export async function reorderMasterPortfolio(
         select: { id: true, masterId: true, sortOrder: true, createdAt: true },
       });
       if (!target || target.masterId !== masterId) {
-        throw new AppError("Not found", 404, "NOT_FOUND");
+        throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
       }
 
       // Find neighbour in the requested direction. Ordering matches the

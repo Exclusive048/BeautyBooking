@@ -45,7 +45,7 @@ export async function PUT(
 
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   const { serviceId, ...input } = parsed.data;
   const result = await setMasterServiceOverride(p.id, p.masterId, serviceId, input);

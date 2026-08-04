@@ -12,7 +12,7 @@ export const YANDEX_STATE_TTL_SECONDS = 10 * 60;
 function requireSigningSecret(): string {
   const secret = env.AUTH_JWT_SECRET;
   if (!secret) {
-    throw new AppError("AUTH_JWT_SECRET is not configured", 500, "INTERNAL_ERROR");
+    throw new AppError("Не настроен AUTH_JWT_SECRET.", 500, "INTERNAL_ERROR");
   }
   return secret;
 }

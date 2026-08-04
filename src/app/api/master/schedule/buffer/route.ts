@@ -16,7 +16,7 @@ const bufferSchema = z.object({
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const result = await getProviderBuffer(providerId);
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, bufferSchema);

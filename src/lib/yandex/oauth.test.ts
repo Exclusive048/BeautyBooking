@@ -65,9 +65,13 @@ describe("FIX-YANDEX-OAUTH — authorize URL", () => {
 
   it("throws a typed error when the client id is not configured", () => {
     delete process.env.YANDEX_OAUTH_CLIENT_ID;
+    // ERR-LOCALIZATION-01: «typed» — это про `code`, а не про текст. Раньше
+    // тест ловил ошибку регуляркой по английскому message; после локализации
+    // ассерт переведён на сам контракт (`AppError.code`), который переводам
+    // не подвержен.
     expect(() =>
       buildYandexAuthorizeUrl({ state: "s", codeChallenge: "c", redirectUri: "https://x/cb" })
-    ).toThrowError(/client id is not configured/i);
+    ).toThrowError(expect.objectContaining({ code: "YANDEX_CLIENT_ID_MISSING", status: 500 }));
   });
 });
 

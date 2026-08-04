@@ -35,7 +35,7 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
       provider: { select: { cancellationDeadlineHours: true } },
     },
   });
-  if (!booking) throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+  if (!booking) throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
 
   // PACKAGE-BOOKING-MVP-1: a package child must NOT be cancelled alone —
   // that would leave the discounted siblings as a broken partial package.
@@ -57,11 +57,11 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
   });
 
   if (runtimeStatus === "REJECTED") {
-    throw new AppError("Booking already cancelled", 409, "BOOKING_CANCELLED");
+    throw new AppError("Запись уже отменена.", 409, "BOOKING_CANCELLED");
   }
 
   if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
-    throw new AppError("Booking already started", 409, "CONFLICT");
+    throw new AppError("Запись уже началась.", 409, "CONFLICT");
   }
 
   const declinesMasterChange =
@@ -72,7 +72,7 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
 
   if (!declinesMasterChange) {
     if (!canCancelOrReschedule(booking.status)) {
-      throw new AppError("Booking cannot be cancelled in current state", 409, "CONFLICT");
+      throw new AppError("Запись нельзя отменить в текущем статусе.", 409, "CONFLICT");
     }
     if (input.cancelledBy === "CLIENT") {
       ensureBookingActionWindow(booking.startAtUtc);

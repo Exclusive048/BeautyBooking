@@ -42,7 +42,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const parsed = mediaAssetIdParamSchema.safeParse(params);
     if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: { message: "Validation error", code: "VALIDATION_ERROR" } },
+        { ok: false, error: { message: "Проверьте правильность заполнения полей.", code: "VALIDATION_ERROR" } },
         { status: 400 }
       );
     }
@@ -63,7 +63,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     });
     if (!asset || asset.deletedAt || asset.status !== MediaAssetStatus.READY) {
       return NextResponse.json(
-        { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
+        { ok: false, error: { message: "Файл не найден.", code: "MEDIA_ASSET_NOT_FOUND" } },
         { status: 404 }
       );
     }
@@ -101,7 +101,7 @@ export async function GET(req: Request, ctx: RouteContext) {
           storageKey: asset.storageKey,
         });
         return NextResponse.json(
-          { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
+          { ok: false, error: { message: "Файл не найден.", code: "MEDIA_ASSET_NOT_FOUND" } },
           { status: 404 }
         );
       }
@@ -134,7 +134,7 @@ export async function GET(req: Request, ctx: RouteContext) {
           code: "INVALID_PRIVATE_MEDIA_TOKEN",
         });
         return NextResponse.json(
-          { ok: false, error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+          { ok: false, error: { message: "Требуется вход в аккаунт.", code: "UNAUTHORIZED" } },
           { status: 401 }
         );
       }
@@ -150,7 +150,7 @@ export async function GET(req: Request, ctx: RouteContext) {
           .catch(() => undefined);
 
         return NextResponse.json(
-          { ok: false, error: { message: "Media asset not found", code: "MEDIA_ASSET_NOT_FOUND" } },
+          { ok: false, error: { message: "Файл не найден.", code: "MEDIA_ASSET_NOT_FOUND" } },
           { status: 404 }
         );
       }

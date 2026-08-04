@@ -18,11 +18,11 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
     const offerId = params.offerId;
-    if (!offerId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!offerId) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const offer = await prisma.modelOffer.findUnique({
       where: { id: offerId },
@@ -35,7 +35,7 @@ export async function GET(req: Request, ctx: RouteContext) {
         status: true,
       },
     });
-    if (!offer) return jsonFail(404, "Offer not found", "NOT_FOUND");
+    if (!offer) return jsonFail(404, "Предложение не найдено.", "NOT_FOUND");
 
     await resolveMasterAccess(offer.masterId, user.id);
 

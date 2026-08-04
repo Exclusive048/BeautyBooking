@@ -33,7 +33,7 @@ async function resolveStudioProviderId(studioId: string): Promise<string> {
     select: { providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
   return studio.providerId;
 }
@@ -62,7 +62,7 @@ export async function assertBelongsToStudio(
         select: { id: true },
       });
       if (!master) {
-        throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+        throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
       }
       return master.id;
     }
@@ -72,7 +72,7 @@ export async function assertBelongsToStudio(
         select: { id: true },
       });
       if (!service) {
-        throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+        throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
       }
       return service.id;
     }
@@ -82,7 +82,7 @@ export async function assertBelongsToStudio(
         select: { id: true },
       });
       if (!booking) {
-        throw new AppError("Booking not found", 404, "BOOKING_NOT_FOUND");
+        throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
       }
       return booking.id;
     }

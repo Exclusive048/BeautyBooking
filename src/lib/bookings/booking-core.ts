@@ -236,7 +236,7 @@ export async function resolveBookingCore(input: {
   }
 
   if (!service.isEnabled || !service.isActive) {
-    throw new AppError("Service is not available", 400, "SERVICE_DISABLED");
+    throw new AppError("Услуга недоступна.", 400, "SERVICE_DISABLED");
   }
 
   if (
@@ -244,7 +244,7 @@ export async function resolveBookingCore(input: {
     provider.ownerUserId &&
     provider.ownerUserId === input.clientUserId
   ) {
-    throw new AppError("Cannot book your own services", 400, "FORBIDDEN");
+    throw new AppError("Нельзя записаться на собственную услугу.", 400, "FORBIDDEN");
   }
 
   const providerServiceMismatch =
@@ -311,7 +311,7 @@ export async function resolveBookingCore(input: {
 
   const effectivePrice = override?.priceOverride ?? service.basePrice ?? service.price;
   if (!Number.isInteger(effectivePrice) || effectivePrice < 0) {
-    throw new AppError("Service price is invalid.", 400, "VALIDATION_ERROR");
+    throw new AppError("Некорректная цена услуги.", 400, "VALIDATION_ERROR");
   }
 
   const startAtUtc =

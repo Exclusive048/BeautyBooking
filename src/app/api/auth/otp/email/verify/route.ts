@@ -70,7 +70,7 @@ export async function POST(req: Request) {
         );
       }
       void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: "CODE_NOT_FOUND" });
-      return fail("Code not found", 401, "CODE_NOT_FOUND");
+      return fail("Код не найден или истёк.", 401, "CODE_NOT_FOUND");
     }
 
     // RKN-FIX-01 (mirrors the phone route): resolve new-vs-existing BEFORE the

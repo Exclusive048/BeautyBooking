@@ -18,12 +18,12 @@ export async function POST(req: Request) {
   const name = env.AUTH_COOKIE_NAME;
   const token = cookieStore.get(name)?.value;
   if (!token) {
-    return fail("Unauthorized", 401, "UNAUTHORIZED");
+    return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
   }
 
   const payload = verifySessionToken(token);
   if (!payload) {
-    return fail("Unauthorized", 401, "UNAUTHORIZED");
+    return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
   }
 
   const phone = payload.phone ?? null;

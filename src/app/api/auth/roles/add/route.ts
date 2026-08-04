@@ -28,12 +28,12 @@ export async function POST(req: Request) {
   const body = await readBody(req);
   const parsed = roleQuerySchema.safeParse(body);
   if (!parsed.success) {
-    return fail("Invalid request body", 400, "INVALID_BODY");
+    return fail("Проверьте правильность заполнения полей.", 400, "INVALID_BODY");
   }
 
   const { role } = parsed.data;
   if (!isAllowedRoleAddition(role)) {
-    return fail("Forbidden role", 403, "FORBIDDEN_ROLE");
+    return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN_ROLE");
   }
 
   const roles = await addRoleToUser(auth.user.id, auth.user.roles, role);

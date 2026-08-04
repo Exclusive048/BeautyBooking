@@ -33,7 +33,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     });
 
     if (!provider || !provider.isPublished) {
-      return fail("Provider not found", 404, "PROVIDER_NOT_FOUND");
+      return fail("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
     }
 
     if (provider.type === ProviderType.MASTER) {
@@ -95,6 +95,6 @@ export async function GET(_req: Request, ctx: RouteContext) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
     logError("GET /api/providers/[id]/masters failed", { error: detail });
-    return fail("Internal error", 500, "INTERNAL_ERROR");
+    return fail("Не удалось выполнить операцию. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
   }
 }

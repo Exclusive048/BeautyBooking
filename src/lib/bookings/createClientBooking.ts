@@ -130,7 +130,7 @@ export async function createClientBooking(
         now,
       });
       if (data.hotSlotId && !hotPricing.isHot) {
-        throw new AppError("Selected hot slot is no longer available.", 409, "BOOKING_CONFLICT");
+        throw new AppError("Этот горячий слот уже занят. Выберите другое время.", 409, "BOOKING_CONFLICT");
       }
       if (hotPricing.isHot && hotPricing.discountedPrice !== null) {
         bookedServicePrice = hotPricing.discountedPrice;
@@ -147,7 +147,7 @@ export async function createClientBooking(
         });
         if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
           throw new AppError(
-            "Cannot rebook the same discounted hot slot after cancellation. Please choose another time.",
+            "Повторная запись на тот же горячий слот после отмены недоступна. Выберите другое время.",
             409,
             "BOOKING_CONFLICT"
           );

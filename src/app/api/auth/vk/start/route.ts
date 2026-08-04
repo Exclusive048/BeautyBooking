@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     // server-side (FZ-199 kill-switch), before any cred read / OAuth work —
     // a flag-off provider with creds present must not initiate the flow.
     if (!isVkAuthEnabled) {
-      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     // RKN-FIX-01: the consent the visitor ticked on /login travels with the
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
     } catch (error) {
       const appError = error instanceof AppError ? error : toAppError(error);
       if (VK_NOT_CONFIGURED_CODES.has(appError.code)) {
-        return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+        return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
       }
       return fail(appError.message, appError.status, appError.code, appError.details);
     }

@@ -184,7 +184,7 @@ export function toAppError(input: unknown): AppError {
     const maybeStatus = record.status;
     const maybeDetails = record.details;
     if (isErrorCode(maybeCode) && typeof maybeStatus === "number") {
-      return new AppError(input.message || "Internal error", maybeStatus, maybeCode, maybeDetails);
+      return new AppError(input.message || "Не удалось выполнить операцию. Попробуйте ещё раз.", maybeStatus, maybeCode, maybeDetails);
     }
   }
 
@@ -199,5 +199,5 @@ export function toAppError(input: unknown): AppError {
     }
   }
 
-  return new AppError("Internal error", 500, "INTERNAL_ERROR");
+  return new AppError("Не удалось выполнить операцию. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
 }

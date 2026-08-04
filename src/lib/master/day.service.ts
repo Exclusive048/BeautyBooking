@@ -87,7 +87,7 @@ type BaseDayData = {
 function parseDateKey(date: string): Date {
   const parsed = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
-    throw new AppError("Invalid date", 400, "DATE_INVALID");
+    throw new AppError("Некорректная дата.", 400, "DATE_INVALID");
   }
   return parsed;
 }
@@ -217,7 +217,7 @@ export async function getMasterDay(input: {
     },
   });
   if (!master) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   const [bookingsRaw, finishedMonth, reviews, services, newBookingsCount] = await prisma.$transaction([
@@ -425,10 +425,10 @@ export async function createSoloMasterBooking(input: {
     select: { id: true, studioId: true, type: true, bufferBetweenBookingsMin: true },
   });
   if (!master || master.type !== "MASTER") {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
   if (master.studioId !== null) {
-    throw new AppError("Manual booking is available only for solo masters", 403, "FORBIDDEN");
+    throw new AppError("Ручная запись доступна только мастерам без студии.", 403, "FORBIDDEN");
   }
 
   const service = await prisma.service.findFirst({
@@ -447,7 +447,7 @@ export async function createSoloMasterBooking(input: {
     },
   });
   if (!service) {
-    throw new AppError("Service not found", 404, "SERVICE_NOT_FOUND");
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
 
   const endAt = new Date(input.startAt.getTime() + service.durationMin * 60000);

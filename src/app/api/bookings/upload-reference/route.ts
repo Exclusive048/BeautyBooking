@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) {
-      return fail("Unauthorized", 401, "UNAUTHORIZED");
+      return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
     }
 
     const rateLimit = await checkRateLimit(
@@ -41,14 +41,14 @@ export async function POST(req: Request) {
       BOOKING_REFERENCE_UPLOAD_RATE_LIMIT
     );
     if (rateLimit.limited) {
-      return tooManyRequests(rateLimit.retryAfterSeconds, "Too many uploads. Try again later.");
+      return tooManyRequests(rateLimit.retryAfterSeconds, "Слишком много загрузок. Попробуйте позже.");
     }
 
     const contentLengthHeader = req.headers.get("content-length");
     if (contentLengthHeader) {
       const contentLength = Number.parseInt(contentLengthHeader, 10);
       if (Number.isFinite(contentLength) && contentLength > MEDIA_MAX_FILE_SIZE_BYTES) {
-        return jsonFail(413, "File is too large", "MEDIA_FILE_TOO_LARGE");
+        return jsonFail(413, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
       }
     }
 
@@ -57,18 +57,18 @@ export async function POST(req: Request) {
       image: formData.get("image"),
     });
     if (!parsed.success) {
-      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
+      return fail("Проверьте правильность заполнения полей.", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
     const { image: fileValue } = parsed.data;
 
     if (fileValue.size > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(413, "File is too large", "MEDIA_FILE_TOO_LARGE");
+      return jsonFail(413, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
     }
 
     const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
     const detected = await fileTypeFromBuffer(rawBuffer);
     if (!detected || !MEDIA_ALLOWED_MIME_TYPES.includes(detected.mime as AllowedMediaMimeType)) {
-      return jsonFail(415, "Unsupported image type", "MEDIA_INVALID_MIME");
+      return jsonFail(415, "Неподдерживаемый формат изображения.", "MEDIA_INVALID_MIME");
     }
 
     let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     }
 
     if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(400, "File is too large", "MEDIA_FILE_TOO_LARGE");
+      return jsonFail(400, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
     }
 
     const bytes = new Uint8Array(outputBuffer);

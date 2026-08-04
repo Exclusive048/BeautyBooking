@@ -43,23 +43,23 @@ export async function acceptStudioInvite(
   });
 
   if (!invite) {
-    return { ok: false, status: 404, message: "Invite not found", code: "INVITE_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
   if (!hasInvitePhoneAccess(user.phone, invite.phone)) {
-    return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
+    return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
   if (invite.status === MembershipStatus.LEFT) {
-    return { ok: false, status: 409, message: "Invite revoked", code: "INVITE_REVOKED" };
+    return { ok: false, status: 409, message: "Приглашение отозвано.", code: "INVITE_REVOKED" };
   }
 
   if (invite.status === MembershipStatus.ACTIVE) {
-    return { ok: false, status: 409, message: "Invite already accepted", code: "INVITE_ALREADY_ACCEPTED" };
+    return { ok: false, status: 409, message: "Приглашение уже принято.", code: "INVITE_ALREADY_ACCEPTED" };
   }
 
   if (invite.status === MembershipStatus.REJECTED) {
-    return { ok: false, status: 409, message: "Invite already rejected", code: "INVITE_ALREADY_REJECTED" };
+    return { ok: false, status: 409, message: "Приглашение уже отклонено.", code: "INVITE_ALREADY_REJECTED" };
   }
 
   // BC-CAP: accepting an invite makes a master ACTIVE (consumes a seat). Under
@@ -94,7 +94,7 @@ export async function acceptStudioInvite(
     return {
       ok: false,
       status: 409,
-      message: "Invite phone is already attached to another account",
+      message: "Этот телефон уже привязан к другому аккаунту.",
       code: "INVITE_PHONE_ALREADY_USED",
     };
   }
@@ -212,19 +212,19 @@ export async function rejectStudioInvite(
   });
 
   if (!invite) {
-    return { ok: false, status: 404, message: "Invite not found", code: "INVITE_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
   if (!hasInvitePhoneAccess(user.phone, invite.phone)) {
-    return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
+    return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
   if (invite.status === MembershipStatus.ACTIVE) {
-    return { ok: false, status: 409, message: "Invite already accepted", code: "INVITE_ALREADY_ACCEPTED" };
+    return { ok: false, status: 409, message: "Приглашение уже принято.", code: "INVITE_ALREADY_ACCEPTED" };
   }
 
   if (invite.status === MembershipStatus.LEFT) {
-    return { ok: false, status: 409, message: "Invite revoked", code: "INVITE_REVOKED" };
+    return { ok: false, status: 409, message: "Приглашение отозвано.", code: "INVITE_REVOKED" };
   }
 
   if (invite.status === MembershipStatus.REJECTED) {

@@ -55,7 +55,7 @@ export async function DELETE(
 
   const body = await req.json().catch(() => null);
   const parsed = detachSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   // `detachMasterFromStudio` is scoped: it only detaches a master whose
   // `studioId` equals this studio's provider id (unconditional `!==`), so a

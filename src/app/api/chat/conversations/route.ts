@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
             : "CLIENT";
 
     if (perspective === "MASTER" && !isMaster) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const conversations = await listConversations({

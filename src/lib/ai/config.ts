@@ -26,7 +26,7 @@ export function ensureAiFeaturesStartupConfig(): void {
   const folderId = env.YANDEX_FOLDER_ID?.trim();
   if (apiKey && folderId) return;
   throw new AppError(
-    "AI_FEATURES_ENABLED=true requires YANDEX_API_KEY + YANDEX_FOLDER_ID",
+    "Не настроены YANDEX_API_KEY и YANDEX_FOLDER_ID — AI-функции включить нельзя.",
     500,
     "INTERNAL_ERROR",
   );
@@ -57,6 +57,6 @@ export async function clearAiFeaturesEnabledCache(): Promise<void> {
 export async function assertAiFeaturesEnabled(): Promise<void> {
   const enabled = await getAiFeaturesEnabled();
   if (!enabled) {
-    throw new AppError("AI features are disabled", 503, "SYSTEM_FEATURE_DISABLED");
+    throw new AppError("AI-функции отключены.", 503, "SYSTEM_FEATURE_DISABLED");
   }
 }

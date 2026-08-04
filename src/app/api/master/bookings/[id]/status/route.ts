@@ -26,9 +26,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     // - реализовано: endpoint передаёт подтверждение/отклонение в src/lib/studio/bookings.service.
     // - реализовано частично: публично принимает CANCELLED/NO_SHOW, но нормализует их в REJECTED.
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const { id } = await ctx.params;
-    if (!id) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!id) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const body = await parseBody(req, masterBookingStatusSchema);
     const masterId = await getCurrentMasterProviderId(user.id);

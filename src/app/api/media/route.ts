@@ -30,7 +30,7 @@ export async function GET(req: Request) {
       kind: url.searchParams.get("kind") ?? undefined,
     });
     if (!parsed.success) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     const user = await getSessionUser();
@@ -53,12 +53,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const formData = await req.formData();
     const fileValue = formData.get("file");
     if (!(fileValue instanceof File)) {
-      return jsonFail(400, "File is required", "MEDIA_FILE_REQUIRED");
+      return jsonFail(400, "Прикрепите файл.", "MEDIA_FILE_REQUIRED");
     }
 
     const parsedBody = mediaUploadBodySchema.safeParse({
@@ -68,17 +68,17 @@ export async function POST(req: Request) {
       replaceAssetId: formDataField(formData, "replaceAssetId"),
     });
     if (!parsedBody.success) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     if (fileValue.size <= 0 || fileValue.size > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(400, "File is too large", "MEDIA_FILE_TOO_LARGE");
+      return jsonFail(400, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
     }
 
     const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
     const detected = await fileTypeFromBuffer(rawBuffer);
     if (!detected || !MEDIA_ALLOWED_MIME_TYPES.includes(detected.mime as AllowedMediaMimeType)) {
-      return jsonFail(415, "Unsupported image type", "MEDIA_INVALID_MIME");
+      return jsonFail(415, "Неподдерживаемый формат изображения.", "MEDIA_INVALID_MIME");
     }
 
     let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
     }
 
     if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(400, "File is too large", "MEDIA_FILE_TOO_LARGE");
+      return jsonFail(400, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
     }
 
     const bytes = new Uint8Array(outputBuffer);

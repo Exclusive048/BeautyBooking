@@ -38,7 +38,7 @@ export async function GET() {
 export async function PATCH(req: Request) {
   const sessionUser = await getSessionUser();
   if (!sessionUser) {
-    return fail("Unauthorized", 401, "UNAUTHORIZED");
+    return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
   }
 
   try {
@@ -71,8 +71,8 @@ export async function PATCH(req: Request) {
     return ok({ user: updated });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return fail("Phone or email already used", 409, "CONFLICT");
+      return fail("Телефон или email уже используется.", 409, "CONFLICT");
     }
-    return fail("Failed to save profile", 500, "INTERNAL_ERROR");
+    return fail("Не удалось сохранить профиль. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
   }
 }

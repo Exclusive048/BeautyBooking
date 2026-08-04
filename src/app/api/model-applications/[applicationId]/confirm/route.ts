@@ -72,14 +72,14 @@ function resolveClientName(user: { displayName: string | null; firstName: string
 export async function POST(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     if (!user.roles.includes(AccountType.CLIENT)) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     const params = await ctx.params;
     const applicationId = params.applicationId;
-    if (!applicationId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!applicationId) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     await parseBody(req, confirmApplicationSchema);
 
@@ -155,9 +155,9 @@ export async function POST(req: Request, ctx: RouteContext) {
       },
     });
 
-    if (!application) return jsonFail(404, "Application not found", "NOT_FOUND");
+    if (!application) return jsonFail(404, "Заявка не найдена.", "NOT_FOUND");
     if (application.clientUserId !== user.id) {
-      return jsonFail(403, "Forbidden", "FORBIDDEN");
+      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
     }
 
     if (application.status === "CONFIRMED" && application.bookingId) {
@@ -165,20 +165,20 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     if (application.status !== "APPROVED_WAITING_CLIENT") {
-      return jsonFail(409, "Application is not ready", "CONFLICT");
+      return jsonFail(409, "Заявка ещё не готова.", "CONFLICT");
     }
 
     if (application.offer.status !== "ACTIVE") {
-      return jsonFail(409, "Offer is not active", "CONFLICT");
+      return jsonFail(409, "Предложение неактивно.", "CONFLICT");
     }
 
     if (!application.proposedTimeLocal) {
-      return jsonFail(409, "Proposed time is missing", "CONFLICT");
+      return jsonFail(409, "Не указано предложенное время.", "CONFLICT");
     }
 
     const offerService = application.offer.masterService?.service ?? application.offer.service;
     if (!offerService) {
-      return jsonFail(409, "Offer service is missing", "CONFLICT");
+      return jsonFail(409, "У предложения не указана услуга.", "CONFLICT");
     }
 
     const inRange = isTimeWithinRange({
@@ -187,13 +187,13 @@ export async function POST(req: Request, ctx: RouteContext) {
       end: application.offer.timeRangeEndLocal,
     });
     if (!inRange) {
-      return jsonFail(400, "Validation error", "TIME_RANGE_INVALID");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "TIME_RANGE_INVALID");
     }
 
     const date = dateFromKey(application.offer.dateLocal);
     const timeParts = parseTime(application.proposedTimeLocal);
     if (!date || !timeParts) {
-      return jsonFail(400, "Validation error", "DATE_INVALID");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "DATE_INVALID");
     }
 
     const startAtUtc = toUtcFromLocalDateTime(
@@ -230,16 +230,16 @@ export async function POST(req: Request, ctx: RouteContext) {
         ]);
 
         if (!offerRow || offerRow.status !== "ACTIVE") {
-          throw new AppError("Offer is not active", 409, "CONFLICT");
+          throw new AppError("Предложение неактивно.", 409, "CONFLICT");
         }
         if (!appRow) {
-          throw new AppError("Application not found", 404, "NOT_FOUND");
+          throw new AppError("Заявка не найдена.", 404, "NOT_FOUND");
         }
         if (appRow.status === "CONFIRMED" && appRow.bookingId) {
           return appRow.bookingId;
         }
         if (appRow.status !== "APPROVED_WAITING_CLIENT") {
-          throw new AppError("Application is not ready", 409, "CONFLICT");
+          throw new AppError("Заявка ещё не готова.", 409, "CONFLICT");
         }
 
         const bufferMin = await resolveBufferMinutes(
@@ -272,7 +272,7 @@ export async function POST(req: Request, ctx: RouteContext) {
           return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
         });
         if (conflict) {
-          throw new AppError("Time slot is not available", 409, "SLOT_CONFLICT");
+          throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
         }
 
         const booking = await tx.booking.create({

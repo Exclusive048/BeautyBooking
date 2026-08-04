@@ -46,12 +46,12 @@ export async function closeOfferWithCascade(input: {
     select: { id: true, masterId: true, status: true },
   });
   if (!offer) {
-    throw new AppError("Offer not found", 404, "NOT_FOUND");
+    throw new AppError("Предложение не найдено.", 404, "NOT_FOUND");
   }
   await resolveMasterAccess(offer.masterId, input.userId);
 
   if (offer.status === ModelOfferStatus.ARCHIVED) {
-    throw new AppError("Offer is archived", 409, "CONFLICT");
+    throw new AppError("Предложение в архиве.", 409, "CONFLICT");
   }
   if (offer.status === ModelOfferStatus.CLOSED) {
     return { offerId: offer.id, cascadedCount: 0 };
@@ -150,7 +150,7 @@ export async function computeAvailableTimeSlots(input: {
     },
   });
   if (!offer) {
-    throw new AppError("Offer not found", 404, "NOT_FOUND");
+    throw new AppError("Предложение не найдено.", 404, "NOT_FOUND");
   }
   await resolveMasterAccess(offer.masterId, input.userId);
 

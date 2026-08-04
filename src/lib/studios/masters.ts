@@ -14,7 +14,7 @@ async function ensureStudio(studioId: string): Promise<Result<{ id: string }>> {
     select: { id: true, type: true },
   });
   if (!studio || studio.type !== ProviderType.STUDIO) {
-    return { ok: false, status: 404, message: "Studio not found", code: "STUDIO_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
   }
   return { ok: true, data: { id: studio.id } };
 }
@@ -44,11 +44,11 @@ export async function attachMasterToStudio(
     select: { id: true, name: true, type: true, studioId: true },
   });
   if (!master || master.type !== ProviderType.MASTER) {
-    return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
 
   if (master.studioId && master.studioId !== studioId) {
-    return { ok: false, status: 409, message: "Master already belongs to a studio", code: "MASTER_ALREADY_ASSIGNED" };
+    return { ok: false, status: 409, message: "Мастер уже состоит в студии.", code: "MASTER_ALREADY_ASSIGNED" };
   }
 
   if (master.studioId === studioId) {
@@ -76,7 +76,7 @@ export async function detachMasterFromStudio(
     select: { id: true, name: true, type: true, studioId: true },
   });
   if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioId) {
-    return { ok: false, status: 404, message: "Master not found", code: "MASTER_NOT_FOUND" };
+    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
 
   const updated = await prisma.provider.update({

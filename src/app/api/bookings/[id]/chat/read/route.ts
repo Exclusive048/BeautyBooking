@@ -20,9 +20,9 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
 
     const access = await resolveChatAccess(bookingId, user.userId);
     if (!access.ok) {
-      if (access.reason === "not-found") return jsonFail(404, "Booking not found", "NOT_FOUND");
-      if (access.reason === "forbidden") return jsonFail(403, "Forbidden", "FORBIDDEN");
-      return jsonFail(409, "Chat unavailable", "CONFLICT");
+      if (access.reason === "not-found") return jsonFail(404, "Запись не найдена.", "NOT_FOUND");
+      if (access.reason === "forbidden") return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
+      return jsonFail(409, "Чат недоступен.", "CONFLICT");
     }
 
     const chat = await prisma.bookingChat.upsert({

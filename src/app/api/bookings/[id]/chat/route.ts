@@ -36,12 +36,12 @@ export async function GET(req: NextRequest, ctx: { params: RouteParams }) {
     const access = await resolveChatAccess(bookingId, user.userId);
     if (!access.ok) {
       if (access.reason === "not-found") {
-        return jsonFail(404, "Booking not found", "NOT_FOUND");
+        return jsonFail(404, "Запись не найдена.", "NOT_FOUND");
       }
       if (access.reason === "forbidden") {
-        return jsonFail(403, "Forbidden", "FORBIDDEN");
+        return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
       }
-      return jsonFail(409, "Chat unavailable", "CONFLICT");
+      return jsonFail(409, "Чат недоступен.", "CONFLICT");
     }
 
     let chat = await prisma.bookingChat.findUnique({
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest, ctx: { params: RouteParams }) {
     }
 
     if (!chat) {
-      return jsonFail(404, "Chat not found", "NOT_FOUND");
+      return jsonFail(404, "Чат не найден.", "NOT_FOUND");
     }
 
     const unreadCount = await prisma.chatMessage.count({

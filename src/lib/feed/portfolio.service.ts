@@ -558,7 +558,7 @@ export async function getPortfolioDetail(
   });
 
   if (!item || !item.isPublic) {
-    throw new AppError("Not found", 404, "NOT_FOUND");
+    throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
 
   // FEED-PORTFOLIO-N1-FIX-A: single batched lookup for the main item's services.
@@ -660,7 +660,7 @@ export async function togglePortfolioFavorite(input: {
   });
 
   if (!item || !item.isPublic) {
-    throw new AppError("Not found", 404, "NOT_FOUND");
+    throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
 
   const existing = await prisma.favorite.findUnique({

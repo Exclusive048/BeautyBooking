@@ -58,7 +58,7 @@ export type YandexProfile = {
 export function requireYandexRedirectUri(): string {
   const redirectUri = getYandexRedirectUri();
   if (!redirectUri) {
-    throw new AppError("Yandex redirect uri is not configured", 500, "YANDEX_REDIRECT_URI_MISSING");
+    throw new AppError("Не настроен YANDEX_OAUTH_REDIRECT_URI.", 500, "YANDEX_REDIRECT_URI_MISSING");
   }
   return redirectUri.trim();
 }
@@ -70,7 +70,7 @@ export function buildYandexAuthorizeUrl(input: {
 }): string {
   const clientId = getYandexClientId();
   if (!clientId) {
-    throw new AppError("Yandex client id is not configured", 500, "YANDEX_CLIENT_ID_MISSING");
+    throw new AppError("Не настроен YANDEX_OAUTH_CLIENT_ID.", 500, "YANDEX_CLIENT_ID_MISSING");
   }
 
   const url = new URL(YANDEX_AUTHORIZE_URL);
@@ -100,10 +100,10 @@ export async function exchangeYandexCodeForToken(input: {
   const clientId = getYandexClientId();
   const clientSecret = getYandexClientSecret();
   if (!clientId) {
-    throw new AppError("Yandex client id is not configured", 500, "YANDEX_CLIENT_ID_MISSING");
+    throw new AppError("Не настроен YANDEX_OAUTH_CLIENT_ID.", 500, "YANDEX_CLIENT_ID_MISSING");
   }
   if (!clientSecret) {
-    throw new AppError("Yandex client secret is not configured", 500, "YANDEX_CLIENT_SECRET_MISSING");
+    throw new AppError("Не настроен YANDEX_OAUTH_CLIENT_SECRET.", 500, "YANDEX_CLIENT_SECRET_MISSING");
   }
 
   const body = new URLSearchParams();
@@ -121,7 +121,7 @@ export async function exchangeYandexCodeForToken(input: {
   });
   const json = (await res.json().catch(() => null)) as YandexTokenResponse | null;
   if (!json) {
-    throw new AppError("Yandex token request failed", 502, "YANDEX_OAUTH_FAILED");
+    throw new AppError("Не удалось войти через Яндекс. Попробуйте ещё раз.", 502, "YANDEX_OAUTH_FAILED");
   }
 
   if ("error" in json) {
@@ -129,11 +129,11 @@ export async function exchangeYandexCodeForToken(input: {
   }
 
   if (!res.ok) {
-    throw new AppError("Yandex token request failed", 502, "YANDEX_OAUTH_FAILED", json);
+    throw new AppError("Не удалось войти через Яндекс. Попробуйте ещё раз.", 502, "YANDEX_OAUTH_FAILED", json);
   }
 
   if (!json.access_token) {
-    throw new AppError("Yandex token response is incomplete", 502, "YANDEX_OAUTH_FAILED", json);
+    throw new AppError("Не удалось войти через Яндекс. Попробуйте ещё раз.", 502, "YANDEX_OAUTH_FAILED", json);
   }
 
   return {
@@ -157,15 +157,15 @@ export async function fetchYandexProfile(accessToken: string): Promise<YandexPro
   });
   const json = (await res.json().catch(() => null)) as YandexUserInfoResponse | null;
   if (!json) {
-    throw new AppError("Yandex profile request failed", 502, "YANDEX_PROFILE_FAILED");
+    throw new AppError("Не удалось получить профиль Яндекс ID. Попробуйте ещё раз.", 502, "YANDEX_PROFILE_FAILED");
   }
 
   if (json.error) {
-    throw new AppError(json.error_description ?? "Yandex profile request failed", 502, "YANDEX_PROFILE_FAILED", json);
+    throw new AppError(json.error_description ?? "Не удалось получить профиль Яндекс ID. Попробуйте ещё раз.", 502, "YANDEX_PROFILE_FAILED", json);
   }
 
   if (!res.ok || !json.id) {
-    throw new AppError("Yandex profile is missing", 502, "YANDEX_PROFILE_FAILED", json);
+    throw new AppError("Не удалось получить профиль Яндекс ID. Попробуйте ещё раз.", 502, "YANDEX_PROFILE_FAILED", json);
   }
 
   const email = json.default_email?.trim() || json.emails?.[0]?.trim() || null;

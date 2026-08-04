@@ -15,10 +15,10 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const { assetId } = await ctx.params;
-    if (!assetId) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!assetId) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const masterId = await getCurrentMasterProviderId(user.id);
     const asset = await prisma.mediaAsset.findFirst({
@@ -37,7 +37,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     });
 
     if (!asset) {
-      return jsonFail(404, "Not found", "NOT_FOUND");
+      return jsonFail(404, "Ничего не найдено.", "NOT_FOUND");
     }
 
     if (!asset.visualIndexed) {

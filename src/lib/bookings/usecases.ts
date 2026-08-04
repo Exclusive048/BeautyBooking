@@ -68,7 +68,7 @@ async function ensureNoConflictsExcluding(
   });
 
   if (conflict) {
-    return { ok: false, status: 409, message: "Time slot is not available", code: "SLOT_CONFLICT" };
+    return { ok: false, status: 409, message: "Это время уже занято. Выберите другое.", code: "SLOT_CONFLICT" };
   }
 
   return { ok: true, data: null };
@@ -135,7 +135,7 @@ export async function rescheduleBooking(input: {
       },
     },
   });
-  if (!booking) return { ok: false, status: 404, message: "Booking not found", code: "BOOKING_NOT_FOUND" };
+  if (!booking) return { ok: false, status: 404, message: "Запись не найдена.", code: "BOOKING_NOT_FOUND" };
 
   const runtimeStatus = resolveBookingRuntimeStatus({
     status: booking.status,
@@ -144,24 +144,24 @@ export async function rescheduleBooking(input: {
   });
 
   if (runtimeStatus === "REJECTED") {
-    return { ok: false, status: 409, message: "Booking cancelled", code: "BOOKING_CANCELLED" };
+    return { ok: false, status: 409, message: "Запись отменена.", code: "BOOKING_CANCELLED" };
   }
 
   if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
-    return { ok: false, status: 409, message: "Booking already started", code: "CONFLICT" };
+    return { ok: false, status: 409, message: "Запись уже началась.", code: "CONFLICT" };
   }
 
   if (runtimeStatus === "CHANGE_REQUESTED") {
     return {
       ok: false,
       status: 409,
-      message: "Booking already has a pending change request",
+      message: "По записи уже есть запрос на перенос.",
       code: "CONFLICT",
     };
   }
 
   if (runtimeStatus !== "PENDING" && runtimeStatus !== "CONFIRMED") {
-    return { ok: false, status: 409, message: "Booking cannot be rescheduled", code: "CONFLICT" };
+    return { ok: false, status: 409, message: "Запись нельзя перенести.", code: "CONFLICT" };
   }
 
   // fix-04a: the previous master-only required-comment guard was
@@ -175,20 +175,20 @@ export async function rescheduleBooking(input: {
 
   if (typeof input.silentMode === "boolean") {
     if (input.actor !== "CLIENT" || !booking.clientUserId || booking.clientUserId !== input.actorUserId) {
-      return { ok: false, status: 403, message: "Forbidden", code: "FORBIDDEN" };
+      return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
     }
     if (runtimeStatus !== "PENDING") {
       return {
         ok: false,
         status: 409,
-        message: "Silent mode can be changed only for pending bookings",
+        message: "Тихий режим доступен только для неподтверждённых записей.",
         code: "CONFLICT",
       };
     }
   }
 
   if (!isValidDate(input.startAtUtc) || !isValidDate(input.endAtUtc)) {
-    return { ok: false, status: 400, message: "Invalid booking time", code: "DATE_INVALID" };
+    return { ok: false, status: 400, message: "Некорректное время записи.", code: "DATE_INVALID" };
   }
 
   ensureBookingActionWindow(booking.startAtUtc);
@@ -232,7 +232,7 @@ export async function rescheduleBooking(input: {
     return {
       ok: false,
       status: 409,
-      message: "Client change request limit reached",
+      message: "Достигнут лимит переносов записи со стороны клиента.",
       code: "CONFLICT",
     };
   }
@@ -241,7 +241,7 @@ export async function rescheduleBooking(input: {
     return {
       ok: false,
       status: 409,
-      message: "Master change request limit reached",
+      message: "Достигнут лимит переносов записи со стороны мастера.",
       code: "CONFLICT",
     };
   }

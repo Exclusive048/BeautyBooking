@@ -61,7 +61,7 @@ export async function PATCH(
 
   const body = await req.json().catch(() => null);
   const parsed = toggleSchema.safeParse(body);
-  if (!parsed.success) return fail("Validation error", 400, "VALIDATION_ERROR");
+  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
 
   for (const toggle of parsed.data.toggles) {
     const result = await setStudioMemberServiceEnabled(

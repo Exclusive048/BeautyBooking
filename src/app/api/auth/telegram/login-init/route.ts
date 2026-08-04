@@ -22,7 +22,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 export async function GET(req: Request) {
   return withRequestContext(req, async () => {
     if (!(await getTelegramEnabled())) {
-      return fail("Auth method not configured", 503, "SERVICE_UNAVAILABLE");
+      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     // RKN-FIX-01 — parity with the VK/Yandex start routes. The widget only

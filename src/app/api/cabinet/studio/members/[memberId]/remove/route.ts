@@ -37,7 +37,7 @@ async function resolveCurrentStudioForAdmin(userId: string): Promise<{ id: strin
     orderBy: { createdAt: "asc" },
   });
   if (!membership) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   return membership.studio;
@@ -54,7 +54,7 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     const params = await ctx.params;
     if (!params.memberId?.trim()) {
-      return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
 
     const body = await parseBody(req, bodySchema);

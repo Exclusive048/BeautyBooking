@@ -35,7 +35,7 @@ export async function ensureFreeSubscription(userId: string, scope: Subscription
 
   if (!plan) {
     logError("Free billing plan not found. Run `npm run seed` to create default plans.", { userId, scope, planCode });
-    throw new AppError("Subscription setup failed", 503, "SERVICE_UNAVAILABLE");
+    throw new AppError("Не удалось оформить подписку. Попробуйте ещё раз.", 503, "SERVICE_UNAVAILABLE");
   }
 
   const existing = await prisma.userSubscription.findUnique({

@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     // `proxy.ts` still applies (middleware runs ahead of this handler), so a
     // disabled endpoint is not a free probing surface.
     if (!isPhoneAuthEnabled) {
-      return fail("Phone login is temporarily unavailable", 503, "SYSTEM_FEATURE_DISABLED");
+      return fail("Вход по телефону временно недоступен.", 503, "SYSTEM_FEATURE_DISABLED");
     }
 
     const body = await req.json().catch(() => null);

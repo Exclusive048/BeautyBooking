@@ -32,7 +32,7 @@ export async function resolveMasterAccess(
     select: { id: true, type: true, name: true, timezone: true, studioId: true, ownerUserId: true },
   });
   if (!master || master.type !== ProviderType.MASTER) {
-    throw new AppError("Master not found", 404, "MASTER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   if (master.ownerUserId && master.ownerUserId === userId) {
@@ -49,5 +49,5 @@ export async function resolveMasterAccess(
     }
   }
 
-  throw new AppError("Forbidden", 403, "FORBIDDEN");
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }

@@ -42,7 +42,7 @@ export type StudioCalendarData = {
 function toDateRange(date: string, view: CalendarView): { from: Date; to: Date } {
   const base = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(base.getTime())) {
-    throw new AppError("Invalid date", 400, "DATE_INVALID");
+    throw new AppError("Некорректная дата.", 400, "DATE_INVALID");
   }
 
   const from = new Date(base);
@@ -78,7 +78,7 @@ export async function getStudioCalendar(input: {
     select: { id: true, providerId: true },
   });
   if (!studio) {
-    throw new AppError("Studio not found", 404, "STUDIO_NOT_FOUND");
+    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
 
   const { from, to } = toDateRange(input.date, input.view);
@@ -175,7 +175,7 @@ export async function createStudioBlock(input: {
   note?: string;
 }): Promise<StudioCalendarBlock> {
   if (input.endAt <= input.startAt) {
-    throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
+    throw new AppError("Некорректный диапазон времени.", 400, "TIME_RANGE_INVALID");
   }
 
   // SECURITY-EXPOSURE-AUDIT-01 #1 (R1a): the masterId was trusted — any studio
@@ -223,16 +223,16 @@ export async function updateStudioBlock(input: {
     select: { id: true, studioId: true, startAt: true, endAt: true },
   });
   if (!block) {
-    throw new AppError("Block not found", 404, "BLOCK_NOT_FOUND");
+    throw new AppError("Блокировка не найдена.", 404, "BLOCK_NOT_FOUND");
   }
   if (block.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
 
   const nextStartAt = input.startAt ?? block.startAt;
   const nextEndAt = input.endAt ?? block.endAt;
   if (nextEndAt <= nextStartAt) {
-    throw new AppError("Invalid time range", 400, "TIME_RANGE_INVALID");
+    throw new AppError("Некорректный диапазон времени.", 400, "TIME_RANGE_INVALID");
   }
 
   const updated = await prisma.timeBlock.update({
@@ -266,10 +266,10 @@ export async function deleteStudioBlock(input: {
     select: { id: true, studioId: true, masterId: true },
   });
   if (!block) {
-    throw new AppError("Block not found", 404, "BLOCK_NOT_FOUND");
+    throw new AppError("Блокировка не найдена.", 404, "BLOCK_NOT_FOUND");
   }
   if (block.studioId !== input.studioId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   await prisma.timeBlock.delete({ where: { id: block.id } });
   await invalidateSlotsForMaster(block.masterId);

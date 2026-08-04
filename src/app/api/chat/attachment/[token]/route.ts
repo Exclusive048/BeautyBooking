@@ -42,7 +42,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const token = params.token?.trim();
     if (!token) {
       return NextResponse.json(
-        { ok: false, error: { message: "Token required", code: "VALIDATION_ERROR" } },
+        { ok: false, error: { message: "Не указан токен доступа.", code: "VALIDATION_ERROR" } },
         { status: 400 },
       );
     }
@@ -56,7 +56,7 @@ export async function GET(req: Request, ctx: RouteContext) {
         code: "INVALID_CHAT_ATTACHMENT_TOKEN",
       });
       return NextResponse.json(
-        { ok: false, error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { ok: false, error: { message: "Требуется вход в аккаунт.", code: "UNAUTHORIZED" } },
         { status: 401 },
       );
     }

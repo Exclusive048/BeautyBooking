@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     // Session VALIDATION, refresh and logout are deliberately untouched:
     // everyone already signed in stays signed in.
     if (!isPhoneAuthEnabled) {
-      return fail("Phone login is temporarily unavailable", 503, "SYSTEM_FEATURE_DISABLED");
+      return fail("Вход по телефону временно недоступен.", 503, "SYSTEM_FEATURE_DISABLED");
     }
 
     const routeStartedAt = Date.now();
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
         operation: "otp-verify",
         code: "CODE_NOT_FOUND",
       });
-      return fail("Code not found", 401, "CODE_NOT_FOUND");
+      return fail("Код не найден или истёк.", 401, "CODE_NOT_FOUND");
     }
 
     const verifyDbStartedAt = Date.now();

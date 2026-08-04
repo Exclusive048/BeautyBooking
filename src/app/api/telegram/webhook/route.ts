@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   if (secret) {
     const header = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
     if (header !== secret) {
-      return fail("Forbidden", 403, "FORBIDDEN");
+      return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
     }
   }
 
@@ -30,14 +30,14 @@ export async function POST(req: Request) {
   const ip = getClientIp(req);
   const allowed = await checkTelegramWebhookRateLimit(ip);
   if (!allowed) {
-    return fail("Rate limit exceeded", 429, "RATE_LIMITED");
+    return fail("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
   try {
     const body = await req.json().catch(() => null);
     const parsed = telegramWebhookBodySchema.safeParse(body);
     if (!parsed.success) {
-      return fail("Validation error", 400, "BAD_REQUEST", formatZodError(parsed.error));
+      return fail("Проверьте правильность заполнения полей.", 400, "BAD_REQUEST", formatZodError(parsed.error));
     }
     await handleTelegramWebhook(parsed.data, { requestId });
   } catch (error) {

@@ -29,7 +29,7 @@ function getGeocodeKey(): string {
   const key = env.YANDEX_GEOCODER_API_KEY ?? "";
   const trimmed = key.trim();
   if (!trimmed) {
-    throw new AppError("Geocoding unavailable", 503, "INTERNAL_ERROR");
+    throw new AppError("Сервис адресов временно недоступен. Попробуйте позже.", 503, "INTERNAL_ERROR");
   }
   return trimmed;
 }
@@ -57,13 +57,13 @@ async function geocodeAddress(query: string): Promise<{ lat: number; lng: number
   try {
     response = await fetch(url.toString(), { cache: "no-store" });
   } catch {
-    throw new AppError("Geocoding unavailable", 502, "INTERNAL_ERROR", {
+    throw new AppError("Сервис адресов временно недоступен. Попробуйте позже.", 502, "INTERNAL_ERROR", {
       reason: "fetch_failed",
     });
   }
 
   if (!response.ok) {
-    throw new AppError("Geocoding unavailable", 502, "INTERNAL_ERROR", {
+    throw new AppError("Сервис адресов временно недоступен. Попробуйте позже.", 502, "INTERNAL_ERROR", {
       status: response.status,
     });
   }

@@ -73,7 +73,7 @@ async function resolveProviderIds(
 export async function getSessionUser(req: Request): Promise<SessionUser> {
   const auth = await requireAuthFromRequest(req);
   if (!auth.ok) {
-    throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
+    throw new AppError("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
   }
   const user = auth.user;
 
@@ -91,7 +91,7 @@ export async function getSessionUser(req: Request): Promise<SessionUser> {
 
 export function requireRole(user: SessionUser, roles: AccountType[]): AppError | null {
   if (!hasAnyRole(user, roles)) {
-    return new AppError("Forbidden", 403, "FORBIDDEN");
+    return new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   return null;
 }

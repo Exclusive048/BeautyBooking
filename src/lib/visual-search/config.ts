@@ -22,7 +22,7 @@ export function ensureVisualSearchStartupConfig(): void {
   const folderId = env.YANDEX_FOLDER_ID?.trim();
   if (apiKey && folderId) return;
   throw new AppError(
-    "YANDEX_API_KEY and YANDEX_FOLDER_ID are required when VISUAL_SEARCH_ENABLED=true",
+    "Не настроены YANDEX_API_KEY и YANDEX_FOLDER_ID — визуальный поиск включить нельзя.",
     500,
     "INTERNAL_ERROR"
   );

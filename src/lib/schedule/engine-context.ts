@@ -115,7 +115,7 @@ function buildRuleFromWeeklyConfig(input: {
 function dateKeyToUtcStart(dateKey: string): Date {
   const parts = parseDateKeyParts(dateKey);
   if (!parts) {
-    throw new AppError(`Invalid date key: ${dateKey}`, 400, "DATE_INVALID");
+    throw new AppError(`Некорректная дата: ${dateKey}.`, 400, "DATE_INVALID");
   }
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0));
 }
@@ -181,7 +181,7 @@ export async function createScheduleContext(input: {
     select: { id: true, timezone: true },
   });
   if (!provider) {
-    throw new AppError("Provider not found", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   const timezone = normalizeTimezone(input.timezoneHint, provider.timezone);

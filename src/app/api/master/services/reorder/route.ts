@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const body = await parseBody(req, reorderMasterServiceSchema);
     const masterId = await getCurrentMasterProviderId(user.id);
     const data = await reorderMasterService(masterId, body.itemId, body.direction);

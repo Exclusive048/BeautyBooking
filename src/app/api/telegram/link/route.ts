@@ -10,7 +10,7 @@ export async function GET() {
   // effective kill-switch — a disabled provider must not hand out a working
   // t.me deep-link, even with a bot username configured.
   if (!(await getTelegramEnabled())) {
-    return fail("Telegram not configured", 503, "SYSTEM_FEATURE_DISABLED");
+    return fail("Вход через Telegram не настроен.", 503, "SYSTEM_FEATURE_DISABLED");
   }
 
   const auth = await requireAuth();
@@ -18,7 +18,7 @@ export async function GET() {
 
   const botUsername = getTelegramBotUsername();
   if (!botUsername) {
-    return fail("Telegram bot username is not configured", 500, "TELEGRAM_BOT_USERNAME_MISSING");
+    return fail("Не настроено имя Telegram-бота.", 500, "TELEGRAM_BOT_USERNAME_MISSING");
   }
 
   const { token, expiresAt } = await generateTelegramLinkToken(auth.user.id);

@@ -49,7 +49,7 @@ export async function validateChatAttachmentAsset(input: {
     throw new AppError("Некорректный тип вложения.", 400, "MEDIA_INVALID_KIND");
   }
   if (asset.createdByUserId && asset.createdByUserId !== input.senderUserId) {
-    throw new AppError("Forbidden", 403, "FORBIDDEN");
+    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
   if (
     asset.entityType !== MediaEntityType.CHAT_MESSAGE ||

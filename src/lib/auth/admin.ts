@@ -10,7 +10,7 @@ export async function requireAdminAuth(): Promise<AdminAuthResult> {
   const auth = await requireAuth();
   if (!auth.ok) return auth;
   if (!hasAdminRole(auth.user)) {
-    return { ok: false, response: fail("Forbidden", 403, "FORBIDDEN") };
+    return { ok: false, response: fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN") };
   }
   return { ok: true, user: auth.user };
 }

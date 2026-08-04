@@ -45,5 +45,5 @@ export async function PATCH(req: Request) {
   if (!auth.ok) return auth.response;
 
   void req;
-  return fail("Use /api/admin/catalog/categories endpoints", 410, "GONE");
+  return fail("Этот адрес больше не используется — обратитесь к /api/admin/catalog/categories.", 410, "GONE");
 }

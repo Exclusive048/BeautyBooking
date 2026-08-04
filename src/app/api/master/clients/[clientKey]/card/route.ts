@@ -21,10 +21,10 @@ export const runtime = "nodejs";
 export async function GET(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
-    if (!params.clientKey) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!params.clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
@@ -34,7 +34,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       where: { id: providerId },
       select: { timezone: true },
     });
-    if (!provider) return jsonFail(404, "Master not found", "MASTER_NOT_FOUND");
+    if (!provider) return jsonFail(404, "Мастер не найден.", "MASTER_NOT_FOUND");
 
     const data = await getClientCardData({
       providerId,
@@ -59,10 +59,10 @@ export async function GET(req: Request, ctx: RouteContext) {
 export async function PATCH(req: Request, ctx: RouteContext) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const params = await ctx.params;
-    if (!params.clientKey) return jsonFail(400, "Validation error", "VALIDATION_ERROR");
+    if (!params.clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const providerId = await getCurrentMasterProviderId(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
