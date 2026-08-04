@@ -71,6 +71,11 @@ docs/runbooks/
 !docs/AUTH-PROVIDER-ABSTRACTION-PLAN.md
 !docs/migration-samples/
 !docs/migration-samples/**
+# AUDIT-RECONCILE-01 (2026-08-04): пять отчётов AUDIT-FRESH-0{1..5} — evidence-база
+# всех фиксов ближайшей волны. Каждый фикс-промпт ссылается на них `file:line`;
+# вне git такая ссылка непроверяема вторым разработчиком и не переживает машину.
+!docs/audits/
+!docs/audits/**
 
 # Graphify knowledge graph output (regeneratable via `graphify update .`)
 # Excludes graph.json (large, derived) + GRAPH_REPORT.md (large, derived) + cache.
