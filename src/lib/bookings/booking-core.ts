@@ -96,6 +96,46 @@ export function normalizeBufferMinutes(value: number | null | undefined): number
   return Math.min(30, safe);
 }
 
+/**
+ * LOGIC-01 — скоуп поиска конфликтов: «время мастера — это время мастера».
+ *
+ * Раньше предикат ключевался ПАРОЙ `(providerId, masterProviderId)`, а один и
+ * тот же мастер имеет брони под ДВУМЯ разными `providerId`: через личный
+ * профиль (`providerId = мастер`, `/api/public/bookings` при этом мастеров
+ * студии не отсекает — проверено на HEAD) и через студийный кабинет
+ * (`providerId = провайдер студии`, `masterProviderId = мастер`). Множества не
+ * пересекались, поэтому студийный админ создавал бронь поверх существующей
+ * **без всякой гонки**, а Serializable этого не ловил: транзакции читают
+ * непересекающиеся строки, цикла зависимостей нет, обе коммитятся.
+ *
+ * Правило «время мастера — это время мастера» в проекте уже принято: на нём
+ * стоят `TimeBlock` (`time-blocks.ts:50-53`, ключ только `masterId`) и
+ * генератор слотов (`schedule/usecases.ts:310-315`). Этот предикат приводится
+ * к ним же, а не изобретает пятое определение конфликта.
+ *
+ * ⚠️ Скоуп строится как **надмножество** прежнего, а не как замена. Для брони
+ * БЕЗ назначенного мастера (`masterProviderId = null`, студийная бронь на
+ * кабинет целиком) прежний широкий клоз `{ providerId }` сохранён: он ловил
+ * пересечение с любой бронью студии, и сузить его — отдельное продуктовое
+ * решение, а не побочный эффект фикса скоупа.
+ */
+export function buildConflictScopeWhere(input: {
+  providerId: string;
+  masterProviderId: string | null;
+}) {
+  const masterKey = input.masterProviderId ?? input.providerId;
+  const orClauses: Array<Record<string, unknown>> = [
+    // исполнитель — независимо от того, под каким providerId создана бронь
+    { masterProviderId: masterKey },
+    // бронь без назначенного мастера: занят сам провайдер
+    { masterProviderId: null, providerId: masterKey },
+  ];
+  if (!input.masterProviderId) {
+    orClauses.push({ providerId: input.providerId });
+  }
+  return { OR: orClauses };
+}
+
 export async function ensureNoConflicts(
   db: DbClient,
   input: {
@@ -113,13 +153,9 @@ export async function ensureNoConflicts(
     ? shiftMinutes(input.endAtUtc, input.bufferMin)
     : input.endAtUtc;
 
-  const conflictWhere = input.masterProviderId
-    ? { providerId: input.providerId, masterProviderId: input.masterProviderId }
-    : { providerId: input.providerId };
-
   const conflicts = await db.booking.findMany({
     where: {
-      ...conflictWhere,
+      ...buildConflictScopeWhere(input),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       startAtUtc: { not: null, lt: bufferedEnd },
       endAtUtc: { not: null, gt: bufferedStart },

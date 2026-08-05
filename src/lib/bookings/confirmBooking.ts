@@ -5,6 +5,7 @@ import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
+import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import {
   emitBookingConfirmedSystemMessage,
@@ -120,9 +121,13 @@ export async function confirmBooking(
   }
 
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
-  const conflictWhere = booking.masterProviderId
-    ? { providerId: booking.providerId, masterProviderId: booking.masterProviderId }
-    : { providerId: booking.providerId };
+  // LOGIC-01: скоуп конфликта — из общего билдера («время мастера — это время
+  // мастера»), а не собственная пара `(providerId, masterProviderId)`. Пара
+  // не видела брони того же мастера, созданные под другим `providerId`.
+  const conflictWhere = buildConflictScopeWhere({
+    providerId: booking.providerId,
+    masterProviderId: booking.masterProviderId,
+  });
 
   const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
   const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;

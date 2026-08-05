@@ -12,6 +12,7 @@ import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
 import { prismaDirect } from "@/lib/prisma-direct";
@@ -250,9 +251,13 @@ export async function POST(req: Request, ctx: RouteContext) {
         const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
         const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
 
-        const conflictWhere = application.offer.masterId
-          ? { providerId: offerService.providerId, masterProviderId: application.offer.masterId }
-          : { providerId: offerService.providerId };
+        // LOGIC-01: скоуп — из общего билдера. Собственная пара
+        // `(providerId, masterProviderId)` не видела брони того же мастера,
+        // созданные под другим `providerId` (личный профиль ↔ студия).
+        const conflictWhere = buildConflictScopeWhere({
+          providerId: offerService.providerId,
+          masterProviderId: application.offer.masterId ?? null,
+        });
 
         const conflicts = await tx.booking.findMany({
           where: {

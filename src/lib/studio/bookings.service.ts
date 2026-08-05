@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
-import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
+import { buildConflictScopeWhere, normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
@@ -247,10 +247,18 @@ export async function createStudioBooking(input: {
   try {
     created = await prisma.$transaction(
       async (tx) => {
+        // LOGIC-01: скоуп — из общего билдера. Пара `(providerId студии,
+        // masterProviderId)` не видела брони ТОГО ЖЕ мастера, созданные через
+        // его личный профиль (`providerId = мастер`), поэтому админ студии
+        // создавал бронь поверх существующей БЕЗ всякой гонки — у этого пути
+        // вдобавок нет предварительной availability-проверки, и in-tx предикат
+        // был его единственной защитой.
         const conflicts = await tx.booking.findMany({
           where: {
-            providerId: studio.providerId,
-            masterProviderId: master.id,
+            ...buildConflictScopeWhere({
+              providerId: studio.providerId,
+              masterProviderId: master.id,
+            }),
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
             startAtUtc: { not: null },
             endAtUtc: { not: null },
@@ -511,10 +519,14 @@ export async function moveStudioBooking(input: {
   try {
     await prisma.$transaction(
       async (tx) => {
+        // LOGIC-01: тот же скоуп, что у create. Exclude-self сохранён — при
+        // переносе бронь ещё занимает свой старый слот.
         const conflicts = await tx.booking.findMany({
           where: {
-            providerId: booking.providerId,
-            masterProviderId: input.targetMasterId,
+            ...buildConflictScopeWhere({
+              providerId: booking.providerId,
+              masterProviderId: input.targetMasterId,
+            }),
             id: { not: booking.id },
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
             startAtUtc: { not: null },
