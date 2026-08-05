@@ -200,3 +200,62 @@ describe("SMS-GATEWAY-A — createSmscProvider HTTP integration", () => {
     }
   });
 });
+
+/**
+ * RES-08 — запрос к шлюзу шёл без верхней границы.
+ *
+ * Fail-soft провайдера построен на возврате `PROVIDER_UNAVAILABLE`, то есть
+ * отрабатывает ПОСЛЕ возврата вызова, — а без границы возврата могло не быть
+ * вовсе: вызов инлайновый на пути выпуска OTP, и зависший шлюз держит запрос
+ * пользователя. Сегодня P2 только из-за выключенного `PHONE_AUTH_ENABLED`.
+ */
+describe("RES-08 — граница запроса к SMSC", () => {
+  const config = { login: "u", password: "p" };
+
+  it("send передаёт AbortSignal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: 1, cnt: 1, cost: "1", balance: "10" }),
+    });
+    const provider = createSmscProvider({
+      ...config,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    await provider.send("+79991111111", "hi");
+
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("checkBalance передаёт AbortSignal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ balance: "10", currency: "RUB" }),
+    });
+    const provider = createSmscProvider({
+      ...config,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    await provider.checkBalance();
+
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("срабатывание таймаута отдаёт штатный fail-soft, а не пробрасывает бросок", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new DOMException("The operation was aborted due to timeout", "TimeoutError"));
+    const provider = createSmscProvider({
+      ...config,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    const result = await provider.send("+79991111111", "hi");
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toBe("PROVIDER_UNAVAILABLE");
+  });
+});
