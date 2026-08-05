@@ -1,5 +1,5 @@
 import { fail, ok } from "@/lib/api/response";
-import { timingSafeStringEqual } from "@/lib/auth/constant-time";
+import { isAuthorizedCronRequest } from "@/lib/api/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { createRecurringPayment } from "@/lib/payments/yookassa/client";
 import { addMonthsUtc, sha256 } from "@/lib/billing/utils";
@@ -23,13 +23,6 @@ export const runtime = "nodejs";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getCronToken(req: Request): string | null {
-  const header = req.headers.get("x-cron-token");
-  if (header?.trim()) return header.trim();
-
-  const token = new URL(req.url).searchParams.get("token");
-  return token?.trim() ?? null;
-}
 
 function formatDateKeyUtc(date: Date): string {
   const year = date.getUTCFullYear();
@@ -47,10 +40,9 @@ function getGraceUntil(now: Date): Date {
 // ---------------------------------------------------------------------------
 
 export async function POST(req: Request) {
-  const token = getCronToken(req);
-  const expected = env.BILLING_RENEW_SECRET?.trim();
-
-  if (!expected || !token || !timingSafeStringEqual(token, expected)) {
+  // SEC-21: только заголовок `x-cron-token`. Query-строка попадает в access-логи
+  // балансировщика и в реферер — секрету там не место.
+  if (!isAuthorizedCronRequest(req, env.BILLING_RENEW_SECRET)) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");
   }
 

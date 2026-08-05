@@ -211,7 +211,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 `/terms` · `/privacy` · `/consent` — три **отдельных** документа. `/consent` (RKN-FIX-01) — согласие на обработку ПДн, намеренно НЕ политика конфиденциальности (§4). Все три версионируются из `lib/legal/documents.ts` и на 2026-08-03 несут плашку «Черновик» до юрревью (§8).
 
 ### API — заметки, которых в дереве нет
-- **Cron/секретные эндпоинты** (fail-closed по токену): `/api/billing/renew/run` · `/api/billing/mrr/snapshot/run` · `/api/catalog/available-today/run` · `/api/health/worker`.
+- **Cron/секретные эндпоинты** (fail-closed по токену): `/api/billing/renew/run` · `/api/billing/mrr/snapshot/run` · `/api/catalog/available-today/run` · `/api/health/worker`. **Секрет — только заголовком** (SEC-21): три cron-роута несли одинаковую копию читалки, которая при отсутствии `x-cron-token` брала `?token=` из query, а query-строка попадает в access-логи балансировщика и в реферер. Копии сведены в единственный `lib/api/cron-auth.ts` (`isAuthorizedCronRequest`, header-only + constant-time), поэтому новый cron-роут наследует правило, а не переписывает его. `/api/health/worker` жил на своём заголовке `x-worker-secret` и до этого. Вебхука ЮКассы правило НЕ касается: там `?token=` — URL, прописанный в ЛК платёжного провайдера, и якорь подлинности всё равно другой (инв. #5).
 - **`/api/payments/yookassa/webhook`** — тело untrusted; authenticity держит worker API re-fetch (инв. #5), не подпись.
 - **Публичные пакеты:** `/api/public/packages/[id]/{propose,book}` + `…/studio/{propose,book}` — `propose` advisory, брони материализуются только на `/book`.
 - **Reschedule** — `/api/bookings/[id]/{confirm,decline-reschedule}`, общий backend для solo-мастера и studio-admin (инв. #32).

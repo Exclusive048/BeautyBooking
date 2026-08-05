@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import type {
   BookingDto,
   BookingClientDto,
