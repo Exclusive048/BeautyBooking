@@ -10,18 +10,18 @@
 |---|---|
 | **Дата последнего обновления** | 2026-08-05 |
 | **Ветка** | `audit-fixes` |
-| **Следующая находка** | **SEC-22** — мёртвое Supabase-легаси в next.config.ts |
+| **Следующая находка** | **SEC-23** — `MEDIA_LOCAL_ROOT` по умолчанию внутри `public/` |
 
-**Прогресс: 24 / 157**
+**Прогресс: 25 / 157**
 
 | Файл аудита | Всего | FIXED | STALE | BLOCKED | DEFERRED-BIG | PENDING |
 |---|---:|---:|---:|---:|---:|---:|
-| AUDIT-FRESH-01 — безопасность | 30 | 24 | 0 | 0 | 0 | 6 |
+| AUDIT-FRESH-01 — безопасность | 30 | 25 | 0 | 0 | 0 | 5 |
 | AUDIT-FRESH-02 — логика | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-03 — устойчивость | 31 | 0 | 0 | 0 | 0 | 31 |
 | AUDIT-FRESH-04 — производительность | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-05 — UI/UX | 36 | 0 | 0 | 0 | 0 | 36 |
-| **Итого** | **157** | **24** | **0** | **0** | **0** | **133** |
+| **Итого** | **157** | **25** | **0** | **0** | **0** | **132** |
 
 > SEC-01 + SEC-02 закрыты одним коммитом `a4b7a41b` (`FIX-SEC-EMAIL-IDENTITY-01`) — он лёг на `main` до создания ветки, поэтому в `git log audit-fixes` он первый.
 
@@ -55,7 +55,7 @@
 | **SEC-19** | P3 | `FIXED` | `0314a603` | одна ветка вместо двух: аллоулист выбирается по окружению, сравнение нормализовано; смоук подтвердил отказ чужому Origin в dev |
 | **SEC-20** | P3 | `FIXED` | `2e840f23` | локальная копия с ранней веткой по длине удалена, роут импортирует `lib/auth/constant-time` (хеширует обе стороны до сравнения) |
 | **SEC-21** | P3 | `FIXED` | `28af9141` | три копии читалки сведены в `lib/api/cron-auth.ts`, только заголовок `x-cron-token`; смоук: `?token=` → 403, заголовок → 200; ops-строка в DEPLOY-BACKLOG |
-| **SEC-22** | P3 | `PENDING` | — | мёртвое Supabase-легаси.** `next.config.ts:33-46` — правило runtime-кэширования Service Worker для `*.supabase.co/storage/v1/object/public/*` … |
+| **SEC-22** | P3 | `FIXED` | `8e87bb24` | правило удалено из `next.config.ts`; трекаемый `public/sw.js` пересобран — иначе в репозитории остался бы SW с правилом |
 | **SEC-23** | P3 | `PENDING` | — | `MEDIA_LOCAL_ROOT` по умолчанию внутри `public/`.** `src/lib/media/storage/local.ts:7`: `join(process.cwd(), "public", "uploads")`, и … |
 | **SEC-24** | P3 | `PENDING` | — | `GET /api/auth/refresh` меняет состояние.** `src/app/api/auth/refresh/route.ts:54-73` — ротация сессии на GET, достижимая межсайтовой top-level … |
 | **SEC-25** | P3 | `PENDING` | — | не-constant-time сравнение секрета.** `src/app/api/health/status/route.ts:35`: `providedSecret === expectedSecret`. В соседних роутах используется … |
