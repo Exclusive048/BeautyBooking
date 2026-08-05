@@ -26,6 +26,12 @@ import {
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import {
+  abortPackageIdempotency,
+  beginPackageIdempotency,
+  completePackageIdempotency,
+  type PackageBookingResult,
+} from "@/lib/bookings/package-idempotency";
 import { logError } from "@/lib/logging/logger";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 
@@ -397,11 +403,7 @@ export async function proposeSoloPackageSelections(input: {
   };
 }
 
-export type CreateSoloPackageResult = {
-  bookingPackageId: string;
-  bookingIds: string[];
-  totalKopeks: number;
-};
+export type CreateSoloPackageResult = PackageBookingResult;
 
 /**
  * Atomic package create. Validates each chosen component slot through the
@@ -410,7 +412,7 @@ export type CreateSoloPackageResult = {
  * Serializable transaction. Any conflict / placement failure rolls the whole
  * thing back — no partial package. Commit-time P2034/P2002 → clean 409.
  */
-export async function createSoloPackageBooking(input: {
+type CreateSoloPackageInput = {
   packageId: string;
   clientUserId: string | null;
   clientName: string;
@@ -419,7 +421,39 @@ export async function createSoloPackageBooking(input: {
   silentMode?: boolean;
   /** Chosen slots, one per component. serviceId must belong to the package. */
   slots: SoloPackageSlot[];
-}): Promise<CreateSoloPackageResult> {
+  /**
+   * LOGIC-09 (инв. #28): значение заголовка `x-idempotency-key`. Без него
+   * повторный сабмит упирался в `ensureNoConflicts` уже созданных сиблингов и
+   * отвечал «Это время уже занято» — пользователю, чей пакет только что
+   * успешно создан.
+   */
+  idempotencyKey?: string | null;
+};
+
+export async function createSoloPackageBooking(
+  input: CreateSoloPackageInput,
+): Promise<CreateSoloPackageResult> {
+  const guard = await beginPackageIdempotency({
+    idempotencyKey: input.idempotencyKey,
+    clientUserId: input.clientUserId,
+    clientPhone: input.clientPhone,
+  });
+  if (guard.cached) return guard.cached;
+
+  let result: CreateSoloPackageResult;
+  try {
+    result = await createSoloPackageBookingUnguarded(input);
+  } catch (error) {
+    await abortPackageIdempotency(guard.heldKey);
+    throw error;
+  }
+  await completePackageIdempotency(guard.heldKey, result.bookingPackageId);
+  return result;
+}
+
+async function createSoloPackageBookingUnguarded(
+  input: CreateSoloPackageInput,
+): Promise<CreateSoloPackageResult> {
   const pkg = await loadSoloPackage(input.packageId);
 
   // The provided slots must cover exactly the package components (by service),

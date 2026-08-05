@@ -19,6 +19,11 @@ import {
   type CreateSoloPackageResult,
 } from "@/lib/bookings/package-booking";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import {
+  abortPackageIdempotency,
+  beginPackageIdempotency,
+  completePackageIdempotency,
+} from "@/lib/bookings/package-idempotency";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { logError } from "@/lib/logging/logger";
 
@@ -208,7 +213,7 @@ export async function proposeStudioPackagePlacement(input: {
  * Bookings + N BookingServiceItems in ONE Serializable transaction. Any
  * conflict / placement failure rolls the whole thing back — no partial package.
  */
-export async function createStudioPackageBooking(input: {
+type CreateStudioPackageInput = {
   packageId: string;
   clientUserId: string | null;
   clientName: string;
@@ -217,7 +222,34 @@ export async function createStudioPackageBooking(input: {
   silentMode?: boolean;
   /** Chosen master + slot, one per component. serviceId must belong to the package. */
   selections: StudioPackageSelection[];
-}): Promise<CreateSoloPackageResult> {
+  /** LOGIC-09 (инв. #28) — см. одноимённый параметр solo-близнеца. */
+  idempotencyKey?: string | null;
+};
+
+export async function createStudioPackageBooking(
+  input: CreateStudioPackageInput,
+): Promise<CreateSoloPackageResult> {
+  const guard = await beginPackageIdempotency({
+    idempotencyKey: input.idempotencyKey,
+    clientUserId: input.clientUserId,
+    clientPhone: input.clientPhone,
+  });
+  if (guard.cached) return guard.cached;
+
+  let result: CreateSoloPackageResult;
+  try {
+    result = await createStudioPackageBookingUnguarded(input);
+  } catch (error) {
+    await abortPackageIdempotency(guard.heldKey);
+    throw error;
+  }
+  await completePackageIdempotency(guard.heldKey, result.bookingPackageId);
+  return result;
+}
+
+async function createStudioPackageBookingUnguarded(
+  input: CreateStudioPackageInput,
+): Promise<CreateSoloPackageResult> {
   const pkg = await loadStudioPackage(input.packageId);
   const ordered = orderSelections(pkg, input.selections);
 

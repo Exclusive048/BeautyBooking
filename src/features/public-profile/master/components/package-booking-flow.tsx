@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles } from "lucide-react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,11 @@ export function PackageBookingFlow({
 }: Props) {
   const components = bundle.components;
   const viewerTz = useViewerTimeZoneContext();
+  // LOGIC-09: ключ идемпотентности живёт весь визард — повтор сабмита обязан
+  // вернуть тот же пакет, а не «это время занято».
+  const idempotencyKeyRef = useRef<string>(
+    typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`,
+  );
 
   const [phase, setPhase] = useState<Phase>("build");
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
@@ -298,7 +303,13 @@ export function PackageBookingFlow({
     try {
       const res = await fetch(`/api/public/packages/${encodeURIComponent(bundle.id)}/book`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // LOGIC-09 (инв. #28): без ключа повторный сабмит упирался в уже
+          // созданные сиблинги и отвечал «Это время уже занято» — пакет при
+          // этом был создан. Ключ живёт на весь визард, как в одиночном флоу.
+          "x-idempotency-key": idempotencyKeyRef.current,
+        },
         body: JSON.stringify({
           clientName: trimmedName,
           clientPhone: trimmedPhone,

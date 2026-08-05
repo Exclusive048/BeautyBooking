@@ -60,35 +60,41 @@ async function loadBookingForIdempotency(
   return booking ? toBookingDto(booking) : null;
 }
 
-async function waitForIdempotencyResult(
+async function waitForIdempotencyResult<T>(
   key: string,
-  userId: string | null
-): Promise<BookingDto | null> {
+  load: (entityId: string) => Promise<T | null>
+): Promise<T | null> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await getIdempotencyRecord(key);
     if (current?.status === "done") {
-      const booking = await loadBookingForIdempotency(userId, current.bookingId);
-      if (booking) return booking;
+      const result = await load(current.entityId);
+      if (result) return result;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return null;
 }
 
-export async function resolveBookingIdempotency(input: {
+/**
+ * Lock-then-create поверх Redis: «уже сделано → отдать то же», «кто-то делает →
+ * подождать», «никого → взять замок».
+ *
+ * LOGIC-09: параметризован загрузчиком, потому что второй потребитель —
+ * пакетная бронь — хранит `bookingPackageId` и восстанавливает свой результат
+ * по нему. Копировать сюда весь танец с замком ради другого типа результата
+ * значило бы завести вторую реализацию идемпотентности рядом с инв. #28.
+ */
+export async function resolveIdempotency<T>(input: {
   key: string;
   ttlSeconds: number;
-  userId: string | null;
-}): Promise<{ booking: BookingDto | null; lockAcquired: boolean }> {
+  load: (entityId: string) => Promise<T | null>;
+}): Promise<{ result: T | null; lockAcquired: boolean }> {
   const existing = await getIdempotencyRecord(input.key);
   if (existing?.status === "done") {
-    return {
-      booking: await loadBookingForIdempotency(input.userId, existing.bookingId),
-      lockAcquired: false,
-    };
+    return { result: await input.load(existing.entityId), lockAcquired: false };
   }
   if (existing?.status === "pending") {
-    return { booking: await waitForIdempotencyResult(input.key, input.userId), lockAcquired: false };
+    return { result: await waitForIdempotencyResult(input.key, input.load), lockAcquired: false };
   }
 
   let acquired: boolean;
@@ -98,11 +104,23 @@ export async function resolveBookingIdempotency(input: {
     throw new AppError("Сервис временно недоступен. Попробуйте позже.", 503, "INTERNAL_ERROR");
   }
   if (!acquired) {
-    const booking = await waitForIdempotencyResult(input.key, input.userId);
-    return { booking, lockAcquired: false };
+    return { result: await waitForIdempotencyResult(input.key, input.load), lockAcquired: false };
   }
 
-  return { booking: null, lockAcquired: true };
+  return { result: null, lockAcquired: true };
+}
+
+export async function resolveBookingIdempotency(input: {
+  key: string;
+  ttlSeconds: number;
+  userId: string | null;
+}): Promise<{ booking: BookingDto | null; lockAcquired: boolean }> {
+  const resolved = await resolveIdempotency({
+    key: input.key,
+    ttlSeconds: input.ttlSeconds,
+    load: (bookingId) => loadBookingForIdempotency(input.userId, bookingId),
+  });
+  return { booking: resolved.result, lockAcquired: resolved.lockAcquired };
 }
 
 export async function storeBookingIdempotency(input: {
@@ -111,6 +129,27 @@ export async function storeBookingIdempotency(input: {
   ttlSeconds: number;
 }): Promise<void> {
   await setIdempotencyResult(input.key, input.bookingId, input.ttlSeconds);
+}
+
+/**
+ * LOGIC-09 — пакетная бронь: ключ и TTL те же по смыслу, но кэшируется
+ * `bookingPackageId`, а не одна бронь. Пакет — это N строк `Booking` в одной
+ * транзакции, и повтор обязан вернуть ВЕСЬ пакет, иначе клиент увидит одну
+ * бронь вместо купленных трёх.
+ */
+export function buildCreatePackageBookingIdempotencyKey(
+  namespaceKey: string,
+  requestId: string
+): string {
+  return `idempotency:createPackageBooking:${namespaceKey}:${requestId}`;
+}
+
+export async function storePackageIdempotency(input: {
+  key: string;
+  bookingPackageId: string;
+  ttlSeconds: number;
+}): Promise<void> {
+  await setIdempotencyResult(input.key, input.bookingPackageId, input.ttlSeconds);
 }
 
 export async function clearBookingIdempotency(key: string): Promise<void> {

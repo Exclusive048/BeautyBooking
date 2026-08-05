@@ -50,6 +50,8 @@ export async function POST(
     const p = params instanceof Promise ? await params : params;
     const body = await parseBody(req, studioPackageBookSchema);
 
+    const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || null;
+
     const phoneNormalized = normalizePhone(body.clientPhone);
     if (!phoneNormalized || phoneNormalized.length < 8) {
       return jsonFail(400, "Проверьте номер телефона.", "VALIDATION_ERROR");
@@ -106,6 +108,12 @@ export async function POST(
       comment: body.comment ?? null,
       silentMode: body.silentMode ?? false,
       selections,
+      // LOGIC-09 (инв. #28): повторный сабмит обязан вернуть ТОТ ЖЕ пакет, а не
+      // «это время занято» — так выглядел двойной клик, потому что второй
+      // запрос упирался в уже созданные сиблинги. Заголовок опционален:
+      // требовать его — ломать контракт публичного роута для существующих
+      // клиентов, а не чинить находку.
+      idempotencyKey,
     });
 
     return jsonOk(result);
