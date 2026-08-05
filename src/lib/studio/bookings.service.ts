@@ -593,7 +593,18 @@ export async function updateMasterBookingStatus(input: {
     throw new AppError("Запись уже завершена — изменить её нельзя.", 409, "VALIDATION_ERROR");
   }
 
-  if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
+  // LOGIC-05: «не пришёл» — единственное действие, для которого наступившее
+  // время приёма не помеха, а ПРЕДПОСЫЛКА. Общий гейт отбивал его 409 ровно в
+  // тот момент, когда оно только и имеет смысл, а до начала приёма — пропускал.
+  // Мастер физически не мог отметить неявку: метрика неявок всегда нулевая,
+  // политика поздних отмен опиралась на статус, который не проставляется.
+  const isNoShowAction = input.status === "NO_SHOW";
+
+  if (isNoShowAction) {
+    if (runtimeStatus === "PENDING" || runtimeStatus === "CONFIRMED" || runtimeStatus === "CHANGE_REQUESTED") {
+      throw new AppError("Приём ещё не начался — отметить неявку нельзя.", 409, "CONFLICT");
+    }
+  } else if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
     throw new AppError("Запись уже началась.", 409, "CONFLICT");
   }
 
@@ -648,17 +659,30 @@ export async function updateMasterBookingStatus(input: {
     const updated = await applyBookingTransition(tx, {
       id: booking.id,
       expectedStatus: booking.status,
-      data: {
-        status: input.status,
-        cancelledBy: "PROVIDER",
-        cancelReason: comment || null,
-        cancelledAtUtc: new Date(),
-        requestedBy: "MASTER",
-        actionRequiredBy: null,
-        proposedStartAt: null,
-        proposedEndAt: null,
-        changeComment: comment || null,
-      },
+      // LOGIC-05: неявка — не отмена. `cancelledBy`/`cancelReason`/
+      // `cancelledAtUtc` проставлялись безусловно, из-за чего `NO_SHOW` был
+      // неотличим от «отменил мастер» в любом отчёте, который смотрит на эти
+      // поля. Для неявки пишется только статус и служебные сбросы.
+      data: isNoShowAction
+        ? {
+            status: input.status,
+            requestedBy: "MASTER",
+            actionRequiredBy: null,
+            proposedStartAt: null,
+            proposedEndAt: null,
+            changeComment: comment || null,
+          }
+        : {
+            status: input.status,
+            cancelledBy: "PROVIDER",
+            cancelReason: comment || null,
+            cancelledAtUtc: new Date(),
+            requestedBy: "MASTER",
+            actionRequiredBy: null,
+            proposedStartAt: null,
+            proposedEndAt: null,
+            changeComment: comment || null,
+          },
       select: { id: true, status: true },
     });
 
