@@ -45,7 +45,7 @@
 | **SEC-12** | P2 | `FIXED` | `2620abdc` | курсоры через общий `lib/pagination/cursor.ts` (providers + hot-slots), id категорий кодируются с декодом в одной точке, сырой id провайдера убран; booking-флоу — в BLOCKED (исключение rule 12) |
 | **SEC-13** | P2 | `FIXED` | `b6ac399c` | access-токен несёт `fid` (семья сессий), `loadActiveSessionUser` требует живую строку семьи; смоук поймал третий путь — `getSessionUserId` верил токену |
 | **SEC-14** | P2 | `FIXED` | `640c75c2` | `telegram/config.ts` переведён на `env` (+ `TELEGRAM_WEBHOOK_SECRET` в схему); новый гейт `check:env-discipline` ловит обе нотации |
-| **SEC-15** | P2 | `FIXED` | `<sha15>` | расчёт вынесен в `buildHotSlotFeed` + кэш 120 с + тир `hotSlotsFeed`; ключ только из влияющих параметров (иначе `?tag=` обходит кэш) |
+| **SEC-15** | P2 | `FIXED` | `afb34f68` | расчёт вынесен в `buildHotSlotFeed` + кэш 120 с + тир `hotSlotsFeed`; ключ только из влияющих параметров (иначе `?tag=` обходит кэш) |
 | **SEC-16** | P2 | `PENDING` | — | Тело запроса парсится без ограничения размера; на `/support/partnership` — до рейт-лимита |
 | **SEC-17** | P2 | `PENDING` | — | Нет глобальной квоты хранилища; лимит фото клиентской карточки обходится созданием карточек |
 | **SEC-18** | P2 | `PENDING` | — | Prompt injection: публичное AI-резюме собирается из 30 сырых пользовательских отзывов |
