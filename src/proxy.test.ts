@@ -20,8 +20,8 @@
  * pattern as other proxy-adjacent pure-helper tests (e.g. `prompt-modal.test.tsx`).
  */
 
-import { describe, it, expect } from "vitest";
-import { normalizeOrigin, shouldRejectCrossSiteMutation } from "./proxy";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { getAllowedOrigin, normalizeOrigin, shouldRejectCrossSiteMutation } from "./proxy";
 
 describe("normalizeOrigin — IDN + protocol canonicalization", () => {
   it("normalizes Cyrillic IDN to Punycode form", () => {
@@ -214,5 +214,58 @@ describe("shouldRejectCrossSiteMutation — SEC-08", () => {
         originAllowed: true,
       }),
     ).toBe(true);
+  });
+});
+
+/**
+ * SEC-19 — dev-ветка `getAllowedOrigin` была написана так:
+ *
+ *     if (ALLOWED_DEV_ORIGINS.has(requestOrigin)) return requestOrigin;
+ *     return requestOrigin;
+ *
+ * то есть первая строка не значила ничего и отражался ЛЮБОЙ `Origin`, а рядом
+ * ставится `Access-Control-Allow-Credentials: true`. Безопасно это было ровно
+ * потому, что `Dockerfile` фиксирует `ENV NODE_ENV=production` — защита жила в
+ * переменной окружения, а не в коде.
+ *
+ * `NODE_ENV` в vitest — `"test"`, то есть по умолчанию исполняется именно та
+ * ветка, в которой была дыра.
+ */
+describe("getAllowedOrigin — SEC-19", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("в dev отражает только allowlist, а не любой Origin", () => {
+    expect(getAllowedOrigin("http://localhost:3000")).toBe("http://localhost:3000");
+    expect(getAllowedOrigin("http://127.0.0.1:3000")).toBe("http://127.0.0.1:3000");
+    expect(getAllowedOrigin("https://evil.example")).toBeNull();
+  });
+
+  it("в dev нормализует обе стороны — хвостовой слэш не обходит список", () => {
+    expect(getAllowedOrigin("http://localhost:3000/")).toBe("http://localhost:3000/");
+    expect(getAllowedOrigin("http://localhost:3001")).toBeNull();
+  });
+
+  it("непарсящийся Origin отклоняется", () => {
+    expect(getAllowedOrigin("не-url")).toBeNull();
+    expect(getAllowedOrigin(null)).toBeNull();
+  });
+
+  it("`NEXT_PUBLIC_APP_URL` — явный escape hatch, а не отражение чего угодно", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://172.29.32.1:3000");
+    expect(getAllowedOrigin("http://172.29.32.1:3000")).toBe("http://172.29.32.1:3000");
+    expect(getAllowedOrigin("http://172.29.32.2:3000")).toBeNull();
+  });
+
+  it("в production поведение прежнее: канонический домен и его punycode-форма", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(getAllowedOrigin("https://мастеррядом.online")).toBe("https://мастеррядом.online");
+    expect(getAllowedOrigin("https://xn--80aic0adlmagk0m.online")).toBe(
+      "https://xn--80aic0adlmagk0m.online",
+    );
+    expect(getAllowedOrigin("https://www.мастеррядом.online")).toBe("https://www.мастеррядом.online");
+    // dev-адреса в проде не проходят — списки не смешались
+    expect(getAllowedOrigin("http://localhost:3000")).toBeNull();
   });
 });

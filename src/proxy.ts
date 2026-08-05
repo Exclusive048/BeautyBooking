@@ -49,25 +49,50 @@ const PRODUCTION_ALLOWLIST_NORMALIZED = new Set(
     .filter((value): value is string => value !== null),
 );
 
-function getAllowedOrigin(requestOrigin: string | null): string | null {
+const DEV_ALLOWLIST_NORMALIZED = new Set(
+  [...ALLOWED_DEV_ORIGINS]
+    .map(normalizeOrigin)
+    .filter((value): value is string => value !== null),
+);
+
+/**
+ * SEC-19 — dev-ветка была написана так:
+ *
+ *     if (ALLOWED_DEV_ORIGINS.has(requestOrigin)) return requestOrigin;
+ *     return requestOrigin;
+ *
+ * то есть первая строка не значила ничего: отражался ЛЮБОЙ `Origin`, и рядом
+ * `setCorsHeaders` ставит `Access-Control-Allow-Credentials: true`. Безопасно
+ * это было ровно потому, что `Dockerfile` фиксирует `ENV NODE_ENV=production`,
+ * — то есть защита держалась на переменной окружения сборки, а не на коде.
+ * Любой запуск прод-нагрузки без `NODE_ENV=production` давал полный обход CORS
+ * с куками и заодно снимал CSP (те же ветки ниже по файлу).
+ *
+ * Теперь ветка одна: аллоулист выбирается по окружению, а решение — общее.
+ * `NEXT_PUBLIC_APP_URL` признаётся в обоих окружениях: в dev это escape hatch
+ * для разработчика, открывающего приложение по LAN-адресу, и он же остаётся
+ * явным списком, а не отражением чего угодно.
+ */
+export function getAllowedOrigin(requestOrigin: string | null): string | null {
   if (!requestOrigin) return null;
 
-  if (process.env.NODE_ENV === "production") {
-    const incoming = normalizeOrigin(requestOrigin);
-    if (!incoming) return null;
-    if (PRODUCTION_ALLOWLIST_NORMALIZED.has(incoming)) {
-      return requestOrigin;
-    }
-    const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-    if (envUrl) {
-      const envNormalized = normalizeOrigin(envUrl);
-      if (envNormalized && envNormalized === incoming) return requestOrigin;
-    }
-    return null;
+  const incoming = normalizeOrigin(requestOrigin);
+  if (!incoming) return null;
+
+  const allowlist =
+    process.env.NODE_ENV === "production"
+      ? PRODUCTION_ALLOWLIST_NORMALIZED
+      : DEV_ALLOWLIST_NORMALIZED;
+
+  if (allowlist.has(incoming)) return requestOrigin;
+
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (envUrl) {
+    const envNormalized = normalizeOrigin(envUrl);
+    if (envNormalized && envNormalized === incoming) return requestOrigin;
   }
 
-  if (ALLOWED_DEV_ORIGINS.has(requestOrigin)) return requestOrigin;
-  return requestOrigin;
+  return null;
 }
 
 function setCorsHeaders(response: NextResponse, origin: string): void {
