@@ -108,3 +108,7 @@ public/workbox-*.js.map
 public/fallback-*.js
 public/worker-*.js
 session-audit/
+
+# SEC-23: корень локального медиа-хранилища (dev). Намеренно вне public/ —
+# иначе Next раздавал бы приватные вложения статикой мимо ensureCanReadMedia.
+/.media-uploads/

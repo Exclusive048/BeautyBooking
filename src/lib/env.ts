@@ -354,6 +354,25 @@ const refinedSchema = envSchema
       "(YOOKASSA_SHOP_ID + YOOKASSA_SECRET_KEY set). It is a cheap URL pre-filter, " +
       "NOT the authenticity anchor — authenticity is the worker API re-fetch (invariant #5). " +
       "Set it, or unset the YooKassa credentials to run without payments."
+  )
+  // SEC-23: локальное дисковое хранилище в production — отказ на старте.
+  //
+  // Дело не в надёжности диска, а в ACL: файлы local-провайдера отдаются как
+  // обычные файлы файловой системы, и если корень лежит внутри `public/`, Next
+  // раздаёт их статикой мимо `ensureCanReadMedia` — а `proxy.ts` исключает
+  // картиночные расширения из matcher'а, так что и прокси такого запроса не
+  // видит. Приватность вложения чата или фото клиентской карточки держалась бы
+  // на непредсказуемости имени файла. `STORAGE_PROVIDER` по умолчанию `"local"`,
+  // то есть забытая переменная в проде давала бы ровно этот режим молча.
+  //
+  // Дефолт корня вынесен из `public/` отдельно (`media/storage/local.ts`) —
+  // но дефолт защищает только того, кто ничего не задал.
+  .refine(
+    (e) => e.NODE_ENV !== "production" || e.STORAGE_PROVIDER !== "local",
+    "STORAGE_PROVIDER=local is not allowed in production — set STORAGE_PROVIDER=s3. " +
+      "Local-disk media is served as plain files, bypassing ensureCanReadMedia (and the " +
+      "proxy matcher excludes image extensions), so chat attachments and client-card photos " +
+      "would be protected only by the unpredictability of their filenames."
   );
 
 // ── Parse ─────────────────────────────────────────────────────────────────────

@@ -20,6 +20,15 @@ const BASE: Record<string, string> = {
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
   NEXT_PUBLIC_APP_URL: "https://example.com",
+  // SEC-23: `STORAGE_PROVIDER=local` в проде теперь отвергается на старте
+  // (файлы local-провайдера отдаются мимо `ensureCanReadMedia`). Эти тесты про
+  // другое, поэтому в базовую фикстуру добавлено валидное s3-хранилище — иначе
+  // прод-кейсы падают на чужом refine. Сам refine покрыт в
+  // `env/local-storage-prod-guard.test.ts`.
+  STORAGE_PROVIDER: "s3",
+  S3_BUCKET: "bucket",
+  S3_ACCESS_KEY: "s3-key",
+  S3_SECRET_KEY: "s3-secret",
 };
 
 const parse = (over: Record<string, string | undefined>) => {
