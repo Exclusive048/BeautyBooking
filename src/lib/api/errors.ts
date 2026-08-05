@@ -14,6 +14,8 @@ const ERROR_CODES = [
   "BOOKING_CONFLICT",
   "BOOKING_NOT_FOUND",
   "BOOKING_TIME_REQUIRED",
+  // LOGIC-02: статус брони изменился между чтением и записью
+  "BOOKING_STATUS_CHANGED",
   "PACKAGE_NOT_FOUND",
   "PACKAGE_NOT_SOLO",
   "PACKAGE_NOT_STUDIO",

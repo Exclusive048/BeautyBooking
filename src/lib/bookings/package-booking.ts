@@ -27,6 +27,7 @@ import {
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { logError } from "@/lib/logging/logger";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 
 /**
  * PACKAGE-BOOKING-MVP-1 — solo-master sequential package booking.
@@ -657,8 +658,14 @@ export async function cancelSoloPackageBooking(input: {
   const cancelledBookingIds = await prisma.$transaction(async (tx) => {
     const ids: string[] = [];
     for (const child of liveChildren) {
-      await tx.booking.update({
-        where: { id: child.id },
+      // LOGIC-02: переход только из наблюдённого статуса ребёнка. Статусы
+      // прочитаны выше и ВНЕ транзакции, поэтому безусловная запись затирала бы
+      // чужой переход по конкретному компоненту. Отказ здесь роняет всю
+      // транзакцию — и это правильно: пакет отменяется целиком (инв. #34).
+      await applyBookingTransition(tx, {
+        id: child.id,
+        expectedStatus: child.status,
+        select: { id: true },
         data: {
           status: "REJECTED",
           cancelledBy: input.cancelledBy,

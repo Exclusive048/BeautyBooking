@@ -11,6 +11,7 @@ import {
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import { assertBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { AppError } from "@/lib/api/errors";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 
 type RescheduleRecord = BookingDto;
 
@@ -255,8 +256,11 @@ export async function rescheduleBooking(input: {
   // pending bookings (the status validation up at line 148 still
   // bounds the action to PENDING/CONFIRMED).
 
-  const updated = await prisma.booking.update({
-    where: { id: booking.id },
+  // LOGIC-02: переход только из наблюдённого статуса — иначе перенос ложится
+  // поверх уже отменённой брони.
+  const updated = await applyBookingTransition(prisma, {
+    id: booking.id,
+    expectedStatus: booking.status,
     data: {
       status: "CHANGE_REQUESTED",
       proposedStartAt: input.startAtUtc,

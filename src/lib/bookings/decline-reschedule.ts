@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 
 /**
  * FIX-R2-06-A — decline a pending reschedule request (two-sided approval).
@@ -46,8 +47,10 @@ export async function declineClientRescheduleRequest(
     throw new AppError("Сейчас ход за другой стороной.", 409, "CONFLICT");
   }
 
-  const updated = await prisma.booking.update({
-    where: { id: booking.id },
+  // LOGIC-02: переход только из наблюдённого статуса.
+  const updated = await applyBookingTransition(prisma, {
+    id: booking.id,
+    expectedStatus: booking.status,
     data: {
       status: "CONFIRMED",
       proposedStartAt: null,

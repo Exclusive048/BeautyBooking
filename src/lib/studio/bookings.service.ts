@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { buildConflictScopeWhere, normalizeBufferMinutes } from "@/lib/bookings/booking-core";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
@@ -715,8 +716,10 @@ export async function updateMasterBookingStatus(input: {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updated = await tx.booking.update({
-      where: { id: booking.id },
+    // LOGIC-02: переход только из наблюдённого статуса.
+    const updated = await applyBookingTransition(tx, {
+      id: booking.id,
+      expectedStatus: booking.status,
       data: {
         status: input.status,
         cancelledBy: "PROVIDER",

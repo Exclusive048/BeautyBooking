@@ -11,6 +11,7 @@ import {
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { emitBookingCancelledSystemMessage } from "@/lib/chat/system-messages";
 import { logError } from "@/lib/logging/logger";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 
 export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
   // AUDIT (отмена/отклонение):
@@ -90,8 +91,11 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updated = await tx.booking.update({
-      where: { id: input.bookingId },
+    // LOGIC-02: переход только из наблюдённого статуса — иначе отмена ложится
+    // поверх уже подтверждённого мастером переноса (и наоборот).
+    const updated = await applyBookingTransition(tx, {
+      id: input.bookingId,
+      expectedStatus: booking.status,
       data: declinesMasterChange
         ? {
             status: "CONFIRMED",

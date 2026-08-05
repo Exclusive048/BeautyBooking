@@ -6,6 +6,7 @@ import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/f
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 import { scheduleBookingReminders } from "@/lib/bookings/reminders";
 import {
   emitBookingConfirmedSystemMessage,
@@ -183,8 +184,27 @@ export async function confirmBooking(
           endAtUtc,
         });
 
-        return tx.booking.update({
-          where: { id: bookingId },
+        // LOGIC-02: переход только из ТОГО статуса, который был прочитан и
+        // провалидирован выше. Без этого условия отмена, закоммитившаяся между
+        // чтением и записью, затиралась обратно в CONFIRMED — вместе с уже
+        // проставленными `cancelledAtUtc`/`cancelledBy`, которые confirm не
+        // чистит, то есть строка становилась внутренне противоречивой.
+        return applyBookingTransition(tx, {
+          id: bookingId,
+          expectedStatus: booking.status,
+          // Подтверждение переноса применяет время из `proposedStartAt`,
+          // прочитанное снаружи. Встречное предложение с другой стороны меняет
+          // это поле, НЕ меняя статус, — одного статуса как guard'а тут мало,
+          // иначе мастер подтвердил бы уже неактуальное время.
+          ...(appliesRequestedChange
+            ? {
+                expectAlso: {
+                  proposedStartAt: booking.proposedStartAt,
+                  proposedEndAt: booking.proposedEndAt,
+                  actionRequiredBy: booking.actionRequiredBy,
+                },
+              }
+            : {}),
           data: {
             status: "CONFIRMED",
             actionRequiredBy: null,
