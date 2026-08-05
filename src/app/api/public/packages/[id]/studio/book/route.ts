@@ -6,7 +6,7 @@ import { parseISOToUTC } from "@/lib/time";
 import { createStudioPackageBooking } from "@/lib/bookings/package-booking-studio";
 import { findOrCreateGuestUserByPhone } from "@/lib/users/find-or-create-guest";
 import { getSessionUserFromRequest } from "@/lib/auth/session";
-import { normalizePhone } from "@/lib/auth/otp";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
@@ -52,8 +52,15 @@ export async function POST(
 
     const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || null;
 
-    const phoneNormalized = normalizePhone(body.clientPhone);
-    if (!phoneNormalized || phoneNormalized.length < 8) {
+    // LOGIC-30: форма телефона, а не только длина. Порог «≥ 8 символов»
+    // пропускал строки, телефоном не являющиеся, — а телефон здесь ключ
+    // склейки гостевых броней, namespace идемпотентности и рейт-лимита, и
+    // мусор в нём дороже обычной валидационной небрежности. Нормализатор тот
+    // же, что у склейки и CRM-ключа, поэтому «8 999…» приводится к
+    // каноническому «+7999…», а не сохраняется как «+8999…» (профиль с таким
+    // телефоном недостижим навсегда).
+    const phoneNormalized = normalizeRussianPhone(body.clientPhone);
+    if (!phoneNormalized) {
       return jsonFail(400, "Проверьте номер телефона.", "VALIDATION_ERROR");
     }
 

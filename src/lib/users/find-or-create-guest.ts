@@ -1,6 +1,7 @@
 import { AccountType, type UserProfile } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { normalizePhone } from "@/lib/auth/otp";
+import { AppError } from "@/lib/api/errors";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { logInfo } from "@/lib/logging/logger";
 import { maskPhone } from "@/lib/logging/masking";
@@ -25,9 +26,19 @@ export async function findOrCreateGuestUserByPhone(input: {
   phone: string;
   displayName?: string | null;
 }): Promise<{ profile: UserProfile; wasCreated: boolean }> {
-  const phone = normalizePhone(input.phone.trim());
-  if (!phone || phone.length < 8) {
-    throw new Error("Invalid phone for guest user creation");
+  // LOGIC-30: канонизация — `normalizeRussianPhone`, та же, которой пользуются
+  // `linkGuestBookingsToUserByPhone` и `crm/client-key.ts`. Здесь стоял
+  // `normalizePhone` (чистит разделители и дописывает «+», формы не проверяет)
+  // с порогом «длина ≥ 8», и это давало не просто слабую валидацию, а
+  // РАСХОЖДЕНИЕ КЛЮЧА: гость, набравший «8 999 123-45-67», получал профиль с
+  // телефоном `+89991234567`, тогда как склейка и вход ищут `+79991234567`.
+  // Такой профиль недостижим НАВСЕГДА — ни OTP-вход его не найдёт (там форма
+  // `^\+7\d{10}$`), ни `linkGuestBookingsToUserByPhone` не привяжет брони, а
+  // согласие по 152-ФЗ (RKN-FIX-02) осталось бы висеть на аккаунте, до
+  // которого человек не может добраться.
+  const phone = normalizeRussianPhone(input.phone);
+  if (!phone) {
+    throw new AppError("Проверьте номер телефона.", 400, "VALIDATION_ERROR");
   }
 
   const existing = await prisma.userProfile.findUnique({ where: { phone } });
