@@ -10,18 +10,18 @@
 |---|---|
 | **Дата последнего обновления** | 2026-08-05 |
 | **Ветка** | `audit-fixes` |
-| **Следующая находка** | **SEC-08** — защита от CSRF однослойная (только `SameSite=Lax`) |
+| **Следующая находка** | **SEC-09** — мёртвый `POST /api/auth/profile/ensure` воскрешает телефон удалённого аккаунта |
 
-**Прогресс: 7 / 157**
+**Прогресс: 8 / 157**
 
 | Файл аудита | Всего | FIXED | STALE | BLOCKED | DEFERRED-BIG | PENDING |
 |---|---:|---:|---:|---:|---:|---:|
-| AUDIT-FRESH-01 — безопасность | 30 | 7 | 0 | 0 | 0 | 23 |
+| AUDIT-FRESH-01 — безопасность | 30 | 8 | 0 | 0 | 0 | 22 |
 | AUDIT-FRESH-02 — логика | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-03 — устойчивость | 31 | 0 | 0 | 0 | 0 | 31 |
 | AUDIT-FRESH-04 — производительность | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-05 — UI/UX | 36 | 0 | 0 | 0 | 0 | 36 |
-| **Итого** | **157** | **7** | **0** | **0** | **0** | **150** |
+| **Итого** | **157** | **8** | **0** | **0** | **0** | **149** |
 
 > SEC-01 + SEC-02 закрыты одним коммитом `a4b7a41b` (`FIX-SEC-EMAIL-IDENTITY-01`) — он лёг на `main` до создания ветки, поэтому в `git log audit-fixes` он первый.
 
@@ -38,7 +38,7 @@
 | **SEC-05** | P1 | `FIXED` | `3810a9d9` | `requirePublished` для чужих; своя сторона (владелец + админ студии) сохраняет доступ через `requireProviderOwner` |
 | **SEC-06** | P1 | `FIXED` | `b791fe06` | общий `readValidatedImageUpload` (sniff по байтам + sharp re-encode) в обоих роутах фото карточки; попутно 415 вместо 500 на битом входе |
 | **SEC-07** | P1 | `FIXED` | `6820ac90` + `042d82a9` + `0fd503e1` | prod-high 21 → 5: sharp/nodemailer/prisma, Next 16.3.0 (изолированно, с прод-билдом и рантайм-смоуком), транзитивные. Остаток — цепочка `next-pwa`→`workbox`, в BLOCKED |
-| **SEC-08** | P2 | `PENDING` | — | Защита от CSRF однослойная: только `SameSite=Lax`, ни Origin-проверки, ни Content-Type |
+| **SEC-08** | P2 | `FIXED` | `836676e6` | `shouldRejectCrossSiteMutation` в прокси: 403 по `Sec-Fetch-Site`/`Origin`, ключевой кейс `same-site` (поддомен); server-to-server не задет. Слой `Content-Type` — в BACKLOG |
 | **SEC-09** | P2 | `PENDING` | — | Мёртвый `POST /api/auth/profile/ensure` воскрешает телефон удалённого аккаунта |
 | **SEC-10** | P2 | `PENDING` | — | `?mt=`-ветка отдачи медиа: только токен, без сессии и без `ensureCanReadMedia` |
 | **SEC-11** | P2 | `PENDING` | — | `GET /api/public/services/[id]/booking-config` без проверки публикации и с сырыми id вопросов |

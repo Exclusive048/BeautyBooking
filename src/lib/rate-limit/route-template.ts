@@ -40,7 +40,7 @@ const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
   "clients", "close", "cohorts", "confirm", "consents",
   "conversations", "crop", "dashboard", "day", "decline-reschedule",
   "delete", "detail", "disable", "duplicates", "email",
-  "ensure", "events", "favorite", "favorites", "feed",
+  "events", "favorite", "favorites", "feed",
   "file", "forecast", "free-slots", "funnel", "geocode",
   "global-categories", "health", "heatmap", "home", "hot-slots",
   "ics", "integrations", "invites", "kpis", "lead-time",
