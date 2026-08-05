@@ -106,6 +106,11 @@ const envSchema = z.object({
 
   // ── Telegram ──────────────────────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  // SEC-14: жила мимо Zod (читалась через `process.env[...]` в
+  // `telegram/config.ts`). Цена промаха конкретна: `getTelegramWebhookSecret`
+  // при опечатке в имени возвращает null, а вебхук трактует null как «проверки
+  // подлинности нет» и пропускает весь блок.
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: z.string().optional(),
   // FIX-TELEGRAM-KILLSWITCH: legal kill-switch for *user-facing* Telegram
   // (login, cabinet-connect, notification delivery, footer). Defaults to false
