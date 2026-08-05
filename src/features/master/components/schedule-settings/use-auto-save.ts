@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useSerialTask } from "@/hooks/use-serial-task";
 import type { SaveStatus } from "./save-status-provider";
 
 type SaveResult = { ok: true } | { ok: false; message: string };
@@ -33,7 +34,7 @@ export function useAutoSave<T>(opts: Options<T>): void {
   const { value, baseline, debounceMs = 500, save, setStatus, setErrorMessage, onSaved } = opts;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlightRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   const lastSavedRef = useRef<string>(JSON.stringify(baseline));
   const saveRef = useRef(save);
   const onSavedRef = useRef(onSaved);
@@ -43,6 +44,37 @@ export function useAutoSave<T>(opts: Options<T>): void {
     onSavedRef.current = onSaved;
   });
 
+  // LOGIC-23: раньше здесь жил `AbortController`, чей `signal` в `fetch` не
+  // передавался — он гасил только ПРИМЕНЕНИЕ устаревшего ответа, а оба PATCH'а
+  // всё равно доезжали до сервера. Для расписания это прямой путь к
+  // дубликатам `ScheduleOverride` и `P2002` на `@@unique([configId, weekday])`.
+  // Теперь запросы не пересекаются вовсе: пока один в полёте, следующий ждёт
+  // и стартует с самым свежим черновиком.
+  const requestSave = useSerialTask<{ value: T; serialised: string }>(
+    useCallback(
+      async ({ value: draft, serialised }) => {
+        try {
+          const result = await saveRef.current(draft);
+          if (!mountedRef.current) return;
+          if (result.ok) {
+            lastSavedRef.current = serialised;
+            setStatus("saved");
+            onSavedRef.current?.(draft);
+            idleTimerRef.current = setTimeout(() => setStatus("idle"), 1800);
+          } else {
+            setStatus("error");
+            setErrorMessage(result.message);
+          }
+        } catch (error) {
+          if (!mountedRef.current) return;
+          setStatus("error");
+          setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить.");
+        }
+      },
+      [setStatus, setErrorMessage]
+    )
+  );
+
   useEffect(() => {
     const serialised = JSON.stringify(value);
     if (serialised === lastSavedRef.current) return;
@@ -51,41 +83,21 @@ export function useAutoSave<T>(opts: Options<T>): void {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
 
     timerRef.current = setTimeout(() => {
-      const controller = new AbortController();
-      inFlightRef.current?.abort();
-      inFlightRef.current = controller;
-
       setStatus("saving");
-      saveRef.current(value)
-        .then((result) => {
-          if (controller.signal.aborted) return;
-          if (result.ok) {
-            lastSavedRef.current = serialised;
-            setStatus("saved");
-            onSavedRef.current?.(value);
-            idleTimerRef.current = setTimeout(() => setStatus("idle"), 1800);
-          } else {
-            setStatus("error");
-            setErrorMessage(result.message);
-          }
-        })
-        .catch((error) => {
-          if (controller.signal.aborted) return;
-          setStatus("error");
-          setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить.");
-        });
+      void requestSave({ value, serialised });
     }, debounceMs);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [value, debounceMs, setStatus, setErrorMessage]);
+  }, [value, debounceMs, setStatus, requestSave]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      inFlightRef.current?.abort();
     };
   }, []);
 }

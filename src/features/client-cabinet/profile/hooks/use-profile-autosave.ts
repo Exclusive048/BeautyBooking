@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSerialTask } from "@/hooks/use-serial-task";
 import type { ProfileDTO, ProfileUpdatePatch } from "@/lib/client-cabinet/profile.service";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -31,7 +32,14 @@ export function useProfileAutosave({ onSaved }: Options) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const flush = useCallback(async () => {
+  // LOGIC-23: guard'а не было вовсе — `flush` забирает накопленный патч и
+  // обнуляет `pendingRef`, поэтому повторный debounce до возврата первого
+  // ответа отправлял ВТОРОЙ PATCH с ДРУГИМ набором полей параллельно, и
+  // выигрывал последний пришедший ответ, а не последняя правка. «Очередь на
+  // одного» это закрывает без потери правок: пока запрос в полёте,
+  // накопление продолжается в `pendingRef`, и следующий прогон заберёт его
+  // целиком.
+  const flush = useSerialTask<void>(useCallback(async () => {
     const payload = pendingRef.current;
     pendingRef.current = {};
     if (Object.keys(payload).length === 0) {
@@ -61,7 +69,7 @@ export function useProfileAutosave({ onSaved }: Options) {
       if (fadeRef.current) clearTimeout(fadeRef.current);
       fadeRef.current = setTimeout(() => setStatus("idle"), ERROR_FADE_MS);
     }
-  }, [onSaved]);
+  }, [onSaved]));
 
   const scheduleSave = useCallback(
     (patch: Partial<ProfileUpdatePatch>) => {
@@ -69,7 +77,7 @@ export function useProfileAutosave({ onSaved }: Options) {
       setStatus("saving");
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        void flush();
+        void flush(undefined);
       }, DEBOUNCE_MS);
     },
     [flush],
