@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { OtpChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
+import { toAppError } from "@/lib/api/errors";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { formatZodError } from "@/lib/api/validation";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
@@ -11,7 +12,8 @@ import {
   clearOtpEmailVerifyFailures,
   registerOtpEmailVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
-import { resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
+import { findVerifiedEmailProfile, resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
+import { isEmailAuthEnabled } from "@/lib/env";
 import { otpEmailVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
@@ -26,6 +28,13 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
+    // FIX-SEC-EMAIL-IDENTITY-01: килсвитч канала — до любой работы, как в
+    // AUTH-GATE-01 у телефона. Гейтится и `verify`, а не только `request`:
+    // иначе выключение канала не отзывает уже выданные коды.
+    if (!isEmailAuthEnabled) {
+      return fail("Вход по email временно недоступен.", 503, "SYSTEM_FEATURE_DISABLED");
+    }
+
     const body = await req.json().catch(() => null);
     const parsed = otpEmailVerifySchema.safeParse(body);
     if (!parsed.success) {
@@ -75,7 +84,15 @@ export async function POST(req: Request) {
 
     // RKN-FIX-01 (mirrors the phone route): resolve new-vs-existing BEFORE the
     // code is consumed, so a consent refusal doesn't burn the user's code.
-    const existingProfile = await prisma.userProfile.findUnique({ where: { email: normalizedEmail } });
+    //
+    // 🔴 FIX-SEC-EMAIL-IDENTITY-01: ищем ТОЛЬКО профиль с подтверждённым
+    // адресом. Раньше здесь был `findUnique({ where: { email } })` — любая
+    // строка, включая занятую без доказательства владения (кабинетный
+    // request-verify пишет адрес до подтверждения), считалась «этот
+    // пользователь вернулся». Итог: владелец адреса вводил свой код и получал
+    // сессию В ЧУЖОЙ профиль. Неподтверждённая строка теперь для входа
+    // невидима — решение принимает `findVerifiedEmailProfile`.
+    const existingProfile = await findVerifiedEmailProfile(normalizedEmail);
 
     if (!existingProfile && !hasRequiredConsents(consent)) {
       void recordSurfaceEvent({
@@ -95,7 +112,26 @@ export async function POST(req: Request) {
     // OTP-EMAIL-LOGIN-RACE: create-or-recover is delegated so a P2002 from two
     // simultaneous first-time logins re-reads the winner's row instead of
     // erroring (6th re-read-on-conflict site — see email-login-profile.ts).
-    const profile = await resolveEmailLoginProfile(normalizedEmail, existingProfile);
+    // FIX-SEC-EMAIL-IDENTITY-01: отказ «адрес занят строкой без доказательства
+    // владения» — это НОРМАЛЬНОЕ решение, а не сбой. Без этого catch AppError
+    // улетал в общий обработчик и превращался в 500: пользователь видел
+    // «ошибку сервера», а GlitchTip получал алерт на штатную ветку.
+    let profile;
+    try {
+      profile = await resolveEmailLoginProfile(normalizedEmail, existingProfile);
+    } catch (error) {
+      const appError = toAppError(error);
+      if (appError.code === "EMAIL_NOT_VERIFIED") {
+        void recordSurfaceEvent({
+          surface: "auth",
+          outcome: "denied",
+          operation: "otp-email-verify",
+          code: appError.code,
+        });
+        return fail(appError.message, appError.status, appError.code);
+      }
+      throw error;
+    }
 
     const ipAddress = clientIp;
     const userAgent = req.headers.get("user-agent");

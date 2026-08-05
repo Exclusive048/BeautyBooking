@@ -3,6 +3,8 @@ import { AccountType, Prisma, type UserProfile } from "@prisma/client";
 
 const userCreate = vi.hoisted(() => vi.fn());
 const userFindUnique = vi.hoisted(() => vi.fn());
+const userFindFirst = vi.hoisted(() => vi.fn());
+const userUpdate = vi.hoisted(() => vi.fn());
 const ensureClientRole = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
@@ -10,6 +12,10 @@ vi.mock("@/lib/prisma", () => ({
     userProfile: {
       create: userCreate,
       findUnique: userFindUnique,
+      // FIX-SEC-EMAIL-IDENTITY-01: резолвер перешёл с `findUnique({ email })`
+      // на verified-фильтр `findFirst` и идемпотентно ставит отметку владения.
+      findFirst: userFindFirst,
+      update: userUpdate,
     },
   },
 }));
@@ -24,6 +30,9 @@ function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     id: "user-1",
     email: "a@b.ru",
+    // FIX-SEC-EMAIL-IDENTITY-01: «вернувшийся пользователь» по определению
+    // подтверждён — неподтверждённая строка до резолвера больше не доходит.
+    emailVerifiedAt: new Date("2026-08-01T00:00:00.000Z"),
     roles: [AccountType.CLIENT],
     ...overrides,
   } as UserProfile;
@@ -40,6 +49,8 @@ describe("resolveEmailLoginProfile (OTP-EMAIL-LOGIN-RACE, 6th P2002 site)", () =
   beforeEach(() => {
     userCreate.mockReset();
     userFindUnique.mockReset();
+    userFindFirst.mockReset();
+    userUpdate.mockReset();
     ensureClientRole.mockReset();
     // Default: CLIENT already present → same array reference back (no write).
     ensureClientRole.mockImplementation((_id: string, roles: AccountType[]) => roles);
@@ -80,16 +91,22 @@ describe("resolveEmailLoginProfile (OTP-EMAIL-LOGIN-RACE, 6th P2002 site)", () =
     expect(userFindUnique).not.toHaveBeenCalled();
   });
 
-  it("race loser: P2002 on create → re-reads the winner's row and continues (no throw)", async () => {
+  it("race loser: P2002 on create → re-reads the winner's ПОДТВЕРЖДЁННУЮ row and continues (no throw)", async () => {
     const winner = makeProfile({ id: "u-winner" });
     userCreate.mockRejectedValueOnce(makeUniqueViolation());
-    userFindUnique.mockResolvedValueOnce(winner);
+    userFindFirst.mockResolvedValueOnce(winner);
 
     const result = await resolveEmailLoginProfile("race@b.ru", null);
 
     expect(result).toBe(winner);
     expect(userCreate).toHaveBeenCalledOnce();
-    expect(userFindUnique).toHaveBeenCalledWith({ where: { email: "race@b.ru" } });
+    // FIX-SEC-EMAIL-IDENTITY-01: перечитывание — через verified-фильтр.
+    // Был `findUnique({ where: { email } })`: он вернул бы и строку, занятую
+    // без доказательства владения, и гонка осталась бы дырой.
+    expect(userFindFirst).toHaveBeenCalledWith({
+      where: { email: "race@b.ru", emailVerifiedAt: { not: null } },
+    });
+    expect(userFindUnique).not.toHaveBeenCalled();
     // Recovered row is treated like a returning user → role ensured.
     expect(ensureClientRole).toHaveBeenCalledWith("u-winner", winner.roles);
   });
@@ -98,7 +115,7 @@ describe("resolveEmailLoginProfile (OTP-EMAIL-LOGIN-RACE, 6th P2002 site)", () =
     // A single (non-racing) request would have created + returned this row.
     const singleRequestRow = makeProfile({ id: "u-canonical", email: "same@b.ru" });
     userCreate.mockRejectedValueOnce(makeUniqueViolation());
-    userFindUnique.mockResolvedValueOnce(singleRequestRow);
+    userFindFirst.mockResolvedValueOnce(singleRequestRow);
 
     const result = await resolveEmailLoginProfile("same@b.ru", null);
 
@@ -106,18 +123,26 @@ describe("resolveEmailLoginProfile (OTP-EMAIL-LOGIN-RACE, 6th P2002 site)", () =
     expect(result.email).toBe("same@b.ru");
   });
 
-  it("P2002 but re-read returns null: rethrows the original error", async () => {
-    const err = makeUniqueViolation();
-    userCreate.mockRejectedValueOnce(err);
-    userFindUnique.mockResolvedValueOnce(null);
+  it("P2002, но подтверждённой строки нет → отказ EMAIL_NOT_VERIFIED (а не вход в чужой профиль)", async () => {
+    // 🔴 Смена контракта FIX-SEC-EMAIL-IDENTITY-01. Раньше тест ждал проброса
+    // исходного P2002 — то есть «строка есть, но мы её не увидели» трактовалось
+    // как сбой. Теперь это ЗНАЧИМОЕ состояние: адрес занят строкой без
+    // доказательства владения. Войти в неё нельзя (это и есть pre-hijack),
+    // создать вторую нельзя (`email @unique`) — поэтому явный 409.
+    userCreate.mockRejectedValueOnce(makeUniqueViolation());
+    userFindFirst.mockResolvedValueOnce(null);
 
-    await expect(resolveEmailLoginProfile("ghost@b.ru", null)).rejects.toBe(err);
+    await expect(resolveEmailLoginProfile("ghost@b.ru", null)).rejects.toMatchObject({
+      code: "EMAIL_NOT_VERIFIED",
+      status: 409,
+    });
   });
 
   it("non-P2002 create error: rethrows immediately without re-reading", async () => {
     userCreate.mockRejectedValueOnce(new Error("connection lost"));
 
     await expect(resolveEmailLoginProfile("boom@b.ru", null)).rejects.toThrow("connection lost");
+    expect(userFindFirst).not.toHaveBeenCalled();
     expect(userFindUnique).not.toHaveBeenCalled();
   });
 });

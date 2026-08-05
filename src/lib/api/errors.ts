@@ -44,6 +44,9 @@ const ERROR_CODES = [
   "EDIT_WINDOW_EXPIRED",
   "EMAIL_ALREADY_USED",
   "EMAIL_SEND_FAILED",
+  // FIX-SEC-EMAIL-IDENTITY-01: адрес занят строкой без доказательства владения
+  // — войти по нему нельзя, но и второй профиль на тот же email создать нельзя.
+  "EMAIL_NOT_VERIFIED",
   "FEATURE_GATE",
   "FORBIDDEN",
   "FORBIDDEN_ROLE",

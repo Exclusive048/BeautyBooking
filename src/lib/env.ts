@@ -243,7 +243,11 @@ const envSchema = z.object({
   // ── Feature flags (boolean after transform) ───────────────────────────────
   VISUAL_SEARCH_ENABLED: boolFlag,
   AI_FEATURES_ENABLED: boolFlag,
-  EMAIL_AUTH_ENABLED: boolFlag,
+  // FIX-SEC-EMAIL-IDENTITY-01: намеренно НЕ `boolFlag` — тот дефолтит в
+  // `"false"`, а email — единственный рабочий канал входа закрытого деплоя
+  // (phone off tri-state'ом). Дефолт OFF означал бы, что незаданная переменная
+  // гасит вход всем. Резолвер — `isEmailAuthEnabled` ниже: unset → ON.
+  EMAIL_AUTH_ENABLED: z.string().optional(),
 
   // ── Timezone ─────────────────────────────────────────────────────────────
   DEFAULT_TIMEZONE: z.string().min(1).default("Europe/Moscow"),
@@ -550,6 +554,32 @@ export const isPhoneAuthEnabled = ((): boolean => {
   const raw = env.PHONE_AUTH_ENABLED;
   if (raw === undefined || String(raw).trim() === "") return env.NODE_ENV !== "production";
   return String(raw).trim().toLowerCase() === "true";
+})();
+
+/**
+ * FIX-SEC-EMAIL-IDENTITY-01 — килсвитч email-входа.
+ *
+ * До этого коммита `EMAIL_AUTH_ENABLED` была **объявлена и не имела ни одного
+ * потребителя** (единственное вхождение во всём `src/` — строка схемы выше),
+ * то есть килсвитча email-входа не существовало, хотя снапшот §5/§7 утверждал
+ * обратное. Теперь флаг подключён к обоим роутам email-OTP.
+ *
+ * **Семантика намеренно ЗЕРКАЛЬНА телефонной, а не одинакова с ней.**
+ * `PHONE_AUTH_ENABLED` — tri-state с дефолтом OFF в проде: там выключенное
+ * состояние безопаснее, потому что без SMS-провайдера код уходит в лог.
+ * У email обратная ситуация: это **единственный рабочий канал входа закрытого
+ * деплоя**, и дефолт OFF означал бы, что забытая переменная гасит вход всем.
+ * Поэтому здесь простой boolean с **дефолтом ON** (`boolFlag` даёт `true` при
+ * отсутствии значения — см. объявление), а выключение — всегда явное действие.
+ *
+ * Второй гейт — `isEmailConfigured` (SMTP) — остаётся независимым: он отвечает
+ * на «можем ли мы физически отправить письмо», этот — на «разрешён ли канал».
+ * Роут проверяет оба; порядок не важен, оба до генерации кода.
+ */
+export const isEmailAuthEnabled = ((): boolean => {
+  const raw = env.EMAIL_AUTH_ENABLED;
+  if (raw === undefined || String(raw).trim() === "") return true; // unset → ON
+  return String(raw).trim().toLowerCase() !== "false";
 })();
 /**
  * SMS-GATEWAY-A: SMSC.ru provider gate. Both the toggle and the

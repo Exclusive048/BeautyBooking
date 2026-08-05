@@ -11,11 +11,18 @@ import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
 import { buildOtpEmailHtml, buildOtpEmailText } from "@/lib/email/templates/otp-code";
 import { logInfo } from "@/lib/logging/logger";
 import { maskEmail } from "@/lib/logging/masking";
-import { isProduction } from "@/lib/env";
+import { isEmailAuthEnabled, isProduction } from "@/lib/env";
 import { extractClientIp } from "@/lib/http/ip";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
+    // FIX-SEC-EMAIL-IDENTITY-01: килсвитч канала — ДО генерации, записи и
+    // логирования кода (форма гейта из AUTH-GATE-01). `isEmailConfigured` —
+    // отдельный вопрос («есть ли SMTP»), он остаётся ниже.
+    if (!isEmailAuthEnabled) {
+      return fail("Вход по email временно недоступен.", 503, "SYSTEM_FEATURE_DISABLED");
+    }
+
     if (!isEmailConfigured()) {
       return fail("Вход по email не настроен.", 503, "EMAIL_NOT_CONFIGURED");
     }

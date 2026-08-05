@@ -1,5 +1,6 @@
 import { AccountType, Prisma, type UserProfile } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { AppError } from "@/lib/api/errors";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 
 // OTP-EMAIL-LOGIN-RACE: local P2002 constant, mirroring the other
@@ -30,28 +31,71 @@ export async function resolveEmailLoginProfile(
   existing: UserProfile | null,
 ): Promise<UserProfile> {
   if (existing) {
-    return withClientRole(existing);
+    // FIX-SEC-EMAIL-IDENTITY-01 — сюда попадает только профиль, у которого
+    // адрес ПОДТВЕРЖДЁН: неподтверждённый отсеивается на входе (роут передаёт
+    // `existing = null`, см. `findVerifiedEmailProfile`). Отметку ставим здесь
+    // же на случай будущих вызывающих — идемпотентно.
+    return withClientRole(await ensureEmailVerified(existing));
   }
 
   try {
+    // Первый успешный вход по коду с этого адреса И ЕСТЬ доказательство
+    // владения — профиль создаётся сразу верифицированным.
     return await prisma.userProfile.create({
-      data: { email: normalizedEmail, roles: [AccountType.CLIENT] },
+      data: {
+        email: normalizedEmail,
+        emailVerifiedAt: new Date(),
+        roles: [AccountType.CLIENT],
+      },
     });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === PRISMA_UNIQUE_VIOLATION
     ) {
-      // Race: the parallel request just created this profile. Re-read it.
-      const recovered = await prisma.userProfile.findUnique({
-        where: { email: normalizedEmail },
-      });
+      // Гонка: параллельный запрос только что создал строку — перечитываем.
+      //
+      // 🔴 Тот же фильтр верификации, что и на основном пути. Без него дыра
+      // переезжает в гонку: строку мог создать НЕ логин (кабинетный
+      // request-verify пишет адрес без доказательства), и тогда перечитанный
+      // профиль — чужой и неподтверждённый. Проигравший гонку обязан получить
+      // ровно то же решение, что и одиночный запрос.
+      const recovered = await findVerifiedEmailProfile(normalizedEmail);
       if (recovered) {
         return withClientRole(recovered);
       }
+      // Строка есть, но адрес в ней не подтверждён → это не «вход в
+      // существующий». Отдаём типизированный отказ: молча создать второй
+      // профиль нельзя (email @unique), войти в чужой — тем более.
+      throw new AppError(
+        "Не удалось войти по этому адресу. Обратитесь в поддержку.",
+        409,
+        "EMAIL_NOT_VERIFIED",
+      );
     }
     throw error;
   }
+}
+
+/**
+ * Профиль, которому адрес принадлежит доказанно. Единственная точка, где
+ * решается «эта строка годится для входа по email».
+ */
+export async function findVerifiedEmailProfile(
+  normalizedEmail: string,
+): Promise<UserProfile | null> {
+  return prisma.userProfile.findFirst({
+    where: { email: normalizedEmail, emailVerifiedAt: { not: null } },
+  });
+}
+
+/** Идемпотентно проставляет отметку владения (повторный вход ничего не пишет). */
+async function ensureEmailVerified(profile: UserProfile): Promise<UserProfile> {
+  if (profile.emailVerifiedAt) return profile;
+  return prisma.userProfile.update({
+    where: { id: profile.id },
+    data: { emailVerifiedAt: new Date() },
+  });
 }
 
 /**

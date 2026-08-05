@@ -83,10 +83,19 @@ export async function ensureUserByPhone(input: EnsureUserInput): Promise<UserPro
   // Phase 2 — upsert by phone. The release step above guarantees that
   // the canonical email + publicUsername are now free for either the
   // create or update branch.
+  // FIX-SEC-EMAIL-IDENTITY-01: сид обязан ставить `emailVerifiedAt`.
+  // Вход по email-OTP теперь резолвит ТОЛЬКО подтверждённый адрес, а сид-
+  // аккаунты изображают состоявшихся пользователей — в проде такой человек
+  // прошёл бы подтверждение. Без этой строки все 5 showcase-аккаунтов
+  // перестают входить по email, и `.qa`-харнесс (для которого email —
+  // первоклассный канал после QA-HARNESS-EMAIL-01) краснеет на логине.
+  const emailVerifiedAt = new Date();
+
   return prisma.userProfile.upsert({
     where: { phone },
     update: {
       email,
+      emailVerifiedAt,
       publicUsername: desiredPublicUsername,
       firstName: input.firstName,
       lastName: input.lastName,
@@ -96,6 +105,7 @@ export async function ensureUserByPhone(input: EnsureUserInput): Promise<UserPro
     create: {
       phone,
       email,
+      emailVerifiedAt,
       publicUsername: desiredPublicUsername,
       firstName: input.firstName,
       lastName: input.lastName,

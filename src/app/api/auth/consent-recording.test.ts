@@ -37,6 +37,8 @@ vi.mock("@/lib/env", () => ({
   env: { AUTH_JWT_SECRET: "x".repeat(64), TELEGRAM_BOT_TOKEN: "bot", AUTH_COOKIE_NAME: "bh_session" },
   isProduction: false,
   isPhoneAuthEnabled: true,
+  // FIX-SEC-EMAIL-IDENTITY-01: килсвитч email-канала (дефолт ON в проде).
+  isEmailAuthEnabled: true,
   isVkAuthEnabled: true,
   isYandexAuthEnabled: true,
 }));
@@ -50,6 +52,11 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     userProfile: {
       findUnique: vi.fn(async () => state.existingProfile),
+      // FIX-SEC-EMAIL-IDENTITY-01: email-логин резолвит профиль через
+      // verified-фильтр (`findFirst`), а не `findUnique({ email })`.
+      // Фикстура «пользователь существует» здесь по смыслу подтверждена —
+      // предмет этих тестов согласия, а не верификация адреса.
+      findFirst: vi.fn(async () => state.existingProfile),
       create: spies.userProfileCreate,
       update: vi.fn(async () => state.existingProfile),
     },
@@ -77,6 +84,10 @@ vi.mock("@/lib/auth/phone-login-profile", () => ({
 }));
 vi.mock("@/lib/auth/email-login-profile", () => ({
   resolveEmailLoginProfile: vi.fn(async () => ({ id: "new-user", roles: ["CLIENT"], phone: null })),
+  // FIX-SEC-EMAIL-IDENTITY-01: роут ищет профиль через verified-фильтр.
+  // Здесь `null` = «новый пользователь» — ровно тот сценарий, который
+  // проверяют эти два теста (согласия при создании аккаунта).
+  findVerifiedEmailProfile: vi.fn(async () => null),
 }));
 vi.mock("@/lib/auth/cabinet-redirect", () => ({
   resolveCabinetRedirect: vi.fn(async () => ({ target: "/cabinet" })),
