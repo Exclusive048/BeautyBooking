@@ -57,6 +57,10 @@ const fakeRedis = vi.hoisted(() => ({ current: null as ReturnType<typeof makeFak
 
 vi.mock("@/lib/redis/connection", () => ({
   getRedisConnection: async () => fakeRedis.current,
+  // RES-11: команды модуля идут через обёртку с command-таймаутом. Здесь она
+  // сквозная — предмет этих тестов ключи и бюджеты, а не поведение при
+  // brownout'е (оно в `otp-rate-limit-timeout.test.ts`).
+  withRedisCommandTimeout: <T>(_operation: string, promise: Promise<T>) => promise,
 }));
 vi.mock("@/lib/monitoring/api-alerts", () => ({ alertOtpRateLimitTriggered: vi.fn() }));
 

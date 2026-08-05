@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { AppError } from "@/lib/api/errors";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import { alertOtpRateLimitTriggered } from "@/lib/monitoring/api-alerts";
 
@@ -76,6 +76,21 @@ function verifyScopeId(identity: string, ip: string | null): string {
   return `${hashKey(identity)}:${hashKey(ip?.trim() || "unknown")}`;
 }
 
+/**
+ * RES-11 — каждая команда Redis здесь идёт через `withRedisCommandTimeout`.
+ *
+ * Модуль уже был написан fail-closed: любой отказ Redis ловится и превращается
+ * в 503 `RATE_LIMIT_UNAVAILABLE` / 429 — но ловится только то, что ОТКЛОНИЛОСЬ.
+ * Во время brownout'а (реконнект `redis@5`) команда не отклоняется вовсе:
+ * `socket.isOpen` остаётся `true`, промис не settl'ится, команда уходит в
+ * offline-очередь — и `catch` не выполняется никогда. То есть выпуск OTP висел
+ * бы на первом же дребезге, а fail-closed-ветка, ради которой всё написано,
+ * оставалась недостижимой (тот же механизм, что RES-01 закрыл в кэш-слое).
+ *
+ * Семантика таймаута здесь однозначна и совпадает с уже написанной обработкой:
+ * не смогли посчитать лимит — значит отказ, а не «пропустим». Это чувствительный
+ * путь (CLAUDE.md rule 10).
+ */
 async function incrWithWindow(
   key: string,
   windowSeconds: number
@@ -83,9 +98,9 @@ async function incrWithWindow(
   const client = await getRedisConnection();
   if (!client) throw new Error("Redis unavailable");
 
-  const count = await client.incr(key);
+  const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
   if (count === 1) {
-    await client.expire(key, windowSeconds);
+    await withRedisCommandTimeout("otp:expire", client.expire(key, windowSeconds));
   }
   return count;
 }
@@ -93,7 +108,7 @@ async function incrWithWindow(
 async function ttlSeconds(key: string): Promise<number> {
   const client = await getRedisConnection();
   if (!client) throw new Error("Redis unavailable");
-  const ttl = await client.ttl(key);
+  const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(key));
   if (ttl > 0) return ttl;
   return 0;
 }
@@ -160,7 +175,7 @@ export async function checkOtpVerifyLock(phone: string, ip: string | null): Prom
 
   try {
     const lockKey = `otp:verify:lock:${verifyScopeId(phone, ip)}`;
-    const ttl = await client.ttl(lockKey);
+    const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
     if (ttl > 0) {
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl };
     }
@@ -187,15 +202,15 @@ export async function registerOtpVerifyFailure(phone: string, ip: string | null)
   try {
     const scope = verifyScopeId(phone, ip);
     const key = `otp:verify:fail:${scope}`;
-    const count = await client.incr(key);
+    const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
     if (count === 1) {
-      await client.expire(key, OTP_VERIFY_LOCK_SECONDS);
+      await withRedisCommandTimeout("otp:expire", client.expire(key, OTP_VERIFY_LOCK_SECONDS));
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
       alertOtpRateLimitTriggered(ip, phone);
       const lockKey = `otp:verify:lock:${scope}`;
-      await client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS });
-      const ttl = await client.ttl(lockKey);
+      await withRedisCommandTimeout("otp:set", client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS }));
+      const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl > 0 ? ttl : OTP_VERIFY_LOCK_SECONDS };
     }
   } catch (error) {
@@ -218,7 +233,10 @@ export async function clearOtpVerifyFailures(phone: string, ip: string | null): 
     const scope = verifyScopeId(phone, ip);
     const failKey = `otp:verify:fail:${scope}`;
     const lockKey = `otp:verify:lock:${scope}`;
-    await Promise.all([client.del(failKey), client.del(lockKey)]);
+    await Promise.all([
+      withRedisCommandTimeout("otp:del", client.del(failKey)),
+      withRedisCommandTimeout("otp:del", client.del(lockKey)),
+    ]);
   } catch (error) {
     logError("OTP verify lock cleanup failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -298,7 +316,7 @@ export async function checkOtpEmailVerifyLock(email: string, ip: string | null):
 
   try {
     const lockKey = `otp:verify:email:lock:${verifyScopeId(email.toLowerCase(), ip)}`;
-    const ttl = await client.ttl(lockKey);
+    const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
     if (ttl > 0) {
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl };
     }
@@ -325,15 +343,15 @@ export async function registerOtpEmailVerifyFailure(email: string, ip: string | 
   try {
     const scope = verifyScopeId(email.toLowerCase(), ip);
     const key = `otp:verify:email:fail:${scope}`;
-    const count = await client.incr(key);
+    const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
     if (count === 1) {
-      await client.expire(key, OTP_VERIFY_LOCK_SECONDS);
+      await withRedisCommandTimeout("otp:expire", client.expire(key, OTP_VERIFY_LOCK_SECONDS));
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
       alertOtpRateLimitTriggered(ip, email);
       const lockKey = `otp:verify:email:lock:${scope}`;
-      await client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS });
-      const ttl = await client.ttl(lockKey);
+      await withRedisCommandTimeout("otp:set", client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS }));
+      const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl > 0 ? ttl : OTP_VERIFY_LOCK_SECONDS };
     }
   } catch (error) {
@@ -356,7 +374,10 @@ export async function clearOtpEmailVerifyFailures(email: string, ip: string | nu
     const scope = verifyScopeId(email.toLowerCase(), ip);
     const failKey = `otp:verify:email:fail:${scope}`;
     const lockKey = `otp:verify:email:lock:${scope}`;
-    await Promise.all([client.del(failKey), client.del(lockKey)]);
+    await Promise.all([
+      withRedisCommandTimeout("otp:del", client.del(failKey)),
+      withRedisCommandTimeout("otp:del", client.del(lockKey)),
+    ]);
   } catch (error) {
     logError("OTP email verify lock cleanup failed", {
       error: error instanceof Error ? error.message : String(error),
