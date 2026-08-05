@@ -32,6 +32,8 @@ type YandexGeocodeResponse = {
 };
 
 const YANDEX_GEOCODE_URL = "https://geocode-maps.yandex.ru/1.x/";
+/** RES-10 — верхняя граница запроса к геокодеру (см. комментарий у вызова). */
+const GEOCODE_REQUEST_TIMEOUT_MS = 5_000;
 
 function getGeocodeKey(): string {
   const key = env.YANDEX_GEOCODER_API_KEY ?? "";
@@ -73,7 +75,14 @@ async function geocodeAddress(query: string): Promise<GeocodeCoords | null> {
 
   let response: Response;
   try {
-    response = await fetch(url.toString(), { cache: "no-store" });
+    // RES-10: граница обязательна — роут анонимный, а зависший геокодер
+    // держит слот обработки и не даёт признака «таймаут» ни в одном логе.
+    // 5 с: адрес геокодируется за сотни миллисекунд, дольше пользователь всё
+    // равно не ждёт подсказку на вводе.
+    response = await fetch(url.toString(), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(GEOCODE_REQUEST_TIMEOUT_MS),
+    });
   } catch {
     throw new AppError("Сервис адресов временно недоступен. Попробуйте позже.", 502, "INTERNAL_ERROR", {
       reason: "fetch_failed",
