@@ -7,6 +7,7 @@ import { getStorageProvider } from "@/lib/media/storage";
 import { getStrategy } from "@/lib/visual-search/category-registry";
 import { classifyImage } from "@/lib/visual-search/classifier";
 import { assertVisualSearchEnabled } from "@/lib/visual-search/config";
+import { sanitizeVisualMeta } from "@/lib/visual-search/meta-sanitize";
 import {
   createDocEmbedding,
   describeImageWithStrategy,
@@ -163,7 +164,9 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
       await tx.mediaAsset.update({
         where: { id: asset.id },
         data: {
-          visualMeta: visualResult.meta as Prisma.InputJsonValue,
+          // SEC-18: только поля, которые стратегия объявила фильтрами, и только
+          // скаляры — остальное модель выдумала, а фильтрует по нему сырой SQL.
+          visualMeta: sanitizeVisualMeta(visualResult.meta, strategy) as Prisma.InputJsonValue,
           visualDescription: visualResult.text_description,
           visualPromptVersion: strategy.promptVersion,
           visualCategory: classification.category,
