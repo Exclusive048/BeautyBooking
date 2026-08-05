@@ -32,7 +32,7 @@ vi.mock("@/lib/monitoring/api-alerts", () => ({
 }));
 vi.mock("@/lib/notifications/notifier", () => ({
   getNotificationsNotifierRuntimeStatus: () => ({ mode: "memory" }),
-  notificationsNotifier: {},
+  getNotificationsNotifier: () => Promise.resolve({}),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]) } }));
 vi.mock("@/lib/queue/queue", () => ({

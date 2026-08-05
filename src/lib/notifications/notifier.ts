@@ -124,7 +124,58 @@ async function createNotifier(): Promise<NotificationNotifier> {
   return new RedisNotificationNotifier(publisherClient, subscriberClient);
 }
 
-export const notificationsNotifier = createNotifier();
+/**
+ * RES-02 — нотифаер создаётся ЛЕНИВО и с ограниченным ретраем.
+ *
+ * Раньше здесь стояла eager-константа `createNotifier()`: промис создавался на
+ * module-eval и кэшировался навсегда. Если Redis был недоступен именно в этот
+ * момент (его рестарт, гонка при деплое — `depends_on: service_healthy`
+ * страхует только ПЕРВЫЙ старт, не последующие рестарты Redis), промис
+ * оставался отклонённым до конца жизни процесса. Восстановление Redis ничего
+ * не меняло: `createNotifier` больше не вызывался, `notifierRuntimeStatus`
+ * больше не пересчитывался.
+ *
+ * Цена: SSE `/api/notifications/stream` отдаёт 503 `NOTIFIER_UNAVAILABLE` всем
+ * пользователям, `publish` не работает — а in-app уведомления это единственный
+ * всегда включённый канал (Telegram погашен killswitch'ем, push опционален).
+ * Отдельно ломался runbook `docs/runbooks/redis-down.md`: он предлагает ждать
+ * `notifier.mode = "redis"` как признак устранения инцидента, а этот признак
+ * без рестарта контейнера не появлялся бы никогда.
+ *
+ * Успешный нотифаер кэшируется навсегда — пересоздавать рабочее соединение
+ * незачем. Кэшируется именно УСПЕХ: отказ сбрасывает кэш, чтобы следующий
+ * вызов попробовал снова, но не чаще, чем раз в `NOTIFIER_RETRY_COOLDOWN_MS`,
+ * — иначе каждый SSE-коннект долбил бы лежащий Redis.
+ */
+export const NOTIFIER_RETRY_COOLDOWN_MS = 5_000;
+
+let notifierPromise: Promise<NotificationNotifier> | null = null;
+let lastFailure: { error: unknown; at: number } | null = null;
+
+export function getNotificationsNotifier(): Promise<NotificationNotifier> {
+  if (notifierPromise) return notifierPromise;
+
+  if (lastFailure && Date.now() - lastFailure.at < NOTIFIER_RETRY_COOLDOWN_MS) {
+    return Promise.reject(lastFailure.error);
+  }
+
+  const attempt = createNotifier();
+  notifierPromise = attempt;
+  attempt.catch((error) => {
+    // Отказ не должен закрепиться результатом: снимаем кэш, чтобы следующая
+    // попытка после кулдауна действительно состоялась.
+    if (notifierPromise === attempt) notifierPromise = null;
+    lastFailure = { error, at: Date.now() };
+  });
+  return attempt;
+}
+
+/** Только для тестов: забыть и успешный нотифаер, и момент последнего отказа. */
+export function resetNotificationsNotifierForTests(): void {
+  notifierPromise = null;
+  lastFailure = null;
+  notifierRuntimeStatus = { mode: "unavailable", ready: false, reason: "not-initialized" };
+}
 
 export function getNotificationsNotifierRuntimeStatus(): NotifierRuntimeStatus {
   return notifierRuntimeStatus;

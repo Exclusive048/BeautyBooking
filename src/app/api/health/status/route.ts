@@ -5,7 +5,7 @@ import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { logError } from "@/lib/logging/logger";
 import { getAllSurfaceStatuses } from "@/lib/monitoring/status";
 import { alertDeadJobs, alertWorkerDown } from "@/lib/monitoring/api-alerts";
-import { getNotificationsNotifierRuntimeStatus, notificationsNotifier } from "@/lib/notifications/notifier";
+import { getNotificationsNotifierRuntimeStatus, getNotificationsNotifier } from "@/lib/notifications/notifier";
 import { prisma } from "@/lib/prisma";
 import { getQueueStats } from "@/lib/queue/queue";
 import { getRedisConnection } from "@/lib/redis/connection";
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
 
     let notifierReady = false;
     try {
-      await notificationsNotifier;
+      await getNotificationsNotifier();
       notifierReady = true;
     } catch {
       notifierReady = false;

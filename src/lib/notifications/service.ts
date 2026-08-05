@@ -12,7 +12,7 @@ import {
   MASTER_NOTIFICATION_TYPES,
   type NotificationContext,
 } from "@/lib/notifications/groups";
-import { notificationsNotifier } from "@/lib/notifications/notifier";
+import { getNotificationsNotifier } from "@/lib/notifications/notifier";
 import type { NotificationEvent } from "@/lib/notifications/types";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
@@ -130,7 +130,7 @@ async function createNotifications(
 export function publishRealtime(userId: string, event: NotificationEvent) {
   void (async () => {
     try {
-      const notifier = await notificationsNotifier;
+      const notifier = await getNotificationsNotifier();
       notifier.publish(userId, event);
     } catch (error) {
       logError("Realtime notifications publish failed", {
