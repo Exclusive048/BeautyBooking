@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  NotificationType,
-  ReviewTargetType,
-  type Prisma,
-} from "@prisma/client";
+import { NotificationType, ReviewTargetType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createAdminAuditLog } from "@/lib/audit/admin-audit";
 import {
@@ -14,7 +10,7 @@ import {
 import { logError, logInfo } from "@/lib/logging/logger";
 import { dispatchAdminInitiatedNotification } from "@/lib/notifications/admin-initiated";
 import { buildReviewDeletedByAdminBody } from "@/lib/notifications/admin-body-templates";
-import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { recalculateTargetRatings } from "@/lib/reviews/recalculate-ratings";
 
 type DeleteInput = {
   adminUserId: string;
@@ -30,48 +26,6 @@ export class AdminDeleteReviewError extends Error {
   ) {
     super(message);
     this.name = "AdminDeleteReviewError";
-  }
-}
-
-/**
- * Recomputes `Provider.ratingAvg` / `ratingCount` (+ legacy `rating`
- * / `reviews` mirror fields) after a review delete. Same logic as
- * the legacy `/api/admin/reviews/[id]` DELETE endpoint, extracted
- * here so the new admin UI flow keeps target ratings consistent.
- *
- * Wrapped in a TransactionClient so the caller can run the
- * recalculate atomically with the `review.delete`.
- *
- * Soft-deleted reviews are excluded from the aggregate — the freshly
- * deleted row will already carry `deletedAt: now` by the time we run
- * this, so it drops out of `ratingAvg`/`ratingCount` without needing
- * a special case.
- */
-async function recalculateTargetRatings(
-  tx: Prisma.TransactionClient,
-  targetType: ReviewTargetType,
-  targetId: string,
-): Promise<void> {
-  const aggregate = await tx.review.aggregate({
-    where: { targetType, targetId, ...ACTIVE_REVIEW_FILTER },
-    _avg: { rating: true },
-    _count: { _all: true },
-  });
-  const ratingAvg = aggregate._avg.rating ?? 0;
-  const ratingCount = aggregate._count._all ?? 0;
-  try {
-    await tx.provider.update({
-      where: { id: targetId },
-      data: {
-        ratingAvg,
-        ratingCount,
-        rating: ratingAvg,
-        reviews: ratingCount,
-      },
-    });
-  } catch {
-    // provider may not exist for studio target type — same defensive
-    // pattern as the legacy endpoint
   }
 }
 

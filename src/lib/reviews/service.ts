@@ -9,6 +9,7 @@ import {
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
+import { recalculateTargetRatings } from "@/lib/reviews/recalculate-ratings";
 import {
   REVIEW_PRIVATE_TAGS_MAX,
   REVIEW_PUBLIC_TAGS_MAX,
@@ -219,48 +220,6 @@ export async function listReviewTags(): Promise<{
   }
 
   return { publicTags, privateTags };
-}
-
-async function recalculateTargetRatings(
-  tx: Prisma.TransactionClient,
-  targetType: ReviewTargetType,
-  targetId: string
-): Promise<void> {
-  // Soft-deleted reviews (REVIEW-SOFT-DELETE-A) are excluded from the
-  // aggregate. The standard `deletedAt: null` filter applies here too —
-  // a deleted review must not influence the target's public rating.
-  const aggregate = await tx.review.aggregate({
-    where: { targetType, targetId, ...ACTIVE_REVIEW_FILTER },
-    _avg: { rating: true },
-    _count: { _all: true },
-  });
-
-  const ratingAvg = aggregate._avg.rating ?? 0;
-  const ratingCount = aggregate._count._all ?? 0;
-
-  await tx.provider.update({
-    where: { id: targetId },
-    data: {
-      ratingAvg,
-      ratingCount,
-      rating: ratingAvg,
-      reviews: ratingCount,
-    },
-  });
-
-  if (targetType === "studio") {
-    const studio = await tx.studio.findUnique({
-      where: { providerId: targetId },
-      select: { id: true },
-    });
-    if (!studio) {
-      throw new AppError("Профиль для отзыва не найден.", 404, "REVIEW_TARGET_NOT_FOUND");
-    }
-    await tx.studio.update({
-      where: { id: studio.id },
-      data: { ratingAvg, ratingCount },
-    });
-  }
 }
 
 async function ensureMasterReviewAccess(review: {

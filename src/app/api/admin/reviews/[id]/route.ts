@@ -3,8 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
-import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
-import type { ReviewTargetType, Prisma } from "@prisma/client";
+import { recalculateTargetRatings } from "@/lib/reviews/recalculate-ratings";
 
 const dismissSchema = z.object({
   action: z.enum(["dismiss_report"]),
@@ -13,30 +12,6 @@ const dismissSchema = z.object({
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-async function recalculateTargetRatings(
-  tx: Prisma.TransactionClient,
-  targetType: ReviewTargetType,
-  targetId: string
-): Promise<void> {
-  const aggregate = await tx.review.aggregate({
-    where: { targetType, targetId, ...ACTIVE_REVIEW_FILTER },
-    _avg: { rating: true },
-    _count: { _all: true },
-  });
-
-  const ratingAvg = aggregate._avg.rating ?? 0;
-  const ratingCount = aggregate._count._all ?? 0;
-
-  try {
-    await tx.provider.update({
-      where: { id: targetId },
-      data: { ratingAvg, ratingCount, rating: ratingAvg, reviews: ratingCount },
-    });
-  } catch {
-    // provider might not exist for studio target type
-  }
-}
 
 export async function PATCH(req: Request, ctx: RouteContext) {
   const auth = await requireAdminAuth();
