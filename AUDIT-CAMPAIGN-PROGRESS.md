@@ -10,18 +10,18 @@
 |---|---|
 | **Дата последнего обновления** | 2026-08-05 |
 | **Ветка** | `audit-fixes` |
-| **Следующая находка** | **SEC-24** — `GET /api/auth/refresh` меняет состояние |
+| **Следующая находка** | **SEC-25** — не-constant-time сравнение секрета в `health/status` |
 
-**Прогресс: 26 / 157**
+**Прогресс: 27 / 157**
 
 | Файл аудита | Всего | FIXED | STALE | BLOCKED | DEFERRED-BIG | PENDING |
 |---|---:|---:|---:|---:|---:|---:|
-| AUDIT-FRESH-01 — безопасность | 30 | 26 | 0 | 0 | 0 | 4 |
+| AUDIT-FRESH-01 — безопасность | 30 | 27 | 0 | 0 | 0 | 3 |
 | AUDIT-FRESH-02 — логика | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-03 — устойчивость | 31 | 0 | 0 | 0 | 0 | 31 |
 | AUDIT-FRESH-04 — производительность | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-05 — UI/UX | 36 | 0 | 0 | 0 | 0 | 36 |
-| **Итого** | **157** | **26** | **0** | **0** | **0** | **131** |
+| **Итого** | **157** | **27** | **0** | **0** | **0** | **130** |
 
 > SEC-01 + SEC-02 закрыты одним коммитом `a4b7a41b` (`FIX-SEC-EMAIL-IDENTITY-01`) — он лёг на `main` до создания ветки, поэтому в `git log audit-fixes` он первый.
 
@@ -57,7 +57,7 @@
 | **SEC-21** | P3 | `FIXED` | `28af9141` | три копии читалки сведены в `lib/api/cron-auth.ts`, только заголовок `x-cron-token`; смоук: `?token=` → 403, заголовок → 200; ops-строка в DEPLOY-BACKLOG |
 | **SEC-22** | P3 | `FIXED` | `8e87bb24` | правило удалено из `next.config.ts`; трекаемый `public/sw.js` пересобран — иначе в репозитории остался бы SW с правилом |
 | **SEC-23** | P3 | `FIXED` | `c89e419a` | дефолт корня вынесен в `./.media-uploads` + `STORAGE_PROVIDER=local` в проде отвергается на старте (дефолт значения как раз `local`); три env-фикстуры дополнены s3 |
-| **SEC-24** | P3 | `PENDING` | — | `GET /api/auth/refresh` меняет состояние.** `src/app/api/auth/refresh/route.ts:54-73` — ротация сессии на GET, достижимая межсайтовой top-level … |
+| **SEC-24** | P3 | `FIXED` | `7d374360` | GET-обработчик удалён (вызывающих ноль; прозрачный refresh при навигации делает прокси через POST); смоук: GET → 405, POST → 401 |
 | **SEC-25** | P3 | `PENDING` | — | не-constant-time сравнение секрета.** `src/app/api/health/status/route.ts:35`: `providedSecret === expectedSecret`. В соседних роутах используется … |
 | **SEC-30** | P3 | `PENDING` | — | осиротевший check-скрипт падает на пути, удалённом при переходе на multi-file schema.** `scripts/check-utf8-no-bom.mjs:6` захардкожен … |
 | **SEC-26** | P3 | `PENDING` | — | таргетированный DoS на *выпуск* OTP остался.** Фикс targeted-lockout (`src/lib/auth/otp-rate-limit.ts:43-45`, ключ = hash(identity)+hash(ip)) закрыл … |
