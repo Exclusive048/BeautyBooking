@@ -8,7 +8,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
-import { salonInputToUtcIso, utcIsoToSalonInput } from "../../lib/datetime-input";
+import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-input";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.moveDialog;
 const TV = UI_TEXT.studioCabinet.scheduleV2;

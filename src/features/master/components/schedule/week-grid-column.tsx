@@ -87,6 +87,7 @@ export function WeekGridColumn({ day, hourStart, hourEnd, hourPx, timezone }: Pr
           hourPx={hourPx}
           workingIntervals={day.workingIntervals}
           occupied={occupied}
+          timezone={timezone}
         />
       ) : null}
 

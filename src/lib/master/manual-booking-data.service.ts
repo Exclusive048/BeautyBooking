@@ -21,13 +21,20 @@ import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
 export type ManualBookingData = {
   services: DashboardServiceLite[];
   isSolo: boolean;
+  /**
+   * LOGIC-21 · tz-источник — **salon-tz** (`Provider.timezone`, тот же, что
+   * читает `getMasterScheduleWeek` для позиционирования сетки). Модаль вводит и
+   * отдаёт wall-clock, и без этого поля он неизбежно трактовался в таймзоне
+   * браузера.
+   */
+  timezone: string;
 };
 
 export const getMasterManualBookingData = cache(
   async (userId: string): Promise<ManualBookingData | null> => {
     const master = await prisma.provider.findFirst({
       where: { ownerUserId: userId, type: ProviderType.MASTER },
-      select: { id: true, studioId: true },
+      select: { id: true, studioId: true, timezone: true },
       orderBy: { createdAt: "asc" },
     });
     if (!master) return null;
@@ -54,6 +61,7 @@ export const getMasterManualBookingData = cache(
     return {
       services,
       isSolo: master.studioId === null,
+      timezone: master.timezone,
     };
   },
 );

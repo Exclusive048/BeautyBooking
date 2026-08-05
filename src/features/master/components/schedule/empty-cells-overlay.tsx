@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
+import { salonInputToUtcIso } from "@/lib/schedule/datetime-input";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const SLOT_MIN = 30;
@@ -16,6 +17,13 @@ type Props = {
   hourPx: number;
   workingIntervals: Interval[];
   occupied: Interval[];
+  /**
+   * LOGIC-21 · tz-источник — **salon-tz** (`Provider.timezone` мастера, тот же,
+   * что позиционирует сетку через `minuteOfDay(startAtUtc, master.timezone)`).
+   * Обязателен: `startMin` — salon-local минуты, и без зоны их не превратить в
+   * UTC-инстант ничем, кроме таймзоны браузера.
+   */
+  timezone: string;
 };
 
 /**
@@ -36,6 +44,7 @@ export function EmptyCellsOverlay({
   hourPx,
   workingIntervals,
   occupied,
+  timezone,
 }: Props) {
   const { open: openManualBooking } = useManualBooking();
   const pxPerMin = hourPx / 60;
@@ -54,10 +63,17 @@ export function EmptyCellsOverlay({
   if (slots.length === 0) return null;
 
   const handleClick = (startMin: number) => {
-    const [y, m, d] = iso.split("-").map((p) => Number.parseInt(p, 10));
-    if (!y || !m || !d) return;
-    const startsAt = new Date(y, m - 1, d, Math.floor(startMin / 60), startMin % 60, 0, 0);
-    openManualBooking({ prefillTime: startsAt.toISOString() });
+    // LOGIC-21: `iso` — salon-local день колонки, `startMin` — salon-local
+    // минуты (ровно то, что мастер видит на сетке). Раньше их складывал
+    // семиаргументный `new Date(...)`, который трактует wall-clock как
+    // браузерный: у московского админа екатеринбургской студии клик по «13:00»
+    // сохранялся как 15:00 по салону. Сборка идёт через общий salon-local
+    // конвертер — тот же, что у студийных диалогов.
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const salonLocal = `${iso}T${pad(Math.floor(startMin / 60))}:${pad(startMin % 60)}`;
+    const prefillTime = salonInputToUtcIso(salonLocal, timezone);
+    if (!prefillTime) return;
+    openManualBooking({ prefillTime });
   };
 
   return (

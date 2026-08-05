@@ -5,8 +5,16 @@ import {
 } from "@/lib/schedule/timezone";
 
 /**
- * TZ-DISPLAY-SALON-PARITY-01 — salon-tz `datetime-local` conversion for the
- * studio booking dialogs (create + move).
+ * TZ-DISPLAY-SALON-PARITY-01 — salon-tz `datetime-local` conversion for every
+ * cabinet surface where a wall-clock time is typed or pre-filled.
+ *
+ * LOGIC-21: жил в `features/studio-cabinet/schedule/lib/`, пока потребителями
+ * были только студийные диалоги. Мастерский quick-create болел ровно тем же
+ * (клик по ячейке строил инстант в tz БРАУЗЕРА), и переиспользовать модуль
+ * из чужого слайса-кабинета было нельзя — поэтому он переехал сюда, к
+ * `timezone.ts`, на котором и держится. Единственный источник конверсии
+ * salon-local ↔ UTC для `datetime-local`-ввода: вторая копия обязана не
+ * появиться.
  *
  * A native `<input type="datetime-local">` is inherently interpreted in the
  * BROWSER's local tz. For a cross-tz studio admin (e.g. a Moscow browser on a

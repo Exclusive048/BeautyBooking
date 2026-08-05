@@ -114,6 +114,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **Env только через `src/lib/env.ts`** (Zod) — `process.env.*` напрямую запрещён (исключения — CLAUDE.md rule 11).
 - **Public-id opaque** — внутренние CUID не утекают в публичные API (`src/lib/public-id.ts`, инв. #29).
 - **Deep-link focus** — booking/review/notification CTA используют единый `?focus=<id>` + shared `useFocusHighlight()` / `<FocusHighlighter/>` (скролл к `[data-focus-id]` + transient highlight, reduced-motion-gated).
+- **`datetime-local`-ввод времени — только через `src/lib/schedule/datetime-input.ts`** (`utcIsoToSalonInput` / `salonInputToUtcIso` / `salonLocalDatetimeInput`). Нативный `datetime-local` **всегда** трактуется в таймзоне браузера, поэтому и заполнение, и отправка обязаны проходить через salon-конвертер (rule 17, tz-источник — **salon-tz**). Модуль жил в `features/studio-cabinet/schedule/lib/`, пока потребителями были только студийные диалоги; **LOGIC-21** показал цену такого адреса: мастерский quick-create (клик по пустой ячейке расписания) не мог переиспользовать модуль из чужого слайса-кабинета и держал собственный host-локальный путь — клик по «13:00» у московского администратора екатеринбургской студии сохранял бронь на 15:00 по салону. Переехал в `lib/schedule/` к `timezone.ts`; вторая копия появиться не должна.
 
 > Конвенции именования / ошибок / auth / Prisma / schema-discipline — в [`CLAUDE.md`](CLAUDE.md). Cabinet-специфичные UI-паттерны (`MasterPageHeader`, `AppShellContent`, auto-save) — §13 + дизайн-скилл.
 

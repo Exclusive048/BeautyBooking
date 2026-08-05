@@ -10,7 +10,7 @@ import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
-import { salonInputToUtcIso, utcIsoToSalonInput } from "../../lib/datetime-input";
+import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-input";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.createDialog;
 const TV = UI_TEXT.studioCabinet.scheduleV2;

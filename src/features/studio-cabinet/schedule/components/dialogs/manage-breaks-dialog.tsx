@@ -9,7 +9,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
-import { salonInputToUtcIso, salonLocalDatetimeInput } from "../../lib/datetime-input";
+import { salonInputToUtcIso, salonLocalDatetimeInput } from "@/lib/schedule/datetime-input";
 import type {
   ScheduleBreakCell,
   ScheduleMasterColumn,
