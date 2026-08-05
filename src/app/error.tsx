@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useErrorBoundaryReport } from "@/hooks/use-error-boundary-report";
 import { ErrorState } from "@/components/ui/error-state";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -32,18 +32,7 @@ export default function RootError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    fetch("/api/log-error", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        message: error.message,
-        digest: error.digest,
-        url: typeof window !== "undefined" ? window.location.href : undefined,
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
-      }),
-    }).catch(() => {});
-  }, [error]);
+  useErrorBoundaryReport(error);
 
   return (
     <ErrorState

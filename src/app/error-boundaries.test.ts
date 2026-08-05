@@ -64,3 +64,47 @@ describe("RES-06 · error boundary накрывает ungrouped-роуты", () 
     expect(uncovered).toEqual([]);
   });
 });
+
+/**
+ * RES-17 — сегментные boundary не репортили в GlitchTip.
+ *
+ * `reportError` во всём App Router встречался РОВНО ОДИН раз — в
+ * `global-error.tsx`. Остальные слали только `POST /api/log-error`, а тот роут
+ * пишет `logError` и никуда не форвардит: всё, что падает в кабинетах и на
+ * публичных профилях (там, где сосредоточен SSR-рендер), в трекер не попадало.
+ * Расхождение здесь невидимо — «ошибок в трекере нет» читается как «ошибок
+ * нет», — поэтому оно и прожило.
+ */
+describe("RES-17 · каждый boundary репортит в трекер", () => {
+  const BOUNDARIES = [
+    "error.tsx",
+    "global-error.tsx",
+    "(public)/error.tsx",
+    "(cabinet)/error.tsx",
+    "(admin)/error.tsx",
+  ];
+
+  it("все пять идут через общий useErrorBoundaryReport", () => {
+    for (const file of BOUNDARIES) {
+      const source = readFileSync(join(APP_ROOT, file), "utf8");
+      expect(source, file).toMatch(/useErrorBoundaryReport\(error\)/);
+    }
+  });
+
+  it("ни один не несёт собственной копии отправки", () => {
+    // Своя копия — это ровно тот способ, которым один из пяти снова отстанет.
+    for (const file of BOUNDARIES) {
+      const source = readFileSync(join(APP_ROOT, file), "utf8");
+      expect(source, file).not.toMatch(/fetch\("\/api\/log-error"/);
+    }
+  });
+
+  it("хук шлёт оба канала: трекер и структурный лог", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/hooks/use-error-boundary-report.ts"),
+      "utf8"
+    );
+    expect(source).toMatch(/reportError\(error, \{/);
+    expect(source).toMatch(/fetch\("\/api\/log-error"/);
+  });
+});
