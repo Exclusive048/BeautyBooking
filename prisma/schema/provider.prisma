@@ -104,6 +104,9 @@ model Provider {
 
   services Service[]
 
+  // LOGIC-19: блоки времени этого мастера (обратная сторона `TimeBlock.masterProvider`).
+  masterTimeBlocks TimeBlock[] @relation("ProviderTimeBlocks")
+
   masterServices MasterService[] @relation("MasterServices")
 
   servicePackages ServicePackage[] @relation("MasterServicePackages")

@@ -55,6 +55,14 @@ export const PROVIDER_RELATION_DISPOSITION: Record<string, RelationDisposition> 
     kind: "ANONYMIZED",
     reason: "delete-studio: у мастеров студии обнуляется `studioId`, кабинеты мастеров не трогаются",
   },
+  masterTimeBlocks: {
+    kind: "DELETED",
+    reason:
+      "LOGIC-19: delete-master удаляет блоки времени мастера ЯВНО. FK на Provider " +
+      "добавлен той же находкой (до неё `masterId` был голой строкой, невидимой и для " +
+      "БД, и для этого guard'а), но каскад не сработает — строка Provider переживает " +
+      "удаление кабинета. Блоки студийного скоупа уходят каскадом от Studio",
+  },
   studioProfile: { kind: "DELETED", reason: "delete-studio: строка Studio удаляется явно" },
   masterProfile: { kind: "DELETED", reason: "delete-master: строка MasterProfile удаляется явно" },
 
