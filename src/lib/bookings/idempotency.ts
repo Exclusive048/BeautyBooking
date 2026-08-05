@@ -60,17 +60,29 @@ async function loadBookingForIdempotency(
   return booking ? toBookingDto(booking) : null;
 }
 
+/**
+ * LOGIC-10: бюджет ожидания чужого результата был 3 × 100 мс ≈ 300 мс, а
+ * победитель сидит в Serializable-транзакции, длительность которой сам код
+ * логирует как `transactionMs` и которая под нагрузкой 300 мс превышает. То
+ * есть проигравший штатно не дожидался и получал `DUPLICATE_REQUEST` — который
+ * клиент показывал как «время занято». Бюджет поднят до порядка длительности
+ * транзакции; клиентский повтор (`fetchRetryingDuplicates`) — второй слой, а
+ * не замена этому.
+ */
+const IDEMPOTENCY_WAIT_ATTEMPTS = 10;
+const IDEMPOTENCY_WAIT_DELAY_MS = 200;
+
 async function waitForIdempotencyResult<T>(
   key: string,
   load: (entityId: string) => Promise<T | null>
 ): Promise<T | null> {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < IDEMPOTENCY_WAIT_ATTEMPTS; attempt += 1) {
     const current = await getIdempotencyRecord(key);
     if (current?.status === "done") {
       const result = await load(current.entityId);
       if (result) return result;
     }
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, IDEMPOTENCY_WAIT_DELAY_MS));
   }
   return null;
 }

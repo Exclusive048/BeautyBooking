@@ -9,6 +9,10 @@ import {
   type ServiceBookingConfig,
 } from "@/features/booking/lib/booking-config";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  fetchRetryingDuplicates,
+  isDuplicateRequestResponse,
+} from "@/lib/http/idempotent-retry";
 import { SelectionPhase } from "@/features/booking/components/booking-flow/phases/selection-phase";
 import { FormPhase } from "@/features/booking/components/booking-flow/phases/form-phase";
 import { SuccessPhase } from "@/features/booking/components/booking-flow/phases/success-phase";
@@ -331,7 +335,7 @@ export function BookingFlowStepper({
         .filter((x): x is { questionId: string; questionText: string; answer: string } => x !== null) ?? undefined;
 
     try {
-      const res = await fetch("/api/public/bookings", {
+      const res = await fetchRetryingDuplicates("/api/public/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -358,6 +362,15 @@ export function BookingFlowStepper({
       });
 
       if (res.status === 409) {
+        // LOGIC-10: не всякий 409 — конфликт слота. `DUPLICATE_REQUEST` значит
+        // «тот же самый запрос ещё выполняется», и бронь, скорее всего, уже
+        // создана. Показать здесь «время занято» и ротировать ключ — значит
+        // отправить пользователя на второй заход, который упрётся в его же
+        // свежую бронь и получит уже НАСТОЯЩИЙ конфликт.
+        if (await isDuplicateRequestResponse(res)) {
+          setSubmitError(UI_TEXT.publicProfile.booking.submitInFlight);
+          return;
+        }
         dispatch({ type: "submitConflict" });
         // Rotate idempotency key so the retry isn't treated as a duplicate.
         idempotencyKeyRef.current =

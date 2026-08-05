@@ -25,6 +25,10 @@ import {
 } from "@/lib/bookings/package-cursor";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  fetchRetryingDuplicates,
+  isDuplicateRequestResponse,
+} from "@/lib/http/idempotent-retry";
 
 const T = UI_TEXT.publicStudio.packageBooking;
 
@@ -322,7 +326,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/public/packages/${encodeURIComponent(bundle.id)}/studio/book`, {
+      const res = await fetchRetryingDuplicates(`/api/public/packages/${encodeURIComponent(bundle.id)}/studio/book`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -346,7 +350,11 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       if (!res.ok || !json?.ok) {
         setError(json && !json.ok ? json.error.message : T.bookError);
         // A conflict means a placement went stale — send the client back to rebuild.
-        if (res.status === 409) {
+        // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
+        // выполняется», а не устаревшее размещение. Отправлять клиента
+        // пересобирать пакет, который, скорее всего, уже создан, — ровно та
+        // ложь, из-за которой одиночный флоу показывал «время занято».
+        if (res.status === 409 && !(await isDuplicateRequestResponse(res))) {
           setPhase("build");
           setProposal(null);
         }
