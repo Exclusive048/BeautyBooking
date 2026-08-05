@@ -561,6 +561,9 @@ export async function updateMasterBookingStatus(input: {
       status: true,
       startAtUtc: true,
       endAtUtc: true,
+      // LOGIC-04: принадлежность пакету — guard «пакет отменяется целиком»
+      // (инв. #34) стоял только на клиентском пути.
+      bookingPackageId: true,
       requestedBy: true,
       actionRequiredBy: true,
     },
@@ -608,6 +611,28 @@ export async function updateMasterBookingStatus(input: {
   // two paths can't drift.
   if (rejectsChangeRequest) {
     return declineClientRescheduleRequest(booking.id, "MASTER");
+  }
+
+  // LOGIC-04: компонент пакета нельзя отменить в одиночку — ни клиентом, ни
+  // мастером. Клиентский путь (`cancelBooking`) это проверял, мастерский —
+  // параллельная реализация, до `cancelBooking` не доходящая вовсе, — не
+  // проверял, и пакет оставался ACTIVE с одним REJECTED-ребёнком: Σ child
+  // `priceSnapshot` переставала сходиться с `totalKopeks`, то есть клиент
+  // платил пакетную скидку за услуги, часть которых отменена.
+  //
+  // Отказ, а не «отменить пакет целиком за мастера»: «отмена только целиком,
+  // не по частям» — ратифицированное продуктовое решение (§1 контекста,
+  // инв. #34), а тихая отмена ОСТАЛЬНЫХ компонентов по клику «отменить эту
+  // запись» была бы новым поведением, которого мастер не запрашивал. Текст и
+  // код ответа — те же, что на клиентском пути.
+  //
+  // `NO_SHOW` намеренно НЕ гейтится: неявка на один компонент — законный исход
+  // (клиент пришёл на первую услугу и не пришёл на вторую), она ничего не
+  // отменяет и Σ снапшотов не трогает.
+  if ((isRejectAction || isCancelAction) && booking.bookingPackageId) {
+    throw new AppError("Этот пакет отменяется целиком.", 409, "PACKAGE_CANCEL_WHOLE", {
+      bookingPackageId: booking.bookingPackageId,
+    });
   }
 
   if (isRejectAction || isCancelAction) {
