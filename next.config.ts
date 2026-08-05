@@ -30,20 +30,11 @@ const withPWA = require("next-pwa")({
         },
       },
     },
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
-      handler: "StaleWhileRevalidate",
-      options: {
-        cacheName: "supabase-storage",
-        expiration: {
-          maxEntries: 60,
-          maxAgeSeconds: 30 * 24 * 60 * 60,
-        },
-        cacheableResponse: {
-          statuses: [0, 200],
-        },
-      },
-    },
+    // SEC-22: правило runtime-кэширования для `*.supabase.co/storage/...` удалено.
+    // Supabase в проекте не используется (ноль упоминаний в `src/`), медиа идёт
+    // через `storage.yandexcloud.net` либо локальный диск (`STORAGE_PROVIDER`).
+    // Живого кода за правилом не было, но оно попадало в собранный `public/sw.js`
+    // и вводило в заблуждение при чтении конфигурации.
     {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|avif|ico)$/i,
       handler: "StaleWhileRevalidate",
