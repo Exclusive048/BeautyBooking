@@ -540,24 +540,67 @@ async function applyProviderAndDiscountRule(
   });
 }
 
-export async function applyScheduleSnapshot(
+export type ScheduleSnapshotInput = {
+  weekSchedule: DayScheduleDto[];
+  exceptions: Array<Omit<ScheduleExceptionDto, "id">>;
+  slotStepMin?: number;
+  bufferBetweenBookingsMin?: number;
+  bookingRules?: BookingRulesDto;
+  visibility?: VisibilityDto;
+  /** Pass `null` to disable, an object to enable + write values. Omit to leave alone. */
+  hotSlots?: HotSlotsDto | null;
+};
+
+/**
+ * Бюджет транзакции снапшота. Поднят над дефолтными 5 с осознанно: внутри цикл
+ * upsert'ов шаблонов и цикл исключений, число которых задаёт пользователь.
+ * Экспортируется, потому что вызывающий, который добавляет к снапшоту свои
+ * записи в той же транзакции (LOGIC-13), обязан взять тот же бюджет.
+ */
+export const SCHEDULE_SNAPSHOT_TX_OPTIONS = { timeout: 20_000, maxWait: 10_000 } as const;
+
+/**
+ * Применение снапшота внутри ЧУЖОЙ транзакции. Инвалидацию кэша НЕ делает —
+ * её обязан сделать вызывающий после коммита (до коммита сбрасывать нечего, а
+ * откат оставил бы кэш вычищенным под старые данные).
+ */
+export async function applyScheduleSnapshotTx(
+  tx: Prisma.TransactionClient,
   providerId: string,
-  input: {
-    weekSchedule: DayScheduleDto[];
-    exceptions: Array<Omit<ScheduleExceptionDto, "id">>;
-    slotStepMin?: number;
-    bufferBetweenBookingsMin?: number;
-    bookingRules?: BookingRulesDto;
-    visibility?: VisibilityDto;
-    /** Pass `null` to disable, an object to enable + write values. Omit to leave alone. */
-    hotSlots?: HotSlotsDto | null;
-  }
+  input: ScheduleSnapshotInput
 ): Promise<void> {
   const weekSchedule = normalizeWeekScheduleInput(input.weekSchedule as unknown);
   const normalizedExceptions = input.exceptions
     .map((item) => normalizeExceptionInput(item))
     .sort((left, right) => left.date.localeCompare(right.date));
 
+  await applyProviderAndDiscountRule(tx, providerId, input);
+
+  await saveWeekSchedule(tx, providerId, weekSchedule);
+
+  const existing = await tx.scheduleOverride.findMany({
+    where: { providerId },
+    select: { date: true },
+  });
+  const existingDateKeys = new Set(existing.map((item) => item.date.toISOString().slice(0, 10)));
+  const nextDateKeys = new Set<string>();
+
+  for (const item of normalizedExceptions) {
+    await saveException(tx, providerId, item);
+    nextDateKeys.add(item.date);
+  }
+
+  for (const key of existingDateKeys) {
+    if (!nextDateKeys.has(key)) {
+      await removeExceptionByDate(tx, providerId, key);
+    }
+  }
+}
+
+export async function applyScheduleSnapshot(
+  providerId: string,
+  input: ScheduleSnapshotInput
+): Promise<void> {
   // LOGIC-12: весь снапшот применяется ОДНОЙ транзакцией.
   //
   // Раньше это были четыре независимых шага, и самый чувствительный —
@@ -570,36 +613,9 @@ export async function applyScheduleSnapshot(
   // `applyProviderAndDiscountRule` в этом же файле транзакцию имела, с
   // комментарием «so a half-applied state is impossible», — расписание её не
   // имело.
-  //
-  // Таймаут поднят над дефолтными 5 с осознанно: внутри цикл upsert'ов
-  // шаблонов и цикл исключений, число которых задаёт пользователь.
   await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      await applyProviderAndDiscountRule(tx, providerId, input);
-
-      await saveWeekSchedule(tx, providerId, weekSchedule);
-
-      const existing = await tx.scheduleOverride.findMany({
-        where: { providerId },
-        select: { date: true },
-      });
-      const existingDateKeys = new Set(
-        existing.map((item) => item.date.toISOString().slice(0, 10)),
-      );
-      const nextDateKeys = new Set<string>();
-
-      for (const item of normalizedExceptions) {
-        await saveException(tx, providerId, item);
-        nextDateKeys.add(item.date);
-      }
-
-      for (const key of existingDateKeys) {
-        if (!nextDateKeys.has(key)) {
-          await removeExceptionByDate(tx, providerId, key);
-        }
-      }
-    },
-    { timeout: 20_000, maxWait: 10_000 },
+    (tx: Prisma.TransactionClient) => applyScheduleSnapshotTx(tx, providerId, input),
+    SCHEDULE_SNAPSHOT_TX_OPTIONS,
   );
 
   // Инвалидация — ПОСЛЕ коммита: до него кэш сбрасывать не на что, а откат

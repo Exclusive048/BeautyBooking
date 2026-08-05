@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import type { BookingCancelInput } from "@/lib/domain/bookings";
@@ -13,13 +14,42 @@ import { emitBookingCancelledSystemMessage } from "@/lib/chat/system-messages";
 import { logError } from "@/lib/logging/logger";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 
-export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
+/**
+ * Всё, что делается ПОСЛЕ коммита отмены: инвалидация слотов и системное
+ * сообщение в чат. Вынесено в данные, чтобы вызывающий, которому отмена нужна
+ * внутри своей транзакции (LOGIC-13 — отметка дня выходным), мог отложить
+ * побочные эффекты до коммита и не рассылать их при откате.
+ */
+export type CancelBookingSideEffects = {
+  bookingId: string;
+  providerId: string;
+  masterProviderId: string | null;
+  startAtUtc: Date | null;
+  endAtUtc: Date | null;
+  cancelledBy: BookingCancelInput["cancelledBy"];
+  /** Клиент отклонил мастерский перенос — бронь осталась CONFIRMED, отмены не было. */
+  declinesMasterChange: boolean;
+};
+
+/**
+ * Отмена внутри ЧУЖОЙ транзакции: только чтение + переход статуса, без
+ * побочных эффектов. Возвращает их описание — вызывающий обязан прогнать
+ * `runCancelBookingSideEffects` после коммита.
+ *
+ * Чтение брони живёт внутри `tx` намеренно: наблюдённый статус, на который
+ * опирается оптимистическая блокировка `applyBookingTransition` (LOGIC-02),
+ * должен быть прочитан в той же транзакции, в которой пишется.
+ */
+export async function cancelBookingInTx(
+  tx: Prisma.TransactionClient,
+  input: BookingCancelInput
+): Promise<{ dto: BookingStatusUpdateDto; sideEffects: CancelBookingSideEffects }> {
   // AUDIT (отмена/отклонение):
   // - реализовано: отмена/отклонение меняет статус, удаления записи нет.
   // - реализовано: CLIENT/PROVIDER отмена -> REJECTED, requestedBy проставляется.
   // - реализовано: клиентский отказ от мастерского переноса оставляет CONFIRMED и очищает proposed*.
   // - реализовано: правило 60 минут проверяется на сервере для отмены (кроме reject ветки переноса).
-  const booking = await prisma.booking.findUnique({
+  const booking = await tx.booking.findUnique({
     where: { id: input.bookingId },
     select: {
       id: true,
@@ -90,62 +120,78 @@ export async function cancelBooking(input: BookingCancelInput): Promise<BookingS
     // notification below.
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    // LOGIC-02: переход только из наблюдённого статуса — иначе отмена ложится
-    // поверх уже подтверждённого мастером переноса (и наоборот).
-    const updated = await applyBookingTransition(tx, {
-      id: input.bookingId,
-      expectedStatus: booking.status,
-      data: declinesMasterChange
-        ? {
-            status: "CONFIRMED",
-            actionRequiredBy: null,
-            requestedBy: null,
-            changeComment: null,
-            proposedStartAt: null,
-            proposedEndAt: null,
-          }
-        : {
-            status: "REJECTED",
-            cancelledBy: input.cancelledBy,
-            cancelReason: input.reason?.trim() || null,
-            cancelledAtUtc: new Date(),
-            requestedBy: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
-            actionRequiredBy: null,
-            proposedStartAt: null,
-            proposedEndAt: null,
-          },
-      select: { id: true, status: true },
-    });
-
-    return updated;
+  // LOGIC-02: переход только из наблюдённого статуса — иначе отмена ложится
+  // поверх уже подтверждённого мастером переноса (и наоборот).
+  const updated = await applyBookingTransition(tx, {
+    id: input.bookingId,
+    expectedStatus: booking.status,
+    data: declinesMasterChange
+      ? {
+          status: "CONFIRMED",
+          actionRequiredBy: null,
+          requestedBy: null,
+          changeComment: null,
+          proposedStartAt: null,
+          proposedEndAt: null,
+        }
+      : {
+          status: "REJECTED",
+          cancelledBy: input.cancelledBy,
+          cancelReason: input.reason?.trim() || null,
+          cancelledAtUtc: new Date(),
+          requestedBy: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
+          actionRequiredBy: null,
+          proposedStartAt: null,
+          proposedEndAt: null,
+        },
+    select: { id: true, status: true },
   });
 
-  if (!declinesMasterChange) {
-    await invalidateSlotsForBookingRange({
+  return {
+    dto: { id: updated.id, status: updated.status },
+    sideEffects: {
+      bookingId: booking.id,
       providerId: booking.providerId,
       masterProviderId: booking.masterProviderId ?? null,
       startAtUtc: booking.startAtUtc,
       endAtUtc: booking.endAtUtc,
+      cancelledBy: input.cancelledBy,
+      declinesMasterChange,
+    },
+  };
+}
+
+/** Побочные эффекты отмены. Вызывать ТОЛЬКО после коммита транзакции. */
+export async function runCancelBookingSideEffects(
+  effects: CancelBookingSideEffects
+): Promise<void> {
+  // Ветка «клиент отклонил мастерский перенос» ничего не отменяет — бронь
+  // остаётся CONFIRMED, только сбрасываются proposed*. Ни слоты, ни чат
+  // трогать не нужно.
+  if (effects.declinesMasterChange) return;
+
+  await invalidateSlotsForBookingRange({
+    providerId: effects.providerId,
+    masterProviderId: effects.masterProviderId,
+    startAtUtc: effects.startAtUtc,
+    endAtUtc: effects.endAtUtc,
+  });
+
+  try {
+    await emitBookingCancelledSystemMessage({
+      bookingId: effects.bookingId,
+      by: effects.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
+    });
+  } catch (error) {
+    logError("Failed to emit booking system message (cancel)", {
+      bookingId: effects.bookingId,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
+}
 
-  // System message in chat. Skipped for the "client declines master's
-  // reschedule" branch — that doesn't actually cancel the booking, just
-  // reverts proposed* and stays CONFIRMED.
-  if (!declinesMasterChange) {
-    try {
-      await emitBookingCancelledSystemMessage({
-        bookingId: booking.id,
-        by: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
-      });
-    } catch (error) {
-      logError("Failed to emit booking system message (cancel)", {
-        bookingId: booking.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  return { id: updated.id, status: updated.status };
+export async function cancelBooking(input: BookingCancelInput): Promise<BookingStatusUpdateDto> {
+  const { dto, sideEffects } = await prisma.$transaction((tx) => cancelBookingInTx(tx, input));
+  await runCancelBookingSideEffects(sideEffects);
+  return dto;
 }
