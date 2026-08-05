@@ -1,6 +1,7 @@
 import { ok, fail } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { logError } from "@/lib/logging/logger";
 import { getAllSurfaceStatuses } from "@/lib/monitoring/status";
 import { alertDeadJobs, alertWorkerDown } from "@/lib/monitoring/api-alerts";
@@ -32,7 +33,12 @@ function parsePingAgeSeconds(lastPingAt: number | null): number | null {
 async function isAuthorized(request: Request): Promise<boolean> {
   const expectedSecret = resolveWorkerSecret();
   const providedSecret = request.headers.get("x-worker-secret")?.trim();
-  if (expectedSecret && providedSecret && providedSecret === expectedSecret) {
+  // SEC-25: сравнение секрета — constant-time, как в соседних роутах
+  // (`health/worker`, cron-эндпоинты). Голое `===` выходит на первом же
+  // несовпавшем байте, то есть время ответа коррелирует с длиной верного
+  // префикса. Общий хелпер вдобавок хеширует обе стороны, поэтому не утекает и
+  // длина (SEC-20).
+  if (expectedSecret && providedSecret && timingSafeStringEqual(providedSecret, expectedSecret)) {
     return true;
   }
 
