@@ -1609,17 +1609,21 @@ export const openApiSpec = {
           user: { $ref: "#/components/schemas/MeUser" },
         },
       },
+      // LOGIC-24: `displayName` и `address` объявлены здесь не были приняты
+      // роутом никогда — он вырезал их дважды. `phone` убран из принимаемых
+      // ещё в SECURITY-EXPOSURE-AUDIT-01 #2 (непроверенная запись
+      // идентификатора входа = вектор захвата аккаунта), но в опубликованном
+      // контракте остался. Спека — самый внешний слой того же расхождения:
+      // интегратор (мобильный клиент, `MOBILE-API` в бэклоге) реализовал бы по
+      // ней вызовы, которые молча ничего не делают.
       MeUpdateInput: {
         type: "object",
         properties: {
-          displayName: { type: "string" },
-          phone: { type: "string" },
           email: { type: "string" },
           firstName: { type: "string" },
           lastName: { type: "string" },
           middleName: { type: "string" },
           birthDate: { type: "string" },
-          address: { type: "string" },
         },
       },
       MoveStudioBookingInput: {
