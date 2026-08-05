@@ -13,6 +13,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
 import { prismaDirect } from "@/lib/prisma-direct";
@@ -279,6 +280,22 @@ export async function POST(req: Request, ctx: RouteContext) {
         if (conflict) {
           throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
         }
+
+        // LOGIC-06: пятый путь создания брони пропускал guard объявленного
+        // отсутствия мастера. `FIX-TIMEBLOCK-ENFORCEMENT-01` объявляет
+        // `assertNoTimeBlockConflict` «ONE primitive reused at every create/move
+        // site» (`time-blocks.ts:22-25`) — этот сайт был единственным
+        // пропущенным, и подтверждение модель-оффера сажало бронь внутрь
+        // BREAK/BLOCK: мастер видел в календаре блок и бронь поверх него.
+        //
+        // Владелец блока — исполняющий мастер: `masterProviderId`, а для оффера
+        // без назначенного мастера — `providerId` (ровно как в
+        // `ensureNoConflicts`, чтобы определение владельца не разошлось).
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: application.offer.masterId ?? offerService.providerId,
+          startAtUtc,
+          endAtUtc,
+        });
 
         const booking = await tx.booking.create({
           data: {
