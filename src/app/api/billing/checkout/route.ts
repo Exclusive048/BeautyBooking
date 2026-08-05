@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma, type BillingPaymentStatus } from "@prisma/client";
 import { ok, fail } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +12,32 @@ import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 
 export const runtime = "nodejs";
+
+const PRISMA_UNIQUE_VIOLATION = "P2002";
+
+/**
+ * Ответ на «платёж по этому ключу уже есть» (LOGIC-08).
+ *
+ * Вынесен, потому что таких мест теперь ДВА: последовательный дубль ловит
+ * `findUnique` до создания, одновременный — `P2002` на самом создании. Две
+ * копии лестницы разъехались бы, и разъехались бы именно на платёжном экране.
+ */
+function respondToExistingPayment(payment: {
+  status: BillingPaymentStatus;
+  confirmationUrl: string | null;
+}) {
+  if (payment.status === "PENDING" && payment.confirmationUrl) {
+    return ok({ confirmationUrl: payment.confirmationUrl, reused: true });
+  }
+  if (payment.status === "SUCCEEDED") {
+    return ok({ mode: "already-paid", reused: true });
+  }
+  if (payment.status === "PENDING") {
+    // Победитель гонки ещё не сходил в ЮКассу — ссылки пока нет ни у кого.
+    return ok({ mode: "pending", reused: true });
+  }
+  return fail("Платёж уже существует. Попробуйте позже.", 409, "PAYMENT_ALREADY_EXISTS");
+}
 
 const bodySchema = z.object({
   scope: z.enum(["MASTER", "STUDIO"]),
@@ -202,39 +229,53 @@ export async function POST(req: Request) {
   });
 
   if (existingByKey) {
-    if (existingByKey.status === "PENDING" && existingByKey.confirmationUrl) {
-      return ok({ confirmationUrl: existingByKey.confirmationUrl, reused: true });
-    }
-    if (existingByKey.status === "SUCCEEDED") {
-      return ok({ mode: "already-paid", reused: true });
-    }
-    if (existingByKey.status === "PENDING") {
-      return ok({ mode: "pending", reused: true });
-    }
-    return fail("Платёж уже существует. Попробуйте позже.", 409, "PAYMENT_ALREADY_EXISTS");
+    return respondToExistingPayment(existingByKey);
   }
 
-  const payment = await prisma.billingPayment.create({
-    data: {
-      subscriptionId,
-      type: existing && existing.planId !== plan.id ? "UPGRADE" : "INITIAL",
-      status: "PENDING",
-      amountKopeks: priceKopeks,
-      currency: "RUB",
-      periodMonths,
-      idempotenceKey,
-      metadata: {
-        userId: user.id,
-        scope,
-        planId: plan.id,
-        planCode: plan.code,
+  // LOGIC-08: `findUnique` выше и этот `create` — не атомарная пара, поэтому
+  // два ОДНОВРЕМЕННЫХ клика по «Оплатить» оба читают пустоту и оба доходят
+  // сюда. Второго платежа в ЮКассе при этом не возникает — `idempotenceKey
+  // @unique` (инв. #4) срабатывает ДО обращения в API, — но проигравший
+  // получал необработанный P2002, то есть сырой 500 на платёжном экране,
+  // вместо задуманного `{ reused: true }` с той же ссылкой на оплату. Тот же
+  // re-read-on-conflict, что в `mrr-snapshot.ts` и в шести auth-сайтах.
+  let payment: { id: string };
+  try {
+    payment = await prisma.billingPayment.create({
+      data: {
         subscriptionId,
-        periodMonths,
         type: existing && existing.planId !== plan.id ? "UPGRADE" : "INITIAL",
+        status: "PENDING",
+        amountKopeks: priceKopeks,
+        currency: "RUB",
+        periodMonths,
+        idempotenceKey,
+        metadata: {
+          userId: user.id,
+          scope,
+          planId: plan.id,
+          planCode: plan.code,
+          subscriptionId,
+          periodMonths,
+          type: existing && existing.planId !== plan.id ? "UPGRADE" : "INITIAL",
+        },
       },
-    },
-    select: { id: true },
-  });
+      select: { id: true },
+    });
+  } catch (error) {
+    const isUniqueViolation =
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === PRISMA_UNIQUE_VIOLATION;
+    if (!isUniqueViolation) throw error;
+
+    const winner = await prisma.billingPayment.findUnique({
+      where: { idempotenceKey },
+      select: { confirmationUrl: true, status: true },
+    });
+    // Строки нет — значит конфликт был не по этому ключу; молчать нельзя.
+    if (!winner) throw error;
+    return respondToExistingPayment(winner);
+  }
 
   await createBillingAuditLog({
     userId: user.id,
