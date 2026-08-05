@@ -29,7 +29,10 @@ import { exchangeYandexCodeForToken, fetchYandexProfile } from "@/lib/yandex/oau
 const realFetch = globalThis.fetch;
 
 function stubFetch(payload: unknown) {
-  const mock = vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 }));
+  const mock = vi.fn(
+    async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response(JSON.stringify(payload), { status: 200 })
+  );
   globalThis.fetch = mock as unknown as typeof fetch;
   return mock;
 }

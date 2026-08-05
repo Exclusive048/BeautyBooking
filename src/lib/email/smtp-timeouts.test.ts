@@ -18,7 +18,9 @@ import { join, resolve } from "node:path";
  * разошедшаяся с каноном.
  */
 
-const createTransport = vi.hoisted(() => vi.fn(() => ({ sendMail: vi.fn(), verify: vi.fn() })));
+const createTransport = vi.hoisted(() =>
+  vi.fn((_options: Record<string, unknown>) => ({ sendMail: vi.fn(), verify: vi.fn() }))
+);
 
 vi.mock("nodemailer", () => ({ default: { createTransport } }));
 vi.mock("@/lib/env", () => ({

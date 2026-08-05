@@ -3,6 +3,18 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/lib/media/storage/types";
 import { env } from "@/lib/env";
 
+/**
+ * RES-21 — границы S3-вызова.
+ *
+ * 5 с на установку соединения (хранилище в той же зоне — секунды это уже
+ * аномалия) и 30 с на сам запрос: верхняя планка загрузки после re-encode
+ * измеряется мегабайтами, и слишком строгий порог рвал бы легитимную заливку
+ * на медленном канале. Таймаут действует НА ПОПЫТКУ, ретраев по умолчанию три
+ * — то есть худший случай ограничен, а не бесконечен, чем он и был.
+ */
+const S3_CONNECTION_TIMEOUT_MS = 5_000;
+const S3_REQUEST_TIMEOUT_MS = 30_000;
+
 type S3Config = {
   bucket: string;
   endpoint: string;
@@ -63,6 +75,22 @@ export class S3StorageProvider implements StorageProvider {
       credentials: {
         accessKeyId: cfg.accessKey,
         secretAccessKey: cfg.secretKey,
+      },
+      // RES-21: у клиента не было ни request-, ни connection-таймаута — только
+      // неявный `maxAttempts: 3`, который без границы на попытку не
+      // ограничивает НИЧЕГО. Держит два пути: загрузку медиа (запрос
+      // пользователя ждёт ответа) и джобу `media.purge`, то есть фактическое
+      // удаление ПДн из хранилища — зависший вызов там означает, что байты
+      // остаются, а строка-указатель уже не удалена (порядок в DELETION-02
+      // намеренно такой).
+      //
+      // Объект, а не `NodeHttpHandler`: SDK принимает `NodeHttpHandlerOptions`
+      // и конструирует обработчик сам, поэтому не нужен прямой импорт
+      // `@smithy/node-http-handler` — он есть только транзитивно, и зависеть
+      // от него напрямую значило бы завести незаявленную зависимость.
+      requestHandler: {
+        connectionTimeout: S3_CONNECTION_TIMEOUT_MS,
+        requestTimeout: S3_REQUEST_TIMEOUT_MS,
       },
     });
   }
