@@ -1,5 +1,6 @@
 import { z, ZodError } from "zod";
 import { AppError } from "@/lib/api/errors";
+import { MAX_JSON_BODY_BYTES, readBodyTextCapped } from "@/lib/http/body-limit";
 
 type ValidationIssue = {
   path: string;
@@ -24,10 +25,22 @@ function validationError(message: string, details: ValidationDetails): AppError 
   return new AppError(message, 400, "VALIDATION_ERROR", details);
 }
 
-export async function parseBody<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
+export async function parseBody<T>(
+  req: Request,
+  schema: z.ZodType<T>,
+  maxBytes: number = MAX_JSON_BODY_BYTES,
+): Promise<T> {
+  // SEC-16, слой 2: считаем фактические байты. Zod ограничивает поля только
+  // после разбора, а `Content-Length` (слой 1 в `proxy.ts`) может отсутствовать
+  // или лгать — поэтому граница обязана быть и здесь.
+  const read = await readBodyTextCapped(req, maxBytes);
+  if (!read.ok) {
+    throw new AppError("Слишком большой запрос.", 413, "REQUEST_BODY_TOO_LARGE");
+  }
+
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(read.text) as unknown;
   } catch {
     throw validationError("Некорректный формат запроса.", {
       issues: [{ path: "body", message: "Некорректный формат запроса.", code: "invalid_json" }],

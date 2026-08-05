@@ -2,6 +2,7 @@ import { z } from "zod";
 import { logError } from "@/lib/logging/logger";
 import { ok, fail } from "@/lib/api/response";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 
 export const runtime = "nodejs";
@@ -29,9 +30,16 @@ export async function POST(req: Request) {
       return fail("Слишком много запросов. Попробуйте позже.", 429);
     }
 
+    // SEC-16: Zod ограничивает поля только ПОСЛЕ разбора — граница размера
+    // обязана стоять до него.
+    const read = await readBodyTextCapped(req);
+    if (!read.ok) {
+      return fail("Слишком большой запрос.", 413);
+    }
+
     let body: unknown;
     try {
-      body = await req.json();
+      body = JSON.parse(read.text) as unknown;
     } catch {
       return fail("Некорректный формат запроса.", 400);
     }

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { checkRateLimit } from "@/lib/rate-limit";
+import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { toApiRouteTemplate } from "@/lib/rate-limit/route-template";
@@ -241,6 +242,25 @@ export async function proxy(request: NextRequest) {
       NextResponse.json(
         { error: "Запрос отклонён: недопустимый источник." },
         { status: 403 },
+      ),
+      requestId,
+    );
+  }
+
+  // SEC-16, слой 1: заявленный перебор отсекается до входа в обработчик и до
+  // обновления сессии — как и межсайтовая мутация выше. Фактический счётчик
+  // байтов (Content-Length может отсутствовать или лгать) — в `readBodyTextCapped`.
+  if (
+    isApiRoute &&
+    exceedsDeclaredBodyLimit({
+      contentType: request.headers.get("content-type"),
+      contentLength: request.headers.get("content-length"),
+    })
+  ) {
+    return withRequestId(
+      NextResponse.json(
+        { error: "Слишком большой запрос." },
+        { status: 413 },
       ),
       requestId,
     );

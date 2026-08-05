@@ -90,6 +90,8 @@ const ERROR_CODES = [
   "REFERENCE_PHOTO_NOT_FOUND",
   "REFERENCE_PHOTO_INVALID",
   "REFERENCE_PHOTO_USED",
+  // SEC-16: тело запроса перевалило за планку размера (`lib/http/body-limit.ts`)
+  "REQUEST_BODY_TOO_LARGE",
   "REVIEW_ALREADY_EXISTS",
   "REVIEW_NOT_ALLOWED",
   "REVIEW_TARGET_NOT_FOUND",

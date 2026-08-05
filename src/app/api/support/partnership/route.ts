@@ -5,6 +5,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { extractClientIp } from "@/lib/http/ip";
 import {
   extractSmtpErrorDetails,
@@ -17,6 +18,7 @@ export const runtime = "nodejs";
 const INVALID_FORM_ERROR = "Некорректные данные формы.";
 const TOO_MANY_REQUESTS_ERROR =
   "Слишком часто. Попробуйте через несколько минут.";
+const TOO_LARGE_ERROR = "Слишком большой запрос.";
 const SEND_ERROR = "Ошибка отправки. Попробуйте позже.";
 
 /**
@@ -107,9 +109,27 @@ export async function POST(req: Request) {
   const requestId = getRequestId(req);
   const route = "POST /api/support/partnership";
 
+  // SEC-16: рейт-лимит стоял ПОСЛЕ разбора тела, то есть 429 выдавался уже
+  // после того, как произвольно большой JSON прочитан и разобран — ограничитель
+  // не ограничивал самую дорогую часть запроса. Порядок теперь: заявленный
+  // размер (даром, по заголовку) → лимит → фактические байты → разбор.
+  const ip = extractClientIp(req);
+  const userAgent = req.headers.get("user-agent") ?? null;
+
+  const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;
+  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
+  if (!ipAllowed) {
+    return NextResponse.json({ ok: false, error: TOO_MANY_REQUESTS_ERROR }, { status: 429 });
+  }
+
+  const read = await readBodyTextCapped(req);
+  if (!read.ok) {
+    return NextResponse.json({ ok: false, error: TOO_LARGE_ERROR }, { status: 413 });
+  }
+
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(read.text) as unknown;
   } catch {
     return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
   }
@@ -130,15 +150,6 @@ export async function POST(req: Request) {
       honeypotLength: data.honeypot.length,
     });
     return NextResponse.json({ ok: true });
-  }
-
-  const ip = extractClientIp(req);
-  const userAgent = req.headers.get("user-agent") ?? null;
-
-  const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;
-  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-  if (!ipAllowed) {
-    return NextResponse.json({ ok: false, error: TOO_MANY_REQUESTS_ERROR }, { status: 429 });
   }
 
   const recipientRaw = (env.SUPPORT_TO_PARTNERSHIP ?? env.SUPPORT_TO)?.trim();
