@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
+import { toApiRouteTemplate } from "@/lib/rate-limit/route-template";
 import { verifyToken } from "@/lib/auth/jwt";
 
 const PRODUCTION_ORIGIN = "https://мастеррядом.online";
@@ -218,7 +219,9 @@ export async function proxy(request: NextRequest) {
 
   if (tier) {
     const ip = getClientIp(request);
-    const key = `rl:${tier}:${ip}:${method}:${pathname}`;
+    // SEC-03: ключ строится по ШАБЛОНУ роута, а не по конкретному URL. Иначе
+    // каждый id — своё ведро, и перечисление по id не throttled вообще.
+    const key = `rl:${tier}:${ip}:${method}:${toApiRouteTemplate(pathname)}`;
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
     if (result.limited) {
