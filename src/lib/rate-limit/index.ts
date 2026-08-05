@@ -21,6 +21,7 @@ const memoryBuckets = new Map<string, MemoryBucket>();
 const MEMORY_FALLBACK_MAX_BUCKETS = 20_000;
 const SENSITIVE_ROUTE_PREFIXES = [
   "/api/auth",
+  "/api/billing",
   "/api/bookings",
   "/api/payments",
   "/api/me/delete",
@@ -32,6 +33,33 @@ const SENSITIVE_ROUTE_PREFIXES = [
   "/api/studios",
   "/api/reviews",
 ] as const;
+
+/**
+ * LOGIC-14: изъятия из fail-closed, каждое — с причиной.
+ *
+ * `/api/billing` целиком чувствителен: checkout / cancel / auto-renew —
+ * мутирующие денежные действия, и до этого весь домен проваливался в
+ * `publicApi`, тогда как вебхук (`/api/payments`) fail-closed уже был.
+ * Но два прогона по расписанию лежат под тем же префиксом, и для НИХ
+ * fail-closed значит противоположное задуманному:
+ *
+ *  · `/api/billing/renew/run` — LOGIC-07 осознанно сделал его лок **fail-open**
+ *    именно потому, что от двойного списания защищает `BillingPayment.
+ *    idempotenceKey` (инв. #4), а не Redis; остановить биллинг на сутки из-за
+ *    недоступного Redis — цена без выигрыша. 429 на входе отменил бы это
+ *    решение, не изменив его текста.
+ *  · `/api/billing/mrr/snapshot/run` — снапшот строго за сегодня и за
+ *    пропущенный день не бэкфиллится, то есть 429 стирает точку данных
+ *    навсегда.
+ *
+ * Оба — не браузерные поверхности: гейт у них токеном в заголовке
+ * (`isAuthorizedCronRequest`, SEC-21), а не рейт-лимитом.
+ */
+const SENSITIVE_ROUTE_EXCEPTIONS = [
+  "/api/billing/renew/run",
+  "/api/billing/mrr/snapshot/run",
+] as const;
+
 const SENSITIVE_KEY_PREFIXES = [
   "rate:createBooking:",
   // SECURITY-EXPOSURE-AUDIT-01 · Y6: the public booking-write paths must fail
@@ -61,12 +89,15 @@ function extractApiPathFromKey(key: string): string | null {
   return key.slice(index);
 }
 
-function isSensitiveRouteKey(key: string): boolean {
+export function isSensitiveRouteKey(key: string): boolean {
   if (SENSITIVE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
     return true;
   }
   const path = extractApiPathFromKey(key);
   if (!path) return false;
+  if (SENSITIVE_ROUTE_EXCEPTIONS.some((exception) => path === exception)) {
+    return false;
+  }
   return SENSITIVE_ROUTE_PREFIXES.some(
     (prefix) => path === prefix || path.startsWith(`${prefix}/`)
   );
