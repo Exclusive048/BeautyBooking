@@ -50,10 +50,11 @@ const LATE_CANCEL_ACTIONS: readonly LateCancelAction[] = ["none", "reminder", "f
 const SLOT_PRECISIONS: readonly SlotPrecision[] = ["exact", "today_free", "date_only"];
 
 async function saveWeekSchedule(
+  tx: Prisma.TransactionClient,
   providerId: string,
   weekSchedule: DayScheduleDto[]
 ): Promise<void> {
-  const config = await prisma.weeklyScheduleConfig.upsert({
+  const config = await tx.weeklyScheduleConfig.upsert({
     where: { providerId },
     update: {},
     create: { providerId },
@@ -91,7 +92,7 @@ async function saveWeekSchedule(
   for (const signature of signatureOrder) {
     const item = signatures.get(signature);
     if (!item) continue;
-    const template = await prisma.scheduleTemplate.upsert({
+    const template = await tx.scheduleTemplate.upsert({
       where: { providerId_name: { providerId, name: item.name } },
       update: { startLocal: item.startLocal, endLocal: item.endLocal, color: null },
       create: {
@@ -104,9 +105,9 @@ async function saveWeekSchedule(
       select: { id: true },
     });
     templateIdBySignature.set(signature, template.id);
-    await prisma.scheduleTemplateBreak.deleteMany({ where: { templateId: template.id } });
+    await tx.scheduleTemplateBreak.deleteMany({ where: { templateId: template.id } });
     if (item.breaks.length > 0) {
-      await prisma.scheduleTemplateBreak.createMany({
+      await tx.scheduleTemplateBreak.createMany({
         data: item.breaks.map((entry, index) => ({
           templateId: template.id,
           startLocal: entry.start,
@@ -154,14 +155,14 @@ async function saveWeekSchedule(
     };
   });
 
-  await prisma.weeklyScheduleDay.deleteMany({ where: { configId: config.id } });
+  await tx.weeklyScheduleDay.deleteMany({ where: { configId: config.id } });
   if (rows.length > 0) {
-    await prisma.weeklyScheduleDay.createMany({ data: rows });
+    await tx.weeklyScheduleDay.createMany({ data: rows });
   }
-  await prisma.weeklyScheduleConfig.update({ where: { id: config.id }, data: {} });
+  await tx.weeklyScheduleConfig.update({ where: { id: config.id }, data: {} });
 
   const usedAutoTemplateIds = new Set(Array.from(templateIdBySignature.values()));
-  await prisma.scheduleTemplate.deleteMany({
+  await tx.scheduleTemplate.deleteMany({
     where: {
       providerId,
       name: { startsWith: AUTO_TEMPLATE_PREFIX },
@@ -170,9 +171,13 @@ async function saveWeekSchedule(
   });
 }
 
-async function saveException(providerId: string, input: EditorExceptionInput): Promise<void> {
+async function saveException(
+  tx: Prisma.TransactionClient,
+  providerId: string,
+  input: EditorExceptionInput,
+): Promise<void> {
   const date = parseDateKeyToUtcStart(input.date);
-  const existing = await prisma.scheduleOverride.findFirst({
+  const existing = await tx.scheduleOverride.findFirst({
     where: { providerId, date },
     // LOGIC-11: писатель обязан править ТУ ЖЕ строку, которую читают
     // потребители, иначе правка уходит в невидимый дубль.
@@ -184,7 +189,7 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
   const isDayOff = !input.isWorkday;
 
   if (existing) {
-    await prisma.scheduleOverride.update({
+    await tx.scheduleOverride.update({
       where: { id: existing.id },
       data: {
         kind,
@@ -200,7 +205,7 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
       },
     });
   } else {
-    await prisma.scheduleOverride.create({
+    await tx.scheduleOverride.create({
       data: {
         providerId,
         date,
@@ -216,9 +221,9 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
     });
   }
 
-  await prisma.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date } });
+  await tx.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date } });
   if (input.isWorkday && input.scheduleMode === "FLEXIBLE" && input.breaks.length > 0) {
-    await prisma.scheduleBreak.createMany({
+    await tx.scheduleBreak.createMany({
       data: input.breaks.map((item) => ({
         providerId,
         kind: "OVERRIDE",
@@ -230,10 +235,14 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
   }
 }
 
-async function removeExceptionByDate(providerId: string, dateKey: string): Promise<void> {
+async function removeExceptionByDate(
+  tx: Prisma.TransactionClient,
+  providerId: string,
+  dateKey: string,
+): Promise<void> {
   const date = parseDateKeyToUtcStart(dateKey);
-  await prisma.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date } });
-  await prisma.scheduleOverride.deleteMany({ where: { providerId, date } });
+  await tx.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date } });
+  await tx.scheduleOverride.deleteMany({ where: { providerId, date } });
 }
 
 export async function buildScheduleSnapshot(providerId: string): Promise<ScheduleEditorSnapshot> {
@@ -439,9 +448,12 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
 }
 
 /**
- * Atomically writes Provider settings + DiscountRule for hot slots. Runs
- * inside `prisma.$transaction` so a half-applied state is impossible —
- * either both Provider and DiscountRule write, or neither.
+ * Writes Provider settings + DiscountRule for hot slots.
+ *
+ * LOGIC-12: собственная транзакция снята — функция теперь работает на `tx`
+ * внешней. Атомарность не ослабла, а расширилась: раньше настройки и правило
+ * скидок применялись атомарно ОТДЕЛЬНО от расписания, то есть обрыв между
+ * двумя транзакциями оставлял применённой половину снапшота.
  *
  * Hot-slot semantics: input.hotSlots === null → toggle off (DiscountRule
  * stays in DB but `isEnabled = false`, preserving previous tuning).
@@ -449,6 +461,7 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
  * detailed page's `minPriceFrom` / `serviceIds` if a row already exists.
  */
 async function applyProviderAndDiscountRule(
+  tx: Prisma.TransactionClient,
   providerId: string,
   input: {
     slotStepMin?: number;
@@ -485,47 +498,45 @@ async function applyProviderAndDiscountRule(
 
   if (!hasProviderUpdate && !hasHotSlotInput) return;
 
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    if (hasProviderUpdate) {
-      await tx.provider.update({ where: { id: providerId }, data: providerData });
+  if (hasProviderUpdate) {
+    await tx.provider.update({ where: { id: providerId }, data: providerData });
+  }
+
+  if (input.hotSlots === undefined) return;
+  const rule = input.hotSlots;
+
+  if (rule === null) {
+    const existing = await tx.discountRule.findUnique({ where: { providerId } });
+    if (existing && existing.isEnabled) {
+      await tx.discountRule.update({
+        where: { providerId },
+        data: { isEnabled: false },
+      });
     }
+    return;
+  }
 
-    if (input.hotSlots === undefined) return;
-    const rule = input.hotSlots;
-
-    if (rule === null) {
-      const existing = await tx.discountRule.findUnique({ where: { providerId } });
-      if (existing && existing.isEnabled) {
-        await tx.discountRule.update({
-          where: { providerId },
-          data: { isEnabled: false },
-        });
-      }
-      return;
-    }
-
-    await tx.discountRule.upsert({
-      where: { providerId },
-      create: {
-        providerId,
-        isEnabled: true,
-        smartPriceEnabled: false,
-        triggerHours: rule.triggerHours,
-        discountType: "PERCENT",
-        discountValue: rule.discountValue,
-        applyMode: rule.applyMode,
-        minPriceFrom: null,
-        serviceIds: [],
-      },
-      update: {
-        isEnabled: true,
-        triggerHours: rule.triggerHours,
-        discountValue: rule.discountValue,
-        applyMode: rule.applyMode,
-        // discountType / smartPriceEnabled / minPriceFrom / serviceIds are
-        // preserved — the detailed hot-slots page owns those.
-      },
-    });
+  await tx.discountRule.upsert({
+    where: { providerId },
+    create: {
+      providerId,
+      isEnabled: true,
+      smartPriceEnabled: false,
+      triggerHours: rule.triggerHours,
+      discountType: "PERCENT",
+      discountValue: rule.discountValue,
+      applyMode: rule.applyMode,
+      minPriceFrom: null,
+      serviceIds: [],
+    },
+    update: {
+      isEnabled: true,
+      triggerHours: rule.triggerHours,
+      discountValue: rule.discountValue,
+      applyMode: rule.applyMode,
+      // discountType / smartPriceEnabled / minPriceFrom / serviceIds are
+      // preserved — the detailed hot-slots page owns those.
+    },
   });
 }
 
@@ -547,27 +558,51 @@ export async function applyScheduleSnapshot(
     .map((item) => normalizeExceptionInput(item))
     .sort((left, right) => left.date.localeCompare(right.date));
 
-  await applyProviderAndDiscountRule(providerId, input);
+  // LOGIC-12: весь снапшот применяется ОДНОЙ транзакцией.
+  //
+  // Раньше это были четыре независимых шага, и самый чувствительный —
+  // `saveWeekSchedule` — внутри себя делает `deleteMany` + `createMany`. Обрыв
+  // между ними (таймаут пула, рестарт пода, сетевой сбой) оставлял мастера с
+  // НУЛЁМ `WeeklyScheduleDay`, а `buildWeeklyRule` при отсутствии рабочих дней
+  // возвращает `null` — то есть мастер молча исчезал из выдачи слотов и
+  // переставал принимать записи. В UI это выглядело как «просто не
+  // сохранилось»: PATCH ведь вернул ошибку. Соседняя
+  // `applyProviderAndDiscountRule` в этом же файле транзакцию имела, с
+  // комментарием «so a half-applied state is impossible», — расписание её не
+  // имело.
+  //
+  // Таймаут поднят над дефолтными 5 с осознанно: внутри цикл upsert'ов
+  // шаблонов и цикл исключений, число которых задаёт пользователь.
+  await prisma.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      await applyProviderAndDiscountRule(tx, providerId, input);
 
-  await saveWeekSchedule(providerId, weekSchedule);
+      await saveWeekSchedule(tx, providerId, weekSchedule);
 
-  const existing = await prisma.scheduleOverride.findMany({
-    where: { providerId },
-    select: { date: true },
-  });
-  const existingDateKeys = new Set(existing.map((item) => item.date.toISOString().slice(0, 10)));
-  const nextDateKeys = new Set<string>();
+      const existing = await tx.scheduleOverride.findMany({
+        where: { providerId },
+        select: { date: true },
+      });
+      const existingDateKeys = new Set(
+        existing.map((item) => item.date.toISOString().slice(0, 10)),
+      );
+      const nextDateKeys = new Set<string>();
 
-  for (const item of normalizedExceptions) {
-    await saveException(providerId, item);
-    nextDateKeys.add(item.date);
-  }
+      for (const item of normalizedExceptions) {
+        await saveException(tx, providerId, item);
+        nextDateKeys.add(item.date);
+      }
 
-  for (const key of existingDateKeys) {
-    if (!nextDateKeys.has(key)) {
-      await removeExceptionByDate(providerId, key);
-    }
-  }
+      for (const key of existingDateKeys) {
+        if (!nextDateKeys.has(key)) {
+          await removeExceptionByDate(tx, providerId, key);
+        }
+      }
+    },
+    { timeout: 20_000, maxWait: 10_000 },
+  );
 
+  // Инвалидация — ПОСЛЕ коммита: до него кэш сбрасывать не на что, а откат
+  // транзакции оставил бы кэш вычищенным под старые данные.
   await invalidateSlotsForMaster(providerId);
 }
