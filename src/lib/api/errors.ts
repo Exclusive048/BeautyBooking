@@ -74,6 +74,8 @@ const ERROR_CODES = [
   "MEDIA_INVALID_MIME",
   "MEDIA_PORTFOLIO_LIMIT_REACHED",
   "MEDIA_REPLACE_ASSET_MISMATCH",
+  // SEC-17: суммарная байтовая квота аккаунта исчерпана (`media/types.ts`)
+  "MEDIA_STORAGE_QUOTA_EXCEEDED",
   "PHOTO_LIMIT_REACHED",
   "LIMIT_REACHED",
   "NAME_REQUIRED",

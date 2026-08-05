@@ -17,6 +17,7 @@ import {
   MEDIA_ALLOWED_MIME_TYPES,
   MEDIA_MAX_FILE_SIZE_BYTES,
   MEDIA_PORTFOLIO_LIMIT,
+  MEDIA_USER_STORAGE_QUOTA_BYTES,
   toMediaAssetDto,
   type MediaAssetDto,
 } from "@/lib/media/types";
@@ -200,6 +201,45 @@ async function enforcePortfolioLimit(
 }
 
 /**
+ * SEC-17 — суммарная байтовая квота на аккаунт.
+ *
+ * Якорь — `createdByUserId`, а не провайдер: злоупотребляет аккаунт, у него уже
+ * есть индекс, и он единственный общий знаменатель для всех поверхностей
+ * загрузки (портфолио, аватар, фото карточек, вложения чата, референсы броней),
+ * тогда как `entityType`/`entityId` у них разные.
+ *
+ * Считаются только живые строки: `deleteAssetById` удаляет объект из хранилища
+ * следом за пометкой `deletedAt`, поэтому удалённый ассет места уже не занимает
+ * и держать его в сумме означало бы наказывать за уборку.
+ *
+ * Проверка стоит ПОСЛЕ веток замены и вытеснения аватара — они освобождают
+ * байты, и на границе квоты замена файла обязана проходить.
+ */
+export function exceedsStorageQuota(input: {
+  usedBytes: number;
+  incomingBytes: number;
+  quotaBytes?: number;
+}): boolean {
+  const quota = input.quotaBytes ?? MEDIA_USER_STORAGE_QUOTA_BYTES;
+  return input.usedBytes + input.incomingBytes > quota;
+}
+
+async function enforceUserStorageQuota(userId: string, incomingBytes: number): Promise<void> {
+  const used = await prisma.mediaAsset.aggregate({
+    where: { createdByUserId: userId, deletedAt: null },
+    _sum: { sizeBytes: true },
+  });
+
+  if (exceedsStorageQuota({ usedBytes: used._sum.sizeBytes ?? 0, incomingBytes })) {
+    throw new AppError(
+      "Достигнут лимит хранилища. Удалите ненужные файлы.",
+      409,
+      "MEDIA_STORAGE_QUOTA_EXCEEDED",
+    );
+  }
+}
+
+/**
  * SECURITY-EXPOSURE-AUDIT-01 #3 — is a MASTER/STUDIO/SITE portfolio-or-avatar
  * asset visible to an anonymous / non-owner caller?
  *
@@ -352,6 +392,10 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
       await deleteAssetById(avatar.id);
     }
   }
+
+  // SEC-17: после веток замены/вытеснения — они освобождают байты, и на границе
+  // квоты замена файла обязана проходить.
+  await enforceUserStorageQuota(user.id, input.sizeBytes);
 
   const storage = getStorageProvider();
   const storageKey = buildStorageKey({ ...input, entityId });
