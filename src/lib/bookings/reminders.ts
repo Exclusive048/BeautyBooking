@@ -125,6 +125,69 @@ export async function scheduleBookingRemindersSafe(bookingId: string): Promise<v
   }
 }
 
+/**
+ * RES-14 — восстановление напоминаний из БД.
+ *
+ * До этого напоминание существовало ТОЛЬКО как задача в очереди: строка
+ * `Booking` — источник истины, из которого его можно переродить, но никто
+ * этого не делал. AOF Redis (`--appendonly yes`) риск сильно снижает, но
+ * `appendfsync everysec` оставляет окно ≤1 с, а ручной `FLUSHALL` или
+ * пересоздание тома теряют очередь целиком и безвозвратно.
+ *
+ * Свип — ДЕТЕКТОР ОПОЗДАНИЯ, а не периодическая перепланировка: кандидат
+ * появляется, только если момент отправки уже прошёл на `GRACE`, а отметка
+ * так и не поставлена. На здоровой системе (задача уходит в очередь и
+ * срабатывает в свой `runAt` за секунды) кандидатов ноль — то есть дубликатов
+ * задач свип не создаёт вовсе. Это и есть причина, по которой он смотрит на
+ * «просрочено», а не на «запланировано»: очередь снаружи не видна, а любой
+ * DB-флаг «запланировано» пережил бы потерю очереди и тем самым запретил бы
+ * восстановление ровно в том случае, ради которого свип и написан.
+ *
+ * 🔴 Восстанавливается только напоминание за 2 часа. Оно есть у КАЖДОЙ
+ * подходящей брони, поэтому «просрочено и не отправлено» — точный признак
+ * потери. У напоминания за 24 часа такого признака нет: оно планируется лишь
+ * когда до начала было ≥2.5 ч И момент «минус сутки» был в будущем, а
+ * подтверждение брони могло случиться уже после него. Единственный доступный
+ * заменитель (`createdAt`) даёт ложные срабатывания, и цена ошибки
+ * несимметрична: клиенту уйдёт «напоминаем за сутки» за три часа до визита.
+ * Потерянное 24-часовое напоминание догоняется двухчасовым.
+ */
+const REMINDER_RECONCILE_GRACE_MS = 10 * MINUTES;
+const REMINDER_RECONCILE_BATCH = 200;
+
+export async function reconcileBookingReminders(
+  now = new Date()
+): Promise<{ candidates: number; rescheduled: number }> {
+  const overdueBefore = new Date(now.getTime() + REMINDER_2H_MS - REMINDER_RECONCILE_GRACE_MS);
+
+  const candidates = await prisma.booking.findMany({
+    where: {
+      status: "CONFIRMED",
+      silentMode: false,
+      reminder2hSentAt: null,
+      // Момент отправки прошёл, а визит ещё впереди: напоминать задним числом
+      // бессмысленно, и `processBookingReminder` такую задачу всё равно
+      // отбросит.
+      startAtUtc: { gt: now, lte: overdueBefore },
+      provider: { remindersEnabled: true },
+    },
+    select: { id: true },
+    orderBy: { startAtUtc: "asc" },
+    take: REMINDER_RECONCILE_BATCH,
+  });
+
+  let rescheduled = 0;
+  for (const booking of candidates) {
+    // Через тот же планировщик, а не прямым `enqueue`: он заново выводит
+    // расписание от текущего момента и сам решает, что ещё уместно, — прямая
+    // постановка обошла бы эту проверку и могла отправить неуместное.
+    await scheduleBookingRemindersSafe(booking.id);
+    rescheduled += 1;
+  }
+
+  return { candidates: candidates.length, rescheduled };
+}
+
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
 async function markReminderSent(

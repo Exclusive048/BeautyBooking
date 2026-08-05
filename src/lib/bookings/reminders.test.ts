@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const prismaTransaction = vi.hoisted(() => vi.fn());
 const bookingFindUnique = vi.hoisted(() => vi.fn());
+const bookingFindMany = vi.hoisted(() => vi.fn());
 const enqueue = vi.hoisted(() => vi.fn());
 const createBookingReminderJob = vi.hoisted(
   () => vi.fn((payload: unknown, input?: { runAt?: number }) => ({
@@ -17,7 +18,7 @@ const logError = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    booking: { findUnique: bookingFindUnique },
+    booking: { findUnique: bookingFindUnique, findMany: bookingFindMany },
     $transaction: prismaTransaction,
   },
 }));
@@ -39,6 +40,7 @@ vi.mock("@/lib/logging/logger", () => ({ logError }));
 import {
   isBookingReminderJob,
   processBookingReminder,
+  reconcileBookingReminders,
   resolveReminderSchedule,
   scheduleBookingReminders,
 } from "@/lib/bookings/reminders";
@@ -46,6 +48,7 @@ import {
 describe("bookings/reminders", () => {
   beforeEach(() => {
     bookingFindUnique.mockReset();
+    bookingFindMany.mockReset();
     prismaTransaction.mockReset();
     enqueue.mockReset();
     createBookingReminderJob.mockClear();
@@ -102,5 +105,67 @@ describe("bookings/reminders", () => {
   it("recognizes reminder jobs", () => {
     expect(isBookingReminderJob({ type: "booking.reminder" })).toBe(true);
     expect(isBookingReminderJob({ type: "other" })).toBe(false);
+  });
+  /**
+   * RES-14 — напоминание существовало ТОЛЬКО как задача в очереди: строка
+   * `Booking` позволяет его переродить, но никто этого не делал. Свип —
+   * детектор ОПОЗДАНИЯ, а не периодическая перепланировка: на здоровой системе
+   * кандидатов ноль, поэтому дубликатов задач он не плодит.
+   */
+  describe("reconcileBookingReminders — RES-14", () => {
+    it("ищет только просроченные и ещё не отправленные, с визитом впереди", async () => {
+      bookingFindMany.mockResolvedValueOnce([]);
+      const now = new Date("2026-03-01T12:00:00Z");
+
+      const summary = await reconcileBookingReminders(now);
+
+      expect(summary).toEqual({ candidates: 0, rescheduled: 0 });
+      const where = bookingFindMany.mock.calls[0]?.[0]?.where;
+      expect(where).toMatchObject({
+        status: "CONFIRMED",
+        silentMode: false,
+        reminder2hSentAt: null,
+        provider: { remindersEnabled: true },
+      });
+      // Верхняя граница — момент отправки минус запас; нижняя — «сейчас»:
+      // напоминать после начала визита бессмысленно.
+      expect(where.startAtUtc.gt).toEqual(now);
+      expect(where.startAtUtc.lte.getTime()).toBe(
+        now.getTime() + 2 * 60 * 60 * 1000 - 10 * 60 * 1000
+      );
+    });
+
+    it("перепланирует потерянное напоминание через общий планировщик", async () => {
+      bookingFindMany.mockResolvedValueOnce([{ id: "lost-1" }]);
+      bookingFindUnique.mockResolvedValueOnce({
+        id: "lost-1",
+        status: "CONFIRMED",
+        startAtUtc: new Date(Date.now() + 60 * 60 * 1000),
+        silentMode: false,
+        provider: { remindersEnabled: true },
+      });
+
+      const summary = await reconcileBookingReminders();
+
+      expect(summary).toEqual({ candidates: 1, rescheduled: 1 });
+      expect(enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it("отказ очереди на одном кандидате не срывает свип", async () => {
+      bookingFindMany.mockResolvedValueOnce([{ id: "a" }, { id: "b" }]);
+      bookingFindUnique.mockResolvedValue({
+        id: "x",
+        status: "CONFIRMED",
+        startAtUtc: new Date(Date.now() + 60 * 60 * 1000),
+        silentMode: false,
+        provider: { remindersEnabled: true },
+      });
+      enqueue.mockRejectedValueOnce(new Error("Queue requires Redis: enqueue"));
+
+      const summary = await reconcileBookingReminders();
+
+      expect(summary.candidates).toBe(2);
+      expect(logError).toHaveBeenCalled();
+    });
   });
 });

@@ -20,7 +20,7 @@ import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { env, isProduction } from "@/lib/env";
 import { initServerObservability } from "@/lib/observability/server";
 import { flushReports, reportError } from "@/lib/observability/report";
-import { processBookingReminder } from "@/lib/bookings/reminders";
+import { processBookingReminder, reconcileBookingReminders } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
@@ -191,6 +191,29 @@ function startPeriodicJobs() {
     });
     runAvailableTodaySweep();
   }, intervalMs);
+
+  // RES-14: напоминание жило ТОЛЬКО как задача в очереди — потеря очереди
+  // (ручной FLUSHALL, пересоздание тома, окно `appendfsync everysec`) означала
+  // его безвозвратную пропажу, хотя строка `Booking` позволяет его переродить.
+  // Свип — детектор опоздания, а не перепланировка: на здоровой системе
+  // кандидатов ноль, поэтому дубликатов задач он не создаёт. Каждые 5 минут —
+  // запрос дешёвый (индекс `[status, startAtUtc]`, батч 200), а чем позже
+  // обнаружено опоздание, тем меньше пользы от самого напоминания.
+  const reminderReconcileIntervalMs = 5 * 60 * 1000;
+  setInterval(() => {
+    void reconcileBookingReminders()
+      .then((summary) => {
+        if (summary.candidates > 0) {
+          logInfo("bookings.reminders.reconciled", summary);
+        }
+      })
+      .catch((error) => {
+        logError("Booking reminder reconcile failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("bookings.reminders.reconcile", error);
+      });
+  }, reminderReconcileIntervalMs);
 
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
   setInterval(() => {
