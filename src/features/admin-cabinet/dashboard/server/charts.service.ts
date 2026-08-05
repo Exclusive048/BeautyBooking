@@ -21,11 +21,25 @@ function bucketBy7Days(
   rows: { createdAt: Date }[],
   start: Date,
 ): AdminChartPoint[] {
+  // LOGIC-28: tz-источник — **UTC-tech**, и он обязан совпадать с тем, по чему
+  // строятся сами бакеты. Ключ точки — `utcDateKey` (строго UTC, `shared.ts`),
+  // а подпись рендерилась в ambient-tz процесса: один и тот же `date`
+  // бакетировался по UTC и подписывался по `TZ` контейнера. При RU-хостинге
+  // (положительное смещение) UTC-полночь попадает в тот же календарный день,
+  // поэтому расхождения сегодня нет — но выбор не был объявлен и внутренне
+  // противоречив: площадка с отрицательным смещением сдвинула бы подписи на
+  // день относительно СОБСТВЕННЫХ бакетов, молча. Это админская техническая
+  // сводка, а не время записи, поэтому UTC здесь и есть правильный источник —
+  // не salon-tz.
   const labelFmt = new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
+    timeZone: "UTC", // tz-ok: UTC-tech — подпись обязана совпасть с UTC-бакетом
   });
-  const dayLabel = new Intl.DateTimeFormat("ru-RU", { day: "2-digit" });
+  const dayLabel = new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    timeZone: "UTC", // tz-ok: UTC-tech — см. выше
+  });
 
   const points: AdminChartPoint[] = [];
   for (let i = 0; i < 7; i += 1) {
