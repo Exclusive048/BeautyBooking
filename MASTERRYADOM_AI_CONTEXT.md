@@ -219,6 +219,7 @@ CI-гейты — `.github/workflows/quality-gates.yml`, деплой — `.gith
 - **`POST /api/auth/otp/{request,verify}`** — 503 `SYSTEM_FEATURE_DISABLED` при `PHONE_AUTH_ENABLED` off (§5/§7), до генерации кода.
 - **`GET`/`PATCH /api/me/consents/marketing`** (RKN-FIX-18) — единственная поверхность **отзыва** согласия. Только цель `MARKETING`; `enabled:false` = отзыв (строка остаётся, ставится `revokedAt`), `enabled:true` = **новая** строка. Отзыв ПДн/оферты здесь невозможен — 400 `CONSENT_NOT_SELF_REVOCABLE` (§5).
 - **Auth-провайдеры гейтятся и на `start`, и на `callback`** (AUTH-KILLSWITCH-ENFORCE-01, §10) — `unlink`/`status` намеренно нет.
+- **`[id]` в ветке `/api/studios/[id]/**` — это `Provider.id`, а не `Studio.id`** (SEC-28). Так его трактует `ensureStudioAccess` и так его шлют все клиентские вызывающие (в `studio-cabinet/settings/*` об этом отдельные комментарии). `/leave` был единственным исключением — читал сегмент как `Studio.id`; выровнен. Эксплуатируемости не было (роут скоупится на `auth.user.id`), но это ловушка «two id systems» из `lib/studio/tenancy.ts`. Живой путь ухода из студии — `POST /api/cabinet/master/leave-studio`; у `/api/studios/[id]/leave` вызывающих нет.
 
 > Волна RKN добавила один роут (`/consent`); RKN-FIX-18 добавил `/api/me/consents/marketing`. Остальные её изменения — модификации существующих (сверено `git diff --name-status` по девяти коммитам).
 
