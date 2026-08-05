@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/bookings/booking-core";
 
 /**
  * LOGIC-01 — предикат конфликта ключевался ПАРОЙ `(providerId, masterProviderId)`,
@@ -170,5 +170,74 @@ describe("LOGIC-01 · пятая копия скоупа не пройдёт м�
       const source = readFileSync(resolve(PROJECT_ROOT, rel), "utf8");
       expect(source, rel).toContain("buildConflictScopeWhere");
     }
+  });
+});
+
+/**
+ * LOGIC-17 — скоуп отвечает «чьё это время», окно — «за какой отрезок смотрим».
+ * Второго не было вовсе у обоих студийных путей: `findMany` без `lt`/`gt`
+ * забирает ВСЮ историю броней мастера. Помимо стоимости, внутри Serializable
+ * это ставит predicate-lock на всю историю — параллельная запись брони того же
+ * мастера, хоть на следующий год, становится кандидатом на P2034 и получает
+ * ложный 409 `SLOT_CONFLICT`, и частота таких ложных конфликтов растёт линейно
+ * с историей кабинета.
+ *
+ * Опасность сужения запроса — потерять конфликт. Поэтому тест сверяет предикат
+ * БД с предикатом в памяти на границах: они обязаны отбирать одно и то же.
+ */
+describe("buildConflictWindowWhere — LOGIC-17", () => {
+  const start = new Date("2026-08-12T10:00:00.000Z");
+  const end = new Date("2026-08-12T11:00:00.000Z");
+
+  /** Тот же расчёт, что делает `.some(...)` в studio/bookings.service.ts. */
+  function overlapsInMemory(rowStart: Date, rowEnd: Date, bufferMin: number): boolean {
+    const itemStart = bufferMin ? new Date(rowStart.getTime() - bufferMin * 60_000) : rowStart;
+    const itemEnd = bufferMin ? new Date(rowEnd.getTime() + bufferMin * 60_000) : rowEnd;
+    return start < itemEnd && end > itemStart;
+  }
+
+  function matchesWindow(rowStart: Date, rowEnd: Date, bufferMin: number): boolean {
+    const where = buildConflictWindowWhere({ startAtUtc: start, endAtUtc: end, bufferMin });
+    return rowStart < where.startAtUtc.lt && rowEnd > where.endAtUtc.gt;
+  }
+
+  const cases: Array<{ name: string; rowStart: string; rowEnd: string }> = [
+    { name: "точно накрывает", rowStart: "2026-08-12T10:30:00Z", rowEnd: "2026-08-12T11:30:00Z" },
+    { name: "встык до", rowStart: "2026-08-12T09:00:00Z", rowEnd: "2026-08-12T10:00:00Z" },
+    { name: "встык после", rowStart: "2026-08-12T11:00:00Z", rowEnd: "2026-08-12T12:00:00Z" },
+    { name: "за буфером до", rowStart: "2026-08-12T08:00:00Z", rowEnd: "2026-08-12T09:30:00Z" },
+    { name: "за буфером после", rowStart: "2026-08-12T11:20:00Z", rowEnd: "2026-08-12T12:00:00Z" },
+    { name: "далеко в прошлом", rowStart: "2025-01-01T10:00:00Z", rowEnd: "2025-01-01T11:00:00Z" },
+    { name: "далеко в будущем", rowStart: "2027-01-01T10:00:00Z", rowEnd: "2027-01-01T11:00:00Z" },
+  ];
+
+  for (const bufferMin of [0, 15]) {
+    for (const item of cases) {
+      it(`${item.name} · буфер ${bufferMin} — БД и память согласны`, () => {
+        const rowStart = new Date(item.rowStart);
+        const rowEnd = new Date(item.rowEnd);
+        expect(matchesWindow(rowStart, rowEnd, bufferMin)).toBe(
+          overlapsInMemory(rowStart, rowEnd, bufferMin),
+        );
+      });
+    }
+  }
+
+  it("история за пределами окна в выборку не попадает", () => {
+    const where = buildConflictWindowWhere({ startAtUtc: start, endAtUtc: end, bufferMin: 0 });
+    const lastYearStart = new Date("2025-01-01T10:00:00Z");
+    const lastYearEnd = new Date("2025-01-01T11:00:00Z");
+    expect(lastYearStart < where.startAtUtc.lt && lastYearEnd > where.endAtUtc.gt).toBe(false);
+  });
+
+  it("оба студийных пути фильтруют окно, а не читают историю целиком", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/lib/studio/bookings.service.ts"),
+      "utf8",
+    );
+    // Два вызова — create и move.
+    expect(source.match(/buildConflictWindowWhere\(/g)?.length).toBe(2);
+    // Прежняя безоконная форма не должна вернуться.
+    expect(source).not.toMatch(/startAtUtc:\s*\{\s*not:\s*null\s*\},/);
   });
 });

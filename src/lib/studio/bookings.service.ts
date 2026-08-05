@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
-import { buildConflictScopeWhere, normalizeBufferMinutes } from "@/lib/bookings/booking-core";
+import {
+  buildConflictScopeWhere,
+  buildConflictWindowWhere,
+  normalizeBufferMinutes,
+} from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
@@ -157,6 +161,12 @@ export async function createStudioBooking(input: {
         // создавал бронь поверх существующей БЕЗ всякой гонки — у этого пути
         // вдобавок нет предварительной availability-проверки, и in-tx предикат
         // был его единственной защитой.
+        // LOGIC-17: окно обязательно. Без него запрос забирает всю историю
+        // броней мастера и внутри Serializable ставит predicate-lock на неё
+        // целиком — любая параллельная запись того же мастера, хоть на
+        // следующий год, становилась кандидатом на P2034 и получала ложный
+        // 409 SLOT_CONFLICT. Границы — из того же билдера, что у
+        // `ensureNoConflicts`, иначе сужение запроса начнёт терять конфликты.
         const conflicts = await tx.booking.findMany({
           where: {
             ...buildConflictScopeWhere({
@@ -164,8 +174,11 @@ export async function createStudioBooking(input: {
               masterProviderId: master.id,
             }),
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            startAtUtc: { not: null },
-            endAtUtc: { not: null },
+            ...buildConflictWindowWhere({
+              startAtUtc: input.startAt,
+              endAtUtc: endAt,
+              bufferMin: buffer,
+            }),
           },
           select: { startAtUtc: true, endAtUtc: true },
         });
@@ -433,8 +446,13 @@ export async function moveStudioBooking(input: {
             }),
             id: { not: booking.id },
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            startAtUtc: { not: null },
-            endAtUtc: { not: null },
+            // LOGIC-17: см. комментарий у create — без окна predicate-lock
+            // накрывает всю историю броней целевого мастера.
+            ...buildConflictWindowWhere({
+              startAtUtc: newStart,
+              endAtUtc: newEnd,
+              bufferMin: buffer,
+            }),
           },
           select: { id: true, startAtUtc: true, endAtUtc: true },
         });

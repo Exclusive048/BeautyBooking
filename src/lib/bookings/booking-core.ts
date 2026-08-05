@@ -136,6 +136,38 @@ export function buildConflictScopeWhere(input: {
   return { OR: orClauses };
 }
 
+/**
+ * LOGIC-17 — ВРЕМЕННОЕ окно поиска конфликтов (дополняет `buildConflictScopeWhere`,
+ * который задаёт скоуп «чьё это время»).
+ *
+ * Без него запрос забирает ВСЮ историю броней мастера. Помимо стоимости, внутри
+ * Serializable это ставит predicate-lock на всю историю: любая параллельная
+ * запись брони того же мастера — даже на будущий год — становится кандидатом на
+ * `P2034` и получает ложный 409 `SLOT_CONFLICT`. Частота ложных конфликтов
+ * растёт линейно с историей, то есть дефект просыпается тем сильнее, чем дольше
+ * живёт кабинет.
+ *
+ * Границы буферизованы так же, как их потом сравнивает `overlaps`: предикат БД
+ * и предикат в памяти обязаны отбирать одно и то же множество, иначе сужение
+ * запроса начнёт терять конфликты.
+ */
+export function buildConflictWindowWhere(input: {
+  startAtUtc: Date;
+  endAtUtc: Date;
+  bufferMin: number;
+}) {
+  const bufferedStart = input.bufferMin
+    ? shiftMinutes(input.startAtUtc, -input.bufferMin)
+    : input.startAtUtc;
+  const bufferedEnd = input.bufferMin
+    ? shiftMinutes(input.endAtUtc, input.bufferMin)
+    : input.endAtUtc;
+  return {
+    startAtUtc: { not: null, lt: bufferedEnd },
+    endAtUtc: { not: null, gt: bufferedStart },
+  } as const;
+}
+
 export async function ensureNoConflicts(
   db: DbClient,
   input: {
@@ -146,19 +178,11 @@ export async function ensureNoConflicts(
     bufferMin: number;
   }
 ): Promise<void> {
-  const bufferedStart = input.bufferMin
-    ? shiftMinutes(input.startAtUtc, -input.bufferMin)
-    : input.startAtUtc;
-  const bufferedEnd = input.bufferMin
-    ? shiftMinutes(input.endAtUtc, input.bufferMin)
-    : input.endAtUtc;
-
   const conflicts = await db.booking.findMany({
     where: {
       ...buildConflictScopeWhere(input),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null, lt: bufferedEnd },
-      endAtUtc: { not: null, gt: bufferedStart },
+      ...buildConflictWindowWhere(input),
     },
     select: { id: true, startAtUtc: true, endAtUtc: true },
     take: 1,
