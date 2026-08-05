@@ -20,7 +20,8 @@ export type AutocompleteCategory = {
 };
 
 export type AutocompleteProvider = {
-  id: string;
+  // SEC-12: `id` (сырой CUID провайдера) из ответа убран — потребителя у него
+  // не было, переход идёт по `publicUsername`.
   name: string;
   publicUsername: string | null;
   type: "master" | "studio";
@@ -224,7 +225,9 @@ export function ServiceSearchInput({
                 </div>
                 {results.providers.map((p) => (
                   <button
-                    key={p.id}
+                    // SEC-12: id из ответа убран; `publicUsername` уникален, а
+                    // индекс страхует провайдера без него (кнопка disabled).
+                    key={p.publicUsername ?? `provider-${p.name}`}
                     type="button"
                     onClick={() => handleProviderClick(p)}
                     disabled={!p.publicUsername}

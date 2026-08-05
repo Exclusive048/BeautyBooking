@@ -10,6 +10,7 @@ import { diffDateKeys } from "@/lib/schedule/dateKey";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { prisma } from "@/lib/prisma";
+import { encodeCursor } from "@/lib/pagination/cursor";
 
 const hotSlotsQuerySchema = z.object({
   from: z.string().datetime().optional(),
@@ -150,12 +151,16 @@ export async function GET(req: Request) {
           });
           if (!hot.isHot) continue;
 
-          const id = `${rule.providerId}:${service.id}:${slotStartAt.toISOString()}:${slotEndAt.toISOString()}`;
-          if (seenKeys.has(id)) continue;
-          seenKeys.add(id);
+          // SEC-12: внутренний ключ склеен из двух CUID — он годится для
+          // дедупликации внутри прогона, но наружу уходить не должен. Клиент
+          // структуру не разбирает (React-key + мёртвый `?slotId=`), поэтому
+          // публичный id — непрозрачный токен; он же становится курсором.
+          const internalKey = `${rule.providerId}:${service.id}:${slotStartAt.toISOString()}:${slotEndAt.toISOString()}`;
+          if (seenKeys.has(internalKey)) continue;
+          seenKeys.add(internalKey);
 
           items.push({
-            id,
+            id: encodeCursor(internalKey),
             provider: {
               id: rule.provider.id,
               publicUsername: rule.provider.publicUsername,

@@ -4,6 +4,7 @@ import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
+import { encodePublicId } from "@/lib/public-id";
 
 export const runtime = "nodejs";
 
@@ -64,14 +65,19 @@ export async function GET(req: Request) {
     ]);
 
     return jsonOk({
+      // SEC-12: `id` категории клиент возвращает обратно фильтром
+      // `globalCategoryId`, поэтому он не удаляется, а кодируется —
+      // `resolveGlobalCategoryIds` декодирует его на входе.
       categories: categories.map((c) => ({
-        id: c.id,
+        id: encodePublicId(c.id),
         name: c.name,
         slug: c.slug,
-        parentId: c.parentId,
+        parentId: c.parentId ? encodePublicId(c.parentId) : c.parentId,
       })),
+      // SEC-12: сырой CUID провайдера убран — у него НЕТ потребителя
+      // (клик по подсказке ведёт на `/u/{publicUsername}`), а сам
+      // `publicUsername` отдаётся строкой ниже.
       providers: providers.map((p) => ({
-        id: p.id,
         name: p.name,
         publicUsername: p.publicUsername,
         type: p.type === "STUDIO" ? ("studio" as const) : ("master" as const),

@@ -13,21 +13,10 @@ import {
   sortByBayesianRating,
 } from "@/lib/catalog/ranking";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
-
-/** Encode an internal row ID as an opaque, URL-safe cursor token. */
-function encodeCursor(id: string): string {
-  return Buffer.from(id, "utf-8").toString("base64url");
-}
-
-/** Decode a cursor token back to the internal row ID, or return null on failure. */
-function decodeCursor(cursor: string): string | null {
-  try {
-    const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
-    return decoded.length > 0 ? decoded : null;
-  } catch {
-    return null;
-  }
-}
+// SEC-12: курсорные хелперы переехали в общий модуль — их переиспользуют
+// `providers/queries.ts` и `/api/hot-slots`, которые раньше отдавали сырой id.
+import { encodeCursor, decodeCursor } from "@/lib/pagination/cursor";
+import { decodePublicId } from "@/lib/public-id";
 
 // AUDIT (section 6):
 // - Search supports smart tag presets via soft ranking.
@@ -481,7 +470,13 @@ async function resolveCategoryFilterIds(
   globalCategoryId: string | undefined,
   includeChildCategories: boolean | undefined
 ): Promise<string[]> {
-  const normalizedId = globalCategoryId?.trim();
+  // SEC-12: `globalCategoryId` приходит из публичного ответа (автокомплит и
+  // `/api/catalog/global-categories`), где id теперь непрозрачный. Декодируем
+  // на входе. `decodePublicId` backward-compatible: старая ссылка или закладка
+  // с сырым CUID резолвится без изменений.
+  const normalizedId = globalCategoryId?.trim()
+    ? decodePublicId(globalCategoryId.trim())
+    : undefined;
   if (!normalizedId) return [];
 
   const root = await prisma.globalCategory.findUnique({

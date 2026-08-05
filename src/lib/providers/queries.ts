@@ -5,6 +5,7 @@ import {
   PROVIDER_LIST_DEFAULT_LIMIT,
   PROVIDER_LIST_MAX_LIMIT,
 } from "@/lib/providers/schemas";
+import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
 
 type ListProviderCardsInput = {
   cursor?: string | null;
@@ -13,7 +14,14 @@ type ListProviderCardsInput = {
 
 export async function listProviderCards(input: ListProviderCardsInput = {}) {
   const limit = Math.min(Math.max(input.limit ?? PROVIDER_LIST_DEFAULT_LIMIT, 1), PROVIDER_LIST_MAX_LIMIT);
-  const cursorId = input.cursor?.trim();
+  // SEC-12: курсор — непрозрачный токен, а не сырой CUID провайдера.
+  // Задокументированное исключение rule 12 для `/api/providers/[id]` на
+  // курсор не распространялось — это был отдельный недосмотр.
+  const rawCursor = input.cursor?.trim();
+  const cursorId = rawCursor ? decodeCursor(rawCursor) : null;
+  if (rawCursor && !cursorId) {
+    throw new AppError("Некорректный курсор пагинации.", 400, "VALIDATION_ERROR");
+  }
 
   if (cursorId) {
     const cursorProvider = await prisma.provider.findFirst({
@@ -56,7 +64,8 @@ export async function listProviderCards(input: ListProviderCardsInput = {}) {
 
   const hasMore = providers.length > limit;
   const pageItems = hasMore ? providers.slice(0, limit) : providers;
-  const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
+  const lastId = hasMore ? pageItems[pageItems.length - 1]?.id ?? null : null;
+  const nextCursor = lastId ? encodeCursor(lastId) : null;
 
   return {
     items: pageItems.map(mapProviderCard),

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
+import { encodePublicId } from "@/lib/public-id";
 import { CategoryStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -57,13 +58,17 @@ export async function GET() {
 
     const sorted = sortCategoriesHierarchically(categories);
     return ok({
+      // SEC-12: `id` уходит в URL-параметр `globalCategoryId` и возвращается
+      // фильтром каталога, поэтому кодируется, а не удаляется.
+      // `resolveGlobalCategoryIds` декодирует его на входе; старые ссылки с
+      // сырым CUID продолжают работать (decodePublicId backward-compatible).
       categories: sorted.map((category) => ({
-        id: category.id,
+        id: encodePublicId(category.id),
         name: category.name,
         title: category.name,
         slug: category.slug,
         icon: category.icon,
-        parentId: category.parentId,
+        parentId: category.parentId ? encodePublicId(category.parentId) : category.parentId,
         depth: category.depth,
         fullPath: category.fullPath,
         usageCount: category.usageCount,
