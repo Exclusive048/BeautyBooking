@@ -38,7 +38,7 @@
 
 /**
  * @typedef {Object} RawSqlObject
- * @property {"index"} kind
+ * @property {"index" | "constraint"} kind
  * @property {string} name        Точное имя объекта в БД.
  * @property {string} table       Таблица, к которой он относится.
  * @property {string} migration   Миграция, создавшая его.
@@ -65,6 +65,42 @@ export const RAW_SQL_OBJECTS = [
     why: "partial unique (`WHERE \"revokedAt\" IS NULL`): Prisma не выражает частичные уникальные индексы, а полный @@unique здесь нельзя — он запрещал бы вторую строку той же версии и тем самым заставлял ОЖИВЛЯТЬ отозванную, стирая историю отзыва",
     costIfLost:
       "Исчезает гарантия БД «одна АКТИВНАЯ строка согласия на (user, цель, версия)». Останется только прикладная проверка в lib/legal/consent.ts (инв. #37), то есть гонка двух одновременных переключений сможет создать два активных согласия на одну цель — и журнал согласий станет неоднозначным ровно там, где он служит доказательством",
+  },
+  {
+    kind: "constraint",
+    name: "BookingServiceItem_priceSnapshot_nonnegative_check",
+    table: "BookingServiceItem",
+    migration: "20260805183412_logic_20_numeric_range_checks",
+    why: "CHECK: Prisma не выражает check-констрейнты в датамодели (нет `@db.Check` на 6.19.x)",
+    costIfLost:
+      "Отрицательная цена в снапшоте брони перестаёт отвергаться БД. Сегодня её отвергает Zod на всех путях записи, поэтому цена потери — не сегодняшний баг, а возвращение к состоянию «инвариант живёт только в приложении»: следующий путь записи, миграция данных или сид сохранят её молча",
+  },
+  {
+    kind: "constraint",
+    name: "BookingServiceItem_durationSnapshotMin_positive_check",
+    table: "BookingServiceItem",
+    migration: "20260805183412_logic_20_numeric_range_checks",
+    why: "CHECK: Prisma не выражает check-констрейнты в датамодели",
+    costIfLost:
+      "Нулевая/отрицательная длительность услуги в снапшоте брони. Именно из снапшотов выводится конец окна при переносе (LOGIC-03), то есть строка с нулевой длительностью сделала бы бронь бесконечно узкой и пролезающей между чужими",
+  },
+  {
+    kind: "constraint",
+    name: "Review_rating_range_check",
+    table: "Review",
+    migration: "20260805183412_logic_20_numeric_range_checks",
+    why: "CHECK: Prisma не выражает check-констрейнты в датамодели",
+    costIfLost:
+      "Оценка вне шкалы 1..5 попадает в агрегат рейтинга провайдера (reviews/recalculate-ratings.ts) и искажает публичное число, которое исправить можно только пересчётом",
+  },
+  {
+    kind: "constraint",
+    name: "Provider_bufferBetweenBookingsMin_range_check",
+    table: "Provider",
+    migration: "20260805183412_logic_20_numeric_range_checks",
+    why: "CHECK: Prisma не выражает check-констрейнты в датамодели",
+    costIfLost:
+      "Буфер вне 0..30 участвует в предикате конфликта броней (buildConflictWindowWhere + overlaps): отрицательный сужает окно поиска и ПРОПУСКАЕТ реальные пересечения, чрезмерный блокирует расписание целиком",
   },
 ];
 

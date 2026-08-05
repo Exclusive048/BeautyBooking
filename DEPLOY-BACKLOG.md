@@ -88,6 +88,15 @@
   WHERE p.id IS NULL;
   ```
   Ноль → применять как есть. Не ноль → это блоки времени, указывающие на несуществующий кабинет (мусор по определению: `loadTimeBlockRanges` ищет по `masterId`, и такие строки не могут повлиять ни на чьё расписание); удалить тем же условием и только затем применять миграцию. **Порядок важен:** упавший `migrate deploy` останавливает весь прогон, а не только эту миграцию.
+- **🚩 Миграция `20260805183412_logic_20_numeric_range_checks` тоже требует ПРЕДВАРИТЕЛЬНОЙ проверки** *(LOGIC-20, 2026-08-05)*. Четыре CHECK-констрейнта на числовые диапазоны. `ADD CONSTRAINT ... CHECK` валидирует существующие строки и **упадёт** при нарушении. На dev-базе нарушений ноль (проверено), прод не проверялся. **До `migrate deploy` (только чтение):**
+  ```sql
+  SELECT 'priceSnapshot<0' AS k, count(*) FROM "BookingServiceItem" WHERE "priceSnapshot" < 0
+  UNION ALL SELECT 'durationSnapshotMin<=0', count(*) FROM "BookingServiceItem" WHERE "durationSnapshotMin" <= 0
+  UNION ALL SELECT 'rating out 1..5', count(*) FROM "Review" WHERE rating < 1 OR rating > 5
+  UNION ALL SELECT 'buffer out 0..30', count(*) FROM "Provider"
+    WHERE "bufferBetweenBookingsMin" < 0 OR "bufferBetweenBookingsMin" > 30;
+  ```
+  Все нули → применять. Не ноль → **не «почистить» вслепую**: строка вне диапазона это либо след старого бага, либо легитимные данные, которых мы не ожидали (например буфер >30 у провайдера, заведённого до появления потолка). Разбирать по строкам; для буфера безопасная нормализация — `LEAST(30, GREATEST(0, "bufferBetweenBookingsMin"))`, для остальных нужен взгляд на конкретные записи.
 - **Seed `BillingPlanPrice`** — явные active-строки на каждый предлагаемый период (1/3/6/12 мес). Fallback есть, но явная строка предпочтительнее.
 - **VAPID prod-ключи** для web-push (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL`). ⚠️ Web Push — единственный трансграничный поток ПДн; **до юридического вердикта push не включать** (гейт этапа 2).
 
