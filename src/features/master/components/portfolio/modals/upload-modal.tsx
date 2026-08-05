@@ -181,6 +181,14 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
       reset();
       router.refresh();
       onClose();
+    } catch {
+      // RES-12: HTTP-ошибки тут были покрыты все четыре, а самый вероятный
+      // сценарий — обрыв сети посреди загрузки большого файла — нет: `fetch`
+      // бросает, `finally` гасит спиннер, `error` остаётся `null`. Модалка
+      // открыта, очередь на месте, объяснений ноль, а необработанный rejection
+      // уходит из обработчика клика. Текст тот же, что у остальных отказов
+      // загрузки: для пользователя это одна и та же ситуация.
+      setError(T.errorUpload);
     } finally {
       setUploading(false);
     }
