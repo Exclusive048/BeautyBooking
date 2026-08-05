@@ -116,7 +116,32 @@ export async function getMasterServiceBookingConfig(input: {
   return loadServiceConfig(service.id);
 }
 
+/**
+ * SEC-11 — публичная ветка обязана проверять публикацию.
+ *
+ * `loadServiceConfig` — это `findUnique` по id услуги без единого условия, а
+ * мастерский близнец (`getMasterServiceBookingConfig`) авторизует вызывающего.
+ * Публичная же отдавала конфигурацию по любому CUID услуги, включая услугу
+ * неопубликованного или приостановленного кабинета: анониму доставались
+ * авторские тексты вопросов к записи, которые владелец ещё не публиковал.
+ *
+ * Условие то же, что у остальных публичных booking-поверхностей (`/slots`,
+ * `/booking-days`): кабинет опубликован. Плюс сама услуга должна быть
+ * активной — выключенную услугу нельзя забронировать, значит и её анкету
+ * показывать незачем.
+ *
+ * Ошибка намеренно та же, что у несуществующей услуги (404
+ * `SERVICE_NOT_FOUND`): отдельный код сообщал бы анониму, что услуга
+ * существует, но скрыта.
+ */
 export async function getPublicServiceBookingConfig(serviceId: string): Promise<ServiceBookingConfig> {
+  const visible = await prisma.service.findFirst({
+    where: { id: serviceId, isActive: true, provider: { isPublished: true } },
+    select: { id: true },
+  });
+  if (!visible) {
+    throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
+  }
   return loadServiceConfig(serviceId);
 }
 
