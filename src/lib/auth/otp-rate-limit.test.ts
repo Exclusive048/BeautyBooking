@@ -61,6 +61,8 @@ vi.mock("@/lib/redis/connection", () => ({
 vi.mock("@/lib/monitoring/api-alerts", () => ({ alertOtpRateLimitTriggered: vi.fn() }));
 
 import {
+  checkOtpEmailRequestRateLimit,
+  checkOtpRequestRateLimit,
   checkOtpVerifyLock,
   registerOtpVerifyFailure,
   clearOtpVerifyFailures,
@@ -114,5 +116,108 @@ describe("OTP verify lockout is scoped by (phone + IP)", () => {
     await clearOtpVerifyFailures(PHONE, ATTACKER_IP);
     const afterClear = await checkOtpVerifyLock(PHONE, ATTACKER_IP);
     expect(afterClear.ok).toBe(true);
+  });
+});
+
+/**
+ * SEC-26 — тот же класс на стороне ВЫПУСКА кода. Бюджет запросов ключевался
+ * только идентичностью (`otp:request:phone:<hash>`, 3 / 5 мин), поэтому третье
+ * лицо, знающее номер, сжигало его целиком и на пять минут лишало владельца
+ * возможности получить код.
+ *
+ * Скопировать verify-решение нельзя: request отправляет SMS/письмо, и ключ
+ * `(идентичность, IP)` БЕЗ глобального потолка открыл бы бомбардировку жертвы
+ * за наш счёт. Поэтому измерения два, и тесты обязаны удержать оба: снятие
+ * блокировки владельца И сохранение потолка отправок.
+ */
+describe("SEC-26 — выпуск кода ограничен в двух измерениях", () => {
+  const IDENTITY_IP_LIMIT = 3;
+  const IDENTITY_LIMIT = 10;
+
+  it("чужой источник сжигает СВОЙ бюджет, а не бюджет владельца", async () => {
+    for (let i = 0; i < IDENTITY_IP_LIMIT; i++) {
+      const r = await checkOtpRequestRateLimit({ phone: PHONE, ip: ATTACKER_IP });
+      expect(r.ok).toBe(true);
+    }
+    const attackerBlocked = await checkOtpRequestRateLimit({ phone: PHONE, ip: ATTACKER_IP });
+    expect(attackerBlocked.ok).toBe(false);
+
+    // Владелец со своего IP по-прежнему получает код — это и есть находка.
+    const victim = await checkOtpRequestRateLimit({ phone: PHONE, ip: VICTIM_IP });
+    expect(victim.ok).toBe(true);
+  });
+
+  it("один источник по-прежнему ограничен тремя запросами за 5 минут", async () => {
+    for (let i = 0; i < IDENTITY_IP_LIMIT; i++) {
+      expect((await checkOtpRequestRateLimit({ phone: PHONE, ip: ATTACKER_IP })).ok).toBe(true);
+    }
+    expect((await checkOtpRequestRateLimit({ phone: PHONE, ip: ATTACKER_IP })).ok).toBe(false);
+  });
+
+  it("потолок отправок на номер сохраняется — распределённая бомбардировка не проходит", async () => {
+    // по одному запросу с каждого из десяти адресов: per-IP лимит не при чём,
+    // per-(идентичность, IP) тоже — упереться должно ровно в потолок идентичности
+    for (let i = 0; i < IDENTITY_LIMIT; i++) {
+      const r = await checkOtpRequestRateLimit({ phone: PHONE, ip: `203.0.113.${i + 10}` });
+      expect(r.ok).toBe(true);
+    }
+    const eleventh = await checkOtpRequestRateLimit({ phone: PHONE, ip: "203.0.113.99" });
+    expect(eleventh.ok).toBe(false);
+  });
+
+  it("бюджеты разных номеров не пересекаются", async () => {
+    for (let i = 0; i < IDENTITY_IP_LIMIT; i++) {
+      await checkOtpRequestRateLimit({ phone: PHONE, ip: ATTACKER_IP });
+    }
+    const otherPhone = await checkOtpRequestRateLimit({ phone: "+79995550001", ip: ATTACKER_IP });
+    expect(otherPhone.ok).toBe(true);
+  });
+
+  it("per-IP лимит жив: один адрес не перебирает номера пачками", async () => {
+    // 5 / 60 с на IP — шестой запрос с того же адреса блокируется даже при
+    // разных номерах
+    for (let i = 0; i < 5; i++) {
+      const r = await checkOtpRequestRateLimit({ phone: `+7999555000${i}`, ip: ATTACKER_IP });
+      expect(r.ok).toBe(true);
+    }
+    const sixth = await checkOtpRequestRateLimit({ phone: "+79995550009", ip: ATTACKER_IP });
+    expect(sixth.ok).toBe(false);
+  });
+});
+
+/**
+ * SEC-26 — email-близнец. Дефект был тот же (бюджет по адресу), а канал в
+ * закрытом деплое ЕДИНСТВЕННЫЙ рабочий: `PHONE_AUTH_ENABLED` в проде off.
+ * Починить только телефонный лимит значило бы закрыть спящую дверь и оставить
+ * живую, поэтому оба измерения проверяются и здесь.
+ */
+describe("SEC-26 — выпуск email-кода ограничен в двух измерениях", () => {
+  const EMAIL = "victim@example.com";
+
+  it("чужой источник сжигает СВОЙ бюджет, а не бюджет владельца адреса", async () => {
+    for (let i = 0; i < 3; i++) {
+      expect((await checkOtpEmailRequestRateLimit({ email: EMAIL, ip: ATTACKER_IP })).ok).toBe(true);
+    }
+    expect((await checkOtpEmailRequestRateLimit({ email: EMAIL, ip: ATTACKER_IP })).ok).toBe(false);
+    expect((await checkOtpEmailRequestRateLimit({ email: EMAIL, ip: VICTIM_IP })).ok).toBe(true);
+  });
+
+  it("потолок отправок на адрес сохраняется", async () => {
+    for (let i = 0; i < 10; i++) {
+      const r = await checkOtpEmailRequestRateLimit({ email: EMAIL, ip: `198.51.100.${i + 20}` });
+      expect(r.ok).toBe(true);
+    }
+    expect((await checkOtpEmailRequestRateLimit({ email: EMAIL, ip: "198.51.100.99" })).ok).toBe(false);
+  });
+
+  it("регистр адреса не создаёт второй бюджет", async () => {
+    for (let i = 0; i < 3; i++) {
+      await checkOtpEmailRequestRateLimit({ email: EMAIL, ip: ATTACKER_IP });
+    }
+    const upper = await checkOtpEmailRequestRateLimit({
+      email: EMAIL.toUpperCase(),
+      ip: ATTACKER_IP,
+    });
+    expect(upper.ok).toBe(false);
   });
 });

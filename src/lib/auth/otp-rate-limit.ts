@@ -6,8 +6,40 @@ import { alertOtpRateLimitTriggered } from "@/lib/monitoring/api-alerts";
 
 const OTP_REQUEST_IP_LIMIT = 5;
 const OTP_REQUEST_IP_WINDOW_SECONDS = 60;
-const OTP_REQUEST_PHONE_LIMIT = 3;
-const OTP_REQUEST_PHONE_WINDOW_SECONDS = 5 * 60;
+
+/**
+ * SEC-26 — выпуск кода ограничивается в ДВУХ измерениях, и это не дублирование:
+ * измерения защищают разное и потому не сводятся одно к другому.
+ *
+ * Раньше бюджет запросов был один и ключевался ТОЛЬКО идентичностью
+ * (`otp:request:phone:<hash>`, 3 / 5 мин). Третье лицо, знающее номер, сжигало
+ * его целиком и на пять минут лишало владельца возможности получить код —
+ * тот же таргетированный DoS, который на verify-стороне уже закрыт
+ * добавлением IP в ключ (SECURITY-EXPOSURE-AUDIT-01 · O2).
+ *
+ * Просто скопировать то решение сюда НЕЛЬЗЯ: verify ничего не отправляет, а
+ * request отправляет SMS/письмо. Ключ `(идентичность, IP)` без глобального
+ * потолка означал бы, что распределённый источник шлёт жертве неограниченное
+ * число сообщений за наш счёт — это хуже, чем пятиминутная блокировка.
+ *
+ * Поэтому:
+ *   - `(идентичность, IP)` — 3 / 5 мин, **ровно как было**: один источник не
+ *     может выбрать чужой бюджет, а нормальный пользователь со своего IP
+ *     ничего не замечает;
+ *   - `идентичность` — 10 / 60 мин: потолок «сколько сообщений вообще можно
+ *     отправить на этот адрес», то есть защита от бомбардировки и от расхода
+ *     бюджета шлюза.
+ *
+ * Атака не исчезает полностью — она дорожает: чтобы лишить владельца кода,
+ * нужно не одно обращение, а ≥4 источника. Полностью её убрать нельзя, не сняв
+ * потолок отправок, а он защищает жертву от худшего. Заодно почасовой предел
+ * ужесточается: раньше распределённый источник мог выдать до 36 сообщений в
+ * час на номер, теперь 10.
+ */
+const OTP_REQUEST_IDENTITY_IP_LIMIT = 3;
+const OTP_REQUEST_IDENTITY_IP_WINDOW_SECONDS = 5 * 60;
+const OTP_REQUEST_IDENTITY_LIMIT = 10;
+const OTP_REQUEST_IDENTITY_WINDOW_SECONDS = 60 * 60;
 
 const OTP_VERIFY_FAIL_LIMIT = 5;
 const OTP_VERIFY_LOCK_SECONDS = 15 * 60;
@@ -76,15 +108,22 @@ export async function checkOtpRequestRateLimit(input: {
   }
 
   const ipKey = `otp:request:ip:${hashKey(input.ip?.trim() || "unknown")}`;
-  const phoneKey = `otp:request:phone:${hashKey(input.phone)}`;
+  // SEC-26: бюджет одного источника. Прежний ключ `otp:request:phone:<hash>`
+  // ключевался только идентичностью, поэтому чужой запрос списывал бюджет
+  // владельца.
+  const identityIpKey = `otp:request:phone-ip:${verifyScopeId(input.phone, input.ip)}`;
+  // Потолок отправок на идентичность — защита от бомбардировки и расхода шлюза.
+  const identityKey = `otp:request:phone:${hashKey(input.phone)}`;
 
   let ipCount = 0;
-  let phoneCount = 0;
+  let identityIpCount = 0;
+  let identityCount = 0;
 
   try {
-    [ipCount, phoneCount] = await Promise.all([
+    [ipCount, identityIpCount, identityCount] = await Promise.all([
       incrWithWindow(ipKey, OTP_REQUEST_IP_WINDOW_SECONDS),
-      incrWithWindow(phoneKey, OTP_REQUEST_PHONE_WINDOW_SECONDS),
+      incrWithWindow(identityIpKey, OTP_REQUEST_IDENTITY_IP_WINDOW_SECONDS),
+      incrWithWindow(identityKey, OTP_REQUEST_IDENTITY_WINDOW_SECONDS),
     ]);
   } catch (error) {
     logError("OTP request rate limit failed", {
@@ -93,11 +132,16 @@ export async function checkOtpRequestRateLimit(input: {
     return { ok: false, status: 503, error: "RATE_LIMIT_UNAVAILABLE", retryAfterSec: 60 };
   }
 
-  if (ipCount > OTP_REQUEST_IP_LIMIT || phoneCount > OTP_REQUEST_PHONE_LIMIT) {
+  const ipExceeded = ipCount > OTP_REQUEST_IP_LIMIT;
+  const identityIpExceeded = identityIpCount > OTP_REQUEST_IDENTITY_IP_LIMIT;
+  const identityExceeded = identityCount > OTP_REQUEST_IDENTITY_LIMIT;
+
+  if (ipExceeded || identityIpExceeded || identityExceeded) {
     alertOtpRateLimitTriggered(input.ip, input.phone);
     const retryAfter = Math.max(
-      ipCount > OTP_REQUEST_IP_LIMIT ? await ttlSeconds(ipKey) : 0,
-      phoneCount > OTP_REQUEST_PHONE_LIMIT ? await ttlSeconds(phoneKey) : 0,
+      ipExceeded ? await ttlSeconds(ipKey) : 0,
+      identityIpExceeded ? await ttlSeconds(identityIpKey) : 0,
+      identityExceeded ? await ttlSeconds(identityKey) : 0,
       1
     );
     return { ok: false, status: 429, error: "RATE_LIMIT", retryAfterSec: retryAfter };
@@ -184,8 +228,14 @@ export async function clearOtpVerifyFailures(phone: string, ip: string | null): 
 
 // ── Email OTP rate limit ──────────────────────────────────────────────────────
 
-const OTP_REQUEST_EMAIL_LIMIT = 3;
-const OTP_REQUEST_EMAIL_WINDOW_SECONDS = 5 * 60;
+// SEC-26: близнец телефонных лимитов. Дефект был тот же — бюджет выпуска
+// ключевался только адресом, — а канал этот в закрытом деплое ЕДИНСТВЕННЫЙ
+// рабочий (`PHONE_AUTH_ENABLED` в проде off), так что чинить его отдельно от
+// телефонного значило бы закрыть спящую дверь и оставить живую.
+const OTP_REQUEST_EMAIL_IP_LIMIT = 3;
+const OTP_REQUEST_EMAIL_IP_WINDOW_SECONDS = 5 * 60;
+const OTP_REQUEST_EMAIL_LIMIT = 10;
+const OTP_REQUEST_EMAIL_WINDOW_SECONDS = 60 * 60;
 
 export async function checkOtpEmailRequestRateLimit(input: {
   email: string;
@@ -196,15 +246,21 @@ export async function checkOtpEmailRequestRateLimit(input: {
     return { ok: false, status: 503, error: "RATE_LIMIT_UNAVAILABLE", retryAfterSec: 60 };
   }
 
+  const normalizedEmail = input.email.toLowerCase();
   const ipKey = `otp:request:ip:${hashKey(input.ip?.trim() || "unknown")}`;
-  const emailKey = `otp:request:email:${hashKey(input.email.toLowerCase())}`;
+  // SEC-26: бюджет одного источника (см. телефонный близнец выше).
+  const emailIpKey = `otp:request:email-ip:${verifyScopeId(normalizedEmail, input.ip)}`;
+  // Потолок отправок на адрес — защита от бомбардировки почтового ящика.
+  const emailKey = `otp:request:email:${hashKey(normalizedEmail)}`;
 
   let ipCount = 0;
+  let emailIpCount = 0;
   let emailCount = 0;
 
   try {
-    [ipCount, emailCount] = await Promise.all([
+    [ipCount, emailIpCount, emailCount] = await Promise.all([
       incrWithWindow(ipKey, OTP_REQUEST_IP_WINDOW_SECONDS),
+      incrWithWindow(emailIpKey, OTP_REQUEST_EMAIL_IP_WINDOW_SECONDS),
       incrWithWindow(emailKey, OTP_REQUEST_EMAIL_WINDOW_SECONDS),
     ]);
   } catch (error) {
@@ -214,11 +270,16 @@ export async function checkOtpEmailRequestRateLimit(input: {
     return { ok: false, status: 503, error: "RATE_LIMIT_UNAVAILABLE", retryAfterSec: 60 };
   }
 
-  if (ipCount > OTP_REQUEST_IP_LIMIT || emailCount > OTP_REQUEST_EMAIL_LIMIT) {
+  const ipExceeded = ipCount > OTP_REQUEST_IP_LIMIT;
+  const emailIpExceeded = emailIpCount > OTP_REQUEST_EMAIL_IP_LIMIT;
+  const emailExceeded = emailCount > OTP_REQUEST_EMAIL_LIMIT;
+
+  if (ipExceeded || emailIpExceeded || emailExceeded) {
     alertOtpRateLimitTriggered(input.ip, input.email);
     const retryAfter = Math.max(
-      ipCount > OTP_REQUEST_IP_LIMIT ? await ttlSeconds(ipKey) : 0,
-      emailCount > OTP_REQUEST_EMAIL_LIMIT ? await ttlSeconds(emailKey) : 0,
+      ipExceeded ? await ttlSeconds(ipKey) : 0,
+      emailIpExceeded ? await ttlSeconds(emailIpKey) : 0,
+      emailExceeded ? await ttlSeconds(emailKey) : 0,
       1
     );
     return { ok: false, status: 429, error: "RATE_LIMIT", retryAfterSec: retryAfter };
