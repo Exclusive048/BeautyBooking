@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { logError } from "@/lib/logging/logger";
 import { enqueue } from "@/lib/queue/queue";
 import {
   BOOKING_REMINDER_JOB_TYPE,
@@ -95,6 +96,33 @@ export async function scheduleBookingReminders(bookingId: string): Promise<void>
       )
     )
   );
+}
+
+/**
+ * RES-03/RES-15 — планирование напоминаний ПОСЛЕ коммита брони.
+ *
+ * `scheduleBookingReminders` бросает: `enqueue` в проде при недоступном Redis
+ * поднимает ошибку (`queue.ts` — memory-fallback только вне прода). На
+ * пост-коммитном участке это означало 500 на уже созданную бронь: клиент
+ * видит «Не удалось создать запись» и жмёт ещё раз, а без
+ * `x-idempotency-key` (гостевой виджет, мобильные клиенты) создаёт ВТОРУЮ.
+ * Напоминание — не корректностный гейт: бронь уже валидна и видна обеим
+ * сторонам, отсутствие напоминания её не отменяет.
+ *
+ * Поэтому все пост-коммитные вызывающие идут через эту обёртку, а не через
+ * собственный `try/catch` (он стоял ровно в одном файле из трёх — асимметрия
+ * и была находкой). Сырой `scheduleBookingReminders` остаётся для путей, где
+ * отказ обязан быть виден вызывающему.
+ */
+export async function scheduleBookingRemindersSafe(bookingId: string): Promise<void> {
+  try {
+    await scheduleBookingReminders(bookingId);
+  } catch (error) {
+    logError("Failed to schedule booking reminders", {
+      bookingId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 type DbClient = Prisma.TransactionClient | typeof prisma;

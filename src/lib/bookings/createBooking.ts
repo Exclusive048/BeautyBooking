@@ -18,7 +18,7 @@ import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
 import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
 import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { logInfo, logError } from "@/lib/logging/logger";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
 import { emitBookingCreatedSystemMessage } from "@/lib/chat/system-messages";
@@ -282,7 +282,7 @@ export async function createBooking(input: {
   }
 
   if (shouldAutoConfirm) {
-    await scheduleBookingReminders(created.id);
+    await scheduleBookingRemindersSafe(created.id);
   }
 
   await invalidateSlotsForBookingRange({

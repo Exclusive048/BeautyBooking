@@ -7,7 +7,7 @@ import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation"
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import {
   emitBookingConfirmedSystemMessage,
   emitBookingRescheduledSystemMessage,
@@ -242,14 +242,7 @@ export async function confirmBooking(
     throw error;
   }
 
-  try {
-    await scheduleBookingReminders(updated.id);
-  } catch (error) {
-    logError("Failed to schedule booking reminders", {
-      bookingId: updated.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  await scheduleBookingRemindersSafe(updated.id);
 
   if (appliesRequestedChange) {
     await invalidateSlotsForBookingMove({

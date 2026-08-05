@@ -26,6 +26,7 @@ import {
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import {
   abortPackageIdempotency,
   beginPackageIdempotency,
@@ -582,6 +583,16 @@ async function createSoloPackageBookingUnguarded(
     const conflict = mapPrismaBookingConflict(error);
     if (conflict) throw conflict;
     throw error;
+  }
+
+  // RES-15: напоминания 24 ч/2 ч планируются на КАЖДЫЙ компонент — компоненты
+  // могут стоять в разные дни (PACKAGE-SOLO-WIZARD-01), и одна задача на пакет
+  // покрыла бы только один из них. Дедупликация — по самой брони
+  // (`reminder24hSentAt`/`reminder2hSentAt`), как у одиночной записи.
+  if (shouldAutoConfirm) {
+    for (const bookingId of result.bookingIds) {
+      await scheduleBookingRemindersSafe(bookingId);
+    }
   }
 
   // Post-tx slot-cache invalidation per child (best-effort, non-fatal).

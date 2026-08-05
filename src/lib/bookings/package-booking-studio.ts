@@ -19,6 +19,7 @@ import {
   type CreateSoloPackageResult,
 } from "@/lib/bookings/package-booking";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import {
   abortPackageIdempotency,
   beginPackageIdempotency,
@@ -386,6 +387,14 @@ async function createStudioPackageBookingUnguarded(
     const conflict = mapPrismaBookingConflict(error);
     if (conflict) throw conflict;
     throw error;
+  }
+
+  // RES-15: напоминания на каждый компонент — см. соло-путь. Здесь компоненты
+  // ещё и у разных мастеров, но напоминание привязано к брони, а не к мастеру.
+  if (shouldAutoConfirm) {
+    for (const bookingId of result.bookingIds) {
+      await scheduleBookingRemindersSafe(bookingId);
+    }
   }
 
   // Post-tx slot-cache + advisor invalidation per child (best-effort, non-fatal).

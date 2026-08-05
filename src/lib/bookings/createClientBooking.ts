@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
@@ -260,7 +260,7 @@ export async function createClientBooking(
     }
 
     if (shouldAutoConfirm) {
-      await scheduleBookingReminders(booking.id);
+      await scheduleBookingRemindersSafe(booking.id);
     }
 
     await invalidateSlotsForBookingRange({
