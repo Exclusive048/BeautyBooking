@@ -72,7 +72,12 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [selectedDate, setSelectedDate] = useState(todayKey());
+  // LOGIC-26: при монтировании tz салона ещё не загружена — берём зону
+  // зрителя как единственное, что известно, и пересчитываем ниже, как только
+  // придёт профиль. К этому моменту выбрать дату пользователь не мог: полоса
+  // дней живёт за шагом «когда», а виджет до конца загрузки в состоянии
+  // `loading`.
+  const [selectedDate, setSelectedDate] = useState(() => todayKey(viewerTimeZone));
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
   const [masterId, setMasterId] = useState(initialMasterId ?? "");
   const [slotLabel, setSlotLabel] = useState("");
@@ -214,6 +219,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         if (profileRes.provider.type !== "STUDIO") throw new Error(UI_TEXT.publicStudio.studioOnlyProfileError);
         if (cancelled) return;
         setStudio(profileRes.provider);
+        // LOGIC-26: день по умолчанию — «сегодня» САЛОНА. Клиент из
+        // Калининграда (+2), открывающий екатеринбургскую студию (+5) поздно
+        // вечером, иначе видел выдачу на вчерашний по меркам салона день.
+        setSelectedDate(todayKey(profileRes.provider.timezone));
         setMasters(mastersRes.ok ? mastersRes.masters : []);
       } catch (err) {
         if (!cancelled) {

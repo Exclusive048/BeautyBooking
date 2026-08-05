@@ -15,6 +15,7 @@ import {
   fetchBookingMe,
   fetchMasterAvailability,
   todayKey,
+  buildDayOptions,
   type SlotItem,
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
@@ -55,21 +56,6 @@ type Proposal = { packageName: string; totalKopeks: number; components: Proposed
 type Phase = "build" | "review" | "contacts" | "success";
 type SessionUser = { displayName: string | null; phone: string | null };
 
-function buildDays(count: number): { key: string; label: string }[] {
-  const out: { key: string; label: string }[] = [];
-  const base = new Date();
-  for (let i = 0; i < count; i += 1) {
-    const d = new Date(base);
-    d.setDate(base.getDate() + i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    out.push({
-      key,
-      label: d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", weekday: "short" }),
-    });
-  }
-  return out;
-}
-
 export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, masters }: Props) {
   const components = bundle.components;
   // LOGIC-09: ключ идемпотентности живёт весь визард — повтор сабмита обязан
@@ -77,14 +63,16 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   const idempotencyKeyRef = useRef<string>(
     typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`,
   );
-  const days = useMemo(() => buildDays(14), []);
+  // LOGIC-26: дни визарда — в tz студии, а не посетителя (`studioTimezone`
+  // здесь уже есть пропом; прежний `buildDays` его просто не использовал).
+  const days = useMemo(() => buildDayOptions(14, studioTimezone), [studioTimezone]);
 
   const [phase, setPhase] = useState<Phase>("build");
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
 
   // Active-component picker state.
   const [selectedMasterId, setSelectedMasterId] = useState("");
-  const [selectedDay, setSelectedDay] = useState(days[0]?.key ?? todayKey());
+  const [selectedDay, setSelectedDay] = useState(days[0]?.key ?? todayKey(studioTimezone));
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -170,12 +158,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       setPhase("build");
       setPlacements({});
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey());
+      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
       setProposal(null);
       setError(null);
       setComment("");
     }
-  }, [open, days]);
+  }, [open, days, studioTimezone]);
 
   // Session prefill.
   useEffect(() => {
@@ -238,10 +226,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         },
       }));
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey());
+      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
       setError(null);
     },
-    [activeComponent, selectedMasterId, masterName, days],
+    [activeComponent, selectedMasterId, masterName, days, studioTimezone],
   );
 
   // Re-pick a placed component → cascade-clear it + every later one (their
@@ -257,10 +245,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         return next;
       });
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey());
+      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
       setError(null);
     },
-    [components, days],
+    [components, days, studioTimezone],
   );
 
   const buildSelections = useCallback(

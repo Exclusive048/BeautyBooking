@@ -1,6 +1,8 @@
 import type { ApiResponse } from "@/lib/types/api";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
+import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 export type StudioMaster = {
   id: string;
@@ -74,29 +76,62 @@ export type MastersResult =
 
 export const STUDIO_BOOKING_DAYS_AHEAD = 60;
 
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+/**
+ * LOGIC-26 — tz-источник этих ключей: **salon-tz** (rule 17).
+ *
+ * Раньше день считался host-локальными геттерами (`getFullYear`/`getMonth`/
+ * `getDate`), то есть по часам посетителя. Клиент из Калининграда (+2),
+ * открывающий екатеринбургскую студию (+5) поздно вечером, получал выдачу
+ * слотов на ВЧЕРАШНИЙ по меркам салона день: виджет открывался не на том дне,
+ * и часть сегодняшних слотов была невидима. Данные это не портило (лечится
+ * навигацией), но первый экран показывал не то.
+ *
+ * `toLocalDateKey`/`addDaysToDateKey` — те же хелперы, которыми пользуется
+ * движок расписания; собственной арифметики дат здесь быть не должно.
+ */
+export function todayKey(timeZone: string) {
+  return toLocalDateKey(new Date(), timeZone);
 }
 
-function parseDateKey(dateKey: string) {
+/** Проверка ФОРМЫ ключа (YYYY-MM-DD) — от таймзоны не зависит. */
+function isValidDateKey(dateKey: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
   const [y, m, d] = dateKey.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
+  return Boolean(y) && m >= 1 && m <= 12 && d >= 1 && d <= 31;
 }
 
-export function buildDateBounds(base: Date, daysAhead: number = STUDIO_BOOKING_DAYS_AHEAD) {
-  const min = toDateKey(base);
-  const maxDate = new Date(base);
-  maxDate.setDate(base.getDate() + daysAhead);
-  const max = toDateKey(maxDate);
-  return { min, max };
+export function buildDateBounds(
+  base: Date,
+  timeZone: string,
+  daysAhead: number = STUDIO_BOOKING_DAYS_AHEAD
+) {
+  const min = toLocalDateKey(base, timeZone);
+  return { min, max: addDaysToDateKey(min, daysAhead) };
 }
 
-export function todayKey() {
-  return toDateKey(new Date());
+/** Список ближайших дней в tz салона: ключ (salon-local) + подпись для чипа. */
+export function buildDayOptions(
+  count: number,
+  timeZone: string
+): { key: string; label: string }[] {
+  const first = todayKey(timeZone);
+  const out: { key: string; label: string }[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const key = addDaysToDateKey(first, i);
+    // Подпись строится из полудня салонного дня — так она не съезжает на
+    // соседние сутки ни при каком смещении зоны.
+    const noonUtc = dateFromLocalDateKey(key, timeZone, 12, 0);
+    out.push({
+      key,
+      label: noonUtc.toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+        weekday: "short",
+        timeZone,
+      }),
+    });
+  }
+  return out;
 }
 
 async function safeJson<T>(res: Response) {
@@ -150,7 +185,7 @@ export async function fetchMasterAvailability(
   serviceId: string,
   dateKey: string
 ): Promise<AvailabilityResult> {
-  if (!parseDateKey(dateKey)) {
+  if (!isValidDateKey(dateKey)) {
     return { ok: false, error: "Некорректная дата", code: "DATE_INVALID" };
   }
 
