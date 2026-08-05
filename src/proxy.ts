@@ -236,6 +236,59 @@ function readSetCookieHeaders(headers: Headers): string[] {
   return splitCombinedSetCookieHeader(combined);
 }
 
+/**
+ * LOGIC-22 — обновлённая сессия должна действовать в ЭТОМ запросе, а не в
+ * следующем.
+ *
+ * Прокси при протухшем access-токене честно обновляет сессию server-to-server,
+ * но свежие куки клал только в ОТВЕТ. `requestHeaders`, которые уезжают в
+ * обработчик роута, оставались со старой `cookie`, поэтому обработчик видел
+ * протухшую сессию и считал вызывающего анонимом. На `/api/bookings` это не
+ * ошибка авторизации, а тихая смена ветки: зарегистрированный клиент уходил по
+ * ГОСТЕВОМУ пути, где обязателен `consent` — а клиент его не слал, потому что
+ * своим состоянием считал себя авторизованным. Итог — 400 `CONSENT_REQUIRED`
+ * на самом ответственном шаге воронки, исчезающий со второй попытки (браузер
+ * к тому моменту уже получил новую куку с ответом на упавший запрос).
+ *
+ * Слияние, а не замена: `Set-Cookie` приходит только на сессионную пару, а в
+ * запросе живут и чужие куки (баннер cookie-уведомления, OAuth-state) —
+ * затереть их значило бы сломать соседние механизмы. Удаление (`Max-Age=0`,
+ * так `clearSessionCookies` гасит пару) обязано убирать имя из запроса, иначе
+ * обработчик увидел бы отозванную сессию живой.
+ */
+export function mergeRefreshedCookies(
+  currentCookieHeader: string | null,
+  setCookieHeaders: string[],
+): string {
+  const jar = new Map<string, string>();
+  for (const part of (currentCookieHeader ?? "").split(";")) {
+    const separator = part.indexOf("=");
+    if (separator <= 0) continue;
+    const name = part.slice(0, separator).trim();
+    if (name) jar.set(name, part.slice(separator + 1).trim());
+  }
+
+  for (const setCookie of setCookieHeaders) {
+    const [pair, ...attributes] = setCookie.split(";");
+    const separator = pair?.indexOf("=") ?? -1;
+    if (!pair || separator <= 0) continue;
+    const name = pair.slice(0, separator).trim();
+    if (!name) continue;
+
+    const maxAge = attributes
+      .map((attribute) => /^\s*max-age\s*=\s*(-?\d+)\s*$/i.exec(attribute))
+      .find((match) => match !== null);
+    if (maxAge && Number(maxAge[1]) <= 0) {
+      jar.delete(name);
+      continue;
+    }
+
+    jar.set(name, pair.slice(separator + 1).trim());
+  }
+
+  return Array.from(jar, ([name, value]) => `${name}=${value}`).join("; ");
+}
+
 export async function proxy(request: NextRequest) {
   const requestId = resolveRequestId(request);
   const method = request.method.toUpperCase();
@@ -314,6 +367,14 @@ export async function proxy(request: NextRequest) {
 
         if (refreshRes.ok) {
           refreshedSetCookies = readSetCookieHeaders(refreshRes.headers);
+          // LOGIC-22: свежая кука уезжает и ВНУТРЬ — иначе обработчик этого же
+          // запроса продолжит читать протухшую и примет вызывающего за гостя.
+          if (refreshedSetCookies.length > 0) {
+            requestHeaders.set(
+              "cookie",
+              mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies),
+            );
+          }
         }
       }
     }

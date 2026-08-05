@@ -21,7 +21,12 @@
  */
 
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { getAllowedOrigin, normalizeOrigin, shouldRejectCrossSiteMutation } from "./proxy";
+import {
+  getAllowedOrigin,
+  mergeRefreshedCookies,
+  normalizeOrigin,
+  shouldRejectCrossSiteMutation,
+} from "./proxy";
 
 describe("normalizeOrigin — IDN + protocol canonicalization", () => {
   it("normalizes Cyrillic IDN to Punycode form", () => {
@@ -267,5 +272,75 @@ describe("getAllowedOrigin — SEC-19", () => {
     expect(getAllowedOrigin("https://www.мастеррядом.online")).toBe("https://www.мастеррядом.online");
     // dev-адреса в проде не проходят — списки не смешались
     expect(getAllowedOrigin("http://localhost:3000")).toBeNull();
+  });
+});
+
+/**
+ * LOGIC-22 — прокси обновляет сессию, и обновление действует В ЭТОМ запросе.
+ *
+ * Свежие куки клались только в ответ, а `requestHeaders` уезжали в обработчик
+ * со старой `cookie`. На `/api/bookings` это не 401, а тихая смена ветки:
+ * зарегистрированный клиент со «протухшей вкладкой» уходил по ГОСТЕВОМУ пути,
+ * где обязателен `consent`, которого клиент не слал (своим состоянием он
+ * считал себя авторизованным) → 400 `CONSENT_REQUIRED`, исчезающий со второй
+ * попытки. Слияние здесь — предмет теста: сессионную пару надо заменить,
+ * соседние куки сохранить, погашенную — убрать.
+ */
+describe("mergeRefreshedCookies — LOGIC-22", () => {
+  const REFRESHED = [
+    "bh_session=new.access.jwt; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200",
+    "bh_refresh=new.refresh.jwt; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=2592000",
+  ];
+
+  it("подменяет протухшую сессионную пару свежей", () => {
+    const merged = mergeRefreshedCookies(
+      "bh_session=stale.access.jwt; bh_refresh=old.refresh.jwt",
+      REFRESHED,
+    );
+    expect(merged).toContain("bh_session=new.access.jwt");
+    expect(merged).toContain("bh_refresh=new.refresh.jwt");
+    expect(merged).not.toContain("stale.access.jwt");
+    expect(merged).not.toContain("old.refresh.jwt");
+  });
+
+  it("сохраняет чужие куки — Set-Cookie приходит только на сессионную пару", () => {
+    const merged = mergeRefreshedCookies(
+      "mr_cookie_notice=v1; bh_session=stale.access.jwt; theme=dark",
+      REFRESHED,
+    );
+    expect(merged).toContain("mr_cookie_notice=v1");
+    expect(merged).toContain("theme=dark");
+  });
+
+  it("не протаскивает атрибуты Set-Cookie в заголовок запроса", () => {
+    const merged = mergeRefreshedCookies("bh_session=stale", REFRESHED);
+    for (const attribute of ["Path=", "HttpOnly", "SameSite", "Max-Age"]) {
+      expect(merged).not.toContain(attribute);
+    }
+  });
+
+  it("Max-Age=0 убирает имя, а не записывает пустое значение", () => {
+    // Так гасит пару `clearSessionCookies`: увидеть отозванную сессию живой
+    // обработчик не должен.
+    const merged = mergeRefreshedCookies("bh_session=stale; theme=dark", [
+      "bh_session=; Path=/; HttpOnly; Max-Age=0",
+    ]);
+    expect(merged).not.toContain("bh_session");
+    expect(merged).toBe("theme=dark");
+  });
+
+  it("работает без входящей cookie (первый запрос вкладки)", () => {
+    expect(mergeRefreshedCookies(null, REFRESHED)).toBe(
+      "bh_session=new.access.jwt; bh_refresh=new.refresh.jwt",
+    );
+  });
+
+  it("режет пару по ПЕРВОМУ '=' — значение может его содержать", () => {
+    const merged = mergeRefreshedCookies("a=1", ["token=abc=def==; Path=/"]);
+    expect(merged).toBe("a=1; token=abc=def==");
+  });
+
+  it("игнорирует мусорные сегменты, не роняя остальной jar", () => {
+    expect(mergeRefreshedCookies("a=1;; =nameless; b=2", ["; broken"])).toBe("a=1; b=2");
   });
 });
