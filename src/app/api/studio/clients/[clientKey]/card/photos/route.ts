@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureStudioRole } from "@/lib/studio/access";
 import { parseQuery } from "@/lib/validation";
 import { uploadMediaAsset } from "@/lib/media/service";
+import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
 
 type RouteContext = {
   params: Promise<{ clientKey: string }>;
@@ -60,14 +61,16 @@ export async function POST(req: Request, ctx: RouteContext) {
       return jsonFail(400, "Файл обязателен", "MEDIA_FILE_REQUIRED");
     }
 
-    const bytes = new Uint8Array(await fileValue.arrayBuffer());
+    // SEC-06: тип берётся из магических байтов и файл переупаковывается —
+    // `fileValue.type` это заявление клиента, а не факт.
+    const image = await readValidatedImageUpload(fileValue, { quality: 90 });
     const asset = await uploadMediaAsset(user, {
       entityType: MediaEntityType.CLIENT_CARD,
       entityId: card.id,
       kind: MediaKind.CLIENT_CARD_PHOTO,
-      mimeType: fileValue.type,
-      sizeBytes: fileValue.size,
-      bytes,
+      mimeType: image.mimeType,
+      sizeBytes: image.sizeBytes,
+      bytes: image.bytes,
       originalFilename: fileValue.name || "photo",
     });
 
