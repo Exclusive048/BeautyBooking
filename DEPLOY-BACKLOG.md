@@ -114,6 +114,7 @@
   | `job.deadLetter` (тег `jobType`) | Задача исчерпала ретраи — в т.ч. `media.purge` |
 
   *(Источник: HARDENING-MISC-01, `src/lib/observability/compliance.ts`.)*
+- **`stop_grace_period` действует, только если прод поднимается ЭТИМ compose-файлом** *(RES-16, 2026-08-06)*. В `docker-compose.prod.yml` заданы `worker: 60s` и `app: 30s` — до этого действовал докерный дефолт 10 c, из-за которого длинная джоба (`media.purge` пачкой, `mrr.snapshot`, масс-рассылка) получала SIGKILL на каждом деплое: потери нет (`recoverStuckJobs` подберёт по staleness), но это +5 минут задержки и лишний attempt каждый раз. **Что проверить на площадке:** если сервисы запускаются не через `docker compose up` (systemd-юнит, k8s, свой раннер), значение из файла не применяется — нужен эквивалент (`TimeoutStopSec=`, `terminationGracePeriodSeconds`). И наоборот: если перед контейнерами стоит балансировщик, его drain-таймаут должен быть **не меньше** `app: 30s`, иначе клиенту всё равно обрывается соединение.
 - **GlitchTip: инстанс + DSN + retention/диск + alert-rules**, включая worker-liveness. `GLITCHTIP_DSN` (сервер) и `NEXT_PUBLIC_GLITCHTIP_DSN` (браузер) — **два независимых гейта**; без DSN SDK даже не догружается.
 - **Source-maps для GlitchTip** — server-стеки без них нечитаемы (deferred DevOps-шаг).
 - **Мониторинг** — по разделу из `DEPLOY_GUIDE.md` (см. предупреждение о его устарелости в шапке).

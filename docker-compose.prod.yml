@@ -42,6 +42,10 @@ services:
   app:
     image: ${REGISTRY}/beautyhub-app:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    # RES-16: 10 c дефолта — это верхняя граница на добивание in-flight
+    # запросов при деплое. 30 c дают завершиться самому долгому легитимному
+    # запросу (загрузка медиа с re-encode) вместо обрыва соединения клиенту.
+    stop_grace_period: 30s
     env_file: .env.production
     depends_on:
       postgres:
@@ -77,6 +81,14 @@ services:
   worker:
     image: ${REGISTRY}/beautyhub-worker:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    # RES-16: docker-дефолт — 10 c, и это меньше, чем идёт длинная джоба
+    # (`media.purge` пачкой объектов, `mrr.snapshot`, масс-рассылка). Цикл
+    # воркера проверяет `isShuttingDown` только на витке, то есть текущую
+    # джобу он дорабатывает, а SIGKILL её обрывает. Потери при этом нет —
+    # джоба остаётся в `queue:processing`, и `recoverStuckJobs` подберёт её по
+    # staleness, — но это +5 минут задержки и лишний attempt на КАЖДЫЙ деплой.
+    # 60 c: с запасом перекрывает и джобу, и `flushReports(2000)` в конце.
+    stop_grace_period: 60s
     env_file: .env.production
     depends_on:
       postgres:
