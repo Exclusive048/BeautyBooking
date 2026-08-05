@@ -117,3 +117,35 @@ describe("sendPushToUser — never rejects (FIX-4)", () => {
     );
   });
 });
+/**
+ * RES-22 — у запроса к push-сервису не было верхней границы: третий аргумент
+ * `sendNotification` отсутствовал вовсе.
+ *
+ * Адресат здесь — ЧУЖОЙ сервис (FCM, Mozilla, Apple), выбранный браузером
+ * пользователя, а отправка идёт `Promise.all` по всем подпискам: один
+ * зависший эндпоинт держал бы весь пакет и слот воркера.
+ */
+describe("sendPushToUser — граница запроса (RES-22)", () => {
+  it("в каждый вызов уходит timeout", async () => {
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+
+    await sendPushToUser("u-1", PAYLOAD);
+
+    const options = sendNotification.mock.calls[0]?.[2] as { timeout?: number } | undefined;
+    expect(typeof options?.timeout).toBe("number");
+    expect(options!.timeout!).toBeGreaterThan(0);
+    expect(options!.timeout!).toBeLessThanOrEqual(30_000);
+  });
+
+  it("срабатывание таймаута не роняет отправку и не удаляет подписку", async () => {
+    // У ошибки таймаута нет `statusCode`, поэтому 410-ветка (удаление
+    // протухшей подписки) не должна срабатывать — иначе одна сетевая заминка
+    // отписывала бы живое устройство.
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    sendNotification.mockRejectedValueOnce(new Error("Socket timeout"));
+
+    await expect(sendPushToUser("u-1", PAYLOAD)).resolves.toBeUndefined();
+    expect(subsDeleteMany).not.toHaveBeenCalled();
+    expect(logError).toHaveBeenCalled();
+  });
+});

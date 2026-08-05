@@ -122,6 +122,14 @@ describe("RES-15 · пакетные брони планируют напоми�
   });
 });
 
+/**
+ * Оба теста ниже динамически импортируют роут, а он тянет полный граф модулей
+ * booking-флоу (движок расписания, Prisma-клиент, кэш). Под параллельной
+ * нагрузкой полного прогона этот импорт перестаёт укладываться в дефолтные 5 с
+ * vitest — то есть тест мигал бы по причине, к его предмету не относящейся.
+ */
+const ROUTE_IMPORT_TIMEOUT_MS = 30_000;
+
 describe("RES-13 · публичные роуты booking-флоу отвечают JSON-конвертом", () => {
   beforeEach(() => {
     resolveProviderBySlugOrId.mockReset();
@@ -141,7 +149,7 @@ describe("RES-13 · публичные роуты booking-флоу отвеча�
     const body = await res.json();
     expect(body.ok).toBe(false);
     expect(typeof body.error?.message).toBe("string");
-  });
+  }, ROUTE_IMPORT_TIMEOUT_MS);
 
   it("booking-days: неожиданный throw → 500 с { ok:false }, а не HTML Next", async () => {
     resolveProviderBySlugOrId.mockRejectedValue(new Error("db connection lost"));
@@ -156,5 +164,5 @@ describe("RES-13 · публичные роуты booking-флоу отвеча�
     const body = await res.json();
     expect(body.ok).toBe(false);
     expect(typeof body.error?.message).toBe("string");
-  });
+  }, ROUTE_IMPORT_TIMEOUT_MS);
 });
