@@ -9,6 +9,7 @@ import {
   verifyPrivateMediaDeliveryToken,
 } from "@/lib/media/private-delivery";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { ensureCanReadMedia } from "@/lib/media/access";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { getMediaFile, isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
@@ -138,6 +139,18 @@ export async function GET(req: Request, ctx: RouteContext) {
           { status: 401 }
         );
       }
+
+      // SEC-10: токен отвечает на вопрос «какой актив», но не «кому можно».
+      // Без второй половины утёкшая ссылка (referrer, скриншот, лог прокси)
+      // открывает приватный актив кому угодно на срок жизни токена — до 15
+      // минут. Соседний чат-роут именно поэтому токену в одиночку не верит:
+      // `getSessionUser` + `getMediaFile` → `ensureCanReadMedia`. Приводим
+      // ветку к той же модели, чтобы на одном механизме не жили две разные.
+      // Флоу не задет: `?mt=`-ссылки выдаются только кабинету мастера на фото
+      // откликов модели, а ACL `MODEL_APPLICATION` пускает и заявителя, и
+      // владельца оффера.
+      const tokenUser = await getSessionUser();
+      await ensureCanReadMedia(tokenUser, asset.entityType, asset.entityId, asset.kind);
 
       const storage = getStorageProvider();
       const tokenFile = await storage.getObject(asset.storageKey, asset.mimeType);
