@@ -1,7 +1,7 @@
-import crypto from "crypto";
 import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { env } from "@/lib/env";
 import { extractClientIp } from "@/lib/http/ip";
 import { checkYookassaIpAllowlist } from "@/lib/payments/yookassa/allowlist";
@@ -54,12 +54,11 @@ const webhookBodySchema = z.object({
   object: z.object({ id: z.string().min(1) }),
 });
 
-function timingSafeStringEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-  if (aBuf.length !== bBuf.length) return false;
-  return crypto.timingSafeEqual(aBuf, bBuf);
-}
+// SEC-20: локальная копия сравнения удалена в пользу общего
+// `lib/auth/constant-time.ts`. Копия начиналась с `if (aBuf.length !== bBuf.length)
+// return false` — то есть длина секрета утекала по времени ответа мимо самого
+// constant-time-сравнения. Общий хелпер хеширует обе стороны до сравнения и
+// потому не зависит от длины; в его комментарии эта ловушка описана прямо.
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
