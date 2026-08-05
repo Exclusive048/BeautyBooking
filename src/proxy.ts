@@ -115,6 +115,16 @@ type RateLimitTier =
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
+/**
+ * RES-04 — верхняя граница self-hop'а прокси в `/api/auth/refresh`.
+ *
+ * 2 с: обновление сессии — это одна проверка подписи + пара запросов к БД, то
+ * есть десятки миллисекунд на здоровой системе. Порог выбран так, чтобы не
+ * срезать легитимный хвост латентности и при этом не дать очереди сложиться:
+ * при 2 с прокси освобождает слот раньше, чем клиентский `fetch` успевает
+ * выйти по собственному таймауту.
+ */
+const REFRESH_FETCH_TIMEOUT_MS = 2000;
 const PUBLIC_PATHS = ["/login", "/register", "/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
 
 function resolveRequestId(request: NextRequest): string {
@@ -358,23 +368,44 @@ export async function proxy(request: NextRequest) {
       const refreshToken = request.cookies.get("bh_refresh")?.value;
       if (refreshToken) {
         const refreshUrl = new URL(REFRESH_ENDPOINT_PATH, request.url);
-        const refreshRes = await fetch(refreshUrl.toString(), {
-          method: "POST",
-          headers: {
-            cookie: request.headers.get("cookie") ?? "",
-          },
-        });
+        // RES-04: у этого хопа обязана быть верхняя граница, и она не про
+        // «медленно». Прокси держит ВХОДЯЩИЙ запрос, пока ждёт ИСХОДЯЩИЙ к
+        // самому себе, то есть каждый такой запрос занимает два слота
+        // обработки вместо одного. Если `/api/auth/refresh` начинает тормозить
+        // (исчерпан пул Prisma), петля затягивается сама: чем больше висит,
+        // тем меньше слотов остаётся тому самому роуту, которого все ждут.
+        // Без границы разорвать её нечем. Матчер покрывает всё, кроме статики,
+        // а access-токен живёт 2 ч — путь горячий у каждого залогиненного.
+        //
+        // Отказ или таймаут = продолжаем БЕЗ обновления: обработчик увидит
+        // протухшую куку и ответит 401, клиент уйдёт на /login. Это хуже
+        // успешного обновления и лучше зависания. `fetch` здесь ещё и бросал
+        // при сетевой ошибке (ECONNREFUSED при рестарте) — из middleware это
+        // 500 на КАЖДЫЙ запрос, а не 401.
+        try {
+          const refreshRes = await fetch(refreshUrl.toString(), {
+            method: "POST",
+            headers: {
+              cookie: request.headers.get("cookie") ?? "",
+            },
+            signal: AbortSignal.timeout(REFRESH_FETCH_TIMEOUT_MS),
+          });
 
-        if (refreshRes.ok) {
-          refreshedSetCookies = readSetCookieHeaders(refreshRes.headers);
-          // LOGIC-22: свежая кука уезжает и ВНУТРЬ — иначе обработчик этого же
-          // запроса продолжит читать протухшую и примет вызывающего за гостя.
-          if (refreshedSetCookies.length > 0) {
-            requestHeaders.set(
-              "cookie",
-              mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies),
-            );
+          if (refreshRes.ok) {
+            refreshedSetCookies = readSetCookieHeaders(refreshRes.headers);
+            // LOGIC-22: свежая кука уезжает и ВНУТРЬ — иначе обработчик этого же
+            // запроса продолжит читать протухшую и примет вызывающего за гостя.
+            if (refreshedSetCookies.length > 0) {
+              requestHeaders.set(
+                "cookie",
+                mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies),
+              );
+            }
           }
+        } catch {
+          // Логгера здесь нет намеренно: `logging/logger.ts` тянет
+          // `async_hooks`, которого нет в edge-рантайме прокси.
+          refreshedSetCookies = [];
         }
       }
     }
