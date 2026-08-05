@@ -22,6 +22,18 @@ export const RATE_LIMITS = {
   // General public API
   publicApi: { windowSeconds: 60, maxRequests: 120 },
 
+  // SEC-04: анонимные прокси к ПЛАТНЫМ API Яндекса (геокодер и suggest). До
+  // фикса их защищал только общий publicApi-тир (120/60с), то есть один IP мог
+  // сжечь ~172 800 платных вызовов в сутки. Тир отдельный, потому что цена
+  // запроса тут не в CPU, а в деньгах, и она не должна зависеть от того, как
+  // когда-нибудь перенастроят общий публичный лимит.
+  // Числа взяты от реального ритма ввода: suggest дебаунсится 220–300 мс и
+  // отменяет предыдущий запрос, то есть один введённый адрес стоит ~10–20
+  // запросов; 60/мин оставляет запас на три-четыре адреса подряд. Геокодер
+  // дёргается только при ВЫБОРЕ подсказки — на порядок реже.
+  addressSuggest: { windowSeconds: 60, maxRequests: 60 },
+  addressGeocode: { windowSeconds: 60, maxRequests: 30 },
+
   // Payment-provider webhook ingress (YooKassa). Isolated from `publicApi` so a
   // future public-API tightening can't starve payment notifications. 300/min per
   // source IP is far above YooKassa's spaced retry cadence (it never floods a

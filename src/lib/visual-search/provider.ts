@@ -38,6 +38,7 @@ const VISION_IMAGE_MAX_SIDE = 512;
 const VISION_IMAGE_QUALITY = 85;
 const EMBEDDING_DIMENSIONS = 256;
 const VISION_TIMEOUT_MS = 30_000;
+const VISION_MAX_TOKENS = 1024;
 const EMBEDDING_TIMEOUT_MS = 30_000;
 
 let visionClient: OpenAI | null = null;
@@ -171,6 +172,11 @@ export async function requestVisionJson(input: {
       {
         model: visionModelUri(),
         temperature: 0.1,
+        // SEC-04: без `max_tokens` единственной границей ответа был таймаут в
+        // 30 с — то есть стоимость одного анонимного запроса не была ограничена
+        // сверху ничем, кроме времени. Ответ здесь всегда компактный JSON
+        // (классификация или описание + meta), 1024 токена дают запас в разы.
+        max_tokens: VISION_MAX_TOKENS,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: input.systemPrompt },

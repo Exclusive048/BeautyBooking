@@ -1,5 +1,10 @@
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
+import {
+  normalizeAddressQuery,
+  readAddressCache,
+  writeAddressCache,
+} from "@/lib/maps/address-cache";
 
 export type AddressSuggestion = {
   value: string;
@@ -51,6 +56,12 @@ export async function suggestAddresses(input: {
   if (query.length < 2) return [];
 
   const limit = clampLimit(input.limit ?? 5);
+
+  // SEC-04: тот же запрос второй раз не должен стоить платного вызова.
+  const cacheParts = [normalizeAddressQuery(query), String(limit)] as const;
+  const cached = await readAddressCache<AddressSuggestion[]>("suggest", cacheParts);
+  if (cached) return cached;
+
   const apiKey = getSuggestKey();
 
   const url = new URL(YANDEX_SUGGEST_URL);
@@ -98,5 +109,7 @@ export async function suggestAddresses(input: {
     if (unique.size >= limit) break;
   }
 
-  return Array.from(unique.values());
+  const suggestions = Array.from(unique.values());
+  await writeAddressCache("suggest", cacheParts, suggestions);
+  return suggestions;
 }

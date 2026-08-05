@@ -94,6 +94,14 @@ describe("vision — Yandex qwen3.6-35b-a3b via AI Studio compat endpoint", () =
     expect(userContent[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
   });
 
+  // SEC-04: до фикса длину ответа ограничивал только таймаут в 30 с, то есть
+  // стоимость одного анонимного vision-запроса не имела верхней границы.
+  it("ставит max_tokens — стоимость ответа ограничена не только таймаутом", async () => {
+    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" });
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.max_tokens).toBe(1024);
+  });
+
   it("parses a valid JSON object response", async () => {
     const result = await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" });
     expect(result).toEqual({ category: "manicure", confidence: "high" });

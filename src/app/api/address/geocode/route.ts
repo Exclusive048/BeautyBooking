@@ -4,6 +4,14 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
 import { env } from "@/lib/env";
+import { getClientIp } from "@/lib/http/ip";
+import {
+  normalizeAddressQuery,
+  readAddressCache,
+  writeAddressCache,
+} from "@/lib/maps/address-cache";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 export const runtime = "nodejs";
 
@@ -44,7 +52,17 @@ function parsePoint(value?: string): { lat: number; lng: number } | null {
   return { lat, lng };
 }
 
-async function geocodeAddress(query: string): Promise<{ lat: number; lng: number } | null> {
+type GeocodeCoords = { lat: number; lng: number };
+
+async function geocodeAddress(query: string): Promise<GeocodeCoords | null> {
+  // SEC-04: повторный геокод того же адреса не должен стоить платного вызова.
+  const cacheParts = [normalizeAddressQuery(query)] as const;
+  const cached = await readAddressCache<{ coords: GeocodeCoords | null }>(
+    "geocode",
+    cacheParts,
+  );
+  if (cached) return cached.coords;
+
   const apiKey = getGeocodeKey();
   const url = new URL(YANDEX_GEOCODE_URL);
   url.searchParams.set("apikey", apiKey);
@@ -77,11 +95,26 @@ async function geocodeAddress(query: string): Promise<{ lat: number; lng: number
 
   const pos =
     payload?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
-  return parsePoint(pos);
+  const coords = parsePoint(pos);
+  // Ненайденный адрес кэшируется тоже — иначе «мусорный» запрос остаётся
+  // платным при каждом повторе. Поэтому значение обёрнуто в объект: `null`
+  // внутри него — это ответ, а `null` из кэша — промах.
+  await writeAddressCache("geocode", cacheParts, { coords });
+  return coords;
 }
 
 export async function GET(req: Request) {
   try {
+    // SEC-04: собственный тир — цена запроса здесь в деньгах, а не в CPU, и
+    // не должна зависеть от настроек общего публичного лимита.
+    const limit = await checkRateLimit(
+      `rl:address:geocode:${getClientIp(req)}`,
+      RATE_LIMITS.addressGeocode,
+    );
+    if (limit.limited) {
+      throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
+    }
+
     const query = parseQuery(new URL(req.url), querySchema);
     const coords = await geocodeAddress(query.q);
     return jsonOk({ coords });
