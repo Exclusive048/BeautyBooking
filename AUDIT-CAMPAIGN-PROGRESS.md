@@ -37,7 +37,7 @@
 | **SEC-04** | P1 | `FIXED` | `48911f2d` | кэш адресных API на сутки + тиры `addressSuggest`/`addressGeocode` + `max_tokens` у vision; 2 части — в BLOCKED (сессия = продуктовое; ключ `ip+providerId` ослабляет лимит) |
 | **SEC-05** | P1 | `FIXED` | `3810a9d9` | `requirePublished` для чужих; своя сторона (владелец + админ студии) сохраняет доступ через `requireProviderOwner` |
 | **SEC-06** | P1 | `FIXED` | `b791fe06` | общий `readValidatedImageUpload` (sniff по байтам + sharp re-encode) в обоих роутах фото карточки; попутно 415 вместо 500 на битом входе |
-| **SEC-07** | P1 | `FIXED` | `6820ac90` + `042d82a9` + `<part3>` | prod-high 21 → 5: sharp/nodemailer/prisma, Next 16.3.0 (изолированно, с прод-билдом и рантайм-смоуком), транзитивные. Остаток — цепочка `next-pwa`→`workbox`, в BLOCKED |
+| **SEC-07** | P1 | `FIXED` | `6820ac90` + `042d82a9` + `0fd503e1` | prod-high 21 → 5: sharp/nodemailer/prisma, Next 16.3.0 (изолированно, с прод-билдом и рантайм-смоуком), транзитивные. Остаток — цепочка `next-pwa`→`workbox`, в BLOCKED |
 | **SEC-08** | P2 | `PENDING` | — | Защита от CSRF однослойная: только `SameSite=Lax`, ни Origin-проверки, ни Content-Type |
 | **SEC-09** | P2 | `PENDING` | — | Мёртвый `POST /api/auth/profile/ensure` воскрешает телефон удалённого аккаунта |
 | **SEC-10** | P2 | `PENDING` | — | `?mt=`-ветка отдачи медиа: только токен, без сессии и без `ensureCanReadMedia` |

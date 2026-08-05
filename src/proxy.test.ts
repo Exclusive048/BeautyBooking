@@ -21,7 +21,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { normalizeOrigin } from "./proxy";
+import { normalizeOrigin, shouldRejectCrossSiteMutation } from "./proxy";
 
 describe("normalizeOrigin — IDN + protocol canonicalization", () => {
   it("normalizes Cyrillic IDN to Punycode form", () => {
@@ -133,5 +133,86 @@ describe("CORS allowlist via normalizeOrigin — both bugs regression-pinned", (
     // Only bare + www are allowed; arbitrary subdomains must NOT be admitted
     expect(isAllowed("https://api.мастеррядом.online")).toBe(false);
     expect(isAllowed("https://admin.мастеррядом.online")).toBe(false);
+  });
+});
+
+/**
+ * SEC-08 — второй слой против CSRF поверх `SameSite=Lax`.
+ *
+ * `SameSite=Lax` закрывает классический межсайтовый CSRF, но НЕ различает
+ * поддомены: любой поддомен `мастеррядом.online` мог делать аутентифицированные
+ * мутации. Ключевой кейс здесь — `sec-fetch-site: same-site`, а не `cross-site`.
+ *
+ * Второе обязательство теста — не сломать server-to-server: вебхук ЮКассы и
+ * cron-эндпоинты не шлют ни `Origin`, ни `Sec-Fetch-Site`, и обязаны проходить.
+ */
+describe("shouldRejectCrossSiteMutation — SEC-08", () => {
+  const base = { origin: null as string | null, originAllowed: false };
+
+  it("поддомен (same-site) отклоняется — это и есть остаточная поверхность Lax", () => {
+    expect(
+      shouldRejectCrossSiteMutation({ ...base, method: "POST", fetchSite: "same-site" }),
+    ).toBe(true);
+  });
+
+  it("чужой сайт (cross-site) отклоняется", () => {
+    for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
+      expect(
+        shouldRejectCrossSiteMutation({ ...base, method, fetchSite: "cross-site" }),
+      ).toBe(true);
+    }
+  });
+
+  it("свой origin и адресная строка проходят", () => {
+    expect(
+      shouldRejectCrossSiteMutation({ ...base, method: "POST", fetchSite: "same-origin" }),
+    ).toBe(false);
+    expect(
+      shouldRejectCrossSiteMutation({ ...base, method: "POST", fetchSite: "none" }),
+    ).toBe(false);
+  });
+
+  it("чтение не трогаем — гейт только на мутациях", () => {
+    for (const method of ["GET", "HEAD", "OPTIONS"]) {
+      expect(
+        shouldRejectCrossSiteMutation({ ...base, method, fetchSite: "cross-site" }),
+      ).toBe(false);
+    }
+  });
+
+  it("server-to-server проходит: ни Origin, ни Sec-Fetch-Site (вебхук ЮКассы, cron)", () => {
+    expect(
+      shouldRejectCrossSiteMutation({ method: "POST", fetchSite: null, origin: null, originAllowed: false }),
+    ).toBe(false);
+  });
+
+  it("запасной сигнал Origin работает, когда Sec-Fetch-Site нет (старый браузер)", () => {
+    expect(
+      shouldRejectCrossSiteMutation({
+        method: "POST",
+        fetchSite: null,
+        origin: "https://evil.example",
+        originAllowed: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRejectCrossSiteMutation({
+        method: "POST",
+        fetchSite: null,
+        origin: "https://мастеррядом.online",
+        originAllowed: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("Sec-Fetch-Site главнее Origin: поддомен не пролезает подделкой allowlist-origin", () => {
+    expect(
+      shouldRejectCrossSiteMutation({
+        method: "POST",
+        fetchSite: "same-site",
+        origin: "https://мастеррядом.online",
+        originAllowed: true,
+      }),
+    ).toBe(true);
   });
 });

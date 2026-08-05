@@ -137,6 +137,45 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
   return "publicApi";
 }
 
+/**
+ * SEC-08 — второй слой защиты от CSRF, рядом с `SameSite=Lax`.
+ *
+ * Куки уже стоят с явным `SameSite=Lax`, поэтому классический межсайтовый
+ * CSRF на POST закрыт. Остаточная поверхность — **same-site, cross-origin**:
+ * `SameSite` не различает поддомены, то есть любой поддомен
+ * `мастеррядом.online` (будущий staging, маркетинговый, скомпрометированный)
+ * делает полноценные аутентифицированные мутации. Второго слоя не было
+ * вообще: ни один мутирующий обработчик не смотрел ни на `Origin`, ни на
+ * `Sec-Fetch-Site`.
+ *
+ * Порядок сигналов важен и выбран под реальный состав трафика:
+ *   1. `Sec-Fetch-Site` — его шлют все актуальные браузеры, и только он
+ *      различает `same-site` (тот самый поддомен) и `same-origin`.
+ *      `none` — это адресная строка/закладка, легитимно.
+ *   2. `Origin` — запасной сигнал для старых браузеров.
+ *   3. **Ни того, ни другого — пропускаем.** Это не дыра, а необходимость:
+ *      так выглядит вебхук ЮКассы, cron-эндпоинты и будущий мобильный
+ *      клиент. Браузер, выполняя межсайтовую мутацию, обязан прислать хотя
+ *      бы один из двух заголовков — то есть класс атаки закрыт, а
+ *      server-to-server не сломан.
+ *
+ * Встраивание в чужую страницу здесь ни при чём: CSP несёт
+ * `frame-ancestors 'none'`, легитимных cross-site мутаций у продукта нет.
+ */
+const CSRF_TRUSTED_FETCH_SITES = new Set(["same-origin", "none"]);
+
+export function shouldRejectCrossSiteMutation(input: {
+  method: string;
+  fetchSite: string | null;
+  origin: string | null;
+  originAllowed: boolean;
+}): boolean {
+  if (!MUTATION_METHODS.has(input.method)) return false;
+  if (input.fetchSite) return !CSRF_TRUSTED_FETCH_SITES.has(input.fetchSite);
+  if (!input.origin) return false;
+  return !input.originAllowed;
+}
+
 function isAccessTokenValid(token: string | undefined): boolean {
   if (!token) return false;
   try {
@@ -185,6 +224,26 @@ export async function proxy(request: NextRequest) {
     if (corsOrigin) setCorsHeaders(preflightResponse, corsOrigin);
     preflightResponse.headers.set("x-request-id", requestId);
     return preflightResponse;
+  }
+
+  // SEC-08: отсекаем ДО обновления сессии — межсайтовая мутация не должна
+  // даже провоцировать ротацию refresh-токена.
+  if (
+    isApiRoute &&
+    shouldRejectCrossSiteMutation({
+      method,
+      fetchSite: request.headers.get("sec-fetch-site"),
+      origin: request.headers.get("origin"),
+      originAllowed: corsOrigin !== null,
+    })
+  ) {
+    return withRequestId(
+      NextResponse.json(
+        { error: "Запрос отклонён: недопустимый источник." },
+        { status: 403 },
+      ),
+      requestId,
+    );
   }
 
   const requestHeaders = new Headers(request.headers);
