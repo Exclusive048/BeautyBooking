@@ -10,9 +10,9 @@
 |---|---|
 | **Дата последнего обновления** | 2026-08-05 |
 | **Ветка** | `audit-fixes` |
-| **Следующая находка** | **RES-03 + RES-13 + RES-15** (P1/P2, чинятся одной правкой — группа названа самим аудитом) — незащищённый post-commit `scheduleBookingReminders`, два публичных роута без `try/catch`, пакетные брони не планируют напоминания |
+| **Следующая находка** | **RES-04** (P1) — `proxy.ts` делает self-fetch в `/api/auth/refresh` без таймаута на каждом запросе с протухшим access-токеном |
 
-**Прогресс: 61 / 157**
+**Прогресс: 64 / 157**
 
 > Колонка `BLOCKED` считает находки целиком. Заблокированные **пункты внутри** починенной находки (у LOGIC-01 это п. 4 «DB-констрейнт» и п. 5 «запрет личного профиля мастеру студии») живут в [`AUDIT-CAMPAIGN-BLOCKED.md`](AUDIT-CAMPAIGN-BLOCKED.md) и в счётчик не входят — иначе сумма по строке превысила бы число находок в файле.
 
@@ -20,10 +20,10 @@
 |---|---:|---:|---:|---:|---:|---:|
 | AUDIT-FRESH-01 — безопасность | 30 | 30 | 0 | 0 | 0 | 0 |
 | AUDIT-FRESH-02 — логика | 30 | 29 | 0 | 1 | 0 | 0 |
-| AUDIT-FRESH-03 — устойчивость | 31 | 2 | 0 | 0 | 0 | 29 |
+| AUDIT-FRESH-03 — устойчивость | 31 | 5 | 0 | 0 | 0 | 26 |
 | AUDIT-FRESH-04 — производительность | 30 | 0 | 0 | 0 | 0 | 30 |
 | AUDIT-FRESH-05 — UI/UX | 36 | 0 | 0 | 0 | 0 | 36 |
-| **Итого** | **157** | **61** | **0** | **1** | **0** | **95** |
+| **Итого** | **157** | **64** | **0** | **1** | **0** | **92** |
 
 > SEC-01 + SEC-02 закрыты одним коммитом `a4b7a41b` (`FIX-SEC-EMAIL-IDENTITY-01`) — он лёг на `main` до создания ветки, поэтому в `git log audit-fixes` он первый.
 
@@ -105,7 +105,7 @@
 |---|---|---|---|---|
 | **RES-01** | P1 | `FIXED` | `e3c01c14` | все команды через существующий `withRedisCommandTimeout`; таймаут = cache-miss для чтения/инвалидации и ОТКАЗ для `setNx`. Тест моделирует «команда не резолвится никогда» — без обёртки он висит до принудительного таймаута vitest. `disableOfflineQueue` не трогал (меняет поведение всех потребителей соединения) |
 | **RES-02** | P1 | `FIXED` | `dc8c2461` | ленивый `getNotificationsNotifier()`: успех кэшируется навсегда, отказ — только на 5 с кулдауна. Runbook `redis-down.md` приведён в соответствие: его пункт «ждать mode=redis» до этого был невыполним без рестарта контейнера |
-| **RES-03** | P1 | `PENDING` | — | `createBooking`: незащищённый post-commit `scheduleBookingReminders` — бронь создана, пользователь видит 500 |
+| **RES-03** | P1 | `FIXED` | `532a9cf7` | единственная пост-коммитная обёртка `scheduleBookingRemindersSafe` вместо копии try/catch на вызывающего; сырой бросающий вызов вне модуля запрещён guard'ом по дереву |
 | **RES-04** | P1 | `PENDING` | — | `proxy.ts` делает self-fetch в `/api/auth/refresh` без таймаута на каждом запросе с протухшим access-токеном |
 | **RES-05** | P1 | `PENDING` | — | SMTP без таймаутов, `await sendEmail` держит ответ — на единственном включённом в проде канале входа |
 | **RES-06** | P1 | `PENDING` | — | Core-роуты без error boundary: белый экран вместо страницы |
@@ -115,9 +115,9 @@
 | **RES-10** | P2 | `PENDING` | — | Геокодер и Suggest без таймаута в request-path** — `src/app/api/address/geocode/route.ts:58`, `src/lib/cities/yandex-locality.ts:98` (оба `fetch(url … |
 | **RES-11** | P2 | `PENDING` | — | `otp-rate-limit.ts` ходит в Redis без command-таймаута** — `src/lib/auth/otp-rate-limit.ts:52-58,60-66` и далее: `client.incr`, `client.expire` … |
 | **RES-12** | P2 | `PENDING` | — | Загрузка портфолио: `try/finally` без `catch`** — `src/features/master/components/portfolio/modals/upload-modal.tsx:124-186`. HTTP-ошибки покрыты … |
-| **RES-13** | P2 | `PENDING` | — | `/api/public/providers/[providerId]/slots` и `.../booking-days` без `try/catch`** — оба в списке 18 роутов без `catch`. Неожиданный throw (ошибка … |
+| **RES-13** | P2 | `FIXED` | `532a9cf7` | оба роута обёрнуты по канону соседнего `/api/masters/[id]/availability`; новой формы ответа не заведено. Остальные 16 роутов из того же списка — в BACKLOG (`PUBLIC-ROUTES-ERROR-ENVELOPE-SWEEP`) |
 | **RES-14** | P2 | `PENDING` | — | Напоминания о брони существуют только в очереди — восстановления нет** — `scheduleBookingReminders` вызывается ровно в трёх местах … |
-| **RES-15** | P2 | `PENDING` | — | Пакетные брони не планируют напоминания вообще** — `grep -n scheduleBookingReminders src/lib/bookings/package-booking*.ts` → 0 хитов, при том что … |
+| **RES-15** | P2 | `FIXED` | `532a9cf7` | планировщик на КАЖДЫЙ компонент (компоненты бывают в разные дни — одна задача на пакет покрыла бы один), дедупликация по самой брони |
 | **RES-16** | P2 | `PENDING` | — | Нет `stop_grace_period` — SIGTERM убивает воркер через 10 c** — `grep stop_grace_period docker-compose.prod.yml` → пусто, значит docker-дефолт 10 c … |
 | **RES-17** | P2 | `PENDING` | — | Boundary `(public)`/`(cabinet)`/`(admin)` не репортят в GlitchTip** — три сегментных `error.tsx` шлют только `POST /api/log-error`, а … |
 | **RES-18** | P2 | `PENDING` | — | Нет глобальной системы тостов; 13 `window.alert()` вместо неё** — ни `sonner`, ни `react-hot-toast`, ни `<Toaster>`, ни файла `*toast*` в `src/` … |
