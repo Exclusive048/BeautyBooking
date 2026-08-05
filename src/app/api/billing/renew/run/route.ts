@@ -9,7 +9,11 @@ import { priceOptInDeadline, shouldEnterPriceOptIn } from "@/lib/billing/price-o
 import { processPriceOptInReminders } from "@/lib/billing/price-optin-cron";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
-import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
+import {
+  formatBillingDeadlineLabel,
+  resolveSubscriptionTimezone,
+} from "@/lib/billing/deadline-label";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { NotificationType, Prisma } from "@prisma/client";
 import * as cache from "@/lib/cache/cache";
@@ -365,7 +369,11 @@ async function runBillingCron() {
         title: UI_TEXT.billing.priceOptIn.startedTitle,
         body: UI_TEXT.billing.priceOptIn.startedBody(
           moneyRUBFromKopeks(resolvedPriceKopeks),
-          dateRU(deadline),
+          formatBillingDeadlineLabel(
+            deadline,
+            // LOGIC-25: salon-tz кабинета, а не ambient-tz процесса.
+            await resolveSubscriptionTimezone(subscription.userId, subscription.scope),
+          ),
         ),
         payloadJson: {
           scope: subscription.scope,
