@@ -34,6 +34,12 @@ export const RATE_LIMITS = {
   addressSuggest: { windowSeconds: 60, maxRequests: 60 },
   addressGeocode: { windowSeconds: 60, maxRequests: 30 },
 
+  // SEC-15: лента горячих слотов — самый дорогой анонимный обработчик:
+  // вложенный цикл «провайдеры × услуги × до 14 дней» на каждый промах кэша.
+  // Общий publicApi (120/мин) не отражает эту асимметрию, а варьируя `from`,
+  // мимо кэша можно промахиваться намеренно.
+  hotSlotsFeed: { windowSeconds: 60, maxRequests: 30 },
+
   // Payment-provider webhook ingress (YooKassa). Isolated from `publicApi` so a
   // future public-API tightening can't starve payment notifications. 300/min per
   // source IP is far above YooKassa's spaced retry cadence (it never floods a
