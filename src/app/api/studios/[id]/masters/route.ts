@@ -15,6 +15,13 @@ import { ensureStudioAdmin } from "@/lib/studios/access";
  * accepting user's own phone (`hasInvitePhoneAccess`) before calling
  * `attachMasterToStudio` internally. The primitive is intentionally kept for
  * that consented path; only this unconsented HTTP surface is gone.
+ *
+ * SEC-27: the null-permissive branch this comment describes is gone too. The
+ * primitive now asks the DB for a master that is free or already in THIS studio
+ * (`OR: [{ studioId: null }, { studioId }]`) and repeats that state in the
+ * write's `where`, so the rule can no longer be misread as a branch — nor lost
+ * to a race. Consent itself still lives with the invite flow, not the primitive
+ * (`STUDIO-ATTACH-CONSENT-CONTRACT` in BACKLOG).
  */
 
 const detachSchema = z.object({
