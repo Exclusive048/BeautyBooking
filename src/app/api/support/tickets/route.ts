@@ -10,6 +10,7 @@ import { extractClientIp } from "@/lib/http/ip";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import { normalizeSupportContact } from "@/lib/support/contact-shared";
+import { SMTP_TIMEOUTS } from "@/lib/email/sender";
 import { extractSmtpErrorDetails, maskSmtpIdentity, normalizeSmtpAddressList } from "@/lib/support/smtp";
 import {
   getSupportAttachmentValidationMessage,
@@ -335,6 +336,9 @@ export async function POST(req: Request) {
       user: normalizedSmtpUser.value,
       pass: smtpPass,
     },
+    // RES-05: границы — общие с `lib/email/sender.ts`, второго набора значений
+    // быть не должно (дефолты nodemailer держат сокет 10 минут).
+    ...SMTP_TIMEOUTS,
   });
 
   const safeTitle = data.title.replace(/\s+/g, " ").trim().slice(0, 120);
@@ -352,35 +356,12 @@ export async function POST(req: Request) {
     createdAt,
   });
 
-  try {
-    await transporter.verify();
-  } catch (error) {
-    const smtpError = extractSmtpErrorDetails(error);
-    logError("Support ticket SMTP verify failed", {
-      requestId,
-      route,
-      phase: "verify",
-      errorKind: smtpError.errorKind,
-      errorMessage: smtpError.errorMessage,
-      errorCode: smtpError.errorCode,
-      responseCode: smtpError.responseCode,
-      command: smtpError.command,
-      errorName: smtpError.name,
-      response: smtpError.response,
-      ...smtpDiagnostics,
-      type: data.type,
-      titleLength: data.title.length,
-      descriptionLength: data.description.length,
-      ...attachmentDiagnostics,
-      pageUrl: safePageForLog(pageUrl),
-      userId,
-      ip,
-      contactPresent: Boolean(contact),
-      contactLength: contact?.length ?? 0,
-      contactSource,
-    });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
-  }
+  // RES-05: `transporter.verify()` отсюда убран. Это был ПОЛНЫЙ второй
+  // SMTP-сеанс (connect + TLS + AUTH) перед каждой отправкой, то есть удвоение
+  // ожидания на пути, который пользователь ждёт синхронно. Диагностика не
+  // теряется: отказ соединения/аутентификации всплывает из `sendMail` через
+  // тот же `extractSmtpErrorDetails` и тот же набор полей — отличается только
+  // `phase`.
 
   try {
     const attachments = attachment

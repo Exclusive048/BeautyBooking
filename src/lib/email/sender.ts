@@ -10,6 +10,28 @@ type MailOptions = {
   text?: string;
 };
 
+/**
+ * RES-05 — верхние границы SMTP-сессии. ЕДИНСТВЕННЫЙ источник для всех
+ * транспортов проекта (этот + оба support-роута, которые строят свой).
+ *
+ * Дефолты nodemailer здесь не «щедрые», а несовместимые с интерактивным
+ * запросом: connect 2 мин, greeting 30 с, **socket 10 мин**. Отправка стоит
+ * в горячем пути входа — `await sendEmail` держит ответ, а UI переключает шаг
+ * на OTP-код только по нему. Поскольку в проде phone-OTP выключен tri-state'ом
+ * (`PHONE_AUTH_ENABLED`), email — единственный рабочий канал входа: зависший
+ * SMTP означает не «письмо позже», а «войти нельзя», причём с крутящейся
+ * кнопкой на десять минут.
+ *
+ * Значения: 5 с на соединение и приветствие (SMTP-хост в той же сети или
+ * рядом — секунды это уже аномалия), 10 с на сокет — письмо с вложением
+ * поддержки легитимно дольше рукопожатия.
+ */
+export const SMTP_TIMEOUTS = {
+  connectionTimeout: 5_000,
+  greetingTimeout: 5_000,
+  socketTimeout: 10_000,
+} as const;
+
 function buildTransporter() {
   const host = env.SMTP_HOST;
   const user = env.SMTP_USER;
@@ -21,6 +43,7 @@ function buildTransporter() {
     port,
     secure: port === 465,
     auth: { user, pass },
+    ...SMTP_TIMEOUTS,
   });
 }
 

@@ -7,6 +7,7 @@ import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { extractClientIp } from "@/lib/http/ip";
+import { SMTP_TIMEOUTS } from "@/lib/email/sender";
 import {
   extractSmtpErrorDetails,
   maskSmtpIdentity,
@@ -208,6 +209,9 @@ export async function POST(req: Request) {
       user: normalizedSmtpUser.value,
       pass: smtpPass,
     },
+    // RES-05: границы — общие с `lib/email/sender.ts`, второго набора значений
+    // быть не должно (дефолты nodemailer держат сокет 10 минут).
+    ...SMTP_TIMEOUTS,
   });
 
   const createdAt = new Date();
@@ -239,22 +243,12 @@ export async function POST(req: Request) {
     secure,
   };
 
-  try {
-    await transporter.verify();
-  } catch (error) {
-    const smtpError = extractSmtpErrorDetails(error);
-    logError("Partnership SMTP verify failed", {
-      requestId,
-      route,
-      phase: "verify",
-      errorKind: smtpError.errorKind,
-      errorMessage: smtpError.errorMessage,
-      ...smtpDiagnostics,
-      kind: data.kind,
-      ip,
-    });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
-  }
+  // RES-05: `transporter.verify()` отсюда убран. Это был ПОЛНЫЙ второй
+  // SMTP-сеанс (connect + TLS + AUTH) перед каждой отправкой, то есть удвоение
+  // ожидания на пути, который пользователь ждёт синхронно. Диагностика не
+  // теряется: отказ соединения/аутентификации всплывает из `sendMail` через
+  // тот же `extractSmtpErrorDetails` и тот же набор полей — отличается только
+  // `phase`.
 
   try {
     await transporter.sendMail({
