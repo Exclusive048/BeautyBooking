@@ -28,6 +28,7 @@ import {
 } from "@/lib/schedule/editor-shared";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
 
 /**
  * Server-only orchestration for schedule edits. The pure types/helpers
@@ -173,6 +174,9 @@ async function saveException(providerId: string, input: EditorExceptionInput): P
   const date = parseDateKeyToUtcStart(input.date);
   const existing = await prisma.scheduleOverride.findFirst({
     where: { providerId, date },
+    // LOGIC-11: писатель обязан править ТУ ЖЕ строку, которую читают
+    // потребители, иначе правка уходит в невидимый дубль.
+    orderBy: SCHEDULE_OVERRIDE_PICK_ORDER,
     select: { id: true },
   });
 

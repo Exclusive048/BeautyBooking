@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { MasterWorkWindow } from "@/lib/bookings/policy-enforcement";
 import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
 import { timeToMinutes } from "@/lib/schedule/time";
+import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
 
 /**
  * LOGIC-03 — резолвер рабочего окна мастера, вынесенный из
@@ -62,6 +63,9 @@ export async function resolveMasterWorkWindow(
   const [override, weeklyDay] = await Promise.all([
     prisma.scheduleOverride.findFirst({
       where: { providerId: masterProviderId, date: overrideDate },
+      // LOGIC-11: без порядка guard брал произвольную из дублей, а движок —
+      // свою; общий канон сводит их на одну строку.
+      orderBy: SCHEDULE_OVERRIDE_PICK_ORDER,
       include: { template: { select: { startLocal: true, endLocal: true } } },
     }),
     prisma.weeklyScheduleDay.findFirst({

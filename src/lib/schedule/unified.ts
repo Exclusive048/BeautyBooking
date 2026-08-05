@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
+import {
+  SCHEDULE_OVERRIDE_PICK_ORDER,
+  SCHEDULE_OVERRIDE_RANGE_ORDER,
+} from "@/lib/schedule/override-order";
 
 export type ScheduleBreakInput = {
   startLocal: string;
@@ -389,7 +393,7 @@ export async function listScheduleOverrides(providerId: string, month: string): 
   const range = parseMonthKey(month);
   const overrides = await prisma.scheduleOverride.findMany({
     where: { providerId, date: { gte: range.from, lt: range.toExclusive } },
-    orderBy: { date: "asc" },
+    orderBy: SCHEDULE_OVERRIDE_RANGE_ORDER, // LOGIC-11
     select: {
       date: true,
       kind: true,
@@ -463,6 +467,7 @@ export async function upsertScheduleOverride(
 
   const existing = await prisma.scheduleOverride.findFirst({
     where: { providerId, date },
+    orderBy: SCHEDULE_OVERRIDE_PICK_ORDER, // LOGIC-11
     select: { id: true },
   });
 
@@ -755,6 +760,7 @@ export async function applySchedulePayload(providerId: string, payload: Schedule
 
       const existing = await tx.scheduleOverride.findFirst({
         where: { providerId, date: overrideDate },
+        orderBy: SCHEDULE_OVERRIDE_PICK_ORDER, // LOGIC-11
         select: { id: true },
       });
 

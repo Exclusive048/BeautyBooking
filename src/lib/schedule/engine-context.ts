@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { resolvePublishedUntilLocal } from "@/lib/schedule/publish-horizon";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { SCHEDULE_OVERRIDE_RANGE_ORDER } from "@/lib/schedule/override-order";
 import type { DayOfWeek, ScheduleBreakInterval } from "@/lib/domain/schedule";
 
 type ScheduleVersion = {
@@ -249,6 +250,9 @@ export async function createScheduleContext(input: {
     // combined tuple promise from RSC flight serialization. Engine output identical.
     const overrideRows = await prisma.scheduleOverride.findMany({
       where: { providerId: provider.id, date: { gte: fromUtc, lt: toUtcExclusive } },
+      // LOGIC-11: движок берёт ПЕРВОЕ совпадение по дате (`findOverrideForDate`),
+      // поэтому канонической строке надо стоять первой в своей дате.
+      orderBy: SCHEDULE_OVERRIDE_RANGE_ORDER,
       select: {
         date: true,
         kind: true,

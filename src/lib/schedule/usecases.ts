@@ -28,6 +28,7 @@ import {
 import { createScheduleContext } from "@/lib/schedule/engine-context";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 import { bucketRangesByDateKey, loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
+import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
 
 type RangeInput = {
   from: Date;
@@ -151,6 +152,7 @@ export async function setScheduleOverride(
   const breaks = validated.data.breaks ?? undefined;
   const existing = await prisma.scheduleOverride.findFirst({
     where: { providerId, date },
+    orderBy: SCHEDULE_OVERRIDE_PICK_ORDER, // LOGIC-11
   });
 
   const ops: Prisma.PrismaPromise<unknown>[] = [
