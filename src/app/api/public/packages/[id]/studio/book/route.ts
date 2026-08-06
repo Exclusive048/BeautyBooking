@@ -10,7 +10,7 @@ import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
-import { consentFlagsSchema } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 import { assertRequiredConsents, recordGuestConsents } from "@/lib/legal/consent";
 
 /**

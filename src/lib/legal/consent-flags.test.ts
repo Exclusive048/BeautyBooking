@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   consentFlagsFromParams,
-  consentFlagsSchema,
   consentFlagsToQuery,
   hasRequiredConsents,
   parseConsentFlags,
   serializeConsentFlags,
   EMPTY_CONSENT_FLAGS,
 } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 
 /**
  * RKN-FIX-01 — the flag contract shared by the login form, the OTP routes and

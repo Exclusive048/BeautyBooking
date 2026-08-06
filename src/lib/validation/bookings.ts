@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { consentFlagsSchema } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 
 const dateString = z
   .string()
