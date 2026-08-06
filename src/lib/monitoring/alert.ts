@@ -4,6 +4,18 @@ import { logError } from "@/lib/logging/logger";
 export type AlertLevel = "critical" | "error" | "warning";
 export type AlertContext = Record<string, unknown>;
 
+/**
+ * RES-23. Верхняя граница исходящего запроса к Telegram Bot API.
+ *
+ * Вызов идёт через `void` из `logError`, то есть запрос пользователя он не
+ * держит — но и не отпускает сокет: без границы каждая запись об ошибке
+ * оставляет висящее соединение undici, а «много ошибок» — это ровно тот режим,
+ * ради которого канал и существует. 5 с, а не 10, как у платёжных/OAuth-вызовов:
+ * доставка алерта best-effort и никого не блокирует, поэтому здесь важнее
+ * быстро освободить сокет, чем дождаться ответа.
+ */
+const ALERT_REQUEST_TIMEOUT_MS = 5_000;
+
 const LEVEL_LABELS: Record<AlertLevel, { emoji: string; label: string }> = {
   critical: { emoji: "🚨", label: "CRITICAL" },
   error: { emoji: "⚠️", label: "ERROR" },
@@ -73,6 +85,7 @@ export async function sendAlert(
         text: parts.join("\n"),
         parse_mode: "HTML",
       }),
+      signal: AbortSignal.timeout(ALERT_REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
