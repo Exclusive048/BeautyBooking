@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { Image as ImageIcon, Info, List, Star } from "lucide-react";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -49,7 +50,7 @@ export function SectionNav() {
     const el = document.getElementById(id);
     if (!el) return;
     const y = el.getBoundingClientRect().top + window.scrollY - 80;
-    window.scrollTo({ top: y, behavior: "smooth" });
+    window.scrollTo({ top: y, behavior: scrollBehavior() });
   }
 
   return (

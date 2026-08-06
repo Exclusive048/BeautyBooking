@@ -24,6 +24,7 @@ import type { CatalogSort } from "@/lib/catalog/schemas";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
 import { getCurrentCitySlug } from "@/lib/cities/client-city";
 import { providerPublicUrl } from "@/lib/public-urls";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
 
@@ -918,7 +919,7 @@ export default function CatalogPageClient({
                 onChange={(next) => {
                   updateParams({ page: next > 1 ? String(next) : null });
                   if (typeof window !== "undefined") {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
+                    window.scrollTo({ top: 0, behavior: scrollBehavior() });
                   }
                 }}
               />

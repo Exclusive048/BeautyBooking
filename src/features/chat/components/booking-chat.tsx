@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationEvent } from "@/lib/notifications/types";
 
@@ -137,7 +138,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
 
   useEffect(() => {
     if (!isAtBottom) return;
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    endRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "end" });
   }, [isAtBottom, messages.length]);
 
   const handleScroll = () => {

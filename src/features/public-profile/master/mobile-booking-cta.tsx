@@ -1,5 +1,6 @@
 "use client";
 
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const BOOKING_OPEN_SHEET_EVENT = "booking:open-sheet";
@@ -12,7 +13,7 @@ export function MobileBookingCta() {
     const el = document.getElementById("booking");
     if (el) {
       const y = el.getBoundingClientRect().top + window.scrollY - 16;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y, behavior: scrollBehavior() });
     }
   }
 

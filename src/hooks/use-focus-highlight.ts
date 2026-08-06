@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { scrollBehavior } from "@/lib/ui/scroll";
 
 /**
  * FIX-R2-06-B — shared deep-link focus reader for the booking/review-list
@@ -56,13 +57,12 @@ export function useFocusHighlight(readySignal?: unknown): void {
       const target = document.querySelector<HTMLElement>(`[data-focus-id="${escaped}"]`);
       if (!target) return; // graceful: id not on this page → no-op
 
-      const prefersReduced =
-        typeof window !== "undefined" &&
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
+      // UI-11: гейт был написан здесь верно и ТОЛЬКО здесь — остальные шесть
+      // программных прокруток продукта жили с литералом. Инлайн заменён на
+      // общий `scrollBehavior()`, чтобы правило имело одну реализацию, а не
+      // одну правильную копию и шесть отсутствующих.
       target.scrollIntoView({
-        behavior: prefersReduced ? "auto" : "smooth",
+        behavior: scrollBehavior(),
         block: "center",
       });
 

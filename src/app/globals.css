@@ -280,7 +280,19 @@
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
 
-  html { scroll-behavior: smooth; }
+  /* UI-11 — плавная прокрутка включается ПО РАЗРЕШЕНИЮ, а не отключается по
+     запрету. Форма `no-preference` — идиома этого файла (три существующих
+     блока) и она строго безопаснее `reduce`: браузер, который медиазапрос
+     не поддерживает, не матчит `no-preference` и остаётся на мгновенной
+     прокрутке, тогда как отмена через `reduce` в нём просто не сработает.
+     ⚠️ Это правило покрывает якорные переходы и вызовы БЕЗ явного
+     `behavior`; программные прокрутки с `behavior: "smooth"` перекрывают
+     CSS по спецификации и гейтятся отдельно — `lib/ui/scroll.ts`. */
+  html { scroll-behavior: auto; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
   body { -webkit-overflow-scrolling: touch; }
   a, button { -webkit-user-select: none; user-select: none; }
 }
