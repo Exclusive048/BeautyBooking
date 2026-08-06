@@ -3,6 +3,7 @@ import * as cache from "@/lib/cache/cache";
 import { listDateKeysExclusive } from "@/lib/schedule/dateKey";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { invalidateScheduleVersion } from "@/lib/schedule/schedule-version-cache";
 import { enqueueAvailableTodayRecompute } from "@/lib/schedule/available-today-recompute-enqueue";
 
 const SLOTS_TTL_SECONDS = 120;
@@ -57,6 +58,11 @@ export async function setCachedSlotsForDate(input: {
 export async function invalidateSlotsForMaster(masterId: string): Promise<void> {
   await Promise.all([
     cache.delByPattern(`slots:${masterId}:*`),
+    // PERF-04: `scheduleVersion` кэшируется (он же — часть ключа выше), и
+    // сбрасывается ровно здесь: этот вызов и есть «расписание изменилось».
+    // Порядок с `delByPattern` не важен — ключи разные, а любой промах по
+    // версии заканчивается полным пересчётом.
+    invalidateScheduleVersion(masterId),
     invalidateAdvisorCache(masterId),
   ]);
   // CATALOG-AVAILABLE-TODAY Phase 4: a schedule/day-off edit for this master

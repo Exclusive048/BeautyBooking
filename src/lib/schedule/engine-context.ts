@@ -5,6 +5,10 @@ import { resolvePublishedUntilLocal } from "@/lib/schedule/publish-horizon";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { SCHEDULE_OVERRIDE_RANGE_ORDER } from "@/lib/schedule/override-order";
+import {
+  readCachedScheduleVersion,
+  writeCachedScheduleVersion,
+} from "@/lib/schedule/schedule-version-cache";
 import type { DayOfWeek, ScheduleBreakInterval } from "@/lib/domain/schedule";
 
 type ScheduleVersion = {
@@ -122,6 +126,13 @@ function dateKeyToUtcStart(dateKey: string): Date {
 }
 
 async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion> {
+  // PERF-04: пять операторов ниже вычисляют ключ кэша, а не ответ, — поэтому
+  // они шли и при попадании в кэш тоже. Сброс — явный, из
+  // `invalidateSlotsForMaster`; TTL здесь только верхняя граница на случай
+  // пропущенной инвалидации, и он равен TTL самих слотов.
+  const cached = await readCachedScheduleVersion(masterId);
+  if (cached) return cached;
+
   const [provider, overrideMax, overrideBreakMax, templateMax, weeklyConfigMax] =
     await prisma.$transaction([
     prisma.provider.findUnique({
@@ -155,7 +166,9 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
   ]);
 
   const value = latest ? String(latest.getTime()) : "0";
-  return { value, updatedAt: latest };
+  const version: ScheduleVersion = { value, updatedAt: latest };
+  await writeCachedScheduleVersion(masterId, version);
+  return version;
 }
 
 export async function getScheduleWindow(masterId: string, timeZone: string): Promise<ScheduleWindow> {
@@ -176,17 +189,33 @@ export async function createScheduleContext(input: {
   providerId: string;
   timezoneHint?: string;
   range?: { fromKey: string; toKeyExclusive: string };
+  /**
+   * PERF-04. Вызывающий, который УЖЕ прочитал провайдера и разрешил окно
+   * расписания (`listAvailabilitySlotsPaginated` обязан сделать это до
+   * контекста — из окна строится ключ слот-кэша), передаёт их сюда, а не
+   * заставляет перечитывать. Поле всё-или-ничего намеренно: разрешать
+   * половину значило бы завести состояние «окно от одной версии, контекст от
+   * другой», а ключ, по которому слоты ЧИТАЮТСЯ, обязан совпасть с ключом, по
+   * которому они ПИШУТСЯ.
+   */
+  prefetched?: {
+    provider: { id: string; timezone: string };
+    scheduleWindow: ScheduleWindow;
+  };
 }): Promise<ScheduleContext> {
-  const provider = await prisma.provider.findUnique({
-    where: { id: input.providerId },
-    select: { id: true, timezone: true },
-  });
+  const provider =
+    input.prefetched?.provider ??
+    (await prisma.provider.findUnique({
+      where: { id: input.providerId },
+      select: { id: true, timezone: true },
+    }));
   if (!provider) {
     throw new AppError("Профиль не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   const timezone = normalizeTimezone(input.timezoneHint, provider.timezone);
-  const scheduleWindow = await getScheduleWindow(provider.id, timezone);
+  const scheduleWindow =
+    input.prefetched?.scheduleWindow ?? (await getScheduleWindow(provider.id, timezone));
 
   // RULE-12-SCHEDULE (FIX-19): these are read-only schedule loads. They were a
   // `prisma.$transaction([...])` whose raw row results (with the WeeklyScheduleConfig
