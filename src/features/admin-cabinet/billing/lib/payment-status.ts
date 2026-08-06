@@ -32,9 +32,9 @@ export function paymentStatusDisplay(
 }
 
 export const PAYMENT_STATUS_TONE_CLASS: Record<PaymentStatusTone, string> = {
-  success: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  warning: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
-  destructive: "bg-red-500/12 text-red-700 dark:text-red-300",
+  success: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
+  warning: "bg-amber-500/[0.12] text-amber-700 dark:text-amber-300",
+  destructive: "bg-red-500/[0.12] text-red-700 dark:text-red-300",
   muted: "bg-bg-input text-text-sec",
-  info: "bg-primary/12 text-accent-text",
+  info: "bg-primary/[0.12] text-accent-text",
 };

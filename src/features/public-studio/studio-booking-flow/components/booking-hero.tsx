@@ -101,7 +101,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         </div>
 
         {prefilledMaster ? (
-          <div className="flex items-center gap-3 rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 to-amber-400/8 px-3 py-2.5">
+          <div className="flex items-center gap-3 rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 to-amber-400/[0.08] px-3 py-2.5">
             <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-sm font-semibold text-white" aria-hidden>
               {prefilledMaster.name.charAt(0).toUpperCase()}
             </div>

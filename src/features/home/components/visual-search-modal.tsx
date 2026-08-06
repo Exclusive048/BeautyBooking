@@ -146,7 +146,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-accent/12 ring-1 ring-brand-accent/20">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-accent/[0.12] ring-1 ring-brand-accent/20">
               <Sparkles className="h-4 w-4 text-brand-accent" />
             </div>
             <div>
@@ -252,7 +252,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
 
           {/* Error */}
           {error && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-red-500/15 bg-red-500/6 px-3.5 py-2.5">
+            <div className="flex items-start gap-2.5 rounded-xl border border-red-500/15 bg-red-500/[0.06] px-3.5 py-2.5">
               <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
               <p className="text-xs leading-relaxed text-red-300/90">{error}</p>
             </div>
@@ -291,7 +291,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
               {/* Category label */}
               <div className="flex items-center gap-2">
                 <div className="h-px flex-1 bg-border-subtle" />
-                <span className="flex items-center gap-1.5 rounded-full border border-brand-accent/20 bg-brand-accent/8 px-3 py-1 text-[11px] font-medium text-brand-accent">
+                <span className="flex items-center gap-1.5 rounded-full border border-brand-accent/20 bg-brand-accent/[0.08] px-3 py-1 text-[11px] font-medium text-brand-accent">
                   <Sparkles className="h-3 w-3" />
                   {UI_TEXT.home.visualSearch.searchingCategory.replace(
                     "{category}",

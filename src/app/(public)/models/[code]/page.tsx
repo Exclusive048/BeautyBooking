@@ -61,7 +61,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
     <div className="min-h-dvh bg-background">
       {/* Subtle hero gradient */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-pink-500/6 via-purple-500/3 to-transparent dark:from-pink-500/4 dark:via-purple-500/2"
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-pink-500/[0.06] via-purple-500/[0.03] to-transparent dark:from-pink-500/[0.04] dark:via-purple-500/[0.02]"
         aria-hidden
       />
 

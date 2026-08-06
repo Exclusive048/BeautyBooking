@@ -48,11 +48,11 @@ export function HeroSection({ eyebrow, title, description, cta, decoration }: Pr
       {/* Soft brand glow — same recipe as homepage hero */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-primary/8 blur-3xl dark:bg-primary/12"
+        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-primary-magenta/8 blur-3xl dark:bg-primary-magenta/12"
+        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-primary-magenta/[0.08] blur-3xl dark:bg-primary-magenta/[0.12]"
       />
 
       <div

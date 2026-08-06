@@ -91,7 +91,7 @@ export function VkNotificationsSection({
 
   if (loading) {
     return (
-      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/4 p-4 text-sm text-text-sec"}>
+      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/[0.04] p-4 text-sm text-text-sec"}>
         {UI_TEXT.common.loading}
       </div>
     );
@@ -104,7 +104,7 @@ export function VkNotificationsSection({
   const connectText = connectLabel ?? UI_TEXT.settings.vk.connect;
 
   return (
-    <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
+    <div className={embedded ? "p-4" : "rounded-2xl bg-white/[0.04] p-4"}>
       <div className="flex items-center justify-between gap-3">
         {leadingIcon ? <div className="shrink-0">{leadingIcon}</div> : null}
         <div className="min-w-0 flex-1">

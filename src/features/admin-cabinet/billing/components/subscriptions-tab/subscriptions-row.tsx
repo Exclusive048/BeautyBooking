@@ -21,8 +21,8 @@ const DATE_FMT = new Intl.DateTimeFormat("ru-RU", {
 
 const TIER_TONE: Record<PlanTier, string> = {
   [PlanTier.FREE]: "bg-bg-input text-text-sec",
-  [PlanTier.PRO]: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  [PlanTier.PREMIUM]: "bg-primary/12 text-accent-text",
+  [PlanTier.PRO]: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
+  [PlanTier.PREMIUM]: "bg-primary/[0.12] text-accent-text",
 };
 
 const STATUS_LABEL: Record<SubscriptionStatus, string> = {
@@ -91,7 +91,7 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
           className={cn(
             "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide",
             row.autoRenew
-              ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
+              ? "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300"
               : "bg-bg-input text-text-sec",
           )}
         >

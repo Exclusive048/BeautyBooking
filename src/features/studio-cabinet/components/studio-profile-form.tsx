@@ -35,7 +35,7 @@ type Props = {
 };
 
 const inputClass =
-  "border border-white/10 bg-white/6 focus-visible:border-white/20 focus-visible:ring-0";
+  "border border-white/10 bg-white/[0.06] focus-visible:border-white/20 focus-visible:ring-0";
 
 export function StudioProfileForm({
   name,

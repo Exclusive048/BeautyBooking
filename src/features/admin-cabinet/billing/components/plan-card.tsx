@@ -29,7 +29,7 @@ export function PlanCardView({ plan, onEdit }: Props) {
       className={cn(
         "relative flex flex-col rounded-2xl border p-5 shadow-card",
         plan.isFeatured
-          ? "border-primary/40 bg-gradient-to-br from-primary/8 via-bg-card to-bg-card"
+          ? "border-primary/40 bg-gradient-to-br from-primary/[0.08] via-bg-card to-bg-card"
           : "border-border-subtle bg-bg-card",
         !plan.isActive && "opacity-60",
       )}

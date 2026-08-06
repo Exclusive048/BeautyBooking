@@ -11,8 +11,8 @@ const T = UI_TEXT.adminPanel.users.plan;
 
 const TIER_TONE: Record<PlanTier, string> = {
   [PlanTier.FREE]: "bg-bg-input text-text-sec",
-  [PlanTier.PRO]: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  [PlanTier.PREMIUM]: "bg-primary/12 text-accent-text",
+  [PlanTier.PRO]: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
+  [PlanTier.PREMIUM]: "bg-primary/[0.12] text-accent-text",
 };
 
 type Props = {

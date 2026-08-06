@@ -117,7 +117,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-white/8 hover:text-text-main"
+            className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-white/[0.08] hover:text-text-main"
             title={settingsText.publicLink.open}
             aria-label={settingsText.publicLink.open}
           >

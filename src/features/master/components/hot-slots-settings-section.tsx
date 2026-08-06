@@ -120,7 +120,7 @@ export function HotSlotsSettingsSection({
 
   if (loading) {
     return (
-      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/4 p-4 text-sm text-text-sec"}>
+      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/[0.04] p-4 text-sm text-text-sec"}>
         {UI_TEXT.common.loading}
       </div>
     );
@@ -128,7 +128,7 @@ export function HotSlotsSettingsSection({
 
   if (!rule) {
     return (
-      <div className={embedded ? "p-4" : "rounded-2xl bg-white/4 p-4"}>
+      <div className={embedded ? "p-4" : "rounded-2xl bg-white/[0.04] p-4"}>
         <p className="text-sm text-text-sec">{text.unavailable}</p>
         {error ? <p className="mt-2 text-xs text-rose-400">{error}</p> : null}
       </div>
@@ -143,7 +143,7 @@ export function HotSlotsSettingsSection({
   };
 
   return (
-    <div className={embedded ? "space-y-4 p-4" : "space-y-4 rounded-2xl bg-white/4 p-4"}>
+    <div className={embedded ? "space-y-4 p-4" : "space-y-4 rounded-2xl bg-white/[0.04] p-4"}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium">{text.title}</p>
@@ -266,7 +266,7 @@ export function HotSlotsSettingsSection({
         ) : null}
 
         {rule.applyMode === "MANUAL" ? (
-          <div className="mt-2 w-full min-w-0 rounded-xl bg-white/6 p-3">
+          <div className="mt-2 w-full min-w-0 rounded-xl bg-white/[0.06] p-3">
             {enabledServices.length === 0 ? (
               <p className="text-xs text-text-sec">{text.noServices}</p>
             ) : (
