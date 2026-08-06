@@ -29,7 +29,7 @@ const T = UI_TEXT.faq;
 
 export default function FaqPage() {
   return (
-    <main className="bg-bg-page">
+    <div className="bg-bg-page">
       {/* JSON-LD FAQPage schema for Rich Snippets in Google/Yandex search */}
       <script
         type="application/ld+json"
@@ -86,6 +86,6 @@ export default function FaqPage() {
           <Link href="/support">{T.cta.supportButton}</Link>
         </Button>
       </section>
-    </main>
+    </div>
   );
 }

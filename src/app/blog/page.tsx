@@ -12,7 +12,7 @@ const COMING_SOON_POSTS = UI_TEXT.pages.blog.comingSoonPosts;
 
 export default function BlogPage() {
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-12 md:py-20 space-y-12">
+    <div className="mx-auto max-w-[900px] px-4 py-12 md:py-20 space-y-12">
       <InfoPageLayout breadcrumb={UI_TEXT.pages.blog.navLabel}>
 
         {/* Hero */}
@@ -61,6 +61,6 @@ export default function BlogPage() {
         </section>
 
       </InfoPageLayout>
-    </main>
+    </div>
   );
 }
