@@ -45,14 +45,17 @@
        TEXT / icons use this; FILLS (buttons/chips/gradient) stay on --primary. */
     --accent-text: 114 8 8;          /* #720808 burgundy — matches light --primary */
 
-    /* === Secondary accents (for badges, alerts) === */
-    --rose: 254 198 211;             /* #FEC6D3 baby pink */
-    --sky:  186 212 237;             /* #BAD4ED powder blue */
+    /* UI-06: здесь жили `--rose` / `--sky` — токены-призраки. Потребителей у
+       них не было ни одного (`var(--rose)` не встречается в дереве), а
+       `rose-*`/`sky-*` в разметке — это встроенные палитры Tailwind, а не они.
+       Мост в конфиге завести НЕЛЬЗЯ: он затёр бы встроенные шкалы, которыми
+       нарисованы 236 сайтов статус-бейджей. Удалены, чтобы правка мёртвой
+       переменной больше не выглядела правкой цвета. */
 
     /* === Login brand-stage accents (LOGIN-REDESIGN-01) ===
        The login brand pane is a FIXED dark surface in BOTH themes, so its
-       decorative accents must be theme-STABLE — using `--rose`/`--sky` there
-       would flip them deep in dark and drop the shimmer/aurora contrast. These
+       decorative accents must be theme-STABLE — a token that flips with the
+       theme would go deep in dark and drop the shimmer/aurora contrast. These
        hold the LIGHT pink/blue and are intentionally NOT overridden in `.dark`. */
     --login-accent-pink: 254 198 211;  /* fixed baby pink */
     --login-accent-blue: 186 212 237;  /* fixed powder blue */
@@ -99,7 +102,7 @@
     --border: var(--border-subtle);
     --text: var(--text-main);
     --text-muted: var(--text-sec);
-    --accent: var(--primary);              /* alias kept; use --rose for pink badges */
+    --accent: var(--primary);              /* alias kept; розовые бейджи — встроенная шкала `rose-*` */
     --accent-hover: var(--primary-hover);
     --accent-foreground: 255 255 255;
     --ring: var(--primary-glow);
@@ -144,9 +147,7 @@
        legible (~7:1 bg-card / ~8:1 bg-page) + on-brand. Fills stay --primary. */
     --accent-text: 198 169 126;      /* #C6A97E warm gold */
 
-    /* === Secondary accents === */
-    --rose: 90 24 32;                /* deep rose for dark mode */
-    --sky:  44 69 102;               /* deep powder blue */
+    /* UI-06: `--rose` / `--sky` удалены и здесь — см. комментарий в `:root`. */
 
     /* === Shadows — pure black for depth === */
     --shadow-sm: 0 12px 28px rgba(0, 0, 0, 0.45);

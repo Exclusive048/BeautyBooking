@@ -65,6 +65,26 @@ module.exports = {
         // Значения — из globals.css, здесь только проброс.
         success: "rgb(var(--success) / <alpha-value>)",
         warning: "rgb(var(--warning) / <alpha-value>)",
+        // UI-06 — тот же класс отказа, что выше, но для `-foreground`-пар.
+        // `primary` и `muted` объявлены СТРОКАМИ, а не объектами, поэтому
+        // производные `*-foreground` из них не генерируются (объектом объявлен
+        // только `destructive` — он и работал). Итог: `text-muted-foreground`
+        // (33 сайта, включая `<Badge variant="muted">`) и
+        // `text-primary-foreground` (активный чип фильтра уведомлений)
+        // компилировались в ничто и наследовали цвет контекста.
+        // Мосты плоские, а не объектные: `primary-hover`/`primary-magenta`/
+        // `primary-glow` — уже отдельные ключи, и превращать один `primary` в
+        // объект посреди них значило бы завести две схемы в одном списке.
+        "muted-foreground": "rgb(var(--muted-foreground) / <alpha-value>)",
+        "primary-foreground": "rgb(var(--primary-foreground) / <alpha-value>)",
+        "accent-foreground": "rgb(var(--accent-foreground) / <alpha-value>)",
+        // 🔴 Мостов `rose` и `sky` здесь НЕТ И БЫТЬ НЕ ДОЛЖНО. В разметке
+        // `rose-*`/`sky-*` — это встроенные палитры Tailwind (236 сайтов:
+        // статус-бейджи, чипы). Ключ `rose: "rgb(var(--rose))"` в `extend`
+        // ЗАМЕНИЛ бы всю шкалу, и `bg-rose-500` перестал бы существовать —
+        // «фикс» сломал бы ровно то, что выглядит починенным. Одноимённые
+        // CSS-переменные-призраки удалены из `globals.css` (потребителей
+        // не было). Сторож — `tailwind-bridge.test.ts`.
         destructive: {
           DEFAULT: "rgb(var(--destructive) / <alpha-value>)",
           foreground: "rgb(var(--destructive-foreground) / <alpha-value>)",

@@ -376,7 +376,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
             type="button"
             disabled={isSearching || !selectedFile}
             onClick={() => void runSearch()}
-            className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta py-3 text-sm font-semibold text-[rgb(var(--accent-foreground))] disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta py-3 text-sm font-semibold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSearching
               ? UI_TEXT.home.visualSearch.analyzing

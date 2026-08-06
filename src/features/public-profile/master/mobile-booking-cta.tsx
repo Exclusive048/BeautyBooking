@@ -25,7 +25,7 @@ export function MobileBookingCta() {
         <button
           type="button"
           onClick={handleClick}
-          className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 py-4 text-base font-semibold text-[rgb(var(--accent-foreground))] shadow-hover transition active:scale-[0.98]"
+          className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 py-4 text-base font-semibold text-accent-foreground shadow-hover transition active:scale-[0.98]"
         >
           {UI_TEXT.publicProfile.page.bookNow}
         </button>

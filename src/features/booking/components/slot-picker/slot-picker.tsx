@@ -232,7 +232,7 @@ const SlotButton = memo(function SlotButton({
       className={cn(
         "rounded-2xl border px-3 py-2 text-sm transition",
         active
-          ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
+          ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-accent-foreground"
           : isHot
             ? "border-amber-300/60 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
             : "border-border-subtle bg-bg-input text-text-main hover:bg-bg-elevated",
