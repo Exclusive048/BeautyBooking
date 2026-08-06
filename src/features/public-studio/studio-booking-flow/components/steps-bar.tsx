@@ -45,7 +45,7 @@ export function StepsBar({ active, done, scenarioB }: Props) {
                   ? "bg-primary text-white"
                   : isActive
                   ? "bg-text text-bg-card"
-                  : "bg-bg-muted text-text-muted"
+                  : "bg-muted text-text-muted"
               }`}
               aria-hidden
             >

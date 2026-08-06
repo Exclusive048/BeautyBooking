@@ -193,11 +193,11 @@ export function WhenStep({
       {loading ? (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {Array.from({ length: 9 }).map((_, idx) => (
-            <div key={idx} className="h-9 animate-pulse rounded-lg bg-bg-muted/60" />
+            <div key={idx} className="h-9 animate-pulse rounded-lg bg-muted/60" />
           ))}
         </div>
       ) : slots.length === 0 ? (
-        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-8 text-center text-sm text-text-muted">
+        <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
           {UI_TEXT.bookingWidget.whenStep.noSlots}
         </div>
       ) : (

@@ -118,7 +118,7 @@ export function YouStep({
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-subtle bg-bg-card p-4">
         <span
           className={`relative mt-0.5 inline-flex h-6 w-11 flex-shrink-0 rounded-full border transition ${
-            silentMode ? "border-primary/70 bg-primary/25" : "border-border-subtle bg-bg-muted/20"
+            silentMode ? "border-primary/70 bg-primary/25" : "border-border-subtle bg-muted/20"
           }`}
         >
           <input

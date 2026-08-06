@@ -26,7 +26,7 @@ function formatRub(n: number): string {
  * Dual-thumb price range slider with a histogram backdrop.
  *
  * Histogram bars in the active range render with `bg-primary/55`; bars outside
- * use `bg-bg-muted/40` for a clear "unselected" affordance. The slider thumbs
+ * use `bg-muted/40` for a clear "unselected" affordance. The slider thumbs
  * are native `<input type="range">` overlaid on a custom track — clicks on the
  * histogram itself fall through to the underlying range inputs so the widget
  * behaves predictably with keyboard and pointer.

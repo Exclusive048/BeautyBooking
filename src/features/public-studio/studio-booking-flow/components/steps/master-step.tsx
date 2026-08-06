@@ -50,7 +50,7 @@ export function MasterStep({
       </header>
 
       {available.length === 0 ? (
-        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-8 text-center text-sm text-text-muted">
+        <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
           {UI_TEXT.bookingWidget.masterStep.noMasters}
         </div>
       ) : (

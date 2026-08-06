@@ -113,7 +113,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
             </div>
           </div>
         ) : masters.length > 0 ? (
-          <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-muted/60 px-3 py-2.5">
+          <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-muted/60 px-3 py-2.5">
             <div className="flex" aria-hidden>
               {visibleMasters.map((m, i) => (
                 <span

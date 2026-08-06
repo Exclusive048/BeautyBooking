@@ -559,7 +559,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         <p className="mt-2 text-xs text-text-muted">{UI_TEXT.bookingWidget.success.hint}</p>
         <a
           href={studioBackHref}
-          className="mt-5 inline-flex rounded-xl bg-bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-bg-muted/70"
+          className="mt-5 inline-flex rounded-xl bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-muted/70"
         >
           {UI_TEXT.bookingWidget.success.backToStudio}
         </a>
@@ -724,11 +724,11 @@ function BookingFlowSkeleton() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4">
-        <div className="h-44 animate-pulse rounded-2xl bg-bg-muted/40" />
-        <div className="h-14 animate-pulse rounded-xl bg-bg-muted/40" />
-        <div className="h-72 animate-pulse rounded-2xl bg-bg-muted/40" />
+        <div className="h-44 animate-pulse rounded-2xl bg-muted/40" />
+        <div className="h-14 animate-pulse rounded-xl bg-muted/40" />
+        <div className="h-72 animate-pulse rounded-2xl bg-muted/40" />
       </div>
-      <div className="h-72 animate-pulse rounded-2xl bg-bg-muted/40" />
+      <div className="h-72 animate-pulse rounded-2xl bg-muted/40" />
     </div>
   );
 }
@@ -765,7 +765,7 @@ function renderBookingConfig(input: {
   if (!bookingConfig.requiresReferencePhoto && bookingConfig.questions.length === 0) return null;
 
   return (
-    <div className="mt-4 space-y-3 rounded-xl border border-border-subtle bg-bg-muted/30 p-4">
+    <div className="mt-4 space-y-3 rounded-xl border border-border-subtle bg-muted/30 p-4">
       <div className="text-sm font-semibold text-text">{UI_TEXT.publicProfile.booking.bookingConfigTitle}</div>
       {bookingConfig.requiresReferencePhoto ? (
         <div>
