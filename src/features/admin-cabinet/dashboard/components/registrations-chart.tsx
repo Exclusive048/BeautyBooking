@@ -1,5 +1,3 @@
-"use client";
-
 import { ChartCard } from "@/features/admin-cabinet/dashboard/components/chart-card";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { AdminChartSeries } from "@/features/admin-cabinet/dashboard/types";
@@ -11,7 +9,10 @@ type Props = {
 const T = UI_TEXT.adminPanel.dashboard.charts;
 
 /** Bar chart wrapper: passes the series through to the shared
- * `<ChartCard>` with `variant="bars"`. */
+ * `<ChartCard>` with `variant="bars"`.
+ *
+ * PERF-25: серверный компонент — граница у `<ChartCard>`, см. соседний
+ * `bookings-chart.tsx`. */
 export function RegistrationsChart({ data }: Props) {
   return (
     <ChartCard

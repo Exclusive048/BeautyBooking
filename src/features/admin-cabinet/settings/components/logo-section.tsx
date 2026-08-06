@@ -1,9 +1,12 @@
-"use client";
-
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import { UI_TEXT } from "@/lib/ui/text";
 
+/**
+ * PERF-25: серверный компонент. Интерактивность целиком в `<AvatarEditor>`
+ * (свой `"use client"`), сюда не приходит ни одного пропа — секция была
+ * лишней точкой входа в клиентский бандл админки.
+ */
 export function LogoSection() {
   const t = UI_TEXT.adminPanel.settings.sections.logo;
   return (
