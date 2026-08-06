@@ -323,6 +323,7 @@ export async function listAvailabilitySlotsPaginated(
         serviceId,
         serviceDuration: durationMin,
         bufferMin,
+        slotStepMin,
         timeZone: timezone,
         scheduleVersion: scheduleWindow.scheduleVersion,
         publishedUntilLocal: scheduleWindow.publishedUntilLocal,
@@ -456,7 +457,7 @@ export async function listAvailabilitySlotsPaginated(
       // Замок именует ровно ту работу, которую защищает: провайдер, услуга,
       // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
       // разными отрезками друг друга не блокируют.
-      lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}`,
+      lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}`,
       read: async () => {
         const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
         // Частично заполненный набор — ещё не результат: победитель пишет дни по
@@ -581,6 +582,7 @@ export async function listAvailabilitySlots(
       serviceId,
       serviceDuration: durationMin,
       bufferMin,
+      slotStepMin,
       timeZone: timezone,
       scheduleVersion: ctx.scheduleWindow.scheduleVersion,
       publishedUntilLocal: ctx.scheduleWindow.publishedUntilLocal,

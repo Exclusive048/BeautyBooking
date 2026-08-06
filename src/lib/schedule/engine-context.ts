@@ -125,20 +125,45 @@ function dateKeyToUtcStart(dateKey: string): Date {
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0));
 }
 
+/**
+ * Версия расписания = «когда в последний раз менялась СТРУКТУРА расписания».
+ *
+ * PERF-18 — до этого первым входом был `Provider.updatedAt`, то есть версию
+ * двигала ЛЮБАЯ запись в строку провайдера. А пишут в неё вещи, к расписанию
+ * отношения не имеющие: пересчёт рейтинга при каждом отзыве
+ * (`reviews/recalculate-ratings.ts`), пересчёт `availableToday`
+ * (`recompute-available-today.ts` — который сам запускается ИЗ инвалидатора
+ * слотов), правки профиля, соцсети, аватар. Версия входит в ключи `slots:*`,
+ * `dayPlan:*` и `bookingDays:*`, поэтому её смена осиротняет весь прогретый
+ * набор провайдера — все дни × все услуги × все длительности, — тогда как
+ * поменялся, скажем, средний балл.
+ *
+ * Убрать провайдера из версии можно ровно потому, что все его поля, влияющие
+ * на результат, уже лежат в ключах САМИ:
+ *   - `timezone` — в ключе `slots:*`, `dayPlan:*` и `bookingDays:*`;
+ *   - `bufferBetweenBookingsMin` — в ключе `slots:*`;
+ *   - `slotStepMin` — добавлен в ключ `slots:*` этой же правкой; он был
+ *     единственным входом `buildSlotsForDay`, который держался ТОЛЬКО на
+ *     `Provider.updatedAt` (`buildSlotsCacheKey`).
+ * Остальные поля (`minBookingHoursAhead`, `visibleSlotDays`,
+ * `acceptNewClients`, …) применяются ПОСЛЕ чтения кэша — они сужают выдачу, а
+ * не то, что закэшировано.
+ *
+ * Направление ошибки при этом не поменялось: пропустить изменение структуры
+ * нельзя (все четыре таблицы по-прежнему здесь), а лишний ключевой вход мы
+ * заменили не на «ничего», а на явное перечисление в самих ключах.
+ *
+ * PERF-04: операторы ниже вычисляют ключ кэша, а не ответ, — поэтому они шли
+ * и при попадании в кэш тоже. Сброс — явный, из `invalidateSlotsForMaster`;
+ * TTL здесь только верхняя граница на случай пропущенной инвалидации, и он
+ * равен TTL самих слотов.
+ */
 async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion> {
-  // PERF-04: пять операторов ниже вычисляют ключ кэша, а не ответ, — поэтому
-  // они шли и при попадании в кэш тоже. Сброс — явный, из
-  // `invalidateSlotsForMaster`; TTL здесь только верхняя граница на случай
-  // пропущенной инвалидации, и он равен TTL самих слотов.
   const cached = await readCachedScheduleVersion(masterId);
   if (cached) return cached;
 
-  const [provider, overrideMax, overrideBreakMax, templateMax, weeklyConfigMax] =
+  const [overrideMax, overrideBreakMax, templateMax, weeklyConfigMax] =
     await prisma.$transaction([
-    prisma.provider.findUnique({
-      where: { id: masterId },
-      select: { updatedAt: true },
-    }),
     prisma.scheduleOverride.aggregate({
       where: { providerId: masterId },
       _max: { updatedAt: true },
@@ -158,7 +183,6 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
   ]);
 
   const latest = maxDate([
-    provider?.updatedAt ?? null,
     overrideMax._max.updatedAt ?? null,
     overrideBreakMax._max.updatedAt ?? null,
     templateMax._max.updatedAt ?? null,

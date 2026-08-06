@@ -40,11 +40,12 @@ describe("schedule/slotsCache", () => {
       serviceId: "s1",
       serviceDuration: 60,
       bufferMin: 10,
+      slotStepMin: 30,
       timeZone: "UTC",
       scheduleVersion: "v1",
       publishedUntilLocal: "2026-04-01",
     });
-    expect(key).toBe("slots:m1:2026-03-03:s1:60:10:UTC:v1:2026-04-01");
+    expect(key).toBe("slots:m1:2026-03-03:s1:60:10:30:UTC:v1:2026-04-01");
   });
 
   it("stores slots and registers index", async () => {

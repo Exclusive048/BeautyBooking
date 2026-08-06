@@ -9,17 +9,30 @@ import { enqueueAvailableTodayRecompute } from "@/lib/schedule/available-today-r
 const SLOTS_TTL_SECONDS = 120;
 const SLOTS_INDEX_TTL_SECONDS = SLOTS_TTL_SECONDS;
 
+/**
+ * Ключ обязан перечислять ВСЕ входы `buildSlotsForDay`, влияющие на
+ * результат. Три из них — от провайдера: `timeZone`, `bufferMin` и
+ * `slotStepMin`.
+ *
+ * PERF-18 — `slotStepMin` здесь появился не для полноты: пока в
+ * `scheduleVersion` входил `Provider.updatedAt`, шаг сетки покрывался им
+ * побочно, и это было единственное, что его покрывало. Провайдер из версии
+ * убран (её двигали отзывы и пересчёт `availableToday`), поэтому шаг обязан
+ * стоять там же, где уже стоят его два соседа, — иначе смена шага в
+ * настройках расписания отдавала бы старую сетку до истечения TTL.
+ */
 export function buildSlotsCacheKey(input: {
   masterId: string;
   dateKey: string;
   serviceId: string;
   serviceDuration: number;
   bufferMin: number;
+  slotStepMin: number;
   timeZone: string;
   scheduleVersion: string;
   publishedUntilLocal: string;
 }): string {
-  return `slots:${input.masterId}:${input.dateKey}:${input.serviceId}:${input.serviceDuration}:${input.bufferMin}:${input.timeZone}:${input.scheduleVersion}:${input.publishedUntilLocal}`;
+  return `slots:${input.masterId}:${input.dateKey}:${input.serviceId}:${input.serviceDuration}:${input.bufferMin}:${input.slotStepMin}:${input.timeZone}:${input.scheduleVersion}:${input.publishedUntilLocal}`;
 }
 
 function buildSlotsIndexKey(masterId: string, dateKey: string): string {

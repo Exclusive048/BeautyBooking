@@ -63,6 +63,7 @@ const SERVICE_ID = "svc_1";
 const TIMEZONE = "Asia/Yekaterinburg";
 const DURATION_MIN = 60;
 const BUFFER_MIN = 0;
+const SLOT_STEP_MIN = 30;
 const SCHEDULE_VERSION = "1750000000000";
 const FROM_KEY = "2026-09-01";
 const PAGE_SIZE = 3;
@@ -72,7 +73,7 @@ function primeProvider(): void {
     id: PROVIDER_ID,
     timezone: TIMEZONE,
     bufferBetweenBookingsMin: BUFFER_MIN,
-    slotStepMin: 30,
+    slotStepMin: SLOT_STEP_MIN,
   });
 }
 
@@ -96,6 +97,7 @@ function primeSlotCacheForDays(dateKeys: string[]): void {
       serviceId: SERVICE_ID,
       serviceDuration: DURATION_MIN,
       bufferMin: BUFFER_MIN,
+      slotStepMin: SLOT_STEP_MIN,
       timeZone: TIMEZONE,
       scheduleVersion: SCHEDULE_VERSION,
       publishedUntilLocal,
@@ -111,9 +113,10 @@ function primeSlotCacheForDays(dateKeys: string[]): void {
 }
 
 function primeEmptyScheduleReads(): void {
+  // PERF-18: провайдер из транзакции версии убран — остались четыре агрегата
+  // по таблицам структуры расписания.
   prismaMock.$transaction.mockResolvedValue([
-    { updatedAt: new Date(Number(SCHEDULE_VERSION)) },
-    { _max: { updatedAt: null } },
+    { _max: { updatedAt: new Date(Number(SCHEDULE_VERSION)) } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
