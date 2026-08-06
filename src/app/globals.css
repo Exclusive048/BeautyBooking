@@ -457,14 +457,25 @@
   pointer-events: none;
   background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxNDAnIGhlaWdodD0nMTQwJz48ZmlsdGVyIGlkPSduJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC45JyBudW1PY3RhdmVzPScyJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzE0MCcgaGVpZ2h0PScxNDAnIGZpbHRlcj0ndXJsKCNuKScgb3BhY2l0eT0nMC4wNScvPjwvc3ZnPg==");
 }
+/* PERF-28: полоса блика — собственный слой шириной 300%, который ЕЗДИТ
+   (`transform`), а не перерисовывается (`background-position`). Геометрия та
+   же: раньше фон размером 300%×100% сдвигался внутри бокса 100%×100%, теперь
+   бокс сам 300%×100%, а градиент заполняет его целиком — то есть градиентная
+   коробка идентична, включая угол 120deg. Родитель (`login-showcase.tsx:181`)
+   несёт `overflow-hidden` + `isolate`, поэтому выступающая часть отсекается
+   ровно как прежде. Статичное состояние (reduced-motion) совпадает: прежний
+   дефолт `background-position: 0% 0%` ставил левый край слоя в левый край
+   бокса — это же делает отсутствие трансформации. */
 .login-sheen::after {
   content: "";
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 300%;
   z-index: 0;
   pointer-events: none;
   background: linear-gradient(120deg, transparent 30%, rgb(255 255 255 / 0.06) 46%, transparent 60%);
-  background-size: 300% 100%;
 }
 
 .login-spark {
@@ -480,7 +491,22 @@
    остаётся только то, что утилитой не выражается: стартовое состояние
    pulse-ring для CSS-анимации. Обходной путь LOGIN-WOW-01 снят. */
 .login-dot {
-  box-shadow: 0 0 0 0 rgb(var(--success) / 0.5);
+  position: relative;
+}
+/* PERF-28: пульс-кольцо перестало быть анимацией `box-shadow` (перерисовка
+   каждый кадр) и стало отдельным диском на `transform` + `opacity`. Диск
+   лежит ПОД заливкой точки (`z-index: -1`) — ровно там, где рисует себя
+   box-shadow, — поэтому в покое его не видно, как не было видно тени с
+   нулевым spread'ом. Масштаб выведен из прежних чисел: точка 6 px
+   (`h-1.5 w-1.5`), spread 7 px даёт внешний диаметр 20 px, то есть 3.333×. */
+.login-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 9999px;
+  background: rgb(var(--success) / 0.5);
+  opacity: 0;
 }
 
 /* Photo plate — plane 3 of the showcase stack. Sits behind the frosted benefit
@@ -547,7 +573,7 @@
   .login-aurora > i:nth-child(5) { animation: login-float-b 21s ease-in-out infinite alternate-reverse; }
   .login-sheen::after { animation: login-sheen 9s ease-in-out infinite; }
   .login-spark { animation: login-spark 5s ease-in-out infinite; }
-  .login-dot { animation: login-pulse-dot 2.2s ease-in-out infinite; }
+  .login-dot::after { animation: login-pulse-dot 2.2s ease-in-out infinite; }
   .login-shimmer { animation: login-text-shimmer 4.5s ease-in-out infinite; }
   .login-word { animation: login-word-up 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
   .login-rise { animation: login-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -563,9 +589,17 @@
 @keyframes login-float-a { from { transform: translate(0, 0) scale(1); }   to { transform: translate(9%, 13%) scale(1.18); } }
 @keyframes login-float-b { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-11%, -8%) scale(0.92); } }
 @keyframes login-float-c { from { transform: translate(0, 0) scale(0.95); } to { transform: translate(7%, -11%) scale(1.14); } }
-@keyframes login-sheen { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
+/* PERF-28: сдвиг в долях СОБСТВЕННОЙ ширины слоя (она 300% бокса), поэтому
+   числа не совпадают с прежними процентами `background-position` — они из них
+   выведены. Для фона размером 300% позиция P означает смещение слоя на
+   −2·P ширин бокса: P=120% → −240% бокса = −80% ширины слоя;
+   P=−20% → +40% бокса = +13.3333% ширины слоя. */
+@keyframes login-sheen { 0%, 100% { transform: translateX(-80%); } 50% { transform: translateX(13.3333%); } }
 @keyframes login-spark { 0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 0.9; transform: scale(1) rotate(90deg); } }
-@keyframes login-pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 rgb(var(--success) / 0.5); } 50% { box-shadow: 0 0 0 7px rgb(var(--success) / 0); } }
+/* PERF-28: прежний кадр 0% — spread 0 при alpha 0.5, то есть кольцо ровно под
+   точкой и невидимо; кадр 50% — spread 7 px при alpha 0. Здесь то же самое
+   масштабом и прозрачностью: alpha 0.5 уже в заливке `::after`. */
+@keyframes login-pulse-dot { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(3.3333); opacity: 0; } }
 @keyframes login-text-shimmer { 0%, 100% { background-position: 110% 0; } 50% { background-position: -10% 0; } }
 @keyframes login-word-up { from { transform: translateY(110%); } to { transform: translateY(0); } }
 @keyframes login-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
