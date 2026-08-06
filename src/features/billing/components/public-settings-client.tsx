@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, Download, ExternalLink, Pencil, QrCode, Smartphone } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QrCodeCanvas } from "@/components/ui/qr-code-canvas";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -643,8 +643,8 @@ export function PublicSettingsClient({
 
             <div className="flex flex-col items-center gap-4 p-6 sm:flex-row sm:items-start">
               <div className="rounded-2xl bg-white p-3 shadow-sm">
-                <QRCodeCanvas
-                  ref={qrRef}
+                <QrCodeCanvas
+                  canvasRef={qrRef}
                   value={url}
                   size={180}
                   level="M"
@@ -719,8 +719,8 @@ export function PublicSettingsClient({
 
           {/* Hidden export QR (large size for crisp card output) */}
           <div className="sr-only" aria-hidden="true">
-            <QRCodeCanvas
-              ref={qrExportRef}
+            <QrCodeCanvas
+              canvasRef={qrExportRef}
               value={url}
               size={400}
               level="M"

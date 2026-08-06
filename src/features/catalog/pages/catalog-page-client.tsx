@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
 import { CatalogSearchBar } from "@/features/catalog/components/catalog-search-bar";
 import type { AutocompleteCategory } from "@/features/catalog/components/service-search-input";
@@ -13,10 +15,7 @@ import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
 import { CatalogPagination } from "@/features/catalog/components/catalog-pagination";
 import { SortMenu } from "@/features/catalog/components/sort-menu";
 import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-drawer";
-import { CatalogMap } from "@/features/catalog/components/catalog-map";
-import { CatalogMapSidebar } from "@/features/catalog/components/catalog-map-sidebar";
 import { LoginRequiredModal } from "@/features/auth/components/login-required-modal";
-import { VisualSearchModal } from "@/features/home/components/visual-search-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
 import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
@@ -27,6 +26,35 @@ import { getCurrentCitySlug } from "@/lib/cities/client-city";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
+
+/**
+ * PERF-17 — карта каталога и модалка визуального поиска лежали статическими
+ * импортами прямо в чанке страницы `/catalog` (82 kB), хотя каталог
+ * открывается в списочном режиме, а визуальный поиск на HEAD вообще погашен
+ * флагом `VISUAL_SEARCH_ENABLED` — то есть его код ехал каждому посетителю
+ * каталога, не имея ни одного способа быть показанным.
+ *
+ * `ssr: false` ничего не меняет по смыслу: карта работает с DOM-контейнером
+ * и грузит Яндекс-скрипт из эффекта, модалка рендерится только по клику;
+ * серверной разметки у обеих не было.
+ *
+ * Скелет карты накрывает контейнер целиком (он `relative` и держит
+ * `min-h-[60vh]`), поэтому переключение в режим карты не прыгает.
+ */
+const CatalogMap = dynamic(
+  () => import("@/features/catalog/components/catalog-map").then((m) => m.CatalogMap),
+  { ssr: false, loading: () => <Skeleton className="absolute inset-0 h-full w-full rounded-2xl" /> },
+);
+
+const CatalogMapSidebar = dynamic(
+  () => import("@/features/catalog/components/catalog-map-sidebar").then((m) => m.CatalogMapSidebar),
+  { ssr: false, loading: () => null },
+);
+
+const VisualSearchModal = dynamic(
+  () => import("@/features/home/components/visual-search-modal").then((m) => m.VisualSearchModal),
+  { ssr: false, loading: () => null },
+);
 
 type EntityType = "all" | "master" | "studio";
 type ViewMode = "list" | "map";

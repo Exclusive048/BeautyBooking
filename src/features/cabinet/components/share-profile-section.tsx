@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, Download } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QrCodeCanvas } from "@/components/ui/qr-code-canvas";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -148,7 +148,7 @@ export function ShareProfileSection({ endpoint }: Props) {
       {/* QR Code */}
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-border-subtle bg-white p-6 dark:bg-white">
         <div ref={qrRef}>
-          <QRCodeCanvas
+          <QrCodeCanvas
             value={url}
             size={QR_SIZE}
             level="M"
