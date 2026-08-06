@@ -88,6 +88,8 @@
 
 > ⚠️ **Токен живёт в ДВУХ местах** (HARDENING-MISC-01): CSS-переменная в `src/app/globals.css` **и** мост в `tailwind.config.js`. Переменная без моста — это класс, который компилируется **в ничто**: разметка выглядит правильной, стиля нет, ошибки нет. Так «пропала» точка статуса на `/login`, и так же молча не работали `shadow-brand` (7 сайтов) и `bg/text-destructive` (3). Добавляя состояние или тень — проверяйте обе половины.
 
+> ⚠️ **Есть и ТРЕТЬЕ место — `src/lib/ui/brand-colors.ts`** (UI-04): бренд-значения литералами для сред, куда Tailwind не доходит вовсе — HTML транзакционной почты, `ctx.fillStyle` canvas-постеров кабинета, OG-превью через `next/og` (satori) и `app/global-error.tsx` (рендерится при упавшем root-layout). Литеральные цвета в этих четырёх средах брать **только оттуда**; расхождение с `globals.css` ловит `brand-colors.test.ts` — он читает CSS и сверяет каждую константу с `:root`/`.dark`. До этого все четыре среды несли оставленную фиолетово-розовую палитру (`#7c3aed`/`#ec4899`), то есть первый брендированный артефакт боевого пользователя — письмо с кодом входа — приходил не в цветах продукта.
+
 ### Интеграции
 YooKassa (платежи) · Яндекс S3 / Геокодер / Suggest (медиа, адреса) · Yandex ID OAuth · VK OAuth · Telegram Bot API (gated OFF, + monitoring) · YandexGPT (chat AI, §11) · Yandex AI Studio (visual-search vision `qwen3.6-35b-a3b` + `text-search` embeddings, §11; dormant) · web-push VAPID (push) · nodemailer SMTP (email) · SMSC.ru (SMS, код готов — не подключён) · Sharp (изображения) · AWS SDK S3. *(OpenAI полностью удалён из кодбазы — VISUAL-SEARCH-YANDEX-MIGRATION-01 2026-07-13.)*
 

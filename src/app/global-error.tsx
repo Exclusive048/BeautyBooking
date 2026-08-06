@@ -1,6 +1,12 @@
 "use client";
 
 import { useErrorBoundaryReport } from "@/hooks/use-error-boundary-report";
+import { BRAND_COLORS, brandGradientCss, withAlpha } from "@/lib/ui/brand-colors";
+
+// UI-04: экран рендерится при падении root-layout, то есть Tailwind здесь
+// недоступен по определению — но значения обязаны быть бренд-бордовыми, а не
+// произвольными. Источник — `BRAND_COLORS` (зеркало `globals.css`).
+const C = BRAND_COLORS;
 
 export default function GlobalError({
   error,
@@ -24,32 +30,26 @@ export default function GlobalError({
           *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
           body{
             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-            background:#fafafa;color:#0f0f0f;
+            background:${C.surfacePage};color:${C.textMain};
             min-height:100dvh;display:flex;
             align-items:center;justify-content:center;padding:24px;
           }
-          @media(prefers-color-scheme:dark){
-            body{background:#111;color:#f0f0f0}
-            .card{background:#1c1c1e;border-color:#2c2c2e}
-            .desc{color:#8e8e93}
-            .btn-sec{background:#2c2c2e;color:#f0f0f0;border-color:#3a3a3c}
-            .btn-sec:hover{background:#3a3a3c}
-          }
           .card{
-            max-width:400px;width:100%;background:#fff;
-            border:1px solid #e5e7eb;border-radius:24px;
+            max-width:400px;width:100%;background:${C.surfaceCard};
+            border:1px solid ${C.borderSubtle};border-radius:24px;
             padding:40px 28px;text-align:center;
-            box-shadow:0 4px 32px rgba(0,0,0,.07);
+            box-shadow:0 4px 32px ${withAlpha(C.textMain, 0.1)};
           }
           .icon{
             width:72px;height:72px;border-radius:50%;
-            background:rgba(139,92,246,.1);
+            background:${withAlpha(C.brandVia, 0.1)};
             display:flex;align-items:center;justify-content:center;
             margin:0 auto 24px;
           }
+          .icon svg{color:${C.brandVia}}
           h1{font-size:20px;font-weight:700;line-height:1.3;margin-bottom:10px}
           .desc{
-            font-size:14px;color:#6b7280;line-height:1.65;
+            font-size:14px;color:${C.textSecondary};line-height:1.65;
             margin-bottom:28px;max-width:300px;
             margin-left:auto;margin-right:auto;
           }
@@ -62,15 +62,32 @@ export default function GlobalError({
           }
           .btn:hover{opacity:.85}
           .btn:active{transform:scale(.97)}
-          .btn-pri{background:linear-gradient(135deg,#8b5cf6,#a855f7,#d946ef);color:#fff}
-          .btn-sec{background:#f4f4f5;color:#111;border:1px solid #e5e7eb}
+          .btn-pri{background:${brandGradientCss()};color:${C.textOnBrand}}
+          .btn-sec{background:${C.surfacePage};color:${C.textMain};border:1px solid ${C.borderSubtle}}
+          /* Тёмная схема идёт ПОСЛЕ базовых правил: специфичность у них
+             одинаковая, поэтому решает порядок. Раньше блок стоял выше — и
+             переопределялся целиком, то есть тёмной ветки фактически не
+             существовало: на тёмном фоне рисовалась светлая карточка со
+             светлым же заголовком. Нашлось смоуком UI-04. */
+          @media(prefers-color-scheme:dark){
+            body{background:${C.darkSurfacePage};color:${C.darkTextMain}}
+            .card{background:${C.darkSurfaceCard};border-color:${C.darkBorderSubtle}}
+            .desc{color:${C.darkTextSecondary}}
+            .icon{background:${withAlpha(C.brandVia, 0.28)}}
+            .icon svg{color:${C.darkTextMain}}
+            .btn-sec{background:${withAlpha(C.darkTextMain, 0.08)};color:${C.darkTextMain};border-color:${C.darkBorderSubtle}}
+            .btn-sec:hover{background:${withAlpha(C.darkTextMain, 0.14)}}
+          }
         `}</style>
       </head>
       <body>
         <div className="card">
           <div className="icon">
+            {/* Обводка — через `currentColor`: цвет иконки задаётся классом
+                `.icon svg`, поэтому тёмная схема может его переопределить
+                (бордо на угольном фоне нечитаемо). */}
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
-              stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>

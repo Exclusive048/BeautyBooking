@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
+import { BRAND_COLORS, brandGradientCss, withAlpha } from "@/lib/ui/brand-colors";
 
 export const runtime = "nodejs";
 
@@ -9,11 +10,24 @@ const CARD_HEIGHT = 630;
 const BRAND_NAME = "МастерРядом";
 const BRAND_DOMAIN = "мастеррядом.online";
 
-const GRADIENT_START = "rgb(198, 169, 126)";
-const GRADIENT_END = "rgb(191, 130, 176)";
-const SURFACE_BG = "rgba(30, 30, 36, 0.92)";
-const TEXT_MAIN = "#F5F0EA";
-const TEXT_SEC = "rgba(245, 240, 234, 0.6)";
+/**
+ * UI-04: satori понимает только инлайновые стили, поэтому цвета берутся из
+ * `BRAND_COLORS` (зеркало `globals.css`), а не пишутся литералами.
+ *
+ * Композиция — та же, что была: тёплый градиент-подложка и тёмная карточка
+ * поверх. Разница в том, что подложка теперь бренд-градиент (бордо → малина →
+ * глубокий бордо), а карточка — `--brand-pane`, бренд-поверхность, тёмная в
+ * обеих темах. Оба бордовых слоя близки по светлоте, поэтому край карточки
+ * держит кремовая волосяная граница, а не разница фонов. Светлые заливки
+ * (аватар-заглушка, CTA-пилюля) — тот же приём, что `Button variant="inverted"`
+ * на фиксированно-тёмных бренд-поверхностях продукта.
+ */
+const BACKDROP = brandGradientCss();
+const SURFACE_BG = withAlpha(BRAND_COLORS.brandPane, 0.92);
+const SURFACE_BORDER = withAlpha(BRAND_COLORS.darkTextMain, 0.12);
+const TEXT_MAIN = BRAND_COLORS.darkTextMain;
+const TEXT_SEC = BRAND_COLORS.darkTextSecondary;
+const ACCENT = BRAND_COLORS.brandAccent;
 
 type ProviderData = {
   name: string;
@@ -100,7 +114,7 @@ export async function GET(req: Request) {
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-end",
-          background: `linear-gradient(135deg, ${GRADIENT_START} 0%, ${GRADIENT_END} 100%)`,
+          background: BACKDROP,
           fontFamily: "sans-serif",
         }}
       >
@@ -114,6 +128,7 @@ export async function GET(req: Request) {
             padding: "40px 48px",
             borderRadius: "28px",
             background: SURFACE_BG,
+            border: `1px solid ${SURFACE_BORDER}`,
             backdropFilter: "blur(20px)",
             gap: "0",
           }}
@@ -132,7 +147,7 @@ export async function GET(req: Request) {
                   height: "88px",
                   borderRadius: "50%",
                   objectFit: "cover",
-                  border: `3px solid ${GRADIENT_START}`,
+                  border: `3px solid ${ACCENT}`,
                   flexShrink: 0,
                 }}
               />
@@ -142,13 +157,13 @@ export async function GET(req: Request) {
                   width: "88px",
                   height: "88px",
                   borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${GRADIENT_START}, ${GRADIENT_END})`,
+                  background: BRAND_COLORS.surfaceCard,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: "32px",
                   fontWeight: 700,
-                  color: "#1e1e24",
+                  color: BRAND_COLORS.brandFrom,
                   flexShrink: 0,
                 }}
               >
@@ -184,7 +199,7 @@ export async function GET(req: Request) {
                 {subtitle}
               </div>
               {hasRating ? (
-                <div style={{ fontSize: "16px", color: GRADIENT_START, lineHeight: 1.4, marginTop: "2px" }}>
+                <div style={{ fontSize: "16px", color: ACCENT, lineHeight: 1.4, marginTop: "2px" }}>
                   {ratingText}
                 </div>
               ) : null}
@@ -199,7 +214,7 @@ export async function GET(req: Request) {
               justifyContent: "space-between",
               marginTop: "24px",
               paddingTop: "20px",
-              borderTop: "1px solid rgba(245, 240, 234, 0.1)",
+              borderTop: `1px solid ${SURFACE_BORDER}`,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -220,10 +235,10 @@ export async function GET(req: Request) {
                 alignItems: "center",
                 padding: "8px 20px",
                 borderRadius: "12px",
-                background: `linear-gradient(90deg, ${GRADIENT_START}, ${GRADIENT_END})`,
+                background: BRAND_COLORS.surfaceCard,
                 fontSize: "16px",
                 fontWeight: 600,
-                color: "#1e1e24",
+                color: BRAND_COLORS.brandFrom,
               }}
             >
               Записаться онлайн
