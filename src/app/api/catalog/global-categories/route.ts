@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { publicReferenceCacheInit } from "@/lib/api/cache-headers";
 import { ok, fail } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
@@ -57,28 +58,34 @@ export async function GET() {
     });
 
     const sorted = sortCategoriesHierarchically(categories);
-    return ok({
-      // SEC-12: `id` уходит в URL-параметр `globalCategoryId` и возвращается
-      // фильтром каталога, поэтому кодируется, а не удаляется.
-      // `resolveGlobalCategoryIds` декодирует его на входе; старые ссылки с
-      // сырым CUID продолжают работать (decodePublicId backward-compatible).
-      categories: sorted.map((category) => ({
-        id: encodePublicId(category.id),
-        name: category.name,
-        title: category.name,
-        slug: category.slug,
-        icon: category.icon,
-        parentId: category.parentId ? encodePublicId(category.parentId) : category.parentId,
-        depth: category.depth,
-        fullPath: category.fullPath,
-        usageCount: category.usageCount,
-        status: category.status,
-        isPersonal: !category.visibleToAll,
-        visibleToAll: category.visibleToAll,
-        // SECURITY-EXPOSURE-AUDIT-01 · Y10: `createdByUserId` (a raw UserProfile
-        // CUID) was returned to anonymous callers with no consumer. Removed.
-      })),
-    });
+    // PERF-13: ответ одинаков для анонима и залогиненного (см. комментарий выше —
+    // персональные PENDING-категории сюда намеренно не попадают), поэтому его
+    // можно отдать разделяемому кэшу.
+    return ok(
+      {
+        // SEC-12: `id` уходит в URL-параметр `globalCategoryId` и возвращается
+        // фильтром каталога, поэтому кодируется, а не удаляется.
+        // `resolveGlobalCategoryIds` декодирует его на входе; старые ссылки с
+        // сырым CUID продолжают работать (decodePublicId backward-compatible).
+        categories: sorted.map((category) => ({
+          id: encodePublicId(category.id),
+          name: category.name,
+          title: category.name,
+          slug: category.slug,
+          icon: category.icon,
+          parentId: category.parentId ? encodePublicId(category.parentId) : category.parentId,
+          depth: category.depth,
+          fullPath: category.fullPath,
+          usageCount: category.usageCount,
+          status: category.status,
+          isPersonal: !category.visibleToAll,
+          visibleToAll: category.visibleToAll,
+          // SECURITY-EXPOSURE-AUDIT-01 · Y10: `createdByUserId` (a raw UserProfile
+          // CUID) was returned to anonymous callers with no consumer. Removed.
+        })),
+      },
+      publicReferenceCacheInit()
+    );
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);
     return fail(appError.message, appError.status, appError.code, appError.details);

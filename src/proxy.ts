@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isPublicReferenceApiPath } from "@/lib/api/cache-headers";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
@@ -357,9 +358,17 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  // PERF-13: на публичных справочниках refresh-хоп не делается вовсе. Иначе к
+  // ответу, который сам объявил себя `public, s-maxage=…`, прикладывался бы
+  // `Set-Cookie` с сессией — а такой ответ в разделяемом кэше отдаёт чужую сессию
+  // следующему посетителю. Понизить директиву из прокси нельзя: заголовок
+  // обработчика выигрывает у заголовка middleware (проверено рантаймом), поэтому
+  // множества разводятся здесь. Ни один из этих роутов сессию не читает, а
+  // обновление произойдёт на следующем же запросе к любому другому пути.
+  const skipSessionRefresh = isPublicPath || isPublicReferenceApiPath(pathname);
   let refreshedSetCookies: string[] = [];
 
-  if (!isPublicPath) {
+  if (!skipSessionRefresh) {
     const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
     const accessToken = request.cookies.get(accessCookieName)?.value;
     const accessValid = isAccessTokenValid(accessToken);

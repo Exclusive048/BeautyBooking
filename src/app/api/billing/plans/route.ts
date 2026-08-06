@@ -1,3 +1,4 @@
+import { publicReferenceCacheInit } from "@/lib/api/cache-headers";
 import { ok } from "@/lib/api/response";
 import { prisma } from "@/lib/prisma";
 import { resolveEffectiveFeatures, type PlanNode } from "@/lib/billing/features";
@@ -59,5 +60,7 @@ export async function GET() {
     grouped[plan.scope].push(plan);
   }
 
-  return ok({ plans: grouped });
+  // PERF-13: каталог тарифов, а не состояние подписки зрителя — роут не читает
+  // ни сессию, ни роль (подписка живёт в `/api/me/plan`, и там `private`).
+  return ok({ plans: grouped }, publicReferenceCacheInit());
 }

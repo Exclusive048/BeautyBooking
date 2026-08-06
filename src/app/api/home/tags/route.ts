@@ -1,3 +1,4 @@
+import { publicReferenceCacheInit } from "@/lib/api/cache-headers";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
@@ -11,7 +12,9 @@ export async function GET(req: Request) {
   try {
     const query = parseQuery(new URL(req.url), homeTagsQuerySchema);
     const tags = await listHomeTags(query.categoryId);
-    return jsonOk({ tags });
+    // PERF-13: справочник тегов не зависит от зрителя; вариативность даёт только
+    // `?categoryId`, а он часть ключа кэша (URL).
+    return jsonOk({ tags }, publicReferenceCacheInit());
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {
