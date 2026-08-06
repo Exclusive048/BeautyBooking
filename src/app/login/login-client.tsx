@@ -554,7 +554,7 @@ export default function LoginClient({
                       </label>
                       <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
                         <Phone
-                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-primary"
+                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-accent-text"
                           aria-hidden
                         />
                         <Input
@@ -576,7 +576,7 @@ export default function LoginClient({
                       </label>
                       <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
                         <Mail
-                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-primary"
+                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-accent-text"
                           aria-hidden
                         />
                         <Input
@@ -711,7 +711,7 @@ export default function LoginClient({
                         onClick={resendCode}
                         disabled={loading}
                         data-testid="login-resend"
-                        className="text-sm font-medium text-accent-text transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
+                        className="text-sm font-medium text-accent-text transition-colors hover:text-accent-text-hover disabled:pointer-events-none disabled:opacity-50"
                       >
                         {T.resendCode}
                       </button>

@@ -71,7 +71,17 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
 
       <div className="flex flex-wrap items-start gap-4 p-5 sm:gap-6 sm:p-6">
         <div
-          className="-mt-14 flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border-4 border-bg-card bg-gradient-to-br from-pink-200 via-pink-400 to-primary/80 font-display text-3xl font-semibold text-primary shadow-brand"
+          // UI-10: инициалы — `text-primary`, а это САНКЦИОНИРОВАННАЯ пара к
+          // ФИКСИРОВАННОЙ светлой заливке (`button.tsx` variant `inverted`:
+          // бургунди в обеих темах, светлым не становится). Ломала пару не
+          // подпись, а последний стоп градиента: `to-primary/80` тематизируем
+          // и в своём же цвете, поэтому нижний правый угол плашки уезжал в тот
+          // же бургунди, что и буквы, — 1.59:1 в светлой и 1.11:1 в тёмной, то
+          // есть инициалы там пропадали в ОБЕИХ темах, а не только в тёмной.
+          // Стопы сведены к встроенной розовой шкале: заливка стала полностью
+          // фиксированной (правило пары соблюдено буквально), градиент так же
+          // углубляется к углу, а худшая точка теперь 4.52 / 4.09.
+          className="-mt-14 flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border-4 border-bg-card bg-gradient-to-br from-pink-200 via-pink-300 to-pink-400 font-display text-3xl font-semibold text-primary shadow-brand"
           aria-hidden
         >
           {initials || "S"}

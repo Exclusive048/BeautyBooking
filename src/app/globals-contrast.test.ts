@@ -13,8 +13,8 @@
  * Не-вакуумность: прогонялось на прежних значениях токена (#B89AA0 / #876770)
  * — краснеют все три светлые поверхности и все три тёмные.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const CSS = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
@@ -135,5 +135,93 @@ describe("globals.css — контраст границ элементов уп�
       const secondary = contrast(rgb(scope, "text-sec"), rgb(scope, "bg-card"));
       expect(control).toBeLessThan(secondary);
     }
+  });
+});
+
+/**
+ * UI-10 — заливочный токен не работает цветом переднего плана в тёмной теме.
+ *
+ * Раскол `--primary` (заливка) ↔ `--accent-text` (текст) сделан именно из-за
+ * этого: тёмный бургунди `--primary` (#7A102C) на тёмной карточке (#302026)
+ * даёт 1.42:1. Но раскол закрыл только ПОКОЙ — состояния остались на заливках,
+ * и это давало худшую из возможных форм: элемент был виден, пока его не
+ * трогаешь, и пропадал при фокусе (иконка поля на `/login`, 6.35 → 1.42) или
+ * под курсором (три ссылки, 6.89 → 1.99). Направление ошибки хуже, чем просто
+ * низкий контраст: интерфейс отвечал на действие пользователя исчезновением.
+ *
+ * Тест держит три вещи:
+ *  1) ратио самих токенов переднего плана по четырём поверхностям × две темы;
+ *  2) наведение НЕ СЛАБЕЕ покоя — иначе следующая пара повторит тот же дефект
+ *     с формально проходящими значениями;
+ *  3) заливочные токены (`--primary`, `--primary-hover`, `--primary-magenta`)
+ *     не встречаются классами переднего плана (`text-*`) в дереве. Список
+ *     исключений перечисляет тех, КОМУ МОЖНО, с причиной — это те же обратные
+ *     guard'ы, что #35/#38/SEC-29: новый `text-primary` валит CI просто потому,
+ *     что его нет в списке.
+ *
+ * Не-вакуумность: прогонялось с возвращённым `hover:text-primary-hover`
+ * (краснеет п. 3) и с `--accent-text-hover`, равным тёмному `--primary-hover`
+ * (краснеют п. 1 и п. 2).
+ */
+describe("globals.css — акцентный текст и его состояния", () => {
+  const SURFACES = ["bg-input", "bg-input-focus", "bg-card", "bg-page"] as const;
+  const FOREGROUNDS = ["accent-text", "accent-text-hover"] as const;
+
+  for (const token of FOREGROUNDS) {
+    it.each(SURFACES)(`светлая тема: --${token} на --%s ≥ 4.5:1`, (surface) => {
+      expect(contrast(rgb(":root", token), rgb(":root", surface))).toBeGreaterThanOrEqual(
+        WCAG_AA_TEXT
+      );
+    });
+
+    it.each(SURFACES)(`тёмная тема: --${token} на --%s ≥ 4.5:1`, (surface) => {
+      expect(contrast(rgb(".dark", token), rgb(".dark", surface))).toBeGreaterThanOrEqual(
+        WCAG_AA_TEXT
+      );
+    });
+  }
+
+  it("тёмная тема: наведение ярче покоя — реакция усиливает, а не гасит", () => {
+    // Светлую половину намеренно не проверяем на «ярче»: там наведение это
+    // смена оттенка бургунди → малина (10.59 → 7.21), обе точки далеко над
+    // порогом, и требование монотонности запретило бы существующий приём.
+    // Гасить до неразличимости оно не может — это ловит п. 1.
+    const rest = contrast(rgb(".dark", "accent-text"), rgb(".dark", "bg-card"));
+    const hover = contrast(rgb(".dark", "accent-text-hover"), rgb(".dark", "bg-card"));
+    expect(hover).toBeGreaterThan(rest);
+  });
+
+  it("заливочные токены не используются классами переднего плана", () => {
+    const FILL_ONLY = ["primary", "primary-hover", "primary-magenta"];
+    // Кому можно — с причиной. `inverted` документирован в самом `button.tsx`:
+    // фиксированная белая заливка обязана иметь фиксированную тёмную подпись,
+    // и `--primary` тут единственный токен, который светлым не становится.
+    // Плашка владельца — декоративная иконка на `/60`, не текст.
+    const ALLOWED = new Set([
+      "src/components/ui/button.tsx",
+      "src/features/public-studio/sections/owner-notice-section.tsx",
+      "src/features/public-profile/master/sections/owner-profile-notice.tsx",
+      "src/features/public-studio/studio-booking-flow/components/booking-hero.tsx",
+    ]);
+
+    const walk = (dir: string): string[] =>
+      readdirSync(dir).flatMap((entry) => {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) return walk(full);
+        return full.endsWith(".tsx") ? [full] : [];
+      });
+
+    const root = resolve(process.cwd(), "src");
+    // `(?![\w-])` — иначе `text-primary` матчится внутри `text-primary-hover`
+    // и `text-primary-foreground`, и список нарушений станет фиктивным.
+    const pattern = new RegExp(`text-(?:${FILL_ONLY.join("|")})(?![\\w-])`);
+
+    const offenders = walk(root)
+      .filter((file) => pattern.test(readFileSync(file, "utf8")))
+      .map((file) => file.slice(root.length + 1).split(sep).join("/"))
+      .map((rel) => `src/${rel}`)
+      .filter((rel) => !ALLOWED.has(rel));
+
+    expect(offenders).toEqual([]);
   });
 });

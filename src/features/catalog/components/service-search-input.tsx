@@ -233,7 +233,13 @@ export function ServiceSearchInput({
                     disabled={!p.publicUsername}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-input/70 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-magenta/10 text-primary-magenta">
+                    {/* UI-10: иконка брала ЗАЛИВОЧНЫЙ `primary-magenta` как
+                        цвет переднего плана — 2.89:1 в тёмной теме. Сосед на
+                        30 строк выше (`bg-primary/10 text-accent-text`) уже
+                        держит санкционированный раскол, так что здесь не новое
+                        решение, а выравнивание отставшей плашки: 10.30 / 6.27.
+                        Различает секции подложка и сама иконка, не её цвет. */}
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-magenta/10 text-accent-text">
                       {p.type === "studio" ? (
                         <Building2 className="h-3.5 w-3.5" aria-hidden />
                       ) : (

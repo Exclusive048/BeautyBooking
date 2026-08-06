@@ -50,6 +50,9 @@ module.exports = {
         // Burgundy in light, gold in dark. Use `text-accent-text` for accent
         // TEXT/icons on themed surfaces; keep `text-primary` only on fixed-light fills.
         "accent-text": "rgb(var(--accent-text) / <alpha-value>)",
+        // Пара наведения к `accent-text` (UI-10). Заливочный `primary-hover`
+        // в этой роли гасит ссылку в тёмной теме — см. globals.css.
+        "accent-text-hover": "rgb(var(--accent-text-hover) / <alpha-value>)",
         "accent-hover": "rgb(var(--accent-hover) / <alpha-value>)",
         "surface-hover": "rgb(var(--surface-hover) / <alpha-value>)",
         ring: "rgb(var(--ring) / <alpha-value>)",

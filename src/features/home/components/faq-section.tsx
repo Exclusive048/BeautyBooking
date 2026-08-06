@@ -50,7 +50,7 @@ export function FAQSection() {
       <motion.div variants={item} className="mt-8 text-center">
         <Link
           href="/faq"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-primary-hover"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-accent-text-hover"
         >
           {T.seeAll}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

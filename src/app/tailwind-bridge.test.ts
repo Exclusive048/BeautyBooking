@@ -80,6 +80,10 @@ describe("UI-06 — мост токен ↔ класс", () => {
       "primary-foreground",
       "accent-foreground",
       "border-control",
+      // `accent-text-hover` (UI-10) — снятый мост вернёт три ссылки в
+      // состояние «под курсором цвет не меняется вовсе», то есть отменит
+      // ровно ту реакцию, ради которой пара и заведена.
+      "accent-text-hover",
     ];
     const keys = new Set(bridges().map((b) => b.key));
     for (const name of used) {
