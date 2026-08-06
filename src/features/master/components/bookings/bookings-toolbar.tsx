@@ -72,7 +72,7 @@ export function BookingsToolbar({ initialSearch, initialTab, stats }: Props) {
             onChange={(event) => setSearch(event.target.value)}
             placeholder={T.searchPlaceholder}
             aria-label={T.searchPlaceholder}
-            className="h-10 w-full rounded-xl border border-border-subtle bg-bg-page pl-9 pr-3 text-sm text-text-main placeholder:text-text-sec transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="h-10 w-full rounded-xl border border-border-subtle bg-bg-page pl-9 pr-3 text-sm text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
 

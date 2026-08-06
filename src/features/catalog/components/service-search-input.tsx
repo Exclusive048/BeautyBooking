@@ -179,7 +179,7 @@ export function ServiceSearchInput({
         }}
         placeholder={UI_TEXT.catalog2.searchBar.searchPlaceholder}
         aria-label={UI_TEXT.catalog2.searchBar.searchPlaceholder}
-        className="h-11 w-full rounded-xl bg-transparent pl-9 pr-9 text-base text-text-main placeholder:text-text-sec transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="h-11 w-full rounded-xl bg-transparent pl-9 pr-9 text-base text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
 
       {loading ? (
