@@ -98,8 +98,10 @@ describe("UI-06 — мост токен ↔ класс", () => {
   it("опечатки в именах токенов не возвращаются в разметку", () => {
     // `bg-bg-elevated` и `border-bg-main` — имена, которых в конфиге нет
     // вовсе: `elevated` и `bg-card` пишутся без второго префикса.
+    // `p*-safe` (UI-08) — из плагина `tailwindcss-safe-area`, которого в
+    // `plugins: []` нет; safe-area пишется через `var(--safe-area-inset-*)`.
     const offenders = walkTsx("src").filter((file) =>
-      /\b(bg-bg-elevated|border-bg-main)\b/.test(readFileSync(file, "utf8"))
+      /\b(bg-bg-elevated|border-bg-main|p[btlrxy]-safe)\b/.test(readFileSync(file, "utf8"))
     );
     expect(offenders).toEqual([]);
   });

@@ -6,7 +6,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 export default function OfflinePage() {
   return (
-    <div className="min-h-[100dvh] bg-bg-page px-6 py-10 pt-safe pb-safe flex flex-col items-center justify-center text-center">
+    <div className="min-h-[100dvh] bg-bg-page px-6 py-10 pt-[calc(2.5rem+var(--safe-area-inset-top))] pb-[calc(2.5rem+var(--safe-area-inset-bottom))] flex flex-col items-center justify-center text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg-card shadow-card">
         <WifiOff className="h-8 w-8 text-text-sec" />
       </div>
