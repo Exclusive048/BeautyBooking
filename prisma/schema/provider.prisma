@@ -164,6 +164,11 @@ model Provider {
   @@index([type, isPublished, address])
   @@index([isPublished, autoPublishStoriesEnabled])
   @@index([cityId, isPublished])
+  // PERF-09 (I-6). С выбранным городом (дефолт UI) сортировочный индекс
+  // `[isPublished, ratingAvg, reviews, createdAt]` перестаёт покрывать
+  // `orderBy`: остаётся `(cityId, isPublished)` плюс внешняя сортировка. Этот
+  // повторяет BASE_ORDER каталога целиком, с городом впереди.
+  @@index([cityId, isPublished, ratingAvg(sort: Desc), reviews(sort: Desc), createdAt(sort: Desc)])
 }
 
 model MasterProfile {

@@ -67,6 +67,15 @@ export const RAW_SQL_OBJECTS = [
       "Исчезает гарантия БД «одна АКТИВНАЯ строка согласия на (user, цель, версия)». Останется только прикладная проверка в lib/legal/consent.ts (инв. #37), то есть гонка двух одновременных переключений сможет создать два активных согласия на одну цель — и журнал согласий станет неоднозначным ровно там, где он служит доказательством",
   },
   {
+    kind: "index",
+    name: "Review_active_target_createdAt_idx",
+    table: "Review",
+    migration: "20260806084318_add_perf_composite_indexes",
+    why: "partial index (`WHERE \"deletedAt\" IS NULL`): Prisma частичные индексы не выражает. Полная форма без предиката (`@@index([targetType, targetId, deletedAt, createdAt])`) здесь бесполезна — проверено EXPLAIN'ом: Postgres берёт `IS NULL` как условие индекса, но не как равенство, сохраняющее порядок по `createdAt`, и `Sort` из плана не уходит",
+    costIfLost:
+      "Список активных отзывов провайдера (ACTIVE_REVIEW_FILTER, инв. #17) возвращается к «доступ по (targetType, targetId) → фильтр soft-delete → сортировка всего набора». На публичном профиле мастера с тысячами отзывов это сортировка на каждый показ — молча, без ошибок. Предикат индекса обязан дословно совпадать с ACTIVE_REVIEW_FILTER: при расхождении планировщик просто перестанет его подхватывать",
+  },
+  {
     kind: "constraint",
     name: "BookingServiceItem_priceSnapshot_nonnegative_check",
     table: "BookingServiceItem",

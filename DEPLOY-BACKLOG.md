@@ -97,6 +97,21 @@
     WHERE "bufferBetweenBookingsMin" < 0 OR "bufferBetweenBookingsMin" > 30;
   ```
   Все нули → применять. Не ноль → **не «почистить» вслепую**: строка вне диапазона это либо след старого бага, либо легитимные данные, которых мы не ожидали (например буфер >30 у провайдера, заведённого до появления потолка). Разбирать по строкам; для буфера безопасная нормализация — `LEAST(30, GREATEST(0, "bufferBetweenBookingsMin"))`, для остальных нужен взгляд на конкретные записи.
+- **🚩 Миграция `20260806084318_add_perf_composite_indexes` строит индексы под SHARE-lock** *(PERF-09, 2026-08-06)*. Пять `CREATE INDEX` на `Booking` (×3), `Provider` и `Review` — все три таблицы горячие. Обычный `CREATE INDEX` берёт SHARE-lock и **блокирует запись** в таблицу на время сборки: на пустом проде это миллисекунды, на выросшем — минуты, в течение которых не создаётся ни одна бронь. Данные при этом не трогаются: миграция чисто аддитивная, `DROP` в ней нет (существующие однополевые индексы намеренно оставлены — их удаление отдельное решение), поэтому откат = `DROP INDEX` по именам.
+  - **Если применяется до открытия / на пустой базе** — применять как есть, ничего не делать.
+  - **Если применяется на базе с трафиком** — прогнать вручную с `CONCURRENTLY` ДО `migrate deploy`, а затем пометить миграцию применённой (`npx prisma migrate resolve --applied 20260806084318_add_perf_composite_indexes`), иначе `migrate deploy` попытается создать их второй раз и упадёт. `CREATE INDEX CONCURRENTLY` нельзя выполнять внутри транзакции, поэтому в файл миграции его вписать нельзя — только вручную:
+  ```sql
+  CREATE INDEX CONCURRENTLY "Booking_masterProviderId_startAtUtc_idx" ON "Booking"("masterProviderId", "startAtUtc");
+  CREATE INDEX CONCURRENTLY "Booking_clientUserId_startAtUtc_idx" ON "Booking"("clientUserId", "startAtUtc" DESC);
+  CREATE INDEX CONCURRENTLY "Booking_studioId_startAtUtc_idx" ON "Booking"("studioId", "startAtUtc" DESC);
+  CREATE INDEX CONCURRENTLY "Provider_cityId_isPublished_ratingAvg_reviews_createdAt_idx" ON "Provider"("cityId", "isPublished", "ratingAvg" DESC, "reviews" DESC, "createdAt" DESC);
+  CREATE INDEX CONCURRENTLY "Review_active_target_createdAt_idx" ON "Review"("targetType", "targetId", "createdAt" DESC) WHERE "deletedAt" IS NULL;
+  ```
+  ⚠️ После `CONCURRENTLY` проверить, что ни один индекс не остался невалидным (прерванная сборка оставляет `indisvalid = false`, и такой индекс не используется, но занимает место и замедляет запись):
+  ```sql
+  SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE NOT i.indisvalid;
+  ```
+  - **`Review_active_target_createdAt_idx` — ЧАСТИЧНЫЙ и живёт сырым SQL** (реестр `scripts/raw-sql-objects.mjs`). Его предикат обязан дословно совпадать с `ACTIVE_REVIEW_FILTER`; при расхождении планировщик просто перестанет его подхватывать — молча.
 - **Seed `BillingPlanPrice`** — явные active-строки на каждый предлагаемый период (1/3/6/12 мес). Fallback есть, но явная строка предпочтительнее.
 - **VAPID prod-ключи** для web-push (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL`). ⚠️ Web Push — единственный трансграничный поток ПДн; **до юридического вердикта push не включать** (гейт этапа 2).
 
