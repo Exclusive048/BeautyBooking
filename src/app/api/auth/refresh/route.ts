@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
-import { clearSessionCookies, getRefreshCookieName, rotateSessionCookies } from "@/lib/auth/session";
+import { clearSessionCookies, getRefreshCookieName } from "@/lib/auth/session";
+import { rotateSessionWithTelemetry } from "@/lib/auth/session-refresh";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 
 const REFRESH_COOKIE_NAME = getRefreshCookieName();
@@ -38,14 +39,11 @@ export async function POST(req: Request) {
     }
 
     const response = ok({ ok: true });
-    const session = await rotateSessionCookies(response, refreshToken);
-    if (!session) {
-      void recordSurfaceEvent({
-        surface: "auth",
-        outcome: "failure",
-        operation: "refresh-post",
-        code: "INVALID_REFRESH_TOKEN",
-      });
+    // PERF-14: ротация и её телеметрия — общие с прокси (`rotateSessionWithTelemetry`),
+    // иначе события `surface: "auth"` пропали бы с того пути, по которому идёт
+    // большинство обновлений сессии.
+    const rotated = await rotateSessionWithTelemetry(response, refreshToken);
+    if (!rotated) {
       const unauthorized = fail("Сессия истекла. Войдите заново.", 401, "UNAUTHORIZED");
       clearSessionCookies(unauthorized);
       unauthorized.headers.set("Cache-Control", "no-store");

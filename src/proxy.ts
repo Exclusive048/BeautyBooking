@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isPublicReferenceApiPath } from "@/lib/api/cache-headers";
+import { rotateSessionWithTelemetry } from "@/lib/auth/session-refresh";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
@@ -117,15 +118,11 @@ type RateLimitTier =
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
 /**
- * RES-04 — верхняя граница self-hop'а прокси в `/api/auth/refresh`.
- *
- * 2 с: обновление сессии — это одна проверка подписи + пара запросов к БД, то
- * есть десятки миллисекунд на здоровой системе. Порог выбран так, чтобы не
- * срезать легитимный хвост латентности и при этом не дать очереди сложиться:
- * при 2 с прокси освобождает слот раньше, чем клиентский `fetch` успевает
- * выйти по собственному таймауту.
+ * RES-04 задавал верхнюю границу self-hop'а прокси в `/api/auth/refresh` (2 с).
+ * PERF-14 убрал сам хоп — обновление идёт вызовом функции, — поэтому и граница
+ * ушла: ограничивать больше нечего, а гонка вокруг ротации токена вредна
+ * (см. комментарий на месте вызова). Константа удалена намеренно, не забыта.
  */
-const REFRESH_FETCH_TIMEOUT_MS = 2000;
 const PUBLIC_PATHS = ["/login", "/register", "/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
 
 function resolveRequestId(request: NextRequest): string {
@@ -376,32 +373,37 @@ export async function proxy(request: NextRequest) {
     if (!accessValid) {
       const refreshToken = request.cookies.get("bh_refresh")?.value;
       if (refreshToken) {
-        const refreshUrl = new URL(REFRESH_ENDPOINT_PATH, request.url);
-        // RES-04: у этого хопа обязана быть верхняя граница, и она не про
-        // «медленно». Прокси держит ВХОДЯЩИЙ запрос, пока ждёт ИСХОДЯЩИЙ к
-        // самому себе, то есть каждый такой запрос занимает два слота
-        // обработки вместо одного. Если `/api/auth/refresh` начинает тормозить
-        // (исчерпан пул Prisma), петля затягивается сама: чем больше висит,
-        // тем меньше слотов остаётся тому самому роуту, которого все ждут.
-        // Без границы разорвать её нечем. Матчер покрывает всё, кроме статики,
-        // а access-токен живёт 2 ч — путь горячий у каждого залогиненного.
+        // PERF-14: обновление сессии идёт ВЫЗОВОМ ФУНКЦИИ, а не HTTP-запросом к
+        // самому себе. Прежний self-hop держал ВХОДЯЩИЙ запрос, пока ждал
+        // ИСХОДЯЩИЙ, то есть каждый такой запрос занимал два слота обработки
+        // вместо одного, и при замедлении `/api/auth/refresh` (исчерпан пул
+        // Prisma) петля затягивалась сама: чем больше висит, тем меньше слотов
+        // остаётся тому самому роуту, которого все ждут. Путь горячий у каждого
+        // залогиненного — матчер покрывает всё кроме статики, access-токен живёт
+        // 2 ч. RES-04 ограничивал этот хоп сверху; теперь ограничивать нечего.
         //
-        // Отказ или таймаут = продолжаем БЕЗ обновления: обработчик увидит
-        // протухшую куку и ответит 401, клиент уйдёт на /login. Это хуже
-        // успешного обновления и лучше зависания. `fetch` здесь ещё и бросал
-        // при сетевой ошибке (ECONNREFUSED при рестарте) — из middleware это
-        // 500 на КАЖДЫЙ запрос, а не 401.
+        // Стало возможным потому, что прокси Next 16 работает в рантайме
+        // **Node.js** (это дефолт, и опция `runtime` в proxy-файлах вообще
+        // недоступна). Предыдущая формулировка про edge-рантайм здесь была
+        // унаследована от эпохи `middleware.ts` и уже не соответствовала коду:
+        // модуль и так импортирует `crypto` и Redis-лимитер.
+        //
+        // Таймаута тут намеренно НЕТ, и это не упущение: оборвать ротацию гонкой
+        // нельзя. `Promise.race` не отменяет запрос Prisma — refresh-токен успел
+        // бы пометиться использованным, а новая кука до клиента не доехала бы,
+        // то есть пользователя выбросило бы на /login по вине самой защиты.
+        // Верхняя граница есть и она серверная: `statement_timeout=30000`
+        // (RES-24) плюс конечные `connect_timeout`/`pool_timeout` Prisma.
+        //
+        // Отказ = продолжаем БЕЗ обновления: обработчик увидит протухшую куку и
+        // ответит 401, клиент уйдёт на /login. Хуже успешного обновления и лучше
+        // упавшего запроса — throw из прокси это 500 на КАЖДЫЙ запрос.
         try {
-          const refreshRes = await fetch(refreshUrl.toString(), {
-            method: "POST",
-            headers: {
-              cookie: request.headers.get("cookie") ?? "",
-            },
-            signal: AbortSignal.timeout(REFRESH_FETCH_TIMEOUT_MS),
-          });
+          const carrier = NextResponse.next();
+          const rotated = await rotateSessionWithTelemetry(carrier, refreshToken);
 
-          if (refreshRes.ok) {
-            refreshedSetCookies = readSetCookieHeaders(refreshRes.headers);
+          if (rotated) {
+            refreshedSetCookies = readSetCookieHeaders(carrier.headers);
             // LOGIC-22: свежая кука уезжает и ВНУТРЬ — иначе обработчик этого же
             // запроса продолжит читать протухшую и примет вызывающего за гостя.
             if (refreshedSetCookies.length > 0) {
@@ -412,8 +414,9 @@ export async function proxy(request: NextRequest) {
             }
           }
         } catch {
-          // Логгера здесь нет намеренно: `logging/logger.ts` тянет
-          // `async_hooks`, которого нет в edge-рантайме прокси.
+          // Логгера здесь нет намеренно: `logging/logger.ts` работает через
+          // request-контекст, которого у прокси нет; отказ ротации уже виден в
+          // телеметрии `surface: "auth"`.
           refreshedSetCookies = [];
         }
       }

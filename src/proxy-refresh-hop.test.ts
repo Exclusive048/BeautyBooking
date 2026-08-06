@@ -1,25 +1,37 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { NextRequest } from "next/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * RES-04 — self-hop прокси в `/api/auth/refresh` шёл без верхней границы и без
- * `try/catch`.
+ * RES-04 → PERF-14 — обновление сессии прокси больше не идёт по HTTP.
  *
- * Импакт не «медленнее», а петля: прокси держит ВХОДЯЩИЙ запрос, пока ждёт
- * ИСХОДЯЩИЙ к самому себе, то есть один запрос занимает два слота обработки.
- * Когда `/api/auth/refresh` начинает тормозить, свободных слотов остаётся всё
- * меньше — в том числе для него самого, и разорвать это нечем. Плюс голый
- * `fetch` БРОСАЕТ при сетевой ошибке, а throw из middleware — это 500 на
- * каждый запрос вместо честного 401.
+ * История. RES-04 обнаружил, что self-hop прокси в `/api/auth/refresh` шёл без
+ * верхней границы и без `try/catch`: прокси держит ВХОДЯЩИЙ запрос, пока ждёт
+ * ИСХОДЯЩИЙ к самому себе, то есть один запрос занимает два слота обработки, и
+ * при замедлении refresh-роута петля затягивается сама. Тогда хоп ограничили
+ * таймаутом 2 с.
+ *
+ * PERF-14 убрал сам хоп: прокси Next 16 работает в рантайме Node.js, поэтому
+ * ротация вызывается функцией. Инвариант, который сторожит этот файл, стал
+ * СТРОЖЕ прежнего — не «у хопа есть граница», а «хопа нет вовсе», — и
+ * одновременно сохранил вторую половину RES-04: отказ обновления не роняет
+ * запрос, а даёт обработчику увидеть протухшую куку и ответить 401.
+ *
+ * Не-вакуумность: прогонялось с возвращённым `fetch`-хопом (тест на отсутствие
+ * сетевого вызова краснеет) и с `rotateSessionWithTelemetry`, бросающим ошибку
+ * без `try/catch` в прокси (запрос отвечает 500 — краснеет второй тест).
  */
 
 const checkRateLimit = vi.hoisted(() => vi.fn(async () => ({ limited: false, retryAfterSeconds: 0 })));
 const verifyToken = vi.hoisted(() => vi.fn(() => null));
+const rotateSessionWithTelemetry = vi.hoisted(() =>
+  vi.fn(async (_response: { headers: Headers }, _refreshToken: string): Promise<boolean> => false),
+);
 
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit }));
 vi.mock("@/lib/auth/jwt", () => ({ verifyToken }));
+vi.mock("@/lib/auth/session-refresh", () => ({ rotateSessionWithTelemetry }));
 
 import { proxy } from "./proxy";
 
@@ -32,12 +44,14 @@ function requestWithStaleSession(): NextRequest {
   });
 }
 
-describe("RES-04 · self-hop прокси в /api/auth/refresh ограничен сверху", () => {
+describe("PERF-14 · прокси обновляет сессию вызовом, а не запросом к самому себе", () => {
   const realFetch = globalThis.fetch;
 
   beforeEach(() => {
     checkRateLimit.mockClear();
-    // Протухший access-токен: именно эта ветка и уходит в self-hop.
+    rotateSessionWithTelemetry.mockReset();
+    rotateSessionWithTelemetry.mockResolvedValue(false);
+    // Протухший access-токен: именно эта ветка и уходила в self-hop.
     verifyToken.mockReturnValue(null);
   });
 
@@ -46,47 +60,39 @@ describe("RES-04 · self-hop прокси в /api/auth/refresh ограниче�
     vi.unstubAllGlobals();
   });
 
-  it("в self-hop передаётся AbortSignal", async () => {
-    let capturedSignal: AbortSignal | null = null;
-    globalThis.fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
-      capturedSignal = (init?.signal as AbortSignal | undefined) ?? null;
-      return new Response(null, { status: 200 });
-    }) as unknown as typeof fetch;
+  it("сетевого вызова не происходит вовсе — ротация зовётся напрямую", async () => {
+    const networkCall = vi.fn(async () => new Response(null, { status: 200 }));
+    globalThis.fetch = networkCall as unknown as typeof fetch;
 
     await proxy(requestWithStaleSession());
 
-    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+    expect(networkCall).not.toHaveBeenCalled();
+    expect(rotateSessionWithTelemetry).toHaveBeenCalledTimes(1);
+    expect(rotateSessionWithTelemetry.mock.calls[0][1]).toBe("refresh-token");
   });
 
-  it("таймаут хопа не роняет входящий запрос — обработчик просто увидит протухшую куку", async () => {
-    globalThis.fetch = vi.fn(async () => {
-      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
-    }) as unknown as typeof fetch;
+  it("отказ ротации не роняет входящий запрос (обработчик ответит 401 сам)", async () => {
+    rotateSessionWithTelemetry.mockRejectedValue(new Error("db unavailable"));
 
     const res = await proxy(requestWithStaleSession());
 
     expect(res.status).toBeLessThan(500);
   });
 
-  it("сетевой отказ хопа (ECONNREFUSED при рестарте) тоже не роняет запрос", async () => {
-    globalThis.fetch = vi.fn(async () => {
-      throw new TypeError("fetch failed");
-    }) as unknown as typeof fetch;
+  it("без refresh-куки ротация не вызывается", async () => {
+    const res = await proxy(
+      new NextRequest("https://example.test/cabinet/master", { method: "GET" }),
+    );
 
-    const res = await proxy(requestWithStaleSession());
-
+    expect(rotateSessionWithTelemetry).not.toHaveBeenCalled();
     expect(res.status).toBeLessThan(500);
   });
 
-  it("граница задана константой и не превышает 5 с", () => {
-    // Сам факт срабатывания таймера тестом не проверяется — ждать 2 с в
-    // прогоне дороже, чем оно стоит. Проверяется контракт: сигнал уходит в
-    // `fetch` (тест выше), а его источник — именно таймаут с осмысленным
-    // значением.
-    expect(PROXY_SOURCE).toMatch(/signal:\s*AbortSignal\.timeout\(REFRESH_FETCH_TIMEOUT_MS\)/);
-    const declared = PROXY_SOURCE.match(/const REFRESH_FETCH_TIMEOUT_MS = (\d+);/);
-    expect(declared).not.toBeNull();
-    expect(Number(declared![1])).toBeGreaterThan(0);
-    expect(Number(declared![1])).toBeLessThanOrEqual(5000);
+  it("в исходнике не осталось ни self-hop'а, ни его таймаута", () => {
+    // Хоп возвращается «естественно» — кто-то допишет `fetch` обратно, увидев
+    // старый комментарий. Проверяется отсутствие обеих его примет.
+    expect(PROXY_SOURCE).not.toMatch(/await\s+fetch\(/);
+    expect(PROXY_SOURCE).not.toContain("REFRESH_FETCH_TIMEOUT_MS");
+    expect(PROXY_SOURCE).toContain("rotateSessionWithTelemetry");
   });
 });
