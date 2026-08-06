@@ -2437,6 +2437,7 @@ export const UI_TEXT = {
         title: "Здесь пока пусто",
         bodyAll: "Когда клиенты оставят отзывы — они появятся тут.",
         bodyFiltered: "Под выбранный фильтр отзывов нет.",
+        resetCta: "Сбросить фильтры",
       },
       anon: "Клиент",
       noService: "Услуга",
@@ -2479,6 +2480,7 @@ export const UI_TEXT = {
         emptyBody:
           "Пока никто к вам не записывался. Когда придут — появятся здесь автоматически.",
         emptyFiltered: "Под фильтр ничего не попало",
+        emptyResetCta: "Сбросить фильтры",
         backToList: "К списку",
         noVisits: "Без визитов",
         visitsTemplate: "{n} {word} · посл. {when}",
@@ -6807,6 +6809,9 @@ export const UI_TEXT = {
       empty: {
         title: "Нет записей",
         hint: "Записи появятся после первых бронирований.",
+        filteredTitle: "Под фильтр ничего не попало",
+        filteredHint: "Измените параметры или сбросьте фильтры.",
+        resetCta: "Сбросить фильтры",
       },
       pagination: {
         loadMore: "Показать ещё",
@@ -7195,6 +7200,9 @@ export const UI_TEXT = {
       empty: {
         title: "Нет клиентов",
         hint: "Клиенты появятся после первых записей.",
+        filteredTitle: "Под фильтр никто не попал",
+        filteredHint: "Измените запрос или сбросьте фильтры.",
+        resetCta: "Сбросить фильтры",
       },
       errors: {
         loadFailed: "Не удалось загрузить клиентов",

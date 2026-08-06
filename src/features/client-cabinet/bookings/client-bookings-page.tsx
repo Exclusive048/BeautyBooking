@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ResilientImage } from "@/components/ui/resilient-image";
@@ -126,7 +127,7 @@ export function ClientBookingsPage() {
       ) : isLoading ? (
         <BookingsListSkeleton />
       ) : bookings.length === 0 ? (
-        <EmptyState />
+        <BookingsEmptyState />
       ) : (
         <div className="space-y-8" data-testid="bookings-list">
           {months.map((month) => (
@@ -671,17 +672,20 @@ function ActionLink({
 
 /* -------------------------------------------------------------------------- */
 
-function EmptyState() {
+/**
+ * RES-28: локальная копия называлась `EmptyState` — ровно как общий экспорт из
+ * `@/components/ui/empty-state`, из-за чего в трёх файлах `client-cabinet` жили
+ * три разных компонента с одним именем. Действие и текст сохранены дословно.
+ */
+function BookingsEmptyState() {
   return (
-    <Card className="flex flex-col items-center gap-4 p-10 text-center">
-      <div className="grid h-14 w-14 place-items-center rounded-full bg-bg-input">
-        <Calendar className="h-6 w-6 text-text-sec" aria-hidden />
-      </div>
-      <div className="font-display text-lg text-text-main">{T.empty}</div>
-      <Link href="/catalog">
-        <Button variant="primary">{T.emptyCta}</Button>
-      </Link>
-    </Card>
+    <EmptyState
+      variant="card"
+      iconSize="lg"
+      icon={Calendar}
+      title={T.empty}
+      action={{ label: T.emptyCta, href: "/catalog", variant: "primary" }}
+    />
   );
 }
 

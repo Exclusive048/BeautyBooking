@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Switch } from "@/components/ui/switch";
 import {
   groupForNotificationType,
@@ -262,7 +263,7 @@ export function ClientNotificationsPage() {
       ) : isLoading ? (
         <NotificationsSkeleton />
       ) : filtered.length === 0 ? (
-        <EmptyState />
+        <NotificationsEmptyState />
       ) : (
         <ul className="space-y-2">
           {filtered.map((n) => (
@@ -373,13 +374,13 @@ function deriveAction(n: NotificationItem): { href: string; label: string } | nu
   return null;
 }
 
-function EmptyState() {
-  return (
-    <Card className="flex flex-col items-center gap-3 p-10 text-center">
-      <Inbox className="h-10 w-10 text-text-sec/40" aria-hidden />
-      <div className="font-display text-base text-text-main">{T.empty}</div>
-    </Card>
-  );
+/**
+ * RES-28: локальная копия называлась `EmptyState` — как общий экспорт из
+ * `@/components/ui/empty-state`. Кнопки нет и здесь: у пустого списка
+ * уведомлений действия не существует, придумывать его — менять продукт.
+ */
+function NotificationsEmptyState() {
+  return <EmptyState variant="card" icon={Inbox} title={T.empty} />;
 }
 
 function NotificationsSkeleton() {

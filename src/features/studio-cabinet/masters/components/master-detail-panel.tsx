@@ -1,4 +1,5 @@
 import { Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioMasterDetail } from "../server/types";
 import { MasterDetailHeader } from "./master-detail-header";
@@ -7,13 +8,16 @@ import { MasterDetailWeekSchedule } from "./master-detail-week-schedule";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail;
 
+/**
+ * RES-28: общий примитив вместо руками собранной разметки.
+ *
+ * Кнопки нет намеренно: это пустой ВЫБОР, а не пустой список — действие
+ * («выберите мастера») выполняется в списке слева, и подсказка про это и есть
+ * `T.empty.hint`. Кнопка здесь вела бы в никуда.
+ */
 export function MasterDetailEmpty() {
   return (
-    <section className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border-subtle bg-bg-card p-12 text-center">
-      <Users className="h-12 w-12 text-text-sec/30" aria-hidden />
-      <p className="text-base font-semibold text-text-main">{T.empty.title}</p>
-      <p className="max-w-sm text-sm text-text-sec">{T.empty.hint}</p>
-    </section>
+    <EmptyState variant="card" icon={Users} title={T.empty.title} description={T.empty.hint} />
   );
 }
 

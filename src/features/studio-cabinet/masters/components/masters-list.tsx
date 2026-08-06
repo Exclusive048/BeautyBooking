@@ -1,4 +1,5 @@
 import { Plus, Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioMasterListItem } from "../server/types";
 import { MasterListItem } from "./master-list-item";
@@ -30,10 +31,11 @@ export function MastersList({
       </p>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-border-subtle bg-bg-card p-8 text-center">
-          <Users className="h-8 w-8 text-text-sec/40" aria-hidden />
-          <p className="text-sm text-text-sec">{T.list.empty}</p>
-        </div>
+        // RES-28: общий примитив. Отдельной кнопки нет намеренно — приглашение
+        // мастера уже стоит карточкой прямо под списком (`inviteCard` ниже) и
+        // рендерится в том числе при пустом списке; вторая копия того же
+        // действия дала бы два CTA подряд.
+        <EmptyState variant="card" icon={Users} title={T.list.empty} className="px-6 py-8" />
       ) : (
         <ul className="space-y-2">
           {items.map((master) => (

@@ -54,6 +54,11 @@ export function StudioClientsPage({
             scheduleMasters={scheduleMasters}
             services={services}
             timezone={data.timezone}
+            isFiltered={
+              Boolean(search) ||
+              (Boolean(masterId) && masterId !== "all") ||
+              (Boolean(segment) && segment !== "all")
+            }
           />
           <ClientsPagination nextCursor={data.nextCursor} />
         </div>

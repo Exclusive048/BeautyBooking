@@ -1,4 +1,5 @@
 import { Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import type {
   StudioCabinetServiceOption,
   StudioCabinetShellExtras,
@@ -8,6 +9,8 @@ import type { StudioClientRow } from "../lib/types";
 import { ClientTableRow } from "./client-row";
 
 const T = UI_TEXT.studioCabinet.clientsV2;
+/** Сброс фильтров = тот же путь без query-параметров. */
+const PAGE_PATH = "/cabinet/studio/clients";
 
 type Props = {
   rows: StudioClientRow[];
@@ -18,16 +21,34 @@ type Props = {
   services: StudioCabinetServiceOption[];
   /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the «Записать» dialog. */
   timezone: string;
+  /** RES-28: применён ли хоть один фильтр — от этого зависит, есть ли у пустого
+   * состояния действие. Считает страница: только она знает значения по умолчанию. */
+  isFiltered: boolean;
 };
 
-export function ClientsTable({ rows, studioId, scheduleMasters, services, timezone }: Props) {
+export function ClientsTable({
+  rows,
+  studioId,
+  scheduleMasters,
+  services,
+  timezone,
+  isFiltered,
+}: Props) {
   if (rows.length === 0) {
+    // RES-28: общий примитив. Действие — сброс фильтров и только при их
+    // наличии; для случая «клиентов ещё нет» кнопки нет намеренно — «+ Клиент»
+    // уже стоит в шапке страницы, и вторая копия дала бы два CTA на экране.
+    // Текст тоже зависит от фильтра: живой прогон показал, что под запросом,
+    // который ничего не нашёл, страница уверяла «Клиенты появятся после первых
+    // записей» — при 16 клиентах в базе и счётчике «0 отфильтровано» в шапке.
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle bg-bg-card p-10 text-center">
-        <Users className="h-10 w-10 text-text-sec/30" aria-hidden />
-        <p className="text-base font-semibold text-text-main">{T.empty.title}</p>
-        <p className="max-w-md text-sm text-text-sec">{T.empty.hint}</p>
-      </div>
+      <EmptyState
+        variant="card"
+        icon={Users}
+        title={isFiltered ? T.empty.filteredTitle : T.empty.title}
+        description={isFiltered ? T.empty.filteredHint : T.empty.hint}
+        action={isFiltered ? { label: T.empty.resetCta, href: PAGE_PATH } : undefined}
+      />
     );
   }
   return (

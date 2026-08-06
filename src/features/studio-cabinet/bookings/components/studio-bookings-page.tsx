@@ -66,6 +66,9 @@ export function StudioBookingsPage({
         rows={list.items}
         masters={scheduleMasters}
         timezone={list.timezone}
+        isFiltered={
+          Boolean(search) || (Boolean(status) && status !== "all") || (Boolean(masterId) && masterId !== "all")
+        }
       />
       <BookingsPagination nextCursor={list.nextCursor} />
     </div>

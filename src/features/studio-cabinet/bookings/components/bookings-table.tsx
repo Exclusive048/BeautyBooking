@@ -1,4 +1,5 @@
 import { Calendar } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
 import type { StudioBookingRow } from "../server/types";
@@ -6,6 +7,8 @@ import { BookingRow } from "./booking-row";
 
 const T = UI_TEXT.studioCabinet.bookingsV2.table;
 const E = UI_TEXT.studioCabinet.bookingsV2.empty;
+/** Сброс фильтров = тот же путь без query-параметров. */
+const PAGE_PATH = "/cabinet/studio/bookings";
 
 type Props = {
   studioId: string;
@@ -13,16 +16,24 @@ type Props = {
   masters: ScheduleMasterColumn[];
   /** FIX-STUDIO-CALENDAR-SALON-TZ: salon tz for the "when" column. */
   timezone: string;
+  /** RES-28: применён ли хоть один фильтр — от этого зависит, есть ли у пустого
+   * состояния действие. Считает страница: только она знает значения по умолчанию. */
+  isFiltered: boolean;
 };
 
-export function BookingsTable({ studioId, rows, masters, timezone }: Props) {
+export function BookingsTable({ studioId, rows, masters, timezone, isFiltered }: Props) {
   if (rows.length === 0) {
+    // RES-28: общий примитив. Действие — сброс фильтров, и только когда они
+    // применены: кнопку «создать запись» сюда не дублируем, она уже стоит в
+    // шапке страницы прямо над таблицей (один primary CTA на экран).
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border-subtle bg-bg-card p-12 text-center">
-        <Calendar className="h-10 w-10 text-text-sec/30" aria-hidden />
-        <p className="text-base font-semibold text-text-main">{E.title}</p>
-        <p className="max-w-sm text-sm text-text-sec">{E.hint}</p>
-      </div>
+      <EmptyState
+        variant="card"
+        icon={Calendar}
+        title={isFiltered ? E.filteredTitle : E.title}
+        description={isFiltered ? E.filteredHint : E.hint}
+        action={isFiltered ? { label: E.resetCta, href: PAGE_PATH } : undefined}
+      />
     );
   }
 
