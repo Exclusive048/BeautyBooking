@@ -51,7 +51,7 @@ import { runMediaCleanup } from "@/lib/media/cleanup";
 import { runMediaPurge } from "@/lib/media/purge";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
-import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
+import { createMrrSnapshotForToday, runMrrSnapshotBackstop } from "@/lib/billing/mrr-snapshot";
 import { processPlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
 import {
   recomputeAvailableToday,
@@ -220,6 +220,32 @@ function startPeriodicJobs() {
         reportWorkerFailure("bookings.reminders.reconcile", error);
       });
   }, reminderReconcileIntervalMs);
+
+  // RES-26: снимок MRR держался на ОДНОМ внешнем срабатывании cron'а в сутки, и
+  // пропуск оставлял в ряду дыру навсегда. Подбор — не бэкфилл, а второй шанс
+  // ИЗМЕРИТЬ сегодняшний день (почему прошедшие дни восстановить нельзя — в
+  // `runMrrSnapshotBackstop`). Каждые 15 минут, потому что решение принимает сам
+  // хелпер по часу UTC: до окна это ранний выход без обращения к БД, внутри окна
+  // — один `findUnique` по уникальному ключу, а несколько попыток подряд
+  // страхуют от рестарта воркера на границе суток.
+  const mrrBackstopIntervalMs = 15 * 60 * 1000;
+  setInterval(() => {
+    void runMrrSnapshotBackstop()
+      .then((result) => {
+        if (result.ran && result.created) {
+          logInfo("billing.mrr.snapshot.backstopped", {
+            snapshotDate: result.snapshot.snapshotDate.toISOString().slice(0, 10),
+            mrrKopeks: result.snapshot.mrrKopeks.toString(),
+          });
+        }
+      })
+      .catch((error) => {
+        logError("MRR snapshot backstop failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("billing.mrr.snapshot.backstop", error);
+      });
+  }, mrrBackstopIntervalMs);
 
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
   setInterval(() => {
