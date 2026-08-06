@@ -22,9 +22,17 @@
  * п. 2), с мостом на несуществующую переменную (п. 1) и с `rose`, добавленным
  * в конфиг (п. 3).
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+
+function walkTsx(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) return walkTsx(full);
+    return full.endsWith(".tsx") ? [full] : [];
+  });
+}
 
 const CONFIG = readFileSync(resolve(process.cwd(), "tailwind.config.js"), "utf8");
 const CSS = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
@@ -68,6 +76,32 @@ describe("UI-06 — мост токен ↔ класс", () => {
     for (const name of used) {
       expect(keys.has(name), `нет моста для ${name}`).toBe(true);
     }
+  });
+
+  /**
+   * UI-07 — тот же класс отказа, но у компонентных классов: разметка их
+   * ставит, правила нет. `glass-panel` и `fade-in-up` потерялись вместе с
+   * `lux-*` в коммите `68c17f9` (UI-01), `histogram-slider-thumb` не
+   * существовал никогда. Ошибки при этом нет ни одной: сайдбар без
+   * поверхности и бегунок в дефолтном виде браузера выглядят «как задумано».
+   *
+   * Не-вакуумность: прогонялось с удалённым `.glass-panel` (краснеет) и с
+   * возвращённым `bg-bg-elevated` в разметке (краснеет).
+   */
+  it("компонентные классы из разметки имеют правило", () => {
+    for (const rule of [".glass-panel", ".fade-in-up", ".histogram-slider-thumb"]) {
+      expect(CSS.includes(`${rule} `) || CSS.includes(`${rule}:`) || CSS.includes(`${rule}::`), rule)
+        .toBe(true);
+    }
+  });
+
+  it("опечатки в именах токенов не возвращаются в разметку", () => {
+    // `bg-bg-elevated` и `border-bg-main` — имена, которых в конфиге нет
+    // вовсе: `elevated` и `bg-card` пишутся без второго префикса.
+    const offenders = walkTsx("src").filter((file) =>
+      /\b(bg-bg-elevated|border-bg-main)\b/.test(readFileSync(file, "utf8"))
+    );
+    expect(offenders).toEqual([]);
   });
 
   it("rose/sky остаются встроенными палитрами Tailwind", () => {

@@ -304,7 +304,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
 
   const avatarNode = useMemo(
     () => (
-      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-bg-main bg-bg-elevated">
+      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-bg-card bg-elevated">
         <AvatarEditor
           entityType={MediaEntityType.STUDIO}
           entityId={providerId}

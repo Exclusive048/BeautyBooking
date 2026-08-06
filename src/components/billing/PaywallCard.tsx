@@ -23,7 +23,7 @@ export function PaywallCard({ feature, billingHref, description, title }: Paywal
 
   return (
     <div className="flex min-h-[320px] flex-col items-center justify-center rounded-3xl border border-border-subtle bg-bg-card/60 px-6 py-12 text-center">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-elevated">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-elevated">
         <Lock className="h-6 w-6 text-text-sec" aria-hidden />
       </div>
       <h2 className="text-lg font-semibold text-text-main">
@@ -49,7 +49,7 @@ export function LockBadge({ tooltip }: { tooltip?: string }) {
     <span
       title={tooltip ?? t.lockedTooltip}
       aria-label={tooltip ?? t.lockedTooltip}
-      className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-bg-elevated"
+      className="ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-elevated"
     >
       <Lock className="h-2.5 w-2.5 text-text-sec" aria-hidden />
     </span>

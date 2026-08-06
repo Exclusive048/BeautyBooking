@@ -235,7 +235,7 @@ const SlotButton = memo(function SlotButton({
           ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-accent-foreground"
           : isHot
             ? "border-amber-300/60 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
-            : "border-border-subtle bg-bg-input text-text-main hover:bg-bg-elevated",
+            : "border-border-subtle bg-bg-input text-text-main hover:bg-elevated",
         disabled && "cursor-not-allowed opacity-60",
         className
       )}

@@ -300,6 +300,78 @@
     border-color: rgb(var(--border-focus));
     box-shadow: 0 0 0 1px rgb(var(--border-focus) / 0.34), 0 0 0 7px rgb(var(--border-focus) / 0.16);
   }
+
+  /* UI-07 — три класса, потерянные тем же коммитом `68c17f9`, что и `lux-*`
+     (UI-01). Разметка их ставит до сих пор, поэтому «класс есть, правила нет»
+     выглядело как задуманный вид: сайдбар клиентского кабинета и навбар
+     студии оставались `rounded-[26px] p-4` без поверхности вовсе. Правила
+     возвращены дословно; переменные, на которые они ссылаются, в схеме есть
+     (обе темы). */
+  .glass-panel {
+    background-color: rgb(var(--glass-bg) / 0.75);
+    border: 1px solid rgb(var(--glass-border) / 0.18);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px);
+  }
+
+  /* Появление секций публичных профилей (13 сайтов). Класс статичен, а
+     анимация — только под `no-preference`: это текущая идиома файла (см.
+     `login-*` и `focus-row-highlight`), и она безопаснее прежнего
+     `animation: none` в `reduce` — стартовая непрозрачность 0 при
+     отключённой анимации просто не применяется. */
+  .fade-in-up {
+    opacity: 1;
+  }
+
+  /* Ползунки фильтра цены в каталоге. Класс в разметке был, правила не
+     существовало НИКОГДА (в истории `globals.css` его нет) — то есть оба
+     бегунка рисовались дефолтным видом браузера поверх бренд-полосы. */
+  .histogram-slider-thumb::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background-color: rgb(var(--bg-card));
+    border: 2px solid rgb(var(--primary));
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+  }
+
+  .histogram-slider-thumb::-moz-range-thumb {
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background-color: rgb(var(--bg-card));
+    border: 2px solid rgb(var(--primary));
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+  }
+
+  .histogram-slider-thumb:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgb(var(--border-focus) / 0.28);
+  }
+
+  .histogram-slider-thumb:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 4px rgb(var(--border-focus) / 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in-up {
+    animation: fadeInUp 0.4s ease-out both;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer utilities {

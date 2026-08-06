@@ -79,7 +79,7 @@ function CTACard({
         "relative flex flex-col gap-5 overflow-hidden rounded-3xl border p-6 md:p-8",
         isBrand
           ? "border-transparent bg-brand-gradient text-white shadow-brand"
-          : "border-border-subtle bg-bg-elevated text-text-main",
+          : "border-border-subtle bg-elevated text-text-main",
       )}
     >
       {/* Decorative accent — only on brand card, subtle */}
