@@ -1,7 +1,7 @@
 import { HeroBlock } from "@/features/public-profile/master/hero-block";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { getSessionUser } from "@/lib/auth/session";
-import { getFavoriteProviderIds } from "@/lib/favorites/get-favorites";
+import { isProviderFavorited } from "@/lib/favorites/get-favorites";
 import { getMasterPublicProfileView } from "@/lib/master/public-profile-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -40,8 +40,7 @@ export async function HeroSection({ providerId }: Props) {
   // renders correctly on first paint instead of flickering after a client
   // fetch.
   const user = await getSessionUser();
-  const favoriteIds = user ? await getFavoriteProviderIds(user.id) : null;
-  const isFavorited = favoriteIds?.has(view.provider.id) ?? false;
+  const isFavorited = user ? await isProviderFavorited(user.id, view.provider.id) : false;
 
   return (
     <div className="fade-in-up">

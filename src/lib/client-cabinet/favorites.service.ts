@@ -1,9 +1,9 @@
 import {
   BookingStatus,
   PlanTier,
+  Prisma,
   ProviderType,
   SubscriptionStatus,
-  type Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -55,23 +55,31 @@ async function getFirstPortfolioPhotos(
 ): Promise<Map<string, string>> {
   if (providerIds.length === 0) return new Map();
 
-  // One pass — group by masterId picking the most recent in-search photo.
-  // We sort by createdAt desc and `distinctOn` would be ideal but Prisma's
-  // groupBy doesn't return scalar columns alongside aggregates. A simple
-  // findMany + JS reduce is plenty fast for N≤200 favorites.
-  const rows = await prisma.portfolioItem.findMany({
-    where: {
-      masterId: { in: providerIds },
-      inSearch: true,
-      isPublic: true,
-    },
-    orderBy: { createdAt: "desc" },
-    select: { masterId: true, mediaUrl: true },
-  });
+  // PERF-22 — «самое свежее фото на мастера» делалось выборкой ВСЕХ публичных
+  // in-search работ всех избранных мастеров и отбрасыванием всего, кроме
+  // первой строки каждого. То есть объём чтения рос как «избранные ×
+  // портфолио каждого», а на выход шло ровно `providerIds.length` строк;
+  // комментарий «plenty fast for N≤200 favorites» опирался на потолок, которого
+  // нигде нет — избранное не ограничено ничем.
+  //
+  // `DISTINCT ON` — сырым SQL сознательно: `distinct` у Prisma выполняется
+  // В ПАМЯТИ клиента (проверено логом запросов — в SQL уходит обычный SELECT
+  // без `DISTINCT ON`, все строки всё равно едут в Node), то есть на объём
+  // чтения он не влияет. Правило отбора дословно то же, что было в JS-редьюсе:
+  // сортировка по `createdAt DESC` внутри мастера, побеждает первая строка.
+  // Индекс `@@index([masterId, createdAt])` покрывает и порядок, и группировку.
+  const rows = await prisma.$queryRaw<Array<{ masterId: string; mediaUrl: string }>>`
+    SELECT DISTINCT ON ("masterId") "masterId", "mediaUrl"
+    FROM "PortfolioItem"
+    WHERE "masterId" IN (${Prisma.join(providerIds)})
+      AND "inSearch" = true
+      AND "isPublic" = true
+    ORDER BY "masterId", "createdAt" DESC
+  `;
 
   const out = new Map<string, string>();
   for (const row of rows) {
-    if (!out.has(row.masterId)) out.set(row.masterId, row.mediaUrl);
+    out.set(row.masterId, row.mediaUrl);
   }
   return out;
 }

@@ -2,18 +2,28 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 /**
- * Returns the set of provider IDs the given user has favorited.
- * Wrapped in `React.cache` so multiple server components in the same render
- * tree share a single query instead of re-running it. The set datatype gives
- * O(1) lookups when annotating catalog items with `initialFavorited`.
+ * Избран ли ЭТОТ провайдер этим пользователем.
+ *
+ * PERF-22 — раньше на месте этой функции стоял `getFavoriteProviderIds`,
+ * который тянул ВЕСЬ список избранного (без `take`) ради одного `has()` на
+ * публичной странице мастера. Множество там ни для чего больше не
+ * использовалось, поэтому вопрос сузился до того, каким он и был по
+ * существу: есть ли одна строка. Ответ тот же, стоимость — точечный
+ * `findUnique` по `@@unique([userId, providerId])` вместо чтения, растущего
+ * вместе с числом избранных.
+ *
+ * `React.cache` сохранён: ключ теперь из двух аргументов, поэтому повторный
+ * запрос той же пары в одном рендере по-прежнему идёт один раз.
  */
-export const getFavoriteProviderIds = cache(async (userId: string): Promise<Set<string>> => {
-  const rows = await prisma.userFavorite.findMany({
-    where: { userId },
-    select: { providerId: true },
-  });
-  return new Set(rows.map((r) => r.providerId));
-});
+export const isProviderFavorited = cache(
+  async (userId: string, providerId: string): Promise<boolean> => {
+    const row = await prisma.userFavorite.findUnique({
+      where: { userId_providerId: { userId, providerId } },
+      select: { id: true },
+    });
+    return row !== null;
+  },
+);
 
 /**
  * Favorited providers keyed by `publicUsername` — for public surfaces that
