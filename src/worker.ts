@@ -91,6 +91,12 @@ let jobsProcessed = 0;
 let workerSecretMissingLogged = false;
 
 const HEALTHCHECK_INTERVAL_MS = 30_000;
+// RES-24-соседний: пинг живости стоит В ГЛАВНОМ ЦИКЛЕ, до `dequeue()`, и раньше
+// уходил в `fetch` без границы — то есть зависший `app` останавливал разбор
+// очереди целиком, при том что собственные зависимости воркера (Redis,
+// Postgres) в порядке. Граница заведомо меньше интервала между пингами: даже
+// намертво зависший `app` стоит воркеру одного витка, а не работы.
+const HEALTHCHECK_REQUEST_TIMEOUT_MS = 5_000;
 const STUCK_RECOVERY_INTERVAL_MS = 2 * 60 * 1000;
 // FIX-15: refresh the in-flight job's lease well within PROCESSING_TIMEOUT_MS
 // (5 min) so a live long-running job is never re-queued as "stuck".
@@ -299,6 +305,7 @@ async function pingHealthcheck(): Promise<void> {
       headers: {
         "x-worker-secret": workerSecret,
       },
+      signal: AbortSignal.timeout(HEALTHCHECK_REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
     logError("Worker healthcheck ping failed", {
