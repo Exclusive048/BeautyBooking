@@ -93,6 +93,34 @@ export const redisClient: CacheClient = {
       });
     }
   },
+  async sAdd(key: string, member: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      const client = await getRedisConnection();
+      if (!client) return false;
+      await withRedisCommandTimeout("cache:sAdd", client.sAdd(key, member));
+      if (ttlSeconds > 0) {
+        // TTL продлевается на КАЖДОМ добавлении: множество обязано жить не
+        // меньше самого свежего из своих ключей, иначе учёт протухнет раньше
+        // учтённого.
+        await withRedisCommandTimeout("cache:sAdd:expire", client.expire(key, ttlSeconds));
+      }
+      return true;
+    } catch (error) {
+      logError("Redis sAdd failed", { key, error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+  },
+  async sMembers(key: string): Promise<string[]> {
+    try {
+      const client = await getRedisConnection();
+      if (!client) return [];
+      const members = await withRedisCommandTimeout("cache:sMembers", client.sMembers(key));
+      return Array.isArray(members) ? members : [];
+    } catch (error) {
+      logError("Redis sMembers failed", { key, error: error instanceof Error ? error.message : String(error) });
+      return [];
+    }
+  },
   async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
     try {
       const client = await getRedisConnection();

@@ -39,6 +39,30 @@ function buildSlotsIndexKey(masterId: string, dateKey: string): string {
   return `slotsIndex:${masterId}:${dateKey}`;
 }
 
+/**
+ * PERF-21 — учёт живых слот-ключей мастера.
+ *
+ * `delByPattern` не «ищет по префиксу»: `SCAN MATCH` фильтрует уже
+ * ВЫБРАННЫЕ ключи, поэтому обход идёт по всему keyspace, а в нём вперемешку
+ * живут окна рейт-лимита, сессии, `dayPlan:*`, идемпотентность и pub/sub.
+ * При сотнях тысяч ключей `invalidateSlotsForMaster` — то есть каждое
+ * сохранение расписания и каждая правка блокировки времени — стоит тысячи
+ * round-trip'ов ради десятка своих ключей.
+ *
+ * Множество даёт точный список. Направление ошибки выбрано в пользу
+ * полноты: **пустой ответ трактуется как «учёта нет» и уводит в прежний
+ * перебор**, поэтому вытесненное или протухшее множество означает лишний
+ * скан, а не пропущенную инвалидацию. Обратная сторона — у мастера без
+ * прогретого кэша сохранение расписания по-прежнему стоит скан; это ровно
+ * сегодняшняя цена, и платится она там, где чистить всё равно нечего.
+ *
+ * Имя намеренно не начинается с `slots:` — иначе `delByPattern("slots:<id>:*")`
+ * сносил бы сам учёт.
+ */
+function buildSlotsKeysetKey(masterId: string): string {
+  return `slotsKeyset:${masterId}`;
+}
+
 export async function getCachedSlots(key: string): Promise<AvailabilitySlot[] | null> {
   return cache.get<AvailabilitySlot[]>(key);
 }
@@ -64,16 +88,43 @@ export async function setCachedSlotsForDate(input: {
   dateKey: string;
   slots: AvailabilitySlot[];
 }): Promise<void> {
+  // Порядок обязателен: сначала учёт, потом значение. Если учесть не
+  // удалось (Redis недоступен, таймаут команды), запись НЕ делается вовсе —
+  // иначе появился бы слот-ключ, о котором множество не знает, и
+  // `invalidateSlotsForMaster` прошёл бы мимо него по быстрому пути.
+  // Отказ здесь означает «не закэшировали», то есть следующий запрос
+  // посчитает заново; при недоступном Redis запись всё равно была бы no-op.
+  const registered = await cache.sAdd(buildSlotsKeysetKey(input.masterId), input.key, SLOTS_TTL_SECONDS);
+  if (!registered) return;
+
   await cache.set(input.key, input.slots, SLOTS_TTL_SECONDS);
   await registerSlotsIndex(input.masterId, input.dateKey, input.key);
 }
 
+/**
+ * PERF-21: снести слот-ключи мастера — по учёту, если он есть, и полным
+ * перебором, если его нет. Пустой список сознательно означает и «кэш
+ * холодный», и «учёт потеряли»: в обоих случаях правильный ответ один и тот
+ * же, а различать их значило бы завести ветку, в которой можно пропустить
+ * инвалидацию.
+ */
+async function purgeSlotsForMaster(masterId: string): Promise<void> {
+  const keysetKey = buildSlotsKeysetKey(masterId);
+  const keys = await cache.sMembers(keysetKey);
+  if (keys.length === 0) {
+    await cache.delByPattern(`slots:${masterId}:*`);
+    return;
+  }
+  await Promise.all(keys.map((key) => cache.del(key)));
+  await cache.del(keysetKey);
+}
+
 export async function invalidateSlotsForMaster(masterId: string): Promise<void> {
   await Promise.all([
-    cache.delByPattern(`slots:${masterId}:*`),
+    purgeSlotsForMaster(masterId),
     // PERF-04: `scheduleVersion` кэшируется (он же — часть ключа выше), и
     // сбрасывается ровно здесь: этот вызов и есть «расписание изменилось».
-    // Порядок с `delByPattern` не важен — ключи разные, а любой промах по
+    // Порядок с чисткой слотов не важен — ключи разные, а любой промах по
     // версии заканчивается полным пересчётом.
     invalidateScheduleVersion(masterId),
     invalidateAdvisorCache(masterId),

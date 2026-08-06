@@ -46,3 +46,11 @@ export async function delByPattern(pattern: string): Promise<void> {
 export async function setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
   return resolveClient().setNx(key, value, ttlSeconds);
 }
+
+export async function sAdd(key: string, member: string, ttlSeconds: number): Promise<boolean> {
+  return resolveClient().sAdd(key, member, ttlSeconds);
+}
+
+export async function sMembers(key: string): Promise<string[]> {
+  return resolveClient().sMembers(key);
+}

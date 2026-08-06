@@ -46,6 +46,14 @@ vi.mock("@/lib/cache/cache", () => ({
     }
   }),
   setNx: vi.fn(async () => true),
+  // PERF-21: учёт живых слот-ключей мастера. Здесь он настоящий (тот же
+  // `store`), потому что от него зависит и запись значения, и путь сброса.
+  sAdd: vi.fn(async (key: string, member: string) => {
+    const existing = (store.get(key) as string[] | undefined) ?? [];
+    if (!existing.includes(member)) store.set(key, [...existing, member]);
+    return true;
+  }),
+  sMembers: vi.fn(async (key: string) => (store.get(key) as string[] | undefined) ?? []),
 }));
 
 vi.mock("@/lib/advisor/cache", () => ({ invalidateAdvisorCache: vi.fn() }));
