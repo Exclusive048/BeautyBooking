@@ -1,6 +1,6 @@
 import { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { loadBookingWithRelations, notifyBookingCompletedReview } from "@/lib/notifications/booking-notifications";
+import { loadBookingsWithRelations, notifyBookingCompletedReview } from "@/lib/notifications/booking-notifications";
 import { logError } from "@/lib/logging/logger";
 
 export async function runBookingReviewPromptJob(now = new Date()): Promise<void> {
@@ -28,15 +28,24 @@ export async function runBookingReviewPromptJob(now = new Date()): Promise<void>
   });
   const notifiedSet = new Set(alreadyNotified.map((item) => item.bookingId).filter(Boolean));
 
-  for (const item of candidates) {
-    if (notifiedSet.has(item.id)) continue;
+  // PERF-26: снапшоты грузятся одним запросом на весь проход, а не поштучно
+  // внутри цикла. Прежняя форма стоила `findUnique` + рассылка на КАЖДОГО
+  // кандидата, то есть до 400 последовательных round-trip'ов при `take: 200`.
+  // Сама рассылка остаётся последовательной и по-прежнему изолирована
+  // try/catch на элемент: она шлёт push и пишет уведомление, и падение одного
+  // получателя не должно ни останавливать проход, ни ускоряться за счёт
+  // параллельной нагрузки на push-канал.
+  const pendingIds = candidates.map((item) => item.id).filter((id) => !notifiedSet.has(id));
+  const bookings = await loadBookingsWithRelations(pendingIds);
+
+  for (const id of pendingIds) {
     try {
-      const booking = await loadBookingWithRelations(item.id);
+      const booking = bookings.get(id);
       if (!booking) continue;
       await notifyBookingCompletedReview(booking);
     } catch (error) {
       logError("Booking review prompt failed", {
-        bookingId: item.id,
+        bookingId: id,
         error: error instanceof Error ? error.message : String(error),
       });
     }
