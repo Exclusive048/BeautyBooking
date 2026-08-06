@@ -21,7 +21,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   provider: { findUnique: vi.fn() },
   booking: { findMany: vi.fn() },
-  timeBlock: { findMany: vi.fn() },
+  timeBlock: { findMany: vi.fn(), aggregate: vi.fn() },
   weeklyScheduleConfig: { findUnique: vi.fn(), aggregate: vi.fn() },
   scheduleTemplate: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleOverride: { findMany: vi.fn(), aggregate: vi.fn() },
@@ -57,13 +57,21 @@ import { invalidateScheduleVersion } from "@/lib/schedule/schedule-version-cache
 const PROVIDER_ID = "prov_18";
 const TIMEZONE = "Asia/Yekaterinburg";
 
-/** Четыре агрегата структуры расписания; `structureUpdatedAt` — их максимум. */
-function primeScheduleStructure(structureUpdatedAt: Date | null): void {
+/**
+ * Пять агрегатов структуры расписания: четыре по таблицам шаблонов/override'ов
+ * и пятый — `TimeBlock` (PERF-19), у которого кроме метки времени берётся ещё
+ * и счётчик строк.
+ */
+function primeScheduleStructure(
+  structureUpdatedAt: Date | null,
+  timeBlocks: { updatedAt: Date | null; count: number } = { updatedAt: null, count: 0 },
+): void {
   prismaMock.$transaction.mockResolvedValue([
     { _max: { updatedAt: structureUpdatedAt } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
+    { _max: { updatedAt: timeBlocks.updatedAt }, _count: timeBlocks.count },
   ]);
 }
 
@@ -119,6 +127,39 @@ describe("PERF-18 · версия расписания зависит от ра�
     const before = await freshVersion();
 
     primeScheduleStructure(new Date("2026-08-06T09:30:00.000Z"));
+    const after = await freshVersion();
+
+    expect(after).not.toBe(before);
+  });
+
+  /**
+   * PERF-19 — блокировки времени участвуют в `buildSlotsForDay`, но не входили
+   * ни в ключ, ни в версию: их корректность держалась ИСКЛЮЧИТЕЛЬНО на явном
+   * `invalidateSlotsForMaster`, а тот путь глушит ошибки Redis. Второй слой
+   * обязан ловить и создание, и снятие блокировки.
+   */
+  it("создание блокировки времени меняет версию", async () => {
+    primeScheduleStructure(new Date("2026-08-01T10:00:00.000Z"));
+    const before = await freshVersion();
+
+    primeScheduleStructure(new Date("2026-08-01T10:00:00.000Z"), {
+      updatedAt: new Date("2026-08-06T12:00:00.000Z"),
+      count: 1,
+    });
+    const after = await freshVersion();
+
+    expect(after).not.toBe(before);
+  });
+
+  it("снятие блокировки меняет версию, даже если максимум не сдвинулся", async () => {
+    // Ровно тот случай, который `_max updatedAt` не ловит: удалили строку, не
+    // бывшую максимумом. Для блокировок это норма — они временные, и снятие
+    // обязано вернуть слот в выдачу.
+    const blockStamp = new Date("2026-08-06T12:00:00.000Z");
+    primeScheduleStructure(new Date("2026-08-01T10:00:00.000Z"), { updatedAt: blockStamp, count: 2 });
+    const before = await freshVersion();
+
+    primeScheduleStructure(new Date("2026-08-01T10:00:00.000Z"), { updatedAt: blockStamp, count: 1 });
     const after = await freshVersion();
 
     expect(after).not.toBe(before);

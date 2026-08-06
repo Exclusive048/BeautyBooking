@@ -150,8 +150,17 @@ function dateKeyToUtcStart(dateKey: string): Date {
  * не то, что закэшировано.
  *
  * Направление ошибки при этом не поменялось: пропустить изменение структуры
- * нельзя (все четыре таблицы по-прежнему здесь), а лишний ключевой вход мы
- * заменили не на «ничего», а на явное перечисление в самих ключах.
+ * нельзя (все таблицы по-прежнему здесь), а лишний ключевой вход мы заменили
+ * не на «ничего», а на явное перечисление в самих ключах.
+ *
+ * PERF-19 — пятая таблица, `TimeBlock`, добавлена сюда позже остальных, и по
+ * другой причине. Блокировки времени участвуют в `buildSlotsForDay`
+ * (`loadTimeBlockRanges`), но не входили НИ в ключ, ни в версию: их
+ * корректность держалась ИСКЛЮЧИТЕЛЬНО на явном `invalidateSlotsForMaster`
+ * из `studio/calendar.service.ts`, а тот путь глушит ошибки Redis
+ * (`delByPattern` ловит и логирует). То есть один brownout Redis означал
+ * заблокированное время, которое до истечения TTL продолжает предлагаться к
+ * записи. Теперь у этого есть второй, независимый слой.
  *
  * PERF-04: операторы ниже вычисляют ключ кэша, а не ответ, — поэтому они шли
  * и при попадании в кэш тоже. Сброс — явный, из `invalidateSlotsForMaster`;
@@ -162,7 +171,7 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
   const cached = await readCachedScheduleVersion(masterId);
   if (cached) return cached;
 
-  const [overrideMax, overrideBreakMax, templateMax, weeklyConfigMax] =
+  const [overrideMax, overrideBreakMax, templateMax, weeklyConfigMax, timeBlockAgg] =
     await prisma.$transaction([
     prisma.scheduleOverride.aggregate({
       where: { providerId: masterId },
@@ -180,6 +189,15 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
       where: { providerId: masterId },
       _max: { updatedAt: true },
     }),
+    // PERF-19: блокировки времени — последний вход слот-кэша, который до сих
+    // пор не был представлен в ключе НИЧЕМ. Скоуп тот же, что у
+    // `loadTimeBlockRanges` (по `masterId`), иначе версия сторожила бы не то
+    // множество, которое читает движок.
+    prisma.timeBlock.aggregate({
+      where: { masterId },
+      _max: { updatedAt: true },
+      _count: true,
+    }),
   ]);
 
   const latest = maxDate([
@@ -187,9 +205,16 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
     overrideBreakMax._max.updatedAt ?? null,
     templateMax._max.updatedAt ?? null,
     weeklyConfigMax._max.updatedAt ?? null,
+    timeBlockAgg._max.updatedAt ?? null,
   ]);
 
-  const value = latest ? String(latest.getTime()) : "0";
+  // Счётчик блокировок — рядом с меткой времени, а не вместо неё: `_max`
+  // ловит создание и правку, но НЕ удаление строки, которая не была
+  // максимумом (максимум при этом не двигается). Для блокировок это не
+  // теоретический случай — они по природе временные, и снятие блокировки
+  // обязано вернуть слот. Обе величины идут из одного агрегата, лишнего
+  // запроса нет.
+  const value = `${latest ? latest.getTime() : 0}:${timeBlockAgg._count}`;
   const version: ScheduleVersion = { value, updatedAt: latest };
   await writeCachedScheduleVersion(masterId, version);
   return version;

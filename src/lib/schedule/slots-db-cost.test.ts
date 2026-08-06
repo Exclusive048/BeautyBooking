@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({
   provider: { findUnique: vi.fn() },
   booking: { findMany: vi.fn() },
-  timeBlock: { findMany: vi.fn() },
+  timeBlock: { findMany: vi.fn(), aggregate: vi.fn() },
   weeklyScheduleConfig: { findUnique: vi.fn(), aggregate: vi.fn() },
   scheduleTemplate: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleOverride: { findMany: vi.fn(), aggregate: vi.fn() },
@@ -72,7 +72,7 @@ const TIMEZONE = "Asia/Yekaterinburg";
 const DURATION_MIN = 60;
 const BUFFER_MIN = 0;
 const SLOT_STEP_MIN = 30;
-const SCHEDULE_VERSION = "1750000000000";
+const SCHEDULE_VERSION = "1750000000000:0";
 const FROM_KEY = "2026-09-01";
 const PAGE_SIZE = 3;
 
@@ -88,7 +88,7 @@ function primeProvider(): void {
 function primeScheduleVersionCache(): void {
   store.set(buildScheduleVersionCacheKey(PROVIDER_ID), {
     value: SCHEDULE_VERSION,
-    updatedAtIso: new Date(Number(SCHEDULE_VERSION)).toISOString(),
+    updatedAtIso: new Date(1750000000000).toISOString(),
   });
 }
 
@@ -121,13 +121,14 @@ function primeSlotCacheForDays(dateKeys: string[]): void {
 }
 
 function primeEmptyScheduleReads(): void {
-  // PERF-18: провайдер из транзакции версии убран — остались четыре агрегата
-  // по таблицам структуры расписания.
+  // PERF-18: провайдер из транзакции версии убран. PERF-19: пятым агрегатом
+  // добавлен `TimeBlock` (метка времени + счётчик строк).
   prismaMock.$transaction.mockResolvedValue([
-    { _max: { updatedAt: new Date(Number(SCHEDULE_VERSION)) } },
+    { _max: { updatedAt: new Date(1750000000000) } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
+    { _max: { updatedAt: null }, _count: 0 },
   ]);
   prismaMock.weeklyScheduleConfig.findUnique.mockResolvedValue(null);
   prismaMock.scheduleTemplate.findMany.mockResolvedValue([]);
