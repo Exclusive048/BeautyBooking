@@ -12,6 +12,7 @@ import {
 } from "@/lib/media/types";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
+import { capLongestSide, MEDIA_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
 
 export const runtime = "nodejs";
 
@@ -90,15 +91,20 @@ export async function POST(req: Request) {
     // surfaces, at the cost of ~30% larger files (storage is cheap).
     // Visual search runs against an in-memory resize of the **stored
     // original**, so embedding quality is unaffected by this bump.
+    // PERF-07: верхняя граница разрешения. Перекодирование тут было всегда,
+    // ресайза не было — в хранилище ложился оригинал до 10 МБ, и оптимизатор
+    // `next/image` тянул его из S3 на каждый промах своего кэша. Порог — из
+    // самой широкой поверхности показа портфолио, см. `image-resize.ts`.
+    const resized = capLongestSide(sharp(rawBuffer), MEDIA_MAX_IMAGE_SIDE_PX);
     if (detected.mime === "image/png") {
       outputMime = "image/webp";
-      outputBuffer = await sharp(rawBuffer).webp({ quality: 95 }).toBuffer();
+      outputBuffer = await resized.webp({ quality: 95 }).toBuffer();
     } else if (detected.mime === "image/jpeg") {
       outputMime = "image/jpeg";
-      outputBuffer = await sharp(rawBuffer).jpeg({ quality: 95 }).toBuffer();
+      outputBuffer = await resized.jpeg({ quality: 95 }).toBuffer();
     } else {
       outputMime = "image/webp";
-      outputBuffer = await sharp(rawBuffer).webp({ quality: 95 }).toBuffer();
+      outputBuffer = await resized.webp({ quality: 95 }).toBuffer();
     }
 
     if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {

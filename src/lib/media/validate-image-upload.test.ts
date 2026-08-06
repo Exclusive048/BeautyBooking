@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { AppError } from "@/lib/api/errors";
 import { MEDIA_MAX_FILE_SIZE_BYTES } from "@/lib/media/types";
 import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
+import { MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
 
 /**
  * SEC-06 — доверять можно магическим байтам, а не `File.type`.
@@ -50,7 +51,7 @@ describe("SEC-06 · заявленный клиентом MIME не приним
   it("HTML под видом image/png отвергается", async () => {
     const html = Buffer.from("<html><script>alert(1)</script></html>", "utf8");
     const error = await expectAppError(
-      readValidatedImageUpload(asFile(html, "image/png"), { quality: 90 }),
+      readValidatedImageUpload(asFile(html, "image/png"), { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX }),
     );
     expect(error.code).toBe("MEDIA_INVALID_MIME");
     expect(error.status).toBe(415);
@@ -62,7 +63,7 @@ describe("SEC-06 · заявленный клиентом MIME не приним
       "utf8",
     );
     const error = await expectAppError(
-      readValidatedImageUpload(asFile(svg, "image/png", "x.svg"), { quality: 90 }),
+      readValidatedImageUpload(asFile(svg, "image/png", "x.svg"), { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX }),
     );
     expect(error.code).toBe("MEDIA_INVALID_MIME");
   });
@@ -73,7 +74,7 @@ describe("SEC-06 · заявленный клиентом MIME не приним
   it("обрезанный ZIP-заголовок под видом image/jpeg даёт 415, а не 500", async () => {
     const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00]);
     const error = await expectAppError(
-      readValidatedImageUpload(asFile(zip, "image/jpeg", "x.jpg"), { quality: 90 }),
+      readValidatedImageUpload(asFile(zip, "image/jpeg", "x.jpg"), { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX }),
     );
     expect(error.code).toBe("MEDIA_INVALID_MIME");
     expect(error.status).toBe(415);
@@ -83,7 +84,7 @@ describe("SEC-06 · заявленный клиентом MIME не приним
     const header = (await realPng()).subarray(0, 40);
     const corrupt = Buffer.concat([header, Buffer.alloc(64, 0xff)]);
     const error = await expectAppError(
-      readValidatedImageUpload(asFile(corrupt, "image/png"), { quality: 90 }),
+      readValidatedImageUpload(asFile(corrupt, "image/png"), { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX }),
     );
     expect(error.code).toBe("MEDIA_INVALID_MIME");
     expect(error.status).toBe(415);
@@ -94,7 +95,7 @@ describe("SEC-06 · заявленный клиентом MIME не приним
     const result = await readValidatedImageUpload(
       // клиент врёт про тип — на результат это не влияет
       asFile(png, "application/octet-stream"),
-      { quality: 90 },
+      { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX },
     );
     expect(result.mimeType).toBe("image/webp");
     expect(result.sizeBytes).toBe(result.bytes.byteLength);
@@ -104,6 +105,7 @@ describe("SEC-06 · заявленный клиентом MIME не приним
   it("настоящий JPEG остаётся JPEG", async () => {
     const result = await readValidatedImageUpload(asFile(await realJpeg(), "image/png"), {
       quality: 90,
+      maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX,
     });
     expect(result.mimeType).toBe("image/jpeg");
   });
@@ -117,6 +119,7 @@ describe("SEC-06 · переупаковка убивает полиглот", (
     // Сам полиглот определяется как PNG — sniff'а одного было бы мало.
     const result = await readValidatedImageUpload(asFile(polyglot, "image/png"), {
       quality: 90,
+      maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX,
     });
 
     const stored = Buffer.from(result.bytes).toString("latin1");
@@ -152,7 +155,7 @@ describe("SEC-06 · загрузочные роуты не обходят при
 describe("SEC-06 · границы размера", () => {
   it("пустой файл отвергается", async () => {
     const error = await expectAppError(
-      readValidatedImageUpload(asFile(Buffer.alloc(0), "image/png"), { quality: 90 }),
+      readValidatedImageUpload(asFile(Buffer.alloc(0), "image/png"), { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX }),
     );
     expect(error.code).toBe("MEDIA_FILE_TOO_LARGE");
     expect(error.status).toBe(413);
@@ -168,7 +171,7 @@ describe("SEC-06 · границы размера", () => {
       },
     } as unknown as File;
 
-    const error = await expectAppError(readValidatedImageUpload(oversized, { quality: 90 }));
+    const error = await expectAppError(readValidatedImageUpload(oversized, { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX }));
     expect(error.code).toBe("MEDIA_FILE_TOO_LARGE");
   });
 });

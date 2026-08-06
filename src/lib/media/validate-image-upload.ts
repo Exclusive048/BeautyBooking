@@ -2,6 +2,7 @@ import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
 
 import { AppError } from "@/lib/api/errors";
+import { capLongestSide } from "@/lib/media/image-resize";
 import {
   MEDIA_ALLOWED_MIME_TYPES,
   MEDIA_MAX_FILE_SIZE_BYTES,
@@ -53,11 +54,14 @@ async function sniffMime(buffer: Buffer): Promise<string | null> {
 }
 
 /** PNG и всё нестандартное уходит в webp; jpeg остаётся jpeg. */
-function encodeTo(mime: string, buffer: Buffer, quality: number) {
+function encodeTo(mime: string, buffer: Buffer, quality: number, maxSidePx: number) {
+  // PERF-07: ресайз стоит ДО кодека — иначе кодек сжимал бы полное
+  // разрешение, а результат всё равно уменьшался.
+  const resized = capLongestSide(sharp(buffer), maxSidePx);
   if (mime === "image/jpeg") {
-    return { mime: "image/jpeg" as AllowedMediaMimeType, output: sharp(buffer).jpeg({ quality }) };
+    return { mime: "image/jpeg" as AllowedMediaMimeType, output: resized.jpeg({ quality }) };
   }
-  return { mime: "image/webp" as AllowedMediaMimeType, output: sharp(buffer).webp({ quality }) };
+  return { mime: "image/webp" as AllowedMediaMimeType, output: resized.webp({ quality }) };
 }
 
 export type ValidatedImageUpload = {
@@ -68,7 +72,7 @@ export type ValidatedImageUpload = {
 
 export async function readValidatedImageUpload(
   file: File,
-  options: { quality: number },
+  options: { quality: number; maxSidePx: number },
 ): Promise<ValidatedImageUpload> {
   if (file.size <= 0 || file.size > MEDIA_MAX_FILE_SIZE_BYTES) {
     throw new AppError("Файл слишком большой.", 413, "MEDIA_FILE_TOO_LARGE");
@@ -80,7 +84,7 @@ export async function readValidatedImageUpload(
     throw new AppError("Неподдерживаемый формат изображения.", 415, "MEDIA_INVALID_MIME");
   }
 
-  const { mime, output } = encodeTo(detectedMime, rawBuffer, options.quality);
+  const { mime, output } = encodeTo(detectedMime, rawBuffer, options.quality, options.maxSidePx);
   // Битая картинка проходит sniff по заголовку, но не декодируется. Это тоже
   // «неподдерживаемый формат», а не 500.
   let outputBuffer: Buffer;

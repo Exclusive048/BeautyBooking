@@ -12,6 +12,7 @@ import { ensureStudioRole } from "@/lib/studio/access";
 import { parseQuery } from "@/lib/validation";
 import { uploadMediaAsset } from "@/lib/media/service";
 import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
+import { MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
 
 type RouteContext = {
   params: Promise<{ clientKey: string }>;
@@ -63,7 +64,10 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     // SEC-06: тип берётся из магических байтов и файл переупаковывается —
     // `fileValue.type` это заявление клиента, а не факт.
-    const image = await readValidatedImageUpload(fileValue, { quality: 90 });
+    const image = await readValidatedImageUpload(fileValue, {
+      quality: 90,
+      maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX,
+    });
     const asset = await uploadMediaAsset(user, {
       entityType: MediaEntityType.CLIENT_CARD,
       entityId: card.id,
