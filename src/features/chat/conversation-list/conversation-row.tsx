@@ -26,6 +26,11 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
     ? formatRowTime(conversation.lastMessage.createdAt, viewerTimezone)
     : "";
   const hasUnread = conversation.unreadCount > 0;
+  const initialsAvatar = (
+    <div className="bg-brand-gradient flex h-[42px] w-[42px] items-center justify-center rounded-full text-base font-semibold text-white">
+      {initialOf(partner.name)}
+    </div>
+  );
 
   return (
     <button
@@ -44,6 +49,9 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
       ) : null}
 
       <div className="relative shrink-0">
+        {/* RES-30: инициалы — замена на ЛЮБОЕ «фото показать нечем», а не только
+            на `avatarUrl === null`. Битый URL раньше давал плейсхолдер портфолио
+            в круглом аватаре собеседника. */}
         {partner.avatarUrl ? (
           <ResilientImage
             src={partner.avatarUrl}
@@ -51,11 +59,10 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
             width={42}
             height={42}
             className="h-[42px] w-[42px] rounded-full object-cover"
+            fallback={initialsAvatar}
           />
         ) : (
-          <div className="bg-brand-gradient flex h-[42px] w-[42px] items-center justify-center rounded-full text-base font-semibold text-white">
-            {initialOf(partner.name)}
-          </div>
+          initialsAvatar
         )}
         {conversation.hasOpenBooking ? (
           <span

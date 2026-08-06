@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { IMAGE_FALLBACK_SRC, isOptimizableImageSrc } from "./image-host";
 
@@ -40,6 +40,17 @@ type ResilientImageProps = {
   style?: CSSProperties;
   /** Override the local placeholder shown when the image is unavailable. */
   fallbackSrc?: string;
+  /**
+   * RES-30: собственная замена вместо картинки-плейсхолдера.
+   *
+   * Дефолтный плейсхолдер — «фотография», и для аватара он врёт: у аватарных
+   * поверхностей уже есть своя замена (инициалы), но срабатывала она только при
+   * `avatarUrl === null`. Битый или неоптимизируемый URL — то же самое «фото
+   * показать нечем», а выглядело иначе. Слот принимает готовую разметку
+   * вызывающего, поэтому вторую копию инициалов заводить не нужно; имеет
+   * приоритет над `fallbackSrc`.
+   */
+  fallback?: ReactNode;
 };
 
 function buildObjectPosition(
@@ -98,6 +109,7 @@ export function ResilientImage({
   className,
   style,
   fallbackSrc,
+  fallback,
 }: ResilientImageProps) {
   const [errored, setErrored] = useState(false);
   const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight);
@@ -106,6 +118,10 @@ export function ResilientImage({
   const showFallback = errored || !isOptimizableImageSrc(src);
 
   if (showFallback) {
+    // RES-30: своя замена побеждает картинку-плейсхолдер. Возвращаем разметку
+    // вызывающего как есть — он и решает про размер, форму и a11y.
+    if (fallback !== undefined) return <>{fallback}</>;
+
     const placeholder = fallbackSrc ?? IMAGE_FALLBACK_SRC;
     const fallbackStyle: CSSProperties = {
       ...style,
