@@ -28,11 +28,21 @@ export function EventsFeed({ initial }: Props) {
   const [items, setItems] = useState<AdminEventItem[]>(initial);
   const seenIds = useRef<Set<string>>(new Set(initial.map((e) => e.id)));
   const isVisible = useRef(true);
+  // PERF-27: тик, пришедший поверх незавершённого запроса, ПРОПУСКАЕТСЯ.
+  // Раньше `setInterval` стрелял безусловно, и медленный ответ (админский
+  // запрос по событиям — не самый дешёвый) складывал запросы стопкой: чем
+  // тяжелее серверу, тем больше их в полёте одновременно. `useSerialTask`
+  // здесь не подходит намеренно — он ОТКЛАДЫВАЕТ вытесненный вход и
+  // выполняет его следом, а у опроса значение — «сейчас», и отложенный тик
+  // сразу после предыдущего это тот же лишний запрос.
+  const inFlight = useRef(false);
   const reduce = useReducedMotion();
 
   const latestMs = items.length > 0 ? items[0]!.timeMs : 0;
 
   const poll = useCallback(async (since: number) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
       const url = since
         ? `/api/admin/dashboard/events?since=${since}`
@@ -62,6 +72,8 @@ export function EventsFeed({ initial }: Props) {
     } catch {
       // Silent — next poll will retry. Avoids surfacing transient
       // network blips as user-visible errors in a live dashboard.
+    } finally {
+      inFlight.current = false;
     }
   }, []);
 
@@ -69,6 +81,11 @@ export function EventsFeed({ initial }: Props) {
     const onVisibility = () => {
       isVisible.current = document.visibilityState === "visible";
     };
+    // PERF-27: начальное значение читается с документа, а не принимается за
+    // «видно». Вкладка, открытая в фоне (Ctrl+click по ссылке на дашборд),
+    // до первого переключения фокуса опрашивала API как активная — то есть
+    // ровно в том случае, ради которого пауза и сделана.
+    onVisibility();
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
