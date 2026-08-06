@@ -5,12 +5,12 @@ import {
   MediaKind,
   SubscriptionScope,
   type MediaAsset,
-  type UserProfile,
 } from "@prisma/client";
 import { Readable } from "stream";
 import { AppError } from "@/lib/api/errors";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
+import type { SessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getStorageProvider } from "@/lib/media/storage";
 import {
@@ -297,7 +297,7 @@ async function filterPublicPortfolioAssetIds(assetIds: string[]): Promise<Set<st
 }
 
 export async function listMediaAssets(
-  user: UserProfile | null,
+  user: SessionUser | null,
   input: { entityType: MediaEntityType; entityId: string; kind?: MediaKind }
 ): Promise<MediaAssetDto[]> {
   const entityId = normalizeEntityId(input.entityId);
@@ -352,7 +352,7 @@ export async function listMediaAssets(
   return assets.map(toMediaAssetDto);
 }
 
-export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInput): Promise<MediaAssetDto> {
+export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInput): Promise<MediaAssetDto> {
   validateUploadBasics(input);
   const entityId = normalizeEntityId(input.entityId);
 
@@ -495,7 +495,7 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
 }
 
 export async function uploadBookingReferenceAsset(
-  user: UserProfile | null,
+  user: SessionUser | null,
   input: {
     mimeType: string;
     sizeBytes: number;
@@ -577,7 +577,7 @@ export async function uploadBookingReferenceAsset(
  * which is what the validator checks to enforce one-shot use.
  */
 export async function uploadChatAttachmentAsset(
-  user: UserProfile,
+  user: SessionUser,
   input: {
     mimeType: string;
     sizeBytes: number;
@@ -644,7 +644,7 @@ export async function uploadChatAttachmentAsset(
   return { id: created.id };
 }
 
-export async function deleteMediaAsset(user: UserProfile, assetId: string): Promise<{ id: string }> {
+export async function deleteMediaAsset(user: SessionUser, assetId: string): Promise<{ id: string }> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },
   });
@@ -722,7 +722,7 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
 
 
 export async function updateMediaCrop(
-  user: UserProfile,
+  user: SessionUser,
   assetId: string,
   input: { cropX: number; cropY: number; cropWidth: number; cropHeight: number }
 ): Promise<MediaAssetDto> {
@@ -749,7 +749,7 @@ export async function updateMediaCrop(
 }
 
 export async function getMediaFile(
-  user: UserProfile | null,
+  user: SessionUser | null,
   assetId: string
 ): Promise<MediaFileResult> {
   const asset = await prisma.mediaAsset.findUnique({

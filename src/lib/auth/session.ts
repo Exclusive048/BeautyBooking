@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { env, isProduction } from "@/lib/env";
 import {
@@ -78,6 +79,44 @@ function parseAccessTokenPayload(token: string | null | undefined): SessionPaylo
  * Токены без `fid` (выпущенные до SEC-13) проходят как legacy — иначе деплой
  * разлогинил бы всех разом. Они живут не дольше своего TTL.
  */
+/**
+ * PERF-23 — что именно нужно вызывающим от «текущего пользователя».
+ *
+ * Запрос шёл без `select`, то есть на КАЖДЫЙ аутентифицированный запрос (а
+ * `getSessionUser` стоит практически в каждом защищённом роуте и в SSR
+ * публичных страниц) из БД приезжала вся строка `UserProfile` — тридцать с
+ * лишним колонок, включая адрес, ФИО, даты блокировки и причину блокировки,
+ * которых сессии не нужно ничего.
+ *
+ * Список ниже — не догадка: он выведен компилятором. Prisma сужает тип
+ * результата по `select`, поэтому любой потребитель, читающий поле не из
+ * этого списка, валит `typecheck`. То есть полнота списка проверяется
+ * гейтом, а не ревью, и новое поле нельзя начать читать молча.
+ */
+const SESSION_USER_SELECT = {
+  id: true,
+  roles: true,
+  phone: true,
+  email: true,
+  emailVerifiedAt: true,
+  displayName: true,
+  firstName: true,
+  lastName: true,
+  publicUsername: true,
+  telegramId: true,
+  externalPhotoUrl: true,
+  isDeleted: true,
+} as const;
+
+/**
+ * Пользователь текущей сессии. Именно этот тип обязаны принимать хелперы,
+ * которым его передают: объявленный в сигнатуре полный `UserProfile` —
+ * это тихое требование прочитать из БД всё, даже если функция читает `roles`.
+ */
+export type SessionUser = Prisma.UserProfileGetPayload<{
+  select: typeof SESSION_USER_SELECT;
+}>;
+
 async function loadActiveSessionUser(userId: string, familyId?: string | null) {
   return prisma.userProfile.findFirst({
     where: {
@@ -87,6 +126,7 @@ async function loadActiveSessionUser(userId: string, familyId?: string | null) {
         ? { refreshSessions: { some: { familyId, revokedAt: null } } }
         : {}),
     },
+    select: SESSION_USER_SELECT,
   });
 }
 

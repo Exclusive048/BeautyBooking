@@ -123,13 +123,19 @@ describe("SEC-13 · отзыв семьи выселяет держателя ac
     const token = signAccessToken({ sub: "u1", roles: ["CLIENT"], fid: "fam-1" });
     await getSessionUserFromRequest(reqWithAccess(token));
     expect(spies.findFirst).toHaveBeenCalledTimes(1);
-    expect(spies.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: "u1",
-        isDeleted: false,
-        refreshSessions: { some: { familyId: "fam-1", revokedAt: null } },
-      },
-    });
+    // `objectContaining` — предмет этого пина именно `where` (проверка семьи
+    // в том же единственном запросе). Набор колонок в `select` — предмет
+    // PERF-23 и своего пина; пришивать его сюда значило бы ронять этот тест
+    // при каждом изменении списка полей сессии.
+    expect(spies.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "u1",
+          isDeleted: false,
+          refreshSessions: { some: { familyId: "fam-1", revokedAt: null } },
+        },
+      }),
+    );
   });
 
   it("живая семья продолжает работать", async () => {
@@ -166,9 +172,9 @@ describe("SEC-13 · совместимость: деплой не разлоги
     const user = await getSessionUserFromRequest(reqWithAccess(legacy));
     expect(user).not.toBeNull();
     // Про семью такой токен не спрашивают вовсе.
-    expect(spies.findFirst).toHaveBeenCalledWith({
-      where: { id: "u1", isDeleted: false },
-    });
+    expect(spies.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "u1", isDeleted: false } }),
+    );
   });
 });
 

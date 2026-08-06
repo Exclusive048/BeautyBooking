@@ -1,10 +1,11 @@
-import { AccountType, MediaEntityType, MediaKind, MembershipStatus, ProviderType, StudioRole, type UserProfile } from "@prisma/client";
+import { AccountType, MediaEntityType, MediaKind, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import type { SessionUser } from "@/lib/auth/session";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
 import { resolveChatAccessForBooking } from "@/lib/chat/access";
 
-function isSiteAdmin(user: UserProfile): boolean {
+function isSiteAdmin(user: SessionUser): boolean {
   return user.roles.includes(AccountType.ADMIN) || user.roles.includes(AccountType.SUPERADMIN);
 }
 
@@ -82,7 +83,7 @@ function parseChatMessageIdFromEntity(entityId: string): string | null {
   return id.length > 0 ? id : null;
 }
 
-async function canReadChatAttachmentMedia(user: UserProfile, entityId: string): Promise<boolean> {
+async function canReadChatAttachmentMedia(user: SessionUser, entityId: string): Promise<boolean> {
   const chatMessageId = parseChatMessageIdFromEntity(entityId);
   if (!chatMessageId) return false;
 
@@ -122,7 +123,7 @@ async function canReadChatAttachmentMedia(user: UserProfile, entityId: string): 
   return isClient || isMaster;
 }
 
-async function canReadBookingMedia(user: UserProfile, bookingId: string): Promise<boolean> {
+async function canReadBookingMedia(user: SessionUser, bookingId: string): Promise<boolean> {
   if (user.roles.includes(AccountType.ADMIN) || user.roles.includes(AccountType.SUPERADMIN)) {
     return true;
   }
@@ -156,7 +157,7 @@ async function canReadBookingMedia(user: UserProfile, bookingId: string): Promis
 }
 
 export async function ensureCanManageMedia(
-  user: UserProfile,
+  user: SessionUser,
   entityType: MediaEntityType,
   entityId: string,
   kind: MediaKind
@@ -229,7 +230,7 @@ export async function ensureCanManageMedia(
 }
 
 export async function ensureCanReadMedia(
-  user: UserProfile | null,
+  user: SessionUser | null,
   entityType: MediaEntityType,
   entityId: string,
   kind?: MediaKind
