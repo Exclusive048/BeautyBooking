@@ -233,6 +233,60 @@
   a, button { -webkit-user-select: none; user-select: none; }
 }
 
+/* ============================================================
+   UI-01 — `.lux-card` / `.lux-input` возвращены дословно из `68c17f9`
+   («redesign login pane», 2026-04-27), где их снесли вместе с −526 строками
+   `globals.css`. Классы при этом остались в разметке: `Card`, `Input`,
+   `Select`, `Textarea` и ещё полтора десятка мест ссылались на правила,
+   которых в проекте не существовало ни одного дня после того коммита
+   (`grep 'lux-' *.css` → 0 определений; единственный CSS-файл — этот).
+
+   🔴 Почему это было не «карточки чуть плоские». Tailwind preflight ставит
+   `border-width: 0` ВСЕМУ, а базовое правило ниже (`input, textarea, select`)
+   задаёт полю только `border-color` — ширины не задаёт никто. То есть у полей
+   ввода не было рамки вообще, а отличала поле от карточки одна лишь заливка
+   `--bg-input` против `--bg-card` — в светлой теме это контраст 1.05:1, то
+   есть визуально ничем. Провал WCAG 1.4.11 на всех формах продукта, включая
+   единственное поле, которое видит боевой пользователь на `/login` (в проде
+   включён email-OTP). Фокус при этом был виден — кольцо ставит отдельное
+   правило `input:focus`, — поэтому дефект и не бросался в глаза: поле
+   «появлялось» при клике и исчезало при уходе фокуса.
+
+   Класс без правила молча компилируется в ничто — та же форма отказа, что у
+   токена без моста в `tailwind.config.js` (HARDENING-MISC-01). Долгосрочное
+   лечение — перенести стили внутрь компонентов (`border border-border-subtle
+   bg-bg-input …`), чтобы такой разрыв стал невозможен; заведено в BACKLOG.
+   ============================================================ */
+@layer components {
+  .lux-card {
+    background-color: rgb(var(--bg-card));
+    border: 1px solid rgb(var(--border-subtle) / 0.9);
+    box-shadow: var(--shadow-card);
+    transition: border-color 240ms ease, box-shadow 240ms ease, transform 240ms ease;
+  }
+
+  .lux-card:hover {
+    border-color: rgb(var(--border-subtle) / 1);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .lux-input {
+    background-color: rgb(var(--bg-input));
+    border: 1px solid rgb(var(--border-subtle) / 0.68);
+    transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+  }
+
+  .lux-input:hover {
+    border-color: rgb(var(--border-subtle));
+  }
+
+  .lux-input:focus-visible {
+    background-color: rgb(var(--bg-input-focus));
+    border-color: rgb(var(--border-focus));
+    box-shadow: 0 0 0 1px rgb(var(--border-focus) / 0.34), 0 0 0 7px rgb(var(--border-focus) / 0.16);
+  }
+}
+
 @layer utilities {
   .scrollbar-hide {
     scrollbar-width: none;
