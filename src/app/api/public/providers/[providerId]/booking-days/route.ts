@@ -6,7 +6,10 @@ import { findWorkingDays } from "@/lib/schedule/booking-days";
 import * as cache from "@/lib/cache/cache";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
+import { withSingleFlight } from "@/lib/cache/single-flight";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+
+type BookingDaysPayload = { timezone: string; days: Array<{ date: string }>; nextFrom: string };
 
 const MAX_SCAN_DAYS = 60;
 const CACHE_TTL_SECONDS = 120;
@@ -52,25 +55,34 @@ export async function GET(
       range: { fromKey, toKeyExclusive: scanToKeyExclusive },
     });
     const cacheKey = `bookingDays:${provider.id}:${fromKey}:${limit}:${provider.timezone}:${ctx.scheduleWindow.scheduleVersion}:${ctx.scheduleWindow.publishedUntilLocal}`;
-    const cached = await cache.get<{ timezone: string; days: Array<{ date: string }>; nextFrom: string }>(cacheKey);
+    const cached = await cache.get<BookingDaysPayload>(cacheKey);
     if (cached) {
       return ok(cached);
     }
 
-    const result = await findWorkingDays({
-      fromKey,
-      limit,
-      maxScan: MAX_SCAN_DAYS,
-      getDayPlan: async (dateKey) => ScheduleEngine.getDayPlanFromContext(ctx, dateKey),
+    // PERF-10: без замка истечение TTL горячего мастера означает, что скан
+    // рабочих дней запускают все параллельные запросы разом.
+    const payload = await withSingleFlight<BookingDaysPayload>({
+      lockKey: `sf:${cacheKey}`,
+      read: () => cache.get<BookingDaysPayload>(cacheKey),
+      compute: async () => {
+        const result = await findWorkingDays({
+          fromKey,
+          limit,
+          maxScan: MAX_SCAN_DAYS,
+          getDayPlan: async (dateKey) => ScheduleEngine.getDayPlanFromContext(ctx, dateKey),
+        });
+
+        const computed: BookingDaysPayload = {
+          timezone: provider.timezone,
+          days: result.days,
+          nextFrom: result.nextFrom,
+        };
+        await cache.set(cacheKey, computed, CACHE_TTL_SECONDS);
+        return computed;
+      },
     });
 
-    const payload = {
-      timezone: provider.timezone,
-      days: result.days,
-      nextFrom: result.nextFrom,
-    };
-
-    await cache.set(cacheKey, payload, CACHE_TTL_SECONDS);
     return ok(payload);
   } catch (error) {
     const appError = toAppError(error);
