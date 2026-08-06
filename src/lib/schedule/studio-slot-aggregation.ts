@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
-import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
+import { resolveServiceDurations } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
 
 /**
@@ -98,10 +98,18 @@ export async function aggregateStudioSlots(
   // Each master may have a different effective duration (override). The
   // aggregator runs per-master with its own duration — schedules are
   // already per-master in the engine.
+  //
+  // PERF-08: длительности резолвятся ОДНИМ пакетом на весь набор, а не по
+  // 2–3 запроса на мастера. Услуга у всех одна и та же, то есть её чтение
+  // повторялось M раз буквально одним и тем же запросом. Правило не
+  // продублировано — обе формы резолвера сидят на одной чистой функции
+  // (`resolveDuration.ts`), поэтому коды отказа те же.
+  const durations = await resolveServiceDurations(masterIds, input.serviceId);
+
   const perMaster = await Promise.all(
     masterIds.map(async (masterId) => {
-      const duration = await resolveServiceDuration(masterId, input.serviceId);
-      if (!duration.ok) {
+      const duration = durations.get(masterId);
+      if (!duration || !duration.ok) {
         return { masterId, slots: [] as Array<{ startAtUtc: string; endAtUtc: string; label: string }> };
       }
       const result = await listAvailabilitySlotsPaginated(masterId, input.serviceId, duration.data, {
