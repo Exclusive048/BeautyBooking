@@ -71,7 +71,7 @@ export function FavoriteToggleButton({
   const base =
     variant === "floating"
       ? "grid h-10 w-10 place-items-center rounded-full bg-bg-card/85 text-text-sec shadow-card backdrop-blur transition hover:bg-bg-card hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/45"
-      : "inline-flex h-10 items-center gap-1.5 rounded-2xl border border-border-subtle/80 bg-bg-input px-3 text-sm font-medium text-text-main hover:border-border-subtle hover:bg-bg-card";
+      : "inline-flex h-10 items-center gap-1.5 rounded-2xl border border-border-control bg-bg-input px-3 text-sm font-medium text-text-main hover:bg-bg-card";
 
   return (
     <button

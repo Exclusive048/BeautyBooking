@@ -28,7 +28,7 @@ export const ChipButton = forwardRef<HTMLButtonElement, Props>(
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
           active
             ? "bg-primary text-white shadow-sm"
-            : "border border-border-subtle bg-bg-page text-text-main hover:bg-bg-input/70",
+            : "border border-border-control bg-bg-page text-text-main hover:bg-bg-input/70",
           className,
         )}
         {...rest}

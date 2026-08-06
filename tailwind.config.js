@@ -36,6 +36,7 @@ module.exports = {
         input: "rgb(var(--input) / <alpha-value>)",
         border: "rgb(var(--border) / <alpha-value>)",
         "border-subtle": "rgb(var(--border-subtle) / <alpha-value>)",
+        "border-control": "rgb(var(--border-control) / <alpha-value>)",
         "border-focus": "rgb(var(--border-focus) / <alpha-value>)",
         text: "rgb(var(--text) / <alpha-value>)",
         "text-muted": "rgb(var(--text-muted) / <alpha-value>)",

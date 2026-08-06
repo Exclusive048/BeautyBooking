@@ -48,6 +48,7 @@ function contrast(fg: [number, number, number], bg: [number, number, number]): n
 }
 
 const WCAG_AA_TEXT = 4.5;
+const WCAG_NON_TEXT = 3;
 
 describe("globals.css — контраст плейсхолдера", () => {
   // Поверхности, на которых плейсхолдер реально рисуется: заливка поля в
@@ -74,6 +75,65 @@ describe("globals.css — контраст плейсхолдера", () => {
       const main = contrast(rgb(scope, "text-main"), rgb(scope, "bg-input"));
       const placeholder = contrast(rgb(scope, "text-placeholder"), rgb(scope, "bg-input"));
       expect(placeholder).toBeLessThan(main);
+    }
+  });
+});
+
+/**
+ * UI-09 — граница элемента управления держит порог WCAG 1.4.11 (3:1).
+ *
+ * Отдельный токен от `--border-subtle` нужен именно потому, что у двух этих
+ * границ РАЗНЫЕ пороги: делитель внутри карточки — декор, а рамка поля или
+ * кнопки `secondary` несёт информацию «здесь начинается интерактив», и без
+ * неё элемент отличает от фона одна заливка (`--bg-input` на `--bg-card` —
+ * 1.05:1). Один общий токен нельзя ни поднять (делители станут грубыми), ни
+ * оставить (управление неразличимо), поэтому их два.
+ *
+ * Планка каждой темы считается по САМОЙ ТРЕБОВАТЕЛЬНОЙ поверхности, а не по
+ * средней: в светлой это `--bg-page` (тёмная граница на самом тёмном светлом
+ * фоне), в тёмной — `--bg-card` (светлая граница на самом светлом тёмном).
+ * Ориентиры из самой находки этой проверки не проходят: #A08E86 даёт 2.77 на
+ * `--bg-page`, #7A4048 — 1.95 на `--bg-card`.
+ *
+ * Не-вакуумность: прогонялось на прежнем значении (`--border-control` =
+ * `--border-subtle`) — краснеют все четыре поверхности обеих тем.
+ */
+describe("globals.css — контраст границ элементов управления", () => {
+  // Поверхности, на которых рамка управления реально рисуется: заливка поля
+  // в покое и в фокусе (`.lux-input`), карточка (кнопки `secondary`/`icon`,
+  // ячейки OTP) и страница (`ChipButton` держит фон `bg-bg-page`).
+  const SURFACES = ["bg-input", "bg-input-focus", "bg-card", "bg-page"] as const;
+
+  it.each(SURFACES)("светлая тема: --border-control на --%s ≥ 3:1", (surface) => {
+    expect(contrast(rgb(":root", "border-control"), rgb(":root", surface))).toBeGreaterThanOrEqual(
+      WCAG_NON_TEXT
+    );
+  });
+
+  it.each(SURFACES)("тёмная тема: --border-control на --%s ≥ 3:1", (surface) => {
+    expect(contrast(rgb(".dark", "border-control"), rgb(".dark", surface))).toBeGreaterThanOrEqual(
+      WCAG_NON_TEXT
+    );
+  });
+
+  it("граница управления заметнее декоративного делителя в обеих темах", () => {
+    // Иначе разделение токенов вырождается: два имени с одним значением
+    // выглядят как система, но не дают ничего — а именно так дефект и
+    // выглядел до UI-09, когда `--border-subtle` нёс обе роли.
+    for (const scope of [":root", ".dark"] as const) {
+      const control = contrast(rgb(scope, "border-control"), rgb(scope, "bg-card"));
+      const subtle = contrast(rgb(scope, "border-subtle"), rgb(scope, "bg-card"));
+      expect(control).toBeGreaterThan(subtle);
+    }
+  });
+
+  it("граница управления не перебивает вторичный текст — иерархия слоёв", () => {
+    // Рамка обязана быть различима, но она рамка: если она контрастнее
+    // текста рядом, взгляд уходит на контур вместо содержимого.
+    for (const scope of [":root", ".dark"] as const) {
+      const control = contrast(rgb(scope, "border-control"), rgb(scope, "bg-card"));
+      const secondary = contrast(rgb(scope, "text-sec"), rgb(scope, "bg-card"));
+      expect(control).toBeLessThan(secondary);
     }
   });
 });

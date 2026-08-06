@@ -26,7 +26,21 @@
     --text-placeholder: 141 98 107;  /* #8D626B placeholder */
 
     /* === Borders === */
-    --border-subtle: 224 208 200;    /* warm taupe */
+    --border-subtle: 224 208 200;    /* warm taupe — ДЕЛИТЕЛИ И КАРТОЧКИ */
+    /* Граница, которая ОПРЕДЕЛЯЕТ элемент управления (поле, кнопка, чип,
+       переключатель), — это не декор: по ней пользователь понимает, где
+       начинается интерактив, поэтому у неё порог WCAG 1.4.11 = 3:1, а не
+       «чем тише, тем лучше». `--border-subtle` давал 1.46:1 на `--bg-card`
+       и 1.32:1 на `--bg-page` (UI-09) — то есть кнопка `secondary` и поле
+       ввода отличались от фона одной заливкой.
+       Планка считается по САМОЙ ТРЕБОВАТЕЛЬНОЙ поверхности темы, а не по
+       средней: в светлой это `--bg-page` (тёмная граница на самом тёмном
+       светлом фоне даёт минимум), в тёмной — `--bg-card`. Ориентиры из
+       находки эту проверку не проходят (#A08E86 → 2.77 на `--bg-page`,
+       #7A4048 → 1.95 на `--bg-card`). Ратио здесь: page 3.23 / input 3.39 /
+       card 3.57. Оттенок тот же тёплый тауп, изменена только светлота.
+       Сторож — `globals-contrast.test.ts`. */
+    --border-control: 145 131 126;   /* #91837E control outline */
     --border-focus: 114 8 8;         /* burgundy ring */
 
     /* === Primary — BURGUNDY (was beige/gold) === */
@@ -132,7 +146,14 @@
     --text-placeholder: 165 135 143; /* #A5878F */
 
     /* === Borders === */
-    --border-subtle: 90 24 32;       /* burgundy-tinted */
+    --border-subtle: 90 24 32;       /* burgundy-tinted — делители и карточки */
+    /* UI-09, тёмная половина: `--border-subtle` давал 1.17:1 на `--bg-card` —
+       худшее значение обеих тем. Планка тут считается по самой СВЕТЛОЙ тёмной
+       поверхности (`--bg-card`), на ней светлая граница различима хуже всего.
+       Ратио: card 3.50 / page 4.06 / input 4.33. Оттенок остаётся в бордовой
+       семье (пыльная роза), заметно темнее `--text-sec` (#C79BA2) — иерархия
+       «граница слабее вторичного текста» сохранена. */
+    --border-control: 158 106 114;   /* #9E6A72 control outline */
     --border-focus: 122 16 44;       /* burgundy focus ring (FIX-BATCH-H) */
 
     /* === Primary — burgundy, brand-consistent (FIX-BATCH-H, was salmon-pink) === */
@@ -226,7 +247,7 @@
   input, textarea, select {
     background-color: rgb(var(--input));
     color: rgb(var(--text));
-    border-color: rgb(var(--border));
+    border-color: rgb(var(--border-control));
   }
   input::placeholder, textarea::placeholder { color: rgb(var(--text-placeholder)); }
   input:focus, textarea:focus, select:focus {
@@ -285,14 +306,23 @@
     box-shadow: var(--shadow-hover);
   }
 
+  /* UI-09 — рамка поля держит 3:1 в ПОКОЕ, а не только под курсором.
+     Прежняя форма `--border-subtle / 0.68` давала 1.19:1 на `--bg-page`:
+     альфа тут не «мягче», а прямое умножение и без того недостаточного
+     контраста на композит с заливкой. Поэтому токен управления идёт на
+     ПОЛНОЙ непрозрачности, а ступень наведения, которую раньше давал
+     переход 0.68 → 1, перенесена на заливку: она поднимается до
+     `--bg-input-focus` — того же токена, что уже использует `:focus-visible`.
+     Ладдер состояний сохранён (покой → наведение → фокус), новых токенов не
+     заведено, и ни одна ступень не слабее предыдущей. */
   .lux-input {
     background-color: rgb(var(--bg-input));
-    border: 1px solid rgb(var(--border-subtle) / 0.68);
+    border: 1px solid rgb(var(--border-control));
     transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
   }
 
   .lux-input:hover {
-    border-color: rgb(var(--border-subtle));
+    background-color: rgb(var(--bg-input-focus));
   }
 
   .lux-input:focus-visible {

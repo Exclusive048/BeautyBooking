@@ -71,7 +71,16 @@ describe("UI-06 — мост токен ↔ класс", () => {
 
   it("имена, которыми пользуется разметка, мост имеют", () => {
     // Список — из находки UI-06: ровно те, что компилировались в ничто.
-    const used = ["muted-foreground", "primary-foreground", "accent-foreground"];
+    // `border-control` (UI-09) — тот же класс отказа: снятый мост оставит
+    // `border-border-control` в разметке восьми элементов управления и
+    // вернёт границы в состояние «компилируется в ничто», то есть в провал
+    // WCAG 1.4.11, ради которого токен и заведён.
+    const used = [
+      "muted-foreground",
+      "primary-foreground",
+      "accent-foreground",
+      "border-control",
+    ];
     const keys = new Set(bridges().map((b) => b.key));
     for (const name of used) {
       expect(keys.has(name), `нет моста для ${name}`).toBe(true);

@@ -229,7 +229,7 @@ export function OtpInput({
                   ? "border-red-400/70 bg-red-50/60 dark:bg-red-950/30"
                   : filled
                     ? "login-otp-pop border-primary bg-primary/5"
-                    : "border-border-subtle",
+                    : "border-border-control",
                 // Reduced-motion fallback for the verifying sweep: a static
                 // tint, so the stage is still visible without any movement.
                 state === "verifying" ? "border-primary/60" : null,

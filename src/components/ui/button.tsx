@@ -21,8 +21,13 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 const variants: Record<ButtonVariant, string> = {
   primary:
     "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-accent-foreground shadow-card hover:brightness-[1.03] hover:shadow-hover focus-visible:ring-2 focus-visible:ring-primary-glow/70 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page",
+  // UI-09: рамка `secondary`/`icon` — единственное, что отделяет кнопку от
+  // фона (заливка `bg-bg-input` на `bg-bg-card` это 1.05:1), значит она
+  // подпадает под WCAG 1.4.11 и идёт на `border-control` БЕЗ альфы: `/80`
+  // композитится с заливкой и снимает те же ~20% контраста, ради которых
+  // токен и заводился. Ступень наведения сохранена на заливке.
   secondary:
-    "border border-border-subtle/80 bg-bg-input text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.28)] hover:border-border-subtle hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page",
+    "border border-border-control bg-bg-input text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.28)] hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page",
   ghost:
     "bg-transparent text-text-main hover:bg-bg-input/85 focus-visible:ring-2 focus-visible:ring-primary-glow/35",
   // Fixed light fill (white, same in both themes) MUST pair with a fixed dark
@@ -37,7 +42,7 @@ const variants: Record<ButtonVariant, string> = {
     "border border-transparent bg-white text-primary hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
   danger: "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-500",
   icon:
-    "border border-border-subtle/80 bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",
+    "border border-border-control bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",
   wrapper:
     "bg-transparent text-inherit hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary-glow/35",
 };
