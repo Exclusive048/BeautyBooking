@@ -219,3 +219,59 @@ describe("PERF-08 · стоимость пакета не растёт с чис
     expect(serviceFindUnique).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * PERF-24 — поштучная форма читала мастера и услугу двумя последовательными
+ * заходами, хотя один не вход другому. Она стоит на публичных горячих путях
+ * (`/api/public/providers/[id]/slots`, `/api/masters/[id]/availability`), где
+ * лишний round-trip платится на каждый показ сетки слотов.
+ *
+ * Проверка устроена барьером, а не подсчётом вызовов: оба мока отдают ответ
+ * ТОЛЬКО после того, как вызваны оба. Последовательный код такой барьер не
+ * проходит по построению — второй запрос не начнётся, пока не ответил первый,
+ * — поэтому тест не вакуумный без правки самого теста.
+ */
+describe("PERF-24 · мастер и услуга читаются одним заходом", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("второй запрос стартует, не дожидаясь ответа первого", async () => {
+    let arrived = 0;
+    let openGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve;
+    });
+    const throughGate = async <T,>(value: T): Promise<T> => {
+      arrived += 1;
+      if (arrived >= 2) openGate();
+      await gate;
+      return value;
+    };
+
+    providerFindUnique.mockImplementation(() => throughGate(SOLO));
+    serviceFindUnique.mockImplementation(() =>
+      throughGate({ ...STUDIO_SERVICE, providerId: SOLO.id })
+    );
+    masterServiceFindUnique.mockResolvedValue(null);
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error("Запросы идут последовательно: второй ждёт ответа первого.")),
+        1_000
+      );
+    });
+
+    try {
+      await expect(
+        Promise.race([resolveServiceDuration(SOLO.id, SERVICE_ID), deadline])
+      ).resolves.toEqual({ ok: true, data: 60 });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    expect(providerFindUnique).toHaveBeenCalledTimes(1);
+    expect(serviceFindUnique).toHaveBeenCalledTimes(1);
+  });
+});

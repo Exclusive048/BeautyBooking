@@ -58,14 +58,14 @@ export default async function Page({ searchParams }: PageProps) {
       redirect("/403");
     }
 
+    // PERF-24: `getCurrentMasterProviderContext` уже возвращает `{id, studioId}`
+    // и бросает 403, если кабинета нет, — повторное чтение той же строки за
+    // тем же `studioId` было третьим последовательным round-trip'ом ни за чем.
+    // Соседние `hasMasterProfile`/`getCurrentMasterProviderContext` намеренно
+    // остаются последовательными: это цепочка гвардов, и её порядок — часть
+    // смысла (без мастерского профиля пользователь уходит на /403, а не в
+    // ошибку из второго резолвера).
     const masterContext = await getCurrentMasterProviderContext(user.id);
-    const master = await prisma.provider.findUnique({
-      where: { id: masterContext.id },
-      select: { studioId: true },
-    });
-    if (!master) {
-      redirect("/403");
-    }
 
     // FIX-VISUAL-POLISH G7: render inside the master cabinet shell (sidebar +
     // bottom-nav) so billing is consistent with the other /cabinet/master/*
@@ -73,7 +73,7 @@ export default async function Page({ searchParams }: PageProps) {
     return (
       <MasterCabinetShell userId={user.id}>
         <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 lg:px-8">
-          {master.studioId ? (
+          {masterContext.studioId ? (
             <section className="space-y-4">
               <div className="lux-card rounded-[24px] p-6">
                 <h1 className="text-2xl font-semibold text-text-main">Тариф управляется студией</h1>

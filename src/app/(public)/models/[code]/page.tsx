@@ -43,10 +43,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ModelOfferPage({ params }: PageProps) {
   const { code } = await params;
-  const offer = await getPublicModelOffer(code);
+  // PERF-24: оффер читается по коду из URL, сессия — по куке; ни один из них
+  // не вход другого. 404 остаётся 404 — просто сессия к этому моменту уже
+  // прочитана.
+  const [offer, user] = await Promise.all([getPublicModelOffer(code), getSessionUser()]);
   if (!offer) return notFound();
-
-  const user = await getSessionUser();
   const loginHref = `/login?next=${encodeURIComponent(`/models/${offer.publicCode}`)}`;
   const isFree = offer.price === null || offer.price === 0;
   // FIX-MASTER-01 item 4: offer.price is KOPEKS — raw interpolation rendered

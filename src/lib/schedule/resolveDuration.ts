@@ -68,18 +68,24 @@ function decideServiceDuration(input: {
 }
 
 export async function resolveServiceDuration(masterId: string, serviceId: string): Promise<DurationResult> {
-  const master = await prisma.provider.findUnique({
-    where: { id: masterId },
-    select: MASTER_SELECT,
-  });
+  // PERF-24: строка мастера и строка услуги друг от друга не зависят —
+  // читаются одним заходом, как это уже делает пакетная версия ниже. Ранний
+  // выход по негодному мастеру сохранён: порядок отказов задаёт
+  // `decideServiceDuration`, а не порядок запросов, поэтому ответ тот же
+  // `MASTER_NOT_FOUND` — просто услуга к этому моменту уже прочитана.
+  const [master, service] = await Promise.all([
+    prisma.provider.findUnique({
+      where: { id: masterId },
+      select: MASTER_SELECT,
+    }),
+    prisma.service.findUnique({
+      where: { id: serviceId },
+      select: SERVICE_SELECT,
+    }),
+  ]);
   if (!master || master.type !== ProviderType.MASTER) {
     return decideServiceDuration({ master: null, service: null, override: null });
   }
-
-  const service = await prisma.service.findUnique({
-    where: { id: serviceId },
-    select: SERVICE_SELECT,
-  });
 
   // Оверрайд читается только там, где он вообще может решать, — ровно как
   // раньше: у соло-мастера третьего запроса не было.
