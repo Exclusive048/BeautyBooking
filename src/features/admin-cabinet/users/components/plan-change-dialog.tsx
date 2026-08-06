@@ -1,17 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  AccountType,
-  PlanTier,
-  SubscriptionScope,
-} from "@prisma/client";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
+import { AccountType, PlanTier, SubscriptionScope } from "@/lib/prisma-enums";
 import { UI_TEXT } from "@/lib/ui/text";
 import {
   formatPlanName,

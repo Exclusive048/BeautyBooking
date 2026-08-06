@@ -1,4 +1,6 @@
-import { NotificationType } from "@prisma/client";
+// PERF-11: тип, а не значение — `import type` стирается компилятором и не тянет
+// в браузер рантайм Prisma (модуль достижим от клиентского центра уведомлений).
+import type { NotificationType } from "@prisma/client";
 
 export type ClientNotificationGroup =
   | "bookings"

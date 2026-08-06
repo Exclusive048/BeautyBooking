@@ -1,6 +1,6 @@
 "use client";
 
-import { ReviewTargetType } from "@prisma/client";
+import { ReviewTargetType } from "@/lib/prisma-enums";
 import { AlertTriangle, Flag } from "lucide-react";
 import { ReviewActions } from "@/features/admin-cabinet/reviews/components/review-actions";
 import { ReviewRatingStars } from "@/features/admin-cabinet/reviews/components/review-rating-stars";

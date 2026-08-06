@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { NotificationType } from "@prisma/client";
+import { NotificationType } from "@/lib/prisma-enums";
 import { Check, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";

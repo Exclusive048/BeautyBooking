@@ -1,4 +1,4 @@
-import { DiscountType } from "@prisma/client";
+import { DiscountType } from "@/lib/prisma-enums";
 import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 
 export type BundlePricing = {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { SubscriptionScope } from "@prisma/client";
+import { SubscriptionScope } from "@/lib/prisma-enums";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { PlanCardView } from "@/features/admin-cabinet/billing/components/plan-card";
 import {

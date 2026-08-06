@@ -1,6 +1,6 @@
 "use client";
 
-import { MediaEntityType } from "@prisma/client";
+import { MediaEntityType } from "@/lib/prisma-enums";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";

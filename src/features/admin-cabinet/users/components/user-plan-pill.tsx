@@ -1,6 +1,6 @@
 "use client";
 
-import { PlanTier, SubscriptionStatus } from "@prisma/client";
+import { PlanTier, SubscriptionStatus } from "@/lib/prisma-enums";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";

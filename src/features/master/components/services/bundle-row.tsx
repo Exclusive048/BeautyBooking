@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Package } from "lucide-react";
 import { useState } from "react";
-import { DiscountType } from "@prisma/client";
+import { DiscountType } from "@/lib/prisma-enums";
 import { cn } from "@/lib/cn";
 import type {
   MasterServicesViewData,

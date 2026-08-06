@@ -1,6 +1,6 @@
 "use client";
 
-import { PlanTier } from "@prisma/client";
+import { PlanTier } from "@/lib/prisma-enums";
 import { Crown } from "lucide-react";
 import { UserAvatar } from "@/features/admin-cabinet/users/components/user-avatar";
 import { UserPlanPill } from "@/features/admin-cabinet/users/components/user-plan-pill";

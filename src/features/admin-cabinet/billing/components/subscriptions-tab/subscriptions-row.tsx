@@ -1,6 +1,6 @@
 "use client";
 
-import { PlanTier, SubscriptionStatus } from "@prisma/client";
+import { PlanTier, SubscriptionStatus } from "@/lib/prisma-enums";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kopeks";

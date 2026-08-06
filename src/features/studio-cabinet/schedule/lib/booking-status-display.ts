@@ -1,4 +1,4 @@
-import { BookingStatus } from "@prisma/client";
+import { BookingStatus } from "@/lib/prisma-enums";
 
 export type BookingStatusTone = "confirmed" | "pending" | "new" | "done" | "muted";
 

@@ -3,7 +3,7 @@
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BillingPaymentStatus } from "@prisma/client";
+import { BillingPaymentStatus } from "@/lib/prisma-enums";
 import { Button } from "@/components/ui/button";
 import { BillingTabEmpty } from "@/features/admin-cabinet/billing/components/billing-tab-empty";
 import { PaymentTableRow } from "@/features/admin-cabinet/billing/components/payments-tab/payment-row";
