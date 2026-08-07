@@ -17,7 +17,14 @@ export function AddBundleButton({ allServices }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="secondary" size="md" onClick={() => setOpen(true)} className="gap-1.5">
+      <Button
+        variant="secondary"
+        size="md"
+        onClick={() => setOpen(true)}
+        className="gap-1.5"
+        // UI-18: см. соседний `AddServiceButton` — действие называет aria-label.
+        aria-label={T.addBundleAria}
+      >
         <Plus className="h-4 w-4" aria-hidden />
         {T.addBundleCta}
       </Button>

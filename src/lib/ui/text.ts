@@ -1741,11 +1741,11 @@ export const UI_TEXT = {
       tagsTitle: "Какой стиль?",
     },
     visualSearch: {
-      button: "🔍 Найти по фото",
+      button: "Найти по фото",
       modalTitle: "Найти по фото",
-      modalSubtitle: "Покажи фото - найдем похожие работы",
+      modalSubtitle: "Покажите фото — найдём похожие работы",
       previewAlt: "Предпросмотр",
-      dropzoneTitle: "Покажи фото - найдем похожие работы",
+      dropzoneTitle: "Покажите фото — найдём похожие работы",
       dropzoneRelease: "Отпустите файл",
       dropzoneSubtitle: "или выберите файл",
       chooseFile: "Выбрать фото",
@@ -1999,7 +1999,7 @@ export const UI_TEXT = {
       breadcrumb: "Настройки расписания",
       title: "Настройки расписания",
       subtitle: "Часы, перерывы, исключения и правила бронирования",
-      previewCta: "Превью клиента",
+      previewCta: "Открыть превью клиента",
       studioApproval: {
         infoTemplate:
           "Вы в команде студии «{studio}». Изменения расписания отправляются на одобрение студии — текущее расписание не меняется, пока студия не подтвердит.",
@@ -3136,7 +3136,7 @@ export const UI_TEXT = {
         roleStudioAdmin: "Админ студии",
         roleAdmin: "Администратор",
         roleSuperadmin: "Суперадмин",
-        manageRolesCta: "Управление ролями",
+        manageRolesCta: "Управлять ролями",
         exportHeading: "Экспорт данных",
         exportBody:
           "Скоро вы сможете запросить копию всех своих данных в формате JSON: профиль, бронирования, отзывы, портфолио.",
@@ -3151,8 +3151,15 @@ export const UI_TEXT = {
       breadcrumb: "Услуги и цены",
       title: "Услуги и цены",
       subtitle: "Что предлагаете клиентам и за сколько",
+      // UI-18: подпись оставлена короткой — обе кнопки стоят в шапке рядом, и
+      // на 390px удлинение обеих сжимает заголовок страницы до нечитаемого
+      // огрызка (замерено скриншотами до/после). Действие называет `aria-label`:
+      // видимая подпись входит в него целиком, поэтому WCAG 2.5.3 соблюдён, а
+      // скринридер перестаёт объявлять «кнопка Услуга».
       addServiceCta: "Услуга",
+      addServiceAria: "Добавить услугу",
       addBundleCta: "Пакет",
+      addBundleAria: "Добавить пакет",
       kpi: {
         servicesLabel: "Услуг",
         bundlesLabel: "Пакетов",
@@ -3449,7 +3456,7 @@ export const UI_TEXT = {
         pendingBadge: "Ожидает",
         confirmAction: "Подтвердить",
         declineAction: "Отклонить",
-        chatAction: "Чат",
+        chatAction: "Открыть чат",
         moreAction: "Действия",
         rescheduleAction: "Перенести",
         cancelAction: "Отменить",
@@ -4158,8 +4165,8 @@ export const UI_TEXT = {
       privateTagsTitle: "Можно улучшить",
       masterReply: "Ответ мастера",
       reply: "Ответить",
-      replyPlaceholder: "Напиши ответ клиенту...",
-      replyPrompt: "Напиши ответ клиенту...",
+      replyPlaceholder: "Напишите ответ клиенту…",
+      replyPrompt: "Напишите ответ клиенту…",
       replySave: "Отправить",
       replyCancel: "Отмена",
       replyFailed: "Не удалось отправить ответ. Попробуйте ещё раз.",
@@ -5651,7 +5658,7 @@ export const UI_TEXT = {
       noReviews: "Отзывов пока нет — станьте первым",
       loadFailed: "Не удалось загрузить отзывы. Попробуйте ещё раз.",
       masterReply: "Ответ мастера",
-      summaryButton: "Резюме",
+      summaryButton: "Показать резюме",
       summaryTitle: "Что говорят клиенты",
       summaryLoading: "Анализируем отзывы...",
       summaryFewReviews: "Пока недостаточно отзывов для резюме",
