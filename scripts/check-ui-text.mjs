@@ -108,4 +108,35 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
+/**
+ * UI-19 — многоточие в UI-строках только одним символом «…».
+ *
+ * Раскол был почти ровным (90 «…» против 88 «...») и доходил до прямых
+ * коллизий на одном слове: «Загрузка…» рядом с «Загрузка...», «Отправляем…»
+ * рядом с «Отправляем...». Ни один гейт этого не видел — для них обе формы
+ * просто строка.
+ *
+ * Проверка держится ровно на этом одном символе и потому не требует реестра
+ * исключений: три точки в русской UI-строке не бывают правильными. Ё-половина
+ * находки сюда НЕ вынесена сознательно — там нужен словарь ударных форм
+ * («сохранён» с ё, но «сохранены» без), а гейт со словарём наполовину хуже
+ * отсутствующего.
+ */
+const TEXT_SOURCE = resolve(process.cwd(), "src/lib/ui/text.ts");
+const textLines = readFileSync(TEXT_SOURCE, "utf8").split("\n");
+const ellipsis = [];
+textLines.forEach((line, index) => {
+  const re = /"((?:[^"\\]|\\.)*)"/g;
+  let match;
+  while ((match = re.exec(line)) !== null) {
+    if (match[1].includes("...")) ellipsis.push({ line: index + 1, value: match[1].slice(0, 80) });
+  }
+});
+
+if (ellipsis.length > 0) {
+  console.error("Многоточие в UI-строках пишется одним символом «…», а не тремя точками:");
+  for (const row of ellipsis) console.error(`  src/lib/ui/text.ts:${row.line}  ${row.value}`);
+  process.exit(1);
+}
+
 console.log("UI text hardcode check passed.");
