@@ -40,7 +40,12 @@ const variants: Record<ButtonVariant, string> = {
   // (FIX-ROUND-02). Use on brand-gradient / burgundy surfaces.
   inverted:
     "border border-transparent bg-white text-primary hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-  danger: "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-500",
+  // UI-25: токен `destructive` (мост в tailwind.config), не `bg-red-600` —
+  // литеральный red не реагирует на тему, а у токена в светлой теме свой,
+  // более глубокий красный (#B00020). Hover — brightness, как у `primary`:
+  // ступень не зависит от фона под кнопкой, в отличие от альфы.
+  danger:
+    "bg-destructive text-destructive-foreground hover:brightness-110 focus-visible:ring-2 focus-visible:ring-destructive",
   icon:
     "border border-border-control bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",
   wrapper:
