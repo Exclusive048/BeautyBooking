@@ -10,7 +10,7 @@
 |---|---|
 | **Дата последнего обновления** | 2026-08-07 |
 | **Ветка** | `audit-fixes` |
-| **Следующая находка** | **UI-24** (P3) — имена вариантов в SKILL.md разошлись с кодом |
+| **Следующая находка** | **UI-25** (P3) — `Button variant="danger"` игнорирует токен `destructive` |
 
 **Прогресс: 136 / 157**  
 > Счётчик прогресса считает только `FIXED` (так он вёлся с начала кампании). Разобранных находок больше на семь: 4 `BLOCKED` + 3 `DEFERRED-BIG` (PERF-03 засчитан в `FIXED` — закрыта одна из двух цепочек, вторая отдельной записью в BLOCKED) — они в таблице ниже и в [`AUDIT-CAMPAIGN-BLOCKED.md`](AUDIT-CAMPAIGN-BLOCKED.md).
@@ -25,8 +25,8 @@
 | AUDIT-FRESH-02 — логика | 30 | 29 | 0 | 1 | 0 | 0 |
 | AUDIT-FRESH-03 — устойчивость | 31 | 29 | 1 | 0 | 1 | 0 |
 | AUDIT-FRESH-04 — производительность | 30 | 23 | 2 | 3 | 2 | 0 |
-| AUDIT-FRESH-05 — UI/UX | 36 | 25 | 1 | 0 | 4 | 6 |
-| **Итого** | **157** | **136** | **4** | **4** | **7** | **6** |
+| AUDIT-FRESH-05 — UI/UX | 36 | 26 | 1 | 0 | 4 | 5 |
+| **Итого** | **157** | **137** | **4** | **4** | **7** | **5** |
 
 > SEC-01 + SEC-02 закрыты одним коммитом `a4b7a41b` (`FIX-SEC-EMAIL-IDENTITY-01`) — он лёг на `main` до создания ветки, поэтому в `git log audit-fixes` он первый.
 
@@ -207,7 +207,7 @@
 | **UI-35** | P3 | `FIXED` | `3770d7ea` | Все 5 сайтов находки + те же по классу соседи без ярлыка (правый блок topbar, публичный bottom-nav, cabinet-sidebar, studio-sidebar, section-nav профиля) — 10 файлов. Ярлыки из `UI_TEXT.a11y` (`userActions`/`cabinetSections`/`adminSections`): разные у сосуществующих на странице, общие у разведённых брейкпоинтом. `SectionNav` — через `aria-labelledby` на видимый заголовок (`useId`), чтобы доступное имя совпадало с видимым. Проверено: grep не находит `<nav>` без ярлыка; `StudioNavbar` (только `/cabinet/billing`) и `StudioSidebar` (layout студии) на одном маршруте не встречаются — общий ярлык корректен. Англоязычные хардкоды ярлыков соседних `<nav>` (`"breadcrumb"`, `"Billing sections"`, `"account-nav"`, `"Breadcrumb"`) — класс UI-36, не тронуты |
 | **UI-36** | P3 | `FIXED` | `1093793d` | Утверждение аудита «остальные 81 кнопка берут ярлык из UI_TEXT» опровергнуто свипом: англоязычных/технических `aria-label` было **11**, не 1 (`remove` ×2, `close-menu` ×2, `breadcrumb` ×2, `Billing sections`, `account-nav`, `weekday`, `Revenue timeline`, `unread`) — гейт `check:ui-text` ловит русские хардкоды, английские проходят молча, потому и выжили. Все 11 → ключи `UI_TEXT` (breadcrumb — существующий `a11y.breadcrumbs`; чипы — `a11y.removeItem(name)` с именем тега, иначе несколько «Убрать» на экране неразличимы; остальные — свои namespaces). `FeatureGate` — `inert` рядом с `aria-hidden` (React 19 принимает boolean-проп): фокусируемые потомки гейченного контента были в tab-порядке, будучи скрыты от AT. Проверено: grep англоязычных ярлыков = 0, check EXIT=0, test EXIT=0 (таймаут-флейк `prisma-enums` A/B-опровергнут: изолированно 2.6 с из 5, зелёный повторный полный прогон) |
 | **UI-23** | P3 | `STALE-ON-BRANCH` | закрыто побочно UI-06/07 и заменой `pt-safe`/`pb-safe` | Все три пункта уже решены ранними коммитами кампании: `--rose`/`--sky` удалены в UI-06 вместе с дезинформирующим комментарием `:93` (на их месте — объяснение); `--glass-border`/`--glass-bg` больше не сироты — их потребляет восстановленное в UI-07 правило `.glass-panel` (2 живых сайта: cabinet-sidebar, studio-navbar); `--safe-area-inset-*` — 5 потребителей через arbitrary values (`offline/page`, `cookie-notice`, `update-prompt`, `network-banner` ×2), форма закреплена `tailwind-bridge.test.ts:115`. Проверено грепом по HEAD ветки |
-| **UI-24** | P3 | `PENDING` | — | Имена вариантов в SKILL.md разошлись с кодом** — **S |
+| **UI-24** | P3 | `FIXED` | без SHA — `.claude/` в `.gitignore` (строка 54), файл не трекается; правка применена по месту, скилл читается с диска каждой сессией | Таблица §6 переписана по фактическим union-типам `src/components/ui/`: Button `primary\|secondary\|ghost\|danger\|icon\|wrapper\|inverted` + size `sm\|md\|lg\|icon\|none` (дефолты `primary`/`md`), Badge `default\|success\|warning\|danger\|info\|muted`, `Checkbox size="sm\|md"` (компонент уже существует — создан ранее в кампании), добавлен `SegmentedTabs`. Фиктивные строки удалены: `Alert`, `EditableField` («см. паттерн ниже» вёл в никуда — паттерна в документе нет), `CardFooter` (в `card.tsx` не экспортируется). Правило синхронизации «меняешь union — правь таблицу в том же изменении» — комментарием при таблице. ⚠️ Форсить файл в git поверх осознанного ignore — решение владельца; если `.claude` планируется версионировать, правка уже на диске |
 | **UI-25** | P3 | `PENDING` | — | `Button variant="danger"` игнорирует токен `destructive`** — **S |
 | **UI-26** | P3 | `PENDING` | — | 204 сырых `<button>` и 63 сырых поля** — **L |
 | **UI-27** | P3 | `PENDING` | — | 548 ad-hoc `dark:`-оверрайдов** — **L |
