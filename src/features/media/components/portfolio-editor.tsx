@@ -205,12 +205,17 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       ) : null}
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-        {assets.map((asset) => (
+        {assets.map((asset, index) => (
           <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
-            <Button variant="wrapper" className="relative h-full w-full" onClick={() => setPreviewUrl(asset.url)}>
+            <Button
+              variant="wrapper"
+              className="relative h-full w-full"
+              onClick={() => setPreviewUrl(asset.url)}
+              aria-label={mediaText.openPreviewAriaTemplate.replace("{n}", String(index + 1))}
+            >
               <ResilientImage
                 src={asset.url}
-                alt=""
+                alt={mediaText.photoAltTemplate.replace("{n}", String(index + 1))}
                 sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover"
               />
@@ -262,7 +267,7 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
           <div className="relative h-[90vh] w-[90vw]">
             <ResilientImage
               src={previewUrl}
-              alt=""
+              alt={mediaText.previewAlt}
               sizes="90vw"
               fit="contain"
               className="rounded-2xl bg-bg-card object-contain"

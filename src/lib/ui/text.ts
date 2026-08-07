@@ -1738,6 +1738,9 @@ export const UI_TEXT = {
         next: "Следующее",
         paused: "Пауза",
         counter: "{current} / {total}",
+        // UI-33: сам кадр — единственное содержимое просмотрщика. Слово
+        // «сторис» в alt не повторяем: им уже подписан диалог.
+        photoAltTemplate: "Работа — {provider}, {current} из {total}",
         openProfile: "Открыть профиль",
       },
       relativeTime: {
@@ -1777,6 +1780,7 @@ export const UI_TEXT = {
       modalTitle: "Найти по фото",
       modalSubtitle: "Покажите фото — найдём похожие работы",
       previewAlt: "Предпросмотр",
+      resultPhotoAltTemplate: "Похожая работа — {provider} № {n}",
       dropzoneTitle: "Покажите фото — найдём похожие работы",
       dropzoneRelease: "Отпустите файл",
       dropzoneSubtitle: "или выберите файл",
@@ -2478,6 +2482,9 @@ export const UI_TEXT = {
       title: "Клиенты",
       subtitle: "История работы с клиентами и аналитика",
       cardNotePlaceholder: "Запишите важные детали о клиенте",
+      // UI-33: ключ ОДИН на оба кабинета — дровер общий для MASTER и STUDIO
+      // (как и соседний `cardNotePlaceholder`), иначе формулировки разъедутся.
+      cardPhotoAltTemplate: "Фото работы для клиента {name} № {n}",
       kpi: {
         totalLabel: "Всего клиентов",
         totalSubtextTemplate: "+{count} за месяц",
@@ -2677,6 +2684,9 @@ export const UI_TEXT = {
       },
       applicationCard: {
         photosLabel: "Фото-портфолио",
+        // UI-33: заголовок полоски — обычный <p>, с картинками программно не
+        // связан, поэтому каждая миниатюра была для скринридера немой.
+        photoAltTemplate: "Фото-портфолио из заявки № {n}",
         photosEmpty: "Без фото",
         consentYes: "Согласие на съёмку",
         consentNo: "Без согласия на съёмку",
@@ -3000,6 +3010,7 @@ export const UI_TEXT = {
           "Клиенты охотнее записываются к мастерам с примерами работ.",
         emptyCta: "Добавить работу",
         hiddenBadge: "скрыто",
+        imageAltTemplate: "Работа из портфолио № {n}",
       },
     },
     portfolioPage: {
@@ -3024,7 +3035,12 @@ export const UI_TEXT = {
         moveUpAria: "Переместить выше",
         moveDownAria: "Переместить ниже",
         menuAria: "Действия",
-        editAriaLabel: "Изменить",
+        // UI-33: номер работы делает плитки различимыми. Без него сетка из N
+        // работ звучит как N одинаковых кнопок «Изменить», а `aria-label`
+        // кнопки перекрывает `alt` вложенной картинки — то есть один alt
+        // до пользователя тут не доходит.
+        editAriaTemplate: "Изменить работу № {n}",
+        imageAltTemplate: "Работа из портфолио № {n}",
       },
       menu: {
         edit: "Изменить",
@@ -3052,6 +3068,10 @@ export const UI_TEXT = {
         defaultCategoryNone: "— Без категории —",
         defaultPublicLabel: "Сразу показывать в каталоге",
         previewRemoveAria: "Удалить из очереди",
+        // UI-33: имя файла нигде не отрисовано — оно есть только в самой
+        // миниатюре, поэтому очередь из трёх фото звучала как три пустых
+        // элемента с одинаковой кнопкой удаления.
+        previewAltTemplate: "Предпросмотр файла {name}",
         progressTemplate: "Загружено {done} из {total}",
         cancel: "Отмена",
         submit: "Загрузить",
@@ -3064,6 +3084,9 @@ export const UI_TEXT = {
       edit: {
         title: "Редактирование работы",
         photoLabel: "Фото",
+        // UI-33: `photoLabel` — обычный <p>, программной связи с картинкой у
+        // него нет, поэтому у самого фото должно быть своё имя.
+        photoAlt: "Фото редактируемой работы",
         cropCta: "Обрезать",
         replaceCta: "Заменить",
         replaceSoonHint: "Замена скоро",
@@ -5105,6 +5128,11 @@ export const UI_TEXT = {
       replacePhotoAria: "Заменить фото",
       removePhotoAria: "Удалить фото",
       closePreviewAria: "Закрыть предпросмотр",
+      // UI-33: единственный потомок кнопки открытия — картинка, поэтому без
+      // этих двух ключей у кнопки не было доступного имени вовсе.
+      openPreviewAriaTemplate: "Открыть фото № {n}",
+      photoAltTemplate: "Работа из портфолио № {n}",
+      previewAlt: "Фото во весь экран",
     },
   },
   clientCabinet: {
@@ -7465,6 +7493,10 @@ export const UI_TEXT = {
     gradePro: "Профи",
     gradeNew: "Новый",
     noPortfolio: "Портфолио появится скоро",
+    // UI-33: миниатюры в оверлее карточки мастера — единственное, что
+    // показывает его работы; оверлей спрятан трансформом, но в дереве
+    // доступности присутствует всегда.
+    masterWorkAltTemplate: "Работа мастера {name} № {n}",
     openMaster: "Открыть профиль",
     loadingStudio: "Загружаем студию…",
     loadingProfile: "Загружаем страницу студии…",
@@ -7521,6 +7553,7 @@ export const UI_TEXT = {
     goToBooking: "К записи",
     sectionPhotos: "Фотографии студии",
     sectionPhotosSubtitle: "Интерьер, команда и атмосфера",
+    photoAltTemplate: "Фотография студии № {n}",
     sectionReviews: "Отзывы",
     sectionReviewsSubtitle: "Последние отзывы клиентов",
     reviewLeave: "Оставить отзыв",
@@ -8062,6 +8095,11 @@ export const UI_TEXT = {
       attachInvalidType: "Поддерживаются JPEG, PNG, WebP.",
       attachTooLarge: "Файл слишком большой.",
       attachRemoveAria: "Убрать вложение",
+      // UI-33: вложение обёрнуто ссылкой без текста — без этих строк у
+      // ссылки не было доступного имени вовсе, скринридер читал URL.
+      attachmentAltOwn: "Ваше фото",
+      attachmentAltTemplate: "Фото от {name}",
+      attachmentLoadFailed: "Не удалось загрузить вложение",
     },
     weekdayShort: ["пн", "вт", "ср", "чт", "пт", "сб", "вс"] as string[],
     monthsGenitive: [

@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { BubbleMeta } from "@/features/chat/chat-window/bubble-meta";
 import { formatTimeHm } from "@/features/chat/lib/format-time";
 import type { ThreadMessageDto } from "@/features/chat/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   message: ThreadMessageDto;
@@ -16,9 +17,12 @@ type Props = {
 function AttachmentImage({
   url,
   className,
+  alt,
 }: {
   url: string;
   className: string;
+  /** UI-33: ссылка-обёртка своего текста не имеет — имя ей даёт эта строка. */
+  alt: string;
 }) {
   // MASTER-CHAT-ATTACHMENT-FIX-A:
   //   - Track load + error so the bubble never collapses to the
@@ -46,7 +50,7 @@ function AttachmentImage({
         )}
       >
         <ImageOff className="h-6 w-6" aria-hidden />
-        <span className="text-xs">Не удалось загрузить вложение</span>
+        <span className="text-xs">{UI_TEXT.chat.composer.attachmentLoadFailed}</span>
       </div>
     );
   }
@@ -60,7 +64,7 @@ function AttachmentImage({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
-        alt=""
+        alt={alt}
         loading="lazy"
         className={cn(
           "absolute inset-0 block h-full w-full object-cover transition-opacity duration-200",
@@ -93,7 +97,18 @@ export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
             "border border-border-subtle bg-bg-input/40",
           )}
         >
-          <AttachmentImage url={attachmentUrl} className="" />
+          <AttachmentImage
+            url={attachmentUrl}
+            className=""
+            alt={
+              isMine
+                ? UI_TEXT.chat.composer.attachmentAltOwn
+                : UI_TEXT.chat.composer.attachmentAltTemplate.replace(
+                    "{name}",
+                    message.senderName
+                  )
+            }
+          />
         </a>
       ) : null}
       {hasBody ? (

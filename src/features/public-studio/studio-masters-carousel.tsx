@@ -148,7 +148,14 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
                               так же. Сырой `next/image` на хосте вне `remotePatterns`
                               БРОСАЕТ в рендере, а на мёртвой ссылке рисует сломанную
                               картинку — без `onError` и без гейта `isOptimizableImageSrc`. */}
-                          <ResilientImage src={thumb} alt="" sizes="80px" className="object-cover" />
+                          <ResilientImage
+                            src={thumb}
+                            alt={UI_TEXT.publicStudio.masterWorkAltTemplate
+                              .replace("{name}", master.name)
+                              .replace("{n}", String(index + 1))}
+                            sizes="80px"
+                            className="object-cover"
+                          />
                         </div>
                       ))}
                     </div>

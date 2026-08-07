@@ -143,7 +143,7 @@ export function EditItemModal({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.mediaUrl}
-                alt=""
+                alt={T.photoAlt}
                 className="h-full w-full object-cover"
               />
             </div>

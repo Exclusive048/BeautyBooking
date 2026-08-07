@@ -304,9 +304,16 @@ export function ClientCardDrawer({
                 </Button>
               </div>
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
-                {photos.map((photo) => (
+                {photos.map((photo, index) => (
                   <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
-                    <ResilientImage src={photo.url} alt="" sizes="(max-width: 640px) 50vw, 33vw" className="object-cover" />
+                    <ResilientImage
+                      src={photo.url}
+                      alt={UI_TEXT.cabinetMaster.clients.cardPhotoAltTemplate
+                        .replace("{name}", clientName)
+                        .replace("{n}", String(index + 1))}
+                      sizes="(max-width: 640px) 50vw, 33vw"
+                      className="object-cover"
+                    />
                     <Button
                       variant="ghost"
                       size="none"

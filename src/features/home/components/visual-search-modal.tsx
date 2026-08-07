@@ -311,14 +311,16 @@ export function VisualSearchModal({ open, onClose }: Props) {
                     {/* Photo strip */}
                     {item.matchingPhotos.length > 0 && (
                       <div className="grid grid-cols-3 gap-0.5">
-                        {item.matchingPhotos.slice(0, 3).map((photo) => (
+                        {item.matchingPhotos.slice(0, 3).map((photo, photoIndex) => (
                           <div
                             key={photo.assetId}
                             className="aspect-square overflow-hidden"
                           >
                             <img
                               src={photo.url}
-                              alt=""
+                              alt={UI_TEXT.home.visualSearch.resultPhotoAltTemplate
+                                .replace("{provider}", item.provider.name)
+                                .replace("{n}", String(photoIndex + 1))}
                               className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
                             />
                           </div>
