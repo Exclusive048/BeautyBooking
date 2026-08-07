@@ -55,7 +55,7 @@ export function NotificationsTabs({ activeTab, tabCounts, sort }: Props) {
 
   return (
     <nav
-      aria-label="Фильтр уведомлений"
+      aria-label={UI_TEXT.a11y.notificationsFilter}
       className="-mx-4 overflow-x-auto px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8"
     >
       <ul className="flex min-w-max items-center gap-1 border-b border-border-subtle">

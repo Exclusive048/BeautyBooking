@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { Drawer } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type CardPhoto = {
   id: string;
@@ -260,7 +261,7 @@ export function ClientCardDrawer({
               <Textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Запишите важные детали о клиенте"
+                placeholder={UI_TEXT.cabinetMaster.clients.cardNotePlaceholder}
                 className="mt-2"
                 rows={5}
               />

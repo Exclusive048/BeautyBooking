@@ -30,7 +30,7 @@ export function PaywallCard({ feature, billingHref, description, title }: Paywal
         {title ?? t.title}
       </h2>
       <p className="mt-2 max-w-xs text-sm text-text-sec">
-        {description ?? (feature ? t.description(feature) : t.description("эту функцию"))}
+        {description ?? t.description(feature ?? t.defaultFeature)}
       </p>
       <Button asChild className="mt-6">
         <Link href={billingHref}>{t.cta}</Link>

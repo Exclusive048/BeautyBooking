@@ -29,7 +29,7 @@ type Props = {
 export function ClientsTabs({ activeTab, tabCounts, sort, search }: Props) {
   return (
     <nav
-      aria-label="Фильтр клиентов"
+      aria-label={UI_TEXT.a11y.clientsFilter}
       className="-mx-4 overflow-x-auto px-4 md:-mx-6 md:px-6 lg:-mx-0 lg:px-0"
     >
       <ul className="flex min-w-max items-center gap-1 border-b border-border-subtle">

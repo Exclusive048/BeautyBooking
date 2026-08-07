@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   rating: number;
@@ -17,7 +18,7 @@ export function ReviewRatingStars({ rating, size = "sm" }: Props) {
     <span
       className="inline-flex items-center gap-0.5"
       role="img"
-      aria-label={`${rating} из 5`}
+      aria-label={UI_TEXT.a11y.ratingOutOfFive(String(rating))}
     >
       {Array.from({ length: 5 }).map((_, idx) => (
         <Star

@@ -41,7 +41,7 @@ export function CatalogPagination({ current, total, onChange }: Props) {
   const active = "bg-brand-gradient text-white border border-transparent";
 
   return (
-    <nav className="flex items-center justify-center gap-1.5" aria-label="Пагинация">
+    <nav className="flex items-center justify-center gap-1.5" aria-label={UI_TEXT.a11y.pagination}>
       <button
         type="button"
         aria-label={T.prevAria}

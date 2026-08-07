@@ -198,7 +198,7 @@ export async function Topbar() {
         {/* Center nav (desktop) */}
         <nav
           className="hidden min-w-0 flex-1 items-center justify-center gap-1 lg:flex"
-          aria-label="Основная навигация"
+          aria-label={UI_TEXT.a11y.mainNav}
         >
           {NAV_LINKS.map((link) => (
             <NavLink key={link.href} href={link.href} label={link.label} />

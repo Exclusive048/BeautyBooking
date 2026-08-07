@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export type Crumb = {
   label: string;
@@ -36,7 +37,7 @@ export function MasterPageHeader({ breadcrumb, title, subtitle, actions }: Props
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 flex-1">
           <nav
-            aria-label="Хлебные крошки"
+            aria-label={UI_TEXT.a11y.breadcrumbs}
             className="mb-1.5 flex items-center gap-1 text-xs text-text-sec"
           >
             <Home className="h-3 w-3 shrink-0" aria-hidden />

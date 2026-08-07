@@ -1,5 +1,6 @@
 import { Star } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   value: number; // 0..5 (can be non-integer for averages)
@@ -20,7 +21,7 @@ const SIZE_CLASS = {
 export function RatingStars({ value, size = "md" }: Props) {
   const filled = Math.max(0, Math.min(5, Math.round(value)));
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`${value} из 5`}>
+    <span className="inline-flex items-center gap-0.5" aria-label={UI_TEXT.a11y.ratingOutOfFive(String(value))}>
       {[1, 2, 3, 4, 5].map((star) => (
         <Star
           key={star}

@@ -380,7 +380,7 @@ function PersonalCard({
     <Card className="p-6">
       <SectionHeader
         title={T.sections.personal}
-        subtitle="Эти данные видят только мастера, у которых вы были на приёме."
+        subtitle={T.sectionHints.personal}
       />
 
       <FieldRow label={T.fields.firstName}>
@@ -456,7 +456,7 @@ function ContactsCard({
     <Card className="p-6">
       <SectionHeader
         title={T.sections.contacts}
-        subtitle="Канал, по которому мастер с вами свяжется."
+        subtitle={T.sectionHints.contacts}
       />
 
       <FieldRow
@@ -543,7 +543,7 @@ function LinkedAccountsCard({
     <Card className="p-6">
       <SectionHeader
         title={T.sections.linkedAccounts}
-        subtitle="Для быстрого входа и связи с мастером."
+        subtitle={T.sectionHints.linkedAccounts}
       />
 
       <div className="space-y-2.5">

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const DEFAULT_LENGTH = 6;
 
@@ -213,7 +214,7 @@ export function OtpInput({
               onKeyDown={(event) => handleKeyDown(index, event)}
               onPaste={handlePaste}
               disabled={disabled}
-              aria-label={`Цифра ${index + 1} из ${length}`}
+              aria-label={UI_TEXT.a11y.otpDigit(index + 1, length)}
               className={cn(
                 "h-12 w-full min-w-0 rounded-2xl border bg-bg-card text-center text-lg font-semibold tabular-nums text-text-main shadow-sm outline-none sm:h-14 sm:text-xl",
                 "transition-[border-color,box-shadow,transform,background-color] duration-200",

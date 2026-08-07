@@ -60,7 +60,7 @@ export function PhotoCarousel({ photos, alt }: PhotoCarouselProps) {
             {safePhotos.map((_, i) => (
               <button
                 key={i}
-                aria-label={`Фото ${i + 1}`}
+                aria-label={UI_TEXT.a11y.photoIndex(i + 1)}
                 onClick={(e) => {
                   e.stopPropagation();
                   setIndex(i);

@@ -123,7 +123,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                   type="button"
                   onClick={() => setMoreOpen(false)}
                   className="rounded-lg p-1.5 text-text-sec hover:text-text-main"
-                  aria-label="Закрыть"
+                  aria-label={UI_TEXT.common.close}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -165,7 +165,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
       <nav
         className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        aria-label="Основная навигация"
+        aria-label={UI_TEXT.a11y.mainNav}
       >
         <div className="border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl">
           <ul className="flex items-stretch">

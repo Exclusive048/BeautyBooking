@@ -2,6 +2,7 @@
 
 import { useId, useMemo } from "react";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   /** Absolute min/max from the data set — slider domain. */
@@ -103,7 +104,7 @@ export function HistogramSlider({ min, max, value, onChange, distribution }: Pro
         />
         <input
           id={lowId}
-          aria-label="Минимальная цена"
+          aria-label={UI_TEXT.a11y.priceMin}
           type="range"
           min={min}
           max={max}
@@ -114,7 +115,7 @@ export function HistogramSlider({ min, max, value, onChange, distribution }: Pro
         />
         <input
           id={highId}
-          aria-label="Максимальная цена"
+          aria-label={UI_TEXT.a11y.priceMax}
           type="range"
           min={min}
           max={max}

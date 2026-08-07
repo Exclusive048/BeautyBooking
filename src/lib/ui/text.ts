@@ -26,6 +26,33 @@ export const UI_TEXT = {
     confirmPending: "Подождите…",
     commentLabel: "Комментарий",
   },
+  /**
+   * UI-21 — ярлыки, которые видит только вспомогательная технология
+   * (`aria-label`, `alt`, `placeholder`). Они такие же UI-тексты, как подписи
+   * кнопок, но жили хардкодом: гейт `check:ui-text` сканировал только пять
+   * публичных корней, и в кабинетах, компонентах и админке правило 1 не
+   * действовало вовсе.
+   *
+   * Ярлык рейтинга здесь ОДИН намеренно: до этого он существовал в четырёх
+   * формулировках («{r} из 5» в админке, «{v} из 5» в студии, «Рейтинг {r} из
+   * 5» у мастера), то есть один и тот же элемент интерфейса представлялся
+   * незрячему пользователю по-разному в зависимости от кабинета.
+   */
+  a11y: {
+    mainNav: "Основная навигация",
+    breadcrumbs: "Хлебные крошки",
+    pagination: "Пагинация",
+    ratingOutOfFive: (value: string) => `Рейтинг ${value} из 5`,
+    priceMin: "Минимальная цена",
+    priceMax: "Максимальная цена",
+    clientLoading: "Загрузка клиента",
+    clientsFilter: "Фильтр клиентов",
+    notificationsFilter: "Фильтр уведомлений",
+    serviceCategories: "Категории услуг",
+    bookAtSlot: (slot: string) => `Записаться на ${slot}`,
+    otpDigit: (index: number, total: number) => `Цифра ${index} из ${total}`,
+    photoIndex: (index: number) => `Фото ${index}`,
+  },
   brand: {
     name: "МастерРядом",
     tagline: "Маркетплейс мастеров красоты",
@@ -535,7 +562,7 @@ export const UI_TEXT = {
   models: {
     hero: { eyebrow: "Для моделей" },
     compactHero: { learnMore: "Что такое модель?" },
-    howItWorks: { eyebrow: "Как это работает" },
+    howItWorks: { eyebrow: "Как это работает", title: "Взаимный обмен — в чём суть" },
     expectations: { eyebrow: "Прежде чем откликнуться" },
     list: {
       titleWithCity: "Предложения в городе {city}",
@@ -1001,6 +1028,10 @@ export const UI_TEXT = {
     paywall: {
       title: "Доступно на тарифе PRO",
       description: (feature: string) => `Чтобы использовать «${feature}», перейдите на тариф PRO или выше.`,
+      // UI-21: подстановка на случай, когда вызывающий не назвал функцию. Жила
+      // хардкодом в самом компоненте — то есть единственный источник текстов
+      // знал шаблон, но не знал слово, которое в него подставляется.
+      defaultFeature: "эту функцию",
       cta: "Перейти на PRO",
       lockedTooltip: "Доступно с тарифа PRO",
       activeCount: (active: number, total: number) => `${active} из ${total} активно`,
@@ -1697,6 +1728,7 @@ export const UI_TEXT = {
       ratingLabel: "рейтинг",
     },
     stories: {
+      railAria: "Сторис мастеров",
       cardLabel: "Открыть профиль",
       newWorksSr: "новые работы",
       viewer: {
@@ -2388,6 +2420,8 @@ export const UI_TEXT = {
       },
       distribution: {
         heading: "Распределение оценок",
+        rowAria: (star: number, count: number, percent: number) =>
+          `${star} звёзд: ${count} (${percent}%)`,
         rowTemplate: "{count} · {percent}%",
       },
       kpi: {
@@ -2443,6 +2477,7 @@ export const UI_TEXT = {
       breadcrumb: "Клиенты",
       title: "Клиенты",
       subtitle: "История работы с клиентами и аналитика",
+      cardNotePlaceholder: "Запишите важные детали о клиенте",
       kpi: {
         totalLabel: "Всего клиентов",
         totalSubtextTemplate: "+{count} за месяц",
@@ -5259,6 +5294,9 @@ export const UI_TEXT = {
       activeMark: "Активный",
     },
     favorites: {
+      openProfileAria: "Открыть профиль",
+      aboutStudioAria: "О студии",
+      removeFromFavoritesAria: "Убрать из избранного",
       eyebrow: "Личное",
       title: "Избранные мастера",
       descriptionEmpty: "Здесь будут мастера, которых вы сохраните.",
@@ -5418,6 +5456,15 @@ export const UI_TEXT = {
         contacts: "Контакты",
         linkedAccounts: "Привязанные аккаунты",
         danger: "Удалить аккаунт",
+      },
+      sectionHints: {
+        personal: "Эти данные видят только мастера, у которых вы были на приёме.",
+        contacts: "Канал, по которому мастер с вами свяжется.",
+        linkedAccounts: "Для быстрого входа и связи с мастером.",
+      },
+      telegramModal: {
+        unavailableTitle: "Подключение Telegram недоступно",
+        connectTitle: "Подключить Telegram",
       },
       fields: {
         firstName: "Имя",

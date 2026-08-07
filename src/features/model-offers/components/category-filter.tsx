@@ -19,7 +19,7 @@ export function CategoryFilter({ categories, activeCategoryId }: Props) {
   const allActive = !activeCategoryId;
 
   return (
-    <nav aria-label="Категории услуг" className="flex flex-wrap gap-2">
+    <nav aria-label={UI_TEXT.a11y.serviceCategories} className="flex flex-wrap gap-2">
       <Link
         href={allHref}
         className={

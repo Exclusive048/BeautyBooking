@@ -202,7 +202,7 @@ function RoleSwitcherDrawer({
                 type="button"
                 onClick={onClose}
                 className="rounded-lg p-1.5 text-text-sec hover:text-text-main"
-                aria-label="Закрыть"
+                aria-label={UI_TEXT.common.close}
               >
                 <X className="h-4 w-4" />
               </button>

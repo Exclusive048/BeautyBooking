@@ -1,3 +1,4 @@
+import { UI_TEXT } from "@/lib/ui/text";
 /**
  * Loading placeholder shown in the right pane while
  * `ClientDetailPanel` fetches detail data after a row click. Layout
@@ -9,7 +10,7 @@ export function ClientDetailSkeleton() {
   return (
     <div
       role="status"
-      aria-label="Загрузка клиента"
+      aria-label={UI_TEXT.a11y.clientLoading}
       className="animate-pulse rounded-2xl border border-border-subtle bg-bg-card p-5"
     >
       <div className="flex items-start gap-4 border-b border-border-subtle pb-4">

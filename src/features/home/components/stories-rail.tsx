@@ -132,6 +132,7 @@ export function StoriesRail() {
   }, [viewedRevision]);
 
   const groups = data?.groups ?? [];
+  const T = UI_TEXT.homeFeed.stories;
 
   const onSelect = (group: StoriesGroup) => {
     const idx = groups.findIndex((g) => g.masterId === group.masterId);
@@ -141,7 +142,7 @@ export function StoriesRail() {
   // Loading: skeleton with reserved height, no layout-jump when groups load
   if (isLoading && !data) {
     return (
-      <section data-testid="stories-rail" aria-label="Сторис мастеров" className="-mx-4 sm:-mx-6">
+      <section data-testid="stories-rail" aria-label={T.railAria} className="-mx-4 sm:-mx-6">
         <RailSkeleton />
       </section>
     );
@@ -158,7 +159,7 @@ export function StoriesRail() {
       initial={reduce ? false : { opacity: 0, y: -8 }}
       animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={reduce ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-      aria-label="Сторис мастеров"
+      aria-label={T.railAria}
       className="-mx-4 sm:-mx-6"
     >
       <motion.div
