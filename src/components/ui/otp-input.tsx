@@ -110,13 +110,25 @@ export function OtpInput({
     if (autoFocus) refs.current[0]?.focus();
   }, [autoFocus]);
 
+  // UI-34: эффект двигает фокус ТОЛЬКО когда код обнулили снаружи — неверный
+  // код, «Отправить снова», возврат на шаг ввода (`login-client` в этих
+  // случаях зовёт `setCode("")`). Тогда пользователь ничего не нажимал, поле
+  // опустело само, и начинать надо с первой ячейки.
+  //
+  // Раньше эффект реагировал на ЛЮБОЕ изменение `value` и утаскивал фокус на
+  // «первую пустую» ячейку — из-за чего исправить среднюю цифру было нельзя:
+  // стрелками до неё дойти можно, но первый же ввод отбрасывал курсор назад,
+  // и вся реализованная Arrow-навигация не стоила ничего. Перевод курсора
+  // вперёд теперь происходит там, где ему и место, — в обработчиках ввода и
+  // вставки (см. `handleChange` / `handlePaste`).
+  const previousValueRef = useRef(value);
   useEffect(() => {
-    if (value.length >= length) {
-      refs.current[length - 1]?.focus();
-    } else {
-      refs.current[value.length]?.focus();
+    const previous = previousValueRef.current;
+    previousValueRef.current = value;
+    if (value.length === 0 && previous.length > 0) {
+      refs.current[0]?.focus();
     }
-  }, [value, length]);
+  }, [value]);
 
   // Wrong-code shake: retrigger the CSS animation by toggling the class on the
   // grid element directly (manual DOM update — not React state), forcing a
@@ -143,6 +155,9 @@ export function OtpInput({
     if (next.length === length) {
       onComplete?.(next);
     }
+    // Курсор вперёд — от введённой ячейки, а не от «первой пустой»: правка
+    // середины кода ведёт к следующей цифре, а не в начало.
+    refs.current[Math.min(index + 1, length - 1)]?.focus();
   }
 
   function handleKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
@@ -173,6 +188,7 @@ export function OtpInput({
     if (pasted.length === length) {
       onComplete?.(pasted);
     }
+    refs.current[Math.min(pasted.length, length - 1)]?.focus();
   }
 
   const complete = value.length >= length;
@@ -207,7 +223,11 @@ export function OtpInput({
               }}
               type="text"
               inputMode="numeric"
-              autoComplete={index === 0 ? "one-time-code" : "off"}
+              // UI-34: `one-time-code` на КАЖДОЙ ячейке — Safari/iOS
+              // подставляет код из SMS/почты по группе полей, а `off` на
+              // остальных пяти подстановку подавлял.
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
               maxLength={2}
               value={value[index] ?? ""}
               onChange={(event) => handleChange(index, event)}
