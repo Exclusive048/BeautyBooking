@@ -148,7 +148,13 @@ export function UsernameEditableRow({ value }: Props) {
 
         {isEditing ? (
           <div className="mt-1 space-y-2">
-            <div className="flex items-baseline gap-1 border-b-2 border-primary py-1">
+            {/* UI-32: подчёркивание живёт на обёртке (внутри неё префикс
+                «@» и само поле), поэтому и на фокус реагирует обёртка через
+                `focus-within`. Строка закрывается кнопками «Отмена»/
+                «Сохранить», а не по blur, — значит поле бывает видно
+                расфокусированным, и сплошной primary про фокус не говорил
+                ничего. */}
+            <div className="flex items-baseline gap-1 border-b-2 border-border-subtle py-1 focus-within:border-primary">
               <span className="shrink-0 text-sm text-text-sec">{T.usernamePrefix}</span>
               <input
                 id={inputId}

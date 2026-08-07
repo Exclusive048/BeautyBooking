@@ -179,7 +179,13 @@ export function AddressEditor({ value }: Props) {
                 setTimeout(() => setOpen(false), 150);
               }}
               placeholder={T_LOC.addressPlaceholder}
-              className="block w-full border-0 border-b-2 border-primary bg-transparent py-1 text-sm text-text-main outline-none focus:ring-0"
+              // UI-32: подчёркивание — само по себе индикатор фокуса, поэтому
+              // оно зависит от фокуса. В отличие от соседних inline-edit строк
+              // это поле НЕ уходит из режима правки по blur (его закрывает
+              // только выбор подсказки, Escape или сохранение), то есть оно
+              // может стоять расфокусированным на экране — а сплошной primary
+              // выглядел одинаково и с фокусом, и без.
+              className="block w-full border-0 border-b-2 border-border-subtle bg-transparent py-1 text-sm text-text-main outline-none focus:border-primary focus:ring-0"
             />
             {open && suggestions.length > 0 ? (
               <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-bg-card py-1 shadow-card">

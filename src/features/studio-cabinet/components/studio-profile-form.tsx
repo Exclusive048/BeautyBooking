@@ -34,8 +34,12 @@ type Props = {
   onVkChange: (value: string) => void;
 };
 
-const inputClass =
-  "border border-white/10 bg-white/[0.06] focus-visible:border-white/20 focus-visible:ring-0";
+// UI-32: своих focus-состояний класс не задаёт намеренно. `focus-visible:ring-0`
+// гасил кольцо `.lux-input:focus-visible` (утилита бьёт слой компонентов), а
+// заменой служил переход бордера `white/10 → white/20` — дельта в 10% альфы,
+// кратно ниже 3:1. Оба переопределения сняты: фокус выглядит так же, как во
+// всех остальных полях продукта.
+const inputClass = "border border-white/10 bg-white/[0.06]";
 
 export function StudioProfileForm({
   name,

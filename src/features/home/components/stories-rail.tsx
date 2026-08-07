@@ -56,7 +56,7 @@ function StoryRing({
       whileTap={reduce ? undefined : { scale: 0.95 }}
       onClick={() => onSelect(group)}
       aria-label={`${T.cardLabel} ${group.providerName}`}
-      className="flex w-[84px] shrink-0 snap-start flex-col items-center gap-1.5 focus-visible:outline-none sm:w-[92px]"
+      className="flex w-[84px] shrink-0 snap-start flex-col items-center gap-1.5 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/70 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page sm:w-[92px]"
     >
       <div className="relative">
         <div
