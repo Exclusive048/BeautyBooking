@@ -55,6 +55,12 @@ jobs:
       - name: Encoding check
         run: npm run check:encoding
 
+      - name: Dead CSS classes check
+        # UI-16: класс, компилирующийся в ничто, не виден ни lint'у (AST), ни
+        # typecheck'у (типы), ни encoding/mojibake (байты) — 192 таких сайта
+        # прошли этот самый workflow незамеченными.
+        run: npm run check:dead-classes
+
       - name: Context freshness check
         run: npm run check:context-freshness
 
