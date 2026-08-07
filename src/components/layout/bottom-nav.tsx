@@ -340,6 +340,7 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
       <RoleSwitcherDrawer open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       <nav
+        aria-label={UI_TEXT.a11y.mainNav}
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-bg-card/95 shadow-card backdrop-blur lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >

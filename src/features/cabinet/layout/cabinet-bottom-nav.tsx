@@ -24,7 +24,7 @@ export function CabinetBottomNav() {
 
   return (
     <>
-    <nav className="fixed inset-x-0 bottom-0 z-40 lg:hidden">
+    <nav aria-label={UI_TEXT.a11y.cabinetSections} className="fixed inset-x-0 bottom-0 z-40 lg:hidden">
       {/* Blur backdrop */}
       <div className="absolute inset-0 border-t border-border-subtle/60 bg-bg-card/90 backdrop-blur-xl" />
       {/* Safe area padding */}

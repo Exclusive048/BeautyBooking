@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Image as ImageIcon, Layers, MapPin, Pencil, Phone, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { ProfileSectionId } from "@/lib/master/profile-completion";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -36,6 +36,7 @@ const ROOT_MARGIN = "-30% 0px -55% 0px";
  * still picks up the active state when its top reaches ~30% from top.
  */
 export function SectionNav({ bySection }: Props) {
+  const headingId = useId();
   const [activeId, setActiveId] = useState<ProfileSectionId>("header");
 
   useEffect(() => {
@@ -71,9 +72,15 @@ export function SectionNav({ bySection }: Props) {
     return () => observer.disconnect();
   }, []);
 
+  // UI-35: у этой навигации уже есть видимый заголовок — берём его через
+  // `aria-labelledby`, а не выдумываем вторую формулировку в `UI_TEXT`:
+  // доступное имя обязано совпадать с тем, что читает зрячий.
   return (
-    <nav className="rounded-2xl border border-border-subtle bg-bg-card p-2">
-      <p className="px-2 pb-2 pt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+    <nav aria-labelledby={headingId} className="rounded-2xl border border-border-subtle bg-bg-card p-2">
+      <p
+        id={headingId}
+        className="px-2 pb-2 pt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+      >
         {T.sidebar.sectionsHeading}
       </p>
       <ul className="space-y-0.5">

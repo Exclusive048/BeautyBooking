@@ -145,7 +145,7 @@ export function MasterSidebar({
         </p>
       </div>
 
-      <nav className="px-3 py-4">
+      <nav aria-label={UI_TEXT.a11y.cabinetSections} className="px-3 py-4">
         <NavGroup label={T.nav.groups.work} first>
           {renderItem({
             href: HREF.home,

@@ -206,7 +206,7 @@ export async function Topbar() {
         </nav>
 
         {/* Right side */}
-        <nav className="flex shrink-0 items-center gap-2">
+        <nav aria-label={UI_TEXT.a11y.userActions} className="flex shrink-0 items-center gap-2">
           {user ? (
             <>
               <NotificationsBell ariaLabel={UI_TEXT.nav.notifications} />
