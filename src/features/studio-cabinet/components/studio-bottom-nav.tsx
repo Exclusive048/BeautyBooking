@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontal, X, type LucideIcon } from "lucide-react";
@@ -12,6 +12,7 @@ import {
   type StudioNavItem,
 } from "@/features/studio-cabinet/config/studio-nav";
 import type { StudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
+import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -93,6 +94,17 @@ function NavTab({
 export function StudioBottomNav({ counts }: Props) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetTitleId = useId();
+
+  // UI-13 — это модальный bottom-sheet с интерактивным содержимым, а не
+  // «подложка навигации»: в exempt-листе ESLint так классифицирован СКРИМ,
+  // и классификация на сам лист не распространялась. У него не было ни
+  // `role="dialog"`, ни Escape, ни focus-trap, ни блокировки прокрутки
+  // фона — то есть Tab уходил в страницу под листом, а колесо прокручивало
+  // её же. Контракт взят общий, разметка и анимация не тронуты.
+  useOverlayA11y({ open: moreOpen, onClose: () => setMoreOpen(false), containerRef: sheetRef });
+
   const reduce = useReducedMotion();
 
   const primary = pickPrimaryTabs();
@@ -120,6 +132,11 @@ export function StudioBottomNav({ counts }: Props) {
               animate={reduce ? { y: 0 } : { y: 0 }}
               exit={reduce ? { y: "100%" } : { y: "100%" }}
               transition={reduce ? { duration: 0 } : { type: "spring", damping: 30, stiffness: 340 }}
+              ref={sheetRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={sheetTitleId}
+              tabIndex={-1}
               className="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
@@ -127,7 +144,7 @@ export function StudioBottomNav({ counts }: Props) {
                 <div className="h-1 w-10 rounded-full bg-border-subtle" />
               </div>
               <div className="flex items-center justify-between px-5 pb-3 pt-1">
-                <span className="text-sm font-semibold text-text-main">
+                <span id={sheetTitleId} className="text-sm font-semibold text-text-main">
                   {T.bottomNav.moreTitle}
                 </span>
                 <button

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { AdminSidebar } from "@/features/admin-cabinet/components/admin-sidebar";
 import type { AdminPanelUser } from "@/features/admin-cabinet/types";
+import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
 export function AdminSidebarMobile({ open, onClose, user }: Props) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) onClose();
@@ -31,14 +33,16 @@ export function AdminSidebarMobile({ open, onClose, user }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+  // UI-13 — `aria-modal="true"` ниже это ОБЕЩАНИЕ вспомогательной технологии,
+  // что фокус заперт внутри; здесь оно было ложным. Свой Escape был, а
+  // focus-trap, начального и возвращаемого фокуса и блокировки прокрутки
+  // фона не было вовсе: Tab уходил на страницу под оверлеем, скринридер —
+  // следом. Ложное обещание хуже отсутствующего, потому что AT перестаёт
+  // предлагать пользователю обходные пути. Контракт взят общий — тот же,
+  // что у `ModalSurface` и `Drawer`; собственный Escape убран, он в нём есть.
+  // Разметка и анимация не тронуты намеренно: перевод на `Drawer` поменял бы
+  // ширину, chrome и тайминги, то есть внешний вид (см. ledger).
+  useOverlayA11y({ open, onClose, containerRef: panelRef });
 
   return (
     <AnimatePresence>
@@ -62,6 +66,8 @@ export function AdminSidebarMobile({ open, onClose, user }: Props) {
             transition={reduce ? { duration: 0 } : { duration: 0.2 }}
           />
           <motion.div
+            ref={panelRef}
+            tabIndex={-1}
             className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-bg-page shadow-2xl"
             initial={reduce ? false : { x: "-100%" }}
             animate={reduce ? { x: 0 } : { x: 0 }}

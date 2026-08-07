@@ -9,6 +9,7 @@ import type { MediaAssetDto } from "@/lib/media/types";
 import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { Button } from "@/components/ui/button";
+import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -32,6 +33,17 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [assets, setAssets] = useState<MediaAssetDto[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const closePreview = useCallback(() => setPreviewUrl(null), []);
+
+  // UI-13 — у лайтбокса не было НИЧЕГО из контракта диалога: ни Escape, ни
+  // focus-trap, ни возврата фокуса, ни блокировки прокрутки фона. Закрыть
+  // его можно было только кликом по невидимой кнопке-подложке, то есть с
+  // клавиатуры выход находился наощупь, а колесо прокручивало страницу
+  // ПОД полноэкранным чёрным слоем. Исключение в ESLint обосновано верно,
+  // но оно про позиционирование — a11y-контракт им не покрывается.
+  useOverlayA11y({ open: previewUrl !== null, onClose: closePreview, containerRef: previewRef });
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
@@ -238,8 +250,15 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
 
       {previewUrl ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <Button variant="wrapper" className="absolute inset-0" onClick={() => setPreviewUrl(null)} aria-label={mediaText.closePreviewAria} />
+        <div
+          ref={previewRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={mediaText.closePreviewAria}
+          tabIndex={-1}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+        >
+          <Button variant="wrapper" className="absolute inset-0" onClick={closePreview} aria-label={mediaText.closePreviewAria} />
           <div className="relative h-[90vh] w-[90vw]">
             <ResilientImage
               src={previewUrl}
