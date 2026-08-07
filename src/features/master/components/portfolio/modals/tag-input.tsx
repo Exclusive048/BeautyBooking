@@ -91,7 +91,7 @@ export function TagInput({ value, options, onChange, inputId }: Props) {
               <button
                 type="button"
                 onClick={() => remove(id)}
-                aria-label="remove"
+                aria-label={UI_TEXT.a11y.removeItem(option.name)}
                 className="text-accent-text/60 hover:text-accent-text"
               >
                 <X className="h-3 w-3" aria-hidden />

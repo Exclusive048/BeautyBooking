@@ -48,7 +48,7 @@ export function BillingTabs({ active }: Props) {
   return (
     <nav
       className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border-subtle bg-bg-card p-1 shadow-card"
-      aria-label="Billing sections"
+      aria-label={T.navAria}
     >
       {TABS.map((tab) => {
         const isActive = active === tab.key;

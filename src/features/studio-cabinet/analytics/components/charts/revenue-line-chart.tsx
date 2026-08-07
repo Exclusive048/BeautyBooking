@@ -96,7 +96,7 @@ export function RevenueLineChart({ data, compare }: Props) {
         viewBox={`0 0 ${CHART_W} ${CHART_H}`}
         className="h-48 w-full text-accent-text"
         role="img"
-        aria-label="Revenue timeline"
+        aria-label={T.revenueChartAria}
       >
         <path d={currentArea} className="fill-primary/10" />
         <path d={currentLine} className="fill-none stroke-primary stroke-[2]" />

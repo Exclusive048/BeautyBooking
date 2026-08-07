@@ -49,6 +49,12 @@ export const UI_TEXT = {
     adminSections: "Разделы панели управления",
     breadcrumbs: "Хлебные крошки",
     pagination: "Пагинация",
+    // UI-36: общие AT-ярлыки — «Закрыть меню» для невидимого бэкдропа
+    // контекстных меню, «Убрать …» для крестика на чипе. Имя элемента в
+    // ярлыке обязательно: на экране несколько чипов, и одинаковые «Убрать»
+    // в списке AT неразличимы.
+    closeMenu: "Закрыть меню",
+    removeItem: (name: string) => `Убрать «${name}»`,
     ratingOutOfFive: (value: string) => `Рейтинг ${value} из 5`,
     priceMin: "Минимальная цена",
     priceMax: "Максимальная цена",
@@ -2843,6 +2849,7 @@ export const UI_TEXT = {
           "Свободные окошки в {weekday} {hour} стабильно пустуют. Запустить акцию?",
         emptyTitle: "Нет данных",
         emptyBody: "Когда появятся записи — здесь будет тепловая карта.",
+        weekdayColumnAria: "День недели",
       },
       topServices: {
         heading: "Топ услуг по выручке",
@@ -3131,6 +3138,7 @@ export const UI_TEXT = {
       title: "Настройки аккаунта",
       subtitle: "Личное — недоступно клиентам",
       tabs: {
+        navAria: "Разделы аккаунта",
         notifications: "Уведомления",
         security: "Безопасность",
         account: "Аккаунт",
@@ -4706,6 +4714,7 @@ export const UI_TEXT = {
         noData: "—",
       },
       tabs: {
+        navAria: "Разделы биллинга",
         plans: "Тарифы",
         subs: "Активные подписки",
         payments: "Платежи и история",
@@ -7052,6 +7061,7 @@ export const UI_TEXT = {
         revenueNoCompare: "Период",
         legendNow: "Сейчас",
         legendPrev: "Прошлый период",
+        revenueChartAria: "Динамика выручки",
         sourcesTitle: "Источники записи",
         sourcesDesc: "Откуда приходят клиенты",
         hoursTitle: "Загрузка по часам",
@@ -7135,6 +7145,7 @@ export const UI_TEXT = {
       infoBannerLink: "Настройках студии",
       card: {
         relatesTo: "Касается",
+        unreadAria: "Непрочитанное уведомление",
       },
       actions: {
         approve: "Подтвердить",

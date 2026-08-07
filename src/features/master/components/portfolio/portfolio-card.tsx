@@ -143,7 +143,7 @@ export function PortfolioCard({
             <>
               <button
                 type="button"
-                aria-label="close-menu"
+                aria-label={UI_TEXT.a11y.closeMenu}
                 className="fixed inset-0 z-10 cursor-default"
                 onClick={() => setMenuOpen(false)}
               />

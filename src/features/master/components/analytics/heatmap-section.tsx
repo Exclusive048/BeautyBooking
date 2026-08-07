@@ -53,7 +53,7 @@ export function HeatmapSection({ data }: Props) {
         <table className="w-full border-separate border-spacing-1">
           <thead>
             <tr>
-              <th aria-label="weekday" className="w-8" />
+              <th aria-label={T.weekdayColumnAria} className="w-8" />
               {HOURS.map((hour) => (
                 <th
                   key={hour}
