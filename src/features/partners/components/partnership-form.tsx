@@ -137,55 +137,67 @@ export function PartnershipForm() {
       </div>
 
       <Field label={T.kind.label} error={errors.kind}>
-        <Select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as PartnershipKind | "")}
-          required
-        >
-          <option value="" disabled>
-            {T.kind.placeholder}
-          </option>
-          {PARTNERSHIP_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {T.kind.options[k]}
+        {(controlId) => (
+          <Select
+            id={controlId}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as PartnershipKind | "")}
+            required
+          >
+            <option value="" disabled>
+              {T.kind.placeholder}
             </option>
-          ))}
-        </Select>
+            {PARTNERSHIP_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {T.kind.options[k]}
+              </option>
+            ))}
+          </Select>
+        )}
       </Field>
 
       <Field label={T.organizationName.label} error={errors.organizationName}>
-        <Input
-          value={organizationName}
-          onChange={(e) => setOrganizationName(e.target.value)}
-          placeholder={T.organizationName.placeholder}
-          maxLength={160}
-          autoComplete="organization"
-          required
-        />
+        {(controlId) => (
+          <Input
+            id={controlId}
+            value={organizationName}
+            onChange={(e) => setOrganizationName(e.target.value)}
+            placeholder={T.organizationName.placeholder}
+            maxLength={160}
+            autoComplete="organization"
+            required
+          />
+        )}
       </Field>
 
       <Field label={T.contactName.label} error={errors.contactName}>
-        <Input
-          value={contactName}
-          onChange={(e) => setContactName(e.target.value)}
-          placeholder={T.contactName.placeholder}
-          maxLength={120}
-          autoComplete="name"
-          required
-        />
+        {(controlId) => (
+          <Input
+            id={controlId}
+            value={contactName}
+            onChange={(e) => setContactName(e.target.value)}
+            placeholder={T.contactName.placeholder}
+            maxLength={120}
+            autoComplete="name"
+            required
+          />
+        )}
       </Field>
 
       <div className="grid gap-5 md:grid-cols-2">
         <Field label={T.email.label} error={errors.email}>
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={T.email.placeholder}
-            maxLength={200}
-            autoComplete="email"
-            required
-          />
+          {(controlId) => (
+            <Input
+              id={controlId}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={T.email.placeholder}
+              maxLength={200}
+              autoComplete="email"
+              required
+            />
+          )}
         </Field>
         {/* FIX-TELEGRAM-KILLSWITCH: Telegram contact field absent when off. */}
         {isTelegramEnabled && (
@@ -197,12 +209,15 @@ export function PartnershipForm() {
               </>
             }
           >
-            <Input
-              value={telegram}
-              onChange={(e) => setTelegram(e.target.value)}
-              placeholder={T.telegram.placeholder}
-              maxLength={80}
-            />
+            {(controlId) => (
+              <Input
+                id={controlId}
+                value={telegram}
+                onChange={(e) => setTelegram(e.target.value)}
+                placeholder={T.telegram.placeholder}
+                maxLength={80}
+              />
+            )}
           </Field>
         )}
       </div>
@@ -215,24 +230,30 @@ export function PartnershipForm() {
           </>
         }
       >
-        <Input
-          type="url"
-          value={website}
-          onChange={(e) => setWebsite(e.target.value)}
-          placeholder={T.website.placeholder}
-          maxLength={300}
-        />
+        {(controlId) => (
+          <Input
+            id={controlId}
+            type="url"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder={T.website.placeholder}
+            maxLength={300}
+          />
+        )}
       </Field>
 
       <Field label={T.description.label} error={errors.description}>
-        <Textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={T.description.placeholder}
-          rows={6}
-          maxLength={2000}
-          required
-        />
+        {(controlId) => (
+          <Textarea
+            id={controlId}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={T.description.placeholder}
+            rows={6}
+            maxLength={2000}
+            required
+          />
+        )}
       </Field>
 
       <div className="space-y-1">
@@ -282,14 +303,26 @@ export function PartnershipForm() {
 type FieldProps = {
   label: React.ReactNode;
   error?: string;
-  children: React.ReactNode;
+  children: (controlId: string) => React.ReactNode;
 };
 
+/**
+ * Подпись поля, программно связанная со своим контролом: `<label>` его не
+ * оборачивает, поэтому связь держится на `htmlFor`/`id`. Идентификатор
+ * выдаёт сам `Field` и отдаёт его children функцией — проставить его на
+ * нужный контрол обязан вызывающий, и забыть это молча нельзя.
+ */
 function Field({ label, error, children }: FieldProps) {
+  const controlId = useId();
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-text-main">{label}</label>
-      {children}
+      <label
+        htmlFor={controlId}
+        className="mb-1.5 block text-sm font-medium text-text-main"
+      >
+        {label}
+      </label>
+      {children(controlId)}
       {error ? (
         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
       ) : null}

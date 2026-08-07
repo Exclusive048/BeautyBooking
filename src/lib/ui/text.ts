@@ -3294,6 +3294,7 @@ export const UI_TEXT = {
         servicesHint: "минимум 2",
         servicesEmpty: "Сначала создайте услуги",
         discountLabel: "Скидка",
+        discountTypeLabel: "Единица скидки",
         discountTypePercent: "%",
         discountTypeFixed: "₽",
         previewSumLabel: "Сумма услуг",
@@ -8039,6 +8040,9 @@ export const UI_TEXT = {
       ] as string[],
     },
     composer: {
+      // Имя поля для скринридера: placeholder меняется на подсказку о том,
+      // почему писать нельзя, поэтому именем поля он служить не может.
+      inputLabel: "Текст сообщения",
       placeholderMaster: "Сообщение клиенту…",
       placeholderClient: "Сообщение мастеру…",
       send: "Отправить",

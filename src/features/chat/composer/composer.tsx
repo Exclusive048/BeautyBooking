@@ -299,6 +299,7 @@ export function Composer({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleKeyDown}
+          aria-label={T.composer.inputLabel}
           placeholder={canSend ? placeholder : (disabledHint ?? T.composer.disabledFallback)}
           disabled={!canSend || sending}
           rows={1}

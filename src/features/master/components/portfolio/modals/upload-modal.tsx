@@ -44,6 +44,7 @@ type QueuedFile = {
 export function UploadModal({ open, onClose, providerId, categories }: Props) {
   const router = useRouter();
   const inputId = useId();
+  const defaultCategorySelectId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cachedProviderIdRef = useRef<string | null>(providerId ?? null);
   const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -246,10 +247,14 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         ) : null}
 
         <div>
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <label
+            htmlFor={defaultCategorySelectId}
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+          >
             {T.defaultCategoryLabel}
           </label>
           <select
+            id={defaultCategorySelectId}
             value={defaultCategoryId}
             onChange={(event) => setDefaultCategoryId(event.target.value)}
             className="mt-1.5 block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"

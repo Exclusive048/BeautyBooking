@@ -769,19 +769,22 @@ function renderBookingConfig(input: {
       <div className="text-sm font-semibold text-text">{UI_TEXT.publicProfile.booking.bookingConfigTitle}</div>
       {bookingConfig.requiresReferencePhoto ? (
         <div>
+          {/* `renderBookingConfig` — обычная функция, а не компонент (у неё
+              есть ранние return'ы), поэтому `useId` здесь звать нельзя:
+              подпись связана с контролом обёрткой, а не `htmlFor`/`id`. */}
           <label className="block text-xs text-text-muted">
             {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-red-500">*</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (file) onReferenceUpload(file);
+              }}
+              disabled={referenceUploading}
+              className="mt-2 block w-full text-xs text-text-muted"
+            />
           </label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              if (file) onReferenceUpload(file);
-            }}
-            disabled={referenceUploading}
-            className="mt-2 block w-full text-xs text-text-muted"
-          />
           {referenceUploading ? (
             <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.referencePhotoUploading}</div>
           ) : null}
