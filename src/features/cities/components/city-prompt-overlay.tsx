@@ -77,7 +77,7 @@ export function CityPromptOverlay() {
         type="button"
         onClick={handleClose}
         aria-label={T.close}
-        className="absolute right-3 top-3 rounded-lg p-1.5 text-text-sec transition-colors hover:bg-muted hover:text-text-main"
+        className="absolute right-3 top-3 -m-2 rounded-lg p-3.5 text-text-sec transition-colors hover:bg-muted hover:text-text-main"
       >
         <X className="h-4 w-4" aria-hidden />
       </button>

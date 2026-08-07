@@ -581,7 +581,7 @@ export function PublicSettingsClient({
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
+                  className="-m-2 rounded-lg p-3.5 text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
                   title={t.openProfile}
                   aria-label={t.openProfile}
                 >

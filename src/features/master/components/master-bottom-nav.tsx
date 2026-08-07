@@ -122,7 +122,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                 <button
                   type="button"
                   onClick={() => setMoreOpen(false)}
-                  className="rounded-lg p-1.5 text-text-sec hover:text-text-main"
+                  className="-m-2 rounded-lg p-3.5 text-text-sec hover:text-text-main"
                   aria-label={UI_TEXT.common.close}
                 >
                   <X className="h-4 w-4" />
