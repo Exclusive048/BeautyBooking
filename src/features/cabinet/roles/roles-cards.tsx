@@ -82,10 +82,11 @@ export function RolesCards({
       const res = await fetch(endpoint, { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | ErrorPayload | null;
       if (!res.ok || !json || !json.ok) {
-        const message =
-          json && !json.ok
-            ? json.error.message
-            : `${UI_TEXT.cabinetRolesPage.deleteErrorPrefix}: ${res.status}`;
+        // UI-17: фолбэк — курируемая строка, а не «Ошибка удаления: 500».
+        // HTTP-статус пользователю ничего не сообщает и ничего не предлагает;
+        // ответ без курируемого `message` — ровно тот случай, для которого
+        // `deleteFailed` и написан.
+        const message = json && !json.ok ? json.error.message : UI_TEXT.cabinetRolesPage.deleteFailed;
         const code = json && !json.ok ? json.error.code : null;
         if (code === "ACTIVE_BOOKINGS") {
           const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
