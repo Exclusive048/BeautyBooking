@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
@@ -40,9 +41,8 @@ export function DeleteAccountModal({
       <div className="space-y-4">
         <p className="text-sm text-text-sec">{UI_TEXT.deletion.accountWarning}</p>
 
-        <label className="flex items-start gap-2 text-sm text-text-sec">
-          <input
-            type="checkbox"
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-text-sec">
+          <Checkbox
             checked={checked}
             onChange={(event) => setChecked(event.target.checked)}
             className="mt-1"

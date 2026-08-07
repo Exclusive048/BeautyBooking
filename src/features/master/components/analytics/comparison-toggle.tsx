@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useId } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.analytics.period;
@@ -35,13 +36,7 @@ export function ComparisonToggle({ checked }: Props) {
       htmlFor={id}
       className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main"
     >
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={handleChange}
-        className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-      />
+      <Checkbox id={id} checked={checked} onChange={handleChange} />
       <span>{T.comparisonLabel}</span>
     </label>
   );

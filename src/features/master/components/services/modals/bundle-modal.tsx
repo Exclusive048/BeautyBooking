@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { DiscountType } from "@/lib/prisma-enums";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -210,11 +211,9 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
                           !service.isEnabled && "opacity-60"
                         )}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
                           onChange={() => toggleService(service.id)}
-                          className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                         />
                         <span className="flex-1 truncate text-text-main">{service.name}</span>
                         <span className="shrink-0 font-mono text-[11px] text-text-sec">
@@ -290,11 +289,9 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         ) : null}
 
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={isEnabled}
             onChange={(event) => setIsEnabled(event.target.checked)}
-            className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <span>{T.isEnabledLabel}</span>
         </label>

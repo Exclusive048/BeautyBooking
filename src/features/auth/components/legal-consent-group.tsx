@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useId } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/cn";
 import { LEGAL_DOCUMENTS } from "@/lib/legal/documents";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
@@ -56,12 +57,11 @@ function ConsentRow({
   const inputId = useId();
   return (
     <div className={cn("flex items-start gap-3 px-3", compact ? "py-2" : "py-2.5")}>
-      <input
+      <Checkbox
         id={inputId}
-        type="checkbox"
         checked={checked}
         onChange={(event) => onCheckedChange(event.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border border-border-subtle bg-bg-card accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="mt-0.5"
       />
       <label htmlFor={inputId} className="cursor-pointer leading-relaxed">
         {children}

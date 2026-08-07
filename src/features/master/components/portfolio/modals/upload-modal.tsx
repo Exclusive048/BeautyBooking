@@ -4,6 +4,7 @@ import { Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { cn } from "@/lib/cn";
 import type { PortfolioCategoryOption } from "@/lib/master/portfolio-view.service";
@@ -264,11 +265,9 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         </div>
 
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={defaultPublic}
             onChange={(event) => setDefaultPublic(event.target.checked)}
-            className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <span>{T.defaultPublicLabel}</span>
         </label>

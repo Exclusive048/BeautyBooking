@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -366,12 +367,11 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
         htmlFor={consentId}
         className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-text-sec"
       >
-        <input
+        <Checkbox
           id={consentId}
-          type="checkbox"
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+          className="mt-0.5"
           required
         />
         <span>
