@@ -68,6 +68,16 @@ ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public" \
     AUTH_JWT_SECRET="build-only-placeholder-not-used-at-runtime-0000000000000000" \
     OTP_HMAC_SECRET="build-only-placeholder-0000000000000000"
 
+# ─── Heap-кап для сборки на ВМ (CI-DEPLOY-NOREGISTRY-01) ─────────────────────
+# Образы собираются на прод-ВМ рядом с работающим приложением; `next build`
+# (webpack) — главный потребитель памяти, и без капа его пик определяется
+# машиной, а не нами. docker-compose.prod.yml передаёт --max-old-space-size=2048;
+# дефолт пустой, чтобы CI-сборка (build-images.yml) и любой ручной `docker build`
+# оставались некапленными. ENV стоит ПОСЛЕ prisma generate намеренно — кап
+# относится только к `npm run build`.
+ARG BUILD_NODE_OPTIONS=""
+ENV NODE_OPTIONS=$BUILD_NODE_OPTIONS
+
 RUN npm run build
 
 # ─── Stage 3: Production runner ──────────────────────────────────────────────
