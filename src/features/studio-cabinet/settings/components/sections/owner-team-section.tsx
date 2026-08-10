@@ -68,14 +68,14 @@ function TeamRow({ member, accent }: { member: StudioTeamMember; accent: "owner"
           <span
             className={
               accent === "owner"
-                ? "rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
-                : "rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300"
+                ? "rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
+                : "rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300"
             }
           >
             {accent === "owner" ? T.roleOwner : T.roleAdmin}
           </span>
           {member.isCurrentUser ? (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-accent-text">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-text">
               {T.youChip}
             </span>
           ) : null}

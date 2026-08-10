@@ -262,7 +262,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
                     ) : (
                       <span
                         aria-hidden
-                        className="grid h-5 w-5 place-items-center rounded-full bg-bg-card text-[9px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                        className="grid h-5 w-5 place-items-center rounded-full bg-bg-card text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
                       >
                         {initials(master.displayName)}
                       </span>

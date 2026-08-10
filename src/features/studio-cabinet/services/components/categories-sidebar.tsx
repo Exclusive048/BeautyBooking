@@ -116,7 +116,7 @@ export function CategoriesSidebar({
                     </span>
                     {category.status === "PENDING" ? (
                       <span
-                        className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
+                        className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
                         title={T.pendingHint}
                       >
                         {T.pendingBadge}

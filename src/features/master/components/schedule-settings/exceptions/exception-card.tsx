@@ -46,7 +46,7 @@ export function ExceptionCard({ group, onEdit, onDelete }: Props) {
         )}
       >
         <Icon className="h-4 w-4" aria-hidden />
-        <span className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.1em]">
+        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.1em]">
           {isOff ? T.kind.offBadge : T.kind.shortBadge}
         </span>
       </div>

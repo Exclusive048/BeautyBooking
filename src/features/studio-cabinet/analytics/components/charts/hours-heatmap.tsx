@@ -41,7 +41,7 @@ export function HoursHeatmap({ data }: Props) {
             {Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i).map((hour) => (
               <th
                 key={hour}
-                className="w-6 text-[9px] font-mono font-normal tabular-nums text-text-sec"
+                className="w-6 text-[10px] font-mono font-normal tabular-nums text-text-sec"
               >
                 {hour}
               </th>

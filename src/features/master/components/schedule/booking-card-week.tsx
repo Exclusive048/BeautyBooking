@@ -89,7 +89,7 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
         {isNewClient && !isPending && showDetails ? (
           <Badge
             variant="default"
-            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 py-0 text-[9px] leading-tight text-emerald-900 dark:text-emerald-100"
+            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 py-0 text-[10px] leading-tight text-emerald-900 dark:text-emerald-100"
           >
             {T.newBadge}
           </Badge>

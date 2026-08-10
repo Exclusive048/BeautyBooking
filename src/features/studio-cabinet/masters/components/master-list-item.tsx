@@ -81,7 +81,7 @@ export function MasterListItem({
             {master.displayName}
           </span>
           {master.isCurrentUser ? (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-accent-text">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-text">
               {T.listItem.youChip}
             </span>
           ) : null}

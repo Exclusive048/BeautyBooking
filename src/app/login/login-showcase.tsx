@@ -162,7 +162,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
                 {card.subtitle}
               </span>
               {card.badge ? (
-                <span className="ml-auto flex-none rounded-full bg-white/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/75">
+                <span className="ml-auto flex-none rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75">
                   {card.badge}
                 </span>
               ) : null}

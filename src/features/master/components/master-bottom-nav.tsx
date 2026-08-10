@@ -186,7 +186,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                       {showBadge ? (
                         <span
                           aria-label={`${pendingBookingsCount}`}
-                          className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] font-medium text-white tabular-nums"
+                          className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-medium text-white tabular-nums"
                         >
                           {pendingBookingsCount}
                         </span>

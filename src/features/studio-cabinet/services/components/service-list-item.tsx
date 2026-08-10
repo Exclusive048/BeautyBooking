@@ -50,7 +50,7 @@ export function ServiceListItem({
             {service.name}
           </span>
           {!service.isActive ? (
-            <span className="rounded-full border border-border-subtle bg-bg-input px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-text-sec">
+            <span className="rounded-full border border-border-subtle bg-bg-input px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec">
               {T.pausedBadge}
             </span>
           ) : null}
@@ -87,7 +87,7 @@ export function ServiceListItem({
               ) : (
                 <span
                   aria-hidden
-                  className="grid h-6 w-6 place-items-center rounded-full bg-bg-input text-[9px] font-semibold text-text-sec"
+                  className="grid h-6 w-6 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec"
                 >
                   {initials(master.displayName)}
                 </span>
@@ -96,7 +96,7 @@ export function ServiceListItem({
           ))}
         </div>
         {service.masters.length === 0 ? (
-          <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
+          <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
             {T.noMasterBadge}
           </span>
         ) : null}

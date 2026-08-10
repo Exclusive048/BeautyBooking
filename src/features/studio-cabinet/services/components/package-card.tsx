@@ -41,7 +41,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
               </span>
               <h3 className="font-display text-base text-text-main">{pkg.name}</h3>
               {!pkg.isEnabled ? (
-                <span className="rounded-full border border-border-subtle bg-bg-card px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-text-sec">
+                <span className="rounded-full border border-border-subtle bg-bg-card px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec">
                   {T.pausedBadge}
                 </span>
               ) : null}

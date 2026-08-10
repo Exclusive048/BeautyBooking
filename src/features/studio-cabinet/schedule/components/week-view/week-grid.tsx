@@ -59,7 +59,7 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                     ) : (
                       <span
                         aria-hidden
-                        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-input text-[9px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
                       >
                         {initials(row.master.name)}
                       </span>
