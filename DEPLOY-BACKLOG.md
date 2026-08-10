@@ -16,7 +16,7 @@
 
 Это не задачи, а **решения**. Пока они не приняты, провижинить нечего.
 
-- **Площадка: `cr.yandex` или cloud.ru?** В `.github/workflows/deploy.yml` реестр образов — **`cr.yandex`** (Yandex Container Registry), деплой оттуда по SSH. При этом `RKN-COMPLIANCE-REPORT.md` (раздел локализации) называет прод-VM **cloud.ru**. Реестр и хостинг VM — разные вещи, так что формального противоречия может и не быть, но нужно **одно подтверждённое утверждение**. *(Источник: CONTEXT-REFRESH-V3, §8 «Расхождения в доках».)*
+- **Площадка ВМ: где физически стоит прод?** Часть вопроса про реестр ЗАКРЫТА (CI-DEPLOY-NOREGISTRY-01, решение владельца 2026-08-07): **реестра контейнеров нет**, образы собираются на самой прод-ВМ (§1.4), сервисный аккаунт с ролями pusher/puller и секреты реестра не нужны. Остался вопрос о самой ВМ: `RKN-COMPLIANCE-REPORT.md` (раздел локализации) называет прод-VM **cloud.ru** — нужно **одно подтверждённое утверждение** о площадке ВМ и физическом размещении Postgres. *(Источник: CONTEXT-REFRESH-V3 §8 → сужено CI-DEPLOY-NOREGISTRY-01.)*
 - **Физическое размещение Postgres — юрисдикция.** Это не только инфра-вопрос: 152-ФЗ ст. 18 ч. 5 требует локализации, и ответ идёт прямо в уведомление РКН. Подтвердить и записать: где физически стоит БД, где лежат бэкапы, где хранятся логи, где хостится GlitchTip. *(Источник: RKN-AUDIT-01, 🟠 «подтвердить РФ-размещение».)*
 - **pgvector ≥ 0.5.0 на прод-Postgres.** Жёсткий гейт: миграция `20260713120000_reduce_embedding_dimensions_yandex` создаёт HNSW-индекс, а `hnsw` появился в pgvector 0.5.0. Dev-образ `pgvector/pgvector:pg16` удовлетворяет; **прод — подтвердить до первого `migrate deploy`**, иначе миграция упадёт на середине. *(Источник: VISUAL-SEARCH-YANDEX-MIGRATION-01.)*
 
@@ -49,7 +49,53 @@
 - **`YANDEX_API_KEY` + `YANDEX_FOLDER_ID`** — обязательны при `VISUAL_SEARCH_ENABLED=true` (те же creds, что у chat-AI).
 - **Удалить `OPENAI_API_KEY`** из prod env — последний потребитель ушёл (visual-search мигрировал на Yandex). Zod strip'ает безвредно, но чистим явно.
 - **Email infra** — SMTP provider + DNS (DKIM / SPF / DMARC).
-- **NEXT_PUBLIC_* как build-args.** Прецедент DOCKER-READINESS-AUDIT-01: `NEXT_PUBLIC_*` инлайнятся **на этапе сборки**, поэтому их мало положить в runtime-env — они должны прийти build-аргументами в Docker. Иначе публичные значения запекутся пустыми (уже случалось: 8 переменных, включая ИНН и Yandex-кнопку).
+- **NEXT_PUBLIC_* — в `.env.production` на ВМ, и это покрывает И сборку.** Прецедент DOCKER-READINESS-AUDIT-01: `NEXT_PUBLIC_*` инлайнятся **на этапе сборки**, runtime-env до браузера не доезжает (уже случалось: 8 переменных запеклись пустыми, включая ИНН и Yandex-кнопку). Со схемой «сборка на ВМ» (§1.4) источник ОДИН: `docker-compose.prod.yml` интерполирует build-args сервиса `app` из `.env.production` (`--env-file`), то есть переменная, заданная там, попадает и в сборку, и в runtime — отдельного места для build-args больше нет. ⚠️ Пропущенная переменная по-прежнему запекается ПУСТОЙ без ошибки — держать полный список (см. args в compose). `NEXT_PUBLIC_GLITCHTIP_RELEASE` задавать не надо — его экспортирует деплой-скрипт (короткий SHA).
+
+### 1.4. Схема деплоя: сборка на ВМ, без реестра (CI-DEPLOY-NOREGISTRY-01, 2026-08-10)
+
+Решение владельца 2026-08-07: **реестр контейнеров не используется.** Образы `beautyhub-app` / `beautyhub-worker` собираются прямо на прод-ВМ из репозитория; доставка кода — `git pull`. Автоматизация — `.github/workflows/deploy.yml`: **только ручной запуск** (`workflow_dispatch`), без секретов ВМ job «пропущен», не «упал». Гейты деплой не гоняет — перед запуском убедиться, что `CI` и `Build images` зелёные на деплоимом ref.
+
+**Требования к ВМ:**
+
+- Docker Engine + **docker compose v2** (`docker compose`, не `docker-compose`), git.
+- **RAM ≥ 4 ГБ (+ swap ~2 ГБ)** — сборка идёт рядом с работающим приложением. Митигции уже в конфигурации: heap `next build` каплен `--max-old-space-size=2048` (build-arg `BUILD_NODE_OPTIONS` из compose), сборки worker → app идут **последовательно**. Ориентир с CI-раннера и фактический пик первого VM-деплоя — сверять с логом шага «3/6 Сборка» (деплой-скрипт печатает пик used-памяти по семплам).
+- Репозиторий: `git clone <repo> /opt/masterryadom` (каталог зашит в `deploy.yml`), рабочая ветка `main`.
+- **`.env.production` в корне `/opt/masterryadom` — untracked, `git pull` его не трогает.** Проверить после клона: `git check-ignore .env.production` → игнорируется, `git status --short` его не показывает. Деплой использует `git pull --ff-only`: разошедшаяся история = громкий отказ, а не тихая перезапись.
+
+**GitHub-секреты — теперь ТОЛЬКО доступ к ВМ:**
+
+| Секрет | Что это |
+|---|---|
+| `PROD_HOST` | адрес ВМ |
+| `PROD_USER` | SSH-пользователь (в группе `docker`) |
+| `PROD_SSH_KEY` | приватный SSH-ключ |
+
+**Больше НЕ нужны:** `YC_REGISTRY_ID`, `YC_OAUTH_TOKEN` (и `YC_SA_JSON_KEY`, если заводился) — удалить из настроек репозитория, если были созданы.
+
+**Порядок первого деплоя:**
+
+1. Провижининг ВМ (см. требования) + клон в `/opt/masterryadom` + `.env.production` (по `.env.production.example`; 🚩 `YOOKASSA_WEBHOOK_TOKEN` — ДО первого старта, §1.1; 🚩 `NEXT_PUBLIC_*` — тоже сюда, §1.3: они уходят и в сборку).
+2. Предпроверки миграций из §2 (снапшот БД, сироты `TimeBlock`, CHECK-диапазоны, `CONCURRENTLY`-индексы) — **до** запуска workflow: `migrate` внутри деплоя гоняется автоматически.
+3. Три секрета в GitHub (окружение `production` или уровень репозитория — preflight читает окружение `production`, оба места работают) → Actions → `Deploy to Production` → Run workflow (`git_ref: main`).
+   ⚠️ В `.env.production` обязан быть **`NEXT_PUBLIC_APP_URL` именно под этим именем**: runtime-алиас `APP_PUBLIC_URL` в build-args compose не интерполируется, а пустой `NEXT_PUBLIC_APP_URL` роняет сборку app (`new URL("")` в root-layout).
+4. Первый прогон: образов `:previous` ещё нет — скрипт печатает «первый деплой», и при провале healthcheck будет **exit 1 без отката** (чинить вперёд). Со второго деплоя автооткат активен.
+
+**Откат — единственный механизм без реестра — тег `:previous`:**
+
+Автоматический: healthcheck не прошёл → `deploy.yml` сам перетегирует и поднимет `app`/`worker` из `:previous`, прогон завершается **exit 1**. Ручной — та же последовательность:
+
+```bash
+cd /opt/masterryadom
+docker image tag beautyhub-app:previous beautyhub-app:latest
+docker image tag beautyhub-worker:previous beautyhub-worker:latest
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps app worker
+```
+
+- Хранится ровно **один шаг назад**: `:previous` перезаписывается в начале каждого деплоя, строго **до** сборки (иначе откатываться было бы не на что; механика проверена симуляцией — отчёт CI-DEPLOY-NOREGISTRY-01).
+- Миграции откатом **не отменяются**: код `:previous` обязан жить с новой схемой (миграции аддитивны by policy; для деструктивных точка возврата — снапшот БД, §2).
+- `docker image prune -f` в конце успешного деплоя тегированные `:previous` не трогает (чистятся только dangling-слои).
+
+**CI-сборка образов (`build-images.yml`)** — тот же **набор** build-args, что у прод-сборки, но значения-**заглушки** (`https://ci.masterryadom.invalid`, пустые ключи, `NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT=ci`): CI-образ доказывает, что Dockerfile жив, и никуда не деплоится. Боевые значения инлайнятся только на ВМ из `.env.production`.
 
 ---
 
@@ -71,7 +117,7 @@
 - **Воркер — отдельный процесс.** `npm run worker` поднимается **рядом** с Next-приложением; авто-рестарт зависит от конфигурации docker/supervisor. Без него не идут напоминания, вебхуки YooKassa, `media.purge` и MRR-снапшоты.
 - **Trial-conversion backfill** — `npx tsx scripts/backfill-trial-conversion.ts` (dry-run → `--apply`) на staging/prod ДО открытия. Реальных affected rows скорее всего 0.
 - **🚩 `npx prisma db seed` намеренно отключён (SEED-DEFUSE-01, 2026-08-04) — это не поломка, «чинить» не надо.** Хук `prisma.seed` снят из `package.json`. **⚠️ Точное поведение проверено на Prisma 6.19.2 (живой прогон + код CLI), и оно ТИШЕ, чем можно ожидать:** `npx prisma db seed` без настроенного хука — **молчаливый no-op с кодом выхода 0** (в `db seed`: `u = config.migrations?.seed ?? <package.json#prisma.seed>; if (!u) return ""` — ни сообщения, ни ненулевого кода), а `prisma migrate reset` / `migrate dev` **молча пропускают** шаг сида (`x && (…)`), без предупреждения. То есть деструктивного прогона больше нет, но и подтверждения «сид не выполнялся» команда не даёт: увидев exit 0, легко решить, что база засеяна. Хук не может воскреснуть сам — CLI ищет команду только в `package.json#prisma.seed` / prisma-config, файл `prisma/seed.*` не автодетектится. Причина: хук указывал на `prisma/seed.mjs`, чьё тело было `booking.deleteMany() → service.deleteMany() → provider.deleteMany()` и больше ничего — одна привычная команда по живой базе сносила ядро данных в обмен на ноль записей. **Сидинг фикстур — только `npm run seed:test`**, и он в production отказывается без явного `ALLOW_TEST_SEED=true` (как и `seed:test:reset`). Dev-цикл с 2026-08-04 самодостаточен: `npm run db:reset:dev` = `migrate reset --force` → `redis:flush:dev` → `seed:test`, то есть «сбросил → получил рабочую БД» работает одной командой (раньше цепочка обрывалась на flush, а prisma-хук только удалял данные). **В проде фикстуры не запускать вовсе:** это аккаунты `+7999…` с предсказуемым OTP-флоу, среди них ADMIN. Справочные сидеры (`npm run seed:plans` — MASTER_FREE/STUDIO_FREE, `npm run seed:review-tags`) гардом НЕ закрыты и в проде легитимны — free-план читает рантайм (`ensure-free-subscription.ts`).
-- **🚩 Конфигурация площадки из AUDIT-FRESH-01…05** *(перенесено сюда AUDIT-RECONCILE-01 2026-08-04 — rule 15: это ops, не код, в очередь фиксов не идёт)*. Все пункты **LIVE** на HEAD `462ff0b0`, каждый со ссылкой `file:line` в `docs/audits/`:
+- **🚩 Конфигурация площадки из AUDIT-FRESH-01…05** *(перенесено сюда AUDIT-RECONCILE-01 2026-08-04 — rule 15: это ops, не код, в очередь фиксов не идёт)*. Статус на HEAD `462ff0b0` был «все LIVE»; **на 2026-08-10 четыре пункта уже закрыты кодом/compose** — `stop_grace_period` (RES-16), `noeviction` (RES-27), `statement_timeout` (RES-24, теперь его ставит приложение), лимит тела запроса (SEC-16); ниже они сохранены как чек-строки «убедиться, что площадка не отменила», остальные остаются за площадкой:
   - **PgBouncer в Session-режиме** (не Transaction) — Prisma держит prepared statements; Transaction-режим их ломает. Если пул уже поднят в Transaction — либо переключить, либо `pgbouncer=true` в `DATABASE_URL`.
   - **`TRUSTED_PROXY_HOPS` — измерением, а не наугад** (строка выше уже есть; аудит добавляет метод: снять реальный XFF с прод-edge и посчитать хопы, не угадывать).
   - **`stop_grace_period` для воркера** — задача в лизе переживает SIGTERM; без грейса in-flight job уходит в dead-letter на каждом деплое.

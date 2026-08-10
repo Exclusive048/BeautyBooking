@@ -385,10 +385,11 @@ Check:
 - GitHub workflow quality gates is green for current commit.
 
 How to verify:
-- Check latest run of `quality-gates.yml`.
+- Check latest runs of `ci.yml` (гейты + тесты) and `build-images.yml` (сборка образов).
 
 Where to verify:
-- [.github/workflows/quality-gates.yml](/d:/BeautyBooking/beautyhub/.github/workflows/quality-gates.yml).
+- [.github/workflows/ci.yml](/d:/BeautyBooking/beautyhub/.github/workflows/ci.yml);
+- [.github/workflows/build-images.yml](/d:/BeautyBooking/beautyhub/.github/workflows/build-images.yml).
 
 GO condition:
 - Latest workflow run is successful.
