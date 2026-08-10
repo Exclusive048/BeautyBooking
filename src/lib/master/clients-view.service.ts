@@ -16,6 +16,7 @@ import {
   type ClientStatus,
 } from "@/lib/master/clients-classifier";
 import { signClientKeyToken } from "@/lib/master/client-key-token";
+import { crmClientsWindowStart } from "@/lib/crm/clients-window";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -254,7 +255,8 @@ function compareClients(
 }
 
 async function loadAggregates(
-  providerId: string
+  providerId: string,
+  windowStart: Date
 ): Promise<{
   aggregates: Map<string, ClientAggregate>;
   bookings: BookingClientRow[];
@@ -264,6 +266,12 @@ async function loadAggregates(
     where: {
       OR: [{ providerId }, { masterProviderId: providerId }],
       status: { notIn: [BookingStatus.REJECTED, BookingStatus.NO_SHOW] },
+      // PERF-06: окно на входе группировки (см. crm/clients-window.ts).
+      // KPI-строка и счётчики вкладок считаются из этого же оконного набора —
+      // разойтись с таблицей им не из чего. Известное следствие окна: клиент,
+      // чей первый визит старше окна, при возврате классифицируется как
+      // «новый» — это свойство среза, а не баг.
+      startAtUtc: { gte: windowStart },
     },
     select: {
       id: true,
@@ -308,7 +316,7 @@ export async function getMasterClientsView(input: {
   now?: Date;
 }): Promise<MasterClientsViewData> {
   const now = input.now ?? new Date();
-  const { aggregates } = await loadAggregates(input.providerId);
+  const { aggregates } = await loadAggregates(input.providerId, crmClientsWindowStart(now));
 
   const userIds = Array.from(
     new Set(

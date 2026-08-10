@@ -2494,6 +2494,21 @@ export const UI_TEXT = {
       breadcrumb: "Клиенты",
       title: "Клиенты",
       subtitle: "История работы с клиентами и аналитика",
+      // PERF-06: подпись окна CRM-данных. Ключ ОДИН на оба кабинета (как
+      // соседний `cardNotePlaceholder` — прецедент UI-33), число приходит из
+      // CRM_CLIENTS_WINDOW_MONTHS (crm/clients-window.ts) — подпись и окно
+      // меняются только вместе.
+      windowNote: (months: number) => {
+        const mod10 = months % 10;
+        const mod100 = months % 100;
+        const word =
+          mod10 === 1 && mod100 !== 11
+            ? "месяц"
+            : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+              ? "месяца"
+              : "месяцев";
+        return `данные за последние ${months} ${word}`;
+      },
       cardNotePlaceholder: "Запишите важные детали о клиенте",
       // UI-33: ключ ОДИН на оба кабинета — дровер общий для MASTER и STUDIO
       // (как и соседний `cardNotePlaceholder`), иначе формулировки разъедутся.

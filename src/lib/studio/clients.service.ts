@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { applyProfileNames, calculateDaysSinceLastVisit, groupBookings, type BookingClientRow } from "@/lib/crm/clients";
+import { crmClientsWindowStart } from "@/lib/crm/clients-window";
 import { prisma } from "@/lib/prisma";
 import { PdAccessActorType } from "@prisma/client";
 import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
@@ -103,6 +104,9 @@ export async function getStudioClients(input: ClientsPageInput): Promise<StudioC
     where: {
       OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+      // PERF-06: окно на входе группировки (см. crm/clients-window.ts) —
+      // без него страница из 50 клиентов требовала всех броней арендатора.
+      startAtUtc: { gte: crmClientsWindowStart() },
     },
     select: {
       id: true,
