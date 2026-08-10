@@ -290,12 +290,12 @@
 
 **Notifications/push UX (FIX-EXP-NOTIFICATIONS ✅ 2026-06-26 — per-channel prefs + push gesture-gating):**
 - 🟡 **EXP-029** *(DEFERRED — next feature, post-pre-deploy)* — per-event×channel routing matrix. Остаётся «Скоро»-плейсхолдер (master `PerEventPlaceholder`). НЕ строим в этом проходе (per locked decision). Foundation (per-channel on/off) готов — matrix построится поверх той же модели. VK delivery WIP, SMS не wired.
-- 🚀 **DEPLOY/STAGING** — реальный «prompt появляется на gesture» + фактическая push-доставка проверяются на staging (dev: next-pwa отключает SW; push требует prod-build + HTTPS + VAPID). A/B (manual-only vs gesture-prompt) выбирается на staging — оба механизма заложены (manual toggle = default; `syncExistingSubscription` reusable для будущего gesture-trigger).
+- 🚀 **DEPLOY/STAGING** — реальный «prompt появляется на gesture» + фактическая push-доставка проверяются на staging (dev: PWA-плагин — с SEC-07 это `@serwist/next` — отключает SW; push требует prod-build + HTTPS + VAPID). A/B (manual-only vs gesture-prompt) выбирается на staging — оба механизма заложены (manual toggle = default; `syncExistingSubscription` reusable для будущего gesture-trigger).
 
 **Verify-on-prod (dev-config / dev-amplified — проверить на проде, не fix-в-dev):**
 - 🔵 **EXP-009** — Telegram login widget «Bot domain invalid» (TG bot domain не сконфижен на localhost). Проверить prod bot-domain. *(пересекается с deploy-ops «Telegram live round-trip».)*
 - 🔵 **EXP-031** — `/cabinet/studio/analytics` медленный (dev: 60s on-demand compile → ~5.9s SSR; агрегирует ~15 endpoints без кэша). Load-check на warm prod build.
-- 🔵 **PWA SW/push prod-only** — SW не регистрируется в dev (next-pwa off); offline-кэш / install-prompt / push delivery exercise-able только на prod build. Manifest/icons/meta в dev корректны.
+- 🔵 **PWA SW/push prod-only** — SW не регистрируется в dev (PWA-плагин off; с SEC-07 это `@serwist/next`); offline-кэш / install-prompt / push delivery exercise-able только на prod build. Manifest/icons/meta в dev корректны.
 
 ---
 

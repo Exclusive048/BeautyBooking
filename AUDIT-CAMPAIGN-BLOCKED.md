@@ -74,6 +74,8 @@
 
 ## SEC-07 (остаток) — 5 high в сборочной цепочке `next-pwa` → `workbox`
 
+> ✅ **ЗАКРЫТО AUDIT-CAMPAIGN-02 п.2 (2026-08-10)** — путь 1 (рекомендованный): `next-pwa` → `@serwist/next` ^9.5.12, SW-источник `src/app/sw.ts`, приёмка на прод-артефакте (SW + offline + `npm audit --omit=dev`: high 5 → 0). Детали — `AUDIT-CAMPAIGN-02-PROGRESS.md`. Текст ниже — фотография на дату кампании 01.
+
 **Суть находки.** `npm audit --omit=dev` показывал 21 high в прод-зависимостях. Кампания закрыла всё, что чинится: `sharp` → 0.35.3, `nodemailer` → 9.0.4, `prisma` → 6.19.3, `next` → 16.3.0, плюс транзитивные (`ws`, `fast-xml-parser`, `lodash`, …) через `npm audit fix`. **Осталось 5 high, и все они — одна цепочка:** `next-pwa` → `workbox-webpack-plugin` → `workbox-build` → `rollup-plugin-terser` → `serialize-javascript`.
 
 **Почему не сделано: у `next-pwa` нет апгрейда — есть только «фикс» вниз.**
