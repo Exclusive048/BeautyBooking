@@ -136,6 +136,27 @@
     --destructive-foreground: 255 255 255;
     --success: 31 122 77;
     --warning: 180 83 9;
+
+    /* === Статусные ПОВЕРХНОСТИ (UI-26/27, AUDIT-CAMPAIGN-02 п.8) ===
+       Значения сняты с Badge.variantClasses (прошёл контраст-ревью):
+       success=emerald, warning=amber, danger=red, info=blue; тройка
+       surface/text/border на статус. Хранятся ПОЛНЫМ значением цвета, а не
+       триплетом: тёмная тема несёт запечённую альфу (…-950/40, …-800/50),
+       которую мост `<alpha-value>` выразить не может — поэтому классы
+       bg-success-surface и т.п. НЕ принимают модификатор прозрачности.
+       Менять только парой light+dark и только вместе с Badge. */
+    --success-surface: rgb(236 253 245);
+    --success-text: rgb(4 120 87);
+    --success-border: rgb(167 243 208);
+    --warning-surface: rgb(255 251 235);
+    --warning-text: rgb(180 83 9);
+    --warning-border: rgb(253 230 138);
+    --danger-surface: rgb(254 242 242);
+    --danger-text: rgb(185 28 28);
+    --danger-border: rgb(254 202 202);
+    --info-surface: rgb(239 246 255);
+    --info-text: rgb(29 78 216);
+    --info-border: rgb(191 219 254);
   }
 
   .dark {
@@ -228,6 +249,21 @@
     --destructive-foreground: 255 255 255;
     --success: 52 168 99;
     --warning: 217 119 6;
+
+    /* Статусные поверхности — тёмная половина (пары к :root, см. коммент там).
+       Альфа запечена в значение: …-950/0.4 у заливки, …-800/0.5 у рамки. */
+    --success-surface: rgb(2 44 34 / 0.4);
+    --success-text: rgb(110 231 183);
+    --success-border: rgb(6 95 70 / 0.5);
+    --warning-surface: rgb(69 26 3 / 0.4);
+    --warning-text: rgb(252 211 77);
+    --warning-border: rgb(146 64 14 / 0.5);
+    --danger-surface: rgb(69 10 10 / 0.4);
+    --danger-text: rgb(252 165 165);
+    --danger-border: rgb(153 27 27 / 0.5);
+    --info-surface: rgb(23 37 84 / 0.4);
+    --info-text: rgb(147 197 253);
+    --info-border: rgb(30 64 175 / 0.5);
   }
 
   html,

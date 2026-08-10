@@ -93,6 +93,24 @@ module.exports = {
           DEFAULT: "rgb(var(--destructive) / <alpha-value>)",
           foreground: "rgb(var(--destructive-foreground) / <alpha-value>)",
         },
+        // UI-26/27 (AUDIT-CAMPAIGN-02 п.8) — статусные ПОВЕРХНОСТИ: тройка
+        // surface/text/border × success/warning/danger/info, значения сняты с
+        // Badge.variantClasses. Мост БЕЗ `<alpha-value>` намеренно: тёмные
+        // значения несут запечённую альфу (…-950/0.4, …-800/0.5) в самой
+        // переменной, поэтому модификаторы прозрачности (`bg-success-surface/50`)
+        // к этим классам НЕ применяются — и не должны.
+        "success-surface": "var(--success-surface)",
+        "success-text": "var(--success-text)",
+        "success-border": "var(--success-border)",
+        "warning-surface": "var(--warning-surface)",
+        "warning-text": "var(--warning-text)",
+        "warning-border": "var(--warning-border)",
+        "danger-surface": "var(--danger-surface)",
+        "danger-text": "var(--danger-text)",
+        "danger-border": "var(--danger-border)",
+        "info-surface": "var(--info-surface)",
+        "info-text": "var(--info-text)",
+        "info-border": "var(--info-border)",
       },
       backgroundImage: {
         "brand-gradient":

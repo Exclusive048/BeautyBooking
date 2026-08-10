@@ -3,15 +3,18 @@ import React from "react";
 
 type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "muted";
 
+// UI-26/27 (AUDIT-CAMPAIGN-02 п.8): статусные варианты переведены на токены
+// поверхностей (--success-surface/-text/-border и т.д., globals.css) — Badge
+// был ИСТОЧНИКОМ этих значений (контраст-ревью пройден раньше) и стал их
+// эталонным потребителем. Пиксели идентичны прежним литеральным emerald/amber/
+// red/blue-комбинациям (значения перенесены 1:1, включая альфу тёмной темы);
+// `dark:`-вилки ушли в переменные тем.
 const variantClasses: Record<BadgeVariant, string> = {
   default: "border-border-subtle bg-bg-input text-text-main",
-  success:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300",
-  warning:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300",
-  danger:
-    "border-red-200 bg-red-50 text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300",
-  info: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300",
+  success: "border-success-border bg-success-surface text-success-text",
+  warning: "border-warning-border bg-warning-surface text-warning-text",
+  danger: "border-danger-border bg-danger-surface text-danger-text",
+  info: "border-info-border bg-info-surface text-info-text",
   muted: "border-border bg-muted text-muted-foreground",
 };
 

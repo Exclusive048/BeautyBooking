@@ -414,7 +414,7 @@ Centered icon + title + description + secondary CTA.
 | done | FINISHED | emerald (нейтральное завершение) |
 | cancelled | CANCELLED / REJECTED / NO_SHOW | slate (mute) |
 
-Tailwind built-ins (red/amber/emerald/rose/slate) — допустимо для статус-индикаторов; для всего остального — только семантические токены.
+**UI-26/27 (AUDIT-CAMPAIGN-02 п.8, 2026-08-10): статусные ПОВЕРХНОСТИ — только токены.** Для заливки/текста/рамки статусных плашек, пилюль и алертов существует тройка токенов на статус: `bg-success-surface text-success-text border-success-border` (+ `warning`/`danger`/`info`). Значения сняты с `Badge.variantClasses` (контраст-ревью пройден), тёмная тема встроена в переменные — **`dark:`-вилки на статусных поверхностях больше не пишутся**. Сырые `emerald-*`/`amber-*`/`red-*`/`blue-*` комбинации в НОВЫХ статусных поверхностях запрещены; `rose`/`slate` для нестатусных индикаторов (рейтинг, mute) пока допустимы. ⚠️ Модификаторы прозрачности к этим классам не применяются (`bg-success-surface/50` не сработает — альфа тёмной темы запечена в переменную). Предпочтительно вообще не собирать плашку руками, а брать `<Badge variant="…">`.
 
 ### Card-with-toggle (premium feature card)
 
