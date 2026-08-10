@@ -1,0 +1,225 @@
+# CI — качество (CI-DEPLOY-NOREGISTRY-01, 2026-08-10).
+#
+# Зеркалирует ЛОКАЛЬНУЮ батарею `npm run check` (package.json) шаг в шаг, поимённо,
+# в том же порядке, плюс `npm run test`. Секретов НЕ требует. Критерий — только
+# exit-код каждого шага.
+#
+# Предыстория: до этого workflow (quality-gates.yml) дублировал 11 шагов из 18 —
+# check:ui-text, check:error-message-lang, check:env-discipline, check:migration-drops,
+# check:include-where, check:worker-boot и smoke существовали только на машине
+# владельца (находка CONTEXT-REFRESH-V4). Список в CI разошёлся с package.json
+# МОЛЧА — ровно тот класс дефекта, против которого в проекте заведены DMMF-guard'ы.
+# Поэтому здесь стоит локстеп-шаг: он читает `scripts.check` из package.json и
+# требует, чтобы КАЖДАЯ его команда присутствовала в этом файле как `run:`-строка.
+# Новый шаг в `npm run check` без зеркала здесь = красный CI, а не тихий пробел.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - audit-fixes
+      # Негативные пробы гейтов: ветка ci-probe/* с намеренно сломанным кандидатом
+      # (английская строка ошибки / process.env[...] / DROP защищённого объекта)
+      # доказывает, что CI действительно краснеет. Гейт без пробы считается
+      # несуществующим — методология кампании AUDIT-CAMPAIGN-01 (§9 снапшота).
+      - "ci-probe/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: npm run check (18 шагов) + npm run test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # check:schema-drift требует shadow-Postgres: `prisma migrate diff` реплеит
+    # миграции в scratch-БД. В CI гейт HARD-FAIL при недостижимом Postgres
+    # (IS_CI-ветка scripts/check-schema-drift.mjs) — поэтому сервис обязателен.
+    # Образ именно pgvector: миграции создают `extension vector` + HNSW-индекс,
+    # реплей в голом postgres упал бы.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Присутствие для prisma validate/generate — соединений эти команды не делают.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/beautyhub?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/beautyhub?schema=public
+      # Maintenance-БД для shadow-реплея check:schema-drift (см. services выше).
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # В батарее lint/typecheck идут ДО prisma:generate — локально клиент уже
+      # сгенерирован прошлыми прогонами, на свежем checkout его нет. Bootstrap-generate
+      # здесь, чтобы порядок шагов ниже оставался дословно порядком `npm run check`.
+      - name: Prisma generate (bootstrap свежего checkout)
+        run: npx prisma generate
+
+      # Гейт доказан невакуумным (проба: удаление шага из yml → красный; см. отчёт
+      # CI-DEPLOY-NOREGISTRY-01). Три известные формы обхода закрыты явно:
+      # закомментированный шаг (комментарии вырезаются до сверки), `if: false`
+      # (разрешён ТОЛЬКО smoke-шагу) и `continue-on-error` (запрещён целиком).
+      - name: Локстеп — ci.yml зеркалирует npm run check
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const steps = pkg.scripts.check.split("&&").map((s) => s.trim());
+          const raw = fs.readFileSync(".github/workflows/ci.yml", "utf8");
+          // Закомментированный шаг — это ОТСУТСТВУЮЩИЙ шаг, а не зеркало.
+          const live = raw.split("\n").filter((l) => !l.trim().startsWith("#")).join("\n");
+          const missing = steps.filter((s) => !live.includes("run: " + s));
+          if (missing.length > 0) {
+            console.error("ci.yml не зеркалирует npm run check — отсутствуют шаги:");
+            for (const s of missing) console.error("  • " + s);
+            console.error("Добавьте зеркальный шаг в ci.yml (или уберите шаг из package.json check).");
+            process.exit(1);
+          }
+          // Отключатели: if:false легитимен только у smoke (нужен живой сервер);
+          // глушение провала шага (COE ниже) не легитимно ни у кого. Маркеры
+          // собраны конкатенацией, чтобы исходник этого скрипта не удовлетворял
+          // собственные проверки и чтобы runner не развернул выражение.
+          const IF_FALSE = "if: ${" + "{ false }" + "}";
+          // Литерал собран конкатенацией, чтобы исходник ЭТОГО скрипта (он тоже
+          // часть ci.yml) не удовлетворял сверку сам собой.
+          const SMOKE_RUN = "run: npm run " + "smoke";
+          const blocks = live.split(/\n\s*- name:/).slice(1);
+          const rogueOff = blocks.filter((b) => (b.includes(IF_FALSE) || /\n\s*if:\s*false\s*\n/.test(b)) && !b.includes(SMOKE_RUN));
+          if (rogueOff.length > 0) {
+            console.error("Шаг(и) отключены через if:false — это разрешено только smoke-шагу. Чините причину, а не гейт.");
+            process.exit(1);
+          }
+          const COE = "continue-on-" + "error";
+          if (live.includes(COE)) {
+            console.error(COE + " в ci.yml запрещён: провал гейта обязан быть красным.");
+            process.exit(1);
+          }
+          console.log("Локстеп OK — все " + steps.length + " шагов npm run check присутствуют исполняемыми; if:false только у smoke.");
+          EOF
+
+      # ─── npm run check, шаг в шаг (порядок = package.json) ────────────────────
+
+      - name: 1/18 lint
+        run: npm run lint
+
+      - name: 2/18 typecheck
+        run: npm run typecheck
+
+      - name: 3/18 prisma validate
+        run: npm run prisma:validate
+
+      - name: 4/18 prisma generate
+        run: npm run prisma:generate
+
+      # Fail-soft by design (как и smoke): скрипт фетчит /api/openapi с живого
+      # сервера и без него печатает «skipped (server not reachable)» + exit 0.
+      # Шаг оставлен исполняемым, потому что так же он ведёт себя и в локальной
+      # батарее без dev-сервера; реальную сверку спеки с деревом роутов делает
+      # шаг 13/18 (check:openapi-routes), он от сервера не зависит.
+      - name: 5/18 openapi generate
+        run: npm run openapi:generate
+
+      - name: 6/18 encoding check
+        run: npm run check:encoding
+
+      - name: 7/18 mojibake check
+        run: npm run check:mojibake
+
+      - name: 8/18 UI-text discipline (UI_TEXT)
+        run: npm run check:ui-text
+
+      # UI-16: класс, компилирующийся в ничто, не виден ни lint'у (AST), ни
+      # typecheck'у (типы), ни encoding/mojibake (байты) — 192 таких сайта
+      # прошли старый workflow незамеченными.
+      - name: 9/18 dead CSS classes
+        run: npm run check:dead-classes
+
+      # ERR-LOCALIZATION-01: любое сообщение через fail()/AppError обязано нести
+      # кириллицу; исключения — точным текстом в scripts/error-message-allowlist.txt.
+      - name: 10/18 error message language
+        run: npm run check:error-message-lang
+
+      # SEC-14 / инвариант #39: process.env.* и process.env[...] вне списка
+      # исключений rule 11 — скобочная нотация невидима для грепа, так четыре
+      # нарушения прожили в telegram/config.ts.
+      - name: 11/18 env discipline
+        run: npm run check:env-discipline
+
+      - name: 12/18 context freshness
+        run: npm run check:context-freshness
+
+      - name: 13/18 OpenAPI routes coverage
+        run: npm run check:openapi-routes
+
+      # HARD-enforcing в CI: сервис-контейнер postgres поднят, SHADOW_DATABASE_URL
+      # задан, а IS_CI-ветка скрипта трактует недостижимый Postgres как отказ.
+      # Ловит `db push`-антипаттерн (24-операционный дрейф мая 2026).
+      - name: 14/18 schema drift
+        run: npm run check:schema-drift
+
+      # Второй гейт пары: `migrate dev` дописывает DROP сырых SQL-объектов
+      # (HNSW-индекс и др.) в новые миграции — дважды снимали руками при ревью.
+      - name: 15/18 migration drops
+        run: npm run check:migration-drops
+
+      - name: 16/18 include/where discipline
+        run: npm run check:include-where
+
+      # WORKER-BOOT-SERVER-ONLY-01: дефолтный режим CI-safe (без БД/Redis) —
+      # проверяет --conditions=react-server в обоих путях старта воркера + пробу
+      # server-only. Полный boot-смоук (--full) намеренно не здесь: ему нужен стек.
+      - name: 17/18 worker boot guard
+        run: npm run check:worker-boot
+
+      # smoke — 18-й шаг батареи. Требует ЖИВОГО сервера (standalone-билд + Postgres
+      # + Redis + мигрированная БД + env): без сервера scripts/smoke.mjs fail-soft
+      # печатает «skipped (server not reachable)» и выходит 0 — то есть прогон здесь
+      # был бы ИМИТАЦИЕЙ проверки, а не проверкой (задача запрещает «делать вид»).
+      # Честное состояние: шаг виден в прогоне и помечен skipped. Поднятие полного
+      # стека в CI — отдельная задача CI-LIVE-SMOKE в BACKLOG.md.
+      - name: 18/18 smoke — исключён (нужен живой сервер)
+        if: ${{ false }}
+        run: npm run smoke
+
+      # ─── Тесты (2219 шт., env node, без БД/Redis by design) ──────────────────
+
+      - name: npm run test
+        run: npm run test -- --reporter=verbose --bail 1
+        env:
+          NODE_ENV: test
+          AUTH_JWT_SECRET: test-jwt-secret-for-ci-must-be-at-least-64-characters-long-xxxxxxxxxxxxxxx
+          OTP_HMAC_SECRET: test-otp-secret-for-ci-at-least-32chars
+          DATABASE_URL: ""
+          REDIS_URL: ""
