@@ -56,7 +56,18 @@ const sizes: Record<ButtonSize, string> = {
   sm: "h-9 px-3 text-sm",
   md: "h-11 px-4 text-sm",
   lg: "h-12 px-5 text-base",
-  icon: "h-10 w-10 p-0 text-sm",
+  // UI-29 (AUDIT-CAMPAIGN-02 п.5): невидимая after-зона расширяет цель нажатия
+  // до ≥44px (WCAG 2.5.5/AAA) БЕЗ визуальных изменений (скриншот-приёмка
+  // байт-в-байт). ⚠️ inset у absolute-::after считается от PADDING-box: с 1px
+  // бордером (secondary/icon) −4px даёт 46px эффективных, без бордера (ghost) —
+  // 48px; «−2px» давал бы 42 и НЕ дотягивал до 44 — проверено замером.
+  // `relative` скоупится СЮДА, а не в DEFAULT_BASE: у произвольной кнопки могут
+  // быть absolute-дети, заякоренные на дальнего предка, и глобальный relative их
+  // переякорил бы. ⚠️ icon-кнопке нельзя давать `absolute` в className:
+  // `.relative` в CSS-слое позже и победит (cn — плоский join без
+  // tailwind-merge); позиционирование — на обёртке (единственный такой сайт —
+  // share-profile-section, сирота).
+  icon: "relative h-10 w-10 p-0 text-sm after:absolute after:-inset-1 after:content-['']",
   none: "",
 };
 

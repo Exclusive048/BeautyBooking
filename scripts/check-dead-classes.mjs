@@ -86,6 +86,11 @@ export const NOT_A_CLASS = new Set([
   "space-between",
   // Директивы заголовка `Cache-Control`.
   "max-age",
+  // Имена HTTP-заголовков в fetch/route-коде. Стали кандидатами после UI-29:
+  // `after:content-['']` в Button оживил пространство `content-*` в бандле
+  // (утилита content). Сами строки — заголовки, не классы.
+  "content-type",
+  "content-length",
   // Ключи localStorage — совпали с пространством `mr-*` (margin-right).
   "mr-stories-viewed",
   "mr-stories-viewed-items",

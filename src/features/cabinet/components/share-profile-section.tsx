@@ -136,6 +136,10 @@ export function ShareProfileSection({ endpoint }: Props) {
         <label className="mb-1.5 block text-xs text-text-sec">{t.yourLink}</label>
         <div className="relative">
           <Input readOnly value={url} className="pr-12" />
+          {/* ⚠️ UI-29: у size="icon" теперь `relative` (hit-зона 44px) — класс
+              `absolute` на самой кнопке будет ПЕРЕБИТ (cn — плоский join, а
+              `.relative` в CSS позже). Компонент сейчас сирота (0 импортёров);
+              при оживлении перенести позиционирование на обёртку-span. */}
           <Button
             variant="ghost"
             size="icon"
