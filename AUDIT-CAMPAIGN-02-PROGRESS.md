@@ -1,0 +1,22 @@
+# AUDIT-CAMPAIGN-02 — ledger
+
+> Старт: **10 августа 2026**. Вход — [`docs/audits/AUDIT-CAMPAIGN-02.md`](docs/audits/AUDIT-CAMPAIGN-02.md) (11 пунктов, все ратифицированы владельцем 2026-08-07), планы/замеры — [`AUDIT-CAMPAIGN-BLOCKED.md`](AUDIT-CAMPAIGN-BLOCKED.md). Непроходимое — в [`AUDIT-CAMPAIGN-02-BLOCKED.md`](AUDIT-CAMPAIGN-02-BLOCKED.md).
+>
+> **Следующий пункт: 1 (остаток CI-PARITY: QUALITY-GATES-доки + `--create-only`).**
+>
+> Исходная точка (2026-08-10, HEAD `6f4eb49f`, чистое дерево): `npm run check` → EXIT=0, `npm run test` → EXIT=0 (260 файлов / 2219 тестов) — вердикт по коду возврата.
+
+| # | Пункт | Статус | Коммиты / примечание |
+|---|-------|--------|----------------------|
+| 1 | CI-PARITY — гейты в CI | **PENDING** (остаток: описать `check:error-message-lang` + `check:env-discipline` в `docs/QUALITY-GATES.md`; `migrate dev` → `--create-only` в package.json; локстеп остаётся зелёным) | основная часть закрыта CI-DEPLOY-NOREGISTRY-01 (`7ac43f4d` ci.yml — 18 шагов поимённо + локстеп-гейт + негативная проба: run 31390067413 красный ровно на шаге 11/18 env-discipline) |
+| 1b | Реестр контейнеров убран, сборка на ВМ | **FIXED** | `7ac43f4d` (ci.yml), `82858c57` (build-images.yml), `df45e8b5` (deploy.yml + compose + Dockerfile), `c0b68f44` (доки), `f631d08c` (.dockerignore — app-образ не собирался с LOGIC-20, нашёл первый прогон build-images), `6f4eb49f` (замер памяти 5211 MiB в DEPLOY-BACKLOG). Приёмка фактическая: CI run 31391439677 success, Build images run 31391439846 success, Deploy в прогонах отсутствует (workflow_dispatch-only); откат `:previous` проверен симуляцией (tag-до-сборки / retag / prune-безопасность) |
+| 2 | SEC-07 — `next-pwa` → `@serwist/next` | PENDING | |
+| 3 | PERF-06 — окно 24 мес в CRM-группировке | PENDING | |
+| 4 | PERF-27 — интервал ленты админки 5с → 30с | PENDING | |
+| 5 | UI-29 — hit-area в `Button` | PENDING | |
+| 6 | UI-22 ч.1 — убрать `text-[9px]` | PENDING | |
+| 7 | SEC-04 by-photo — бюджет/тир/дедуп | PENDING | |
+| 8 | UI-26 + UI-27 — сырые `<button>` + `dark:` по областям | PENDING | |
+| 9 | PERF-12 — LazyMotion вариант (б) | PENDING | |
+| 10 | PERF-03 + PERF-02 — env-схема + сплит UI_TEXT | PENDING | |
+| 11 | Чат-пагинация (остаток PERF-22) | PENDING | |
