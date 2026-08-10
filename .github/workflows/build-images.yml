@@ -1,0 +1,122 @@
+# Build images — проверка сборки БЕЗ публикации (CI-DEPLOY-NOREGISTRY-01, 2026-08-10).
+#
+# Реестра контейнеров нет (решение владельца 2026-08-07): боевые образы собираются
+# на прод-ВМ (deploy.yml). Этот workflow доказывает в CI, что оба Dockerfile живы
+# и образы собираются, — push отсутствует, секретов не требует. Это единственный
+# гейт, прогоняющий `next build` (в `npm run check` его нет), поэтому он гоняется
+# на каждый пуш в рабочие ветки, а не только при изменении Docker-файлов.
+#
+# ⚠️ NEXT_PUBLIC_* инлайнятся в клиентский бандл НА СБОРКЕ (см. ARG-блок Dockerfile).
+# Список build-args ниже — тот же САМЫЙ НАБОР, что у прод-сборки на ВМ
+# (docker-compose.prod.yml → args), но со значениями-ЗАГЛУШКАМИ: этот образ никуда
+# не деплоится, он только доказывает сборку. Боевые значения приходят на ВМ из
+# .env.production. Отличие CI-заглушек от прода задокументировано в DEPLOY-BACKLOG.md
+# (§ «Схема без реестра»). Держать список в локстепе с Dockerfile и compose.
+
+name: Build images
+
+on:
+  push:
+    branches:
+      - main
+      - audit-fixes
+      - "ci-probe/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: app image (Dockerfile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Замер памяти: сборка на ВМ пойдёт рядом с работающим приложением (риск OOM),
+      # поэтому пик потребления фиксируется здесь как ориентир для требований к ВМ.
+      - name: Память runner'а до сборки
+        run: free -m
+
+      - name: Семплер пиковой памяти (фон, каждые 5 с)
+        run: |
+          nohup bash -c 'while sleep 5; do free -m | awk "/^Mem:/ {print \$3}" >> /tmp/mem-used.log; done' >/dev/null 2>&1 &
+          echo $! > /tmp/mem-sampler.pid
+
+      - name: Build app image (без публикации)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: beautyhub-app:ci
+          # Заглушки CI — см. шапку файла. Набор ключей = прод-набор (compose args).
+          # BUILD_NODE_OPTIONS — тот же heap-кап, что у прод-сборки на ВМ (compose):
+          # без него кап впервые исполнялся бы на самом проде; здесь он проверяется
+          # на каждом пуше — сборка, не влезающая в 2048 МБ, краснеет ДО деплоя.
+          build-args: |
+            BUILD_NODE_OPTIONS=--max-old-space-size=2048
+            NEXT_PUBLIC_APP_URL=https://ci.masterryadom.invalid
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+            NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=
+            NEXT_PUBLIC_TELEGRAM_ENABLED=false
+            NEXT_PUBLIC_VK_ENABLED=false
+            NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=false
+            NEXT_PUBLIC_YANDEX_ENABLED=false
+            NEXT_PUBLIC_YANDEX_MAPS_API_KEY=
+            NEXT_PUBLIC_LEGAL_INN=
+            NEXT_PUBLIC_VK_COMMUNITY_URL=
+            NEXT_PUBLIC_GLITCHTIP_DSN=
+            NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT=ci
+            NEXT_PUBLIC_GLITCHTIP_RELEASE=ci-${{ github.sha }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,scope=app,mode=max
+
+      - name: Пик использованной памяти за сборку
+        if: always()
+        run: |
+          kill "$(cat /tmp/mem-sampler.pid)" 2>/dev/null || true
+          if [ -s /tmp/mem-used.log ]; then
+            echo "Пик used-памяти за сборку (MiB, семплы каждые 5 с): $(sort -n /tmp/mem-used.log | tail -1)"
+          else
+            echo "Семплов нет (сборка целиком из кэша?)"
+          fi
+          free -m
+
+  worker:
+    name: worker image (Dockerfile.worker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Память runner'а до сборки
+        run: free -m
+
+      - name: Build worker image (без публикации)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: false
+          tags: beautyhub-worker:ci
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
+
+      - name: Память runner'а после сборки
+        if: always()
+        run: free -m
