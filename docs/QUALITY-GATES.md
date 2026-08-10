@@ -121,7 +121,9 @@ npm run test        # если затронуты модули с тестами
 
 ### Если изменена схема
 ```bash
-npx prisma migrate dev --name <descriptive_name>   # обязательно: создаёт миграцию
+npm run migrate:new -- --name <descriptive_name>   # создаёт миграцию БЕЗ применения (--create-only)
+# → ПРОЧИТАТЬ prisma/schema/migrations/<timestamp>_<name>/migration.sql ЦЕЛИКОМ (см. ниже)
+npx prisma migrate dev                             # применить ПРОЧИТАННОЕ — отдельный осознанный шаг
 npx prisma validate
 npx prisma generate
 npm run check:schema-drift                          # обязательно: drift-гейт
@@ -135,6 +137,12 @@ npm run check:migration-drops                       # обязательно: н
 > (RKN-FIX-12, RKN-FIX-10, RKN-FIX-18), каждый раз строку снимали руками.
 > Гейт `check:migration-drops` теперь ловит это в CI, но прочитать файл дешевле,
 > чем разбираться с красным CI.
+>
+> Поэтому канон создания — **`npm run migrate:new`** (= `migrate dev --create-only`,
+> MIGRATE-DEV-CREATE-ONLY 2026-08-10): миграция появляется на диске, но НЕ
+> применяется, и окно «прочитать до применения» существует структурно, а не на
+> дисциплине. В кампании AUDIT-CAMPAIGN-01 HNSW-дроп предлагался шесть раз и
+> **дважды применялся к dev-БД до ревью SQL** — с create-only этот класс закрыт.
 >
 > 🚩 **Любой маркер `-- ALLOW-DROP:` в миграции — красный флаг на ревью:
 > остановиться и проверить обоснование.** Маркер отключает защиту для
@@ -161,7 +169,7 @@ npm run check:migration-drops                       # обязательно: н
 5. Re-run `npm run check:schema-drift` — должен exit 0
 
 **Local mode:** если Postgres не запущен, скрипт graceful-skips с warning (не блокирует local dev).
-**CI mode:** при `CI=true` + Postgres unreachable script fails hard. Currently CI не имеет Postgres service — script запускается в local-skip mode и выдаёт warning в logs. Когда DevOps provisions shadow DB в CI workflow + sets `SHADOW_DATABASE_URL`, gate становится hard-enforcing automatically (no script change needed).
+**CI mode:** при `CI=true` + Postgres unreachable script fails hard. С CI-DEPLOY-NOREGISTRY-01 (2026-08-10) `ci.yml` поднимает сервис-контейнер `pgvector/pgvector:pg16` и задаёт `SHADOW_DATABASE_URL` — гейт в CI **hard-enforcing** (в логе зелёного прогона — «SCHEMA-DRIFT: OK», не warning).
 
 **History:** added 2026-05-30 после MIGRATION-RECONCILIATION discovered 24-операционный sprint-long drift caused by README-instructed `db push`. Structural prevention для drift class.
 
@@ -178,6 +186,22 @@ npm run check:migration-drops                       # обязательно: н
 - `NOT_A_CLASS` — строки, которые выглядят классом, но им не являются (CSS-значения инлайновых стилей, директивы `Cache-Control`, ключи localStorage). Пополнять точными значениями и с обоснованием — по образцу `scripts/raw-sql-objects.mjs`.
 
 **Известная граница:** опечатка в самом **варианте** (`hovr:bg-red-500`) не ловится — варианты сверяются с теми, что реально встретились в бандле. Плата принята сознательно: все рецидивы были в имени утилиты, а обратное решение краснело бы на каждом инлайновом стиле.
+
+### check:error-message-lang (ERR-LOCALIZATION-01 2026-08-05)
+
+**Назначение:** любое сообщение, покидающее сервер через `fail()` / `new AppError()` / `tooManyRequests()`, обязано содержать кириллицу — канон «`AppError.message` — курируемая русская строка клиенту» (§13 контекста). Английский текст в этих каналах — либо забытый перевод, либо сырой Prisma/системный текст, которому в клиентском ответе не место.
+
+**Механизм:** сканирует `src/` и проверяет **оба** канала: прямой литерал в вызове и объект-результат `{ ok: false, message }` — второй канал нашли при постройке гейта, им уезжало ~90 английских строк. Законные не-русские строки перечисляются **точным текстом** в `scripts/error-message-allowlist.txt`, каждая с причиной.
+
+**Failure recovery:** перевести строку (канон хвоста — «Не удалось {действие}. Попробуйте ещё раз.», см. CLAUDE.md § Стиль кода); если строка законно не-русская — добавить её точным текстом в allowlist с обоснованием. Расширение allowlist ради «зелёного гейта» без причины — то самое ослабление гейта, которое запрещено.
+
+### check:env-discipline (SEC-14 2026-08-05, инвариант #39)
+
+**Назначение:** правило 11 CLAUDE.md (каждая переменная окружения читается только через `src/lib/env.ts`) раньше держалось на дисциплине ревьюера, а **скобочная нотация `process.env[VAR]` невидима для грепа** `process\.env\.` — так четыре нарушения прожили в `telegram/config.ts`. Цена конкретна: опечатка в имени переменной даёт `null`, а вебхук трактовал `null` как «секрет не настроен» и пропускал весь блок проверки подлинности.
+
+**Механизм:** ловит **обе** нотации — `process.env.NAME` и `process.env[VAR]` — во всём `src/` вне точного списка исключений. Список исключений в `scripts/check-env-discipline.mjs` обязан **дословно** совпадать с rule 11 (`env.ts`, Prisma-файлы, `*.test.ts`, `startup.ts`, `proxy.ts`, `instrumentation.ts` — только `NEXT_RUNTIME`).
+
+**Failure recovery:** читать значение через `env` / computed-флаг из `src/lib/env.ts` (новую переменную — завести в Zod-схеме). Если файл легитимно должен читать `process.env` напрямую — это правка rule 11 **и** списка гейта одним изменением с обоснованием, не точечная затычка.
 
 ### Smoke
 - [ ] Затронутая страница открывается

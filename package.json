@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "prisma:validate": "npx prisma validate",
     "prisma:generate": "npx prisma generate",
+    "migrate:new": "npx prisma migrate dev --create-only",
     "openapi:generate": "node scripts/generate-openapi.mjs",
     "check:encoding": "node scripts/check-encoding.mjs",
     "check:ui-text": "node scripts/check-ui-text.mjs",
