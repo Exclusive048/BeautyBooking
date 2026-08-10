@@ -9,7 +9,11 @@ import type {
   AdminEventsResponse,
 } from "@/features/admin-cabinet/dashboard/types";
 
-const POLL_MS = 5_000;
+// PERF-27 (AUDIT-CAMPAIGN-02 п.4, ратифицировано владельцем): 5с → 30с — как у
+// соседнего system-health.tsx. 720 запросов/час на вкладку → 120; SSE-канал ради
+// одной админской ленты не строится (ратифицировано там же). Подпись бейджа
+// берёт интервал ОТСЮДА (POLL_MS/1000) — цифра в UI не может разойтись с кодом.
+const POLL_MS = 30_000;
 const MAX_ITEMS = 30;
 
 type Props = {
@@ -18,12 +22,12 @@ type Props = {
 
 const T = UI_TEXT.adminPanel.dashboard.feed;
 
-/** Live event feed. Initial set comes from the server (SSR), then a
- * 5-second polling loop pulls anything newer than the latest `timeMs`
- * we've already shown. New items animate in at the top, the list is
- * capped at `MAX_ITEMS` so the DOM doesn't grow unbounded during a
- * long session. Polling pauses when the tab is hidden — there's no
- * point burning rate-limit budget for a tab no admin is looking at. */
+/** Event feed. Initial set comes from the server (SSR), then a polling
+ * loop (POLL_MS) pulls anything newer than the latest `timeMs` we've
+ * already shown. New items animate in at the top, the list is capped at
+ * `MAX_ITEMS` so the DOM doesn't grow unbounded during a long session.
+ * Polling pauses when the tab is hidden — there's no point burning
+ * rate-limit budget for a tab no admin is looking at. */
 export function EventsFeed({ initial }: Props) {
   const [items, setItems] = useState<AdminEventItem[]>(initial);
   const seenIds = useRef<Set<string>>(new Set(initial.map((e) => e.id)));
@@ -137,7 +141,7 @@ function LiveBadge() {
         aria-hidden
         className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
       />
-      {T.liveBadge}
+      {T.liveBadge(POLL_MS / 1000)}
     </span>
   );
 }
