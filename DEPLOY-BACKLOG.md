@@ -58,7 +58,7 @@
 **Требования к ВМ:**
 
 - Docker Engine + **docker compose v2** (`docker compose`, не `docker-compose`), git.
-- **RAM ≥ 4 ГБ (+ swap ~2 ГБ)** — сборка идёт рядом с работающим приложением. Митигции уже в конфигурации: heap `next build` каплен `--max-old-space-size=2048` (build-arg `BUILD_NODE_OPTIONS` из compose), сборки worker → app идут **последовательно**. Ориентир с CI-раннера и фактический пик первого VM-деплоя — сверять с логом шага «3/6 Сборка» (деплой-скрипт печатает пик used-памяти по семплам).
+- **RAM ≥ 4 ГБ (+ swap ~2–4 ГБ)** — сборка идёт рядом с работающим приложением. Митигции уже в конфигурации: heap `next build` каплен `--max-old-space-size=2048` (build-arg `BUILD_NODE_OPTIONS` из compose), сборки worker → app идут **последовательно**. **Замер (CI-раннер 16 ГБ, кап активен, прогон `Build images` 2026-08-10): пик used-памяти за успешную сборку app-образа — 5211 MiB** machine-wide (включая демона Docker и раннер; это верхняя оценка — на ВМ рядом будут postgres/redis/app вместо агента GitHub). Фактический пик первого VM-деплоя — сверять с логом шага «3/6 Сборка» (деплой-скрипт печатает пик по семплам) и при тесноте наращивать swap, а не снимать кап.
 - Репозиторий: `git clone <repo> /opt/masterryadom` (каталог зашит в `deploy.yml`), рабочая ветка `main`.
 - **`.env.production` в корне `/opt/masterryadom` — untracked, `git pull` его не трогает.** Проверить после клона: `git check-ignore .env.production` → игнорируется, `git status --short` его не показывает. Деплой использует `git pull --ff-only`: разошедшаяся история = громкий отказ, а не тихая перезапись.
 
