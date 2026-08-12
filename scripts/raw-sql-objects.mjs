@@ -68,6 +68,15 @@ export const RAW_SQL_OBJECTS = [
   },
   {
     kind: "index",
+    name: "UserProfile_email_verified_unique_idx",
+    table: "UserProfile",
+    migration: "20260812104330_email_partial_unique_verified_only",
+    why: "partial unique (`WHERE \"emailVerifiedAt\" IS NOT NULL`): Prisma частичные уникальные индексы не выражает, а полный @@unique здесь вреден — записать чужой адрес себе в профиль может любой аутентифицированный пользователь (пять путей), и под полным констрейнтом такая НЕПОДТВЕРЖДЁННАЯ строка занимала адрес навсегда: владелец упирался в P2002",
+    costIfLost:
+      "Исчезает гарантия «подтверждённый адрес принадлежит ровно одному профилю» — та самая, на которой стоит инв. #41 и весь email-вход. Прикладной защиты, дублирующей её, НЕТ: `releaseUnverifiedEmailClaims` освобождает чужие НЕподтверждённые заявки, но от гонки двух одновременных подтверждений одного адреса защищает только индекс. Потеря молчалива: вход продолжит работать, а `findVerifiedEmailProfile` (`findFirst`) начнёт возвращать произвольную из двух строк",
+  },
+  {
+    kind: "index",
     name: "Review_active_target_createdAt_idx",
     table: "Review",
     migration: "20260806084318_add_perf_composite_indexes",

@@ -29,10 +29,15 @@ export async function seedClients(): Promise<UserProfile[]> {
       : LAST_NAMES_F[(i + 13) % LAST_NAMES_F.length]!;
     const slug = `${transliterate(first)}-${transliterate(last)}-${i + 1}`;
 
+    // EMAIL-ADDRESS-OCCUPATION: `email` больше не `@unique` целиком (уникальность
+    // частичная — только по подтверждённым), поэтому `upsert by email` не
+    // выражается: `where` у `upsert` принимает лишь уникальные поля. Ключ сидов —
+    // телефон (он `@unique` и остаётся им), а seed-email лишь проставляется.
+    // Идемпотентность сохранена: повторный прогон найдёт ту же строку.
     const row = await prisma.userProfile.upsert({
-      where: { email: seedEmail("client", slug) },
+      where: { phone: seedPhone(CLIENT_PHONE_BASE + i) },
       update: {
-        phone: seedPhone(CLIENT_PHONE_BASE + i),
+        email: seedEmail("client", slug),
         firstName: first,
         lastName: last,
         displayName: `${first} ${last}`,

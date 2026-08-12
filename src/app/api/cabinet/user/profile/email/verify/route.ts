@@ -4,6 +4,7 @@ import { OtpChannel } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import { releaseUnverifiedEmailClaims } from "@/lib/auth/email-claim";
 import { hashOtpCode } from "@/lib/auth/otp";
 import {
   checkOtpEmailVerifyLock,
@@ -90,14 +91,20 @@ export async function POST(req: Request) {
       return jsonFail(401, "Код не подходит", "CODE_NOT_FOUND");
     }
 
-    await Promise.all([
-      clearOtpEmailVerifyFailures(normalizedEmail, clientIp),
-      prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }),
-      prisma.userProfile.update({
+    // EMAIL-ADDRESS-OCCUPATION: отметка владения и освобождение чужих
+    // НЕподтверждённых заявок на этот адрес — одной транзакцией. Вынесены из
+    // `Promise.all` намеренно: там ветки независимы, а здесь порядок и
+    // атомарность существенны — иначе между освобождением и отметкой
+    // существует окно, в котором адрес не принадлежит никому.
+    await prisma.$transaction(async (tx) => {
+      await releaseUnverifiedEmailClaims(tx, normalizedEmail, user.id);
+      await tx.userProfile.update({
         where: { id: user.id },
         data: { emailVerifiedAt: now },
-      }),
-    ]);
+      });
+      await tx.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } });
+    });
+    await clearOtpEmailVerifyFailures(normalizedEmail, clientIp);
 
     logInfo("Cabinet email verify completed", {
       userId: user.id,

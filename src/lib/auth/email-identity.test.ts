@@ -20,7 +20,11 @@ const prismaMock = {
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    // EMAIL-ADDRESS-OCCUPATION: создание и отметка владения идут транзакцией
+    // вместе с освобождением чужих неподтверждённых заявок.
+    updateMany: vi.fn(async () => ({ count: 0 })),
   },
+  $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(prismaMock)),
 };
 
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));

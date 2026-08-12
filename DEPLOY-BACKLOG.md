@@ -143,6 +143,21 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-
     WHERE "bufferBetweenBookingsMin" < 0 OR "bufferBetweenBookingsMin" > 30;
   ```
   Все нули → применять. Не ноль → **не «почистить» вслепую**: строка вне диапазона это либо след старого бага, либо легитимные данные, которых мы не ожидали (например буфер >30 у провайдера, заведённого до появления потолка). Разбирать по строкам; для буфера безопасная нормализация — `LEAST(30, GREATEST(0, "bufferBetweenBookingsMin"))`, для остальных нужен взгляд на конкретные записи.
+- **🚩 Миграция `20260812104330_email_partial_unique_verified_only` меняет уникальность `UserProfile.email`** *(EMAIL-ADDRESS-OCCUPATION, 2026-08-12)*. Снимает полный `UserProfile_email_key` и создаёт **частичный** уникальный `UserProfile_email_verified_unique_idx` (`WHERE "emailVerifiedAt" IS NOT NULL`). Порядок в файле именно такой (сначала DROP, потом CREATE) — обратный на непустой базе может упереться в старый констрейнт.
+  - **Инвентарь ПЕРЕД `migrate deploy`** — уникальный индекс валидирует существующие строки. Под старым полным `@unique` дублей быть не могло, поэтому ожидается ноль; если строк больше нуля, **не применять**, а разбирать руками (это значит, что на проде уже жил обход констрейнта):
+  ```sql
+  SELECT lower(email) AS email, count(*)
+  FROM "UserProfile"
+  WHERE email IS NOT NULL AND "emailVerifiedAt" IS NOT NULL
+  GROUP BY 1 HAVING count(*) > 1;
+  ```
+  - **Если применяется на базе с трафиком** — `CREATE UNIQUE INDEX` берёт SHARE-lock на `UserProfile`, а её читает каждый аутентифицированный запрос. Вариант с `CONCURRENTLY` (вне транзакции, затем `migrate resolve --applied`):
+  ```sql
+  DROP INDEX CONCURRENTLY "UserProfile_email_key";
+  CREATE UNIQUE INDEX CONCURRENTLY "UserProfile_email_verified_unique_idx"
+    ON "UserProfile" ("email") WHERE "emailVerifiedAt" IS NOT NULL;
+  ```
+  ⚠️ Та же проверка на невалидные индексы после `CONCURRENTLY`, что и ниже. 🔴 **Окно между DROP и CREATE — единственный момент, когда два профиля могут подтвердить один адрес.** На закрытом деплое (трафика нет) это неважно; на живой базе делать в окно обслуживания либо принять риск осознанно — прикладной защиты, дублирующей индекс, нет by design.
 - **🚩 Миграция `20260806084318_add_perf_composite_indexes` строит индексы под SHARE-lock** *(PERF-09, 2026-08-06)*. Пять `CREATE INDEX` на `Booking` (×3), `Provider` и `Review` — все три таблицы горячие. Обычный `CREATE INDEX` берёт SHARE-lock и **блокирует запись** в таблицу на время сборки: на пустом проде это миллисекунды, на выросшем — минуты, в течение которых не создаётся ни одна бронь. Данные при этом не трогаются: миграция чисто аддитивная, `DROP` в ней нет (существующие однополевые индексы намеренно оставлены — их удаление отдельное решение), поэтому откат = `DROP INDEX` по именам.
   - **Если применяется до открытия / на пустой базе** — применять как есть, ничего не делать.
   - **Если применяется на базе с трафиком** — прогнать вручную с `CONCURRENTLY` ДО `migrate deploy`, а затем пометить миграцию применённой (`npx prisma migrate resolve --applied 20260806084318_add_perf_composite_indexes`), иначе `migrate deploy` попытается создать их второй раз и упадёт. `CREATE INDEX CONCURRENTLY` нельзя выполнять внутри транзакции, поэтому в файл миграции его вписать нельзя — только вручную:

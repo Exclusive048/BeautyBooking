@@ -126,13 +126,16 @@ async function ensureUser(args: {
   publicUsername: string;
   roles: AccountType[];
 }): Promise<UserProfile> {
-  // Upsert by email — phone may collide with edge cases that the schema's
-  // own @unique already protects us from. We update display name fields
-  // every run so a tweak in russian-names.ts gets picked up.
+  // EMAIL-ADDRESS-OCCUPATION: ключ сида переехал с email на телефон. `email`
+  // больше не `@unique` целиком (частичная уникальность — только по
+  // подтверждённым адресам), поэтому `upsert by email` компилятор не принимает.
+  // Прежний комментарий утверждал обратное — «phone may collide, а email
+  // защищён @unique»; после миграции всё ровно наоборот. Идемпотентность на
+  // месте: телефоны сидов детерминированы (`seedPhone`) и уникальны.
   return prisma.userProfile.upsert({
-    where: { email: args.email },
+    where: { phone: args.phone },
     update: {
-      phone: args.phone,
+      email: args.email,
       firstName: args.firstName,
       lastName: args.lastName,
       displayName: `${args.firstName} ${args.lastName}`,

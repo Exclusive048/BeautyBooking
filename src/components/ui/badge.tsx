@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { defaultUnlessOverridden } from "@/lib/ui/class-groups";
 import React from "react";
 
 type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "muted";
@@ -25,8 +26,16 @@ type BadgeProps = React.HTMLAttributes<HTMLSpanElement> & {
 export function Badge({ className, variant = "default", ...props }: BadgeProps) {
   return (
     <span
+      // CN-CONFLICT-CLASS: отступы — дефолт, а не приказ. `.px-3` 5160 и
+      // `.py-1` 5210 стоят ПОЗЖЕ более узких значений вызывающего (`px-1.5`,
+      // `px-2`, `py-0`), поэтому компактные бейджи каталога и карточки недели
+      // молча получали штатные 12/4 px. Радиус и рамка оставлены жёсткими:
+      // они и есть форма бейджа, а переопределяют их ровно те три сайта,
+      // которым по правилу SKILL.md §16 полагается вариант, а не override.
       className={cn(
-        "inline-flex items-center rounded-full border px-3 py-1 text-xs",
+        "inline-flex items-center rounded-full border text-xs",
+        defaultUnlessOverridden(className, "padding-x", "px-3"),
+        defaultUnlessOverridden(className, "padding-y", "py-1"),
         variantClasses[variant],
         className
       )}
