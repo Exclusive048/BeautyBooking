@@ -246,8 +246,15 @@ export function OtpInput({
                 // `cn` is a plain join and two competing `disabled:opacity-*`
                 // utilities would resolve by stylesheet order, not class order.
                 inFlight ? "disabled:opacity-100" : "disabled:opacity-50",
+                // UI-27: заливка ошибочной ячейки — статусный токен, `dark:`-вилка
+                // уходит в переменную темы. Рамка НАМЕРЕННО остаётся литеральной
+                // `red-400/70`: ратифицированный `--danger-border` откалиброван под
+                // плашку бейджа (светлая red-200) и на поле ввода читается слабее
+                // самой обычной `border-border-control` — то есть перевод рамки на
+                // токен ослабил бы сигнал ошибки на единственном шаге входа.
+                // Вилки тем у неё нет, поэтому предмету UI-27 она не противоречит.
                 state === "error"
-                  ? "border-red-400/70 bg-red-50/60 dark:bg-red-950/30"
+                  ? "border-red-400/70 bg-danger-surface"
                   : filled
                     ? "login-otp-pop border-primary bg-primary/5"
                     : "border-border-control",

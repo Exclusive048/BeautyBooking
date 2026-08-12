@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -133,17 +134,21 @@ export default function TelegramLoginButton({
   }
 
   const iconOnlyButton = (
-    <button
-      type="button"
+    // UI-26 — та же форма, что у VK/Yandex. Безусловный `opacity-50` заменён
+    // на `disabled:opacity-50` базы: обе ветки, гасившие иконку, и так
+    // выставляют `disabled`, поэтому условие было дублем самого себя.
+    <Button
+      variant="wrapper"
+      size="none"
       onClick={botUsername && consentGranted ? handleClick : undefined}
       disabled={!botUsername || !consentGranted}
       aria-label={label}
       title={botUsername ? label : UI_TEXT.auth.telegram.botNotConfigured}
-      className={cn(className, !botUsername && "opacity-50")}
+      className={cn(className)}
     >
       <TelegramIcon className="h-5 w-5 text-[#2AABEE]" />
       <span className="sr-only">{label}</span>
-    </button>
+    </Button>
   );
 
   // Not configured, or consent not yet given → the same inert control. The
@@ -153,17 +158,18 @@ export default function TelegramLoginButton({
 
     return (
       <div className="space-y-2">
-        <button
-          type="button"
-          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-border-subtle/80 bg-bg-input px-4 text-sm font-medium text-text-main opacity-50"
-          aria-label={label}
-          disabled
-        >
+        {/* UI-26: `secondary` + `size="lg"` — дословно то, чем рендерятся
+            неактивные VK и Yandex. Собранная вручную копия расходилась с ними
+            высотой (h-10 против h-12 у `size="lg"`), а стоят все три в одном
+            стеке на `/login`: при снятии FZ-199-килсвитча ряд был бы рваным. */}
+        <Button variant="secondary" size="lg" className="w-full gap-2" disabled aria-label={label}>
           <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
           {label}
-        </button>
+        </Button>
         {!botUsername && showConfigError ? (
-          <div className="text-xs text-red-500">{UI_TEXT.auth.telegram.botNotConfigured}</div>
+          // UI-27: `text-red-500` — литерал вне тем; статусный текст берёт
+          // ратифицированный токен (светлая red-700 / тёмная red-300).
+          <div className="text-xs text-danger-text">{UI_TEXT.auth.telegram.botNotConfigured}</div>
         ) : null}
       </div>
     );
@@ -181,15 +187,17 @@ export default function TelegramLoginButton({
   return (
     <div className="space-y-2">
       <div ref={containerRef} className="pointer-events-none absolute opacity-0" aria-hidden="true" />
-      <button
-        type="button"
+      {/* UI-26 — активная ветка, тот же `secondary`/`lg`, что у VK и Yandex. */}
+      <Button
+        variant="secondary"
+        size="lg"
+        className="w-full cursor-pointer gap-2"
         onClick={handleClick}
         aria-label={label}
-        className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border-subtle/80 bg-bg-input px-4 text-sm font-medium text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/45 disabled:pointer-events-none disabled:opacity-50"
       >
         <TelegramIcon className="h-4 w-4 text-[#2AABEE]" />
         {label}
-      </button>
+      </Button>
     </div>
   );
 }

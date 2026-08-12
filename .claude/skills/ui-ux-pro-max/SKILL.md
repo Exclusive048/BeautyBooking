@@ -416,6 +416,23 @@ Centered icon + title + description + secondary CTA.
 
 **UI-26/27 (AUDIT-CAMPAIGN-02 п.8, 2026-08-10): статусные ПОВЕРХНОСТИ — только токены.** Для заливки/текста/рамки статусных плашек, пилюль и алертов существует тройка токенов на статус: `bg-success-surface text-success-text border-success-border` (+ `warning`/`danger`/`info`). Значения сняты с `Badge.variantClasses` (контраст-ревью пройден), тёмная тема встроена в переменные — **`dark:`-вилки на статусных поверхностях больше не пишутся**. Сырые `emerald-*`/`amber-*`/`red-*`/`blue-*` комбинации в НОВЫХ статусных поверхностях запрещены; `rose`/`slate` для нестатусных индикаторов (рейтинг, mute) пока допустимы. ⚠️ Модификаторы прозрачности к этим классам не применяются (`bg-success-surface/50` не сработает — альфа тёмной темы запечена в переменную). Предпочтительно вообще не собирать плашку руками, а брать `<Badge variant="…">`.
 
+### Выбор варианта `Button` — вариант перебивает className, а не наоборот
+
+**UI-26 (AUDIT-CAMPAIGN-02 п.8, 2026-08-12).** `cn` (`src/lib/cn.ts`) — **плоский join**, а не `tailwind-merge`. Значит при конфликте двух утилит одной группы побеждает не порядок классов в атрибуте, а **порядок правил в собранном CSS**, и Tailwind печатает утилиты одной группы **по алфавиту**. Замер на боевом бандле: `.bg-bg-card` 3991 · `.bg-bg-input` 4028 · `.bg-primary/10` 4414 · **`.bg-transparent` 4632**; в hover-секции `.hover:bg-bg-card` 7684 · `.hover:bg-bg-input` 7693 · **`.hover:bg-transparent` 7815**; цвета текста: `.text-accent-text` 5742 · `.text-inherit` 5898 · `.text-text-main` 6041 · `.text-text-sec` 6064.
+
+**Практическое следствие, которое надо помнить при каждой миграции сырого `<button>`:**
+
+| Нужно | Вариант | Почему |
+|---|---|---|
+| своя заливка (`bg-*`, `hover:bg-*`) или свой цвет текста | **`wrapper`** | единственный без хрома; после UI-26 не объявляет ни `bg-`, ни `text-`, ни `hover:bg-` — «прозрачность» даёт preflight (`button { background-color: transparent; color: inherit }`), а не утилита |
+| тихая кнопка без заливки | `ghost` | несёт `bg-transparent` + `text-text-main` + свой hover — заливку вызывающего убьёт |
+| рамка + `bg-bg-input` + inset-блик | `secondary` | это готовый вид, собирать руками не надо |
+| иконка | `icon` (`size="icon"`) | зона нажатия ≥44px из UI-29 |
+
+**Ловушка, которая уже стоила трёх поверхностей:** `<Button variant="wrapper" className="… bg-bg-card …">` до UI-26 рендерился **прозрачным**. Так молча жили карточки типа обращения на `/support` (там гасился заодно и `.lux-card` — authored-слой идёт до утилит), шапка группы слотов в `slot-picker` (и заливка, и hover) и плитка портфолио на публичном профиле мастера. **`check:dead-classes` этот класс не видит по построению** — класс есть в разметке, правило есть в бандле, оно просто проигрывает. Пин — `src/components/ui/button-wrapper-chromeless.test.ts`.
+
+**Проверять так же, а не на глаз:** если сомневаешься, чей класс победит, собери бандл (`node node_modules/tailwindcss/lib/cli.js -c tailwind.config.js -i src/app/globals.css -o out.css`) и сравни номера строк. Если победить нельзя — не пиши проигрывающий класс: он будет врать про результат.
+
 ### Card-with-toggle (premium feature card)
 
 Большая branded card (brand-gradient, decorative orbs) с toggle. Sub-controls появляются при `isEnabled`. Pre-PRO state — locked card с `Lock` icon + ссылка на `/cabinet/billing`.

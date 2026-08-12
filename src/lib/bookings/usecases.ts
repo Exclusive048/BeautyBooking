@@ -8,6 +8,7 @@ import {
   resolveBookingRuntimeStatus,
   type BookingActor,
 } from "@/lib/bookings/flow";
+import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/bookings/booking-core";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import {
   assertBookingWindow,
@@ -47,20 +48,24 @@ async function ensureNoConflictsExcluding(
   endAtUtc: Date,
   bufferMin: number
 ): Promise<Result<null>> {
-  const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
-  const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
-
-  const conflictWhere = masterProviderId
-    ? { providerId, masterProviderId }
-    : { providerId };
-
+  // LOGIC-01 (доделка FIX-A2): здесь жила ПЯТАЯ копия скоупа — в исходной
+  // дефектной форме `masterProviderId ? { providerId, masterProviderId } :
+  // { providerId }`, то есть ровно пара, которую фикс и убирал. Guard её не
+  // поймал, потому что исключения в `conflict-scope.test.ts` были ФАЙЛОВЫМИ, а
+  // `usecases.ts` числился «чтением списков броней» — одна легитимная выборка в
+  // файле амнистировала весь файл. Это тот же класс «список молча протух», от
+  // которого guard и защищает, воспроизведённый уровнем выше.
+  //
+  // Путь живой: `rescheduleBooking` — предложение переноса. Двойной брони он не
+  // давал (авторитетная проверка при ПРИМЕНЕНИИ стоит в `confirmBooking` и уже
+  // на общем скоупе), но кросс-скоупный конфликт не находился в момент
+  // предложения и всплывал 409-м у противоположной стороны при подтверждении.
   const conflicts = await prisma.booking.findMany({
     where: {
-      ...conflictWhere,
+      ...buildConflictScopeWhere({ providerId, masterProviderId }),
+      ...buildConflictWindowWhere({ startAtUtc, endAtUtc, bufferMin }),
       id: { not: bookingId },
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null, lt: bufferedEnd },
-      endAtUtc: { not: null, gt: bufferedStart },
     },
     select: { id: true, startAtUtc: true, endAtUtc: true },
     take: 1,

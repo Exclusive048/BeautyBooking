@@ -140,14 +140,20 @@ export function PWAInstallPrompt() {
                 )}
               </div>
 
-              <button
-                type="button"
+              {/* UI-26: `ghost` + `size="icon"`. Прежние `p-1` вокруг 16px-иконки
+                  давали цель нажатия 24px — вдвое меньше порога WCAG 2.5.5, и это
+                  на баннере, который показывается ТОЛЬКО на мобильных/PWA, то есть
+                  ровно там, где палец. Отрицательные поля возвращают оптическое
+                  выравнивание по краю карточки при выросшем боксе. */}
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={dismiss}
-                className="shrink-0 rounded-lg p-1 text-text-sec transition-colors hover:text-text-main"
+                className="-mr-1.5 -mt-1.5 shrink-0 text-text-sec hover:text-text-main"
                 aria-label={UI_TEXT.actions.close}
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             {!ios ? (

@@ -46,10 +46,14 @@ export default function YandexLoginButton({
   if (blockedByConsent) {
     if (iconOnly) {
       return (
-        <button type="button" disabled aria-label={label} title={label} className={cn(className, "opacity-50")}>
+        // UI-26: `wrapper` — весь вид приходит из `className` вызывающего, а
+        // гашение даёт `disabled:opacity-50` базы, поэтому прежний безусловный
+        // `opacity-50` не нужен (он гасил бы и не-disabled состояние, если бы
+        // ветка когда-нибудь стала рендериться живой).
+        <Button variant="wrapper" size="none" disabled aria-label={label} title={label} className={cn(className)}>
           <YandexIcon className="h-5 w-5 text-[#FC3F1D]" />
           <span className="sr-only">{label}</span>
-        </button>
+        </Button>
       );
     }
     return (

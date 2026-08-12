@@ -52,16 +52,25 @@ const DEFAULT_ICONS: Record<ErrorStateVariant, LucideIcon> = {
   warning: AlertTriangle,
 };
 
+// UI-26/27 (AUDIT-CAMPAIGN-02 п.8): иконка ошибки/предупреждения — статусная
+// поверхность, значит токены, а не литералы с `dark:`-вилкой. Заодно уходит
+// расхождение с каноном: `danger` был на `rose`, а `rose` в этом проекте
+// закреплён за «идёт сейчас» (таблица статусов в SKILL.md), то есть цвет
+// активного состояния подписывался под отказ. ⚠️ Заливка кружка была
+// `bg-rose-500/10`, а у статусных токенов альфа запечена в переменную и
+// модификатор к ним не применяется — поэтому `/10` не переносится, берётся
+// готовая `*-surface` (в светлой она сплошная и близка к прежним 10% на белом,
+// в тёмной — своя, откалиброванная в шаге 1 кампании).
 const ICON_COLORS: Record<ErrorStateVariant, string> = {
   default: "text-accent-text",
-  danger: "text-rose-500 dark:text-rose-400",
-  warning: "text-amber-500 dark:text-amber-400",
+  danger: "text-danger-text",
+  warning: "text-warning-text",
 };
 
 const ICON_BG: Record<ErrorStateVariant, string> = {
   default: "bg-primary/10",
-  danger: "bg-rose-500/10",
-  warning: "bg-amber-500/10",
+  danger: "bg-danger-surface",
+  warning: "bg-warning-surface",
 };
 
 const containerVariants = {

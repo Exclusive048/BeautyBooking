@@ -48,8 +48,30 @@ const variants: Record<ButtonVariant, string> = {
     "bg-destructive text-destructive-foreground hover:brightness-110 focus-visible:ring-2 focus-visible:ring-destructive",
   icon:
     "border border-border-control bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",
-  wrapper:
-    "bg-transparent text-inherit hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary-glow/35",
+  // UI-26 (AUDIT-CAMPAIGN-02 п.8, область `components`): `wrapper` — вариант
+  // «без хрома», и он обязан НИЧЕГО не заливать. Раньше он объявлял
+  // `bg-transparent text-inherit hover:bg-transparent`, и это молча перебивало
+  // заливку вызывающего: `cn` — плоский join, поэтому побеждает не порядок
+  // классов в атрибуте, а порядок правил в бандле, а Tailwind печатает утилиты
+  // одной группы ПО АЛФАВИТУ. Замер на боевом бандле: `.bg-bg-card` строка 3991,
+  // `.bg-bg-input` 4028, `.bg-primary/10` 4414 — все РАНЬШЕ `.bg-transparent`
+  // 4632; в hover-секции `.hover:bg-bg-card` 7684 и `.hover:bg-bg-input` 7693
+  // раньше `.hover:bg-transparent` 7815. То есть побеждал вариант, всегда.
+  // Цена была не теоретической — три живые поверхности рендерились без фона:
+  // карточки типа обращения на `/support` (там вдобавок гасился и `.lux-card`:
+  // authored-слой идёт до утилит), шапка группы слотов в `slot-picker` (и
+  // заливка, и её hover), плитка портфолио на публичном профиле мастера.
+  // Рантайм-проба до правки: computed `background-color: rgba(0, 0, 0, 0)` при
+  // `class`, содержащем `lux-card` и `bg-bg-card` одновременно.
+  // Удалённые три декларации — избыточны, а не полезны: Tailwind preflight уже
+  // задаёт `button { background-color: transparent; color: inherit }` и
+  // `a { color: inherit }` (проверено в собранном CSS), поэтому «без хрома»
+  // получается само, БЕЗ утилит, которые нечего не добавляют и всё перебивают.
+  // Остаётся только фокус-кольцо — единственное, что вариант реально даёт.
+  // ⚠️ Тот же класс ловушки жив в остальных вариантах (`ghost`/`icon` несут
+  // `bg-transparent`, `ghost` — ещё и `text-text-main`): вызывающий с
+  // собственной заливкой обязан брать `wrapper`, а не `ghost`.
+  wrapper: "focus-visible:ring-2 focus-visible:ring-primary-glow/35",
 };
 
 const sizes: Record<ButtonSize, string> = {

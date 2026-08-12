@@ -28,14 +28,14 @@ export function SocialLinkPreview({
 
   if (result.status === "invalid") {
     return (
-      <p className={cn("mt-1 text-xs text-red-600 dark:text-red-400", className)} role="alert">
+      <p className={cn("mt-1 text-xs text-danger-text", className)} role="alert">
         {T.invalid}
       </p>
     );
   }
 
   return (
-    <p className={cn("mt-1 text-xs text-emerald-600 dark:text-emerald-400", className)}>
+    <p className={cn("mt-1 text-xs text-success-text", className)}>
       {T.previewTemplate.replace("{label}", result.url.replace(/^https:\/\//, ""))}
     </p>
   );

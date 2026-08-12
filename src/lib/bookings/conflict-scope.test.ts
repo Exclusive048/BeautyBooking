@@ -108,9 +108,26 @@ describe("LOGIC-01 · пятая копия скоупа не пройдёт м�
    * Файлы, где этот фильтр означает ЧТЕНИЕ (календарь, витрина, аналитика,
    * пересчёт доступности), а не проверку конфликта перед записью.
    */
+  /**
+   * Признак КОНФЛИКТ-АРИФМЕТИКИ, а не выборки: файл сам сравнивает интервалы.
+   * Читающие поверхности (календарь, CRM, витрина) отдают строки как есть и
+   * пересечений не считают — проверено на всех восьми исключениях: `overlaps(`
+   * встречается ровно в одном файле, и это тот, где пряталась пятая копия.
+   */
+  const OVERLAP_ARITHMETIC = "overlaps(";
+
+  /**
+   * Файлы, где этот фильтр означает ЧТЕНИЕ (календарь, витрина, аналитика,
+   * пересчёт доступности), а не проверку конфликта перед записью.
+   *
+   * 🔴 Исключение ФАЙЛОВОЕ, и в этом была дыра: `usecases.ts` числился здесь
+   * как «чтение списков броней», а рядом, в том же файле, жил
+   * `ensureNoConflictsExcluding` со СТАРЫМ парным скоупом — одна легитимная
+   * выборка амнистировала весь файл, и пятая копия прошла молча. Поэтому
+   * запись в этом списке теперь обязана быть чистой от `overlaps(` (тест ниже).
+   */
   const NON_CONFLICT_READERS: Record<string, string> = {
     "src/app/api/cabinet/master/schedule/route.ts": "чтение расписания кабинета",
-    "src/lib/bookings/usecases.ts": "чтение списков броней",
     "src/lib/master/clients.service.ts": "CRM-выборка клиентов мастера",
     "src/lib/master/day.service.ts": "день мастера на экране",
     "src/lib/master/public-profile-view.service.ts": "публичный профиль",
@@ -160,15 +177,36 @@ describe("LOGIC-01 · пятая копия скоупа не пройдёт м�
     expect(stale, `Пути больше не читают активные брони: ${stale.join(", ")}`).toEqual([]);
   });
 
-  it("все четыре бывшие копии переведены на общий скоуп", () => {
+  it("исключение-«чтение» не считает пересечений — иначе оно прячет проверку", () => {
+    const arithmetic = Object.keys(NON_CONFLICT_READERS).filter((rel) =>
+      readFileSync(resolve(PROJECT_ROOT, rel), "utf8").includes(OVERLAP_ARITHMETIC),
+    );
+
+    expect(
+      arithmetic,
+      `Файл объявлен читающим, но сам сравнивает интервалы (${OVERLAP_ARITHMETIC}) — ` +
+        `значит в нём есть проверка конфликта, и файловое исключение её амнистирует. ` +
+        `Именно так пятая копия скоупа пережила LOGIC-01 в usecases.ts. ` +
+        `Переведите проверку на buildConflictScopeWhere и уберите файл из списка: ${arithmetic.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("все пять бывших копий переведены на общий скоуп", () => {
     for (const rel of [
       "src/lib/bookings/booking-core.ts",
       "src/lib/bookings/confirmBooking.ts",
       "src/lib/studio/bookings.service.ts",
       "src/app/api/model-applications/[applicationId]/confirm/route.ts",
+      // пятая — найдена уже после LOGIC-01, на пути предложения переноса
+      "src/lib/bookings/usecases.ts",
     ]) {
       const source = readFileSync(resolve(PROJECT_ROOT, rel), "utf8");
-      expect(source, rel).toContain("buildConflictScopeWhere");
+      // 🔴 Форма ВЫЗОВА, а не наличие имени: проверка `includes("buildConflictScopeWhere")`
+      // была вакуумной — её удовлетворяли строка импорта и упоминание в комментарии,
+      // поэтому файл с возвращённым парным скоупом проходил guard зелёным (поймано
+      // пробой при доделке FIX-A2).
+      expect(source, `${rel}: скоуп обязан БРАТЬСЯ из общего билдера, а не только импортироваться`)
+        .toContain("buildConflictScopeWhere(");
     }
   });
 });

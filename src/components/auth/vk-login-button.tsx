@@ -52,10 +52,11 @@ export default function VkLoginButton({
   if (blockedByConsent) {
     if (iconOnly) {
       return (
-        <button type="button" disabled aria-label={label} title={label} className={cn(className, "opacity-50")}>
+        // UI-26 — зеркало Yandex: `wrapper` + `disabled:opacity-50` из базы.
+        <Button variant="wrapper" size="none" disabled aria-label={label} title={label} className={cn(className)}>
           <VkIcon className="h-5 w-5 text-[#0077FF]" />
           <span className="sr-only">{label}</span>
-        </button>
+        </Button>
       );
     }
     return (

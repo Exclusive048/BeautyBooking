@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, User, Settings, Shield, LogIn, Briefcase, Building2, UserCircle2, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import type { CabinetKind } from "@/lib/auth/available-cabinets";
 import { CABINET_URLS, detectCurrentCabinet } from "@/lib/auth/available-cabinets";
@@ -67,9 +68,19 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
 
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        className="inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-border-subtle/80 bg-bg-input px-3 py-2 text-sm font-medium text-text-main shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/45"
+      {/* UI-26: это буквально `secondary` — рамка + `bg-bg-input` + inset-блик +
+          `hover:bg-bg-card` + то же фокус-кольцо, только собранные вручную.
+          Отличия после миграции ратифицированы как выравнивание на систему:
+          рамка `border-control` вместо `border-subtle/80` (UI-09 — альфа
+          композитится с заливкой и съедает контраст), альфа блика 0.25 → 0.28,
+          у фокус-кольца появляется offset. `size="none"` — потому что свои
+          `px-3 py-2` уже дают нужную высоту шапки; `gap` НЕ переопределяем:
+          `.gap-1\.5` (3108) идёт раньше `.gap-2` (3120), то есть база всё равно
+          победила бы, и класс в атрибуте только врал бы про результат. */}
+      <Button
+        variant="secondary"
+        size="none"
+        className="cursor-pointer px-3 py-2 text-sm"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={UI_TEXT.nav.userMenuAria}
@@ -82,7 +93,7 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
         >
           <ChevronDown className="h-4 w-4" aria-hidden />
         </motion.span>
-      </button>
+      </Button>
 
       <AnimatePresence>
         {open && (
