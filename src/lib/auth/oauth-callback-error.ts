@@ -1,5 +1,6 @@
 import { AppError, toAppError } from "@/lib/api/errors";
 import { fail } from "@/lib/api/response";
+import { nextRedirect } from "@/lib/http/origin";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { scrubRecord } from "@/lib/observability/scrub";
 
@@ -31,5 +32,25 @@ export function failOAuthCallback(req: Request, error: unknown) {
         ? scrubRecord(appError.details as Record<string, unknown>)
         : undefined,
   });
+
+  // FIX-B5: конфликт уникальности — единственный отказ этого хелпера, у
+  // которого есть ОСМЫСЛЕННОЕ продолжение для пользователя, поэтому он один и
+  // возвращается редиректом.
+  //
+  // Контекст: пользователь в этот момент внутри редиректа провайдера. JSON-тело
+  // здесь — это не «ответ API», а тупик: браузер показывает сырой конверт
+  // вместо сайта, и вернуться некуда. Для остальных отказов (битый токен,
+  // отказ провайдера) сохранена прежняя форма — они означают «повторить нечего»,
+  // и подменять их редиректом значило бы прятать сбой.
+  //
+  // Сегодня ветка недостижима: `email` пишется НЕподтверждённым, а частичный
+  // уникальный индекс (EMAIL-ADDRESS-OCCUPATION) ограничивает только
+  // подтверждённые строки. Она заведена ЗАРАНЕЕ — ровно потому, что станет
+  // достижимой в тот день, когда кто-нибудь решит проставлять здесь
+  // `emailVerifiedAt` (инв. #41 говорит, что решать это нельзя молча).
+  if (appError.code === "ALREADY_EXISTS" || appError.code === "EMAIL_ALREADY_USED") {
+    return nextRedirect(req, "/login?error=email_taken");
+  }
+
   return fail(appError.message, appError.status, appError.code);
 }

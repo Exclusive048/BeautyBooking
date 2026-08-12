@@ -126,6 +126,8 @@ export default function LoginClient({
     const code = searchParams.get("error") ?? "";
     if (code.startsWith("telegram")) return UI_TEXT.auth.telegram.loginFailed;
     if (code === "consent") return UI_TEXT.auth.loginPage.consentExpired;
+    // FIX-B5: колбэк VK/Яндекса вернул конфликт уникальности адреса.
+    if (code === "email_taken") return UI_TEXT.auth.loginPage.emailTakenByAnotherAccount;
     return null;
   }, [searchParams]);
   const reduce = useReducedMotion();

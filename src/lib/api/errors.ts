@@ -184,8 +184,39 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * FIX-B5 — распознавание нарушения уникальности Prisma без импорта Prisma.
+ *
+ * `P2002` — известная форма ошибки, и до этой правки `toAppError` её НЕ узнавал:
+ * у сырой ошибки поле `code` равно строке `"P2002"`, которая не проходит
+ * `isErrorCode` (коды проекта — SCREAMING_SNAKE), а `status` отсутствует вовсе.
+ * Итог — общий 500 «Не удалось выполнить операцию» там, где на деле конфликт.
+ * На OAuth-колбэках это давало JSON-500 ПОСРЕДИ редиректа провайдера.
+ *
+ * ⚠️ Проверка СТРУКТУРНАЯ, а не `instanceof Prisma.PrismaClientKnownRequestError`,
+ * и это не стилистика: `Prisma` — **value**-импорт из `@prisma/client`, а этот
+ * модуль сидит в графе достижимости клиентских компонентов. Такой импорт тихо
+ * утащил бы рантайм Prisma в браузерный бандл, не сломав билд, — ровно дефект
+ * PERF-11 (инв. §3, `lib/prisma-enums.ts`).
+ *
+ * Безопасно по построению: 26 файлов ловят `P2002` у себя, на своём вызове, то
+ * есть до `toAppError` он доходит только там, где обработки нет вообще.
+ */
+function isPrismaUniqueViolation(input: unknown): boolean {
+  if (!isRecord(input)) return false;
+  return (input as Record<string, unknown>).code === "P2002";
+}
+
 export function toAppError(input: unknown): AppError {
   if (input instanceof AppError) return input;
+
+  if (isPrismaUniqueViolation(input)) {
+    return new AppError(
+      "Такая запись уже существует. Проверьте данные и попробуйте ещё раз.",
+      409,
+      "ALREADY_EXISTS",
+    );
+  }
 
   if (input instanceof Error && isRecord(input)) {
     const record = input as Record<string, unknown>;

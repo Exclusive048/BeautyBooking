@@ -143,6 +143,18 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-
     WHERE "bufferBetweenBookingsMin" < 0 OR "bufferBetweenBookingsMin" > 30;
   ```
   Все нули → применять. Не ноль → **не «почистить» вслепую**: строка вне диапазона это либо след старого бага, либо легитимные данные, которых мы не ожидали (например буфер >30 у провайдера, заведённого до появления потолка). Разбирать по строкам; для буфера безопасная нормализация — `LEAST(30, GREATEST(0, "bufferBetweenBookingsMin"))`, для остальных нужен взгляд на конкретные записи.
+- **🚩 Замерить когорту OAuth-адресов ДО публичного открытия** *(FIX-B5, вариант B, 2026-08-12)*. Адрес из VK/Яндекса — ЗАЯВКА, поэтому сервисная почта на него не уходит (`canDeliverServiceEmail`). В кабинете рядом с тумблером стоит надж с подтверждением в один шаг. На dev когорта = 0, но там вообще нет OAuth-профилей — число ничего не значит. Прогнать на проде:
+
+```sql
+SELECT count(*) FROM "UserProfile" u
+WHERE u.email IS NOT NULL AND u."emailVerifiedAt" IS NULL AND u."emailNotificationsEnabled"
+  AND (EXISTS(SELECT 1 FROM "VkLink" v WHERE v."userId" = u.id)
+    OR EXISTS(SELECT 1 FROM "YandexLink" y WHERE y."userId" = u.id));
+```
+
+  - **Не ноль** → проверить, что надж находим: эти люди уже включили уведомления и писем не получают.
+  - **Ноль** → вопрос закрылся сам, действий не требуется.
+
 - **🚩 Миграция `20260812104330_email_partial_unique_verified_only` меняет уникальность `UserProfile.email`** *(EMAIL-ADDRESS-OCCUPATION, 2026-08-12)*. Снимает полный `UserProfile_email_key` и создаёт **частичный** уникальный `UserProfile_email_verified_unique_idx` (`WHERE "emailVerifiedAt" IS NOT NULL`). Порядок в файле именно такой (сначала DROP, потом CREATE) — обратный на непустой базе может упереться в старый констрейнт.
   - **Инвентарь ПЕРЕД `migrate deploy`** — уникальный индекс валидирует существующие строки. Под старым полным `@unique` дублей быть не могло, поэтому ожидается ноль; если строк больше нуля, **не применять**, а разбирать руками (это значит, что на проде уже жил обход констрейнта):
   ```sql
