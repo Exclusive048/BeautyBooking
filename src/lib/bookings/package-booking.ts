@@ -4,9 +4,11 @@ import {
   Prisma,
   ProviderType,
   BookingPackageStatus,
+  BookingSource,
   DiscountType,
   BookingCancelledBy,
 } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
 import {
   ensureNoConflicts,
   resolveBookingCore,
@@ -415,7 +417,12 @@ export type CreateSoloPackageResult = PackageBookingResult;
  */
 type CreateSoloPackageInput = {
   packageId: string;
-  clientUserId: string | null;
+  /**
+   * FIX-B15 — пакет создаётся только для резолвнутого профиля (RKN-FIX-02),
+   * поэтому не nullable. Оба роута объявляют локальную переменную как `string`;
+   * тип фиксирует это на границе, а не оставляет соглашению.
+   */
+  clientUserId: string;
   clientName: string;
   clientPhone: string;
   comment?: string | null;
@@ -437,7 +444,6 @@ export async function createSoloPackageBooking(
   const guard = await beginPackageIdempotency({
     idempotencyKey: input.idempotencyKey,
     clientUserId: input.clientUserId,
-    clientPhone: input.clientPhone,
   });
   if (guard.cached) return guard.cached;
 
@@ -541,9 +547,12 @@ async function createSoloPackageBookingUnguarded(
             bufferMin: core.bufferMin,
           });
 
-          const created = await tx.booking.create({
+          const created = await createBookingRow(tx, {
             data: {
               providerId: pkg.providerId,
+              // FIX-C1: соло-пакет — всегда мастер без студии (`loadPackageForBooking`
+              // отказывает остальным), поэтому writer выведет `studioId: null`.
+              source: BookingSource.WEB,
               serviceId: core.service.id,
               masterProviderId: core.resolvedMasterProviderId,
               masterId: core.resolvedMasterProviderId ?? pkg.providerId,

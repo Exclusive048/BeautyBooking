@@ -204,7 +204,7 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
   await assertVisualSearchEnabled();
 
   const resizedBytes = await resizeForVision(imageBytes);
-  const classification = await classifyImage(resizedBytes);
+  const classification = await classifyImage(resizedBytes, "visual-search:search");
 
   if (classification.category === "none") {
     return { ok: false, reason: "unrecognized" };
@@ -219,7 +219,7 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
     return { ok: false, reason: "unrecognized" };
   }
 
-  const described = await describeImageWithStrategy(resizedBytes, strategy);
+  const described = await describeImageWithStrategy(resizedBytes, strategy, "visual-search:search");
   if (described.error === "not_applicable") {
     return { ok: false, reason: "unrecognized" };
   }

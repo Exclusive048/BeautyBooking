@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 /**
  * RES-10 — платные адресные вызовы (геокодер ×2 и подсказки) шли без верхней
@@ -64,16 +62,11 @@ describe("RES-10 · адресные вызовы ограничены свер�
     expect(signal.aborted).toBe(true);
   });
 
-  it("оба геокодер-вызова несут таймаут", () => {
-    // Роут и auto-grow города дёргают один и тот же внешний сервис из разных
-    // модулей; забыть границу в одном из них — вернуть половину дефекта.
-    for (const file of [
-      "src/app/api/address/geocode/route.ts",
-      "src/lib/cities/yandex-locality.ts",
-    ]) {
-      const source = readFileSync(resolve(process.cwd(), file), "utf8");
-      expect(source).toMatch(/signal:\s*AbortSignal\.timeout\(GEOCODE_REQUEST_TIMEOUT_MS\)/);
-      expect(source).toMatch(/const GEOCODE_REQUEST_TIMEOUT_MS = \d[\d_]*;/);
-    }
-  });
+  /**
+   * FIX-B18: здесь стоял регексп по исходникам обоих геокодер-сайтов. Он
+   * зеленел при мёртвой границе (константа объявлена, а `fetch` вызывается
+   * необёрнутым сайтом) и при снятом `catch`. Заменён поведением —
+   * `address-timeout-behaviour.test.ts`: висящий хост, оба сайта, проверка
+   * что вызов отпустило и что сработала fail-soft-ветка.
+   */
 });

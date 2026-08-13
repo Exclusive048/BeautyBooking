@@ -36,6 +36,7 @@ export function VkNotificationsSection({
   connectButtonClassName,
 }: Props) {
   const vkText = UI_TEXT.settings.vk;
+  const vkStartText = UI_TEXT.settings.vk.connectFailure;
   const legacyVkText = UI_TEXT.clientCabinet.vk;
   const [status, setStatus] = useState<VkStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,23 @@ export function VkNotificationsSection({
   useEffect(() => {
     void loadStatus();
   }, [loadStatus]);
+
+  // FIX-B14: `/api/integrations/vk/start` — навигация (см. `onConnect` ниже), и
+  // её отказы раньше рисовали в окне JSON-конверт. Теперь она возвращает
+  // браузер сюда с `?vk=<исход>`. Читаем флаг здесь, а не на странице-хозяине:
+  // компонент рендерится в нескольких кабинетах, и per-page плюмбинг разошёлся
+  // бы ровно там, где кнопку добавят следующей. `window.location.search`, а не
+  // `useSearchParams()` — последний требует Suspense-границы у каждого хозяина.
+  useEffect(() => {
+    const failure = new URLSearchParams(window.location.search).get("vk");
+    if (!failure) return;
+    if (failure === "provider_unavailable") setError(vkStartText.providerUnavailable);
+    else if (failure === "start_failed") setError(vkStartText.startFailed);
+    else return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("vk");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [vkStartText.providerUnavailable, vkStartText.startFailed]);
 
   const onConnect = () => {
     setError(null);

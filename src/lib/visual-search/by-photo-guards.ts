@@ -2,59 +2,46 @@
 // визуального поиска БЕЗ изменения флоу (поверхность остаётся анонимной,
 // капчи/сессии нет — ратифицировано владельцем).
 //
-// Три слоя (порядок в роуте: тир → флаг → файл → ДЕДУП → БЮДЖЕТ → провайдер):
+// Слои (порядок в роуте: тир → флаг → файл → ДЕДУП → провайдер, где потолок
+// стоит уже внутри провайдера):
 //   1. per-IP тир ужесточён в самом роуте (10/60с → 3/60с);
 //   2. дедуп по sha256 файла: повторный поиск тем же изображением отдаёт
 //      кэшированный ответ и НЕ тратит ни бюджет, ни vision/embedding-вызовы.
 //      В ключе Redis — хеш, не содержимое (прецедент lib/maps/address-cache:
 //      пользовательские данные в имени ключа не живут);
-//   3. глобальный суточный бюджет запросов на инстанс — переиспользует
-//      checkRateLimit (окно 24 ч, ключ несёт UTC-дату → новый день = новый
-//      счётчик, старый умирает по TTL). Один запрос = 2 vision + 1 embedding,
-//      поэтому считаем ЗАПРОСЫ — понятнее и дешевле, чем считать вызовы.
+//   3. суточный денежный потолок — **переехал в `lib/ai/spend-ceiling.ts`**
+//      (FIX-B16), см. ниже.
 //
-// Дата бюджета — UTC-tech (rule 17): это инстансовый технический счётчик,
-// пользовательского времени здесь нет. Работает при выключенном
-// VISUAL_SEARCH_ENABLED (модуль не зависит от флага) — включение флага
-// доработок не требует.
+// ───────────────────────────────────────────────────────────────────────────
+// FIX-B16 — решение SEC-04 УТОЧНЕНО, а не отменено.
 //
-// Деградация при недоступном Redis НАСЛЕДУЕТСЯ от checkRateLimit и осознанно
-// не ужесточается: в production — bounded memory fallback (счёт продолжается
-// в памяти процесса), в dev/test — fail-open (§8 снапшота: «rate-limit
-// fail-open в dev — приемлемо»). Это защита стоимости, а не безопасности —
-// fail-closed здесь глушил бы фичу целиком из-за моргнувшего Redis.
+// Прежний текст этого заголовка говорил: деградация наследуется от
+// `checkRateLimit` и «осознанно не ужесточается», потому что fail-closed глушил
+// бы фичу из-за моргнувшего Redis. **Это рассуждение остаётся в силе — для
+// частотного лимита.** Слои 1 и 2 не тронуты: 3/60с на IP по-прежнему уходит в
+// memory-fallback (prod) / fail-open (dev), ровно как ратифицировано.
+//
+// Изменилось разделение контролей. Частотный лимит и денежный потолок — разные
+// вещи с разной ценой отказа: провалившийся открытым частотный лимит стоит
+// лишних запросов, провалившийся открытым денежный потолок стоит неограниченных
+// денег, а потолок, который обнуляется рестартом процесса, потолком не является
+// вовсе. Прежний суточный бюджет жил в Redis через `checkRateLimit`, то есть при
+// обрыве кэша умножался на число процессов и сбрасывался каждым деплоем. Сегодня
+// это ничего не стоит (фича спит за `VISUAL_SEARCH_ENABLED`), а в день флипа
+// стоило бы ровно столько, сколько успеет потратить включённая фича.
+//
+// Поэтому потолок теперь durable (Postgres, `AiSpendCounter`) и живёт в
+// ЧОКПОЙНТЕ провайдера, а не здесь: у пути ИНДЕКСАЦИИ запроса нет вовсе
+// (воркер), и роут-уровневый счётчик его покрыть не мог физически. Ратифицированное
+// число сохранено по смыслу: 200 запросов = 600 платных вызовов
+// (classify + describe + query-embedding), см. `AI_SPEND_CEILINGS`.
+// ───────────────────────────────────────────────────────────────────────────
 
 import { createHash } from "crypto";
 import { get as cacheGet, set as cacheSet } from "@/lib/cache/cache";
-import { checkRateLimit } from "@/lib/rate-limit";
 import type { VisualSearchHttpResponse } from "@/lib/visual-search/contracts";
 
-/** Суточный потолок поисковых запросов на инстанс (не на IP). */
-export const VISUAL_SEARCH_DAILY_BUDGET = 200;
-
-const BUDGET_WINDOW_SECONDS = 24 * 60 * 60;
 const RESULT_CACHE_TTL_SECONDS = 24 * 60 * 60;
-
-export function visualSearchBudgetKey(now: Date = new Date()): string {
-  return `rl:visual-search:budget:global:${now.toISOString().slice(0, 10)}`;
-}
-
-export async function takeVisualSearchDailyBudget(
-  now: Date = new Date(),
-  budget: number = VISUAL_SEARCH_DAILY_BUDGET,
-): Promise<{ limited: boolean }> {
-  const result = await checkRateLimit(visualSearchBudgetKey(now), {
-    windowSeconds: BUDGET_WINDOW_SECONDS,
-    maxRequests: budget,
-  });
-  return { limited: result.limited };
-}
-
-/** Секунд до конца UTC-суток — Retry-After для честного 429 при исчерпании. */
-export function secondsToUtcMidnight(now: Date = new Date()): number {
-  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
-}
 
 export function byPhotoImageHash(image: Uint8Array): string {
   return createHash("sha256").update(image).digest("hex");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ClassificationResult } from "@/lib/visual-search/prompt";
 import { requestVisionJson } from "@/lib/visual-search/provider";
+import type { AiSpendMeter } from "@/lib/ai/spend-ceiling";
 
 const classificationSchema = z.object({
   category: z.enum(["manicure", "pedicure", "lashes", "brows", "makeup", "hairstyle", "none"]),
@@ -19,11 +20,18 @@ manicure / pedicure / lashes / brows / makeup / hairstyle / none
 Формат ответа:
 {"category":"<slug>","confidence":"<high|medium|low>"}`;
 
-export async function classifyImage(imageBytes: Uint8Array): Promise<ClassificationResult> {
+export async function classifyImage(
+  imageBytes: Uint8Array,
+  // FIX-B16: классификация — платный vision-вызов, и она есть на ОБОИХ путях
+  // (поиск и индексация). Метр прокидывается, а не выводится: у вызывающих
+  // разные карманы, и умолчание здесь молча списывало бы с чужого.
+  meter: AiSpendMeter
+): Promise<ClassificationResult> {
   const json = await requestVisionJson({
     imageBytes,
     systemPrompt: CLASSIFIER_SYSTEM_PROMPT,
     userPrompt: CLASSIFIER_USER_PROMPT,
+    meter,
   });
 
   if (!json) {

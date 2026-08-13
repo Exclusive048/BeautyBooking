@@ -77,6 +77,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
         {primaryService ? (
           <BookingFlowStepper
             providerId={provider.id}
+            providerName={provider.name}
             serviceId={primaryService.id}
             serviceName={primaryService.name}
             servicePrice={primaryService.price}
@@ -112,6 +113,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
           open={sheetOpen}
           onClose={() => setSheetOpen(false)}
           providerId={provider.id}
+          providerName={provider.name}
           serviceId={primaryService.id}
           serviceName={primaryService.name}
           servicePrice={primaryService.price}

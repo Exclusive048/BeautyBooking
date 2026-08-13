@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { installHangingFetch } from "@/lib/testing/hanging-fetch";
 
 /**
  * RES-09 — обмены с VK ID и Яндекс ID шли без верхней границы.
@@ -8,8 +10,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * профилем. Медленный внешний партнёр держал слот обработки бессрочно, а
  * признака «таймаут» не появлялось нигде — вход выглядел просто зависшим.
  *
- * Проверяется контракт «в каждый исходящий вызов уходит AbortSignal»: сам факт
- * срабатывания таймера ждать 10 с в прогоне дороже, чем оно стоит.
+ * GUARD-INTEGRITY (FIX-B10) — почему файл переписан. Прежние четыре проверки
+ * были вида `expect(signalOf(mock)).toBeInstanceOf(AbortSignal)`, то есть
+ * утверждали, что сигнал ПЕРЕДАН, и молчали о том, срабатывает ли он.
+ * `AbortSignal` бесконечного контроллера (`new AbortController().signal`) —
+ * тоже `AbortSignal`, и все четыре теста остались бы зелёными, а дефект RES-09
+ * вернулся бы целиком. Инвариант #43 — этот самый класс.
+ *
+ * @probe   что сломать: в `lib/vk/oauth.ts` заменить
+ *          `signal: AbortSignal.timeout(OAUTH_REQUEST_TIMEOUT_MS)` на
+ *          `signal: new AbortController().signal` (оба обмена VK).
+ *          наблюдалось: «VK · обмен кода на токен» и «VK · чтение профиля»
+ *          красные по таймауту теста (5000 ms) с текстом
+ *          «promise never resolved»; ПРЕЖНЯЯ форма проверки на той же мутации
+ *          осталась бы зелёной — сигнал передан, он `instanceof AbortSignal`.
+ *          восстановлено, `git diff src/lib/vk/oauth.ts` пуст, снова зелено.
  */
 
 vi.mock("@/lib/vk/config", () => ({
@@ -26,75 +41,91 @@ vi.mock("@/lib/yandex/config", () => ({
 import { exchangeVkCodeForToken, fetchVkProfile } from "@/lib/vk/oauth";
 import { exchangeYandexCodeForToken, fetchYandexProfile } from "@/lib/yandex/oauth";
 
-const realFetch = globalThis.fetch;
+/** Заявленная граница обоих модулей (`OAUTH_REQUEST_TIMEOUT_MS`). */
+const DECLARED_TIMEOUT_MS = 10_000;
+/** Запас на планировщик: проверяем «внутри дедлайна», а не точное значение. */
+const SLACK_MS = 4_000;
 
-function stubFetch(payload: unknown) {
-  const mock = vi.fn(
-    async (_url: string | URL | Request, _init?: RequestInit) =>
-      new Response(JSON.stringify(payload), { status: 200 })
-  );
-  globalThis.fetch = mock as unknown as typeof fetch;
-  return mock;
-}
+const CALLS: Array<{ name: string; run: () => Promise<unknown> }> = [
+  {
+    name: "VK · обмен кода на токен",
+    run: () =>
+      exchangeVkCodeForToken({
+        code: "c",
+        codeVerifier: "v",
+        deviceId: "d",
+        redirectUri: "https://example.test/cb",
+        state: "s",
+      }),
+  },
+  { name: "VK · чтение профиля", run: () => fetchVkProfile("token") },
+  {
+    name: "Яндекс · обмен кода на токен",
+    run: () =>
+      exchangeYandexCodeForToken({
+        code: "c",
+        codeVerifier: "v",
+        redirectUri: "https://example.test/cb",
+      }),
+  },
+  { name: "Яндекс · чтение профиля", run: () => fetchYandexProfile("token") },
+];
 
-function signalOf(mock: ReturnType<typeof stubFetch>): unknown {
-  const init = mock.mock.calls[0]?.[1] as RequestInit | undefined;
-  return init?.signal;
-}
-
-describe("RES-09 · OAuth-обмены ограничены сверху", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
+describe("RES-09 · дедлайн OAuth-обменов срабатывает, а не просто объявлен", () => {
+  let harness: ReturnType<typeof installHangingFetch> | null = null;
 
   afterEach(() => {
-    globalThis.fetch = realFetch;
+    harness?.restore();
+    harness = null;
   });
 
-  it("VK: обмен кода на токен передаёт AbortSignal", async () => {
-    const mock = stubFetch({
-      access_token: "t",
-      refresh_token: "r",
-      expires_in: 3600,
-      user_id: 1,
-    });
+  it(
+    "все четыре вызова к зависшему провайдеру отклоняются внутри границы",
+    async () => {
+      harness = installHangingFetch();
 
-    await exchangeVkCodeForToken({
-      code: "c",
-      codeVerifier: "v",
-      deviceId: "d",
-      redirectUri: "https://example.test/cb",
-      state: "s",
-    }).catch(() => undefined);
+      // Параллельно, а не подряд: дедлайн настоящий (fake timers не двигают
+      // нативный `AbortSignal.timeout`), поэтому последовательный прогон стоил
+      // бы четырёх ожиданий вместо одного.
+      const startedAt = Date.now();
+      const settled = await Promise.all(
+        CALLS.map(async ({ name, run }) => {
+          const outcome = await run().then(
+            () => ({ name, rejected: false, error: null as unknown }),
+            (error: unknown) => ({ name, rejected: true, error }),
+          );
+          return { ...outcome, elapsed: Date.now() - startedAt };
+        }),
+      );
 
-    expect(signalOf(mock)).toBeInstanceOf(AbortSignal);
-  });
+      expect(harness.callCount(), "ни один вызов не дошёл до fetch").toBe(CALLS.length);
 
-  it("VK: чтение профиля передаёт AbortSignal", async () => {
-    const mock = stubFetch({ user: { user_id: "1", first_name: "A" } });
+      for (const outcome of settled) {
+        expect(outcome.rejected, `${outcome.name}: вызов завершился без отказа`).toBe(true);
+        expect(
+          outcome.elapsed,
+          `${outcome.name}: висел ${outcome.elapsed} мс при границе ${DECLARED_TIMEOUT_MS} мс`,
+        ).toBeLessThan(DECLARED_TIMEOUT_MS + SLACK_MS);
+        // Нижняя граница: мгновенный отказ означал бы, что мы поймали не
+        // таймаут, а что-то другое (битый конфиг, синхронный throw), и тест
+        // прошёл бы мимо предмета проверки.
+        expect(
+          outcome.elapsed,
+          `${outcome.name}: отказ пришёл через ${outcome.elapsed} мс — это не таймаут`,
+        ).toBeGreaterThan(DECLARED_TIMEOUT_MS / 2);
+      }
+    },
+    DECLARED_TIMEOUT_MS + SLACK_MS + 6_000,
+  );
 
-    await fetchVkProfile("token").catch(() => undefined);
+  it("отказ по дедлайну — TimeoutError, а не безымянная ошибка", async () => {
+    harness = installHangingFetch();
 
-    expect(signalOf(mock)).toBeInstanceOf(AbortSignal);
-  });
+    // Форма отказа — часть контракта: `failOAuthCallback` разбирает ошибку
+    // через `toAppError`, и неотличимый `Error` там теряет причину.
+    const error = await fetchVkProfile("token").catch((e: unknown) => e);
 
-  it("Яндекс: обмен кода на токен передаёт AbortSignal", async () => {
-    const mock = stubFetch({ access_token: "t", expires_in: 3600 });
-
-    await exchangeYandexCodeForToken({
-      code: "c",
-      codeVerifier: "v",
-      redirectUri: "https://example.test/cb",
-    }).catch(() => undefined);
-
-    expect(signalOf(mock)).toBeInstanceOf(AbortSignal);
-  });
-
-  it("Яндекс: чтение профиля передаёт AbortSignal", async () => {
-    const mock = stubFetch({ id: "1", login: "a" });
-
-    await fetchYandexProfile("token").catch(() => undefined);
-
-    expect(signalOf(mock)).toBeInstanceOf(AbortSignal);
-  });
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe("TimeoutError");
+  }, 20_000);
 });

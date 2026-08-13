@@ -37,14 +37,29 @@ function walk(relDir: string): string[] {
   return out;
 }
 
-/** Сайт записи брони: создание строки `Booking` с временем. */
-const CREATES_BOOKING = /booking\.create\(\{/;
+/**
+ * Сайт записи брони: создание строки `Booking` с временем.
+ *
+ * FIX-C1 сменил каноническую форму — строку теперь вставляет единственный writer
+ * `createBookingRow` (`lib/bookings/booking-row.ts`), который выводит
+ * `Booking.studioId` из поверхности. Сырая форма оставлена в детекторе НАМЕРЕННО:
+ * если кто-то вернёт прямой `booking.create`, этот guard обязан продолжать
+ * считать его путём создания, а не потерять из виду. Запрет самой сырой формы —
+ * предмет соседнего сторожа (`bookings/booking-studio-scope.test.ts`), и эти два
+ * правила намеренно независимы.
+ */
+const CREATES_BOOKING = /createBookingRow\(|booking\.create\(\{/;
 
 const WAIVED: Record<string, string> = {
   // Пакетные создатели зовут `ensureNoConflicts` покомпонентно — guard внутри
   // него; отдельная проверка была бы второй, не первой.
   "src/lib/bookings/package-booking.ts": "покомпонентный ensureNoConflicts",
   "src/lib/bookings/package-booking-studio.ts": "покомпонентный ensureNoConflicts",
+  // FIX-C1: writer — это МЕХАНИЗМ вставки, а не путь записи. Он не знает ни
+  // окна, ни буфера, ни мастера-владельца блока и обязан не знать: политику
+  // держат вызывающие. Свойство guard'а от этого не слабеет — каждый файл,
+  // зовущий `createBookingRow`, детектор по-прежнему видит и проверяет.
+  "src/lib/bookings/booking-row.ts": "единственный writer строки; политику проверяют вызывающие",
 };
 
 describe("LOGIC-06 · guard объявленного отсутствия — на каждом пути записи", () => {

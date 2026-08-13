@@ -6,6 +6,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpEmailRequestRateLimit } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { extractClientIp } from "@/lib/http/ip";
 import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
 import {
@@ -72,13 +73,7 @@ export async function POST(req: Request) {
       ip: extractClientIp(req),
     });
     if (!rateLimit.ok) {
-      return NextResponse.json(
-        { ok: false, error: { message: rateLimit.error ?? "Слишком много запросов. Попробуйте позже.", code: "RATE_LIMITED" } },
-        {
-          status: rateLimit.status,
-          headers: { "Retry-After": String(rateLimit.retryAfterSec) },
-        },
-      );
+      return otpRateLimitFail(rateLimit);
     }
 
     // Apply the email immediately and reset verification — UI shows

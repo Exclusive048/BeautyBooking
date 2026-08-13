@@ -34,13 +34,12 @@ export type PackageBookingResult = {
 };
 
 /**
- * Восстановление результата по `bookingPackageId`. Ключ уже отнесён к
- * `clientUserId ?? guest:phone`, поэтому пересечений между пользователями не
- * бывает; фильтр по владельцу оставлен тем же, что у одиночной брони —
- * гостевой пакет читается только как гостевой.
+ * Восстановление результата по `bookingPackageId`. Ключ отнесён к
+ * `clientUserId`, поэтому пересечений между пользователями не бывает; фильтр по
+ * владельцу тот же, что у одиночной брони.
  */
 async function loadPackageForIdempotency(
-  clientUserId: string | null,
+  clientUserId: string,
   bookingPackageId: string,
 ): Promise<PackageBookingResult | null> {
   const pkg = await prisma.bookingPackage.findFirst({
@@ -68,15 +67,20 @@ export type PackageIdempotencyGuard = {
 
 export async function beginPackageIdempotency(input: {
   idempotencyKey?: string | null;
-  clientUserId: string | null;
-  clientPhone: string;
+  /**
+   * FIX-B15 — не nullable, зеркально `createBooking` (см. развёрнутое
+   * обоснование там). Оба пакетных роута резолвят пассивный профиль гостя до
+   * создания пакета (RKN-FIX-02) и объявляют локальную переменную как `string`;
+   * ветка `guest:${clientPhone}` не исполнялась ни разу с тех пор, но читалась
+   * как живая — и была **закреплена тестом** «чужой телефон не читает чужой
+   * пакет», который проверял поведение мёртвой ветки. Отсюда и уверенность
+   * FIX-B13 в том, что гостевой бакет идемпотентности существует.
+   */
+  clientUserId: string;
 }): Promise<PackageIdempotencyGuard> {
   if (!input.idempotencyKey) return { cached: null, heldKey: null };
 
-  // Тот же неймспейс, что у одиночной брони: для гостя стабильный
-  // идентификатор — телефон.
-  const namespaceKey = input.clientUserId ?? `guest:${input.clientPhone}`;
-  const key = buildCreatePackageBookingIdempotencyKey(namespaceKey, input.idempotencyKey);
+  const key = buildCreatePackageBookingIdempotencyKey(input.clientUserId, input.idempotencyKey);
 
   const resolved = await resolveIdempotency({
     key,

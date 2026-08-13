@@ -94,9 +94,7 @@ export async function GET(
       requestId,
       stack: error instanceof Error ? error.stack : undefined,
     });
-    return NextResponse.json(
-      { ok: false, error: { code: "INTERNAL_ERROR", message: "Не удалось загрузить запись." } },
-      { status: 500 },
-    );
+    // FIX-B18: см. близнеца в `../route.ts` — конверт вместо ручной сборки.
+    return jsonFail(500, "Не удалось загрузить запись.", "INTERNAL_ERROR");
   }
 }

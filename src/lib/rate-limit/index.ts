@@ -8,9 +8,25 @@ export type RateLimitConfig = {
   maxRequests: number;
 };
 
+/**
+ * FIX-B12 — почему у отказа есть ПРИЧИНА, а не только флаг.
+ *
+ * `limited: true` возвращается в двух совершенно разных случаях: бюджет
+ * действительно исчерпан, либо посчитать бюджет не удалось и чувствительный
+ * роут закрывается (инв. #6). Прокси рендерил оба одинаково — 429 «Too many
+ * requests», — то есть при обрыве Redis продукт отвечал пользователю, сделавшему
+ * ОДИН запрос, что запросов слишком много. Это не косметика: 429 учит клиента
+ * «подожди и повтори реже», а верный сигнал здесь — 503 «сервис временно
+ * недоступен», тот же, что уже отдаёт `otp-rate-limit.ts` (RES-11).
+ *
+ * Поле опционально, поэтому существующие потребители, читающие только
+ * `.limited`, не меняются.
+ */
+export type RateLimitLimitReason = "budget" | "unavailable";
+
 export type RateLimitResult =
   | { limited: false }
-  | { limited: true; retryAfterSeconds: number };
+  | { limited: true; retryAfterSeconds: number; reason?: RateLimitLimitReason };
 
 type MemoryBucket = {
   count: number;
@@ -32,6 +48,52 @@ const SENSITIVE_ROUTE_PREFIXES = [
   "/api/studio",
   "/api/studios",
   "/api/reviews",
+
+  /**
+   * FIX-B12 — четыре класса из триажа FIX-B11, решение владельца.
+   *
+   * Префиксы состоят ТОЛЬКО из литеральных сегментов — это требование
+   * `route-template.ts`: динамические сегменты схлопываются в `:id`, поэтому
+   * префикс с `[id]`/`:id` внутри перестал бы совпадать. Следствие — префикс
+   * покрывает ПОДДЕРЕВО, то есть чуть шире названных роутов; состав покрытого
+   * (43 роута на 2026-08-12) выводится из дерева `src/app/api` и проверяется
+   * тестом `fail-closed-classes.test.ts` — там же поведенческая половина.
+   * Ни один публичный browsing-путь (каталог, профили, слоты) в них не попал:
+   * обрыв Redis не гасит анонимный сайт.
+   */
+
+  // (б) booking-write вне `/api/bookings` — та же асимметрия внутри домена,
+  // которую LOGIC-14 нашёл в биллинге: `/api/bookings` fail-closed, а
+  // мастерский и админский пути записи брони проваливались в memory-fallback.
+  "/api/master/bookings",
+  "/api/model-applications",
+  "/api/admin/hot-slots",
+  // Отметка дня выходным отменяет брони в той же транзакции (LOGIC-13), то есть
+  // это booking-write, а не «настройки».
+  "/api/cabinet/master/schedule",
+
+  // (в) ПДн — правило 10. Массовые ЧТЕНИЯ тоже покрыты намеренно: именно они
+  // вектор перечисления, ради которого заведён `PdAccessLog` (RKN-FIX-10),
+  // поэтому метод здесь не различается (как и у всех префиксов выше).
+  "/api/me",
+  "/api/cabinet/user/profile",
+  "/api/master/clients",
+  "/api/chat/threads",
+  "/api/integrations/vk",
+
+  // (г) создание аккаунта / подписки — mass-trial-вектор, ради которого класс и
+  // существует: эти шесть роутов создают `UserProfile` + `UserSubscription`.
+  "/api/onboarding",
+  "/api/profiles",
+  "/api/invites",
+
+  // (а) админские денежные мутации. Возражение про доступность здесь почти
+  // пустое: администратор фактически один человек, и он же перезапускает Redis,
+  // тогда как неограниченные денежные мутации под скомпрометированными
+  // кредами стоят несопоставимо больше короткого локаута. Break-glass
+  // намеренно НЕ заводится — пересмотр, когда появится второй администратор.
+  "/api/admin/billing",
+  "/api/admin/users",
 ] as const;
 
 /**
@@ -76,6 +138,51 @@ const SENSITIVE_KEY_PREFIXES = [
   "rl:/api/studio",
   "rl:/api/studios",
   "rl:/api/reviews",
+  // FIX-B12: единственный из 24 роутов класса, у которого есть СВОЙ лимитер
+  // (`rate:chatSend:<userId>`, per-user отправка сообщений). Префикс пути выше
+  // делает fail-closed прокси-тир, но собственный ключ — более узкий лимитер
+  // того же роута, и оставить его fail-open значило бы держать в одном роуте
+  // две разные политики на случай обрыва Redis.
+  "rate:chatSend:",
+
+  /**
+   * FIX-B15 — политика регистрируется ЗАРАНЕЕ, пока путь недостижим.
+   *
+   * Запись ниже сегодня инертна: код до неё не доходит, потому что выше по
+   * обработчику стоит килсвитч, снимаемый **в деплое**. Именно поэтому её и надо
+   * внести сейчас: иначе флип флага делает путь живым И fail-open ОДНИМ
+   * движением, а заметить это некому — тесты зелёные, дифф пустой, гейты в
+   * деплое не работают. Регистрация здесь разводит два события: флаг меняет
+   * достижимость, политика уже верна к моменту, когда она понадобится.
+   *
+   * `rate:telegramWebhook:<ip>` (`lib/telegram/webhookRateLimit.ts`).
+   * `POST /api/telegram/webhook` первой строкой спрашивает `getTelegramEnabled()`,
+   * тот короткозамыкает на env-потолке `NEXT_PUBLIC_TELEGRAM_ENABLED` (unset →
+   * false, ФЗ-199) — до лимита, проверки секрета и записи `TelegramLinkToken`
+   * управление не доходит.
+   *
+   * Префикс ПУТИ `/api/telegram` намеренно НЕ заводится: под него попали бы
+   * `status`/`settings` — чтения кабинетных настроек, для которых обрыв Redis
+   * не повод отказывать. ⚠️ Отказ здесь придёт с текстом «слишком много
+   * запросов», а не «сервис недоступен»: `checkTelegramWebhookRateLimit` идёт
+   * через legacy-перегрузку `checkRateLimit`, которая возвращает `boolean` и
+   * причину выразить не может. Для этого сайта это приемлемо — вызывающий
+   * телеграм-бот, а не браузер, и у него свои ретраи; исправление означало бы
+   * менять legacy-перегрузку, то есть все её сайты сразу.
+   *
+   * ⚠️ Свип нашёл ВТОРОЙ ключ той же формы и осознанно его НЕ внёс:
+   * `rl:visual-search:budget:global:<UTC-дата>` — единственный денежный потолок
+   * платного vision-вызова, тоже достижимый лишь за килсвитчем
+   * (`VISUAL_SEARCH_ENABLED`). Отличие решающее: у него есть **ратифицированное
+   * обратное решение** — заголовок `visual-search/by-photo-guards.ts` (SEC-04,
+   * AUDIT-CAMPAIGN-02 п.7) прямо пишет, что деградация наследуется от
+   * `checkRateLimit` и «осознанно не ужесточается». Внести префикс значило бы
+   * молча отменить его. При этом довод «за» появляется ровно в день флипа:
+   * memory-fallback умножает суточный потолок на число процессов и обнуляет его
+   * рестартом, то есть у платного вызова перестаёт быть верхняя граница.
+   * Поэтому это пункт pre-flip-чеклиста в `DEPLOY-BACKLOG.md`, а не правка тут.
+   */
+  "rate:telegramWebhook:",
 ] as const;
 const RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS = 60;
 
@@ -186,7 +293,11 @@ async function checkRateLimitConfig(
     const client = await getRedisConnection();
     if (!client) {
       if (isSensitiveRouteKey(key)) {
-        return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
+        return {
+          limited: true,
+          retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS,
+          reason: "unavailable",
+        };
       }
       if (isProduction) {
         logError("Rate limit Redis unavailable, using bounded memory fallback", {
@@ -228,7 +339,11 @@ async function checkRateLimitConfig(
       error: error instanceof Error ? error.message : String(error),
     });
     if (isSensitiveRouteKey(key)) {
-      return { limited: true, retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS };
+      return {
+        limited: true,
+        retryAfterSeconds: RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS,
+        reason: "unavailable",
+      };
     }
     maybeAlertRedisRateLimitDegraded();
     if (isProduction) {

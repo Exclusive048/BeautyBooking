@@ -42,7 +42,7 @@ vi.mock("@/lib/prisma", () => ({
     bookingPackage: {
       // Фильтр честный: иначе тест на legacy-запись прошёл бы и с
       // `id: undefined`, то есть перестал бы что-либо проверять.
-      findFirst: async (args: { where: { id?: string; clientUserId: string | null } }) => {
+      findFirst: async (args: { where: { id?: string; clientUserId: string } }) => {
         spies.packageFindFirst(args);
         if (!state.packageRow) return null;
         return args.where.id === state.packageRow.id ? state.packageRow : null;
@@ -57,7 +57,14 @@ import {
   completePackageIdempotency,
 } from "@/lib/bookings/package-idempotency";
 
-const GUEST = { idempotencyKey: "req-1", clientUserId: null, clientPhone: "+79995000000" };
+/**
+ * FIX-B15 — фикстура была `clientUserId: null, clientPhone: …`, то есть тест
+ * проверял поведение МЁРТВОЙ ветки `guest:${clientPhone}`. Это и есть причина,
+ * по которой гостевой бакет идемпотентности выглядел живым: он был не просто
+ * не прочитан, а **закреплён зелёным тестом**. После RKN-FIX-02 гость получает
+ * пассивный профиль до создания пакета, поэтому неймспейс — всегда id.
+ */
+const CLIENT = { idempotencyKey: "req-1", clientUserId: "user-1" };
 
 beforeEach(() => {
   store.clear();
@@ -67,12 +74,12 @@ beforeEach(() => {
 
 describe("LOGIC-09 · повтор возвращает ТОТ ЖЕ пакет", () => {
   it("второй запрос с тем же ключом отдаёт весь пакет и не берёт замок", async () => {
-    const first = await beginPackageIdempotency(GUEST);
+    const first = await beginPackageIdempotency(CLIENT);
     expect(first.cached).toBeNull();
     expect(first.heldKey).not.toBeNull();
     await completePackageIdempotency(first.heldKey, "pkg-1");
 
-    const second = await beginPackageIdempotency(GUEST);
+    const second = await beginPackageIdempotency(CLIENT);
 
     // Весь пакет, а не одна бронь — иначе клиент увидит одну запись из трёх.
     expect(second.cached).toEqual({
@@ -83,25 +90,28 @@ describe("LOGIC-09 · повтор возвращает ТОТ ЖЕ пакет",
     expect(second.heldKey).toBeNull();
   });
 
-  it("ключ отнесён к клиенту: чужой телефон не читает чужой пакет", async () => {
-    const first = await beginPackageIdempotency(GUEST);
+  // FIX-B15: раньше этот тест разносил ключи ТЕЛЕФОНОМ, то есть проверял
+  // мёртвую гостевую ветку. Разделение по клиенту — то, что действительно
+  // происходит: неймспейс строится из `clientUserId`.
+  it("ключ отнесён к клиенту: другой клиент не читает чужой пакет", async () => {
+    const first = await beginPackageIdempotency(CLIENT);
     await completePackageIdempotency(first.heldKey, "pkg-1");
 
-    const other = await beginPackageIdempotency({ ...GUEST, clientPhone: "+79995000001" });
+    const other = await beginPackageIdempotency({ ...CLIENT, clientUserId: "user-2" });
     expect(other.cached).toBeNull();
     expect(other.heldKey).not.toBeNull();
   });
 
   it("замок держится: параллельный запрос получает 409 DUPLICATE_REQUEST", async () => {
-    await beginPackageIdempotency(GUEST);
-    await expect(beginPackageIdempotency(GUEST)).rejects.toMatchObject({
+    await beginPackageIdempotency(CLIENT);
+    await expect(beginPackageIdempotency(CLIENT)).rejects.toMatchObject({
       status: 409,
       code: "DUPLICATE_REQUEST",
     });
   });
 
   it("без ключа идемпотентность не включается (совместимость существующих клиентов)", async () => {
-    const guard = await beginPackageIdempotency({ ...GUEST, idempotencyKey: null });
+    const guard = await beginPackageIdempotency({ ...CLIENT, idempotencyKey: null });
     expect(guard).toEqual({ cached: null, heldKey: null });
     expect(spies.packageFindFirst).not.toHaveBeenCalled();
   });
@@ -109,10 +119,10 @@ describe("LOGIC-09 · повтор возвращает ТОТ ЖЕ пакет",
 
 describe("LOGIC-09 · честная ошибка не запирает пользователя на 10 минут", () => {
   it("после снятия замка тот же ключ снова рабочий", async () => {
-    const first = await beginPackageIdempotency(GUEST);
+    const first = await beginPackageIdempotency(CLIENT);
     await abortPackageIdempotency(first.heldKey);
 
-    const retry = await beginPackageIdempotency(GUEST);
+    const retry = await beginPackageIdempotency(CLIENT);
     expect(retry.cached).toBeNull();
     expect(retry.heldKey).not.toBeNull();
   });
@@ -122,11 +132,11 @@ describe("LOGIC-09 · записи прошлой формы читаются п
   it("запись с полем bookingId разрешается как готовый результат", async () => {
     // Такие записи живут в Redis ещё TTL после выкатки; без совместимости
     // идемпотентность молча отключилась бы ровно на это окно.
-    const probe = await beginPackageIdempotency(GUEST);
+    const probe = await beginPackageIdempotency(CLIENT);
     const key = probe.heldKey!;
     store.set(key, { status: "done", bookingId: "pkg-1" });
 
-    const replay = await beginPackageIdempotency(GUEST);
+    const replay = await beginPackageIdempotency(CLIENT);
     expect(replay.cached?.bookingPackageId).toBe("pkg-1");
   });
 });

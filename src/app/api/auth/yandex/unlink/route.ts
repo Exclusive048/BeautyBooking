@@ -32,6 +32,7 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт `AppError.details`.
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

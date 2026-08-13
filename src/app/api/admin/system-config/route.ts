@@ -225,6 +225,10 @@ export async function PATCH(req: Request) {
     return ok(flags);
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт
+    // `AppError.details`. Роут попал в неё как потребитель `@/lib/telegram/*`
+    // (он и переключает килсвитч FZ-199) — нашёл его сам сторож границы,
+    // в свипе по трём названным поверхностям его бы не было.
+    return fail(appError.message, appError.status, appError.code);
   }
 }

@@ -5,6 +5,7 @@ import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 import type { VisualSearchResult, VisualSearchStrategy } from "@/lib/visual-search/prompt";
 import { env } from "@/lib/env";
+import { takeAiSpendBudget, type AiSpendMeter } from "@/lib/ai/spend-ceiling";
 
 /**
  * Visual-search provider chokepoint — Yandex Cloud AI Studio (VISUAL-SEARCH-YANDEX
@@ -166,7 +167,17 @@ export async function requestVisionJson(input: {
   imageBytes: Uint8Array;
   systemPrompt: string;
   userPrompt: string;
+  /**
+   * FIX-B16: какой суточный бюджет тратит этот вызов. Обязателен ТИПОМ —
+   * поиск и индексация стоят из разных карманов (у индексации нет запроса
+   * вовсе, она идёт из воркера), и вывести одно из другого здесь неоткуда.
+   */
+  meter: AiSpendMeter;
 }): Promise<Record<string, unknown> | null> {
+  // Потолок — до первого байта в сеть и ДО отправки картинки: отказ обязан
+  // быть дешевле вызова, иначе он не защищает от того, ради чего заведён.
+  await takeAiSpendBudget(input.meter);
+
   try {
     const completion = await getVisionClient().chat.completions.create(
       {
@@ -216,12 +227,14 @@ export async function requestVisionJson(input: {
 
 export async function describeImageWithStrategy(
   imageBytes: Uint8Array,
-  strategy: VisualSearchStrategy
+  strategy: VisualSearchStrategy,
+  meter: AiSpendMeter
 ): Promise<VisualSearchResult> {
   const json = await requestVisionJson({
     imageBytes,
     systemPrompt: strategy.systemPrompt,
     userPrompt: strategy.userPrompt,
+    meter,
   });
 
   if (!json || json.error === "not_applicable") {
@@ -253,7 +266,13 @@ export async function describeImageWithStrategy(
  * (search path). Both emit 256 dims so cosine comparison stays valid — swapping
  * them silently degrades relevance, so each path has a dedicated function.
  */
-async function createEmbedding(text: string, modelSlug: string): Promise<number[] | null> {
+async function createEmbedding(
+  text: string,
+  modelSlug: string,
+  meter: AiSpendMeter
+): Promise<number[] | null> {
+  await takeAiSpendBudget(meter);
+
   try {
     const response = await fetch(YANDEX_EMBEDDING_URL, {
       method: "POST",
@@ -292,14 +311,18 @@ async function createEmbedding(text: string, modelSlug: string): Promise<number[
   }
 }
 
-/** Index/store path — embeds a portfolio photo's `text_description`. */
+/**
+ * Index/store path — embeds a portfolio photo's `text_description`.
+ * FIX-B16: метр не параметр — doc-эмбеддинг существует ТОЛЬКО на пути
+ * индексации, и передавать его снаружи значило бы разрешить перепутать.
+ */
 export async function createDocEmbedding(text: string): Promise<number[] | null> {
-  return createEmbedding(text, DOC_EMBEDDING_MODEL);
+  return createEmbedding(text, DOC_EMBEDDING_MODEL, "visual-search:index");
 }
 
 /** Search path — embeds the client's uploaded-photo `text_description`. */
 export async function createQueryEmbedding(text: string): Promise<number[] | null> {
-  return createEmbedding(text, QUERY_EMBEDDING_MODEL);
+  return createEmbedding(text, QUERY_EMBEDDING_MODEL, "visual-search:search");
 }
 
 export function isRetryableProviderError(error: unknown): boolean {

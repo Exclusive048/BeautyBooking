@@ -2,8 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { withRequestContext } from "@/lib/api/with-request-context";
-import { fail } from "@/lib/api/response";
-import { AppError, toAppError } from "@/lib/api/errors";
+import { failOAuthStart, oauthStartLoginRedirect } from "@/lib/auth/oauth-start-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
@@ -11,7 +10,6 @@ import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_V
 import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
 import { signConsentCookieValue, VK_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
 import { isProduction, isVkAuthEnabled } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
 
 const VK_NOT_CONFIGURED_CODES = new Set([
   "VK_CLIENT_ID_MISSING",
@@ -27,8 +25,11 @@ export async function GET(req: Request) {
     // AUTH-KILLSWITCH-ENFORCE-01: refuse when the provider is disabled
     // server-side (FZ-199 kill-switch), before any cred read / OAuth work —
     // a flag-off provider with creds present must not initiate the flow.
+    //
+    // FIX-B14: отказ по-прежнему происходит здесь и до всего; изменилась только
+    // его ФОРМА — навигация возвращается на `/login`, а не в JSON-тупик.
     if (!isVkAuthEnabled) {
-      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
+      return oauthStartLoginRedirect(req, "provider_unavailable");
     }
 
     // RKN-FIX-01: the consent the visitor ticked on /login travels with the
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
     const consentFlags = consentFlagsFromParams(new URL(req.url).searchParams);
     const isLinkingSession = Boolean(await getSessionUser());
     if (!isLinkingSession && !hasRequiredConsents(consentFlags)) {
-      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+      return oauthStartLoginRedirect(req, "consent_required");
     }
 
     try {
@@ -78,11 +79,12 @@ export async function GET(req: Request) {
 
       return NextResponse.redirect(authUrl);
     } catch (error) {
-      const appError = error instanceof AppError ? error : toAppError(error);
-      if (VK_NOT_CONFIGURED_CODES.has(appError.code)) {
-        return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
-      }
-      return fail(appError.message, appError.status, appError.code, appError.details);
+      // FIX-B14: раньше здесь было два разных ответа — 503 для «не
+      // сконфигурирован» и общий `fail(...)` с `appError.details`. Второй ещё и
+      // тащил наружу payload ошибки, который SECURITY-EXPOSURE-AUDIT-01 · Y9
+      // намеренно снял с колбэков; на старте это осталось незамеченным.
+      // Оба исхода теперь навигация, а диагностика уезжает в лог со скрабом.
+      return failOAuthStart(req, error, VK_NOT_CONFIGURED_CODES);
     }
   });
 }

@@ -12,6 +12,7 @@ import {
   clearOtpEmailVerifyFailures,
   registerOtpEmailVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { findVerifiedEmailProfile, resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
 import { isEmailAuthEnabled } from "@/lib/env";
 import { otpEmailVerifySchema } from "@/lib/auth/schemas";
@@ -49,10 +50,7 @@ export async function POST(req: Request) {
 
     const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail, clientIp);
     if (!lockCheck.ok) {
-      return NextResponse.json(
-        { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
-        { status: lockCheck.status, headers: { "Retry-After": String(lockCheck.retryAfterSec) } }
-      );
+      return otpRateLimitFail(lockCheck);
     }
 
     const now = new Date();
@@ -73,10 +71,7 @@ export async function POST(req: Request) {
       const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
       if (!failResult.ok) {
         void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: failResult.error ?? "OTP_VERIFY_LOCKED" });
-        return NextResponse.json(
-          { error: failResult.error, retryAfterSec: failResult.retryAfterSec },
-          { status: failResult.status, headers: { "Retry-After": String(failResult.retryAfterSec) } }
-        );
+        return otpRateLimitFail(failResult);
       }
       void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: "CODE_NOT_FOUND" });
       return fail("Код не найден или истёк.", 401, "CODE_NOT_FOUND");

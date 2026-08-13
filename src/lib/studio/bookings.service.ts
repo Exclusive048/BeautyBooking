@@ -1,5 +1,6 @@
-import { Prisma } from "@prisma/client";
+import { BookingSource, Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { createBookingRow } from "@/lib/bookings/booking-row";
 import {
   buildConflictScopeWhere,
   buildConflictWindowWhere,
@@ -208,10 +209,11 @@ export async function createStudioBooking(input: {
           endAtUtc: endAt,
         });
 
-        const booking = await tx.booking.create({
+        const booking = await createBookingRow(tx, {
           data: {
             providerId: studio.providerId,
-            studioId: studio.id,
+            // FIX-C1: `studioId` выводит writer из `providerId` — здесь это
+            // `studio.providerId`, то есть тот же `studio.id`, что стоял раньше.
             serviceId: service.id,
             masterProviderId: master.id,
             masterId: master.id,
@@ -225,7 +227,9 @@ export async function createStudioBooking(input: {
             notes: input.notes?.trim() || null,
             status: "PENDING",
             actionRequiredBy: "MASTER",
-            source: "MANUAL",
+            // Администратор студии заносит запись, полученную вне сайта
+            // (звонок / визит) — MANUAL здесь и есть правда.
+            source: BookingSource.MANUAL,
           },
           select: { id: true },
         });

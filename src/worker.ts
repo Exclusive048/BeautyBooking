@@ -9,6 +9,7 @@ import {
   heartbeatJob,
   recoverStuckJobs,
 } from "@/lib/queue/queue";
+import { createHealthcheckPinger } from "@/lib/queue/healthcheck-ping";
 import { getRedisConnection } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
@@ -86,17 +87,19 @@ function flushAndExit(code: number): void {
 }
 
 let isShuttingDown = false;
-let lastHealthcheckAt = 0;
 let jobsProcessed = 0;
-let workerSecretMissingLogged = false;
 
-const HEALTHCHECK_INTERVAL_MS = 30_000;
 // RES-24-соседний: пинг живости стоит В ГЛАВНОМ ЦИКЛЕ, до `dequeue()`, и раньше
 // уходил в `fetch` без границы — то есть зависший `app` останавливал разбор
 // очереди целиком, при том что собственные зависимости воркера (Redis,
-// Postgres) в порядке. Граница заведомо меньше интервала между пингами: даже
-// намертво зависший `app` стоит воркеру одного витка, а не работы.
-const HEALTHCHECK_REQUEST_TIMEOUT_MS = 5_000;
+// Postgres) в порядке.
+//
+// FIX-B13: механика (интервал, граница, проглатывание отказа) вынесена в
+// `lib/queue/healthcheck-ping.ts` с инжектируемым `fetchImpl`. Причина — не
+// стиль: этот файл вызывает `startWorker()` на импорте, поэтому в vitest не
+// поднимается, и сторож дедлайна мог проверять только ТЕКСТ файла. Цена
+// регрессии здесь невидима на глаз — «всё зелено», просто очередь стоит.
+const healthcheckPinger = createHealthcheckPinger();
 const STUCK_RECOVERY_INTERVAL_MS = 2 * 60 * 1000;
 // FIX-15: refresh the in-flight job's lease well within PROCESSING_TIMEOUT_MS
 // (5 min) so a live long-running job is never re-queued as "stuck".
@@ -288,20 +291,6 @@ async function enqueueRetry(job: Job, delayMs: number): Promise<void> {
   await enqueue(normalizeJobMeta(retryJob), { delayMs });
 }
 
-function resolveHealthcheckUrl(): string {
-  const appUrl = (
-    env.NEXT_PUBLIC_APP_URL ??
-    env.APP_PUBLIC_URL ??
-    "http://127.0.0.1:3000"
-  ).trim();
-  return `${appUrl.replace(/\/+$/, "")}/api/health/worker`;
-}
-
-function resolveWorkerSecret(): string | null {
-  const secret = env.WORKER_SECRET?.trim();
-  return secret && secret.length > 0 ? secret : null;
-}
-
 async function ensureWorkerRedisReady(): Promise<void> {
   if (!isProduction) return;
 
@@ -313,39 +302,8 @@ async function ensureWorkerRedisReady(): Promise<void> {
   await redis.ping();
 }
 
-async function pingHealthcheck(): Promise<void> {
-  const workerSecret = resolveWorkerSecret();
-  if (!workerSecret) {
-    if (!workerSecretMissingLogged) {
-      logInfo("Worker healthcheck ping skipped: WORKER_SECRET is not configured");
-      workerSecretMissingLogged = true;
-    }
-    return;
-  }
-
-  const healthcheckUrl = resolveHealthcheckUrl();
-
-  try {
-    await fetch(healthcheckUrl, {
-      method: "POST",
-      headers: {
-        "x-worker-secret": workerSecret,
-      },
-      signal: AbortSignal.timeout(HEALTHCHECK_REQUEST_TIMEOUT_MS),
-    });
-  } catch (error) {
-    logError("Worker healthcheck ping failed", {
-      error: error instanceof Error ? error.message : String(error),
-      __skipAlert: true,
-    });
-  }
-}
-
 async function maybePingHealthcheck(): Promise<void> {
-  const now = Date.now();
-  if (now - lastHealthcheckAt < HEALTHCHECK_INTERVAL_MS) return;
-  lastHealthcheckAt = now;
-  await pingHealthcheck();
+  await healthcheckPinger.maybePing();
 }
 
 async function monitorQueueStatsIfNeeded(): Promise<void> {

@@ -128,6 +128,15 @@ export default function LoginClient({
     if (code === "consent") return UI_TEXT.auth.loginPage.consentExpired;
     // FIX-B5: колбэк VK/Яндекса вернул конфликт уникальности адреса.
     if (code === "email_taken") return UI_TEXT.auth.loginPage.emailTakenByAnotherAccount;
+    // FIX-B13: провайдер не ответил за 10 с. Единственный отказ колбэка, где
+    // «попробуйте ещё раз» — не отговорка: причина внешняя и преходящая.
+    if (code === "provider_timeout") return UI_TEXT.auth.loginPage.oauthProviderTimeout;
+    // FIX-B14: исходы СТАРТОВОЙ ноги (`OAuthStartFailure`). Раньше они уезжали
+    // JSON-конвертом прямо в окно браузера — вернуться было некуда. Ключ
+    // запроса и есть имя исхода, см. `lib/auth/oauth-start-error.ts`.
+    if (code === "provider_unavailable") return UI_TEXT.auth.loginPage.oauthProviderUnavailable;
+    if (code === "consent_required") return UI_TEXT.auth.loginPage.consentRequired;
+    if (code === "start_failed") return UI_TEXT.auth.loginPage.oauthStartFailed;
     return null;
   }, [searchParams]);
   const reduce = useReducedMotion();

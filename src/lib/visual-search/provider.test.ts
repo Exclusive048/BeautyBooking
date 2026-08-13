@@ -14,6 +14,14 @@ vi.mock("@/lib/monitoring/alerts", () => ({
   trackError: vi.fn(() => 1),
 }));
 
+// FIX-B16: денежный потолок стоит внутри платных функций провайдера. Здесь он
+// замокан «бюджет есть» — предмет этого файла — контракт с Яндексом (модель,
+// эндпоинт, doc/query-сплит). Поведение потолка — `paid-call-coverage.test.ts`.
+vi.mock("@/lib/ai/spend-ceiling", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/spend-ceiling")>()),
+  takeAiSpendBudget: vi.fn(async () => {}),
+}));
+
 // Mock the OpenAI SDK — capture constructor args + stub chat.completions.create.
 const { mockCreate, constructorCalls } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
@@ -77,7 +85,7 @@ beforeEach(() => {
 
 describe("vision — Yandex qwen3.6-35b-a3b via AI Studio compat endpoint", () => {
   it("constructs the OpenAI SDK with Yandex AI Studio baseURL + folder as project", async () => {
-    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" });
+    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" });
     expect(constructorCalls).toHaveLength(1);
     expect(constructorCalls[0].apiKey).toBe("AQVN-test-yandex-key");
     expect(constructorCalls[0].baseURL).toBe("https://ai.api.cloud.yandex.net/v1");
@@ -85,7 +93,7 @@ describe("vision — Yandex qwen3.6-35b-a3b via AI Studio compat endpoint", () =
   });
 
   it("calls the qwen VLM model URI with json_object response_format + inlined image", async () => {
-    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" });
+    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" });
     const call = mockCreate.mock.calls[0][0];
     expect(call.model).toBe("gpt://b1g-test-folder/qwen3.6-35b-a3b/latest");
     expect(call.response_format).toEqual({ type: "json_object" });
@@ -97,19 +105,19 @@ describe("vision — Yandex qwen3.6-35b-a3b via AI Studio compat endpoint", () =
   // SEC-04: до фикса длину ответа ограничивал только таймаут в 30 с, то есть
   // стоимость одного анонимного vision-запроса не имела верхней границы.
   it("ставит max_tokens — стоимость ответа ограничена не только таймаутом", async () => {
-    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" });
+    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" });
     const call = mockCreate.mock.calls[0][0];
     expect(call.max_tokens).toBe(1024);
   });
 
   it("parses a valid JSON object response", async () => {
-    const result = await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" });
+    const result = await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" });
     expect(result).toEqual({ category: "manicure", confidence: "high" });
   });
 
   it("returns null on non-JSON content", async () => {
     mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "not json" } }] });
-    expect(await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u" })).toBeNull();
+    expect(await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" })).toBeNull();
   });
 });
 
@@ -128,7 +136,7 @@ describe("describeImageWithStrategy — contract + escape hatch", () => {
         },
       ],
     });
-    const result = await describeImageWithStrategy(IMAGE, strategy);
+    const result = await describeImageWithStrategy(IMAGE, strategy, "visual-search:search");
     expect(result.error).toBeUndefined();
     expect(result.text_description).toBe("Нежный французский маникюр овальной формы.");
     expect(result.meta.base_color).toBe("розовый");
@@ -138,7 +146,7 @@ describe("describeImageWithStrategy — contract + escape hatch", () => {
     mockCreate.mockResolvedValueOnce({
       choices: [{ message: { content: '{"error":"not_applicable"}' } }],
     });
-    const result = await describeImageWithStrategy(IMAGE, strategy);
+    const result = await describeImageWithStrategy(IMAGE, strategy, "visual-search:search");
     expect(result.error).toBe("not_applicable");
     expect(result.text_description).toBe("");
   });
@@ -147,7 +155,7 @@ describe("describeImageWithStrategy — contract + escape hatch", () => {
     mockCreate.mockResolvedValueOnce({
       choices: [{ message: { content: '{"shape":"овал","text_description":"   "}' } }],
     });
-    const result = await describeImageWithStrategy(IMAGE, strategy);
+    const result = await describeImageWithStrategy(IMAGE, strategy, "visual-search:search");
     expect(result.error).toBe("not_applicable");
   });
 });

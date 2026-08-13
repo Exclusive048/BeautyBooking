@@ -117,6 +117,9 @@ type RateLimitTier =
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
+/** FIX-C2 — две неаутентифицированные health-пробы (см. `resolveRateLimitTier`). */
+const HEALTH_LIVENESS_PATH = "/api/health";
+const HEALTH_READINESS_PATH = "/api/health/ready";
 /**
  * RES-04 задавал верхнюю границу self-hop'а прокси в `/api/auth/refresh` (2 с).
  * PERF-14 убрал сам хоп — обновление идёт вызовом функции, — поэтому и граница
@@ -146,6 +149,18 @@ function normalizePathname(pathname: string): string {
 function resolveRateLimitTier(method: string, pathname: string): RateLimitTier | null {
   if (!pathname.startsWith("/api/")) return null;
   if (pathname === REFRESH_ENDPOINT_PATH) return null;
+  // FIX-C2: неаутентифицированные health-пробы не проходят через лимитер, и это
+  // не про их стоимость, а про независимость. Ключ лимита считается в Redis, то
+  // есть ДО обработчика каждая проба платила ~2.5 с при обрыве Redis (замер
+  // `SMOKE-01 · F5`) — проба, которая ждёт лежащую зависимость, чтобы сообщить,
+  // что зависимость лежит, отчасти воспроизводит F2 уровнем выше.
+  //
+  // Изъятие узкое и перечислено поимённо: `/api/health/status` и
+  // `/api/health/worker` гейтятся секретом, и снятие лимита открыло бы их
+  // перебору. Обе строки ниже отдают ответ, не зависящий от вызывающего, и
+  // работы не покупают: liveness не ходит никуда, readiness делает два
+  // ограниченных сверху запроса по уже открытым соединениям.
+  if (pathname === HEALTH_LIVENESS_PATH || pathname === HEALTH_READINESS_PATH) return null;
 
   if (method === "POST") {
     if (pathname === "/api/bookings") return "bookingCreate";
@@ -433,11 +448,34 @@ export async function proxy(request: NextRequest) {
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
     if (result.limited) {
+      // FIX-B12: отказ по исчерпанному бюджету и отказ «не смогли посчитать»
+      // рендерились одинаково — 429 «Too many requests». Для fail-closed
+      // чувствительного роута при обрыве Redis это неверно дважды: статус учит
+      // клиента реже повторять (а повторить как раз нужно), и текст утверждает
+      // про число запросов то, чего не было. Форма конверта — та же, что у
+      // `fail()` / `tooManyRequests()`, чтобы клиент разбирал ответ прокси и
+      // ответ обработчика одинаково; собрана здесь руками, потому что
+      // `getRequestId()` работает через request-контекст, которого у прокси нет.
+      const unavailable = result.reason === "unavailable";
       return withRequestId(
         NextResponse.json(
-          { error: "Too many requests" },
           {
-            status: 429,
+            ok: false,
+            requestId,
+            error: unavailable
+              ? {
+                  message: "Сервис временно недоступен. Попробуйте позже.",
+                  code: "RATE_LIMIT_UNAVAILABLE",
+                  details: { retryAfterSeconds: result.retryAfterSeconds },
+                }
+              : {
+                  message: "Слишком много запросов. Попробуйте позже.",
+                  code: "RATE_LIMITED",
+                  details: { retryAfterSeconds: result.retryAfterSeconds },
+                },
+          },
+          {
+            status: unavailable ? 503 : 429,
             headers: {
               "Retry-After": String(result.retryAfterSeconds),
             },

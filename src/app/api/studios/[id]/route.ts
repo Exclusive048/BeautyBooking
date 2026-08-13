@@ -69,7 +69,10 @@ const updateSchema = z
   );
 
 function coordsRequired() {
-  return NextResponse.json({ ok: false, error: "ADDRESS_COORDS_REQUIRED" }, { status: 400 });
+  // FIX-B14: прежняя форма клала МАШИННЫЙ КОД в поле `error`, где UI ждёт
+  // объект `{ message, code }` — то есть сообщения не было вовсе, а гейт
+  // `check:error-message-lang` этого не видел (ответ собран мимо `fail()`).
+  return fail("Укажите адрес — выберите его из подсказок.", 400, "ADDRESS_COORDS_REQUIRED");
 }
 
 export async function GET(_req: Request, ctx: RouteContext) {

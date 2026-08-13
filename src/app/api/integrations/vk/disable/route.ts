@@ -40,6 +40,7 @@ export async function POST() {
     return ok({ enabled: false });
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт `AppError.details`.
+    return fail(appError.message, appError.status, appError.code);
   }
 }

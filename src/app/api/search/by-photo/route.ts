@@ -15,10 +15,9 @@ import { getVisualSearchEnabled } from "@/lib/visual-search/config";
 import {
   byPhotoImageHash,
   getCachedByPhotoResult,
-  secondsToUtcMidnight,
   setCachedByPhotoResult,
-  takeVisualSearchDailyBudget,
 } from "@/lib/visual-search/by-photo-guards";
+import { AiSpendCeilingError } from "@/lib/ai/spend-ceiling";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const runtime = "nodejs";
@@ -95,16 +94,11 @@ export async function POST(req: Request) {
       return jsonOk<VisualSearchHttpResponse>(cached);
     }
 
-    // Слой 3 — глобальный суточный бюджет инстанса: при исчерпании — честный
-    // 429 с курируемой строкой и Retry-After до конца UTC-суток, не 500.
-    const budget = await takeVisualSearchDailyBudget();
-    if (budget.limited) {
-      return tooManyRequests(
-        secondsToUtcMidnight(),
-        UI_TEXT.home.visualSearch.messages.budgetExhausted
-      );
-    }
-
+    // FIX-B16: суточный ДЕНЕЖНЫЙ потолок сработает внутри `searchByImage` — он
+    // живёт в чокпойнте провайдера, чтобы покрывать и путь индексации, у
+    // которого запроса нет. Роут ловит его отдельно от общего `catch` только
+    // ради `Retry-After`: форма отказа (честный 429 + курируемая строка вместо
+    // 500) — ратифицированное поведение SEC-04, и её надо сохранить.
     const result = await searchByImage(new Uint8Array(imageBuffer));
     const response: VisualSearchHttpResponse = result.ok
       ? result
@@ -112,6 +106,12 @@ export async function POST(req: Request) {
     await setCachedByPhotoResult(imageHash, response);
     return jsonOk<VisualSearchHttpResponse>(response);
   } catch (error) {
+    if (error instanceof AiSpendCeilingError) {
+      return tooManyRequests(
+        error.retryAfterSeconds,
+        UI_TEXT.home.visualSearch.messages.budgetExhausted
+      );
+    }
     const appError = toAppError(error);
     if (appError.status >= 500) {
       logError("POST /api/search/by-photo failed", {

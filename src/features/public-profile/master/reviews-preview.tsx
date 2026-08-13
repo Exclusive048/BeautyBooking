@@ -13,6 +13,7 @@ import { StarsDisplay } from "@/features/master/components/reviews/stars-display
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { ReportReviewModal } from "@/features/reviews/components/report-review-modal";
 import type { ReviewDto } from "@/lib/reviews/types";
+import { ApiClientError, fetchJson } from "@/lib/http/client";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -175,22 +176,29 @@ export function ReviewsPreview({
     setSummaryLoading(true);
     setSummaryError(null);
     try {
-      const res = await fetch(
+      // FIX-C3 · SMOKE-01 · F3 — ответ разбирается общим `fetchJson`, а не
+      // руками. Прежний код тело ЧИТАЛ, но `json.error.message` не смотрел ни в
+      // одной ветке: и `!res.ok`, и `catch` печатали одну строку «Попробуйте
+      // через минуту». Для суточного потолка ИИ (FIX-B16 отдаёт 429
+      // `AI_DAILY_LIMIT_REACHED` с курируемой строкой «…дневной лимит исчерпан.
+      // Попробуйте завтра.») это врало о МАСШТАБЕ ВРЕМЕНИ: пользователь ждал
+      // минуту и жал снова, пока не решал, что продукт сломан.
+      const data = await fetchJson<{ summary: string | null; reviewsCount: number }>(
         `/api/public/providers/${encodeURIComponent(providerId)}/review-summary`,
         { cache: "no-store" },
       );
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
-        summary: string | null;
-        reviewsCount: number;
-      }> | null;
-      if (!res.ok || !json || !json.ok) throw new Error(t.summaryFailed);
-      if (!json.data.summary) {
+      if (!data.summary) {
         setSummaryError(t.summaryFewReviews);
       } else {
-        setSummaryText(json.data.summary);
+        setSummaryText(data.summary);
       }
-    } catch {
-      setSummaryError(t.summaryFailed);
+    } catch (error) {
+      // Своя строка остаётся дефолтом: она конкретнее generic-ответа и уместна,
+      // когда сервер СВОЕЙ не прислал (сеть, 500 без тела). Показывается ровно
+      // то, что сервер сказал, — и только когда он это сказал.
+      setSummaryError(
+        error instanceof ApiClientError && error.fromServer ? error.message : t.summaryFailed,
+      );
     } finally {
       setSummaryLoading(false);
     }

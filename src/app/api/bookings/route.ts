@@ -98,8 +98,17 @@ export async function POST(req: Request) {
     //     already identical, since `linkGuestBookingsToUserByPhone` attached
     //     these bookings to the very same phone-keyed profile at the guest's
     //     next login.
-    let effectiveClientUserId: string | null = sessionUser?.id ?? null;
-    if (!sessionUser) {
+    //
+    // FIX-B15: объявлено `string`, а не `string | null`, и присваивается в обеих
+    // ветках — ровно та форма, что уже была у трёх соседних гостевых роутов.
+    // Прежний `string | null` был единственным местом, где отсутствие профиля
+    // всё ещё выражалось типом, и через него `null` формально доезжал до
+    // `createBooking`, у которого была гостевая ветка неймспейса. Теперь
+    // определённость присваивания проверяет компилятор.
+    let effectiveClientUserId: string;
+    if (sessionUser) {
+      effectiveClientUserId = sessionUser.id;
+    } else {
       assertRequiredConsents(consent);
 
       const { profile, wasCreated } = await findOrCreateGuestUserByPhone({
@@ -165,9 +174,9 @@ export async function POST(req: Request) {
         outcome: "success",
         operation: "create-booking",
       });
-      if (effectiveClientUserId) {
-        void invalidateRecentMastersCache(effectiveClientUserId);
-      }
+      // FIX-B15: `if` снят — переменная больше не nullable, и условие читалось
+      // как «у гостя кэш не сбрасываем», чего не происходит с RKN-FIX-02.
+      void invalidateRecentMastersCache(effectiveClientUserId);
       return jsonOk({ booking: created }, { status: 201 });
     }
 
@@ -216,9 +225,7 @@ export async function POST(req: Request) {
       outcome: "success",
       operation: "create-booking",
     });
-    if (effectiveClientUserId) {
-      void invalidateRecentMastersCache(effectiveClientUserId);
-    }
+    void invalidateRecentMastersCache(effectiveClientUserId);
     return jsonOk({ booking }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

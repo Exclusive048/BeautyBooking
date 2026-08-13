@@ -100,9 +100,22 @@ services:
       - "127.0.0.1:3000:3000"
     healthcheck:
       # Node 20 ships a global fetch(), so no curl/wget is needed in the slim
-      # runner image. /api/health returns 200 only when Postgres AND Redis are
-      # reachable (503 otherwise). Generous start_period so a cold Next.js boot
-      # is not counted as unhealthy → no restart loop before the server is up.
+      # runner image.
+      #
+      # FIX-C2: /api/health is a LIVENESS probe — "can this process serve at
+      # all", no dependency I/O. It deliberately does NOT go 503 when Redis is
+      # down. A Redis outage is a partial, by-design degradation (sensitive
+      # routes fail closed, inv. #6; the public storefront keeps serving), and
+      # marking the container unhealthy for it would pull the only instance out
+      # of the load balancer — turning a partial outage into a total one.
+      # Dependency state lives at /api/health/ready and is checked by deploy.yml
+      # as a post-deploy gate, where "this build cannot reach Postgres" is
+      # actionable (roll back) rather than merely reported.
+      #
+      # Generous start_period so a cold Next.js boot is not counted as unhealthy.
+      # NOTE: `restart: unless-stopped` does NOT restart on unhealthy — plain
+      # Compose has no such behaviour. This status is consumed by deploy.yml and
+      # by whatever external monitor DevOps wires up, nothing else.
       test:
         - "CMD"
         - "node"

@@ -127,7 +127,7 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
     const originalBytes = await readStorageBytes(asset.storageKey, asset.mimeType);
     const resizedBytes = await resizeForVision(originalBytes);
 
-    const classification = await classifyImage(resizedBytes);
+    const classification = await classifyImage(resizedBytes, "visual-search:index");
     if (classification.category === "none" || classification.confidence === "low") {
       await markAssetAsUnrecognized(asset.id);
       return;
@@ -139,7 +139,7 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
       return;
     }
 
-    const visualResult = await describeImageWithStrategy(resizedBytes, strategy);
+    const visualResult = await describeImageWithStrategy(resizedBytes, strategy, "visual-search:index");
     if (visualResult.error === "not_applicable") {
       await markAssetAsUnrecognized(asset.id);
       return;

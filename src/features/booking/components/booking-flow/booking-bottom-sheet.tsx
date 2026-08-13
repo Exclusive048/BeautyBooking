@@ -8,6 +8,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   providerId: string;
+  providerName: string;
   serviceId: string;
   serviceName: string;
   servicePrice: number;
@@ -28,6 +29,7 @@ export function BookingBottomSheet({
   open,
   onClose,
   providerId,
+  providerName,
   serviceId,
   serviceName,
   servicePrice,
@@ -47,6 +49,7 @@ export function BookingBottomSheet({
       <div className="px-5 pb-6">
         <BookingFlowStepper
           providerId={providerId}
+          providerName={providerName}
           serviceId={serviceId}
           serviceName={serviceName}
           servicePrice={servicePrice}

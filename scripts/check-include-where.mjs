@@ -23,9 +23,27 @@
  * Silence a deliberate full-fetch with an inline `// include-ok: <reason>` on the
  * relation's line or the line directly above — visible intent, the check:tz model.
  *
- * WARN-ONLY (exit 0): the pre-existing findings are a review backlog, not a build
- * break. To flip to enforcing (exit 1 on any non-opted-out finding) once those are
- * triaged/opted-out, set EXIT_ON_FINDINGS = true below.
+ * FIX-B11 — ГЕЙТ ТЕПЕРЬ УМЕЕТ ПАДАТЬ. До этого здесь стоял
+ * `EXIT_ON_FINDINGS = false`, то есть `process.exit(0)` при любом входе: шаг
+ * висел в батарее из восемнадцати проверок и не мог покраснеть НИКОГДА.
+ * Гейт, который не может упасть, хуже отсутствующего — читатель зелёного CI
+ * считает область покрытой, и именно эта ложная уверенность и есть вред
+ * (инв. #43).
+ *
+ * Почему заморозка инвентаря, а не «починить все находки»: их 39 в 24 файлах,
+ * и каждая требует продуктового решения (это полный fetch по замыслу или
+ * недосмотр?) — то есть отдельный обзор производительности, а не побочный
+ * эффект починки гейта. Поэтому взят приём, уже принятый в этом репозитории
+ * для того же класса задач (`sensitive-fail-open-known.json`): инвентарь
+ * заморожен в `scripts/include-where-baseline.json`, гейт падает на ДЕЛЬТЕ.
+ *
+ * 🔴 Что значит его зелёный — честная формулировка: «неограниченных чтений не
+ * стало больше», а НЕ «неограниченных чтений нет». Существующие 39 остаются
+ * открытым backlog'ом (`PRISMA-INCLUDE-WHERE-TRIAGE` в BACKLOG).
+ *
+ * Падает в трёх случаях: новый файл с находкой; больше находок в уже известном
+ * файле; протухшая запись (находок стало меньше — базлайн обязан сузиться,
+ * иначе он молча амнистирует будущий регресс на освободившемся месте).
  *
  * Usage: `npm run check:include-where`
  */
@@ -34,7 +52,7 @@ import { extname, join, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
-const EXIT_ON_FINDINGS = false; // WARN-ONLY (see header). Flip once backlog cleared.
+const BASELINE_PATH = "scripts/include-where-baseline.json";
 
 const SRC_ROOTS = ["src"];
 const SCHEMA_DIR = "prisma/schema";
@@ -210,7 +228,47 @@ function main() {
     `BASELINE: ${total} unbounded growth-capable list include(s) across ${byFile.size} file(s). ` +
       `Review each: add \`where\`/\`take\`, or \`// include-ok: <reason>\` for a deliberate full-fetch.`,
   );
-  process.exit(EXIT_ON_FINDINGS ? 1 : 0);
+
+  // ── Дельта против замороженного инвентаря (см. шапку) ────────────────────
+  const baseline = existsSync(BASELINE_PATH)
+    ? JSON.parse(readFileSync(BASELINE_PATH, "utf8")).files ?? {}
+    : {};
+
+  const grew = [];
+  for (const [file, hits] of byFile) {
+    const known = baseline[file] ?? 0;
+    if (hits.length > known) grew.push(`${file}: ${known} → ${hits.length}`);
+  }
+  const shrank = [];
+  for (const [file, known] of Object.entries(baseline)) {
+    const now = byFile.get(file)?.length ?? 0;
+    if (now < known) shrank.push(`${file}: ${known} → ${now}`);
+  }
+
+  if (grew.length === 0 && shrank.length === 0) {
+    console.log("");
+    console.log(`Дельта против ${BASELINE_PATH}: пусто — новых неограниченных чтений нет. ✅`);
+    console.log("(Зелёный означает «не стало больше», а НЕ «их нет»: 39 находок — открытый backlog.)");
+    process.exit(0);
+  }
+
+  console.log("");
+  if (grew.length > 0) {
+    console.log("❌ НОВЫЕ неограниченные чтения list-связей (нет `where`/`take`):");
+    for (const line of grew) console.log(`  ${line}`);
+    console.log(
+      "  Добавьте `where`/`take`, либо `// include-ok: <причина>` для осознанного full-fetch,",
+    );
+    console.log(`  либо внесите изменение в ${BASELINE_PATH} ОСОЗНАННО.`);
+  }
+  if (shrank.length > 0) {
+    console.log("❌ Записи базлайна протухли (находок стало меньше) — сузьте инвентарь:");
+    for (const line of shrank) console.log(`  ${line}`);
+    console.log(
+      "  Иначе освободившееся место молча амнистирует будущий регресс в этом же файле.",
+    );
+  }
+  process.exit(1);
 }
 
 // Run only when invoked directly (not when imported by the test).

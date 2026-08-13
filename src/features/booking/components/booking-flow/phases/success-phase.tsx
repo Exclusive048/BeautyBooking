@@ -9,6 +9,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ConfirmedBooking } from "@/features/booking/components/booking-flow/types";
+import { buildSuccessHeadline } from "@/features/booking/components/booking-flow/lib/success-headline";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 const TF = UI_TEXT.publicProfile.bookingFlow;
@@ -82,7 +83,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
       </div>
 
       <p className="font-display text-xl text-text-main">
-        {T.successHeadlineTemplate.replace("{name}", booking.providerName)}
+        {buildSuccessHeadline(booking.providerName)}
       </p>
 
       <div className="space-y-2">

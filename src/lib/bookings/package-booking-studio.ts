@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError, type ErrorCode, toAppError } from "@/lib/api/errors";
-import { Prisma, BookingPackageStatus } from "@prisma/client";
+import { Prisma, BookingPackageStatus, BookingSource } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
 import {
   ensureNoConflicts,
   resolveBookingCore,
@@ -216,7 +217,12 @@ export async function proposeStudioPackagePlacement(input: {
  */
 type CreateStudioPackageInput = {
   packageId: string;
-  clientUserId: string | null;
+  /**
+   * FIX-B15 — пакет создаётся только для резолвнутого профиля (RKN-FIX-02),
+   * поэтому не nullable. Оба роута объявляют локальную переменную как `string`;
+   * тип фиксирует это на границе, а не оставляет соглашению.
+   */
+  clientUserId: string;
   clientName: string;
   clientPhone: string;
   comment?: string | null;
@@ -233,7 +239,6 @@ export async function createStudioPackageBooking(
   const guard = await beginPackageIdempotency({
     idempotencyKey: input.idempotencyKey,
     clientUserId: input.clientUserId,
-    clientPhone: input.clientPhone,
   });
   if (guard.cached) return guard.cached;
 
@@ -343,10 +348,13 @@ async function createStudioPackageBookingUnguarded(
             bufferMin: core.bufferMin,
           });
 
-          const created = await tx.booking.create({
+          const created = await createBookingRow(tx, {
             data: {
               providerId: pkg.providerId,
-              studioId: pkg.studioId,
+              // FIX-C1: `studioId` больше не передаётся — writer выводит его из
+              // `providerId` (у студийного пакета это провайдер студии, то есть
+              // ровно тот `Studio.id`, что стоял здесь раньше).
+              source: BookingSource.WEB,
               serviceId: core.service.id,
               masterProviderId: core.resolvedMasterProviderId,
               masterId: core.resolvedMasterProviderId ?? pkg.providerId,

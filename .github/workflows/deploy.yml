@@ -161,6 +161,33 @@ jobs:
               rollback_and_fail "App не стал healthy за 180 с (статус: $STATUS)"
             fi
 
+            # FIX-C2: compose-проба выше — LIVENESS («процесс обслуживает»), и
+            # она намеренно НЕ краснеет на обрыве Redis: иначе частичная
+            # деградация выводила бы единственный инстанс из ротации. Но живости
+            # мало для вердикта о ДЕПЛОЕ — она не отличает рабочий образ от
+            # образа с неверным DATABASE_URL или неприменённой миграцией.
+            # Поэтому вторым шагом спрашиваем готовность.
+            #
+            # 🔴 Гейтом служит ТОЛЬКО `db`. Откат на `:previous` чинит плохую
+            # сборку и не чинит лежащий Redis — на старом образе он лежит ровно
+            # так же, то есть откат по Redis был бы обрядом, а не средством.
+            # Состояние Redis печатается в лог, чтобы деплой в такое окно был
+            # виден в истории, а не выглядел безоблачным.
+            READY_JSON="$(docker exec "$APP_ID" node -e \
+              "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>r.text()).then(t=>{console.log(t)}).catch(e=>{console.log(JSON.stringify({ok:false,dependencies:{db:'unreachable'},error:String(e)}))})" \
+              2>/dev/null || echo '{"ok":false,"dependencies":{"db":"unreachable"},"error":"docker exec failed"}')"
+            echo "readiness: $READY_JSON"
+            case "$READY_JSON" in
+              *'"db":"ok"'*) : ;;
+              *) rollback_and_fail "Сборка жива, но не готова: БД недостижима из нового образа ($READY_JSON)" ;;
+            esac
+            case "$READY_JSON" in
+              *'"redis":"down"'*)
+                echo "⚠️  Redis недоступен на момент деплоя. Откат НЕ делается (он этого не чинит) —"
+                echo "    но чувствительные роуты сейчас fail-closed: docs/runbooks/redis-down.md"
+                ;;
+            esac
+
             # У воркера нет HTTP-healthcheck'а — liveness по его собственному
             # логу «Worker started» + счётчику рестартов: краш-луп воркера без
             # этой проверки давал бы «✅ деплой успешен» при мёртвых напоминаниях,

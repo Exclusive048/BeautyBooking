@@ -45,9 +45,20 @@ const OTP_VERIFY_FAIL_LIMIT = 5;
 const OTP_VERIFY_LOCK_SECONDS = 15 * 60;
 const OTP_VERIFY_RETRY_AFTER_SECONDS = 60;
 
-type RateLimitResult =
-  | { ok: true }
-  | { ok: false; status: number; error: "RATE_LIMIT" | "RATE_LIMIT_UNAVAILABLE" | "OTP_LOCKED"; retryAfterSec: number };
+/**
+ * FIX-B14: отказ вынесен в собственный экспортируемый тип — на него опирается
+ * `otp-rate-limit-response.ts`, единственное место, где он превращается в
+ * HTTP-ответ. До этого каждый из четырёх OTP-роутов собирал конверт руками и
+ * клал `error` (машинный код) туда, где клиент ждёт текст.
+ */
+export type OtpRateLimitRefusal = {
+  ok: false;
+  status: number;
+  error: "RATE_LIMIT" | "RATE_LIMIT_UNAVAILABLE" | "OTP_LOCKED";
+  retryAfterSec: number;
+};
+
+type RateLimitResult = { ok: true } | OtpRateLimitRefusal;
 
 function hashKey(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");

@@ -143,7 +143,12 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
         body: formData,
       });
 
-      let payload: { ok?: boolean; error?: string } | null = null;
+      // FIX-B18: роут переведён на конверт проекта, поэтому текст лежит в
+      // `error.message`, а не в `error`. Это единственный клиент, который
+      // читал старую форму (партнёрская форма тело отказа не смотрит вовсе),
+      // и без этой правки пользователь увидел бы дефолтную строку вместо
+      // курируемой — то есть регрессию, невидимую для сервера.
+      let payload: { ok?: boolean; error?: { message?: string } } | null = null;
       try {
         payload = await res.json();
       } catch {
@@ -156,7 +161,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
       }
 
       if (!res.ok || !payload?.ok) {
-        setError(payload?.error ?? UI_TEXT.pages.support.form.errorSendFailed);
+        setError(payload?.error?.message ?? UI_TEXT.pages.support.form.errorSendFailed);
         return;
       }
 

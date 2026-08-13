@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { jsonFail } from "@/lib/api/contracts";
 import { getSessionUser } from "@/lib/auth/session";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { verifyChatAttachmentToken } from "@/lib/media/private-delivery";
 import { getMediaFile } from "@/lib/media/service";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type RouteContext = {
   params: Promise<{ token: string }>;
@@ -41,10 +43,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const params = await ctx.params;
     const token = params.token?.trim();
     if (!token) {
-      return NextResponse.json(
-        { ok: false, error: { message: "Не указан токен доступа.", code: "VALIDATION_ERROR" } },
-        { status: 400 },
-      );
+      return jsonFail(400, "Не указан токен доступа.", "VALIDATION_ERROR");
     }
 
     const verified = verifyChatAttachmentToken(token);
@@ -55,10 +54,16 @@ export async function GET(req: Request, ctx: RouteContext) {
         operation: "chat-attachment-token",
         code: "INVALID_CHAT_ATTACHMENT_TOKEN",
       });
-      return NextResponse.json(
-        { ok: false, error: { message: "Требуется вход в аккаунт.", code: "UNAUTHORIZED" } },
-        { status: 401 },
-      );
+      // FIX-C3 · item 3: строка была НЕВЕРНА для самого частого случая. Токен
+      // вложения живёт 15 минут (`CHAT_ATTACHMENT_TOKEN_TTL_SECONDS`), поэтому
+      // на открытой дольше вкладке чата картинки перестают грузиться у
+      // пользователя, который **уже вошёл** — а ответ советовал ему войти. Это
+      // тот же класс, что F3: сервер называет причиной не то.
+      //
+      // Статус остаётся 401 (доступа по этому токену нет), меняется смысл:
+      // причина названа честно, и она действенна — обновить страницу, чтобы
+      // получить свежие токены.
+      return jsonFail(401, UI_TEXT.chat.composer.attachmentLinkExpired, "UNAUTHORIZED");
     }
 
     const user = await getSessionUser();
@@ -101,9 +106,6 @@ export async function GET(req: Request, ctx: RouteContext) {
         code: appError.code,
       });
     }
-    return NextResponse.json(
-      { ok: false, error: { message: appError.message, code: appError.code } },
-      { status: appError.status },
-    );
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

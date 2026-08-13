@@ -1,0 +1,29 @@
+{
+  "_": "FIX-B11: ЗАМОРОЖЕННЫЙ инвентарь неограниченных чтений list-связей. Это НЕ список одобренных — это backlog обзора (PRISMA-INCLUDE-WHERE-CI-CHECK). Гейт падает, когда появляется НОВОЕ чтение или файл, и когда запись протухла. Убирая находку — уменьшите число здесь; добавляя осознанный full-fetch — пометьте его // include-ok: <причина>, тогда он сюда не попадёт.",
+  "files": {
+    "src/app/(cabinet)/cabinet/(user)/roles/page.tsx": 1,
+    "src/app/api/admin/cities/[id]/merge/route.ts": 1,
+    "src/app/api/admin/cities/[id]/route.ts": 1,
+    "src/app/api/admin/cities/route.ts": 1,
+    "src/app/api/bookings/[id]/chat/route.ts": 3,
+    "src/app/api/favorites/route.ts": 1,
+    "src/app/api/master/model-offers/route.ts": 2,
+    "src/features/admin-cabinet/users/server/users.service.ts": 1,
+    "src/lib/bookings/package-booking.ts": 1,
+    "src/lib/bookings/package-idempotency.ts": 1,
+    "src/lib/catalog/catalog.service.ts": 4,
+    "src/lib/chat/conversation-aggregator.ts": 1,
+    "src/lib/client-cabinet/favorites.service.ts": 1,
+    "src/lib/deletion/delete-account.ts": 1,
+    "src/lib/feed/portfolio.service.ts": 7,
+    "src/lib/legal/consent.ts": 1,
+    "src/lib/master/portfolio-mutations.ts": 1,
+    "src/lib/master/portfolio-view.service.ts": 1,
+    "src/lib/master/profile.service.ts": 3,
+    "src/lib/master/services-mutations.ts": 1,
+    "src/lib/providers/queries.ts": 1,
+    "src/lib/providers/usecases.ts": 1,
+    "src/lib/search-by-time/service.ts": 2,
+    "src/lib/studio/masters.service.ts": 1
+  }
+}

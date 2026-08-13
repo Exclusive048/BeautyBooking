@@ -1,4 +1,7 @@
 const ERROR_CODES = [
+  // FIX-B18: код существовал только литералом в master/profile (и уезжал в поле
+  // сообщения). При переводе роута на конверт он стал настоящим ErrorCode.
+  "ADDRESS_COORDS_REQUIRED",
   "ADDRESS_REQUIRED",
   "AUTH_DATE_EXPIRED",
   "AUTO_CONFIRM_NOT_ALLOWED_FOR_STUDIO",
@@ -90,6 +93,11 @@ const ERROR_CODES = [
   "PROVIDER_NOT_FOUND",
   "RANGE_INVALID",
   "RATE_LIMITED",
+  // FIX-B16: суточный ДЕНЕЖНЫЙ потолок платной AI-поверхности исчерпан.
+  // Отдельный код от `RATE_LIMITED` намеренно: тот про бюджет запросов
+  // конкретного клиента, этот — про общий бюджет расходов, и клиент,
+  // сделавший один запрос, не должен читать «вы шлёте слишком часто».
+  "AI_DAILY_LIMIT_REACHED",
   "REFERENCE_PHOTO_REQUIRED",
   "REFERENCE_PHOTO_NOT_FOUND",
   "REFERENCE_PHOTO_INVALID",

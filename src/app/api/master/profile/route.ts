@@ -1,5 +1,5 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
-import { toAppError } from "@/lib/api/errors";
+import { toAppError, type ErrorCode } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
@@ -16,11 +16,27 @@ function jsonProfileOk<T>(data: T) {
   return NextResponse.json({ ok: true, data }, { status: 200, headers: jsonUtf8Headers });
 }
 
-function jsonProfileFail(status: number, message: string, code?: string) {
-  return NextResponse.json(
-    { ok: false, error: message, code },
-    { status, headers: jsonUtf8Headers }
-  );
+/**
+ * FIX-B18 · SUPPORT-ENVELOPE-SHAPE — переведён на конверт проекта.
+ *
+ * Здесь была собственная форма `{ ok:false, error: <строка>, code }`: `error`
+ * строкой, `code` соседом, и всё мимо `fail()`/`jsonFail()`, то есть мимо
+ * `check:error-message-lang`. Цена границы была не теоретической — аудит нашёл
+ * в этом файле ЧЕТЫРЕ сообщения, которые гейт не мог увидеть: `"Unauthorized"`
+ * и трижды `"ADDRESS_COORDS_REQUIRED"`, то есть машинный код в поле текста.
+ * Ровно дефект FIX-B14, доживший в файле, чья строка в замороженном инвентаре
+ * утверждала «тексты русские».
+ *
+ * `jsonUtf8Headers` сохранён: `NextResponse.json` и так ставит charset, но
+ * заголовок здесь был явным с самого начала, и снимать его — отдельное
+ * изменение, к форме конверта отношения не имеющее.
+ */
+function jsonProfileFail(status: number, message: string, code: ErrorCode) {
+  const response = jsonFail(status, message, code);
+  for (const [key, value] of Object.entries(jsonUtf8Headers)) {
+    response.headers.set(key, value);
+  }
+  return response;
 }
 
 export async function GET(req: Request) {
@@ -46,24 +62,24 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonProfileFail(401, "Unauthorized", "UNAUTHORIZED");
+    if (!user) return jsonProfileFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
     const body = await parseBody(req, updateMasterProfileSchema);
     const addressProvided = body.address !== undefined;
     const hasGeoLat = body.geoLat !== undefined;
     const hasGeoLng = body.geoLng !== undefined;
     if (hasGeoLat !== hasGeoLng) {
-      return jsonProfileFail(400, "ADDRESS_COORDS_REQUIRED", "ADDRESS_COORDS_REQUIRED");
+      return jsonProfileFail(400, "Укажите адрес через подсказку — нужны координаты.", "ADDRESS_COORDS_REQUIRED");
     }
     if (addressProvided) {
       const trimmed = body.address?.trim() ?? "";
       if (trimmed) {
         if (!hasGeoLat || body.geoLat === null || body.geoLng === null) {
-          return jsonProfileFail(400, "ADDRESS_COORDS_REQUIRED", "ADDRESS_COORDS_REQUIRED");
+          return jsonProfileFail(400, "Укажите адрес через подсказку — нужны координаты.", "ADDRESS_COORDS_REQUIRED");
         }
       } else {
         if (!hasGeoLat || body.geoLat !== null || body.geoLng !== null) {
-          return jsonProfileFail(400, "ADDRESS_COORDS_REQUIRED", "ADDRESS_COORDS_REQUIRED");
+          return jsonProfileFail(400, "Укажите адрес через подсказку — нужны координаты.", "ADDRESS_COORDS_REQUIRED");
         }
       }
     }

@@ -2396,10 +2396,15 @@ export const openApiSpec = {
     "/api/auth/vk/start": {
       get: {
         summary: "Start VK ID authorization flow",
+        description:
+          "FIX-B14: это НАВИГАЦИЯ браузера, поэтому конверта ошибки у роута нет вовсе — каждый исход " +
+          "отвечает редиректом. Успех → VK ID; отказ → /login?error=<исход>, где исход один из " +
+          "provider_unavailable (килсвитч ФЗ-199 либо не сконфигурирован) · consent_required " +
+          "(обязательные согласия не отмечены, RKN-FIX-01) · start_failed (прочее). " +
+          "Не-браузерный клиент обязан НЕ следовать редиректу и читать ключ из Location.",
         tags: ["auth", "vk"],
         responses: {
-          "307": { description: "Redirect to VK ID" },
-          "500": errorResponse("Internal error"),
+          "307": { description: "Redirect to VK ID, or back to /login?error=<исход>" },
         },
       },
     },
@@ -2418,12 +2423,13 @@ export const openApiSpec = {
     "/api/auth/yandex/start": {
       get: {
         summary: "Start Yandex ID authorization flow",
-        description: "Bespoke-parallel к VK (PKCE S256 + HMAC-signed state/verifier cookies). Согласия из формы входа едут через подписанную state-bound cookie — см. RKN-FIX-01.",
+        description:
+          "Bespoke-parallel к VK (PKCE S256 + HMAC-signed state/verifier cookies). Согласия из формы " +
+          "входа едут через подписанную state-bound cookie — см. RKN-FIX-01. FIX-B14: конверта ошибки " +
+          "нет — исходы те же три, что у VK-близнеца, редиректом на /login?error=<исход>.",
         tags: ["auth", "yandex"],
         responses: {
-          "307": { description: "Redirect to Yandex ID" },
-          "503": errorResponse("Auth method not configured"),
-          "500": errorResponse("Internal error"),
+          "307": { description: "Redirect to Yandex ID, or back to /login?error=<исход>" },
         },
       },
     },
@@ -2444,11 +2450,14 @@ export const openApiSpec = {
     "/api/integrations/vk/start": {
       get: {
         summary: "Start VK ID integration linking",
+        description:
+          "FIX-B14: тоже навигация (кабинетная кнопка «подключить»), конверта ошибки нет. Аудитория — " +
+          "уже вошедший пользователь, поэтому адрес возврата не /login, а страница-источник (Referer, " +
+          "прогнанный через sanitizeInternalPath; дефолт /cabinet/profile) с ?vk=<исход>. " +
+          "Исключение — отсутствие сессии: /login?next=<страница-источник>.",
         tags: ["integrations", "vk"],
         responses: {
-          "307": { description: "Redirect to VK ID" },
-          "401": errorResponse("Unauthorized"),
-          "500": errorResponse("Internal error"),
+          "307": { description: "Redirect to VK ID, back to the connect surface with ?vk=<исход>, or /login" },
         },
       },
     },

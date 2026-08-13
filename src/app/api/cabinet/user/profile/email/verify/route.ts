@@ -11,6 +11,7 @@ import {
   clearOtpEmailVerifyFailures,
   registerOtpEmailVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { maskEmail } from "@/lib/logging/masking";
 import { prisma } from "@/lib/prisma";
@@ -51,13 +52,7 @@ export async function POST(req: Request) {
 
     const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail, clientIp);
     if (!lockCheck.ok) {
-      return NextResponse.json(
-        { ok: false, error: { message: lockCheck.error ?? "Слишком много попыток. Попробуйте позже.", code: "RATE_LIMITED" } },
-        {
-          status: lockCheck.status,
-          headers: { "Retry-After": String(lockCheck.retryAfterSec) },
-        },
-      );
+      return otpRateLimitFail(lockCheck);
     }
 
     const now = new Date();
@@ -77,16 +72,7 @@ export async function POST(req: Request) {
     if (!otp) {
       const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
       if (!failResult.ok) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: { message: failResult.error ?? "Слишком много попыток. Попробуйте позже.", code: "RATE_LIMITED" },
-          },
-          {
-            status: failResult.status,
-            headers: { "Retry-After": String(failResult.retryAfterSec) },
-          },
-        );
+        return otpRateLimitFail(failResult);
       }
       return jsonFail(401, "Код не подходит", "CODE_NOT_FOUND");
     }

@@ -1,4 +1,5 @@
-import { AccountType, Prisma } from "@prisma/client";
+import { AccountType, BookingSource, Prisma } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -297,7 +298,12 @@ export async function POST(req: Request, ctx: RouteContext) {
           endAtUtc,
         });
 
-        const booking = await tx.booking.create({
+        // FIX-C1: третий путь, не выставлявший `Booking.studioId`. Он был
+        // особенно легко пропускаем: `studioId` в этом блоке ЕСТЬ — но у
+        // соседнего `bookingServiceItem.create` (строкой ниже), а это другая
+        // таблица со своей одноимённой колонкой. Греп по файлу находил слово и
+        // успокаивал. Теперь значение выводит writer из `providerId`.
+        const booking = await createBookingRow(tx, {
           data: {
             providerId: offerService.providerId,
             serviceId: offerService.id,
@@ -313,7 +319,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             clientUserId: user.id,
             status: "CONFIRMED",
             actionRequiredBy: null,
-            source: "WEB",
+            source: BookingSource.WEB,
           },
           select: { id: true },
         });

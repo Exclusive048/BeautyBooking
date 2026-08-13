@@ -40,23 +40,17 @@ const bookingSelect = {
 } satisfies Prisma.BookingSelect;
 
 async function loadBookingForIdempotency(
-  userId: string | null,
+  userId: string,
   bookingId: string
 ): Promise<BookingDto | null> {
-  // BOOKING-WIDGET-FOUNDATION-A: guests have no userId. Idempotency key
-  // is already namespaced by phone (see createBooking), so collisions
-  // across users are impossible — we can safely return the cached
-  // booking by id without an ownership filter. Caller passes the row
-  // through DTO (no PII leakage beyond what the same caller submitted).
-  const booking = userId
-    ? await prisma.booking.findFirst({
-        where: { id: bookingId, clientUserId: userId },
-        select: bookingSelect,
-      })
-    : await prisma.booking.findFirst({
-        where: { id: bookingId, clientUserId: null },
-        select: bookingSelect,
-      });
+  // FIX-B15: раньше здесь была вторая ветка `clientUserId: null` для гостя, и
+  // её комментарий ссылался на неймспейс по телефону — механику, отменённую
+  // RKN-FIX-02. Оба вызывающих (`createBooking`, `createClientBooking`) передают
+  // непустой id, и теперь это выражено типом, а не соглашением.
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, clientUserId: userId },
+    select: bookingSelect,
+  });
   return booking ? toBookingDto(booking) : null;
 }
 
@@ -125,7 +119,8 @@ export async function resolveIdempotency<T>(input: {
 export async function resolveBookingIdempotency(input: {
   key: string;
   ttlSeconds: number;
-  userId: string | null;
+  /** FIX-B15: не nullable — см. `loadBookingForIdempotency`. */
+  userId: string;
 }): Promise<{ booking: BookingDto | null; lockAcquired: boolean }> {
   const resolved = await resolveIdempotency({
     key: input.key,

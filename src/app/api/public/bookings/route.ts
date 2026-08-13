@@ -187,9 +187,8 @@ export async function POST(req: Request) {
       operation: "create-public-booking",
       code: appError.code,
     });
-    return NextResponse.json(
-      { ok: false, error: { code: appError.code, message: appError.message } },
-      { status: appError.status },
-    );
+    // FIX-B18: форма и так совпадала с конвертом, но собиралась руками — то
+    // есть без `requestId` и мимо `check:error-message-lang`.
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

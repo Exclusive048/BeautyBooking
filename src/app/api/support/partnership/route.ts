@@ -2,6 +2,8 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonFail } from "@/lib/api/contracts";
+import type { ErrorCode } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -15,6 +17,24 @@ import {
 } from "@/lib/support/smtp";
 
 export const runtime = "nodejs";
+
+/**
+ * FIX-B18 · SUPPORT-ENVELOPE-SHAPE — обе support-поверхности переведены на
+ * конверт проекта.
+ *
+ * Была собственная форма `{ ok:false, error: <строка> }` — `error` строкой, а
+ * не объектом, — и собрана она была руками, то есть мимо `jsonFail()` и мимо
+ * `check:error-message-lang`. Тексты здесь всегда были русскими (константы в
+ * шапке файла), поэтому находки в них не было; ратифицировать форму мешало
+ * другое: пока в проекте живут ДВЕ формы ответа об ошибке, гейт языка
+ * обязан иметь слепую зону, а клиент — знать, какая из форм придёт.
+ *
+ * Конверт добавляет `requestId`, которого у этих ответов не было вовсе, —
+ * то есть жалоба «форма не отправилась» становится сопоставимой с логом.
+ */
+function supportFail(status: number, message: string, code: ErrorCode) {
+  return jsonFail(status, message, code);
+}
 
 const INVALID_FORM_ERROR = "Некорректные данные формы.";
 const TOO_MANY_REQUESTS_ERROR =
@@ -120,24 +140,24 @@ export async function POST(req: Request) {
   const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;
   const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
   if (!ipAllowed) {
-    return NextResponse.json({ ok: false, error: TOO_MANY_REQUESTS_ERROR }, { status: 429 });
+    return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
   }
 
   const read = await readBodyTextCapped(req);
   if (!read.ok) {
-    return NextResponse.json({ ok: false, error: TOO_LARGE_ERROR }, { status: 413 });
+    return supportFail(413, TOO_LARGE_ERROR, "REQUEST_BODY_TOO_LARGE");
   }
 
   let body: unknown;
   try {
     body = JSON.parse(read.text) as unknown;
   } catch {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   const parsed = partnershipSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   const data = parsed.data;
@@ -189,11 +209,11 @@ export async function POST(req: Request) {
       smtpFrom: maskSmtpIdentity(smtpFromRaw),
       recipient: maskSmtpIdentity(recipientRaw),
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   if (smtpPort > 65535) {
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   const normalizedSmtpUser = normalizeSmtpAddressList(smtpUserRaw);
@@ -270,7 +290,7 @@ export async function POST(req: Request) {
       kind: data.kind,
       ip,
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   logInfo("Partnership inquiry submitted", {

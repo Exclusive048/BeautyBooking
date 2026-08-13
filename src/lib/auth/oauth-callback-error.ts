@@ -21,6 +21,25 @@ import { scrubRecord } from "@/lib/observability/scrub";
  * server-side diagnostics (tokens/PII redacted by `scrubRecord`) and returns
  * only the curated message + code — never the raw payload.
  */
+/**
+ * FIX-B13 — «повторять есть что» как СВОЙСТВО отказа, а не как имя кода.
+ *
+ * Дедлайн обменов с провайдером (RES-09, 10 с) отклоняет `fetch` нативным
+ * `DOMException` с именем `TimeoutError`, и он не несёт ни `code`, ни `status` —
+ * то есть `toAppError` сводит его к общему `INTERNAL_ERROR` 500, где таймаут
+ * неотличим от настоящего бага. Поэтому классифицировать надо ИСХОДНУЮ ошибку,
+ * до нормализации: после неё признак уже потерян.
+ *
+ * 🔴 Границу держим узкой намеренно. Таймаут Redis (`REDIS_COMMAND_TIMEOUT`,
+ * `withRedisCommandTimeout`) тоже достижим в колбэке и формально тоже
+ * «retryable», но сюда НЕ входит: это медленно у НАС, а сообщение обещает
+ * пользователю, что медленно было у провайдера. Соврать про причину хуже, чем
+ * отдать общий отказ, — у такого случая должен быть свой текст и своё решение.
+ */
+export function isRetryableOAuthCallbackFailure(error: unknown): boolean {
+  return error instanceof Error && error.name === "TimeoutError";
+}
+
 export function failOAuthCallback(req: Request, error: unknown) {
   const appError = error instanceof AppError ? error : toAppError(error);
   logError("OAuth callback failed", {
@@ -50,6 +69,13 @@ export function failOAuthCallback(req: Request, error: unknown) {
   // `emailVerifiedAt` (инв. #41 говорит, что решать это нельзя молча).
   if (appError.code === "ALREADY_EXISTS" || appError.code === "EMAIL_ALREADY_USED") {
     return nextRedirect(req, "/login?error=email_taken");
+  }
+
+  // FIX-B13: второй — и пока последний — отказ с осмысленным продолжением.
+  // Проверяется ИСХОДНАЯ ошибка, а не `appError.code`: к этому моменту таймаут
+  // уже сведён к `INTERNAL_ERROR` (см. `isRetryableOAuthCallbackFailure`).
+  if (isRetryableOAuthCallbackFailure(error)) {
+    return nextRedirect(req, "/login?error=provider_timeout");
   }
 
   return fail(appError.message, appError.status, appError.code);

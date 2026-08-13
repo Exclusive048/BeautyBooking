@@ -3,6 +3,8 @@ import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { z } from "zod";
+import { jsonFail } from "@/lib/api/contracts";
+import type { ErrorCode } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -18,6 +20,24 @@ import {
 } from "@/lib/support/attachment";
 
 export const runtime = "nodejs";
+
+/**
+ * FIX-B18 · SUPPORT-ENVELOPE-SHAPE — обе support-поверхности переведены на
+ * конверт проекта.
+ *
+ * Была собственная форма `{ ok:false, error: <строка> }` — `error` строкой, а
+ * не объектом, — и собрана она была руками, то есть мимо `jsonFail()` и мимо
+ * `check:error-message-lang`. Тексты здесь всегда были русскими (константы в
+ * шапке файла), поэтому находки в них не было; ратифицировать форму мешало
+ * другое: пока в проекте живут ДВЕ формы ответа об ошибке, гейт языка
+ * обязан иметь слепую зону, а клиент — знать, какая из форм придёт.
+ *
+ * Конверт добавляет `requestId`, которого у этих ответов не было вовсе, —
+ * то есть жалоба «форма не отправилась» становится сопоставимой с логом.
+ */
+function supportFail(status: number, message: string, code: ErrorCode) {
+  return jsonFail(status, message, code);
+}
 
 const INVALID_FORM_ERROR = "\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0435 \u0434\u0430\u043d\u043d\u044b\u0435 \u0444\u043e\u0440\u043c\u044b.";
 const TOO_MANY_REQUESTS_ERROR =
@@ -103,7 +123,7 @@ export async function POST(req: Request) {
   try {
     formData = await req.formData();
   } catch {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   const parsed = supportTicketSchema.safeParse({
@@ -115,13 +135,13 @@ export async function POST(req: Request) {
     pageUrl: readFormText(formData, "pageUrl"),
   });
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   const data = parsed.data;
   const fileEntry = formData.get("file");
   if (fileEntry !== null && !(fileEntry instanceof File)) {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   let attachment:
@@ -149,9 +169,10 @@ export async function POST(req: Request) {
         attachmentMime: normalizeOptional(fileEntry.type),
         attachmentNameLength: fileEntry.name.length,
       });
-      return NextResponse.json(
-        { ok: false, error: getSupportAttachmentValidationMessage(validation.code) },
-        { status: 400 }
+      return supportFail(
+        400,
+        getSupportAttachmentValidationMessage(validation.code),
+        "VALIDATION_ERROR",
       );
     }
 
@@ -201,7 +222,7 @@ export async function POST(req: Request) {
   if (incomingContact) {
     if (data.contactSource === "profile_option") {
       if (!profileContactSet.has(incomingContact)) {
-        return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+        return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
       }
       contactSource = "profile_option";
     } else if (data.contactSource === "manual_input") {
@@ -229,14 +250,14 @@ export async function POST(req: Request) {
   const ipKey = `support:ip:${hashKey(ip ?? "unknown")}`;
   const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
   if (!ipAllowed) {
-    return NextResponse.json({ ok: false, error: TOO_MANY_REQUESTS_ERROR }, { status: 429 });
+    return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
   }
 
   if (userId) {
     const userKey = `support:user:${hashKey(userId)}`;
     const userAllowed = await checkRateLimit(userKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
     if (!userAllowed) {
-      return NextResponse.json({ ok: false, error: TOO_MANY_REQUESTS_ERROR }, { status: 429 });
+      return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
     }
   }
 
@@ -271,11 +292,11 @@ export async function POST(req: Request) {
       passLength: smtpPass?.length ?? 0,
       ...attachmentDiagnostics,
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   if (!supportToRaw || !smtpHost || smtpPort === undefined || !smtpUserRaw || !smtpPass || !smtpFromRaw) {
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   if (smtpPort > 65535) {
@@ -292,7 +313,7 @@ export async function POST(req: Request) {
       passLength: smtpPass.length,
       ...attachmentDiagnostics,
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   const normalizedSmtpUser = normalizeSmtpAddressList(smtpUserRaw);
@@ -406,7 +427,7 @@ export async function POST(req: Request) {
       contactLength: contact?.length ?? 0,
       contactSource,
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   logInfo("Support ticket submitted", {
