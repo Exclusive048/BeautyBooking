@@ -9,6 +9,7 @@ import {
   BookingCancelledBy,
 } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import {
   ensureNoConflicts,
   resolveBookingCore,
@@ -520,7 +521,7 @@ async function createSoloPackageBookingUnguarded(
   // 5. Atomic create — all-or-none.
   let result: CreateSoloPackageResult;
   try {
-    result = await prisma.$transaction(
+    result = await bookingTransaction(
       async (tx) => {
         const bookingPackage = await tx.bookingPackage.create({
           data: {
@@ -586,7 +587,7 @@ async function createSoloPackageBookingUnguarded(
 
         return { bookingPackageId: bookingPackage.id, bookingIds, totalKopeks: finalTotal };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
     );
   } catch (error) {
     const conflict = mapPrismaBookingConflict(error);

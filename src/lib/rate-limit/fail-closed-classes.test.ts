@@ -3,6 +3,8 @@ import path from "node:path";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { exportedHandlerMethods } from "@/lib/testing/route-handlers";
+
 /**
  * FIX-B12 — четыре класса роутов из триажа FIX-B11 стали fail-closed.
  *
@@ -129,10 +131,11 @@ function collectApiRoutes(dir: string, acc: ApiRoute[] = []): ApiRoute[] {
       continue;
     }
     if (entry !== "route.ts") continue;
-    const source = readFileSync(full, "utf8");
-    const methods = [
-      ...source.matchAll(/export\s+(?:async\s+)?function\s+(GET|POST|PATCH|PUT|DELETE)\b/g),
-    ].map((match) => match[1]!);
+    // FIX-C7: вторая копия того же шаблона, что оказалась WEAKER-THAN-CLAIMED в
+    // соседнем `sensitive-routes-completeness.test.ts` — она не видела
+    // `export const POST = …`. Распознавание форм — общее, в
+    // `lib/testing/route-handlers.ts`.
+    const methods = exportedHandlerMethods(readFileSync(full, "utf8"));
     const rel = path.relative(APP, dir).split(path.sep).join("/");
     acc.push({ route: "/" + rel.replace(/\/\([^)]*\)/g, ""), methods });
   }

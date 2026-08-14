@@ -30,10 +30,10 @@ vi.mock("@/lib/cache/cache", () => ({
   del: async (key: string) => {
     store.delete(key);
   },
-  setNx: async (key: string, value: string) => {
-    if (store.has(key)) return false;
+  claimLock: async (key: string, value: string) => {
+    if (store.has(key)) return { status: "held" };
     store.set(key, JSON.parse(value));
-    return true;
+    return { status: "acquired" };
   },
 }));
 

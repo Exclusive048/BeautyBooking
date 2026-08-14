@@ -5647,7 +5647,9 @@ export const UI_TEXT = {
         resend: "Отправить снова",
         confirm: "Подтвердить",
         success: "Email подтверждён",
-        invalidCode: "Неверный код",
+        // FIX-C8: `invalidCode` удалён — модалка больше не подменяет серверный
+        // `CODE_NOT_FOUND` своей строкой, а второго потребителя у ключа не было
+        // (у `/login` собственный `auth.loginPage.invalidCode`).
         // FIX-POLISH-01 (walkthrough #7): «…Попробуйте ещё раз.» per the error
         // convention — this is what the modal shows when the send genuinely
         // fails (the route now returns EMAIL_SEND_FAILED instead of a false 200).
@@ -5890,6 +5892,10 @@ export const UI_TEXT = {
       subscribeHot: "Уведомить о горящих окошках",
       unsubscribeHot: "Подписка активна",
       subscribeLoading: "Сохраняем…",
+      // FIX-C8: дефолт кнопки подписки — только для отказа БЕЗ тела (обрыв
+      // сети, 5xx). Действенные отказы («Достигнут лимит подписок.») приходят
+      // со своей курируемой строкой и показываются как есть.
+      subscribeFailed: "Не удалось изменить подписку. Попробуйте ещё раз.",
       periodMorning: "Утро",
       periodDay: "День",
       periodEvening: "Вечер",

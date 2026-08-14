@@ -1,5 +1,5 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
-import { toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     return jsonOk({ unlinked: true });
   } catch (error) {
-    const appError = toAppError(error);
+    const appError = toAuthSurfaceError(error);
     if (appError.status >= 500) {
       logError("POST /api/auth/telegram/unlink failed", {
         requestId: getRequestId(req),

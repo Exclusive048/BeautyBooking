@@ -1,5 +1,7 @@
 import { Prisma, type BookingSource } from "@prisma/client";
 
+import type { BookingTx } from "@/lib/bookings/booking-transaction";
+
 /**
  * FIX-C1 · SMOKE-01 · F1 — ЕДИНСТВЕННЫЙ writer строк `Booking`.
  *
@@ -66,8 +68,6 @@ import { Prisma, type BookingSource } from "@prisma/client";
  * writer и заведён.
  */
 
-type DbClient = Prisma.TransactionClient;
-
 /**
  * Полезная нагрузка строки брони без двух полей, за которые отвечает writer.
  * `source` возвращён обязательным — молчание вызывающего больше не значит
@@ -82,11 +82,16 @@ export type BookingRowData = Omit<
 /**
  * Создаёт строку `Booking`, выведя `studioId` из поверхности (`providerId`).
  *
- * Прямой `booking.create` в обход этой функции запрещён — сторож
- * `booking-studio-scope.test.ts` обходит дерево и валит CI на втором writer'е.
+ * FIX-C6: клиент — `BookingTx`, то есть транзакция, открытая
+ * `bookingTransaction` (`Serializable` по построению, инв. #31). У этого типа
+ * **нет метода `booking.create`** — право вставки возвращает себе только тело
+ * этой функции, единственным приведением ниже. Поэтому «второй writer» теперь
+ * не компилируется, а не «ловится регекспом»: и `tx.booking.create(…)`, и
+ * обходная форма `const b = tx.booking; b.create(…)` одинаково падают на
+ * `typecheck`.
  */
 export async function createBookingRow<S extends Prisma.BookingSelect>(
-  db: DbClient,
+  db: BookingTx,
   args: { data: BookingRowData; select: S },
 ): Promise<Prisma.BookingGetPayload<{ select: S }>> {
   const studio = await db.studio.findUnique({
@@ -94,7 +99,12 @@ export async function createBookingRow<S extends Prisma.BookingSelect>(
     select: { id: true },
   });
 
-  const created = await db.booking.create({
+  // 🔴 ЕДИНСТВЕННОЕ место в `src/`, где клиент возвращает себе право вставки
+  // строки `Booking`. Инвариант #45 держится тем, что этого приведения больше
+  // нигде нет, — а не тем, что никто не написал `booking.create`.
+  const writable = db as unknown as Prisma.TransactionClient;
+
+  const created = await writable.booking.create({
     data: { ...args.data, studioId: studio?.id ?? null },
     select: args.select,
   });

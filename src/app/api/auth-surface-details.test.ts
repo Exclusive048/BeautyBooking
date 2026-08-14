@@ -2,6 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { stripComments } from "@/lib/testing/source-scan";
+
 /**
  * FIX-B14 · SECURITY-EXPOSURE-AUDIT-01 · Y9 — ни один ответ auth-границы не
  * несёт `AppError.details`.
@@ -46,7 +48,33 @@ const AUTH_PATH_FAMILIES = [
 
 const PROVIDER_MODULE_IMPORT = /@\/lib\/(?:vk|yandex|telegram)\//;
 
-/** `details` уезжает наружу только четвёртым аргументом конвертов проекта. */
+/**
+ * `details` уезжает наружу только четвёртым аргументом конвертов проекта.
+ *
+ * 🔴 **ДЕМОТИРОВАН FIX-C6 — читать вместе с тем, что теперь несёт тип.**
+ *
+ * Девять поверхностей, которые ЛОВЯТ ошибку и отвечают на неё (четыре
+ * `unlink`, telegram-`link`, telegram-настройки, два интеграционных VK-роута,
+ * админский переключатель килсвитча, email-OTP-verify), больше не держат в
+ * руках объект с диагностикой: они зовут `toAuthSurfaceError`
+ * (`lib/auth/auth-surface-error.ts`), а у `AuthSurfaceError` поля `details`
+ * НЕТ. Прокинуть его там нельзя ни прямо, ни через промежуточную переменную,
+ * ни спредом — то есть ровно те формы, что FIX-C5 записал как невидимые,
+ * теперь ошибки компиляции (проба — `auth-surface-error.test.ts`).
+ *
+ * ⚠️ **Что детектор добавляет сверх типа — и почему его нельзя удалить.**
+ * Три OAuth-колбэка держат `AppError` по ДРУГОЙ причине: они его бросают
+ * (`throw new AppError(...)`), и сузить их вид нечем — объект приходит из
+ * `catch` как `unknown` и приводится `instanceof`-ом. За ними, а также за
+ * любой будущей auth-поверхностью, которая заведёт себе `AppError` сама,
+ * остаётся эта проверка. Она по-прежнему построчная и по-прежнему обходится
+ * сборкой аргумента заранее — записано, чтобы «зелено» здесь читалось как
+ * «известных форм нет», а не «утечек нет».
+ *
+ * Второе, что детектор держит и после конверсии: **никто не вернул `toAppError`
+ * на конвертированные девять**. Тип защищает того, кто взял правильный вид;
+ * вернувшийся `toAppError` вернул бы и `details`.
+ */
 const DETAILS_FORWARD = /\b(?:json)?[Ff]ail\([^;]*?\b\w+\.details\b/;
 
 function listRouteFiles(dir: string): string[] {
@@ -62,10 +90,15 @@ function listRouteFiles(dir: string): string[] {
   return out;
 }
 
-/** Комментарии вырезаются: в них `appError.details` упоминается по делу. */
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[^\n]*?\/\/.*$/gm, "");
-}
+/**
+ * Комментарии вырезаются: в них `appError.details` упоминается по делу.
+ *
+ * FIX-C5: разбор переведён на общий `lib/testing/source-scan.ts`. Прежняя форма
+ * (`^[^\n]*?//.*$`) сносила СТРОКУ ЦЕЛИКОМ, если та заканчивалась
+ * комментарием, — то есть `return jsonFail(400, e.message, code, e.details); //
+ * причина` исчезал вместе с нарушением, и сторож объявлял «утечек нет».
+ * Ложный ЗЕЛЁНЫЙ на security-инварианте.
+ */
 
 function toRel(file: string): string {
   return relative(process.cwd(), file).split(sep).join("/");

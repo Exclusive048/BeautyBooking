@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -42,21 +43,19 @@ export function RejectDialog({ open, onClose, requestId, providerName, onResolve
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/studio/schedule/requests/${requestId}/reject`, {
+      // FIX-C8: второй (и последний) сайт, читавший `error` конверта как
+      // строку — разбор в `approve-dialog.tsx`. Объект уезжал в проп
+      // `error?: string | null` и ронял диалог при любом отказе.
+      await fetchJson(`/api/studio/schedule/requests/${requestId}/reject`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ comment: trimmed }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error ?? E.rejectFailed);
-        return;
-      }
       onResolved();
       reset();
       onClose();
-    } catch {
-      setError(E.rejectFailed);
+    } catch (caught) {
+      setError(serverMessageOr(caught, E.rejectFailed));
     } finally {
       setSubmitting(false);
     }

@@ -1,7 +1,11 @@
 import { EventEmitter } from "node:events";
 import type { RedisClientType } from "redis";
 
-import { getRedisConnection, getRedisSubscriberConnection } from "@/lib/redis/connection";
+import {
+  getRedisConnection,
+  getRedisSubscriberConnection,
+  withRedisCommandTimeout,
+} from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import type { NotificationEvent } from "@/lib/notifications/types";
 import { isProduction } from "@/lib/env";
@@ -52,11 +56,20 @@ class RedisNotificationNotifier implements NotificationNotifier {
     private subscriberClient: RedisClientType
   ) {}
 
+  /**
+   * FIX-C4: все три команды ограничены сверху. Здесь дефект тише, чем на
+   * запросных путях, и потому опаснее: вызовы — fire-and-forget, поэтому
+   * молчащий Redis не вешал запрос, а оставлял висеть промис НАВСЕГДА.
+   * Пост-дедлайн у всех трёх — существующий `catch` с `logError`, то есть
+   * отказ становится наблюдаемым вместо бесшумного. ⚠️ У `subscribe` это
+   * особенно важно: SSE-подписка «устанавливалась» и не получала событий
+   * никогда, а в логах не было ничего.
+   */
   publish(userId: string, event: NotificationEvent): void {
     const channel = `notifications:${userId}`;
     const payload = JSON.stringify(event);
 
-    void this.publisherClient.publish(channel, payload).catch((error) => {
+    void withRedisCommandTimeout("notifier:publish", this.publisherClient.publish(channel, payload)).catch((error) => {
       logError("Notifications publish failed", {
         channel,
         error: error instanceof Error ? error.message : String(error),
@@ -79,7 +92,7 @@ class RedisNotificationNotifier implements NotificationNotifier {
       }
     };
 
-    void this.subscriberClient.subscribe(channel, redisHandler).catch((error) => {
+    void withRedisCommandTimeout("notifier:subscribe", this.subscriberClient.subscribe(channel, redisHandler)).catch((error) => {
       logError("Notifications subscribe failed", {
         channel,
         error: error instanceof Error ? error.message : String(error),
@@ -87,7 +100,7 @@ class RedisNotificationNotifier implements NotificationNotifier {
     });
 
     return () => {
-      void this.subscriberClient.unsubscribe(channel, redisHandler).catch((error) => {
+      void withRedisCommandTimeout("notifier:unsubscribe", this.subscriberClient.unsubscribe(channel, redisHandler)).catch((error) => {
         logError("Notifications unsubscribe failed", {
           channel,
           error: error instanceof Error ? error.message : String(error),

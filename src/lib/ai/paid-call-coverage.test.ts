@@ -27,6 +27,22 @@
 // наблюдаемое: ушёл ли байт в сеть.
 //
 // @probe (GUARD-INTEGRITY): пробы и наблюдавшийся текст падения — отчёт FIX-B16.
+//
+// @probe 🔴 FIX-C7 · RETRO-PROBE — ВТОРОЙ сигнал был WEAKER-THAN-CLAIMED.
+//        Прежняя проба жила в отчёте (в файле её текста не было — сама по себе
+//        находка: инв. #43 требует блок ЗДЕСЬ, потому что отчёт не в VCS-графе
+//        сторожа). A/B, один и тот же обход
+//        `fetch("https://llm.api.cloud.yandex.net/v1/chat/completions")`:
+//          · в `lib/ai/_probe-direct.ts`      → 1 failed, файл назван;
+//          · в `lib/reviews/_probe-direct.ts` → **17 passed, зелено**;
+//          · в `lib/ai/`, но хост из константы → **17 passed, зелено**.
+//        Первая ось — область сканирования была сужена до трёх каталогов, то
+//        есть сигнал, заведённый против «поверхность живёт не там, где ждали»,
+//        сам это допущение и делал. Расширено до всего `src/` (замер: литералы
+//        хоста есть ровно в двух файлах, оба — чокпойнты, оба исключены).
+//        Повторная проба после починки: обход в `lib/reviews/` → 1 failed.
+//        Вторая ось (хост из константы) регекспом не лечится —
+//        `AI-BYPASS-INDIRECT-HOST` в BACKLOG.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
@@ -224,7 +240,19 @@ describe("A. поведение: бесплатный экспорт дейст�
 
 const SRC_ROOT = join(process.cwd(), "src");
 const CHOKEPOINT_IMPORTS = ["@/lib/ai/client", "@/lib/visual-search/provider"];
-const CALL_SITE_FAMILIES = ["lib/ai/", "lib/advisor/", "lib/visual-search/"];
+/**
+ * Прямое обращение к платному провайдеру — то, чего мимо чокпойнта быть не
+ * должно. Вынесено из тела проверки, чтобы у распознавания был собственный
+ * контроль на фикстуре (FIX-C7).
+ *
+ * ⚠️ Граница названа честно: узнаётся ЛИТЕРАЛ хоста. Хост, собранный из
+ * константы или env (`fetch(`${BASE}/v1/chat/completions`)`), не распознаётся —
+ * замерено, это вторая ось находки FIX-C7, и регекспом она не лечится (нужен
+ * поток данных). Заведено как `AI-BYPASS-INDIRECT-HOST` в BACKLOG.
+ */
+function callsProviderDirectly(source: string): boolean {
+  return /new OpenAI\(|llm\.api\.cloud\.yandex\.net|ai\.api\.cloud\.yandex\.net/.test(source);
+}
 
 /**
  * Замороженный инвентарь потребителей платных чокпойнтов. Дельта-базлайн:
@@ -304,29 +332,58 @@ describe("B. инвентарь потребителей выводится из
     ).toEqual(KNOWN_PAID_CONSUMERS);
   });
 
-  it("второй сигнал — семейство каталога — не находит платных потребителей вне инвентаря", () => {
+  it("второй сигнал — прямое обращение к провайдеру — не находит обходов чокпойнта", () => {
     // FIX-B14: один сигнал пропускает поверхность, живущую не там, где ждали.
-    // Здесь второй сигнал перекрывает первый: файлы AI-семейств, которые ходят
-    // в сеть к провайдеру, обязаны быть среди известных потребителей.
-    const familyFiles = walk(SRC_ROOT)
-      .map(relative)
-      .filter((rel) => CALL_SITE_FAMILIES.some((family) => rel.startsWith(family)));
+    //
+    // 🔴 FIX-C7 · RETRO-PROBE: ровно это и случилось со ВТОРЫМ сигналом. Он
+    // сканировал только `CALL_SITE_FAMILIES` (`lib/ai/`, `lib/advisor/`,
+    // `lib/visual-search/`), то есть повторял ту же ошибку уровнем ниже —
+    // «поверхность живёт там, где ждали». A/B: один и тот же обход
+    // (`fetch("https://llm.api.cloud.yandex.net/…")`) внутри `lib/ai/` → red,
+    // он же в `lib/reviews/` → **зелено**. А новая AI-поверхность в новом
+    // каталоге — самый вероятный способ завести обход, потому что автор её
+    // туда и положит.
+    //
+    // Область расширена до всего `src/`. Замер: литералы хоста встречаются
+    // ровно в двух файлах — обоих чокпойнтах, которые и так исключены, — так
+    // что расширение на чистом дереве no-op.
+    const scanned = walk(SRC_ROOT).map(relative);
 
-    const suspicious = familyFiles.filter((rel) => {
+    const suspicious = scanned.filter((rel) => {
       if (rel === "lib/ai/client.ts" || rel === "lib/visual-search/provider.ts") return false;
       if (KNOWN_PAID_CONSUMERS.includes(rel)) return false;
       const source = readFileSync(join(SRC_ROOT, rel), "utf8");
-      // Прямое обращение к провайдеру мимо чокпойнтов — то, чего быть не должно.
-      return /new OpenAI\(|llm\.api\.cloud\.yandex\.net|ai\.api\.cloud\.yandex\.net/.test(source);
+      return callsProviderDirectly(source);
     });
 
     expect(
       suspicious,
-      `Файл AI-семейства обращается к провайдеру мимо чокпойнта: ${suspicious.join(", ")}. ` +
+      `Файл обращается к провайдеру мимо чокпойнта: ${suspicious.join(", ")}. ` +
         "Мимо чокпойнта — значит мимо денежного потолка.",
     ).toEqual([]);
+  });
 
-    expect(familyFiles.length).toBeGreaterThan(0); // разборщик что-то нашёл
+  /**
+   * Не-вакуумность — контроль машинерии на ФИКСИРОВАННОЙ фикстуре.
+   *
+   * FIX-C7: здесь стоял `expect(familyFiles.length).toBeGreaterThan(0)` —
+   * счётчик, то есть ровно та опора, которую GUARD-INTEGRITY правило 2
+   * запрещает: он проверяет, что каталог не пуст, а не что разборщик умеет
+   * узнавать обход. Фикстура не зависит от состояния дерева.
+   */
+  it("распознавание прямого вызова провайдера живо (контроль машинерии)", () => {
+    expect(
+      callsProviderDirectly('await fetch("https://llm.api.cloud.yandex.net/v1/chat/completions");'),
+      "разборщик перестал узнавать прямой вызов чат-провайдера — проверка обходов стала вакуумной",
+    ).toBe(true);
+    expect(
+      callsProviderDirectly('await fetch("https://ai.api.cloud.yandex.net/v1/embeddings");'),
+    ).toBe(true);
+    expect(callsProviderDirectly("const client = new OpenAI({ apiKey });")).toBe(true);
+    expect(
+      callsProviderDirectly('await fetch("https://storage.yandexcloud.net/bucket/key");'),
+      "разборщик считает обходом обычный запрос к хранилищу — инвентарь наполнится шумом",
+    ).toBe(false);
   });
 });
 

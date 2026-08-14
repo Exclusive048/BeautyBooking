@@ -10,8 +10,20 @@ import {
 } from "@/lib/bookings/policy-enforcement";
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
+import type { BookingTx } from "@/lib/bookings/booking-transaction";
 
-type DbClient = Prisma.TransactionClient | typeof prisma;
+/**
+ * FIX-C6 (инв. #31) — клиент, которому позволено спрашивать про конфликт.
+ *
+ * Либо пуловый `prisma` (дешёвая предварительная проверка ДО транзакции), либо
+ * `BookingTx` — транзакция booking-домена, открытая `bookingTransaction`, то
+ * есть `Serializable` по построению. Обычный `Prisma.TransactionClient` сюда
+ * НЕ годится намеренно: под Read Committed повторная проверка не даёт ничего
+ * сверх внешней (обе транзакции читают «пусто» и обе коммитятся), а выглядит
+ * защитой. Раньше это утверждение держал регексп по исходнику; теперь —
+ * компилятор.
+ */
+type ConflictCheckClient = typeof prisma | BookingTx;
 
 export type BookingCoreContext = {
   provider: {
@@ -169,7 +181,7 @@ export function buildConflictWindowWhere(input: {
 }
 
 export async function ensureNoConflicts(
-  db: DbClient,
+  db: ConflictCheckClient,
   input: {
     providerId: string;
     masterProviderId: string | null;

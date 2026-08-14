@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 import { AppError, toAppError } from "@/lib/api/errors";
 import { nextRedirect } from "@/lib/http/origin";
 import { getRequestId, logError } from "@/lib/logging/logger";
@@ -35,6 +37,51 @@ import { scrubRecord } from "@/lib/observability/scrub";
  *     cookie). Причина внутренняя.
  */
 export type OAuthStartFailure = "provider_unavailable" | "consent_required" | "start_failed";
+
+declare const OAUTH_START_NAVIGATION: unique symbol;
+
+/**
+ * FIX-C6 — ответ стартовой ноги, который МОЖЕТ быть только навигацией.
+ *
+ * Прежде это держал детектор `ENVELOPE_CALL`: он обходил стартовые ноги и
+ * требовал, чтобы в тексте файла не встретилось возврата конвертов проекта.
+ * Обходилось это тем же приёмом, что и остальные четыре сторожа кампании, —
+ * собрать значение заранее: конверт присваивается переменной на одной строке,
+ * а `return` этой переменной стоит на другой, и детектору не видно ни того, ни
+ * другого.
+ *
+ * Плюс переносом вызова на две строки (детектор построчный) и переименованием
+ * при импорте. Теперь исход объявлен типом: `NextResponse.json(...)` бренда не
+ * несёт, поэтому вернуть конверт из ноги нельзя ни одной из этих форм —
+ * промежуточная переменная тип не стирает.
+ *
+ * Произвести значение могут только две функции ниже, и обе делают редирект.
+ */
+export type OAuthStartNavigation = Response & {
+  readonly [OAUTH_START_NAVIGATION]: true;
+};
+
+/**
+ * Успешный исход: уход к провайдеру. Адрес внешний и построен нами
+ * (`buildVkAuthorizeUrl` / `buildYandexAuthorizeUrl`), поэтому проверка
+ * same-origin здесь была бы неверна — это единственная причина, по которой у
+ * успеха свой производитель, а не общий с внутренней навигацией.
+ */
+export function oauthStartProviderRedirect(authorizeUrl: string): OAuthStartNavigation {
+  return NextResponse.redirect(authorizeUrl) as unknown as OAuthStartNavigation;
+}
+
+/**
+ * Внутренняя навигация стартовой ноги: обратно на `/login` либо на поверхность
+ * подключения в кабинете. Адрес прогоняется через `nextRedirect`
+ * (`sanitizeInternalPath` — враждебное значение схлопывается в дефолт).
+ */
+export function oauthStartInternalRedirect(
+  req: Request,
+  targetPath: string,
+): OAuthStartNavigation {
+  return nextRedirect(req, targetPath) as unknown as OAuthStartNavigation;
+}
 
 /**
  * Классификация ИСКЛЮЧЕНИЯ, брошенного телом старта. Согласия и килсвитч
@@ -77,8 +124,11 @@ export function logOAuthStartFailure(req: Request, error: unknown): void {
  * этот же союз типов, поэтому новый исход без строки в UI не проедет мимо
  * компилятора.
  */
-export function oauthStartLoginRedirect(req: Request, failure: OAuthStartFailure) {
-  return nextRedirect(req, `/login?error=${failure}`);
+export function oauthStartLoginRedirect(
+  req: Request,
+  failure: OAuthStartFailure,
+): OAuthStartNavigation {
+  return oauthStartInternalRedirect(req, `/login?error=${failure}`);
 }
 
 /** Лог + редирект одним вызовом — форма, в которой это нужно в `catch`. */
@@ -86,7 +136,7 @@ export function failOAuthStart(
   req: Request,
   error: unknown,
   notConfiguredCodes: ReadonlySet<string>,
-) {
+): OAuthStartNavigation {
   logOAuthStartFailure(req, error);
   return oauthStartLoginRedirect(req, classifyOAuthStartFailure(error, notConfiguredCodes));
 }

@@ -1,8 +1,16 @@
 import { Prisma, type BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
+import type { BookingDbClient } from "@/lib/bookings/booking-transaction";
 
-type DbClient = Prisma.TransactionClient | typeof prisma;
+/**
+ * FIX-C6: `BookingDbClient` — надтип обычного клиента, поэтому прежние
+ * вызывающие (`prisma`, сырой `Prisma.TransactionClient` на пути отмены пакета)
+ * проходят как раньше, а транзакции booking-домена (`BookingTx`) — тоже.
+ * Сузить его до `BookingTx` нельзя: отмена пакета идёт под обычной изоляцией
+ * осознанно (там нет проверки конфликта, которую надо серилизовать).
+ */
+type DbClient = BookingDbClient | typeof prisma;
 
 /**
  * LOGIC-02 — оптимистическая блокировка перехода статуса брони.

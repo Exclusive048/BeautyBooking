@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { AppError, type ErrorCode, toAppError } from "@/lib/api/errors";
-import { Prisma, BookingPackageStatus, BookingSource } from "@prisma/client";
+import { BookingPackageStatus, BookingSource } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import {
   ensureNoConflicts,
   resolveBookingCore,
@@ -319,7 +320,7 @@ async function createStudioPackageBookingUnguarded(
   // 5. Atomic create — all-or-none.
   let result: CreateSoloPackageResult;
   try {
-    result = await prisma.$transaction(
+    result = await bookingTransaction(
       async (tx) => {
         const bookingPackage = await tx.bookingPackage.create({
           data: {
@@ -389,7 +390,7 @@ async function createStudioPackageBookingUnguarded(
 
         return { bookingPackageId: bookingPackage.id, bookingIds, totalKopeks: finalTotal };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
     );
   } catch (error) {
     const conflict = mapPrismaBookingConflict(error);

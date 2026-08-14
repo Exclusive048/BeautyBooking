@@ -47,7 +47,7 @@ vi.mock("@/lib/cache/cache", () => ({
       if (key.startsWith(prefix)) store.delete(key);
     }
   }),
-  setNx: vi.fn(async () => true),
+  claimLock: vi.fn(async () => ({ status: "acquired" })),
 }));
 
 import { getScheduleWindow } from "@/lib/schedule/engine-context";

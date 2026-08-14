@@ -45,11 +45,32 @@ function requireS3Config(): S3Config {
   return { bucket, endpoint, region, accessKey, secretKey };
 }
 
-function isNoSuchKey(error: unknown): boolean {
-  if (error && typeof error === "object" && "name" in error) {
-    return (error as { name?: string }).name === "NoSuchKey";
-  }
-  return false;
+/**
+ * FIX-C12 — «объекта нет» распознаётся по СТАТУСУ, а не только по имени ошибки.
+ *
+ * 🔴 Провайдер здесь S3-**совместимый** (Yandex Object Storage), а не S3, и
+ * несовпадения живут ровно в таких местах. Прежняя проверка требовала
+ * `error.name === "NoSuchKey"` — одну строку из нескольких, которыми 404
+ * приходит на практике (`NotFound` возвращает SDK для HEAD-подобных ответов,
+ * а совместимый провайдер вправе прислать своё имя при том же коде).
+ *
+ * Цена промаха асимметрична и потому решается в пользу терпимости:
+ *   · на `deleteObject` нераспознанный 404 = вечный dead-letter `media.purge`,
+ *     то есть **невыполненное удаление ПДн** (152-ФЗ), причём навсегда;
+ *   · на `getObject` — 500 вместо честного «нет файла».
+ *
+ * ⚠️ Расширяется ТОЛЬКО 404. `403`/`AccessDenied` обязан продолжать бросать:
+ * проглоченный отказ прав на удалении означал бы «ПДн удалена» при живом
+ * объекте в бакете — то есть ровно ту тихую ложь, против которой заведён
+ * бросающий `runMediaPurge`.
+ */
+function isMissingObjectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: string }).name;
+  if (name === "NoSuchKey" || name === "NotFound") return true;
+  const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+    ?.httpStatusCode;
+  return status === 404;
 }
 
 export class S3StorageProvider implements StorageProvider {
@@ -126,7 +147,7 @@ export class S3StorageProvider implements StorageProvider {
         contentType,
       };
     } catch (error) {
-      if (isNoSuchKey(error)) return null;
+      if (isMissingObjectError(error)) return null;
       throw error;
     }
   }
@@ -140,7 +161,7 @@ export class S3StorageProvider implements StorageProvider {
         })
       );
     } catch (error) {
-      if (isNoSuchKey(error)) return;
+      if (isMissingObjectError(error)) return;
       throw error;
     }
   }

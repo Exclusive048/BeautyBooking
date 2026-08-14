@@ -9,7 +9,6 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { extractClientIp } from "@/lib/http/ip";
-import { getRedisConnection } from "@/lib/redis/connection";
 import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import { normalizeSupportContact } from "@/lib/support/contact-shared";
 import { SMTP_TIMEOUTS } from "@/lib/email/sender";
@@ -242,11 +241,12 @@ export async function POST(req: Request) {
     attachmentMime: attachment?.mimeType ?? null,
   };
 
-  const redis = await getRedisConnection();
-  if (!redis) {
-    logInfo("Support rate limit fallback to memory", { requestId, route });
-  }
-
+  // FIX-C4: здесь стояло получение клиента ради ОДНОЙ лог-строки — команд им
+  // не отправлялось ни одной, а решение о memory-fallback принимает сам
+  // `checkRateLimit` ниже. То есть строка сообщала не о том, что произойдёт, а
+  // о том, что автор предполагал; на brownout'е (клиент жив, но молчит) она бы
+  // молчала, хотя лимитер как раз деградировал. Удалено вместе с импортом —
+  // это единственный способ не оставить сайт, который сторож обязан разбирать.
   const ipKey = `support:ip:${hashKey(ip ?? "unknown")}`;
   const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
   if (!ipAllowed) {

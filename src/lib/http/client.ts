@@ -32,6 +32,28 @@ export class ApiClientError extends Error {
 
 const DEFAULT_ERROR_MESSAGE = "Что-то пошло не так - попробуйте еще раз.";
 
+/**
+ * FIX-C8 — «показать курируемую строку сервера, иначе — свою».
+ *
+ * Это ЕДИНСТВЕННАЯ форма, в которой поверхность принимает решение из FIX-C3, и
+ * вынесена она сюда не ради краткости. Признак `fromServer` бесполезен, пока
+ * каждая поверхность читает его по-своему: `error.message` непуст ВСЕГДА (при
+ * отсутствии тела туда встаёт `DEFAULT_ERROR_MESSAGE`), поэтому наивное
+ * `catch (e) { setError(e.message) }` выглядит как passthrough, но на отказе без
+ * тела печатает дефолт вместо более уместной строки поверхности — то есть чинит
+ * F3 ценой обратного дефекта.
+ *
+ * 🔴 Помощник намеренно НЕ решает за вызывающего. Он отвечает на вопрос «сервер
+ * прислал своё?», а «уместно ли это здесь» остаётся решением сайта: там, где у
+ * поверхности есть более конкретный контекст, она проверяет `error.code` ДО
+ * вызова и подставляет собственную строку (образец — потолок в
+ * `reviews-preview.tsx`). Слепой passthrough на всех сайтах — та же
+ * безответственность, что и слепая своя строка, только в другую сторону.
+ */
+export function serverMessageOr(error: unknown, fallback: string): string {
+  return error instanceof ApiClientError && error.fromServer ? error.message : fallback;
+}
+
 export function getErrorMessageByCode(code?: ErrorCode): string | null {
   if (!code) return null;
   const map: Partial<Record<ErrorCode, string>> = {

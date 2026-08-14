@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { setNxMock, logErrorMock } = vi.hoisted(() => ({
-  setNxMock: vi.fn(),
+const { claimLockMock, logErrorMock } = vi.hoisted(() => ({
+  claimLockMock: vi.fn(),
   logErrorMock: vi.fn(),
 }));
 vi.mock("@/lib/env", () => ({ env: { AUTH_JWT_SECRET: "test-secret" }, isProduction: false }));
-vi.mock("@/lib/cache/cache", () => ({ setNx: setNxMock }));
+vi.mock("@/lib/cache/cache", () => ({ claimLock: claimLockMock }));
 vi.mock("@/lib/logging/logger", () => ({ logError: logErrorMock }));
 
 import {
@@ -58,19 +58,35 @@ describe("telegram-login-state — HARDENING-06 FIX-9 (browser-binding)", () => 
 
 describe("claimTelegramAuthHash — single-use replay guard", () => {
   beforeEach(() => {
-    setNxMock.mockReset();
+    claimLockMock.mockReset();
     logErrorMock.mockReset();
   });
 
   it("first claim → true, replay of the same hash → false", async () => {
-    setNxMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    claimLockMock
+      .mockResolvedValueOnce({ status: "acquired" })
+      .mockResolvedValueOnce({ status: "held" });
     expect(await claimTelegramAuthHash("hash-1")).toBe(true);
     expect(await claimTelegramAuthHash("hash-1")).toBe(false);
   });
 
   it("fails OPEN on a Redis outage (state cookie stays the primary defense)", async () => {
-    setNxMock.mockRejectedValueOnce(new Error("redis down"));
+    // FIX-C11: обрыв приходит ТРЕТЬИМ состоянием, а не как `false`. Это и есть
+    // предмет проверки: «недоступно» обязано вести к пропуску, а «занято» — к
+    // отказу, и спутать их нельзя.
+    claimLockMock.mockResolvedValueOnce({
+      status: "unavailable",
+      error: new Error("redis down"),
+    });
     expect(await claimTelegramAuthHash("hash-2")).toBe(true);
     expect(logErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("🔴 «занято» и «недоступно» ведут к ПРОТИВОПОЛОЖНЫМ ответам", async () => {
+    // Невакуумность предыдущего теста: если бы обе ветки давали `true`,
+    // fail-open читался бы как работающий replay-guard.
+    claimLockMock.mockResolvedValueOnce({ status: "held" });
+    expect(await claimTelegramAuthHash("hash-3")).toBe(false);
+    expect(logErrorMock).not.toHaveBeenCalled();
   });
 });

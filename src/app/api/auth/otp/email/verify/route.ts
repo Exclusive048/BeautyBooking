@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { OtpChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
-import { toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { formatZodError } from "@/lib/api/validation";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
     try {
       profile = await resolveEmailLoginProfile(normalizedEmail, existingProfile);
     } catch (error) {
-      const appError = toAppError(error);
+      const appError = toAuthSurfaceError(error);
       if (appError.code === "EMAIL_NOT_VERIFIED") {
         void recordSurfaceEvent({
           surface: "auth",

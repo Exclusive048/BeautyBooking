@@ -102,7 +102,38 @@ const MESSAGE_ARG_SCAN_DEPTH = 2;
  * `CALLS` — нарушение с просьбой её зарегистрировать. Следующую такую обёртку
  * найдёт гейт, а не пользователь на проде.
  */
-const FACTORY = /function\s+(\w+)\s*\(\s*(?:message|msg)\b[^)]*\)[\s\S]{0,300}?(?:new AppError\(\s*(?:message|msg)\b|\bfail\(\s*(?:message|msg)\b|jsonFail\([^,]+,\s*(?:message|msg)\b)/g;
+/**
+ * 🔴 **FIX-C7 · RETRO-PROBE — детектор был WEAKER-THAN-CLAIMED по ДВУМ осям.**
+ *
+ * Прежняя форма требовала ключевого слова `function`, и A/B на одной и той же
+ * фабрике это показал:
+ *   · `export function failThing(message, status) { return fail(message, …) }`
+ *     → «найдена фабрика ошибок, не перечисленная в CALLS … failThing»;
+ *   · `export const failThing = (message, status) => fail(message, …)`
+ *     → **exit 0, зелено**.
+ * Стрелочная форма не экзотика — она в проекте так же обычна, как декларация.
+ * В дереве на 2026-08-14 таких фабрик ноль (замерено), то есть живой дыры не
+ * было; дыра была в утверждении гейта о себе. Расширено ниже.
+ *
+ * ⚠️ **Вторая ось НЕ закрыта и закрыта быть не может этим шаблоном** — это тот
+ * самый пункт, что `FIX-C5` оставил незакрытым:
+ *
+ *     import { fail as respond } from "@/lib/api/response";
+ *     export function failThing(message, status) { return respond(message, …); }
+ *
+ * → exit 0, зелено. Шаблон ищет ИМЯ конструктора (`fail(`, `jsonFail(`,
+ * `new AppError(`), а переименование при импорте это имя стирает. Чинится
+ * только резолвом импортов, то есть графом, а не регекспом, — заведено как
+ * `GATE-ALIAS-RESOLUTION` в BACKLOG. До тех пор «зелено» здесь означает «нет
+ * фабрик, зовущих конструктор под его собственным именем».
+ *
+ * ⚠️ Ещё две границы, названные, чтобы не считались покрытыми: параметр
+ * сообщения обязан быть ПЕРВЫМ и называться `message`/`msg`; аннотация типа
+ * между именем и `=` не должна содержать `=` (то есть `const x: (m: string) =>
+ * Response = (message) => …` не распознаётся).
+ */
+const FACTORY =
+  /(?:function\s+(\w+)\s*\(|(?:const|let|var)\s+(\w+)\s*(?::[^=\n]*)?=\s*(?:async\s*)?\()\s*(?:message|msg)\b[^)]*\)[\s\S]{0,300}?(?:new AppError\(\s*(?:message|msg)\b|\bfail\(\s*(?:message|msg)\b|jsonFail\([^,]+,\s*(?:message|msg)\b)/g;
 
 function listFiles(dir) {
   const out = [];
@@ -280,7 +311,8 @@ for (const file of files) {
   FACTORY.lastIndex = 0;
   let factory;
   while ((factory = FACTORY.exec(source))) {
-    const name = factory[1];
+    // FIX-C7: две группы — декларация (`function f(`) и стрелочная (`const f = (`).
+    const name = factory[1] ?? factory[2];
     if (CALLS.includes(`${name}(`)) continue;
     unregisteredFactories.push({ file: rel, line: lineOf(source, factory.index), name });
   }

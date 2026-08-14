@@ -47,8 +47,15 @@ function walk(relDir: string): string[] {
  * считать его путём создания, а не потерять из виду. Запрет самой сырой формы —
  * предмет соседнего сторожа (`bookings/booking-studio-scope.test.ts`), и эти два
  * правила намеренно независимы.
+ *
+ * FIX-C5: первая половина детектора переведена с ВЫЗОВА `createBookingRow(` на
+ * ИМПОРТ модуля writer'а. Разница не косметическая: набор путей здесь
+ * ВЫВОДИТСЯ, и файл, выпавший из набора, молча перестаёт проверяться на
+ * TimeBlock — то есть алиас (`const w = createBookingRow; w(tx, …)`) давал бы
+ * ложный ЗЕЛЁНЫЙ на живом правиле. Вызвать, не импортировав, нельзя. Это тот же
+ * урок, что FIX-C1 получил пробой на детекторе горячих слотов.
  */
-const CREATES_BOOKING = /createBookingRow\(|booking\.create\(\{/;
+const CREATES_BOOKING = /@\/lib\/bookings\/booking-row|booking\.create\(\{/;
 
 const WAIVED: Record<string, string> = {
   // Пакетные создатели зовут `ensureNoConflicts` покомпонентно — guard внутри
@@ -94,6 +101,40 @@ describe("LOGIC-06 · guard объявленного отсутствия — н
   it("в списке исключений нет протухших путей", () => {
     const stale = Object.keys(WAIVED).filter((rel) => !creators.includes(rel));
     expect(stale, `Пути больше не создают брони: ${stale.join(", ")}`).toEqual([]);
+  });
+});
+
+describe("FIX-C5 · детектор семьи выводится по импорту, а не по форме вызова", () => {
+  /**
+   * Фикстура — реальная форма, которая КОМПИЛИРУЕТСЯ и проходит `typecheck`:
+   * переименование при импорте. Проверено на живом файле (`master/day.service.ts`)
+   * — 0 ошибок компилятора, а вхождений `createBookingRow(` в нём становится 0.
+   */
+  const ALIASED_CREATE_PATH = [
+    'import { createBookingRow as makeBookingRow } from "@/lib/bookings/booking-row";',
+    "const booking = await makeBookingRow(tx, { providerId, source });",
+  ].join("\n");
+
+  const CALL_SHAPE_DETECTOR = /createBookingRow\(|booking\.create\(\{/;
+
+  it("прежняя форма теряла путь из семьи — то есть переставала его проверять", () => {
+    expect(
+      CALL_SHAPE_DETECTOR.test(ALIASED_CREATE_PATH),
+      "детектор по вызову обязан был ПРОМАХНУТЬСЯ — иначе доказывать нечего",
+    ).toBe(false);
+  });
+
+  it("нынешняя форма путь удерживает", () => {
+    expect(
+      CREATES_BOOKING.test(ALIASED_CREATE_PATH),
+      "путь выпал из семьи: файл, который создаёт брони, перестал проверяться на " +
+        "TimeBlock — ложный ЗЕЛЁНЫЙ на живом правиле (урок FIX-C1)",
+    ).toBe(true);
+  });
+
+  it("сырая форма записи по-прежнему распознаётся", () => {
+    // Вторая половина детектора не должна потеряться при переводе первой.
+    expect(CREATES_BOOKING.test("const b = await tx.booking.create({ data });")).toBe(true);
   });
 });
 

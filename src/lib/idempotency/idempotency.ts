@@ -13,16 +13,25 @@ export type IdempotencyRecord =
 /** Форма записей, выпущенных до LOGIC-09. */
 type LegacyDoneRecord = { status: "done"; bookingId: string };
 
+/**
+ * FIX-C11 — «зависимость недоступна» здесь означает ОТКАЗ, и это не то же самое,
+ * что «замок занят».
+ *
+ * Идемпотентность — обещание «повторный POST не создаст вторую сущность», и без
+ * замка выдать его нечем: пропустить запрос значило бы молча снять гарантию, ради
+ * которой инвариант #28 и существует. Поэтому единственный корректный ответ —
+ * 503-подобный отказ, а не `false` («занято», то есть «дубль») и не `true`.
+ */
 export async function checkAndSetIdempotency(
   key: string,
   ttlSeconds: number
 ): Promise<boolean> {
   const payload = JSON.stringify({ status: "pending" } satisfies IdempotencyRecord);
-  try {
-    return await cache.setNx(key, payload, ttlSeconds);
-  } catch {
+  const claim = await cache.claimLock(key, payload, ttlSeconds);
+  if (claim.status === "unavailable") {
     throw new Error("Service temporarily unavailable");
   }
+  return claim.status === "acquired";
 }
 
 export async function getIdempotencyRecord(key: string): Promise<IdempotencyRecord | null> {
@@ -37,13 +46,14 @@ export async function getIdempotencyRecord(key: string): Promise<IdempotencyReco
   return record as IdempotencyRecord;
 }
 
+/** Тот же отказ, что и у `checkAndSetIdempotency`, и по той же причине. */
 export async function setIdempotencyPending(key: string, ttlSeconds: number): Promise<boolean> {
   const payload = JSON.stringify({ status: "pending" } satisfies IdempotencyRecord);
-  try {
-    return await cache.setNx(key, payload, ttlSeconds);
-  } catch {
+  const claim = await cache.claimLock(key, payload, ttlSeconds);
+  if (claim.status === "unavailable") {
     throw new Error("Service temporarily unavailable");
   }
+  return claim.status === "acquired";
 }
 
 export async function setIdempotencyResult(

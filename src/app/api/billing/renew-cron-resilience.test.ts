@@ -35,8 +35,10 @@ type Sub = {
 };
 
 const state = vi.hoisted(() => ({
-  setNxResult: true as boolean,
-  setNxThrows: false,
+  // FIX-C11: исход замка — ТРИ состояния, а не «результат + бросает». Прежняя
+  // пара флагов позволяла выразить «занято» и «обрыв» независимо, хотя это
+  // взаимоисключающие исходы одной команды.
+  lockClaim: "acquired" as "acquired" | "held" | "unavailable",
   candidates: [] as unknown[],
   subUpdateThrowsFor: null as string | null,
   paymentCreateThrows: null as "P2002" | "OTHER" | null,
@@ -44,7 +46,7 @@ const state = vi.hoisted(() => ({
 }));
 
 const spies = vi.hoisted(() => ({
-  setNx: vi.fn(),
+  claimLock: vi.fn(),
   del: vi.fn(),
   subFindMany: vi.fn(),
   subUpdate: vi.fn(),
@@ -56,10 +58,12 @@ const spies = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/cache/cache", () => ({
-  setNx: async (...args: unknown[]) => {
-    spies.setNx(...args);
-    if (state.setNxThrows) throw new Error("redis down");
-    return state.setNxResult;
+  claimLock: async (...args: unknown[]) => {
+    spies.claimLock(...args);
+    if (state.lockClaim === "unavailable") {
+      return { status: "unavailable", error: new Error("redis down") };
+    }
+    return { status: state.lockClaim };
   },
   del: async (...args: unknown[]) => {
     spies.del(...args);
@@ -170,8 +174,7 @@ function call(): Promise<Response> {
 }
 
 beforeEach(() => {
-  state.setNxResult = true;
-  state.setNxThrows = false;
+  state.lockClaim = "acquired";
   state.candidates = [];
   state.subUpdateThrowsFor = null;
   state.paymentCreateThrows = null;
@@ -181,7 +184,7 @@ beforeEach(() => {
 
 describe("LOGIC-07 · лок прогона", () => {
   it("занятый лок → 409 и ни одного чтения БД", async () => {
-    state.setNxResult = false;
+    state.lockClaim = "held";
 
     const res = await call();
 
@@ -197,12 +200,14 @@ describe("LOGIC-07 · лок прогона", () => {
     const res = await call();
 
     expect(res.status).toBe(200);
-    expect(spies.setNx).toHaveBeenCalledWith("billing:renew:run", expect.any(String), 30 * 60);
+    expect(spies.claimLock).toHaveBeenCalledWith("billing:renew:run", expect.any(String), 30 * 60);
     expect(spies.del).toHaveBeenCalledWith("billing:renew:run");
   });
 
   it("Redis недоступен → прогон ИДЁТ (fail-open) и лок не снимается", async () => {
-    state.setNxThrows = true;
+    // 🔴 Отличие от «занято» решающее и проверяется соседним тестом: «занято»
+    // даёт 409 и НЕ идёт, «недоступно» идёт. Один `boolean` этого не выражал.
+    state.lockClaim = "unavailable";
     state.candidates = [sub("s1")];
 
     const res = await call();

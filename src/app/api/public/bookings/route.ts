@@ -14,6 +14,7 @@ import {
 import { invalidateRecentMastersCache } from "@/lib/bookings/recent-masters";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
@@ -65,12 +66,21 @@ export async function POST(req: Request) {
     // Two-axis rate limit — both must pass.
     const phoneKey = `rate:publicBooking:phone:${phoneNormalized}`;
     const ipKey = `rate:publicBooking:ip:${getClientIp(req)}`;
-    const [phoneAllowed, ipAllowed] = await Promise.all([
-      checkRateLimit(phoneKey, PUBLIC_BOOKING_PHONE_RATE.limit, PUBLIC_BOOKING_PHONE_RATE.windowSeconds),
-      checkRateLimit(ipKey, PUBLIC_BOOKING_IP_RATE.limit, PUBLIC_BOOKING_IP_RATE.windowSeconds),
+    // FIX-C11: перегрузка с конфигом несёт ПРИЧИНУ отказа — обрыв Redis отвечает
+    // 503, исчерпанный бюджет 429. Политика та же (fail-closed, инв. #6).
+    const [phoneLimit, ipLimit] = await Promise.all([
+      checkRateLimit(phoneKey, {
+        maxRequests: PUBLIC_BOOKING_PHONE_RATE.limit,
+        windowSeconds: PUBLIC_BOOKING_PHONE_RATE.windowSeconds,
+      }),
+      checkRateLimit(ipKey, {
+        maxRequests: PUBLIC_BOOKING_IP_RATE.limit,
+        windowSeconds: PUBLIC_BOOKING_IP_RATE.windowSeconds,
+      }),
     ]);
-    if (!phoneAllowed || !ipAllowed) {
-      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
+    const refusal = resolveRateLimitRefusal(phoneLimit, ipLimit);
+    if (refusal) {
+      return jsonFail(refusal.status, refusal.message, refusal.code);
     }
 
     // Provider sanity check — only allow public booking of published MASTER providers.

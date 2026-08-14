@@ -8,10 +8,24 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
  *
  * Проверяется не «замок берётся», а три свойства, ради которых он написан
  * именно так, а не иначе.
+ *
+ * 🔴 **Недоступность зависимости здесь НЕ моделируется — и это осознанно**
+ * (FIX-C11). Прежняя редакция этого файла содержала тест «недоступный Redis не
+ * добавляет ожидания», который моделировал обрыв как `setNx.mockResolvedValue(false)`.
+ * Такого поведения у зависимости нет: `setNx` при истёкшей команде **бросает**
+ * (`redisClient.ts:141-144`), и это утверждали ДВА других зелёных теста
+ * одновременно с этим — `redis-client-timeout.test.ts:77` и
+ * `silent-redis-behaviour.test.ts:151`. Пара-противоречие внутри одного репозитория,
+ * обе половины зелёные, дефект живой: воронка отвечала 500.
+ *
+ * Мок фасада кэша выразить настоящий отказ не может по построению, поэтому
+ * обрыв проверяется на стенде и через НАСТОЯЩИЙ стек — `single-flight-outage.test.ts`
+ * (`lib/testing/silent-redis.ts`). Здесь остаются только свойства замка при
+ * ЖИВОЙ зависимости.
  */
 
 const store = vi.hoisted(() => new Map<string, unknown>());
-const setNx = vi.hoisted(() => vi.fn());
+const claimLock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/cache/cache", () => ({
   get: vi.fn(async (key: string) => (store.has(key) ? store.get(key) : null)),
@@ -22,7 +36,7 @@ vi.mock("@/lib/cache/cache", () => ({
     store.delete(key);
   }),
   delByPattern: vi.fn(),
-  setNx: setNx,
+  claimLock,
 }));
 
 import { withSingleFlight } from "@/lib/cache/single-flight";
@@ -30,12 +44,12 @@ import { withSingleFlight } from "@/lib/cache/single-flight";
 const LOCK = "sf:test";
 const VALUE_KEY = "test:value";
 
-/** Настоящий `setNx` поверх той же карты — чтобы гонка была настоящей. */
-function realSetNx(): void {
-  setNx.mockImplementation(async (key: string, value: string) => {
-    if (store.has(key)) return false;
+/** Настоящий claim поверх той же карты — чтобы гонка была настоящей. */
+function realClaimLock(): void {
+  claimLock.mockImplementation(async (key: string, value: string) => {
+    if (store.has(key)) return { status: "held" };
     store.set(key, value);
-    return true;
+    return { status: "acquired" };
   });
 }
 
@@ -43,7 +57,7 @@ describe("PERF-10 · single-flight", () => {
   beforeEach(() => {
     store.clear();
     vi.clearAllMocks();
-    realSetNx();
+    realClaimLock();
   });
 
   it("двадцать параллельных промахов считают ОДИН раз", async () => {
@@ -106,10 +120,15 @@ describe("PERF-10 · single-flight", () => {
     expect(computes).toBe(1);
   });
 
-  it("недоступный Redis не добавляет ожидания: считаем немедленно", async () => {
-    // Так выглядит brownout — `setNx` отвечает отказом (RES-01), но и замка
-    // в кэше не видно. Отличить это от «замок занят» можно только так.
-    setNx.mockResolvedValue(false);
+  it("замок занят, но держателя не видно — считаем немедленно, без ожидания", async () => {
+    // Настоящая гонка со снятием: `claimLock` увидел ключ, а к моменту
+    // перечитывания держателя его уже сняли. Ждать некого.
+    //
+    // ⚠️ Это НЕ модель обрыва Redis: обрыв приходит третьим состоянием
+    // (`status: "unavailable"`) и проверяется на стенде в
+    // `single-flight-outage.test.ts`. Раньше здесь стоял именно такой тест с
+    // `setNx → false`, и он утверждал про зависимость неправду.
+    claimLock.mockResolvedValue({ status: "held" });
 
     const started = Date.now();
     const value = await withSingleFlight<string>({
@@ -121,6 +140,29 @@ describe("PERF-10 · single-flight", () => {
 
     expect(value).toBe("computed");
     // Ни одного цикла ожидания: waitMs 5 с, а укладываемся в десятки мс.
+    expect(Date.now() - started).toBeLessThan(500);
+  });
+
+  it("🔴 третье состояние: замок недоступен — работа делается, отказа не бывает", async () => {
+    // Поведенческая половина FIX-C11 на уровне мока: `unavailable` обязан вести
+    // к расчёту, а не к исключению и не к ожиданию. Настоящий стек — в
+    // `single-flight-outage.test.ts`; здесь пиннится ветвление самой функции.
+    claimLock.mockResolvedValue({ status: "unavailable", error: new Error("timeout") });
+    let computes = 0;
+
+    const started = Date.now();
+    const value = await withSingleFlight<string>({
+      lockKey: LOCK,
+      waitMs: 5000,
+      read: async () => null,
+      compute: async () => {
+        computes += 1;
+        return "computed";
+      },
+    });
+
+    expect(value).toBe("computed");
+    expect(computes).toBe(1);
     expect(Date.now() - started).toBeLessThan(500);
   });
 

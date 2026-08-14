@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { stripComments } from "@/lib/testing/source-scan";
+
 import { beginPackageIdempotency } from "@/lib/bookings/package-idempotency";
 import { resolveBookingIdempotency } from "@/lib/bookings/idempotency";
 import { createBooking } from "@/lib/bookings/createBooking";
@@ -85,9 +87,10 @@ describe("FIX-B15 · гостевой неймспейс не восстанов
   it("ни один сайт не собирает ключ из телефона", () => {
     const offenders: string[] = [];
     for (const rel of NAMESPACE_SITES) {
-      const source = readFileSync(join(SRC, rel), "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/^[^\n]*?\/\/.*$/gm, "");
+      // FIX-C5: общий разборщик. Прежняя форма сносила строку целиком при
+      // хвостовом комментарии — то есть восстановленный гостевой неймспейс с
+      // пояснением рядом стал бы для сторожа невидимым (инв. #28).
+      const source = stripComments(readFileSync(join(SRC, rel), "utf8"));
       source.split("\n").forEach((line, index) => {
         if (/guest:\$\{|guest:" \+|`guest:/.test(line)) {
           offenders.push(`${rel}:${index + 1} → ${line.trim()}`);

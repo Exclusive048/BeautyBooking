@@ -62,7 +62,11 @@ export async function POST(req: Request) {
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     if (!isEmailConfigured()) {
-      return jsonFail(503, "Вход по email не настроен.", "SYSTEM_FEATURE_DISABLED");
+      // FIX-C8: строка стала видимой (модалка показывает серверный текст), а
+      // «Вход по email не настроен» здесь врала о предмете: этот роут не про
+      // вход, а про подтверждение адреса в кабинете. Гейт тот же (`isEmailConfigured`
+      // — можем ли физически отправить), формулировка — про отправку.
+      return jsonFail(503, "Отправка писем сейчас недоступна. Попробуйте позже.", "SYSTEM_FEATURE_DISABLED");
     }
 
     const body = await parseBody(req, requestSchema);

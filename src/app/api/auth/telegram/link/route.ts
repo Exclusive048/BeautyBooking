@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
 import { verifyTelegramLogin } from "@/lib/auth/telegram";
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
     logInfo("Telegram link completed (redirect)", { userId: user.id, telegramId });
     return backToProfile("connected");
   } catch (error) {
-    const appError = toAppError(error);
+    const appError = toAuthSurfaceError(error);
     if (appError.status >= 500) {
       logError("GET /api/auth/telegram/link failed", {
         requestId: getRequestId(req),

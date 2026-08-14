@@ -9,8 +9,9 @@ import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import { BookingSource, Prisma, type BookingStatus } from "@prisma/client";
+import { BookingSource, type BookingStatus } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 
 export type MasterDayBooking = {
   id: string;
@@ -473,7 +474,7 @@ export async function createSoloMasterBooking(input: {
   };
   await ensureNoConflicts(prisma, conflictScope);
 
-  const created = await prisma.$transaction(
+  const created = await bookingTransaction(
     async (tx) => {
       await ensureNoConflicts(tx, conflictScope);
 
@@ -519,7 +520,7 @@ export async function createSoloMasterBooking(input: {
 
       return booking;
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
   );
 
   await invalidateSlotsForBookingRange({

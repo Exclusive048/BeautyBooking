@@ -7,6 +7,7 @@ import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation"
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import {
   emitBookingConfirmedSystemMessage,
@@ -148,7 +149,7 @@ export async function confirmBooking(
   // overlapping the booking's own current slot would falsely conflict.
   let updated: { id: string; status: BookingStatus };
   try {
-    updated = await prisma.$transaction(
+    updated = await bookingTransaction(
       async (tx) => {
         const conflicts = await tx.booking.findMany({
           where: {
@@ -225,7 +226,9 @@ export async function confirmBooking(
           select: { id: true, status: true },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31). Этот путь
+      // прежний сторож не видел вовсе — он искал `ensureNoConflicts(tx`, а
+      // здесь повторная проверка своя (нужен exclude-self).
     );
   } catch (error) {
     // A true-concurrent approval race surfaces under Serializable as a

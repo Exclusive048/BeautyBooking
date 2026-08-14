@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSerialTask } from "@/hooks/use-serial-task";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import type { ProfileDTO, ProfileUpdatePatch } from "@/lib/client-cabinet/profile.service";
+import { UI_TEXT } from "@/lib/ui/text";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -28,6 +30,16 @@ type Options = {
  */
 export function useProfileAutosave({ onSaved }: Options) {
   const [status, setStatus] = useState<SaveStatus>("idle");
+  /**
+   * FIX-C8 — текст отказа рядом со статусом.
+   *
+   * Индикатор знал только «Не удалось сохранить. Попробуйте ещё раз.», а самый
+   * вероятный отказ этого PATCH'а — `ALREADY_EXISTS` 409 на занятый email или
+   * телефон, то есть повтор не поможет НИКОГДА (вторая половина инв. #41:
+   * «заявить» адрес может кто угодно, «владеть» — один). Пользователь правил
+   * поле, видел красную точку без объяснения и не мог узнать, что адрес занят.
+   */
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const pendingRef = useRef<Partial<ProfileUpdatePatch>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,24 +59,23 @@ export function useProfileAutosave({ onSaved }: Options) {
       return;
     }
     try {
-      const res = await fetch("/api/cabinet/user/profile", {
+      const profile = await fetchJson<ProfileDTO>("/api/cabinet/user/profile", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setStatus("error");
-        if (fadeRef.current) clearTimeout(fadeRef.current);
-        fadeRef.current = setTimeout(() => setStatus("idle"), ERROR_FADE_MS);
-        return;
-      }
-      onSaved(json.data as ProfileDTO);
+      onSaved(profile);
+      setErrorMessage(null);
       setStatus("saved");
       if (fadeRef.current) clearTimeout(fadeRef.current);
       fadeRef.current = setTimeout(() => setStatus("idle"), SAVED_FADE_MS);
-    } catch {
+    } catch (caught) {
+      // fromServer = ПОКАЗАТЬ СЕРВЕРНОЕ: «Этот email уже используется другим
+      // аккаунтом. Укажите другой адрес.» называет и причину, и действие,
+      // тогда как канон индикатора («Попробуйте ещё раз») на 409 — неверный
+      // совет. Своя строка остаётся дефолтом для обрыва сети и 5xx.
+      setErrorMessage(serverMessageOr(caught, UI_TEXT.clientCabinet.profilePage.saveStatus.error));
       setStatus("error");
       if (fadeRef.current) clearTimeout(fadeRef.current);
       fadeRef.current = setTimeout(() => setStatus("idle"), ERROR_FADE_MS);
@@ -91,5 +102,5 @@ export function useProfileAutosave({ onSaved }: Options) {
     [],
   );
 
-  return { status, scheduleSave };
+  return { status, errorMessage, scheduleSave };
 }

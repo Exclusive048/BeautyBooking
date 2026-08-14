@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { BookingSource, MediaEntityType, ProviderType, Prisma } from "@prisma/client";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
   buildCreateBookingIdempotencyKey,
@@ -15,6 +16,7 @@ import { toBookingDto } from "@/lib/bookings/mappers";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-core";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { resolveBookingServicePrice } from "@/lib/bookings/hot-slot-pricing";
 import { logInfo, logError } from "@/lib/logging/logger";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
@@ -90,13 +92,16 @@ export async function createBooking(input: {
 
   let createdBookingId: string | null = null;
   try {
-    const allowed = await checkRateLimit(
-      `rate:createBooking:${namespaceKey}`,
-      CREATE_BOOKING_RATE_LIMIT.limit,
-      CREATE_BOOKING_RATE_LIMIT.windowSeconds
+    // FIX-C11: обрыв Redis отвечает 503 «сервис недоступен», а не 429 «слишком
+    // много запросов» — отказ тот же (fail-closed, инв. #6), сигнал верный.
+    const refusal = resolveRateLimitRefusal(
+      await checkRateLimit(`rate:createBooking:${namespaceKey}`, {
+        maxRequests: CREATE_BOOKING_RATE_LIMIT.limit,
+        windowSeconds: CREATE_BOOKING_RATE_LIMIT.windowSeconds,
+      })
     );
-    if (!allowed) {
-      throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
+    if (refusal) {
+      throw new AppError(refusal.message, refusal.status, refusal.code);
     }
 
     const {
@@ -156,7 +161,7 @@ export async function createBooking(input: {
   const transactionStartedAt = Date.now();
   let created;
   try {
-    created = await prisma.$transaction(
+    created = await bookingTransaction(
       async (tx) => {
         await ensureNoConflicts(tx, {
           providerId: input.providerId,
@@ -234,7 +239,9 @@ export async function createBooking(input: {
 
         return created;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      // FIX-C6: уровень изоляции больше не выбирает вызывающий — его ставит
+      // `bookingTransaction` (инв. #31). Прежний аргумент был обязателен по
+      // соглашению, а его пропажу ловил регексп по исходнику.
     );
   } catch (error) {
     const conflictError = mapPrismaBookingConflict(error);

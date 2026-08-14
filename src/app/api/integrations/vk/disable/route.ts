@@ -1,6 +1,6 @@
 import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
-import { AppError, toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -39,7 +39,7 @@ export async function POST() {
 
     return ok({ enabled: false });
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
+    const appError = toAuthSurfaceError(error);
     // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт `AppError.details`.
     return fail(appError.message, appError.status, appError.code);
   }

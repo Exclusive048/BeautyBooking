@@ -8,6 +8,7 @@ import { findOrCreateGuestUserByPhone } from "@/lib/users/find-or-create-guest";
 import { getSessionUserFromRequest } from "@/lib/auth/session";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
 import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
@@ -66,12 +67,20 @@ export async function POST(
 
     const phoneKey = `rate:studioPackageBook:phone:${phoneNormalized}`;
     const ipKey = `rate:studioPackageBook:ip:${getClientIp(req)}`;
-    const [phoneAllowed, ipAllowed] = await Promise.all([
-      checkRateLimit(phoneKey, PACKAGE_BOOK_PHONE_RATE.limit, PACKAGE_BOOK_PHONE_RATE.windowSeconds),
-      checkRateLimit(ipKey, PACKAGE_BOOK_IP_RATE.limit, PACKAGE_BOOK_IP_RATE.windowSeconds),
+    // FIX-C11: причина отказа различима — 503 при обрыве, 429 при бюджете.
+    const [phoneLimit, ipLimit] = await Promise.all([
+      checkRateLimit(phoneKey, {
+        maxRequests: PACKAGE_BOOK_PHONE_RATE.limit,
+        windowSeconds: PACKAGE_BOOK_PHONE_RATE.windowSeconds,
+      }),
+      checkRateLimit(ipKey, {
+        maxRequests: PACKAGE_BOOK_IP_RATE.limit,
+        windowSeconds: PACKAGE_BOOK_IP_RATE.windowSeconds,
+      }),
     ]);
-    if (!phoneAllowed || !ipAllowed) {
-      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
+    const refusal = resolveRateLimitRefusal(phoneLimit, ipLimit);
+    if (refusal) {
+      return jsonFail(refusal.status, refusal.message, refusal.code);
     }
 
     const selections = body.selections.map((s) => ({

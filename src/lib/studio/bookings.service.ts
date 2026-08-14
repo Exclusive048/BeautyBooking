@@ -1,6 +1,7 @@
 import { BookingSource, Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import {
   buildConflictScopeWhere,
   buildConflictWindowWhere,
@@ -154,7 +155,7 @@ export async function createStudioBooking(input: {
   // yet at create time).
   let created: { id: string };
   try {
-    created = await prisma.$transaction(
+    created = await bookingTransaction(
       async (tx) => {
         // LOGIC-01: скоуп — из общего билдера. Пара `(providerId студии,
         // masterProviderId)` не видела брони ТОГО ЖЕ мастера, созданные через
@@ -247,7 +248,7 @@ export async function createStudioBooking(input: {
 
         return booking;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
     );
   } catch (error) {
     // A true-concurrent create race surfaces under Serializable as a
@@ -438,7 +439,7 @@ export async function moveStudioBooking(input: {
   // (`id: { not: booking.id }`) is preserved so a shift that overlaps
   // the booking's OWN current slot doesn't false-conflict.
   try {
-    await prisma.$transaction(
+    await bookingTransaction(
       async (tx) => {
         // LOGIC-01: тот же скоуп, что у create. Exclude-self сохранён — при
         // переносе бронь ещё занимает свой старый слот.
@@ -525,7 +526,8 @@ export async function moveStudioBooking(input: {
           }
         }
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31). Путь переноса
+      // прежний сторож тоже не видел — повторная проверка здесь своя.
     );
   } catch (error) {
     // A true-concurrent move/create race surfaces under Serializable as

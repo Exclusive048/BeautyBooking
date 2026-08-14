@@ -1,13 +1,14 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import {
   classifyOAuthStartFailure,
   logOAuthStartFailure,
+  oauthStartInternalRedirect,
+  oauthStartProviderRedirect,
   type OAuthStartFailure,
+  type OAuthStartNavigation,
 } from "@/lib/auth/oauth-start-error";
-import { nextRedirect } from "@/lib/http/origin";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
 import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
@@ -51,13 +52,13 @@ function connectSurfacePath(req: Request): string {
   }
 }
 
-function backToConnectSurface(req: Request, failure: OAuthStartFailure) {
+function backToConnectSurface(req: Request, failure: OAuthStartFailure): OAuthStartNavigation {
   const path = connectSurfacePath(req);
   const separator = path.includes("?") ? "&" : "?";
-  return nextRedirect(req, `${path}${separator}vk=${failure}`);
+  return oauthStartInternalRedirect(req, `${path}${separator}vk=${failure}`);
 }
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<OAuthStartNavigation> {
   // AUTH-KILLSWITCH-ENFORCE-01: the VK-connect (notifications) flow is the same
   // VK OAuth mechanism as login — gate it on the same `isVkAuthEnabled` so a
   // disabled VK provider can't be reached via the integrations entry point.
@@ -71,7 +72,10 @@ export async function GET(req: Request) {
   // туда, откуда он нажал «подключить», а не в дефолтный кабинет.
   const user = await getSessionUser();
   if (!user) {
-    return nextRedirect(req, `/login?next=${encodeURIComponent(connectSurfacePath(req))}`);
+    return oauthStartInternalRedirect(
+      req,
+      `/login?next=${encodeURIComponent(connectSurfacePath(req))}`,
+    );
   }
 
   try {
@@ -97,7 +101,7 @@ export async function GET(req: Request) {
       maxAge: VK_ID_STATE_TTL_SECONDS,
     });
 
-    return NextResponse.redirect(authUrl);
+    return oauthStartProviderRedirect(authUrl);
   } catch (error) {
     // FIX-B14 + Y9: `appError.details` больше не уезжает в ответ, отказ —
     // навигация обратно на поверхность подключения.

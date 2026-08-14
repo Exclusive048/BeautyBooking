@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       select: { email: true },
     });
     if (!profile?.email) {
-      return jsonFail(400, "Сначала укажите email", "VALIDATION_ERROR");
+      return jsonFail(400, "Сначала укажите email.", "VALIDATION_ERROR");
     }
 
     const normalizedEmail = profile.email.toLowerCase();
@@ -74,7 +74,11 @@ export async function POST(req: Request) {
       if (!failResult.ok) {
         return otpRateLimitFail(failResult);
       }
-      return jsonFail(401, "Код не подходит", "CODE_NOT_FOUND");
+      // FIX-C8: строка стала видимой пользователю (модалка подтверждения email
+      // больше не подменяет её своей), поэтому получила собственную подсказку —
+      // по UI-17 хвост «Попробуйте ещё раз.» дописывается только там, где своей
+      // подсказки нет, а «проверьте письмо» полезнее канона.
+      return jsonFail(401, "Код не подходит. Проверьте письмо и введите код ещё раз.", "CODE_NOT_FOUND");
     }
 
     // EMAIL-ADDRESS-OCCUPATION: отметка владения и освобождение чужих

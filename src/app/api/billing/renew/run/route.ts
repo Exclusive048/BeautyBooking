@@ -45,9 +45,10 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
 /**
  * Гигиенический лок прогона (LOGIC-07).
  *
- * **Fail-OPEN при недоступности Redis — осознанно.** `cache.setNx` бросает
- * (не возвращает `false`) при обрыве Redis, и различить «занято» от «Redis
- * лежит» здесь обязательно: отказ от прогона на время недоступности кэша
+ * **Fail-OPEN при недоступности Redis — осознанно.** Третье состояние приходит
+ * явным `status: "unavailable"` (FIX-C11; прежде `cache.setNx` бросал, и здесь
+ * это ловилось руками), и различить «занято» от «Redis лежит» обязательно:
+ * отказ от прогона на время недоступности кэша
  * означает, что подписки не продлеваются и не истекают сутками — тихий ущерб,
  * который заметят позже, чем починят Redis. От **двойного списания** защищает
  * не этот лок, а `BillingPayment.idempotenceKey @unique` (инв. #4) плюс
@@ -57,15 +58,21 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
  * отказал бы сам себе, не усилив денежную гарантию.
  */
 async function acquireRunLock(): Promise<{ acquired: boolean; release: boolean }> {
-  try {
-    const acquired = await cache.setNx(RUN_LOCK_KEY, new Date().toISOString(), RUN_LOCK_TTL_SECONDS);
-    return { acquired, release: acquired };
-  } catch (error) {
+  const claim = await cache.claimLock(
+    RUN_LOCK_KEY,
+    new Date().toISOString(),
+    RUN_LOCK_TTL_SECONDS
+  );
+  if (claim.status === "unavailable") {
     logError("Billing renewal run lock unavailable, proceeding without it", {
-      error: error instanceof Error ? error.message : String(error),
+      error: claim.error instanceof Error ? claim.error.message : String(claim.error),
     });
+    // Замок не наш — снимать его нельзя (`release: false`): иначе прогон удалил
+    // бы чужой ключ, если Redis поднялся к моменту завершения.
     return { acquired: true, release: false };
   }
+  const acquired = claim.status === "acquired";
+  return { acquired, release: acquired };
 }
 
 async function releaseRunLock(): Promise<void> {

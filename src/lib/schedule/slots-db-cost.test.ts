@@ -45,7 +45,7 @@ vi.mock("@/lib/cache/cache", () => ({
       if (key.startsWith(prefix)) store.delete(key);
     }
   }),
-  setNx: vi.fn(async () => true),
+  claimLock: vi.fn(async () => ({ status: "acquired" })),
   // PERF-21: учёт живых слот-ключей мастера. Здесь он настоящий (тот же
   // `store`), потому что от него зависит и запись значения, и путь сброса.
   sAdd: vi.fn(async (key: string, member: string) => {

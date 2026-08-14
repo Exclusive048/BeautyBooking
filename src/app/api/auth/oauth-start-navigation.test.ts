@@ -2,6 +2,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+import { stripComments } from "@/lib/testing/source-scan";
+
 /**
  * FIX-B14 · AUTH-RESPONSE-COHERENCE — стартовая нога OAuth отвечает навигацией
  * на КАЖДЫЙ свой исход.
@@ -94,6 +96,8 @@ vi.mock("@/lib/yandex/cookies", () => ({
 }));
 
 import { AppError } from "@/lib/api/errors";
+import { fail } from "@/lib/api/response";
+import type { OAuthStartNavigation } from "@/lib/auth/oauth-start-error";
 import { GET as vkStart } from "@/app/api/auth/vk/start/route";
 import { GET as yandexStart } from "@/app/api/auth/yandex/start/route";
 
@@ -208,8 +212,29 @@ describe("FIX-B14 — исходы стартовой ноги возвраща�
 
 const API_ROOT = join(process.cwd(), "src", "app", "api");
 const AUTH_FAMILIES = ["src/app/api/auth/", "src/app/api/integrations/", "src/app/api/telegram/"];
-/** Конверт проекта в любой из двух его сигнатур. */
-const ENVELOPE_CALL = /\breturn\s+(?:json)?[Ff]ail\(/;
+
+/**
+ * 🔴 **ДЕМОТИРОВАН FIX-C6.** Здесь был детектор `ENVELOPE_CALL`
+ * (`/\breturn\s+(?:json)?[Ff]ail\(/`), искавший возврат конверта в тексте ноги.
+ * Он обходился ровно тем приёмом, что побеждал все пять сторожей кампании, —
+ * собрать значение заранее (`const res = fail(…); return res;`), — а также
+ * переносом вызова на две строки и переименованием при импорте.
+ *
+ * Теперь правило несёт тип: `GET` объявлен возвращающим
+ * `Promise<OAuthStartNavigation>`, а произвести это значение умеют только
+ * `oauthStartProviderRedirect` / `oauthStartInternalRedirect` — обе делают
+ * редирект. Конверт (`NextResponse`) бренда не несёт, поэтому вернуть его
+ * нельзя ни одной из перечисленных форм (проба ниже).
+ *
+ * ⚠️ **Что осталось детектору.** Тип работает только там, где аннотация
+ * ЕСТЬ: новая нога, написанная без неё, вернётся к выводу типа и правило
+ * потеряет. Поэтому проверка сузилась с «найди все нарушения» до «аннотация на
+ * месте», а набор ног по-прежнему ВЫВОДИТСЯ из дерева. Форма объявления при
+ * этом фиксируется: `export const GET = async (…) => …` эта проверка не
+ * увидит — записано, чтобы не считалось покрытым.
+ */
+const RETURNS_NAVIGATION =
+  /export\s+async\s+function\s+GET\s*\([^)]*\)\s*:\s*Promise<OAuthStartNavigation>/;
 
 function listStartRoutes(dir: string): string[] {
   const out: string[] = [];
@@ -228,7 +253,7 @@ function listStartRoutes(dir: string): string[] {
   return out;
 }
 
-describe("FIX-B14 — ни одна стартовая нога не отвечает конвертом", () => {
+describe("FIX-C6 — каждая стартовая нога объявляет исход навигацией", () => {
   const startRoutes = listStartRoutes(API_ROOT);
 
   it("ноги найдены обходом дерева (проверка не вакуумна)", () => {
@@ -241,22 +266,50 @@ describe("FIX-B14 — ни одна стартовая нога не отвеч�
     );
   });
 
-  it("в теле стартовой ноги нет ни одного возврата конверта", () => {
-    const offenders: string[] = [];
-    for (const rel of startRoutes) {
-      readFileSync(rel, "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/^[^\n]*?\/\/.*$/gm, "")
-        .split("\n")
-        .forEach((line, index) => {
-          if (ENVELOPE_CALL.test(line)) offenders.push(`${rel}:${index + 1} → ${line.trim()}`);
-        });
-    }
+  it("тип возврата объявлен — иначе правило не несёт никто", () => {
+    const unannotated = startRoutes.filter(
+      // Комментарии вырезаются: аннотация упоминается в них по делу.
+      (rel) => !RETURNS_NAVIGATION.test(stripComments(readFileSync(rel, "utf8"))),
+    );
+
     expect(
-      offenders,
-      `стартовые ноги, отвечающие конвертом вместо навигации:\n${offenders.join("\n")}\n\n` +
+      unannotated,
+      "стартовая нога не объявляет `Promise<OAuthStartNavigation>`, то есть тип " +
+        "возврата выводится и конверт снова допустим:\n" +
+        `${unannotated.join("\n")}\n\n` +
         "Сюда приходит НАВИГАЦИЯ браузера: любой исход обязан кончиться страницей " +
         "(см. lib/auth/oauth-start-error.ts).",
     ).toEqual([]);
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * Проба: форма обхода, побеждавшая детектор, — собрать ответ заранее.
+ * ------------------------------------------------------------------ */
+
+/**
+ * @probe   что сломать (тип): снять
+ *          `& { readonly [OAUTH_START_NAVIGATION]: true }` с
+ *          `OAuthStartNavigation`.
+ *          наблюдалось: `npm run typecheck` красный — 2 × «Unused
+ *          '@ts-expect-error' directive», то есть обе формы возврата конверта
+ *          снова компилируются.
+ *
+ * Функция никогда не вызывается: предмет — что тело не компилируется.
+ */
+async function _envelopeEvasion(req: Request): Promise<OAuthStartNavigation> {
+  // Форма 1 — прямая, её детектор и ловил.
+  if (req.method === "HEAD") {
+    // @ts-expect-error исход стартовой ноги — навигация, а не конверт: сюда
+    // пришёл браузер, и показать ему можно только страницу.
+    return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
+  }
+
+  // Форма 2 — ОТВЕТ СОБРАН ЗАРАНЕЕ. Детектор искал `return fail(`; здесь
+  // возврат и вызов на разных строках, и он невидим.
+  const res = fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
+  // @ts-expect-error промежуточная переменная тип не стирает.
+  return res;
+}
+
+void _envelopeEvasion;

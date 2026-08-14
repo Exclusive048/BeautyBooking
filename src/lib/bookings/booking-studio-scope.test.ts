@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ProviderType } from "@prisma/client";
 
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { stripComments } from "@/lib/testing/source-scan";
 
 /**
  * FIX-C1 · SMOKE-01 · F1 — бронь, снятая через поверхность студии, управляется
@@ -210,10 +211,45 @@ const PROJECT_ROOT = resolve(__dirname, "..", "..", "..");
 const SRC = resolve(PROJECT_ROOT, "src");
 const WRITER = "src/lib/bookings/booking-row.ts";
 
-/** Прямая вставка строки брони — `prisma.booking.create` / `tx.booking.create`. */
+/**
+ * Прямая вставка строки брони — `prisma.booking.create` / `tx.booking.create`.
+ *
+ * 🔴 **ДЕМОТИРОВАН FIX-C6 — читать вместе с тем, что теперь несёт тип.**
+ *
+ * `bookingTransaction` выдаёт `BookingTx`, у которого метода `booking.create`
+ * НЕТ (`Omit`), а `createBookingRow` возвращает себе право вставки
+ * единственным приведением у себя в теле. Поэтому обе формы, ради которых
+ * FIX-C5 записал этого сторожа слабым, теперь не компилируются:
+ *
+ *   - `tx.booking.create({…})` — прямая;
+ *   - `const t = tx.booking; t.create({…})` — извлечение делегата заранее,
+ *     ровно тот обход, что детектор не видел.
+ *
+ * Проба обеих — `booking-transaction.test.ts` (`@ts-expect-error`, снятие
+ * `Omit` делает директивы неиспользованными и валит `typecheck`).
+ *
+ * ⚠️ **Что детектор добавляет сверх типа — и почему его нельзя удалить.**
+ * У ПУЛОВОГО клиента (`prisma`, `prismaDirect`) метод `booking.create`
+ * остаётся: без него `booking-row.ts` не смог бы вставить строку. Значит две
+ * поверхности типом не закрыты и держатся только этой проверкой:
+ *
+ *   1. `prisma.booking.create(…)` вообще вне транзакции;
+ *   2. `tx.booking.create(…)` в транзакции, открытой сырым
+ *      `prisma.$transaction` (в обход обёртки) — такой `tx` полный.
+ *
+ * Обе — по-прежнему форма вызова, и обе обходятся извлечением делегата в
+ * переменную. Это записано, чтобы «зелено» здесь читалось как «известных форм
+ * нет», а не «нарушений нет».
+ */
 const RAW_CREATE = /\.booking\.create\s*\(/;
-/** Вызов writer'а. Именно ВЫЗОВ: `includes("createBookingRow")` удовлетворился бы импортом. */
-const WRITER_CALL = /createBookingRow\s*\(/;
+/**
+ * Потребитель writer'а — по ИМПОРТУ модуля, не по вызову.
+ *
+ * FIX-C5: было `createBookingRow\s*\(`. Набор путей здесь ВЫВОДИТСЯ, и файл,
+ * выпавший из набора, перестаёт участвовать в проверке не-вакуумности, — то
+ * есть алиас давал бы тихо сузившуюся семью. Вызвать, не импортировав, нельзя.
+ */
+const WRITER_IMPORT = /@\/lib\/bookings\/booking-row/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -225,8 +261,15 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const rel = (file: string) => file.slice(PROJECT_ROOT.length + 1).split(sep).join("/");
-const sources = walk(SRC).map((file) => ({ rel: rel(file), text: readFileSync(file, "utf8") }));
-const createPaths = sources.filter((f) => WRITER_CALL.test(f.text)).map((f) => f.rel).sort();
+// FIX-C6 (GUARD-INTEGRITY правило 6): по СЫРОМУ тексту этот детектор ложно
+// краснел на прозе — `booking-transaction.ts` объясняет в шапке, какую именно
+// форму `.booking.create(` он делает невыразимой, и попадал в нарушители из-за
+// собственного объяснения. Разбор — общим посимвольным сканером.
+const sources = walk(SRC).map((file) => ({
+  rel: rel(file),
+  text: stripComments(readFileSync(file, "utf8")),
+}));
+const createPaths = sources.filter((f) => WRITER_IMPORT.test(f.text)).map((f) => f.rel).sort();
 
 describe("FIX-C1 · `Booking` пишет ровно один writer", () => {
   it("детектор находит семью путей создания — иначе сторож вакуумен", () => {
@@ -250,7 +293,10 @@ describe("FIX-C1 · `Booking` пишет ровно один writer", () => {
       offenders,
       "путь создаёт `Booking` напрямую, минуя `createBookingRow` — значит сам " +
         "решает вопрос `studioId`/`source`, а решить его молчанием и есть дефект " +
-        `F1: ${offenders.join(", ")}`,
+        `F1: ${offenders.join(", ")}. ` +
+        "FIX-C6: внутри `bookingTransaction` это уже не компилируется — сюда " +
+        "попадает только вставка ПУЛОВЫМ клиентом либо транзакцией, открытой в " +
+        "обход обёртки.",
     ).toEqual([]);
   });
 

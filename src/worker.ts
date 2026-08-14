@@ -10,7 +10,7 @@ import {
   recoverStuckJobs,
 } from "@/lib/queue/queue";
 import { createHealthcheckPinger } from "@/lib/queue/healthcheck-ping";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -299,7 +299,13 @@ async function ensureWorkerRedisReady(): Promise<void> {
     throw new Error("Redis is required for worker in production");
   }
 
-  await redis.ping();
+  // FIX-C4: проба готовности ограничена сверху. Пост-дедлайн — тот же throw,
+  // что и при отсутствующем клиенте: в проде воркер без Redis работать не
+  // может и обязан не стартовать. Меняется не решение, а то, что при молчащем
+  // Redis процесс теперь падает с внятной ошибкой за секунды вместо того,
+  // чтобы висеть в `startWorker` бесконечно — а висящий воркер выглядит в
+  // оркестраторе «запускается», а не «сломан», и не рестартится.
+  await withRedisCommandTimeout("worker:boot:ping", redis.ping());
 }
 
 async function maybePingHealthcheck(): Promise<void> {

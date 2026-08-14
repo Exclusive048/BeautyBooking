@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import KNOWN from "@/lib/rate-limit/sensitive-fail-open-known.json";
 import FAIL_OPEN from "@/lib/rate-limit/fail-open-mutating-routes.json";
+import { stripComments } from "@/lib/testing/source-scan";
 
 /**
  * FIX-B7 — третья половина сторожа инв. #6.
@@ -32,6 +33,12 @@ import FAIL_OPEN from "@/lib/rate-limit/fail-open-mutating-routes.json";
  * префиксами в `SENSITIVE_ROUTE_PREFIXES`. Остался `/api/telegram/webhook` —
  * запись в графе есть, достижимости в проде нет (разбор — в самом JSON).
  *
+ * @probe   🔴 **FIX-C7 · RETRO-PROBE: обе прежние пробы были МИНИМАЛЬНЫМИ, сторож
+ *          был WEAKER-THAN-CLAIMED.** Обход — имя переменной-клиента
+ *          (`prismaDirect` вместо `prisma`), A/B и починка описаны у `MUTATION`
+ *          ниже. Повторная проба после починки: `prismaDirect.billingPayment
+ *          .create(…)` в `/api/favorites/toggle` → 1 failed, роут назван.
+ *
  * @probe   что сломать: добавить в любой роут из снимка запись `prisma.billingPayment.create(`
  *          (или завести новый мутирующий роут, пишущий чувствительную модель).
  *          наблюдалось: «Появились НОВЫЕ чувствительные fail-open роуты: …» с именем сайта;
@@ -52,6 +59,26 @@ import FAIL_OPEN from "@/lib/rate-limit/fail-open-mutating-routes.json";
 
 const APP = path.resolve(process.cwd(), "src", "app");
 const MUTATION = "(?:create|createMany|update|updateMany|upsert|delete|deleteMany)\\(";
+
+/**
+ * 🔴 **FIX-C7 · RETRO-PROBE — приёмник больше не перечисляется по имени.**
+ *
+ * Было `\b(?:prisma|tx|db)\.<модель>\.<операция>`. A/B на одном и том же роуте
+ * (`/api/favorites/toggle`), одной и той же модели и операции, различие только
+ * в имени переменной-клиента:
+ *   · `prisma.billingPayment.create(…)`       → 1 failed, роут назван;
+ *   · `prismaDirect.billingPayment.create(…)` → **4 passed, зелено**.
+ * `prismaDirect` — не выдуманное имя: это ЖИВОЙ клиент проекта
+ * (`lib/prisma-direct.ts`), заведённый ровно для обхода пула и используемый в
+ * `api/model-applications/[applicationId]/confirm`. То есть детектор денежной
+ * классификации не видел записи через второй боевой клиент.
+ *
+ * Правило про то, ЧТО записано, а не про то, КАК названа переменная, — поэтому
+ * приёмник снят целиком, а не дополнен ещё одним именем (`writable`, `client`,
+ * `trx` появились бы следующими). Замер после снятия: на чистом дереве ноль
+ * новых находок; единственная возникшая была прозой и ушла вместе с переводом
+ * на `stripComments`.
+ */
 
 /** Модели, запись в которые делает роут чувствительным. Инфраструктурные — исключены (см. шапку). */
 const SENSITIVE_MODELS = [
@@ -93,9 +120,14 @@ function graphOf(entry: string, maxDepth = 3): string[] {
 
 function writesSensitiveModel(entry: string): boolean {
   return graphOf(entry).some((file) => {
-    const source = readFileSync(file, "utf8");
+    // FIX-C7 (GUARD-INTEGRITY правило 6): решение принимается по КОДУ. По сырому
+    // тексту детектор считал записью прозу — шапка `booking-transaction.ts`,
+    // объясняющая форму `.booking.create(`, давала ложное срабатывание на
+    // `/api/master/schedule/buffer`. Без этого расширение приёмника ниже было бы
+    // неприменимо.
+    const source = stripComments(readFileSync(file, "utf8"));
     return SENSITIVE_MODELS.some((model) =>
-      new RegExp(`\\b(?:prisma|tx|db)\\.${model}\\.${MUTATION}`).test(source),
+      new RegExp(`\\.${model}\\.${MUTATION}`).test(source),
     );
   });
 }

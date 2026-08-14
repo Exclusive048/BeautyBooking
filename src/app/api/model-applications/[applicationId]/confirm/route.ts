@@ -1,5 +1,6 @@
-import { AccountType, BookingSource, Prisma } from "@prisma/client";
+import { AccountType, BookingSource } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -219,7 +220,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const safePrice = Number.isFinite(priceValue) && priceValue > 0 ? priceValue : 0;
 
     let siblingCascadeIds: string[] = [];
-    const bookingId = await prismaDirect.$transaction(
+    const bookingId = await bookingTransaction(
       async (tx) => {
         const [offerRow, appRow] = await Promise.all([
           tx.modelOffer.findUnique({
@@ -387,7 +388,10 @@ export async function POST(req: Request, ctx: RouteContext) {
 
         return booking.id;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31). Клиент здесь
+      // прямой (обход пула) — единственная причина, по которой у обёртки вообще
+      // есть параметр `client`.
+      { client: prismaDirect },
     );
 
     const fullApplication = await loadApplicationWithRelations(application.id);

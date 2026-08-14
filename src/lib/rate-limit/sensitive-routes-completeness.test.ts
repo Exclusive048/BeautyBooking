@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { isSensitiveRouteKey } from "@/lib/rate-limit";
+import { hasMutatingHandler } from "@/lib/testing/route-handlers";
 import FROZEN from "@/lib/rate-limit/fail-open-mutating-routes.json";
 
 /**
@@ -26,13 +27,27 @@ import FROZEN from "@/lib/rate-limit/fail-open-mutating-routes.json";
  *          наблюдалось: «Новый мутирующий роут вне чувствительных префиксов …
  *          Появились: /api/refunds/request»; после удаления роута — зелёный.
  *
+ * @probe   🔴 **FIX-C7 · RETRO-PROBE — прежняя проба была МИНИМАЛЬНОЙ, и сторож
+ *          оказался WEAKER-THAN-CLAIMED.** A/B на ОДНОМ И ТОМ ЖЕ роуте, по тому
+ *          же пути, различие только в форме объявления:
+ *            · `export async function POST(…)`      → 1 failed (сторож прав);
+ *            · `export const POST = async (…) => …` → **4 passed, зелено**.
+ *          То есть вердикт держался на форме, которую автор пробы случайно
+ *          выбрал. Форма-обход не экзотическая: к ней приходят, когда
+ *          обработчик заворачивают (`export const POST = withX(handler)`).
+ *          Живой дыры не было — в дереве ноль таких роутов (проверено грепом), —
+ *          дыра была в утверждении сторожа о себе.
+ *          Починено: распознавание вынесено в `lib/testing/route-handlers.ts`
+ *          (три формы: function-декларация, `export const`, `export { x as POST }`).
+ *          Повторная проба после починки: const-форма → 1 failed, тот же текст
+ *          и то же имя роута, что у function-формы.
+ *
  * Почему снимок, а не реестр с причинами: реестр на 108 строк никто не напишет
  * честно, и он выродится в «ок» напротив каждой. Снимок стоит одну строку и
  * ловит именно дельту.
  */
 
 const API_ROOT = path.resolve(process.cwd(), "src", "app", "api");
-const MUTATING = /export\s+(?:async\s+)?function\s+(POST|PATCH|PUT|DELETE)\b/;
 
 function collectMutatingRoutes(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -42,7 +57,8 @@ function collectMutatingRoutes(dir: string, acc: string[] = []): string[] {
       continue;
     }
     if (entry !== "route.ts") continue;
-    if (!MUTATING.test(readFileSync(full, "utf8"))) continue;
+    // FIX-C7: три формы объявления, не одна — см. `lib/testing/route-handlers.ts`.
+    if (!hasMutatingHandler(readFileSync(full, "utf8"))) continue;
     const rel = path
       .relative(path.resolve(process.cwd(), "src", "app"), dir)
       .split(path.sep)

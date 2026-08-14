@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildSuccessHeadline } from "@/features/booking/components/booking-flow/lib/success-headline";
 import { UI_TEXT } from "@/lib/ui/text";
+import { stripComments } from "@/lib/testing/source-scan";
 
 /**
  * FIX-C3 · SMOKE-01 · F4 — на экране успеха записи есть имя мастера.
@@ -61,13 +62,17 @@ describe("FIX-C3 · имя не зависит от best-effort-фетча", () 
    * `providerName: ""` дословно, и сканер считал цитату кодом. Тот же класс, что
    * «`includes()`, удовлетворяемый строкой импорта» из инв. #43 — сторож должен
    * смотреть на код, а не на текст рядом с ним.
+   *
+   * FIX-C5: разбор переведён на общий `lib/testing/source-scan.ts`. Здесь стояла
+   * та самая сломанная форма — она сносила бы строку `providerName: "", // TODO`
+   * вместе с дефектом, то есть сторож зеленел бы ровно на возвращённом F4.
    */
-  const stepper = readFileSync(
-    join(SRC, "features/booking/components/booking-flow/booking-flow-stepper.tsx"),
-    "utf8",
-  )
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^[^\n]*?\/\/.*$/gm, "");
+  const stepper = stripComments(
+    readFileSync(
+      join(SRC, "features/booking/components/booking-flow/booking-flow-stepper.tsx"),
+      "utf8",
+    ),
+  );
 
   it("карточка-заглушка получает имя, а не пустую строку", () => {
     expect(
