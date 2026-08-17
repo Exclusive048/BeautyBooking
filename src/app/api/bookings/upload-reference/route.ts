@@ -13,6 +13,7 @@ import {
 } from "@/lib/media/types";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
+import { capLongestSide, MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -74,15 +75,19 @@ export async function POST(req: Request) {
     let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
     let outputBuffer: Buffer;
 
+    // PERF-07: без ресайза оригинал до 10 МБ уезжал прямо в браузер —
+    // `next/image` тут не применяется осознанно (роут отдачи держит
+    // cookie-auth + токен). Порог — см. `image-resize.ts`.
+    const resized = capLongestSide(sharp(rawBuffer), MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX);
     if (detected.mime === "image/png") {
       outputMime = "image/webp";
-      outputBuffer = await sharp(rawBuffer).webp({ quality: 90 }).toBuffer();
+      outputBuffer = await resized.webp({ quality: 90 }).toBuffer();
     } else if (detected.mime === "image/jpeg") {
       outputMime = "image/jpeg";
-      outputBuffer = await sharp(rawBuffer).jpeg({ quality: 90 }).toBuffer();
+      outputBuffer = await resized.jpeg({ quality: 90 }).toBuffer();
     } else {
       outputMime = "image/webp";
-      outputBuffer = await sharp(rawBuffer).webp({ quality: 90 }).toBuffer();
+      outputBuffer = await resized.webp({ quality: 90 }).toBuffer();
     }
 
     if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {

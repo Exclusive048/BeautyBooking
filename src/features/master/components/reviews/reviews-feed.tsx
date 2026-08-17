@@ -1,9 +1,12 @@
 import { Star } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { MasterReviewItem } from "@/lib/master/reviews-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ReviewCard } from "./review-card";
 
 const T = UI_TEXT.cabinetMaster.reviews.empty;
+/** Сброс фильтра = тот же путь без query-параметров. */
+const PAGE_PATH = "/cabinet/master/reviews";
 
 type Props = {
   reviews: MasterReviewItem[];
@@ -34,14 +37,17 @@ export function ReviewsFeed({
   now,
 }: Props) {
   if (reviews.length === 0) {
+    // RES-28: общий примитив. Действие — только у отфильтрованного случая
+    // (фильтр в query-строке, сброс = путь без параметров). Отзыв пишет клиент,
+    // поэтому кнопки для случая «отзывов ещё нет» у мастера быть не может.
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle bg-bg-card px-4 py-12 text-center">
-        <Star className="mb-3 h-10 w-10 text-text-sec/40" aria-hidden />
-        <p className="font-display text-base text-text-main">{T.title}</p>
-        <p className="mt-1 max-w-md text-sm text-text-sec">
-          {isFiltered ? T.bodyFiltered : T.bodyAll}
-        </p>
-      </div>
+      <EmptyState
+        variant="card"
+        icon={Star}
+        title={T.title}
+        description={isFiltered ? T.bodyFiltered : T.bodyAll}
+        action={isFiltered ? { label: T.resetCta, href: PAGE_PATH } : undefined}
+      />
     );
   }
 

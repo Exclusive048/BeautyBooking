@@ -49,9 +49,14 @@ export async function StudioPhotosSection({ studioId }: Props) {
           <CardContent className="p-5 md:p-6">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {portfolio.length > 0
-                ? portfolio.map((asset) => (
+                ? portfolio.map((asset, index) => (
                     <div key={asset.id} className="relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
-                      <ResilientImage src={asset.url} alt="" sizes="(max-width: 768px) 50vw, 25vw" className="object-cover" />
+                      <ResilientImage
+                        src={asset.url}
+                        alt={UI_TEXT.publicStudio.photoAltTemplate.replace("{n}", String(index + 1))}
+                        sizes="(max-width: 768px) 50vw, 25vw"
+                        className="object-cover"
+                      />
                     </div>
                   ))
                 : Array.from({ length: 8 }).map((_, i) => (

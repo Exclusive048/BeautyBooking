@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { env } from "@/lib/env";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   onClose: () => void;
@@ -69,7 +70,7 @@ export function TelegramConnectModal({ onClose }: Props) {
       <ModalSurface
         open
         onClose={onClose}
-        title="Подключение Telegram недоступно"
+        title={UI_TEXT.clientCabinet.profilePage.telegramModal.unavailableTitle}
       >
         <div className="space-y-3">
           <p className="text-sm text-text-sec">
@@ -87,7 +88,7 @@ export function TelegramConnectModal({ onClose }: Props) {
   }
 
   return (
-    <ModalSurface open onClose={onClose} title="Подключить Telegram">
+    <ModalSurface open onClose={onClose} title={UI_TEXT.clientCabinet.profilePage.telegramModal.connectTitle}>
       <div className="space-y-4">
         <p className="text-sm text-text-sec">
           Нажмите кнопку ниже, чтобы войти через Telegram и привязать аккаунт.

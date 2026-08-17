@@ -59,6 +59,13 @@ model Review {
   @@index([studioId, createdAt])
   @@index([masterId, createdAt])
   @@index([deletedAt])
+  // PERF-09 (I-7). Индекс под «активные отзывы цели, свежие первыми» —
+  // ЧАСТИЧНЫЙ (`WHERE "deletedAt" IS NULL`), поэтому живёт сырым SQL в
+  // миграции 20260806084318 и в реестре scripts/raw-sql-objects.mjs:
+  // `Review_active_target_createdAt_idx`. Полная форма, предложенная аудитом
+  // (`[targetType, targetId, deletedAt, createdAt]`), СОРТИРОВКУ НЕ УБИРАЕТ —
+  // проверено EXPLAIN'ом: Postgres берёт `IS NULL` как условие индекса, но не
+  // как равенство, сохраняющее порядок по следующей колонке.
 }
 
 model ReviewTag {

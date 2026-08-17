@@ -5,7 +5,10 @@ import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { applyBookingTransition } from "@/lib/bookings/transition";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import {
   emitBookingConfirmedSystemMessage,
   emitBookingRescheduledSystemMessage,
@@ -120,9 +123,13 @@ export async function confirmBooking(
   }
 
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
-  const conflictWhere = booking.masterProviderId
-    ? { providerId: booking.providerId, masterProviderId: booking.masterProviderId }
-    : { providerId: booking.providerId };
+  // LOGIC-01: скоуп конфликта — из общего билдера («время мастера — это время
+  // мастера»), а не собственная пара `(providerId, masterProviderId)`. Пара
+  // не видела брони того же мастера, созданные под другим `providerId`.
+  const conflictWhere = buildConflictScopeWhere({
+    providerId: booking.providerId,
+    masterProviderId: booking.masterProviderId,
+  });
 
   const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
   const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
@@ -142,7 +149,7 @@ export async function confirmBooking(
   // overlapping the booking's own current slot would falsely conflict.
   let updated: { id: string; status: BookingStatus };
   try {
-    updated = await prisma.$transaction(
+    updated = await bookingTransaction(
       async (tx) => {
         const conflicts = await tx.booking.findMany({
           where: {
@@ -178,8 +185,27 @@ export async function confirmBooking(
           endAtUtc,
         });
 
-        return tx.booking.update({
-          where: { id: bookingId },
+        // LOGIC-02: переход только из ТОГО статуса, который был прочитан и
+        // провалидирован выше. Без этого условия отмена, закоммитившаяся между
+        // чтением и записью, затиралась обратно в CONFIRMED — вместе с уже
+        // проставленными `cancelledAtUtc`/`cancelledBy`, которые confirm не
+        // чистит, то есть строка становилась внутренне противоречивой.
+        return applyBookingTransition(tx, {
+          id: bookingId,
+          expectedStatus: booking.status,
+          // Подтверждение переноса применяет время из `proposedStartAt`,
+          // прочитанное снаружи. Встречное предложение с другой стороны меняет
+          // это поле, НЕ меняя статус, — одного статуса как guard'а тут мало,
+          // иначе мастер подтвердил бы уже неактуальное время.
+          ...(appliesRequestedChange
+            ? {
+                expectAlso: {
+                  proposedStartAt: booking.proposedStartAt,
+                  proposedEndAt: booking.proposedEndAt,
+                  actionRequiredBy: booking.actionRequiredBy,
+                },
+              }
+            : {}),
           data: {
             status: "CONFIRMED",
             actionRequiredBy: null,
@@ -200,7 +226,9 @@ export async function confirmBooking(
           select: { id: true, status: true },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31). Этот путь
+      // прежний сторож не видел вовсе — он искал `ensureNoConflicts(tx`, а
+      // здесь повторная проверка своя (нужен exclude-self).
     );
   } catch (error) {
     // A true-concurrent approval race surfaces under Serializable as a
@@ -217,14 +245,7 @@ export async function confirmBooking(
     throw error;
   }
 
-  try {
-    await scheduleBookingReminders(updated.id);
-  } catch (error) {
-    logError("Failed to schedule booking reminders", {
-      bookingId: updated.id,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  await scheduleBookingRemindersSafe(updated.id);
 
   if (appliesRequestedChange) {
     await invalidateSlotsForBookingMove({

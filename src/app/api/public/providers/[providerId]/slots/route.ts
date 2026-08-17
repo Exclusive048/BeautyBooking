@@ -1,4 +1,6 @@
 import { ok, fail } from "@/lib/api/response";
+import { toAppError } from "@/lib/api/errors";
+import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
@@ -49,148 +51,164 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ providerId: string }> | { providerId: string } }
 ) {
-  const p = params instanceof Promise ? await params : params;
-  const url = new URL(req.url);
-  const serviceId = url.searchParams.get("serviceId") ?? "";
-  const fromKey = url.searchParams.get("from") ?? "";
-  const toKey = url.searchParams.get("to") ?? "";
-  const limitRaw = url.searchParams.get("limit");
+  // RES-13: без этого конверта неожиданный throw (ошибка Prisma, битая tz)
+  // отдаёт дефолтную HTML-страницу 500 Next вместо `{ ok:false, error }` —
+  // слот-пикер разбирает JSON и получает нераспарсиваемый ответ.
+  try {
+    const p = params instanceof Promise ? await params : params;
+    const url = new URL(req.url);
+    const serviceId = url.searchParams.get("serviceId") ?? "";
+    const fromKey = url.searchParams.get("from") ?? "";
+    const toKey = url.searchParams.get("to") ?? "";
+    const limitRaw = url.searchParams.get("limit");
 
-  if (!serviceId) return fail("Не указана услуга.", 400, "SERVICE_REQUIRED");
-  if (!isDateKey(fromKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
-  if (toKey && !isDateKey(toKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
+    if (!serviceId) return fail("Не указана услуга.", 400, "SERVICE_REQUIRED");
+    if (!isDateKey(fromKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
+    if (toKey && !isDateKey(toKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
 
-  const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
-  if (limitRaw && !Number.isFinite(limit)) {
-    return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
-  }
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
+    if (limitRaw && !Number.isFinite(limit)) {
+      return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
+    }
 
-  const provider = await resolveProviderBySlugOrId({
-    key: p.providerId,
-    select: {
-      id: true,
-      type: true,
-      timezone: true,
-      // BOOKING-WIDGET-A: policy fields are needed for the visible-window
-      // clamp + min-hours filter below. Keep selection narrow.
-      minBookingHoursAhead: true,
-      visibleSlotDays: true,
-    },
-    requirePublished: true,
-  });
-  if (!provider || provider.type !== "MASTER") {
-    return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
-  }
-
-  const duration = await resolveServiceDuration(provider.id, serviceId);
-  if (!duration.ok) {
-    return fail(mapSlotsError(duration.code), duration.status, duration.code);
-  }
-
-  const service = await prisma.service.findUnique({
-    where: { id: serviceId },
-    select: { id: true, price: true },
-  });
-  if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
-
-  // BOOKING-WIDGET-A: clamp the requested horizon to
-  // `Provider.visibleSlotDays`. The cabinet-side schedule editor stores
-  // this value as the "catalog visibility" knob — this clamp is
-  // public-discovery-specific and stays route-local (the authenticated
-  // `/availability` reschedule surface is bounded by `maxBookingDaysAhead`
-  // instead — see bookable-window.ts).
-  const nowForPolicy = new Date();
-  const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy, provider.timezone);
-  const effectiveToKeyExclusive = clampedToKey
-    ? addDaysToDateKey(clampedToKey, 1)
-    : toKey || undefined;
-
-  // EXP-025/026: the shared bookable-window primitive applies the
-  // `minBookingHoursAhead` cutoff + effective weekly/override schedule
-  // filter. `/availability` calls the SAME helper so the two endpoints
-  // can't re-diverge. The DiscountRule fetch stays here (hot-slot pricing
-  // is `/slots`-only) and runs in parallel.
-  const [bookable, rule] = await Promise.all([
-    listBookableSlots({
-      provider,
-      serviceId,
-      durationMinutes: duration.data,
-      fromKey,
-      toKeyExclusive: effectiveToKeyExclusive,
-      limit,
-      now: nowForPolicy,
-    }),
-    prisma.discountRule.findUnique({
-      where: { providerId: provider.id },
+    const provider = await resolveProviderBySlugOrId({
+      key: p.providerId,
       select: {
-        isEnabled: true,
-        triggerHours: true,
-        discountType: true,
-        discountValue: true,
-        applyMode: true,
-        minPriceFrom: true,
-        serviceIds: true,
+        id: true,
+        type: true,
+        timezone: true,
+        // BOOKING-WIDGET-A: policy fields are needed for the visible-window
+        // clamp + min-hours filter below. Keep selection narrow.
+        minBookingHoursAhead: true,
+        visibleSlotDays: true,
       },
-    }),
-  ]);
-  if (!bookable.ok) {
-    return fail(mapSlotsError(bookable.code), bookable.status, bookable.code);
-  }
+      requirePublished: true,
+    });
+    if (!provider || provider.type !== "MASTER") {
+      return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
+    }
 
-  const baseSlots = bookable.slots;
+    const duration = await resolveServiceDuration(provider.id, serviceId);
+    if (!duration.ok) {
+      return fail(mapSlotsError(duration.code), duration.status, duration.code);
+    }
 
-  type SlotLike = (typeof baseSlots)[number] & {
-    hotSlotId?: string | null;
-    isHot?: boolean;
-    discountType?: "PERCENT" | "FIXED";
-    discountValue?: number;
-    originalPrice?: number | null;
-    discountedPrice?: number | null;
-    discountPercent?: number | null;
-  };
+    const service = await prisma.service.findUnique({
+      where: { id: serviceId },
+      select: { id: true, price: true },
+    });
+    if (!service) return fail("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
 
-  const now = new Date();
-  const decoratedSlots: SlotLike[] = baseSlots.map((slot) => {
-    const startAtUtc = toDate(slot.startAtUtc);
-    if (!startAtUtc) {
+    // BOOKING-WIDGET-A: clamp the requested horizon to
+    // `Provider.visibleSlotDays`. The cabinet-side schedule editor stores
+    // this value as the "catalog visibility" knob — this clamp is
+    // public-discovery-specific and stays route-local (the authenticated
+    // `/availability` reschedule surface is bounded by `maxBookingDaysAhead`
+    // instead — see bookable-window.ts).
+    const nowForPolicy = new Date();
+    const clampedToKey = clampVisibleSlotsHorizon(toKey || null, provider, nowForPolicy, provider.timezone);
+    const effectiveToKeyExclusive = clampedToKey
+      ? addDaysToDateKey(clampedToKey, 1)
+      : toKey || undefined;
+
+    // EXP-025/026: the shared bookable-window primitive applies the
+    // `minBookingHoursAhead` cutoff + effective weekly/override schedule
+    // filter. `/availability` calls the SAME helper so the two endpoints
+    // can't re-diverge. The DiscountRule fetch stays here (hot-slot pricing
+    // is `/slots`-only) and runs in parallel.
+    const [bookable, rule] = await Promise.all([
+      listBookableSlots({
+        provider,
+        serviceId,
+        durationMinutes: duration.data,
+        fromKey,
+        toKeyExclusive: effectiveToKeyExclusive,
+        limit,
+        now: nowForPolicy,
+      }),
+      prisma.discountRule.findUnique({
+        where: { providerId: provider.id },
+        select: {
+          isEnabled: true,
+          triggerHours: true,
+          discountType: true,
+          discountValue: true,
+          applyMode: true,
+          minPriceFrom: true,
+          serviceIds: true,
+        },
+      }),
+    ]);
+    if (!bookable.ok) {
+      return fail(mapSlotsError(bookable.code), bookable.status, bookable.code);
+    }
+
+    const baseSlots = bookable.slots;
+
+    type SlotLike = (typeof baseSlots)[number] & {
+      hotSlotId?: string | null;
+      isHot?: boolean;
+      discountType?: "PERCENT" | "FIXED";
+      discountValue?: number;
+      originalPrice?: number | null;
+      discountedPrice?: number | null;
+      discountPercent?: number | null;
+    };
+
+    const now = new Date();
+    const decoratedSlots: SlotLike[] = baseSlots.map((slot) => {
+      const startAtUtc = toDate(slot.startAtUtc);
+      if (!startAtUtc) {
+        return {
+          ...slot,
+          hotSlotId: null,
+          isHot: false,
+          discountType: undefined,
+          discountValue: undefined,
+          originalPrice: null,
+          discountedPrice: null,
+          discountPercent: null,
+        };
+      }
+
+      const hot = resolveDynamicHotSlotPricing({
+        rule,
+        slotStartAtUtc: startAtUtc,
+        serviceId,
+        servicePrice: service.price,
+        providerTimeZone: provider.timezone,
+        now,
+      });
+
       return {
         ...slot,
         hotSlotId: null,
-        isHot: false,
-        discountType: undefined,
-        discountValue: undefined,
-        originalPrice: null,
-        discountedPrice: null,
-        discountPercent: null,
+        isHot: hot.isHot,
+        discountType: hot.discountType,
+        discountValue: hot.discountValue,
+        originalPrice: hot.originalPrice,
+        discountedPrice: hot.discountedPrice,
+        discountPercent: hot.discountPercent,
       };
-    }
-
-    const hot = resolveDynamicHotSlotPricing({
-      rule,
-      slotStartAtUtc: startAtUtc,
-      serviceId,
-      servicePrice: service.price,
-      providerTimeZone: provider.timezone,
-      now,
     });
 
-    return {
+    const serializedSlots = decoratedSlots.map((slot) => ({
       ...slot,
-      hotSlotId: null,
-      isHot: hot.isHot,
-      discountType: hot.discountType,
-      discountValue: hot.discountValue,
-      originalPrice: hot.originalPrice,
-      discountedPrice: hot.discountedPrice,
-      discountPercent: hot.discountPercent,
-    };
-  });
+      startAtUtc: toIso(slot.startAtUtc),
+      endAtUtc: toIso(slot.endAtUtc),
+    }));
 
-  const serializedSlots = decoratedSlots.map((slot) => ({
-    ...slot,
-    startAtUtc: toIso(slot.startAtUtc),
-    endAtUtc: toIso(slot.endAtUtc),
-  }));
-
-  return ok({ timezone: provider.timezone, slots: serializedSlots, meta: bookable.meta });
+    return ok({ timezone: provider.timezone, slots: serializedSlots, meta: bookable.meta });
+  } catch (error) {
+    const appError = toAppError(error);
+    const requestId = getRequestId(req);
+    if (appError.status >= 500) {
+      logError("GET /api/public/providers/[providerId]/slots failed", {
+        requestId,
+        route: "GET /api/public/providers/{providerId}/slots",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+    return fail(appError.message, appError.status, appError.code);
+  }
 }

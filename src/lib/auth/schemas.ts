@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AccountType } from "@prisma/client";
 import { normalizePhone } from "@/lib/auth/otp";
-import { consentFlagsSchema } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 
 const phoneSchema = z.preprocess(
   (value) => (typeof value === "string" ? normalizePhone(value) : value),

@@ -68,11 +68,11 @@ export function HeroSection({ stats }: Props) {
       {/* Decorative blobs — CSS only, no SVG */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-primary/8 blur-3xl dark:bg-primary/12"
+        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-primary-magenta/8 blur-3xl dark:bg-primary-magenta/12"
+        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-primary-magenta/[0.08] blur-3xl dark:bg-primary-magenta/[0.12]"
       />
 
       <div className="relative mx-auto max-w-3xl text-center">

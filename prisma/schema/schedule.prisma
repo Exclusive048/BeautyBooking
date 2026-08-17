@@ -186,7 +186,16 @@ model TimeBlock {
 
   studio Studio? @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
+  // LOGIC-19: `masterId` был голой строкой — БД про связь не знала, поэтому
+  // блок, чей мастер удалён, оставался «сиротой» навсегда и продолжал
+  // участвовать в `loadTimeBlockRanges` (запрос идёт по `masterId`). Заодно
+  // связь была невидима DMMF-guard'у инв. #38: он обходит РЕЛЯЦИИ, а строка
+  // релwith ей не является. Cascade — backstop на случай физического удаления
+  // строки Provider; штатный путь удаления кабинета её анонимизирует, поэтому
+  // каскад не сработает, и блоки чистятся ЯВНО (карта диспозиций).
   masterId String
+
+  masterProvider Provider @relation("ProviderTimeBlocks", fields: [masterId], references: [id], onDelete: Cascade)
 
   startAt DateTime
 

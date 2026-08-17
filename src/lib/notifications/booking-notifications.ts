@@ -178,6 +178,28 @@ export async function loadBookingWithRelations(bookingId: string): Promise<Booki
   });
 }
 
+/**
+ * PERF-26 — тот же набор связей для НАБОРА броней.
+ *
+ * Живёт рядом с поштучной формой и делит с ней `bookingInclude` намеренно:
+ * форма снапшота — вход всех `notify*`-функций ниже, и разойтись двум
+ * загрузчикам нельзя (то же решение, что у `resolveServiceDuration` /
+ * `resolveServiceDurations`).
+ *
+ * Возвращает Map по id; отсутствие ключа вызывающий трактует так же, как
+ * `null` от поштучной версии.
+ */
+export async function loadBookingsWithRelations(
+  bookingIds: string[]
+): Promise<Map<string, BookingWithRelations>> {
+  if (bookingIds.length === 0) return new Map();
+  const rows = await prisma.booking.findMany({
+    where: { id: { in: bookingIds } },
+    include: bookingInclude,
+  });
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
 export async function notifyBookingCreated(booking: BookingWithRelations): Promise<void> {
   const masterUserId = resolveMasterUserId(booking);
   if (!masterUserId) return;

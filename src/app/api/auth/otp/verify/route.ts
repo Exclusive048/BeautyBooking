@@ -6,6 +6,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { resolvePhoneLoginProfile } from "@/lib/auth/phone-login-profile";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
@@ -47,10 +48,7 @@ export async function POST(req: Request) {
 
     const lockCheck = await checkOtpVerifyLock(phone, clientIp);
     if (!lockCheck.ok) {
-      return NextResponse.json(
-        { error: lockCheck.error, retryAfterSec: lockCheck.retryAfterSec },
-        { status: lockCheck.status, headers: { "Retry-After": String(lockCheck.retryAfterSec) } }
-      );
+      return otpRateLimitFail(lockCheck);
     }
 
     const now = new Date();
@@ -75,10 +73,7 @@ export async function POST(req: Request) {
           operation: "otp-verify",
           code: failResult.error ?? "OTP_VERIFY_LOCKED",
         });
-        return NextResponse.json(
-          { error: failResult.error, retryAfterSec: failResult.retryAfterSec },
-          { status: failResult.status, headers: { "Retry-After": String(failResult.retryAfterSec) } }
-        );
+        return otpRateLimitFail(failResult);
       }
       void recordSurfaceEvent({
         surface: "auth",

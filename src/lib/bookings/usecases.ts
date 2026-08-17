@@ -8,9 +8,16 @@ import {
   resolveBookingRuntimeStatus,
   type BookingActor,
 } from "@/lib/bookings/flow";
+import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/bookings/booking-core";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
-import { assertBookingWindow } from "@/lib/bookings/policy-enforcement";
+import {
+  assertBookingWindow,
+  assertWithinMasterWorkHours,
+  resolveSalonLocalParts,
+} from "@/lib/bookings/policy-enforcement";
+import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { AppError } from "@/lib/api/errors";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 
 type RescheduleRecord = BookingDto;
 
@@ -41,20 +48,24 @@ async function ensureNoConflictsExcluding(
   endAtUtc: Date,
   bufferMin: number
 ): Promise<Result<null>> {
-  const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
-  const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
-
-  const conflictWhere = masterProviderId
-    ? { providerId, masterProviderId }
-    : { providerId };
-
+  // LOGIC-01 (доделка FIX-A2): здесь жила ПЯТАЯ копия скоупа — в исходной
+  // дефектной форме `masterProviderId ? { providerId, masterProviderId } :
+  // { providerId }`, то есть ровно пара, которую фикс и убирал. Guard её не
+  // поймал, потому что исключения в `conflict-scope.test.ts` были ФАЙЛОВЫМИ, а
+  // `usecases.ts` числился «чтением списков броней» — одна легитимная выборка в
+  // файле амнистировала весь файл. Это тот же класс «список молча протух», от
+  // которого guard и защищает, воспроизведённый уровнем выше.
+  //
+  // Путь живой: `rescheduleBooking` — предложение переноса. Двойной брони он не
+  // давал (авторитетная проверка при ПРИМЕНЕНИИ стоит в `confirmBooking` и уже
+  // на общем скоупе), но кросс-скоупный конфликт не находился в момент
+  // предложения и всплывал 409-м у противоположной стороны при подтверждении.
   const conflicts = await prisma.booking.findMany({
     where: {
-      ...conflictWhere,
+      ...buildConflictScopeWhere({ providerId, masterProviderId }),
+      ...buildConflictWindowWhere({ startAtUtc, endAtUtc, bufferMin }),
       id: { not: bookingId },
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null, lt: bufferedEnd },
-      endAtUtc: { not: null, gt: bufferedStart },
     },
     select: { id: true, startAtUtc: true, endAtUtc: true },
     take: 1,
@@ -131,8 +142,14 @@ export async function rescheduleBooking(input: {
         select: {
           minBookingHoursAhead: true,
           maxBookingDaysAhead: true,
+          timezone: true,
         },
       },
+      // LOGIC-03: длительность выводится на сервере, а не принимается от
+      // клиента; снапшоты — авторитетный источник (окно брони могло уже
+      // разойтись с ними). Tz исполнителя нужен guard'у рабочих часов.
+      masterProvider: { select: { timezone: true } },
+      serviceItems: { select: { durationSnapshotMin: true } },
     },
   });
   if (!booking) return { ok: false, status: 404, message: "Запись не найдена.", code: "BOOKING_NOT_FOUND" };
@@ -187,6 +204,8 @@ export async function rescheduleBooking(input: {
     }
   }
 
+  // Присланный конец окна дальше НЕ используется (LOGIC-03) — он проверяется
+  // здесь лишь как признак корректно сформированного запроса.
   if (!isValidDate(input.startAtUtc) || !isValidDate(input.endAtUtc)) {
     return { ok: false, status: 400, message: "Некорректное время записи.", code: "DATE_INVALID" };
   }
@@ -217,13 +236,68 @@ export async function rescheduleBooking(input: {
     throw error;
   }
 
+  // LOGIC-03: длительность переноса выводится СЕРВЕРОМ, а присланный конец
+  // окна дальше не используется. Схема валидировала только «конец позже
+  // начала», и `rescheduleBooking` не звал `resolveBookingCore` — то есть ни
+  // длительность услуги, ни рабочие часы не пересчитывались, а `confirmBooking`
+  // применял присланные значения дословно. Клиент мог сжать 90-минутную услугу
+  // до пяти минут и пролезть в щель между чужими бронями (мастер видит в
+  // диалоге только время НАЧАЛА) либо растянуть бронь на весь день. На
+  // create-пути такая подмена невозможна: там диапазон обязан совпасть со
+  // слотом байт в байт.
+  //
+  // Источник длительности — снапшоты `BookingServiceItem.durationSnapshotMin`,
+  // а не текущее окно брони: перенос не меняет длину услуги, а окно могло уже
+  // разойтись со снапшотом. Пустой набор снапшотов → длина текущего окна как
+  // последний ориентир.
+  const snapshotDurationMin = booking.serviceItems.reduce(
+    (sum, item) => sum + Math.max(0, item.durationSnapshotMin ?? 0),
+    0,
+  );
+  const currentWindowMin =
+    booking.startAtUtc && booking.endAtUtc
+      ? Math.max(
+          0,
+          Math.round((booking.endAtUtc.getTime() - booking.startAtUtc.getTime()) / 60_000),
+        )
+      : 0;
+  const durationMin = snapshotDurationMin > 0 ? snapshotDurationMin : currentWindowMin;
+  if (durationMin <= 0) {
+    return { ok: false, status: 400, message: "Некорректная длительность записи.", code: "DURATION_INVALID" };
+  }
+  const endAtUtc = new Date(input.startAtUtc.getTime() + durationMin * 60_000);
+
+  // LOGIC-03: рабочие часы на этом пути не проверялись вообще — перенос на
+  // воскресенье 03:00 проходил. Тот же резолвер и тот же guard, что у
+  // студийного move; окно считается в salon-tz (чтение часов прямо с
+  // UTC-инстанта сдвинуло бы его на оффсет салона).
+  const salonTz = booking.masterProvider?.timezone ?? booking.provider.timezone;
+  const localStart = resolveSalonLocalParts(input.startAtUtc, salonTz);
+  const workWindow = await resolveMasterWorkWindow(
+    booking.masterProviderId ?? booking.providerId,
+    localStart.weekday,
+    localStart.dateKey,
+  );
+  try {
+    assertWithinMasterWorkHours({
+      bookingStartMinutes: localStart.minutesFromMidnight,
+      bookingEndMinutes: localStart.minutesFromMidnight + durationMin,
+      window: workWindow,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { ok: false, status: 409, message: error.message, code: error.code };
+    }
+    throw error;
+  }
+
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
   const conflict = await ensureNoConflictsExcluding(
     booking.id,
     booking.providerId,
     booking.masterProviderId ?? null,
     input.startAtUtc,
-    input.endAtUtc,
+    endAtUtc,
     bufferMin
   );
   if (!conflict.ok) return conflict;
@@ -255,12 +329,15 @@ export async function rescheduleBooking(input: {
   // pending bookings (the status validation up at line 148 still
   // bounds the action to PENDING/CONFIRMED).
 
-  const updated = await prisma.booking.update({
-    where: { id: booking.id },
+  // LOGIC-02: переход только из наблюдённого статуса — иначе перенос ложится
+  // поверх уже отменённой брони.
+  const updated = await applyBookingTransition(prisma, {
+    id: booking.id,
+    expectedStatus: booking.status,
     data: {
       status: "CHANGE_REQUESTED",
       proposedStartAt: input.startAtUtc,
-      proposedEndAt: input.endAtUtc,
+      proposedEndAt: endAtUtc,
       requestedBy: input.actor,
       actionRequiredBy: input.actor === "CLIENT" ? "MASTER" : "CLIENT",
       changeComment:
@@ -304,7 +381,9 @@ export async function rescheduleBooking(input: {
       providerId: booking.providerId,
       masterProviderId: booking.masterProviderId ?? null,
       startAtUtc: input.startAtUtc,
-      endAtUtc: input.endAtUtc,
+      // LOGIC-03: выведенное окно, не присланное — иначе кэш слотов чистился бы
+      // у́же реально занимаемого времени.
+      endAtUtc,
     },
   });
 

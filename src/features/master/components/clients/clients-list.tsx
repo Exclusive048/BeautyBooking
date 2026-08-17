@@ -1,11 +1,14 @@
 "use client";
 
 import { Users } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { ClientListItemView } from "@/lib/master/clients-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ClientListItem } from "./client-list-item";
 
 const T = UI_TEXT.cabinetMaster.clients.list;
+/** Сброс фильтров = тот же путь без query-параметров (`tab`, `q`, `sort`). */
+const PAGE_PATH = "/cabinet/master/clients";
 
 type Props = {
   clients: ClientListItemView[];
@@ -26,16 +29,19 @@ type Props = {
  */
 export function ClientsList({ clients, selectedKey, onSelect, now, isFiltering }: Props) {
   if (clients.length === 0) {
+    // RES-28: общий примитив вместо руками собранной разметки. Действие есть
+    // только у отфильтрованного случая, и оно настоящее — фильтры живут в
+    // query-строке, поэтому «сбросить» это переход на тот же путь без
+    // параметров. Придумывать кнопку для случая «клиентов ещё нет» нельзя:
+    // мастер не заводит клиента руками, тот появляется из брони.
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle bg-bg-card px-4 py-12 text-center">
-        <Users className="mb-3 h-10 w-10 text-text-sec/40" aria-hidden />
-        <p className="font-display text-base text-text-main">
-          {isFiltering ? T.emptyFiltered : T.emptyTitle}
-        </p>
-        {!isFiltering ? (
-          <p className="mt-1 max-w-xs text-sm text-text-sec">{T.emptyBody}</p>
-        ) : null}
-      </div>
+      <EmptyState
+        variant="card"
+        icon={Users}
+        title={isFiltering ? T.emptyFiltered : T.emptyTitle}
+        description={isFiltering ? undefined : T.emptyBody}
+        action={isFiltering ? { label: T.emptyResetCta, href: PAGE_PATH } : undefined}
+      />
     );
   }
 

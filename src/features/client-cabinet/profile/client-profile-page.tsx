@@ -41,6 +41,8 @@ import { TelegramConnectModal } from "./modals/telegram-connect-modal";
 import { isTelegramEnabled } from "@/lib/env";
 
 const T = UI_TEXT.clientCabinet.profilePage;
+// FIX-D1: исходы стартовой ноги VK — те же строки, что у студийного кабинета.
+const vkStartText = UI_TEXT.settings.vk.connectFailure;
 
 type Props = {
   /** Server-loaded user id needed for the AvatarEditor (entityType=USER). */
@@ -88,12 +90,36 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
   }
 }
 
+/**
+ * FIX-D1 — исход стартовой ноги VK → текст. Близнец `telegramConnectResult`
+ * выше и намеренно той же формы: оба читают флаг, который навигация оставила в
+ * адресе, и оба обязаны это делать в ИНИЦИАЛИЗАТОРЕ состояния, а не в эффекте
+ * (`react-hooks/set-state-in-effect`; эффект остаётся только чистить адрес).
+ */
+function vkConnectFailureMessage(value: string | null): string | null {
+  switch (value) {
+    case "provider_unavailable":
+      return vkStartText.providerUnavailable;
+    case "start_failed":
+      return vkStartText.startFailed;
+    case "consent_required":
+      return vkStartText.consentRequired;
+    default:
+      return null;
+  }
+}
+
 export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled = false }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
   );
-  const [stubMessage, setStubMessage] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  // FIX-D1: отказ подключения VK показывается на этой же странице — см.
+  // `vkConnectFailureMessage`. Через инициализатор, а не эффектом.
+  const [stubMessage, setStubMessage] = useState<string | null>(() =>
+    vkConnectFailureMessage(searchParams.get("vk")),
+  );
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [tgModalOpen, setTgModalOpen] = useState(false);
 
@@ -102,7 +128,6 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
   // and strip the param so a refresh doesn't re-show it (replaceState only — no
   // setState in the effect). The connected state itself re-renders from fresh
   // SSR/SWR data after the full-navigation round-trip.
-  const searchParams = useSearchParams();
   const [tgResult, setTgResult] = useState(() =>
     telegramConnectResult(searchParams.get("telegram")),
   );
@@ -110,12 +135,15 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
   useEffect(() => {
     if (tgUrlCleaned.current) return;
     tgUrlCleaned.current = true;
-    if (searchParams.get("telegram")) {
+    // FIX-D1: чистим оба флага навигации — telegram и vk, — иначе обновление
+    // страницы показывало бы уже показанный отказ повторно.
+    if (searchParams.get("telegram") || searchParams.get("vk")) {
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, [searchParams]);
 
-  const { status, scheduleSave } = useProfileAutosave({
+
+  const { status, errorMessage, scheduleSave } = useProfileAutosave({
     onSaved: (next) => {
       void mutate(next, { revalidate: false });
     },
@@ -182,12 +210,14 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
     window.location.href = "/api/auth/vk/start";
   }
 
+
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">
       <div className="flex flex-col gap-5">
         <ProfileHeaderCard
           data={data}
           status={status}
+          statusMessage={errorMessage}
           userId={userId}
           onAvatarChanged={() => void mutate()}
         />
@@ -292,10 +322,13 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
 function ProfileHeaderCard({
   data,
   status,
+  statusMessage,
   userId,
 }: {
   data: ProfileDTO;
   status: SaveStatus;
+  /** FIX-C8: курируемая строка сервера для `status === "error"` (см. хук). */
+  statusMessage?: string | null;
   userId: string;
   // `onAvatarChanged` is accepted for the caller's contract but unused here:
   // <AvatarEditor> owns its full upload/reload pipeline (self-contained), so the
@@ -342,25 +375,37 @@ function ProfileHeaderCard({
           </div>
         </div>
 
-        <SaveStatusIndicator status={status} />
+        <SaveStatusIndicator status={status} message={statusMessage} />
       </div>
     </Card>
   );
 }
 
-function SaveStatusIndicator({ status }: { status: SaveStatus }) {
+function SaveStatusIndicator({
+  status,
+  message,
+}: {
+  status: SaveStatus;
+  message?: string | null;
+}) {
   if (status === "idle") return null;
   const config = {
     saving: { color: "text-amber-600 dark:text-amber-400", label: T.saveStatus.saving },
     saved: { color: "text-emerald-600 dark:text-emerald-400", label: T.saveStatus.saved },
-    error: { color: "text-rose-600 dark:text-rose-400", label: T.saveStatus.error },
+    error: { color: "text-danger-text", label: T.saveStatus.error },
   }[status];
+  // FIX-C8: на ошибке индикатор печатает курируемую строку сервера, если она
+  // пришла («Этот email уже используется другим аккаунтом…»), и свой канон —
+  // если нет. `role="alert"` только у отказа: «Сохраняем»/«Сохранено» — это
+  // фон, а не событие, о котором надо объявлять.
+  const label = status === "error" && message ? message : config.label;
   return (
     <div
       className={`inline-flex items-center gap-1.5 font-mono text-xs ${config.color}`}
+      {...(status === "error" ? { role: "alert" as const } : {})}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-      {config.label}
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden />
+      {label}
     </div>
   );
 }
@@ -380,7 +425,7 @@ function PersonalCard({
     <Card className="p-6">
       <SectionHeader
         title={T.sections.personal}
-        subtitle="Эти данные видят только мастера, у которых вы были на приёме."
+        subtitle={T.sectionHints.personal}
       />
 
       <FieldRow label={T.fields.firstName}>
@@ -456,7 +501,7 @@ function ContactsCard({
     <Card className="p-6">
       <SectionHeader
         title={T.sections.contacts}
-        subtitle="Канал, по которому мастер с вами свяжется."
+        subtitle={T.sectionHints.contacts}
       />
 
       <FieldRow
@@ -543,7 +588,7 @@ function LinkedAccountsCard({
     <Card className="p-6">
       <SectionHeader
         title={T.sections.linkedAccounts}
-        subtitle="Для быстрого входа и связи с мастером."
+        subtitle={T.sectionHints.linkedAccounts}
       />
 
       <div className="space-y-2.5">

@@ -1,5 +1,6 @@
 import "server-only"; // GUARDRAILS-01: hard-fail the build if this ever reaches a client bundle
 import { PrismaClient } from "@prisma/client";
+import { withStatementTimeout } from "@/lib/prisma-datasource";
 
 const globalForPrismaDirect = globalThis as typeof globalThis & {
   __beautyhubPrismaDirect?: PrismaClient;
@@ -14,7 +15,9 @@ if (!directUrl) {
 const createPrismaDirectClient = (): PrismaClient =>
   new PrismaClient({
     datasources: {
-      db: { url: directUrl },
+      // RES-24: та же граница, что у пулового клиента — asymmetric-фикс оставил бы
+      // второй путь записи без потолка
+      db: { url: withStatementTimeout(directUrl) },
     },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });

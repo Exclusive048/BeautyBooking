@@ -4,12 +4,14 @@ import { OtpChannel } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
+import { releaseUnverifiedEmailClaims } from "@/lib/auth/email-claim";
 import { hashOtpCode } from "@/lib/auth/otp";
 import {
   checkOtpEmailVerifyLock,
   clearOtpEmailVerifyFailures,
   registerOtpEmailVerifyFailure,
 } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { maskEmail } from "@/lib/logging/masking";
 import { prisma } from "@/lib/prisma";
@@ -40,7 +42,7 @@ export async function POST(req: Request) {
       select: { email: true },
     });
     if (!profile?.email) {
-      return jsonFail(400, "Сначала укажите email", "VALIDATION_ERROR");
+      return jsonFail(400, "Сначала укажите email.", "VALIDATION_ERROR");
     }
 
     const normalizedEmail = profile.email.toLowerCase();
@@ -50,13 +52,7 @@ export async function POST(req: Request) {
 
     const lockCheck = await checkOtpEmailVerifyLock(normalizedEmail, clientIp);
     if (!lockCheck.ok) {
-      return NextResponse.json(
-        { ok: false, error: { message: lockCheck.error ?? "Слишком много попыток. Попробуйте позже.", code: "RATE_LIMITED" } },
-        {
-          status: lockCheck.status,
-          headers: { "Retry-After": String(lockCheck.retryAfterSec) },
-        },
-      );
+      return otpRateLimitFail(lockCheck);
     }
 
     const now = new Date();
@@ -76,28 +72,29 @@ export async function POST(req: Request) {
     if (!otp) {
       const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
       if (!failResult.ok) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: { message: failResult.error ?? "Слишком много попыток. Попробуйте позже.", code: "RATE_LIMITED" },
-          },
-          {
-            status: failResult.status,
-            headers: { "Retry-After": String(failResult.retryAfterSec) },
-          },
-        );
+        return otpRateLimitFail(failResult);
       }
-      return jsonFail(401, "Код не подходит", "CODE_NOT_FOUND");
+      // FIX-C8: строка стала видимой пользователю (модалка подтверждения email
+      // больше не подменяет её своей), поэтому получила собственную подсказку —
+      // по UI-17 хвост «Попробуйте ещё раз.» дописывается только там, где своей
+      // подсказки нет, а «проверьте письмо» полезнее канона.
+      return jsonFail(401, "Код не подходит. Проверьте письмо и введите код ещё раз.", "CODE_NOT_FOUND");
     }
 
-    await Promise.all([
-      clearOtpEmailVerifyFailures(normalizedEmail, clientIp),
-      prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }),
-      prisma.userProfile.update({
+    // EMAIL-ADDRESS-OCCUPATION: отметка владения и освобождение чужих
+    // НЕподтверждённых заявок на этот адрес — одной транзакцией. Вынесены из
+    // `Promise.all` намеренно: там ветки независимы, а здесь порядок и
+    // атомарность существенны — иначе между освобождением и отметкой
+    // существует окно, в котором адрес не принадлежит никому.
+    await prisma.$transaction(async (tx) => {
+      await releaseUnverifiedEmailClaims(tx, normalizedEmail, user.id);
+      await tx.userProfile.update({
         where: { id: user.id },
         data: { emailVerifiedAt: now },
-      }),
-    ]);
+      });
+      await tx.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } });
+    });
+    await clearOtpEmailVerifyFailures(normalizedEmail, clientIp);
 
     logInfo("Cabinet email verify completed", {
       userId: user.id,

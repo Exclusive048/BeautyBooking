@@ -1,10 +1,49 @@
 import { ok, fail } from "@/lib/api/response";
-import { prisma } from "@/lib/prisma";
+import { getSessionUser } from "@/lib/auth/access";
+import { requireProviderOwner } from "@/lib/auth/ownership";
+import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
+
+// EXP-025: `minBookingHoursAhead` is required so the shared bookable-window
+// primitive can drop too-soon slots — the cutoff this endpoint previously
+// skipped (vs `/slots`).
+const PROVIDER_SELECT = { id: true, timezone: true, minBookingHoursAhead: true } as const;
+
+/**
+ * SEC-05 — расписание неопубликованного кабинета видно только своей стороне.
+ *
+ * Роут обслуживает две аудитории: анонимный виджет записи в студию и
+ * кабинетное окно переноса брони. Поэтому «просто добавить `isPublished`»
+ * нельзя — мастер, снявший профиль с публикации, обязан продолжать переносить
+ * уже существующие брони. Публикация проверяется для всех, а владелец кабинета
+ * и админ студии получают доступ по той же проверке прав, что и остальные
+ * provider-действия (`requireProviderOwner`), без собственной копии правила.
+ */
+async function loadProviderForOwnSide(req: Request, providerKey: string) {
+  let user;
+  try {
+    user = await getSessionUser(req);
+  } catch {
+    return null;
+  }
+
+  const provider = await resolveProviderBySlugOrId({
+    key: providerKey,
+    select: PROVIDER_SELECT,
+  });
+  if (!provider) return null;
+
+  try {
+    await requireProviderOwner(user, provider.id);
+  } catch {
+    return null;
+  }
+  return provider;
+}
 
 export async function GET(
   req: Request,
@@ -27,16 +66,18 @@ export async function GET(
       return fail("Некорректное значение limit.", 400, "LIMIT_INVALID");
     }
 
-    const provider = await prisma.provider.findUnique({
-      where: { id: p.id },
-      // EXP-025: `minBookingHoursAhead` is required so the shared
-      // bookable-window primitive can drop too-soon slots — the cutoff
-      // this endpoint previously skipped (vs `/slots`).
-      select: { id: true, timezone: true, minBookingHoursAhead: true },
-    });
+    // SEC-05: сначала — публичный резолв с обязательной публикацией (тот же
+    // примитив, что у соседнего `/slots`). Неопубликованный кабинет доступен
+    // только своей стороне.
+    const provider =
+      (await resolveProviderBySlugOrId({
+        key: p.id,
+        select: PROVIDER_SELECT,
+        requirePublished: true,
+      })) ?? (await loadProviderForOwnSide(req, p.id));
     if (!provider) return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
 
-    const duration = await resolveServiceDuration(p.id, serviceId);
+    const duration = await resolveServiceDuration(provider.id, serviceId);
     if (!duration.ok) return fail(duration.message, duration.status, duration.code);
 
     // EXP-026: align `to` to the inclusive contract `/slots` documents

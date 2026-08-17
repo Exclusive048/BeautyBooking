@@ -6,6 +6,7 @@ import {
 } from "@/lib/schedule/usecases";
 import { dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
+import { SCHEDULE_OVERRIDE_RANGE_ORDER } from "@/lib/schedule/override-order";
 import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
 
 /**
@@ -142,7 +143,8 @@ export async function listBookableSlots(input: {
         scheduleMode: true,
         fixedSlotTimes: true,
       },
-      orderBy: { date: "asc" },
+      // LOGIC-11: тот же канон, что у движка и у guard'а.
+      orderBy: SCHEDULE_OVERRIDE_RANGE_ORDER,
     }),
   ]);
 
@@ -158,6 +160,11 @@ export async function listBookableSlots(input: {
   const exceptionsByDate = new Map<string, EffectiveSchedule>();
   for (const row of overrides) {
     const dateKey = toLocalDateKey(row.date, provider.timezone);
+    // LOGIC-11: побеждает ПЕРВАЯ строка — как в движке. Раньше здесь стоял
+    // безусловный `set`, то есть при дублях выигрывала ПОСЛЕДНЯЯ, и генератор
+    // слотов расходился с guard'ом рабочих часов даже при одинаковом порядке
+    // выборки.
+    if (exceptionsByDate.has(dateKey)) continue;
     const fixedTimes = normalizeFixedSlotTimes(row.fixedSlotTimes ?? []);
     exceptionsByDate.set(dateKey, {
       isWorkday: row.isWorkday ?? !row.isDayOff,

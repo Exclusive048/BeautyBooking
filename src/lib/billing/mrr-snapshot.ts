@@ -151,6 +151,46 @@ export async function createMrrSnapshotForToday(): Promise<CreateSnapshotResult>
 }
 
 /**
+ * RES-26 — с какого часа UTC воркер подбирает несделанный снимок.
+ *
+ * День снимка — UTC-день (`utcDateOnly`), поэтому час обязан лежать внутри
+ * него: поздний оставляет внешний cron первичным (воркер не забегает вперёд),
+ * но успевает измерить состояние до того, как дата сменится и измерять станет
+ * нечего.
+ */
+export const MRR_SNAPSHOT_BACKSTOP_HOUR_UTC = 23;
+
+export type BackstopResult =
+  | { ran: false; reason: "too-early" }
+  | { ran: true; created: boolean; snapshot: SnapshotData };
+
+/**
+ * Второй шанс ИЗМЕРИТЬ сегодняшний день — не бэкфилл (RES-26).
+ *
+ * Снимок держался на одном внешнем срабатывании cron'а в сутки: не сработало
+ * (планировщик пропустил, воркер лежал дольше трёх попыток задачи) — и в ряду
+ * навсегда дыра, которая проявится ровно через 30 дней, когда
+ * `getMrrSnapshotDaysAgo` не найдёт строку на точную дату.
+ *
+ * 🔴 Дыру за ПРОШЕДШИЙ день закрыть нечем: `UserSubscription` хранит границы
+ * периода одним изменяемым полем (продление перезаписывает), а `status` —
+ * текущий, поэтому набор «кто был оплачен на дату D» из БД не восстанавливается.
+ * Занижённая точка в денежном ряду хуже пропуска: пропуск виден как «—», а
+ * занижение читается как падение выручки, которого не было — тот же принцип уже
+ * записан у `getMrrSnapshotDaysAgo`. Поэтому подбор работает только по
+ * сегодняшней дате и полностью переиспользует идемпотентный
+ * `createMrrSnapshotForToday`.
+ */
+export async function runMrrSnapshotBackstop(now: Date = new Date()): Promise<BackstopResult> {
+  if (now.getUTCHours() < MRR_SNAPSHOT_BACKSTOP_HOUR_UTC) {
+    return { ran: false, reason: "too-early" };
+  }
+
+  const result = await createMrrSnapshotForToday();
+  return { ran: true, created: result.created, snapshot: result.snapshot };
+}
+
+/**
  * Fetches the snapshot row for the day that was exactly `daysAgo`
  * before today (UTC). Returns `null` when no row exists for that
  * date — the KPI delta then falls back to "—" in the UI.

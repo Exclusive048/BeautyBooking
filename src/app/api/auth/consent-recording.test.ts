@@ -231,10 +231,12 @@ describe("email OTP", () => {
 });
 
 describe("VK OAuth", () => {
-  it("start without consent → 400, no OAuth flow begun", async () => {
+  // FIX-B14: отказ тот же и на том же месте (до начала OAuth), но форма —
+  // навигация: стартовая нога отвечает браузеру, а не XHR-клиенту.
+  it("start without consent → возврат на /login?error=consent_required, OAuth не начат", async () => {
     const res = await vkStart(new Request("http://localhost/api/auth/vk/start"));
-    expect(res.status).toBe(400);
-    expect(JSON.stringify(await res.json())).toContain("CONSENT_REQUIRED");
+    expect(res.headers.get("location")).toContain("/login?error=consent_required");
+    expect([302, 307, 308]).toContain(res.status);
     expect(cookieJar.get("vk_state")).toBeUndefined();
   });
 

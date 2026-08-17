@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonFail } from "@/lib/api/contracts";
 import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { Readable } from "stream";
 import { getSessionUser } from "@/lib/auth/session";
@@ -9,6 +10,7 @@ import {
   verifyPrivateMediaDeliveryToken,
 } from "@/lib/media/private-delivery";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { ensureCanReadMedia } from "@/lib/media/access";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { getMediaFile, isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
@@ -41,10 +43,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const params = await ctx.params;
     const parsed = mediaAssetIdParamSchema.safeParse(params);
     if (!parsed.success) {
-      return NextResponse.json(
-        { ok: false, error: { message: "Проверьте правильность заполнения полей.", code: "VALIDATION_ERROR" } },
-        { status: 400 }
-      );
+      return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
     }
     assetId = parsed.data.id;
 
@@ -62,10 +61,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       },
     });
     if (!asset || asset.deletedAt || asset.status !== MediaAssetStatus.READY) {
-      return NextResponse.json(
-        { ok: false, error: { message: "Файл не найден.", code: "MEDIA_ASSET_NOT_FOUND" } },
-        { status: 404 }
-      );
+      return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
     }
 
     // SECURITY-EXPOSURE-AUDIT-01 #3: serve publicly ONLY when the asset is
@@ -100,10 +96,7 @@ export async function GET(req: Request, ctx: RouteContext) {
           assetId: asset.id,
           storageKey: asset.storageKey,
         });
-        return NextResponse.json(
-          { ok: false, error: { message: "Файл не найден.", code: "MEDIA_ASSET_NOT_FOUND" } },
-          { status: 404 }
-        );
+        return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
       }
 
       void recordSurfaceEvent({
@@ -133,11 +126,20 @@ export async function GET(req: Request, ctx: RouteContext) {
           operation: "private-token",
           code: "INVALID_PRIVATE_MEDIA_TOKEN",
         });
-        return NextResponse.json(
-          { ok: false, error: { message: "Требуется вход в аккаунт.", code: "UNAUTHORIZED" } },
-          { status: 401 }
-        );
+        return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
       }
+
+      // SEC-10: токен отвечает на вопрос «какой актив», но не «кому можно».
+      // Без второй половины утёкшая ссылка (referrer, скриншот, лог прокси)
+      // открывает приватный актив кому угодно на срок жизни токена — до 15
+      // минут. Соседний чат-роут именно поэтому токену в одиночку не верит:
+      // `getSessionUser` + `getMediaFile` → `ensureCanReadMedia`. Приводим
+      // ветку к той же модели, чтобы на одном механизме не жили две разные.
+      // Флоу не задет: `?mt=`-ссылки выдаются только кабинету мастера на фото
+      // откликов модели, а ACL `MODEL_APPLICATION` пускает и заявителя, и
+      // владельца оффера.
+      const tokenUser = await getSessionUser();
+      await ensureCanReadMedia(tokenUser, asset.entityType, asset.entityId, asset.kind);
 
       const storage = getStorageProvider();
       const tokenFile = await storage.getObject(asset.storageKey, asset.mimeType);
@@ -149,10 +151,7 @@ export async function GET(req: Request, ctx: RouteContext) {
           })
           .catch(() => undefined);
 
-        return NextResponse.json(
-          { ok: false, error: { message: "Файл не найден.", code: "MEDIA_ASSET_NOT_FOUND" } },
-          { status: 404 }
-        );
+        return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
       }
 
       void recordSurfaceEvent({
@@ -226,9 +225,6 @@ export async function GET(req: Request, ctx: RouteContext) {
       });
     }
 
-    return NextResponse.json(
-      { ok: false, error: { message: appError.message, code: appError.code } },
-      { status: appError.status }
-    );
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

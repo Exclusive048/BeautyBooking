@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { CheckCircle2, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -210,11 +211,10 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
 
       {/* Consent */}
       <label className="flex cursor-pointer items-start gap-3">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={consent}
           onChange={(event) => setConsent(event.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+          className="mt-0.5"
         />
         <span className="text-sm text-muted-foreground">
           {UI_TEXT.pages.modelOffer.applyConsentText}

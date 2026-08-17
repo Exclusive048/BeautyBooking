@@ -1,6 +1,6 @@
 "use client";
 
-import { MediaEntityType } from "@prisma/client";
+import { MediaEntityType } from "@/lib/prisma-enums";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
@@ -113,7 +113,10 @@ export function ProfileMediaEditor({ providerId }: Props) {
       const json = (await res.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
       if (!res.ok || !json || !json.ok) {
         throw new Error(
-          json && !json.ok ? json.error.message : `${t.apiErrorPrefix}: ${res.status}`,
+          // UI-17: фолбэк — курируемая строка, а не «Ошибка API: 500».
+          // HTTP-статус пользователю ничего не сообщает; ниже этот же `catch`
+          // и так подставляет `loadFailed`, когда ошибка не несёт сообщения.
+          json && !json.ok ? json.error.message : t.loadFailed,
         );
       }
       const studio = json.data.studio;
@@ -140,7 +143,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [providerId, setAddressSnapshot, t.apiErrorPrefix, t.loadFailed]);
+  }, [providerId, setAddressSnapshot, t.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -212,7 +215,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
                 "message" in errorValue &&
                 typeof (errorValue as { message?: unknown }).message === "string"
               ? String((errorValue as { message?: unknown }).message)
-              : `${t.apiErrorPrefix}: ${res.status}`;
+              : t.saveFailed;
         throw new Error(message);
       }
       setIsPublished(json.data.studio.isPublished);
@@ -243,7 +246,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         throw new Error(
           uploadJson && !uploadJson.ok
             ? uploadJson.error.message
-            : `${t.apiErrorPrefix}: ${uploadRes.status}`,
+            : t.uploadBannerFailed,
         );
       }
 
@@ -257,7 +260,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         throw new Error(
           saveJson && !saveJson.ok
             ? saveJson.error.message
-            : `${t.apiErrorPrefix}: ${saveRes.status}`,
+            : t.uploadBannerFailed,
         );
       }
       setBannerUrl(saveJson.data.studio.bannerUrl);
@@ -286,7 +289,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         throw new Error(
           saveJson && !saveJson.ok
             ? saveJson.error.message
-            : `${t.apiErrorPrefix}: ${saveRes.status}`,
+            : t.uploadBannerFailed,
         );
       }
       setBannerUrl(saveJson.data.studio.bannerUrl);
@@ -304,7 +307,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
 
   const avatarNode = useMemo(
     () => (
-      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-bg-main bg-bg-elevated">
+      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border-2 border-bg-card bg-elevated">
         <AvatarEditor
           entityType={MediaEntityType.STUDIO}
           entityId={providerId}

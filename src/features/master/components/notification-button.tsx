@@ -28,7 +28,7 @@ export function NotificationButton({ count, href = "/cabinet/master/notification
       {showBadge ? (
         <span
           aria-label={`${count}`}
-          className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] font-medium text-white tabular-nums"
+          className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-medium text-white tabular-nums"
         >
           {count > 99 ? "99+" : count}
         </span>

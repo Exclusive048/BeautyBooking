@@ -18,11 +18,11 @@ export default function CareersPage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/8 blur-3xl dark:bg-primary/12"
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-primary-magenta/8 blur-3xl dark:bg-primary-magenta/12"
+          className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-primary-magenta/[0.08] blur-3xl dark:bg-primary-magenta/[0.12]"
         />
 
         <div className="relative mx-auto max-w-2xl px-4 py-16 text-center lg:py-24">

@@ -1,17 +1,33 @@
-# Production docker-compose.
+# Production docker-compose — образы собираются ЛОКАЛЬНО на ВМ, реестра нет
+# (CI-DEPLOY-NOREGISTRY-01, решение владельца 2026-08-07).
 #
-# Usage:
+# Usage (порядок деплоя автоматизирован в .github/workflows/deploy.yml):
+#   docker compose --env-file .env.production -f docker-compose.prod.yml build worker
+#   docker compose --env-file .env.production -f docker-compose.prod.yml build app
 #   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
 #
 # Required env (in .env.production):
-#   REGISTRY          - Yandex CR prefix, e.g. cr.yandex/<registry-id>
-#   IMAGE_TAG         - image tag to deploy, e.g. a1b2c3d4
 #   POSTGRES_DB       - database name
 #   POSTGRES_USER     - database user
 #   POSTGRES_PASSWORD - database password
 #   REDIS_PASSWORD    - Redis requirepass value
 #   DATABASE_URL      - postgresql://user:pass@postgres:5432/db
 #   REDIS_URL         - redis://:pass@redis:6379
+#   NEXT_PUBLIC_APP_URL - ИМЕННО под этим именем (алиас APP_PUBLIC_URL, который
+#                       понимает runtime-env.ts, в build-args НЕ интерполируется);
+#                       пустое/отсутствующее значение РОНЯЕТ сборку app —
+#                       new URL("") в root-layout бросает на сборе page-data.
+#
+# ⚠️ NEXT_PUBLIC_* — тоже в .env.production, и это НЕ только runtime-env: compose
+# интерполирует их в build-args сервиса `app` (см. ниже). Каждый NEXT_PUBLIC_*
+# инлайнится в клиентский бандл НА СБОРКЕ (src/lib/env.ts `clientEnv`); значение,
+# заданное только в runtime, до браузера НЕ доедет — прецедент «8 переменных
+# запеклись пустыми» (DOCKER-READINESS-AUDIT-01). Список args обязан оставаться
+# в локстепе с ARG-блоком Dockerfile и с build-images.yml (CI-заглушки).
+#
+# BUILD_NODE_OPTIONS (опционально): heap-кап для `next build` на ВМ — сборка идёт
+# рядом с работающим приложением, дефолт --max-old-space-size=2048 защищает от OOM.
+# NEXT_PUBLIC_GLITCHTIP_RELEASE экспортирует деплой-скрипт (короткий SHA).
 
 services:
   # One-shot schema migration — `prisma migrate deploy` against Postgres, then
@@ -20,11 +36,12 @@ services:
   # starts the app against an unmigrated database. Idempotent — migrate deploy
   # applies only pending migrations — so it is safe to re-run on every `up`. Uses
   # the worker image, which carries the Prisma CLI + schema + a matching engine.
-  # NOTE: the CI deploy (deploy.yml) runs migrations via a separate one-off
-  # `docker run` and then `up --no-deps app worker`, which bypasses this service;
-  # it exists for the manual `up -d` path.
+  # NOTE: the VM deploy (deploy.yml) runs `compose run --rm migrate` as an explicit
+  # visible step and then `up -d`; this service also gates the plain `up -d` path.
+  # Namespace-нейтральный локальный тег: собирается `build worker` ниже (у migrate
+  # своего build: нет намеренно — иначе один образ собирался бы дважды).
   migrate:
-    image: ${REGISTRY}/beautyhub-worker:${IMAGE_TAG:-latest}
+    image: beautyhub-worker:latest
     restart: "no"
     env_file: .env.production
     depends_on:
@@ -40,8 +57,35 @@ services:
         max-file: "3"
 
   app:
-    image: ${REGISTRY}/beautyhub-app:${IMAGE_TAG:-latest}
+    image: beautyhub-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Значения интерполируются из .env.production (--env-file). См. шапку файла:
+        # пропущенная переменная запекается в бандл ПУСТОЙ без ошибки — с одним
+        # исключением: пустой NEXT_PUBLIC_APP_URL роняет сборку (new URL("")).
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+        NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME:-}
+        NEXT_PUBLIC_TELEGRAM_ENABLED: ${NEXT_PUBLIC_TELEGRAM_ENABLED:-false}
+        NEXT_PUBLIC_VK_ENABLED: ${NEXT_PUBLIC_VK_ENABLED:-false}
+        NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED: ${NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED:-false}
+        NEXT_PUBLIC_YANDEX_ENABLED: ${NEXT_PUBLIC_YANDEX_ENABLED:-false}
+        NEXT_PUBLIC_YANDEX_MAPS_API_KEY: ${NEXT_PUBLIC_YANDEX_MAPS_API_KEY:-}
+        NEXT_PUBLIC_LEGAL_INN: ${NEXT_PUBLIC_LEGAL_INN:-}
+        NEXT_PUBLIC_VK_COMMUNITY_URL: ${NEXT_PUBLIC_VK_COMMUNITY_URL:-}
+        NEXT_PUBLIC_GLITCHTIP_DSN: ${NEXT_PUBLIC_GLITCHTIP_DSN:-}
+        NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT: ${NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT:-production}
+        NEXT_PUBLIC_GLITCHTIP_RELEASE: ${NEXT_PUBLIC_GLITCHTIP_RELEASE:-}
+        # Heap-кап next build при сборке на ВМ (см. шапку). CI-сборка образов идёт
+        # НЕ через compose и капа не получает (у ARG в Dockerfile дефолт пустой).
+        BUILD_NODE_OPTIONS: ${BUILD_NODE_OPTIONS:---max-old-space-size=2048}
     restart: unless-stopped
+    # RES-16: 10 c дефолта — это верхняя граница на добивание in-flight
+    # запросов при деплое. 30 c дают завершиться самому долгому легитимному
+    # запросу (загрузка медиа с re-encode) вместо обрыва соединения клиенту.
+    stop_grace_period: 30s
     env_file: .env.production
     depends_on:
       postgres:
@@ -56,9 +100,22 @@ services:
       - "127.0.0.1:3000:3000"
     healthcheck:
       # Node 20 ships a global fetch(), so no curl/wget is needed in the slim
-      # runner image. /api/health returns 200 only when Postgres AND Redis are
-      # reachable (503 otherwise). Generous start_period so a cold Next.js boot
-      # is not counted as unhealthy → no restart loop before the server is up.
+      # runner image.
+      #
+      # FIX-C2: /api/health is a LIVENESS probe — "can this process serve at
+      # all", no dependency I/O. It deliberately does NOT go 503 when Redis is
+      # down. A Redis outage is a partial, by-design degradation (sensitive
+      # routes fail closed, inv. #6; the public storefront keeps serving), and
+      # marking the container unhealthy for it would pull the only instance out
+      # of the load balancer — turning a partial outage into a total one.
+      # Dependency state lives at /api/health/ready and is checked by deploy.yml
+      # as a post-deploy gate, where "this build cannot reach Postgres" is
+      # actionable (roll back) rather than merely reported.
+      #
+      # Generous start_period so a cold Next.js boot is not counted as unhealthy.
+      # NOTE: `restart: unless-stopped` does NOT restart on unhealthy — plain
+      # Compose has no such behaviour. This status is consumed by deploy.yml and
+      # by whatever external monitor DevOps wires up, nothing else.
       test:
         - "CMD"
         - "node"
@@ -75,8 +132,19 @@ services:
         max-file: "5"
 
   worker:
-    image: ${REGISTRY}/beautyhub-worker:${IMAGE_TAG:-latest}
+    image: beautyhub-worker:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
     restart: unless-stopped
+    # RES-16: docker-дефолт — 10 c, и это меньше, чем идёт длинная джоба
+    # (`media.purge` пачкой объектов, `mrr.snapshot`, масс-рассылка). Цикл
+    # воркера проверяет `isShuttingDown` только на витке, то есть текущую
+    # джобу он дорабатывает, а SIGKILL её обрывает. Потери при этом нет —
+    # джоба остаётся в `queue:processing`, и `recoverStuckJobs` подберёт её по
+    # staleness, — но это +5 минут задержки и лишний attempt на КАЖДЫЙ деплой.
+    # 60 c: с запасом перекрывает и джобу, и `flushReports(2000)` в конце.
+    stop_grace_period: 60s
     env_file: .env.production
     depends_on:
       postgres:
@@ -120,9 +188,22 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # RES-27: очередь задач и кэш живут в ОДНОМ инстансе, поэтому политика
+    # вытеснения — не настройка производительности, а вопрос сохранности задач.
+    # `noeviction` и так дефолт, но именно поэтому его и записываем: будущее
+    # «поставим allkeys-lru, а то память растёт» выглядит как безобидный тюнинг
+    # и молча начнёт выбрасывать элементы `queue:jobs` — потерянная бронь-
+    # напоминание или вебхук ЮКассы, без единой ошибки в логах. Политика
+    # действует на ВЕСЬ инстанс, включая все логические БД, так что «развести
+    # кэш и очередь по SELECT 1» от этого не защищает — защищают только разные
+    # инстансы. Сторожится тестом `queue/redis-eviction-policy.test.ts`.
+    # `maxmemory` намеренно не задан здесь: при `noeviction` достижение лимита
+    # означает отказ на запись (то есть отказ enqueue), поэтому число обязано
+    # считаться от фактической памяти машины — строка в DEPLOY-BACKLOG.
     command: >
       redis-server
       --appendonly yes
+      --maxmemory-policy noeviction
       --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data

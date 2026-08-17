@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function GiftCardsPage() {
   return (
-    <main className="mx-auto max-w-[720px] px-4 py-12 md:py-24">
+    <div className="mx-auto max-w-[720px] px-4 py-12 md:py-24">
       <InfoPageLayout breadcrumb={UI_TEXT.pages.giftCards.navLabel}>
         <div className="text-center space-y-8 pt-4">
           <Gift className="h-16 w-16 text-accent-text mx-auto" aria-hidden />
@@ -36,6 +36,6 @@ export default function GiftCardsPage() {
           </p>
         </div>
       </InfoPageLayout>
-    </main>
+    </div>
   );
 }

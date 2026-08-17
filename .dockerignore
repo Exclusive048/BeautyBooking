@@ -28,11 +28,19 @@ out
 Thumbs.db
 
 # Test and coverage
+# ⚠️ Паттерны .dockerignore БЕЗ **/ заякорены на корень контекста: прежние
+# `*.test.ts` не матчили вложенные файлы, и все src-тесты ехали в контекст
+# сборки. Это ломало `next build` в образе: tsc типчекал
+# src/lib/schedule/numeric-range-checks.test.ts, чей импорт
+# scripts/raw-sql-objects.mjs указывает в исключённый каталог `scripts` —
+# app-образ не собирался с LOGIC-20 (2026-08-05), и до появления
+# build-images.yml это было невидимо (CI образ не собирал, деплой падал
+# раньше — на логине в реестр). Тесты в артефакт не входят по замыслу.
 coverage
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
 vitest.config.ts
 
 # Docs and scripts

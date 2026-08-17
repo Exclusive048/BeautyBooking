@@ -1,5 +1,3 @@
-"use client";
-
 import { ChartCard } from "@/features/admin-cabinet/dashboard/components/chart-card";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { AdminChartSeries } from "@/features/admin-cabinet/dashboard/types";
@@ -13,7 +11,11 @@ const T = UI_TEXT.adminPanel.dashboard.charts;
 /** Line chart wrapper — same `<ChartCard>` primitive with
  * `variant="line"`. Kept as a separate component so the dashboard
  * orchestrator can place them in different grid cells without
- * threading the variant through prop drilling. */
+ * threading the variant through prop drilling.
+ *
+ * PERF-25: серверный компонент. Границу держит `<ChartCard>` (у него свой
+ * `"use client"` и `useState`), а сюда приходят только строки и уже готовый
+ * ряд данных — директива тут лишь заводила ещё одну точку входа в бандл. */
 export function BookingsChart({ data }: Props) {
   return (
     <ChartCard

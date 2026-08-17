@@ -3,6 +3,18 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/lib/media/storage/types";
 import { env } from "@/lib/env";
 
+/**
+ * RES-21 — границы S3-вызова.
+ *
+ * 5 с на установку соединения (хранилище в той же зоне — секунды это уже
+ * аномалия) и 30 с на сам запрос: верхняя планка загрузки после re-encode
+ * измеряется мегабайтами, и слишком строгий порог рвал бы легитимную заливку
+ * на медленном канале. Таймаут действует НА ПОПЫТКУ, ретраев по умолчанию три
+ * — то есть худший случай ограничен, а не бесконечен, чем он и был.
+ */
+const S3_CONNECTION_TIMEOUT_MS = 5_000;
+const S3_REQUEST_TIMEOUT_MS = 30_000;
+
 type S3Config = {
   bucket: string;
   endpoint: string;
@@ -33,11 +45,32 @@ function requireS3Config(): S3Config {
   return { bucket, endpoint, region, accessKey, secretKey };
 }
 
-function isNoSuchKey(error: unknown): boolean {
-  if (error && typeof error === "object" && "name" in error) {
-    return (error as { name?: string }).name === "NoSuchKey";
-  }
-  return false;
+/**
+ * FIX-C12 — «объекта нет» распознаётся по СТАТУСУ, а не только по имени ошибки.
+ *
+ * 🔴 Провайдер здесь S3-**совместимый** (Yandex Object Storage), а не S3, и
+ * несовпадения живут ровно в таких местах. Прежняя проверка требовала
+ * `error.name === "NoSuchKey"` — одну строку из нескольких, которыми 404
+ * приходит на практике (`NotFound` возвращает SDK для HEAD-подобных ответов,
+ * а совместимый провайдер вправе прислать своё имя при том же коде).
+ *
+ * Цена промаха асимметрична и потому решается в пользу терпимости:
+ *   · на `deleteObject` нераспознанный 404 = вечный dead-letter `media.purge`,
+ *     то есть **невыполненное удаление ПДн** (152-ФЗ), причём навсегда;
+ *   · на `getObject` — 500 вместо честного «нет файла».
+ *
+ * ⚠️ Расширяется ТОЛЬКО 404. `403`/`AccessDenied` обязан продолжать бросать:
+ * проглоченный отказ прав на удалении означал бы «ПДн удалена» при живом
+ * объекте в бакете — то есть ровно ту тихую ложь, против которой заведён
+ * бросающий `runMediaPurge`.
+ */
+function isMissingObjectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = (error as { name?: string }).name;
+  if (name === "NoSuchKey" || name === "NotFound") return true;
+  const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+    ?.httpStatusCode;
+  return status === 404;
 }
 
 export class S3StorageProvider implements StorageProvider {
@@ -63,6 +96,22 @@ export class S3StorageProvider implements StorageProvider {
       credentials: {
         accessKeyId: cfg.accessKey,
         secretAccessKey: cfg.secretKey,
+      },
+      // RES-21: у клиента не было ни request-, ни connection-таймаута — только
+      // неявный `maxAttempts: 3`, который без границы на попытку не
+      // ограничивает НИЧЕГО. Держит два пути: загрузку медиа (запрос
+      // пользователя ждёт ответа) и джобу `media.purge`, то есть фактическое
+      // удаление ПДн из хранилища — зависший вызов там означает, что байты
+      // остаются, а строка-указатель уже не удалена (порядок в DELETION-02
+      // намеренно такой).
+      //
+      // Объект, а не `NodeHttpHandler`: SDK принимает `NodeHttpHandlerOptions`
+      // и конструирует обработчик сам, поэтому не нужен прямой импорт
+      // `@smithy/node-http-handler` — он есть только транзитивно, и зависеть
+      // от него напрямую значило бы завести незаявленную зависимость.
+      requestHandler: {
+        connectionTimeout: S3_CONNECTION_TIMEOUT_MS,
+        requestTimeout: S3_REQUEST_TIMEOUT_MS,
       },
     });
   }
@@ -98,7 +147,7 @@ export class S3StorageProvider implements StorageProvider {
         contentType,
       };
     } catch (error) {
-      if (isNoSuchKey(error)) return null;
+      if (isMissingObjectError(error)) return null;
       throw error;
     }
   }
@@ -112,7 +161,7 @@ export class S3StorageProvider implements StorageProvider {
         })
       );
     } catch (error) {
-      if (isNoSuchKey(error)) return;
+      if (isMissingObjectError(error)) return;
       throw error;
     }
   }

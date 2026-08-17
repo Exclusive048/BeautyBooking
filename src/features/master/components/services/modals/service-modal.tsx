@@ -2,8 +2,9 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
@@ -245,17 +246,23 @@ export function ServiceModal({
     <ModalSurface open={open} onClose={close} title={mode === "create" ? T.title.create : T.title.edit} className="max-w-xl">
       <div className="space-y-4">
         <Field label={T.nameLabel}>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={T.namePlaceholder}
-            maxLength={240}
-            className="h-11 rounded-xl px-3 text-sm"
-          />
+          {(controlId) => (
+            <Input
+              id={controlId}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={T.namePlaceholder}
+              maxLength={240}
+              className="h-11 rounded-xl px-3 text-sm"
+            />
+          )}
         </Field>
 
         <Field label={T.categoryLabel}>
+          {(controlId) => (
+          <>
           <select
+            id={controlId}
             value={categoryId}
             onChange={(event) => setCategoryId(event.target.value)}
             className="block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -275,6 +282,7 @@ export function ServiceModal({
               <Input
                 value={categoryDraft}
                 onChange={(event) => setCategoryDraft(event.target.value)}
+                aria-label={T.categoryCreatePlaceholder}
                 placeholder={T.categoryCreatePlaceholder}
                 maxLength={60}
                 autoFocus
@@ -325,45 +333,56 @@ export function ServiceModal({
               {categoryToast}
             </p>
           ) : null}
+          </>
+          )}
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={T.durationLabel}>
-            <select
-              value={duration}
-              onChange={(event) => setDuration(Number(event.target.value))}
-              className="block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            >
-              {DURATION_OPTIONS.map((min) => (
-                <option key={min} value={min}>
-                  {formatDuration(min)}
-                </option>
-              ))}
-            </select>
+            {(controlId) => (
+              <select
+                id={controlId}
+                value={duration}
+                onChange={(event) => setDuration(Number(event.target.value))}
+                className="block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                {DURATION_OPTIONS.map((min) => (
+                  <option key={min} value={min}>
+                    {formatDuration(min)}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label={T.priceLabel}>
-            <Input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={50}
-              value={priceRubles}
-              onChange={(event) => setPriceRubles(event.target.value)}
-              placeholder={T.pricePlaceholder}
-              className="h-11 rounded-xl px-3 text-sm"
-            />
+            {(controlId) => (
+              <Input
+                id={controlId}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={50}
+                value={priceRubles}
+                onChange={(event) => setPriceRubles(event.target.value)}
+                placeholder={T.pricePlaceholder}
+                className="h-11 rounded-xl px-3 text-sm"
+              />
+            )}
           </Field>
         </div>
 
         <Field label={T.descriptionLabel}>
-          <Textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            rows={3}
-            maxLength={2000}
-            placeholder={T.descriptionPlaceholder}
-            className="rounded-xl"
-          />
+          {(controlId) => (
+            <Textarea
+              id={controlId}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder={T.descriptionPlaceholder}
+              className="rounded-xl"
+            />
+          )}
         </Field>
 
         <div className="space-y-2">
@@ -417,13 +436,32 @@ export function ServiceModal({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * Подпись поля, программно связанная со своим контролом.
+ *
+ * `<label>` не оборачивает контрол (между ними обёртка отступа), поэтому
+ * связь держится на `htmlFor`/`id`. Идентификатор выдаёт сам `Field` и
+ * отдаёт его children функцией — так его нельзя забыть проставить, а поле
+ * с несколькими контролами (селект + кнопка создания категории) само
+ * выбирает, какой из них подписан.
+ */
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: (controlId: string) => React.ReactNode;
+}) {
+  const controlId = useId();
   return (
     <div>
-      <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <label
+        htmlFor={controlId}
+        className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+      >
         {label}
       </label>
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-1.5">{children(controlId)}</div>
     </div>
   );
 }
@@ -449,12 +487,10 @@ function Toggle({
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer text-text-main"
       )}
     >
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
         disabled={disabled}
-        className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       />
       <span>{label}</span>
     </label>

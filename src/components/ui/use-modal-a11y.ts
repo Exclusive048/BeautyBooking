@@ -179,3 +179,52 @@ export function useFocusTrap(
     return () => window.removeEventListener("keydown", handler);
   }, [enabled, handler]);
 }
+
+/**
+ * UI-13 — весь контракт модального оверлея одним вызовом.
+ *
+ * Три focus-хука выше существовали и раньше, но контракт ими не
+ * исчерпывается: «диалог» — это ЕЩЁ и Escape, и блокировка прокрутки фона.
+ * Эти две части жили копиями в `ModalSurface` и `Drawer` (блоки совпадали
+ * дословно) и **отсутствовали** у оверлеев, написанных мимо примитивов, —
+ * а именно у них `aria-modal="true"` уже стоял. Это худший вариант из
+ * возможных: атрибут ОБЕЩАЕТ вспомогательной технологии, что фокус заперт,
+ * и скринридер ведёт себя соответственно, тогда как Tab спокойно уходит на
+ * страницу под оверлеем. Ложное обещание хуже отсутствующего.
+ *
+ * Хук не рендерит и не стилизует ничего — поэтому его можно надеть на
+ * существующую разметку, не трогая ни вёрстку, ни анимацию. Портал в него
+ * намеренно НЕ входит: позиционную часть (`fixed` внутри transform-предка)
+ * в этом проекте уже сторожит ESLint-правило со своим списком исключений,
+ * и дублировать это решение вторым механизмом значило бы завести два
+ * источника правды на один вопрос.
+ */
+export function useOverlayA11y({
+  open,
+  onClose,
+  containerRef,
+  initialFocusRef,
+}: {
+  open: boolean;
+  onClose: () => void;
+  containerRef: RefObject<HTMLElement | null>;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+}): void {
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [open, onClose]);
+
+  useReturnFocus(open);
+  useInitialFocus(open, containerRef, initialFocusRef);
+  useFocusTrap(containerRef, open);
+}

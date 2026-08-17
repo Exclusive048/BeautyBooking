@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
+import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
-import {
-  useFocusTrap,
-  useInitialFocus,
-  useReturnFocus,
-} from "@/components/ui/use-modal-a11y";
+import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 
 export type ModalSurfaceSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -117,30 +113,12 @@ export function ModalSurface({
   // motion-free open. Default users see the original animation.
   const shouldReduceMotion = useReducedMotion();
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKey);
-    };
-  }, [open, onClose]);
-
-  // MODAL-A11Y-BATCH-A: WCAG SC 2.4.3 (Focus Order) + SC 3.2.1 (On Focus).
-  // useReturnFocus captures the opener element on open + restores focus
-  // when the modal closes. useInitialFocus places focus on the first
-  // focusable child (or explicit initialFocusRef) so keyboard users
-  // don't have to Tab from page-start. useFocusTrap cycles Tab within
-  // the modal panel — Tab from the last focusable wraps to first; Shift+
-  // Tab from first wraps to last.
-  useReturnFocus(open);
-  useInitialFocus(open, panelRef, initialFocusRef);
-  useFocusTrap(panelRef, open);
+  // MODAL-A11Y-BATCH-A + UI-13: весь контракт диалога одним вызовом —
+  // Escape, блокировка прокрутки фона, WCAG SC 2.4.3 (Focus Order) и
+  // SC 3.2.1 (On Focus). Escape и scroll-lock жили здесь и в `Drawer`
+  // дословными копиями; после UI-13 у контракта одна реализация, и
+  // оверлеи, написанные мимо примитивов, берут ровно её.
+  useOverlayA11y({ open, onClose, containerRef: panelRef, initialFocusRef });
 
   if (!isBrowser) return null;
 

@@ -43,24 +43,19 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json().catch(() => null);
-    let sanitizedBody: unknown = body;
-    if (body && typeof body === "object" && !Array.isArray(body)) {
-      const rest = { ...(body as Record<string, unknown>) };
-      delete rest.displayName;
-      delete rest.address;
-      sanitizedBody = rest;
-    }
 
-    const parsed = profileUpdateSchema.safeParse(sanitizedBody);
+    // LOGIC-24: раньше здесь стояли ДВЕ зачистки — `displayName`/`address`
+    // вырезались из сырого тела до разбора и из результата после, хотя схема
+    // их описывала, а `updateMeProfile` их писал. Поля убраны из схемы (там же
+    // причина), поэтому и вырезать нечего: непринимаемый ключ отбрасывает Zod,
+    // ровно как `phone`.
+    const parsed = profileUpdateSchema.safeParse(body);
     if (!parsed.success) {
       return fail(formatZodError(parsed.error), 400, "VALIDATION_ERROR");
     }
-    const updatableData = { ...parsed.data };
-    delete updatableData.displayName;
-    delete updatableData.address;
 
     const t0 = Date.now();
-    const updated = await updateMeProfile(sessionUser.id, updatableData);
+    const updated = await updateMeProfile(sessionUser.id, parsed.data);
     logInfo("PATCH /api/me profile updated", { userId: sessionUser.id, ms: Date.now() - t0 });
 
     // No phone-keyed adoption here: `phone` is no longer writable via this route

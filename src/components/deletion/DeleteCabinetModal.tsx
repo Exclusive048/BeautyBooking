@@ -58,7 +58,7 @@ export function DeleteCabinetModal({
         </label>
 
         {typeof activeBookingsCount === "number" ? (
-          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          <div role="alert" className="rounded-xl border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger-text">
             {UI_TEXT.deletion.activeBookingsWarning.replace(
               "{count}",
               String(activeBookingsCount)
@@ -67,7 +67,7 @@ export function DeleteCabinetModal({
         ) : null}
 
         {error ? (
-          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+          <div role="alert" className="rounded-xl border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger-text">
             {error}
           </div>
         ) : null}

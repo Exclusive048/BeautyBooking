@@ -58,7 +58,7 @@ export function CookieNotice() {
           transition={
             reduce ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
           }
-          className="fixed bottom-0 left-0 right-0 z-[45] p-3 pb-safe md:p-5"
+          className="fixed bottom-0 left-0 right-0 z-[45] p-3 pb-[calc(0.75rem+var(--safe-area-inset-bottom))] md:p-5 md:pb-[calc(1.25rem+var(--safe-area-inset-bottom))]"
         >
           <div className="mx-auto max-w-5xl rounded-2xl border border-border-subtle bg-bg-card/95 p-4 shadow-hover backdrop-blur-md md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">

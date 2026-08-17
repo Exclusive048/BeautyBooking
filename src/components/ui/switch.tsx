@@ -40,7 +40,11 @@ export function Switch({
       className={cn(
         "relative inline-flex shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60",
         styles.track,
-        checked ? "bg-primary" : "bg-border-subtle",
+        // UI-09: выключенная дорожка — это САМ индикатор состояния (заливка,
+        // не рамка), поэтому на `bg-border-subtle` она сливалась с карточкой
+        // (1.46:1 светлая / 1.17:1 тёмная) и «выключено» читалось как
+        // «элемента нет». Токен управления даёт те же ≥3:1, что и рамкам.
+        checked ? "bg-primary" : "bg-border-control",
         className
       )}
     >

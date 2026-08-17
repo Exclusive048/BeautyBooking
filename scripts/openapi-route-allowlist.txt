@@ -38,6 +38,13 @@
 /api/admin/cities/duplicates
 /api/admin/cities/{id}
 /api/admin/cities/{id}/merge
+# reason: FIX-B17 runtime debug surface — admin-only, request-scoped echo of the
+# three client-IP headers so `TRUSTED_PROXY_HOPS` can be verified against a real
+# deploy in one request. Deliberately OUTSIDE the public contract: it describes
+# the caller's own request, not a product resource, and documenting request-header
+# echo in a published spec advertises it. Absence is pinned by
+# src/app/api/admin/diagnostics/client-ip/route.test.ts.
+/api/admin/diagnostics/client-ip
 /api/admin/dashboard/charts
 /api/admin/dashboard/events
 /api/admin/dashboard/health
@@ -74,7 +81,6 @@
 /api/auth/otp/email/verify
 /api/auth/otp/request
 /api/auth/otp/verify
-/api/auth/profile/ensure
 /api/auth/refresh
 /api/auth/roles/add
 /api/auth/telegram/link
@@ -124,6 +130,10 @@
 /api/favorites/toggle
 /api/feed/stories
 /api/health
+# reason: FIX-C2 — readiness-проба инфраструктуры (соседка /api/health), потребители
+# внутренние: балансировщик, compose, deploy.yml, мониторинг. Часть контракта
+# эксплуатации, а не публичного API — как и три соседние health-строки.
+/api/health/ready
 /api/health/status
 /api/health/worker
 /api/home/categories

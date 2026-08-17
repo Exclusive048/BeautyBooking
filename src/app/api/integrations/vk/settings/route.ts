@@ -1,7 +1,7 @@
 import { requireAuth } from "@/lib/auth/guards";
 import { fail, ok } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
-import { AppError, toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { isVkNotificationsEnabled } from "@/lib/env";
 import { vkSettingsSchema } from "@/lib/vk/schemas";
@@ -40,7 +40,8 @@ export async function PATCH(req: Request) {
     const result = await setVkLinkEnabled(auth.user.id, parsed.data.enabled);
     return ok({ enabled: result.enabled });
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    const appError = toAuthSurfaceError(error);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт `AppError.details`.
+    return fail(appError.message, appError.status, appError.code);
   }
 }

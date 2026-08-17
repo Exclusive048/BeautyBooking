@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles } from "lucide-react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,10 @@ import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { PublicBundleView } from "@/lib/master/public-profile-view.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  fetchRetryingDuplicates,
+  isDuplicateRequestResponse,
+} from "@/lib/http/idempotent-retry";
 
 const T = UI_TEXT.publicProfile.packageBooking;
 
@@ -97,6 +101,11 @@ export function PackageBookingFlow({
 }: Props) {
   const components = bundle.components;
   const viewerTz = useViewerTimeZoneContext();
+  // LOGIC-09: ключ идемпотентности живёт весь визард — повтор сабмита обязан
+  // вернуть тот же пакет, а не «это время занято».
+  const idempotencyKeyRef = useRef<string>(
+    typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`,
+  );
 
   const [phase, setPhase] = useState<Phase>("build");
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
@@ -254,7 +263,7 @@ export function PackageBookingFlow({
     setProposing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/public/packages/${encodeURIComponent(bundle.id)}/propose`, {
+      const res = await fetchRetryingDuplicates(`/api/public/packages/${encodeURIComponent(bundle.id)}/propose`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slots: buildSlots() }),
@@ -298,7 +307,13 @@ export function PackageBookingFlow({
     try {
       const res = await fetch(`/api/public/packages/${encodeURIComponent(bundle.id)}/book`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // LOGIC-09 (инв. #28): без ключа повторный сабмит упирался в уже
+          // созданные сиблинги и отвечал «Это время уже занято» — пакет при
+          // этом был создан. Ключ живёт на весь визард, как в одиночном флоу.
+          "x-idempotency-key": idempotencyKeyRef.current,
+        },
         body: JSON.stringify({
           clientName: trimmedName,
           clientPhone: trimmedPhone,
@@ -315,7 +330,11 @@ export function PackageBookingFlow({
         setError(json && !json.ok ? json.error.message : T.bookError);
         // A conflict means a placement went stale — send the client back to
         // rebuild. Nothing was created: the create is all-or-none.
-        if (res.status === 409) {
+        // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
+        // выполняется», а не устаревшее размещение. Отправлять клиента
+        // пересобирать пакет, который, скорее всего, уже создан, — ровно та
+        // ложь, из-за которой одиночный флоу показывал «время занято».
+        if (res.status === 409 && !(await isDuplicateRequestResponse(res))) {
           setPhase("build");
           setProposal(null);
         }

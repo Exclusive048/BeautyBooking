@@ -1,5 +1,5 @@
 import { fail, ok } from "@/lib/api/response";
-import { timingSafeStringEqual } from "@/lib/auth/constant-time";
+import { isAuthorizedCronRequest } from "@/lib/api/cron-auth";
 import { env } from "@/lib/env";
 import { logError } from "@/lib/logging/logger";
 import { recomputeAvailableToday } from "@/lib/schedule/recompute-available-today";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
  * CATALOG-AVAILABLE-TODAY — Phase 2: on-demand recompute trigger.
  *
  *   POST /api/catalog/available-today/run
- *   Header `x-cron-token: <AVAILABILITY_CRON_TOKEN>` (or `?token=…`)
+ *   Header `x-cron-token: <AVAILABILITY_CRON_TOKEN>` (header only — SEC-21)
  *
  * Recomputes `Provider.availableToday` for all published providers (via the
  * engine-safe Phase-1 helper) and returns the sweep summary. Runs the sweep
@@ -23,17 +23,11 @@ export const runtime = "nodejs";
  * refuses (never runs unauthenticated). Same shape as
  * `/api/billing/mrr/snapshot/run`.
  */
-function getCronToken(req: Request): string | null {
-  const header = req.headers.get("x-cron-token");
-  if (header?.trim()) return header.trim();
-  const token = new URL(req.url).searchParams.get("token");
-  return token?.trim() ?? null;
-}
 
 export async function POST(req: Request) {
-  const expected = env.AVAILABILITY_CRON_TOKEN?.trim();
-  const token = getCronToken(req);
-  if (!expected || !token || !timingSafeStringEqual(token, expected)) {
+  // SEC-21: только заголовок `x-cron-token`. Query-строка попадает в access-логи
+  // балансировщика и в реферер — секрету там не место.
+  if (!isAuthorizedCronRequest(req, env.AVAILABILITY_CRON_TOKEN)) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");
   }
 

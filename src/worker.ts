@@ -9,7 +9,8 @@ import {
   heartbeatJob,
   recoverStuckJobs,
 } from "@/lib/queue/queue";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { createHealthcheckPinger } from "@/lib/queue/healthcheck-ping";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -20,7 +21,7 @@ import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { env, isProduction } from "@/lib/env";
 import { initServerObservability } from "@/lib/observability/server";
 import { flushReports, reportError } from "@/lib/observability/report";
-import { processBookingReminder } from "@/lib/bookings/reminders";
+import { processBookingReminder, reconcileBookingReminders } from "@/lib/bookings/reminders";
 import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
@@ -51,7 +52,7 @@ import { runMediaCleanup } from "@/lib/media/cleanup";
 import { runMediaPurge } from "@/lib/media/purge";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
-import { createMrrSnapshotForToday } from "@/lib/billing/mrr-snapshot";
+import { createMrrSnapshotForToday, runMrrSnapshotBackstop } from "@/lib/billing/mrr-snapshot";
 import { processPlanEditedMassNotification } from "@/lib/notifications/admin-initiated";
 import {
   recomputeAvailableToday,
@@ -86,11 +87,19 @@ function flushAndExit(code: number): void {
 }
 
 let isShuttingDown = false;
-let lastHealthcheckAt = 0;
 let jobsProcessed = 0;
-let workerSecretMissingLogged = false;
 
-const HEALTHCHECK_INTERVAL_MS = 30_000;
+// RES-24-соседний: пинг живости стоит В ГЛАВНОМ ЦИКЛЕ, до `dequeue()`, и раньше
+// уходил в `fetch` без границы — то есть зависший `app` останавливал разбор
+// очереди целиком, при том что собственные зависимости воркера (Redis,
+// Postgres) в порядке.
+//
+// FIX-B13: механика (интервал, граница, проглатывание отказа) вынесена в
+// `lib/queue/healthcheck-ping.ts` с инжектируемым `fetchImpl`. Причина — не
+// стиль: этот файл вызывает `startWorker()` на импорте, поэтому в vitest не
+// поднимается, и сторож дедлайна мог проверять только ТЕКСТ файла. Цена
+// регрессии здесь невидима на глаз — «всё зелено», просто очередь стоит.
+const healthcheckPinger = createHealthcheckPinger();
 const STUCK_RECOVERY_INTERVAL_MS = 2 * 60 * 1000;
 // FIX-15: refresh the in-flight job's lease well within PROCESSING_TIMEOUT_MS
 // (5 min) so a live long-running job is never re-queued as "stuck".
@@ -192,6 +201,55 @@ function startPeriodicJobs() {
     runAvailableTodaySweep();
   }, intervalMs);
 
+  // RES-14: напоминание жило ТОЛЬКО как задача в очереди — потеря очереди
+  // (ручной FLUSHALL, пересоздание тома, окно `appendfsync everysec`) означала
+  // его безвозвратную пропажу, хотя строка `Booking` позволяет его переродить.
+  // Свип — детектор опоздания, а не перепланировка: на здоровой системе
+  // кандидатов ноль, поэтому дубликатов задач он не создаёт. Каждые 5 минут —
+  // запрос дешёвый (индекс `[status, startAtUtc]`, батч 200), а чем позже
+  // обнаружено опоздание, тем меньше пользы от самого напоминания.
+  const reminderReconcileIntervalMs = 5 * 60 * 1000;
+  setInterval(() => {
+    void reconcileBookingReminders()
+      .then((summary) => {
+        if (summary.candidates > 0) {
+          logInfo("bookings.reminders.reconciled", summary);
+        }
+      })
+      .catch((error) => {
+        logError("Booking reminder reconcile failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("bookings.reminders.reconcile", error);
+      });
+  }, reminderReconcileIntervalMs);
+
+  // RES-26: снимок MRR держался на ОДНОМ внешнем срабатывании cron'а в сутки, и
+  // пропуск оставлял в ряду дыру навсегда. Подбор — не бэкфилл, а второй шанс
+  // ИЗМЕРИТЬ сегодняшний день (почему прошедшие дни восстановить нельзя — в
+  // `runMrrSnapshotBackstop`). Каждые 15 минут, потому что решение принимает сам
+  // хелпер по часу UTC: до окна это ранний выход без обращения к БД, внутри окна
+  // — один `findUnique` по уникальному ключу, а несколько попыток подряд
+  // страхуют от рестарта воркера на границе суток.
+  const mrrBackstopIntervalMs = 15 * 60 * 1000;
+  setInterval(() => {
+    void runMrrSnapshotBackstop()
+      .then((result) => {
+        if (result.ran && result.created) {
+          logInfo("billing.mrr.snapshot.backstopped", {
+            snapshotDate: result.snapshot.snapshotDate.toISOString().slice(0, 10),
+            mrrKopeks: result.snapshot.mrrKopeks.toString(),
+          });
+        }
+      })
+      .catch((error) => {
+        logError("MRR snapshot backstop failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("billing.mrr.snapshot.backstop", error);
+      });
+  }, mrrBackstopIntervalMs);
+
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
   setInterval(() => {
     void enqueue(createMediaCleanupJob()).catch((error) => {
@@ -233,20 +291,6 @@ async function enqueueRetry(job: Job, delayMs: number): Promise<void> {
   await enqueue(normalizeJobMeta(retryJob), { delayMs });
 }
 
-function resolveHealthcheckUrl(): string {
-  const appUrl = (
-    env.NEXT_PUBLIC_APP_URL ??
-    env.APP_PUBLIC_URL ??
-    "http://127.0.0.1:3000"
-  ).trim();
-  return `${appUrl.replace(/\/+$/, "")}/api/health/worker`;
-}
-
-function resolveWorkerSecret(): string | null {
-  const secret = env.WORKER_SECRET?.trim();
-  return secret && secret.length > 0 ? secret : null;
-}
-
 async function ensureWorkerRedisReady(): Promise<void> {
   if (!isProduction) return;
 
@@ -255,41 +299,17 @@ async function ensureWorkerRedisReady(): Promise<void> {
     throw new Error("Redis is required for worker in production");
   }
 
-  await redis.ping();
-}
-
-async function pingHealthcheck(): Promise<void> {
-  const workerSecret = resolveWorkerSecret();
-  if (!workerSecret) {
-    if (!workerSecretMissingLogged) {
-      logInfo("Worker healthcheck ping skipped: WORKER_SECRET is not configured");
-      workerSecretMissingLogged = true;
-    }
-    return;
-  }
-
-  const healthcheckUrl = resolveHealthcheckUrl();
-
-  try {
-    await fetch(healthcheckUrl, {
-      method: "POST",
-      headers: {
-        "x-worker-secret": workerSecret,
-      },
-    });
-  } catch (error) {
-    logError("Worker healthcheck ping failed", {
-      error: error instanceof Error ? error.message : String(error),
-      __skipAlert: true,
-    });
-  }
+  // FIX-C4: проба готовности ограничена сверху. Пост-дедлайн — тот же throw,
+  // что и при отсутствующем клиенте: в проде воркер без Redis работать не
+  // может и обязан не стартовать. Меняется не решение, а то, что при молчащем
+  // Redis процесс теперь падает с внятной ошибкой за секунды вместо того,
+  // чтобы висеть в `startWorker` бесконечно — а висящий воркер выглядит в
+  // оркестраторе «запускается», а не «сломан», и не рестартится.
+  await withRedisCommandTimeout("worker:boot:ping", redis.ping());
 }
 
 async function maybePingHealthcheck(): Promise<void> {
-  const now = Date.now();
-  if (now - lastHealthcheckAt < HEALTHCHECK_INTERVAL_MS) return;
-  lastHealthcheckAt = now;
-  await pingHealthcheck();
+  await healthcheckPinger.maybePing();
 }
 
 async function monitorQueueStatsIfNeeded(): Promise<void> {

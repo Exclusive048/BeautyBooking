@@ -1,4 +1,4 @@
-import { AccountType } from "@prisma/client";
+import { AccountType } from "@/lib/prisma-enums";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -15,9 +15,9 @@ const LABEL: Record<AccountType, string> = {
 
 const TONE: Record<AccountType, string> = {
   [AccountType.CLIENT]: "bg-bg-input text-text-sec",
-  [AccountType.MASTER]: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
-  [AccountType.STUDIO]: "bg-blue-500/12 text-blue-700 dark:text-blue-300",
-  [AccountType.STUDIO_ADMIN]: "bg-blue-500/12 text-blue-700 dark:text-blue-300",
+  [AccountType.MASTER]: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
+  [AccountType.STUDIO]: "bg-blue-500/[0.12] text-blue-700 dark:text-blue-300",
+  [AccountType.STUDIO_ADMIN]: "bg-blue-500/[0.12] text-blue-700 dark:text-blue-300",
   [AccountType.ADMIN]: "bg-primary/10 text-accent-text",
   [AccountType.SUPERADMIN]: "bg-primary/15 text-accent-text",
 };

@@ -219,3 +219,34 @@ describe("queue — ack cleanup (no side-hash leak)", () => {
     expect(fake.hashKeys(HEARTBEAT)).toEqual([]);
   });
 });
+
+describe("queue — LOGIC-15 (восстановление ровно один раз при ≥2 воркерах)", () => {
+  it("два одновременных прогона восстановления кладут задачу в очередь ОДИН раз", async () => {
+    await enqueue(mediaJob("racy"));
+    await dequeue();
+    now += LEASE_MS + 1000; // просрочка лизинга — оба прогона увидят её как бесхозную
+
+    // Оба читают ОДИН И ТОТ ЖЕ снапшот processing до того, как кто-то из них
+    // успел удалить элемент, — это и есть гонка из находки. Раньше результат
+    // `lRem` отбрасывался, и `lPush` делали оба.
+    const [first, second] = await Promise.all([recoverStuckJobs(), recoverStuckJobs()]);
+
+    expect(fake.listLen(QUEUE)).toBe(1); // ровно одна копия вернулась в очередь
+    expect(fake.listLen(PROCESSING)).toBe(0);
+    expect(first + second).toBe(1); // и ровно один прогон засчитал восстановление
+  });
+
+  it("проигравший прогон не сносит heartbeat нового исполнителя", async () => {
+    await enqueue(mediaJob("racy"));
+    await dequeue();
+    now += LEASE_MS + 1000;
+
+    await Promise.all([recoverStuckJobs(), recoverStuckJobs()]);
+
+    // Победитель снял отметку сам; проигравший не должен был трогать хэш
+    // повторно — иначе он мог бы снести отметку уже нового исполнителя.
+    expect(fake.hashKeys(HEARTBEAT)).toEqual([]);
+    const requeued = JSON.parse(fake.lists.get(QUEUE)![0]);
+    expect(requeued.attempts).toBe(1); // одна попытка, а не две
+  });
+});

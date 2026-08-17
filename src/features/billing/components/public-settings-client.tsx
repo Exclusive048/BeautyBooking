@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, Download, ExternalLink, Pencil, QrCode, Smartphone } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QrCodeCanvas } from "@/components/ui/qr-code-canvas";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
+import { BRAND_COLORS, withAlpha } from "@/lib/ui/brand-colors";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Payload = {
@@ -24,6 +25,22 @@ type Props = {
 };
 
 // ─── Canvas helpers ────────────────────────────────────────────────
+
+/**
+ * UI-04: постер скачивают и публикуют — он обязан быть в бренд-палитре, но
+ * `ctx.fillStyle` принимает только строку цвета, поэтому значения идут из
+ * `BRAND_COLORS` (зеркало `globals.css`), а не литералами.
+ *
+ * Канонические стопы бренд-градиента — та же форма, что у утилиты
+ * `bg-brand-gradient`: три стопа на 0 / 55% / 100%. Одна функция на все
+ * акцентные полосы обоих постеров, чтобы форма не разъехалась между ними.
+ */
+function paintBrandGradient(grad: CanvasGradient): CanvasGradient {
+  grad.addColorStop(0, BRAND_COLORS.brandFrom);
+  grad.addColorStop(0.55, BRAND_COLORS.brandVia);
+  grad.addColorStop(1, BRAND_COLORS.brandDeep);
+  return grad;
+}
 
 function loadCanvasImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -52,11 +69,11 @@ function drawCircleAvatar(
     ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2);
   } else {
     const grad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-    grad.addColorStop(0, "#ede9fe");
-    grad.addColorStop(1, "#fce7f3");
+    grad.addColorStop(0, withAlpha(BRAND_COLORS.brandFrom, 0.12));
+    grad.addColorStop(1, withAlpha(BRAND_COLORS.brandVia, 0.1));
     ctx.fillStyle = grad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-    ctx.fillStyle = "#7c3aed";
+    ctx.fillStyle = BRAND_COLORS.brandFrom;
     ctx.font = `bold ${Math.round(r * 0.9)}px system-ui,-apple-system,sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -66,7 +83,7 @@ function drawCircleAvatar(
 
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = "#e5e7eb";
+  ctx.strokeStyle = BRAND_COLORS.borderSubtle;
   ctx.lineWidth = 2;
   ctx.stroke();
 }
@@ -101,21 +118,19 @@ async function renderHorizontalCard(
   const QR_X = W - PAD - QR_SIZE;
   const QR_Y = H - PAD - QR_SIZE;
 
-  // White background
+  // White background — намеренно чистый белый, а не `surfaceCard`: это бумага
+  // печатной карточки и подложка QR, где нужен максимальный контраст для
+  // сканера, а не оттенок палитры.
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, W, H);
 
-  // Left accent bar (gradient violet→pink)
-  const accentGrad = ctx.createLinearGradient(0, 0, 0, H);
-  accentGrad.addColorStop(0, "#7c3aed");
-  accentGrad.addColorStop(1, "#ec4899");
+  // Left accent bar (brand gradient)
+  const accentGrad = paintBrandGradient(ctx.createLinearGradient(0, 0, 0, H));
   ctx.fillStyle = accentGrad;
   ctx.fillRect(0, 0, 8, H);
 
   // Top accent line (thin)
-  const topGrad = ctx.createLinearGradient(0, 0, W, 0);
-  topGrad.addColorStop(0, "#7c3aed");
-  topGrad.addColorStop(1, "#ec4899");
+  const topGrad = paintBrandGradient(ctx.createLinearGradient(0, 0, W, 0));
   ctx.fillStyle = topGrad;
   ctx.fillRect(0, 0, W, 4);
 
@@ -124,7 +139,7 @@ async function renderHorizontalCard(
 
   // Name
   const nameFont = name.length > 20 ? 30 : 36;
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = BRAND_COLORS.textMain;
   ctx.font = `bold ${nameFont}px system-ui,-apple-system,sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -132,7 +147,7 @@ async function renderHorizontalCard(
 
   // Hashtag
   if (hashtag.trim()) {
-    ctx.fillStyle = "#7c3aed";
+    ctx.fillStyle = BRAND_COLORS.brandFrom;
     ctx.font = "22px system-ui,-apple-system,sans-serif";
     const tag = hashtag.startsWith("#") ? hashtag : `#${hashtag}`;
     ctx.fillText(truncate(tag, 40), TEXT_X, AVATAR_CY - AVATAR_R + nameFont + 12);
@@ -140,24 +155,24 @@ async function renderHorizontalCard(
 
   // Address
   if (address.trim()) {
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = BRAND_COLORS.textSecondary;
     ctx.font = "20px system-ui,-apple-system,sans-serif";
     ctx.fillText(`📍 ${truncate(address, 50)}`, TEXT_X, AVATAR_CY + 6);
   }
 
   // Bio
   if (bio.trim()) {
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = BRAND_COLORS.textLabel;
     ctx.font = "18px system-ui,-apple-system,sans-serif";
     ctx.fillText(truncate(bio, 72), TEXT_X, AVATAR_CY + 36);
   }
 
   // QR white background chip
-  ctx.fillStyle = "#f9fafb";
+  ctx.fillStyle = BRAND_COLORS.surfacePage;
   ctx.beginPath();
   ctx.roundRect(QR_X - 12, QR_Y - 12, QR_SIZE + 24, QR_SIZE + 24, 16);
   ctx.fill();
-  ctx.strokeStyle = "#e5e7eb";
+  ctx.strokeStyle = BRAND_COLORS.borderSubtle;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
@@ -165,14 +180,14 @@ async function renderHorizontalCard(
   ctx.drawImage(qrCanvas, QR_X, QR_Y, QR_SIZE, QR_SIZE);
 
   // URL
-  ctx.fillStyle = "#7c3aed";
+  ctx.fillStyle = BRAND_COLORS.brandFrom;
   ctx.font = "20px system-ui,-apple-system,sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "bottom";
   ctx.fillText(profileUrl, PAD + 20, H - PAD + 4);
 
   // Brand name
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = BRAND_COLORS.textSecondary;
   ctx.font = "15px system-ui,-apple-system,sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
@@ -204,14 +219,12 @@ async function renderVerticalCard(
   ctx.fillRect(0, 0, W, H);
 
   // Top gradient accent bar
-  const topGrad = ctx.createLinearGradient(0, 0, W, 0);
-  topGrad.addColorStop(0, "#7c3aed");
-  topGrad.addColorStop(1, "#ec4899");
+  const topGrad = paintBrandGradient(ctx.createLinearGradient(0, 0, W, 0));
   ctx.fillStyle = topGrad;
   ctx.fillRect(0, 0, W, 10 * s);
 
   // Brand
-  ctx.fillStyle = "#7c3aed";
+  ctx.fillStyle = BRAND_COLORS.brandFrom;
   ctx.font = `600 ${28 * s}px system-ui,-apple-system,sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -224,7 +237,7 @@ async function renderVerticalCard(
   drawCircleAvatar(ctx, avatarImg, AVATAR_CX, AVATAR_CY, AVATAR_R, name.charAt(0).toUpperCase());
 
   // Name
-  ctx.fillStyle = "#111827";
+  ctx.fillStyle = BRAND_COLORS.textMain;
   ctx.font = `bold ${52 * s}px system-ui,-apple-system,sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -232,21 +245,21 @@ async function renderVerticalCard(
 
   // Hashtag
   if (hashtag.trim()) {
-    ctx.fillStyle = "#7c3aed";
+    ctx.fillStyle = BRAND_COLORS.brandFrom;
     ctx.font = `${32 * s}px system-ui,-apple-system,sans-serif`;
     const tag = hashtag.startsWith("#") ? hashtag : `#${hashtag}`;
     ctx.fillText(truncate(tag, 36), W / 2, 466 * s);
   }
 
   // Divider
-  ctx.fillStyle = "#e5e7eb";
+  ctx.fillStyle = BRAND_COLORS.borderSubtle;
   ctx.fillRect(80 * s, 520 * s, W - 160 * s, 1.5 * s);
 
   let curY = 560 * s;
 
   // Address
   if (address.trim()) {
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = BRAND_COLORS.textSecondary;
     ctx.font = `${30 * s}px system-ui,-apple-system,sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -257,7 +270,7 @@ async function renderVerticalCard(
   // Bio
   if (bio.trim()) {
     const lines = wrapText(ctx, truncate(bio, 120), W - 160 * s, `${28 * s}px system-ui,-apple-system,sans-serif`);
-    ctx.fillStyle = "#374151";
+    ctx.fillStyle = BRAND_COLORS.textLabel;
     ctx.font = `${28 * s}px system-ui,-apple-system,sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -269,12 +282,12 @@ async function renderVerticalCard(
   }
 
   // Divider 2
-  ctx.fillStyle = "#e5e7eb";
+  ctx.fillStyle = BRAND_COLORS.borderSubtle;
   ctx.fillRect(80 * s, curY, W - 160 * s, 1.5 * s);
   curY += 40 * s;
 
   // "Записаться:" label
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = BRAND_COLORS.textSecondary;
   ctx.font = `${26 * s}px system-ui,-apple-system,sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -282,7 +295,7 @@ async function renderVerticalCard(
   curY += 40 * s;
 
   // URL
-  ctx.fillStyle = "#7c3aed";
+  ctx.fillStyle = BRAND_COLORS.brandFrom;
   ctx.font = `600 ${28 * s}px system-ui,-apple-system,sans-serif`;
   ctx.fillText(profileUrl, W / 2, curY);
   curY += 70 * s;
@@ -290,17 +303,17 @@ async function renderVerticalCard(
   // QR code
   const QR_SIZE = 280 * s;
   const QR_X = (W - QR_SIZE) / 2;
-  ctx.fillStyle = "#f9fafb";
+  ctx.fillStyle = BRAND_COLORS.surfacePage;
   ctx.beginPath();
   ctx.roundRect(QR_X - 16 * s, curY - 16 * s, QR_SIZE + 32 * s, QR_SIZE + 32 * s, 20 * s);
   ctx.fill();
-  ctx.strokeStyle = "#e5e7eb";
+  ctx.strokeStyle = BRAND_COLORS.borderSubtle;
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.drawImage(qrCanvas, QR_X, curY, QR_SIZE, QR_SIZE);
 
   // Username under QR
-  ctx.fillStyle = "#9ca3af";
+  ctx.fillStyle = BRAND_COLORS.textSecondary;
   ctx.font = `${22 * s}px system-ui,-apple-system,sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -568,7 +581,7 @@ export function PublicSettingsClient({
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-lg p-1.5 text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
+                  className="-m-2 rounded-lg p-3.5 text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
                   title={t.openProfile}
                   aria-label={t.openProfile}
                 >
@@ -643,8 +656,8 @@ export function PublicSettingsClient({
 
             <div className="flex flex-col items-center gap-4 p-6 sm:flex-row sm:items-start">
               <div className="rounded-2xl bg-white p-3 shadow-sm">
-                <QRCodeCanvas
-                  ref={qrRef}
+                <QrCodeCanvas
+                  canvasRef={qrRef}
                   value={url}
                   size={180}
                   level="M"
@@ -719,8 +732,8 @@ export function PublicSettingsClient({
 
           {/* Hidden export QR (large size for crisp card output) */}
           <div className="sr-only" aria-hidden="true">
-            <QRCodeCanvas
-              ref={qrExportRef}
+            <QrCodeCanvas
+              canvasRef={qrExportRef}
               value={url}
               size={400}
               level="M"

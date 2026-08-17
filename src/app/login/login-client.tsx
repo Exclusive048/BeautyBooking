@@ -126,6 +126,17 @@ export default function LoginClient({
     const code = searchParams.get("error") ?? "";
     if (code.startsWith("telegram")) return UI_TEXT.auth.telegram.loginFailed;
     if (code === "consent") return UI_TEXT.auth.loginPage.consentExpired;
+    // FIX-B5: колбэк VK/Яндекса вернул конфликт уникальности адреса.
+    if (code === "email_taken") return UI_TEXT.auth.loginPage.emailTakenByAnotherAccount;
+    // FIX-B13: провайдер не ответил за 10 с. Единственный отказ колбэка, где
+    // «попробуйте ещё раз» — не отговорка: причина внешняя и преходящая.
+    if (code === "provider_timeout") return UI_TEXT.auth.loginPage.oauthProviderTimeout;
+    // FIX-B14: исходы СТАРТОВОЙ ноги (`OAuthStartFailure`). Раньше они уезжали
+    // JSON-конвертом прямо в окно браузера — вернуться было некуда. Ключ
+    // запроса и есть имя исхода, см. `lib/auth/oauth-start-error.ts`.
+    if (code === "provider_unavailable") return UI_TEXT.auth.loginPage.oauthProviderUnavailable;
+    if (code === "consent_required") return UI_TEXT.auth.loginPage.consentRequired;
+    if (code === "start_failed") return UI_TEXT.auth.loginPage.oauthStartFailed;
     return null;
   }, [searchParams]);
   const reduce = useReducedMotion();
@@ -554,7 +565,7 @@ export default function LoginClient({
                       </label>
                       <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
                         <Phone
-                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-primary"
+                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-accent-text"
                           aria-hidden
                         />
                         <Input
@@ -576,7 +587,7 @@ export default function LoginClient({
                       </label>
                       <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
                         <Mail
-                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-primary"
+                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-accent-text"
                           aria-hidden
                         />
                         <Input
@@ -711,7 +722,7 @@ export default function LoginClient({
                         onClick={resendCode}
                         disabled={loading}
                         data-testid="login-resend"
-                        className="text-sm font-medium text-accent-text transition-colors hover:text-primary-hover disabled:pointer-events-none disabled:opacity-50"
+                        className="text-sm font-medium text-accent-text transition-colors hover:text-accent-text-hover disabled:pointer-events-none disabled:opacity-50"
                       >
                         {T.resendCode}
                       </button>

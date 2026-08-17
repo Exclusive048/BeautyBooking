@@ -1,3 +1,4 @@
+import { publicReferenceCacheInit } from "@/lib/api/cache-headers";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
@@ -8,7 +9,8 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const data = await listReviewTags();
-    return jsonOk(data);
+    // PERF-13: словарь тегов отзывов — статический справочник, одинаковый для всех.
+    return jsonOk(data, publicReferenceCacheInit());
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

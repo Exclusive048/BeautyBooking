@@ -4,7 +4,20 @@ import { dirname, join, normalize } from "path";
 import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/lib/media/storage/types";
 import { env } from "@/lib/env";
 
-const MEDIA_ROOT = env.MEDIA_LOCAL_ROOT?.trim() || join(process.cwd(), "public", "uploads");
+/**
+ * SEC-23 — дефолт вынесен ИЗ `public/`.
+ *
+ * Всё, что пишет этот провайдер (вложения чата, фото клиентских карточек),
+ * раздавалось бы Next'ом как статика по `/uploads/...` — мимо `ensureCanReadMedia`,
+ * то есть мимо всей ACL-модели медиа; `src/proxy.ts` вдобавок исключает
+ * картиночные расширения из своего matcher'а, так что и прокси такой запрос не
+ * видит. Приватность файла держалась бы только на непредсказуемости имени (uuid).
+ *
+ * Каталог с точкой в начале — чтобы его нельзя было случайно принять за часть
+ * статики; он же в `.gitignore`. Прод сюда не попадает вовсе: `STORAGE_PROVIDER=local`
+ * в production теперь отвергается на старте (`env.ts`).
+ */
+const MEDIA_ROOT = env.MEDIA_LOCAL_ROOT?.trim() || join(process.cwd(), ".media-uploads");
 
 function sanitizePathSegment(segment: string): string {
   return segment.replace(/[:\*\?"<>\|\\\/]/g, "_");

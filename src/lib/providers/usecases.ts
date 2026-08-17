@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
+import { prisma } from "@/lib/prisma";
 import { listProviderCards } from "@/lib/providers/queries";
-import { mapProviderProfile } from "@/lib/providers/mappers";
+import { mapProviderProfile, mapProviderService } from "@/lib/providers/mappers";
 import type { ProviderCardDto, ProviderProfileDto } from "@/lib/providers/dto";
 import { ProviderType } from "@prisma/client";
 import { getStudioBannerUrl } from "@/lib/studios/banner";
@@ -76,8 +77,73 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
   }
 
   if (provider.type === ProviderType.MASTER) {
+    // FIX-D1 (F7): у мастера СТУДИИ услуг в собственности нет — они принадлежат
+    // провайдеру студии, а связь идёт через `MasterService`. Селект выше читает
+    // только прямое владение (`Service.providerId = provider.id`), поэтому у
+    // такого мастера список приходил ПУСТЫМ, секция «Услуги» рендерила
+    // заголовок без карточек, и CTA записи не появлялся вовсе — то есть
+    // собственная страница мастера не могла продать (SMOKE-01 · F7,
+    // подтверждено SMOKE-02).
+    //
+    // Замер, назвавший причину: у Марины `Service.providerId = master` → 0
+    // строк, `MasterService` → 8, и все восемь услуг принадлежат провайдеру
+    // студии. У соло-мастера ровно наоборот (5 собственных, 0 связей). То есть
+    // дефект был в ОБЛАСТИ ЗАПРОСА, а не в условии рендера: секция честно
+    // рисовала то, что ей дали.
+    //
+    // Решение владельца (FIX-D1): личная страница мастера студии — ПРОДАЮЩАЯ
+    // поверхность. Модель данных это уже предполагает — бронь с неё получает
+    // `studioId = null`, не видна журналу студии и не управляется ею (инв. #45).
+    //
+    // Запрос делается только при `studioId != null`: у соло-мастера связей нет
+    // по построению, и лишнее обращение к БД на каждый публичный профиль не
+    // окупается.
+    if (provider.studioId) {
+      profile.services = await loadStudioMasterServices(provider.id);
+    }
     profile.superpowerBadges = await getProviderSuperpowerBadges(provider.id);
   }
 
   return profile;
+}
+
+/**
+ * Услуги мастера студии — через `MasterService`, с персональными
+ * переопределениями цены и длительности.
+ *
+ * Предикат тот же, что у каталога (`catalog.service.ts`): связь включена И сама
+ * услуга включена и активна. Расхождение здесь означало бы, что карточка в
+ * каталоге и профиль показывают разные наборы.
+ */
+async function loadStudioMasterServices(masterProviderId: string) {
+  const links = await prisma.masterService.findMany({
+    where: {
+      masterProviderId,
+      isEnabled: true,
+      service: { isEnabled: true, isActive: true },
+    },
+    select: {
+      priceOverride: true,
+      durationOverrideMin: true,
+      service: {
+        select: {
+          id: true,
+          name: true,
+          durationMin: true,
+          price: true,
+          globalCategory: { select: { name: true, orderIndex: true } },
+        },
+      },
+    },
+  });
+
+  return links.map((link) =>
+    mapProviderService({
+      ...link.service,
+      // Переопределения — это то, что мастер берёт за услугу лично; показывать
+      // студийную цену там, где она перебита, значит обещать не ту сумму.
+      price: link.priceOverride ?? link.service.price,
+      durationMin: link.durationOverrideMin ?? link.service.durationMin,
+    }),
+  );
 }

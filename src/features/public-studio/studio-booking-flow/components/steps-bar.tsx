@@ -45,14 +45,14 @@ export function StepsBar({ active, done, scenarioB }: Props) {
                   ? "bg-primary text-white"
                   : isActive
                   ? "bg-text text-bg-card"
-                  : "bg-bg-muted text-text-muted"
+                  : "bg-muted text-text-muted"
               }`}
               aria-hidden
             >
               {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </span>
             <div className="min-w-0">
-              <div className="font-mono text-[9px] uppercase tracking-[0.08em] text-text-muted">
+              <div className="font-mono text-[10px] uppercase tracking-[0.08em] text-text-muted">
                 {UI_TEXT.bookingWidget.steps.stepLabel.replace("{n}", String(i + 1))}
               </div>
               <div className={`truncate text-xs ${isActive || isDone ? "font-semibold text-text" : "text-text"} sm:text-sm`}>

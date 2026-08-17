@@ -2,10 +2,14 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonFail } from "@/lib/api/contracts";
+import type { ErrorCode } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { extractClientIp } from "@/lib/http/ip";
+import { SMTP_TIMEOUTS } from "@/lib/email/sender";
 import {
   extractSmtpErrorDetails,
   maskSmtpIdentity,
@@ -14,9 +18,28 @@ import {
 
 export const runtime = "nodejs";
 
+/**
+ * FIX-B18 · SUPPORT-ENVELOPE-SHAPE — обе support-поверхности переведены на
+ * конверт проекта.
+ *
+ * Была собственная форма `{ ok:false, error: <строка> }` — `error` строкой, а
+ * не объектом, — и собрана она была руками, то есть мимо `jsonFail()` и мимо
+ * `check:error-message-lang`. Тексты здесь всегда были русскими (константы в
+ * шапке файла), поэтому находки в них не было; ратифицировать форму мешало
+ * другое: пока в проекте живут ДВЕ формы ответа об ошибке, гейт языка
+ * обязан иметь слепую зону, а клиент — знать, какая из форм придёт.
+ *
+ * Конверт добавляет `requestId`, которого у этих ответов не было вовсе, —
+ * то есть жалоба «форма не отправилась» становится сопоставимой с логом.
+ */
+function supportFail(status: number, message: string, code: ErrorCode) {
+  return jsonFail(status, message, code);
+}
+
 const INVALID_FORM_ERROR = "Некорректные данные формы.";
 const TOO_MANY_REQUESTS_ERROR =
   "Слишком часто. Попробуйте через несколько минут.";
+const TOO_LARGE_ERROR = "Слишком большой запрос.";
 const SEND_ERROR = "Ошибка отправки. Попробуйте позже.";
 
 /**
@@ -107,16 +130,34 @@ export async function POST(req: Request) {
   const requestId = getRequestId(req);
   const route = "POST /api/support/partnership";
 
+  // SEC-16: рейт-лимит стоял ПОСЛЕ разбора тела, то есть 429 выдавался уже
+  // после того, как произвольно большой JSON прочитан и разобран — ограничитель
+  // не ограничивал самую дорогую часть запроса. Порядок теперь: заявленный
+  // размер (даром, по заголовку) → лимит → фактические байты → разбор.
+  const ip = extractClientIp(req);
+  const userAgent = req.headers.get("user-agent") ?? null;
+
+  const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;
+  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
+  if (!ipAllowed) {
+    return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
+  }
+
+  const read = await readBodyTextCapped(req);
+  if (!read.ok) {
+    return supportFail(413, TOO_LARGE_ERROR, "REQUEST_BODY_TOO_LARGE");
+  }
+
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(read.text) as unknown;
   } catch {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   const parsed = partnershipSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: INVALID_FORM_ERROR }, { status: 400 });
+    return supportFail(400, INVALID_FORM_ERROR, "VALIDATION_ERROR");
   }
 
   const data = parsed.data;
@@ -130,15 +171,6 @@ export async function POST(req: Request) {
       honeypotLength: data.honeypot.length,
     });
     return NextResponse.json({ ok: true });
-  }
-
-  const ip = extractClientIp(req);
-  const userAgent = req.headers.get("user-agent") ?? null;
-
-  const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;
-  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-  if (!ipAllowed) {
-    return NextResponse.json({ ok: false, error: TOO_MANY_REQUESTS_ERROR }, { status: 429 });
   }
 
   const recipientRaw = (env.SUPPORT_TO_PARTNERSHIP ?? env.SUPPORT_TO)?.trim();
@@ -177,11 +209,11 @@ export async function POST(req: Request) {
       smtpFrom: maskSmtpIdentity(smtpFromRaw),
       recipient: maskSmtpIdentity(recipientRaw),
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   if (smtpPort > 65535) {
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   const normalizedSmtpUser = normalizeSmtpAddressList(smtpUserRaw);
@@ -197,6 +229,9 @@ export async function POST(req: Request) {
       user: normalizedSmtpUser.value,
       pass: smtpPass,
     },
+    // RES-05: границы — общие с `lib/email/sender.ts`, второго набора значений
+    // быть не должно (дефолты nodemailer держат сокет 10 минут).
+    ...SMTP_TIMEOUTS,
   });
 
   const createdAt = new Date();
@@ -228,22 +263,12 @@ export async function POST(req: Request) {
     secure,
   };
 
-  try {
-    await transporter.verify();
-  } catch (error) {
-    const smtpError = extractSmtpErrorDetails(error);
-    logError("Partnership SMTP verify failed", {
-      requestId,
-      route,
-      phase: "verify",
-      errorKind: smtpError.errorKind,
-      errorMessage: smtpError.errorMessage,
-      ...smtpDiagnostics,
-      kind: data.kind,
-      ip,
-    });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
-  }
+  // RES-05: `transporter.verify()` отсюда убран. Это был ПОЛНЫЙ второй
+  // SMTP-сеанс (connect + TLS + AUTH) перед каждой отправкой, то есть удвоение
+  // ожидания на пути, который пользователь ждёт синхронно. Диагностика не
+  // теряется: отказ соединения/аутентификации всплывает из `sendMail` через
+  // тот же `extractSmtpErrorDetails` и тот же набор полей — отличается только
+  // `phase`.
 
   try {
     await transporter.sendMail({
@@ -265,7 +290,7 @@ export async function POST(req: Request) {
       kind: data.kind,
       ip,
     });
-    return NextResponse.json({ ok: false, error: SEND_ERROR }, { status: 500 });
+    return supportFail(500, SEND_ERROR, "INTERNAL_ERROR");
   }
 
   logInfo("Partnership inquiry submitted", {

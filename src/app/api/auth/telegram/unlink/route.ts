@@ -1,5 +1,5 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
-import { toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
     return jsonOk({ unlinked: true });
   } catch (error) {
-    const appError = toAppError(error);
+    const appError = toAuthSurfaceError(error);
     if (appError.status >= 500) {
       logError("POST /api/auth/telegram/unlink failed", {
         requestId: getRequestId(req),
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт `AppError.details`.
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

@@ -20,7 +20,7 @@ export function NetworkBanner() {
 
   if (!isOnline) {
     return (
-      <div className="fixed left-0 right-0 top-0 z-40 pt-safe pointer-events-none">
+      <div className="fixed left-0 right-0 top-0 z-40 pt-[var(--safe-area-inset-top)] pointer-events-none">
         <div className="pointer-events-auto bg-red-600 px-4 py-2 text-center text-xs font-medium text-white">
           {UI_TEXT.network.offline}
         </div>
@@ -30,7 +30,7 @@ export function NetworkBanner() {
 
   if (justReconnected) {
     return (
-      <div className="fixed left-0 right-0 top-0 z-40 pt-safe pointer-events-none">
+      <div className="fixed left-0 right-0 top-0 z-40 pt-[var(--safe-area-inset-top)] pointer-events-none">
         <div className="pointer-events-auto bg-emerald-600 px-4 py-2 text-center text-xs font-medium text-white">
           {UI_TEXT.network.reconnected}
         </div>

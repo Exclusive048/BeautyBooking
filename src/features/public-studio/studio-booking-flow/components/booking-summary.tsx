@@ -40,7 +40,7 @@ export function BookingSummary({
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-sm">
       <div
         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider ${
-          ready ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-bg-muted text-text-muted"
+          ready ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : "bg-muted text-text-muted"
         }`}
       >
         {ready ? <Check className="h-3 w-3" aria-hidden /> : null}

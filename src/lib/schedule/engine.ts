@@ -22,6 +22,13 @@ export const ScheduleEngine = {
     const cached = await getCachedDayPlan(cacheKey);
     if (cached) return cached;
 
+    // PERF-10 намеренно НЕ ставит здесь single-flight-замок, хотя шаблон тот
+    // же. Всё, что ниже, — чистый расчёт из УЖЕ загруженного контекста: ни
+    // одного обращения к БД. Замок стоил бы двух-трёх round-trip'ов к Redis
+    // ради экономии микросекунд CPU, то есть сделал бы промах дороже, а не
+    // дешевле. Замок оправдан там, где промах стоит запросов к БД — слоты,
+    // booking-days, советник.
+
     const overrides = ctx.overridesByDateKey.get(dateKey) ?? [];
     const breaksByDateKey = new Map(
       Array.from(ctx.breaksOverrideByDateKey.entries()).map(([key, list]) => [

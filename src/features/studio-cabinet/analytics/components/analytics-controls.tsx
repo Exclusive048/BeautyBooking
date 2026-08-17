@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
@@ -79,11 +80,10 @@ export function AnalyticsControls({ period, view, compare }: Props) {
           })}
         </div>
         <label className="ml-auto inline-flex items-center gap-2 text-xs text-text-sec">
-          <input
-            type="checkbox"
+          <Checkbox
+            size="sm"
             checked={compare}
             onChange={(e) => updateParam("compare", e.target.checked ? "on" : "off")}
-            className="h-3.5 w-3.5 rounded border-border-subtle accent-primary"
           />
           {T.compare}
         </label>

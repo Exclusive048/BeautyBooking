@@ -1,12 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { CalendarDays } from "lucide-react";
-import { DayPicker } from "react-day-picker";
-import { ru } from "react-day-picker/locale";
 import { ChipButton } from "@/components/ui/chip-button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { UI_TEXT } from "@/lib/ui/text";
-import "react-day-picker/style.css";
+
+/**
+ * PERF-16 — `react-day-picker` + `date-fns` (+`@date-fns/tz`) статическим
+ * импортом давали на `/catalog` чанк 80.7 kB parsed / 23.5 kB gzip, который
+ * ехал каждому посетителю каталога. Календарь при этом открывается по клику по
+ * чипу, то есть у большинства не открывается вовсе.
+ *
+ * `ssr: false` здесь ничего не меняет по смыслу: поповер и так рендерится
+ * только при `open`, то есть на сервере не рендерился никогда.
+ *
+ * Скелет размером с сам календарь — чтобы поповер не прыгал, когда чанк
+ * доедет. Размеры взяты с отрендеренного `DayPicker` (7 колонок × 6 недель
+ * плюс шапка месяца), поэтому подстановка проходит без сдвига.
+ */
+const DatePresetCalendar = dynamic(
+  () => import("@/features/catalog/components/date-preset-calendar"),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[286px] w-[290px]" />,
+  },
+);
 
 type Props = {
   /** ISO date string (YYYY-MM-DD) or empty when no date picked. */
@@ -118,27 +138,14 @@ export function DatePresetChips({ value, onChange }: Props) {
 
         {open ? (
           <div className="absolute left-0 top-full z-30 mt-2 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">
-            {/* react-day-picker v9 ships its own table-based layout in
-                style.css. We keep that structure intact and only theme it
-                via the documented `--rdp-*` CSS variables — overriding
-                `classNames` here would replace the default table classes
-                and collapse the grid into a stack. The wrapping div scopes
-                the variables so they don't leak outside the popover. */}
-            <div className="rdp-theme">
-              <DayPicker
-                mode="single"
-                locale={ru}
-                weekStartsOn={1}
-                selected={selected ?? undefined}
-                onSelect={(date) => {
-                  if (!date) return;
-                  onChange(toIso(date));
-                  setOpen(false);
-                }}
-                disabled={{ before: today }}
-                showOutsideDays={false}
-              />
-            </div>
+            <DatePresetCalendar
+              selected={selected ?? undefined}
+              minDate={today}
+              onSelect={(date) => {
+                onChange(toIso(date));
+                setOpen(false);
+              }}
+            />
           </div>
         ) : null}
       </div>

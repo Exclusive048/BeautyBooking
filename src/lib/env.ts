@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+/**
+ * Канонические хосты публичного адреса (FIX-D1). Домен кириллический, поэтому
+ * форм две и обе легитимны: `new URL().host` unicode в punycode НЕ приводит.
+ * `www` — на случай, если фронт окажется за ним; лишним не будет, а его
+ * отсутствие стоило бы отказа старта на верном по сути значении.
+ */
+const CANONICAL_PUBLIC_HOSTS = new Set([
+  "мастеррядом.online",
+  "www.мастеррядом.online",
+  "xn--80aic0adlmagk0m.online",
+  "www.xn--80aic0adlmagk0m.online",
+]);
+
 // String env var → boolean. Accepts any string; only "true" (case-insensitive) → true.
 const boolFlag = z
   .string()
@@ -106,6 +119,11 @@ const envSchema = z.object({
 
   // ── Telegram ──────────────────────────────────────────────────────────────
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  // SEC-14: жила мимо Zod (читалась через `process.env[...]` в
+  // `telegram/config.ts`). Цена промаха конкретна: `getTelegramWebhookSecret`
+  // при опечатке в имени возвращает null, а вебхук трактует null как «проверки
+  // подлинности нет» и пропускает весь блок.
+  TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
   NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: z.string().optional(),
   // FIX-TELEGRAM-KILLSWITCH: legal kill-switch for *user-facing* Telegram
   // (login, cabinet-connect, notification delivery, footer). Defaults to false
@@ -271,6 +289,52 @@ const refinedSchema = envSchema
     (e) => e.NODE_ENV !== "production" || Boolean(e.NEXT_PUBLIC_APP_URL ?? e.APP_PUBLIC_URL),
     "NEXT_PUBLIC_APP_URL is required in production"
   )
+  /**
+   * 🔴 FIX-D1 — публичный URL проверяется по ФОРМЕ И ХОСТУ, а не только на наличие.
+   *
+   * Отказ здесь молчаливый и наружу направленный: значение выставляет человек в
+   * деплое, и **верное по форме, но чужое по хосту** значение приложение
+   * принимало без единого признака. Наблюдалось живьём (SMOKE-02): локальный
+   * `.env` держал `https://beautyhub.art` — домен, которого у продукта нет, — и
+   * `GET /logout` отвечал `302` на него, то есть рутинное действие уводило
+   * пользователя к третьей стороне.
+   *
+   * Из этого значения строится СЕМЬЯ исходящих ссылок, а не один редирект:
+   * база OAuth-редиректов и logout (`http/origin.ts`), канонические и OG-адреса
+   * (`app/layout.tsx` → `metadataBase`, публичные профили), ссылки в письмах
+   * (`email/templates/notification.ts`), ссылки в Telegram/push-уведомлениях
+   * (`telegram/config.ts` → hot-slots, slot-freed, weekly-stats, booking), и
+   * ссылка «поделиться страницей» в кабинете мастера. Ошибка в одном значении
+   * уезжает во все шесть, причём письма и пуши уходят наружу навсегда.
+   *
+   * Проверяются три свойства, и все три — только в production (dev обязан
+   * работать на `http://localhost:3000`):
+   *   1. разбирается как абсолютный URL (у `z.url()` это уже есть, здесь —
+   *      защита от значения, пришедшего вторым именем `APP_PUBLIC_URL`);
+   *   2. схема `https:` — иначе ссылки в письмах уедут по http;
+   *   3. хост из списка канонических.
+   *
+   * ⚠️ Список хостов держит и unicode-, и punycode-форму: домен кириллический
+   * (`мастеррядом.online` = `xn--80aic0adlmagk0m.online`), и какая из форм
+   * попадёт в env — зависит от того, кто её копировал. Обе легитимны, и
+   * `new URL().host` их НЕ нормализует одну в другую.
+   */
+  .refine(
+    (e) => {
+      if (e.NODE_ENV !== "production") return true;
+      const raw = (e.NEXT_PUBLIC_APP_URL ?? e.APP_PUBLIC_URL)?.trim();
+      if (!raw) return true; // отсутствие ловит рефайн выше — не дублируем сообщение
+      let url: URL;
+      try {
+        url = new URL(raw);
+      } catch {
+        return false;
+      }
+      if (url.protocol !== "https:") return false;
+      return CANONICAL_PUBLIC_HOSTS.has(url.host.toLowerCase());
+    },
+    `NEXT_PUBLIC_APP_URL/APP_PUBLIC_URL must be an absolute https URL on a canonical host in production (${[...CANONICAL_PUBLIC_HOSTS].join(", ")}). A well-formed value pointing at the wrong host silently sends users, emails and push links to a third party — see FIX-D1.`
+  )
   .refine(
     (e) =>
       e.STORAGE_PROVIDER !== "s3" ||
@@ -349,6 +413,25 @@ const refinedSchema = envSchema
       "(YOOKASSA_SHOP_ID + YOOKASSA_SECRET_KEY set). It is a cheap URL pre-filter, " +
       "NOT the authenticity anchor — authenticity is the worker API re-fetch (invariant #5). " +
       "Set it, or unset the YooKassa credentials to run without payments."
+  )
+  // SEC-23: локальное дисковое хранилище в production — отказ на старте.
+  //
+  // Дело не в надёжности диска, а в ACL: файлы local-провайдера отдаются как
+  // обычные файлы файловой системы, и если корень лежит внутри `public/`, Next
+  // раздаёт их статикой мимо `ensureCanReadMedia` — а `proxy.ts` исключает
+  // картиночные расширения из matcher'а, так что и прокси такого запроса не
+  // видит. Приватность вложения чата или фото клиентской карточки держалась бы
+  // на непредсказуемости имени файла. `STORAGE_PROVIDER` по умолчанию `"local"`,
+  // то есть забытая переменная в проде давала бы ровно этот режим молча.
+  //
+  // Дефолт корня вынесен из `public/` отдельно (`media/storage/local.ts`) —
+  // но дефолт защищает только того, кто ничего не задал.
+  .refine(
+    (e) => e.NODE_ENV !== "production" || e.STORAGE_PROVIDER !== "local",
+    "STORAGE_PROVIDER=local is not allowed in production — set STORAGE_PROVIDER=s3. " +
+      "Local-disk media is served as plain files, bypassing ensureCanReadMedia (and the " +
+      "proxy matcher excludes image extensions), so chat attachments and client-card photos " +
+      "would be protected only by the unpredictability of their filenames."
   );
 
 // ── Parse ─────────────────────────────────────────────────────────────────────

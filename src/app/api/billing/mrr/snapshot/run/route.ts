@@ -1,5 +1,5 @@
 import { fail, ok } from "@/lib/api/response";
-import { timingSafeStringEqual } from "@/lib/auth/constant-time";
+import { isAuthorizedCronRequest } from "@/lib/api/cron-auth";
 import { env } from "@/lib/env";
 import { logError } from "@/lib/logging/logger";
 import { enqueue } from "@/lib/queue/queue";
@@ -14,7 +14,8 @@ export const runtime = "nodejs";
  *   Header: `x-cron-token: <MRR_SNAPSHOT_SECRET>`
  *
  * Same auth shape as `/api/billing/renew/run` — token in either an
- * `x-cron-token` header or `?token=…` query, validated against the
+ * `x-cron-token` header (SEC-21: the `?token=…` query form is gone — a
+ * query string lands in LB access logs and referrers), validated against the
  * env var. Endpoint **enqueues** the job rather than running it
  * inline so the cron invoker returns fast even when the worker is
  * busy; the worker handles the snapshot creation with retry/
@@ -25,17 +26,11 @@ export const runtime = "nodejs";
  * a cron retry within the same UTC day reads back the existing row
  * rather than creating a duplicate.
  */
-function getCronToken(req: Request): string | null {
-  const header = req.headers.get("x-cron-token");
-  if (header?.trim()) return header.trim();
-  const token = new URL(req.url).searchParams.get("token");
-  return token?.trim() ?? null;
-}
 
 export async function POST(req: Request) {
-  const expected = env.MRR_SNAPSHOT_SECRET?.trim();
-  const token = getCronToken(req);
-  if (!expected || !token || !timingSafeStringEqual(token, expected)) {
+  // SEC-21: только заголовок `x-cron-token`. Query-строка попадает в access-логи
+  // балансировщика и в реферер — секрету там не место.
+  if (!isAuthorizedCronRequest(req, env.MRR_SNAPSHOT_SECRET)) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");
   }
 

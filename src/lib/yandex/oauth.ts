@@ -9,6 +9,12 @@ import { getYandexClientId, getYandexClientSecret, getYandexRedirectUri } from "
 // Endpoints — https://yandex.ru/dev/id/doc/en/
 const YANDEX_AUTHORIZE_URL = "https://oauth.yandex.ru/authorize";
 const YANDEX_TOKEN_URL = "https://oauth.yandex.ru/token";
+/**
+ * RES-09 — верхняя граница обмена с Яндекс ID. Причина та же, что у
+ * VK-близнеца: оба вызова стоят в callback'е авторизации и держат запрос
+ * пользователя, пока мы ходим за токеном и профилем.
+ */
+const OAUTH_REQUEST_TIMEOUT_MS = 10_000;
 const YANDEX_USER_INFO_URL = "https://login.yandex.ru/info?format=json";
 
 type YandexTokenSuccess = {
@@ -118,6 +124,7 @@ export async function exchangeYandexCodeForToken(input: {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    signal: AbortSignal.timeout(OAUTH_REQUEST_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => null)) as YandexTokenResponse | null;
   if (!json) {
@@ -154,6 +161,7 @@ export async function fetchYandexProfile(accessToken: string): Promise<YandexPro
   const res = await fetch(YANDEX_USER_INFO_URL, {
     method: "GET",
     headers: { Authorization: `OAuth ${accessToken}` },
+    signal: AbortSignal.timeout(OAUTH_REQUEST_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => null)) as YandexUserInfoResponse | null;
   if (!json) {

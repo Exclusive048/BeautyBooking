@@ -27,6 +27,12 @@ vi.mock("@/lib/monitoring/api-alerts", () => ({
   track5xxError: vi.fn(),
 }));
 vi.mock("@/lib/monitoring/status", () => ({ recordSurfaceEvent: vi.fn() }));
+// SEC-20: частичный мок — сравнение настоящее, но видно, что зовут именно общий
+// хелпер, а не локальную копию.
+vi.mock("@/lib/auth/constant-time", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth/constant-time")>();
+  return { timingSafeStringEqual: vi.fn(actual.timingSafeStringEqual) };
+});
 // Partial-mock: keep real `withRequestId` / `getRequestId` (the route + `fail`
 // helper use them), spy only on the log sinks to suppress real Telegram alerts.
 vi.mock("@/lib/logging/logger", async (importOriginal) => {
@@ -34,6 +40,7 @@ vi.mock("@/lib/logging/logger", async (importOriginal) => {
   return { ...actual, logError: vi.fn(), logInfo: vi.fn() };
 });
 
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { POST } from "./route";
 
 const URL_BASE = "http://localhost/api/payments/yookassa/webhook";
@@ -196,6 +203,43 @@ describe("YooKassa webhook IP allowlist enforce (HARDENING-08 FIX-17)", () => {
       }),
     );
     expect(res.status).toBe(403);
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * SEC-20 — роут нёс СОБСТВЕННУЮ копию constant-time-сравнения, и она начиналась
+ * с `if (aBuf.length !== bBuf.length) return false`: длина секрета утекала по
+ * времени ответа мимо самого сравнения. Правильная версия в проекте уже была —
+ * `lib/auth/constant-time.ts` хеширует обе стороны до сравнения и потому от
+ * длины не зависит; в её комментарии эта ловушка описана прямо.
+ *
+ * Тест пиннит именно использование общего хелпера: поведенчески «неверный токен
+ * → 401» одинаково у обеих реализаций, поэтому отличить их можно только так.
+ */
+describe("SEC-20 — сравнение токена вебхука идёт через общий хелпер", () => {
+  it("зовёт `timingSafeStringEqual` из `lib/auth/constant-time`", async () => {
+    mockEnv.YOOKASSA_WEBHOOK_TOKEN = "test-secret";
+    await POST(
+      makeRequest({
+        token: "test-secret",
+        body: { event: "payment.succeeded", object: { id: "pay-1" } },
+      }),
+    );
+    expect(timingSafeStringEqual).toHaveBeenCalledWith("test-secret", "test-secret");
+  });
+
+  it("отказ на токене ДРУГОЙ длины идёт тем же путём, без ранней ветки по длине", async () => {
+    mockEnv.YOOKASSA_WEBHOOK_TOKEN = "test-secret";
+    const res = await POST(
+      makeRequest({
+        token: "x",
+        body: { event: "payment.succeeded", object: { id: "pay-1" } },
+      }),
+    );
+    expect(res.status).toBe(401);
+    // именно общий хелпер принял решение — локальная копия отсекла бы по длине
+    expect(timingSafeStringEqual).toHaveBeenCalledWith("x", "test-secret");
     expect(enqueue).not.toHaveBeenCalled();
   });
 });

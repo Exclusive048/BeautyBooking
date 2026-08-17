@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useId,
   useRef,
   type ReactNode,
@@ -12,11 +11,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  useFocusTrap,
-  useInitialFocus,
-  useReturnFocus,
-} from "@/components/ui/use-modal-a11y";
+import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -131,25 +126,10 @@ export function Drawer({
   // MODAL-A11Y-BATCH-A: respect OS prefers-reduced-motion.
   const shouldReduceMotion = useReducedMotion();
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKey);
-    };
-  }, [open, onClose]);
-
-  // MODAL-A11Y-BATCH-A: WCAG SC 2.4.3 + 3.2.1 focus management shared
-  // with ModalSurface via use-modal-a11y hooks.
-  useReturnFocus(open);
-  useInitialFocus(open, sheetRef, initialFocusRef);
-  useFocusTrap(sheetRef, open);
+  // MODAL-A11Y-BATCH-A + UI-13: контракт диалога целиком (Escape,
+  // scroll-lock, WCAG SC 2.4.3 + 3.2.1) — общий с `ModalSurface` и с
+  // оверлеями, которые примитивами не оборачиваются.
+  useOverlayA11y({ open, onClose, containerRef: sheetRef, initialFocusRef });
 
   if (!isBrowser) return null;
 

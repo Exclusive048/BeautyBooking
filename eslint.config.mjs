@@ -38,8 +38,17 @@ const eslintConfig = defineConfig([
   {
     files: ["**/*.tsx"],
     rules: {
+      // GUARD-INTEGRITY (2026-08-12): было `warn`, а `npm run lint` выходит 0 при
+      // любом числе warning'ов — то есть правило, заведённое после ТРЁХ
+      // рецидивов, не могло остановить четвёртый. Поднято до `error`
+      // @probe что сломать: добавить `fixed inset-0` в `components/ui/header-block.tsx`
+      //        наблюдалось: `13:27 error Overlay/modal surfaces must portal…`,
+      //        `lint` exit 1. При `warn` тот же вход давал 15 problems и exit 0.
+      // без чужих чисток: замер перед правкой — у этого правила **ноль**
+      // срабатываний (все 14 warning'ов базы — это 9 no-unused-vars в тестах
+      // и 5 NEXT163-LOCATION-ASSIGN), то есть базовая линия не затронута.
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector: "Literal[value=/fixed inset-0|fixed top-0 left-0 right-0 bottom-0/]",
           message:

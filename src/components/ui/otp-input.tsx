@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { UI_TEXT } from "@/lib/ui/text";
 
 const DEFAULT_LENGTH = 6;
 
@@ -109,13 +110,25 @@ export function OtpInput({
     if (autoFocus) refs.current[0]?.focus();
   }, [autoFocus]);
 
+  // UI-34: эффект двигает фокус ТОЛЬКО когда код обнулили снаружи — неверный
+  // код, «Отправить снова», возврат на шаг ввода (`login-client` в этих
+  // случаях зовёт `setCode("")`). Тогда пользователь ничего не нажимал, поле
+  // опустело само, и начинать надо с первой ячейки.
+  //
+  // Раньше эффект реагировал на ЛЮБОЕ изменение `value` и утаскивал фокус на
+  // «первую пустую» ячейку — из-за чего исправить среднюю цифру было нельзя:
+  // стрелками до неё дойти можно, но первый же ввод отбрасывал курсор назад,
+  // и вся реализованная Arrow-навигация не стоила ничего. Перевод курсора
+  // вперёд теперь происходит там, где ему и место, — в обработчиках ввода и
+  // вставки (см. `handleChange` / `handlePaste`).
+  const previousValueRef = useRef(value);
   useEffect(() => {
-    if (value.length >= length) {
-      refs.current[length - 1]?.focus();
-    } else {
-      refs.current[value.length]?.focus();
+    const previous = previousValueRef.current;
+    previousValueRef.current = value;
+    if (value.length === 0 && previous.length > 0) {
+      refs.current[0]?.focus();
     }
-  }, [value, length]);
+  }, [value]);
 
   // Wrong-code shake: retrigger the CSS animation by toggling the class on the
   // grid element directly (manual DOM update — not React state), forcing a
@@ -142,6 +155,9 @@ export function OtpInput({
     if (next.length === length) {
       onComplete?.(next);
     }
+    // Курсор вперёд — от введённой ячейки, а не от «первой пустой»: правка
+    // середины кода ведёт к следующей цифре, а не в начало.
+    refs.current[Math.min(index + 1, length - 1)]?.focus();
   }
 
   function handleKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
@@ -172,6 +188,7 @@ export function OtpInput({
     if (pasted.length === length) {
       onComplete?.(pasted);
     }
+    refs.current[Math.min(pasted.length, length - 1)]?.focus();
   }
 
   const complete = value.length >= length;
@@ -206,14 +223,18 @@ export function OtpInput({
               }}
               type="text"
               inputMode="numeric"
-              autoComplete={index === 0 ? "one-time-code" : "off"}
+              // UI-34: `one-time-code` на КАЖДОЙ ячейке — Safari/iOS
+              // подставляет код из SMS/почты по группе полей, а `off` на
+              // остальных пяти подстановку подавлял.
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
               maxLength={2}
               value={value[index] ?? ""}
               onChange={(event) => handleChange(index, event)}
               onKeyDown={(event) => handleKeyDown(index, event)}
               onPaste={handlePaste}
               disabled={disabled}
-              aria-label={`Цифра ${index + 1} из ${length}`}
+              aria-label={UI_TEXT.a11y.otpDigit(index + 1, length)}
               className={cn(
                 "h-12 w-full min-w-0 rounded-2xl border bg-bg-card text-center text-lg font-semibold tabular-nums text-text-main shadow-sm outline-none sm:h-14 sm:text-xl",
                 "transition-[border-color,box-shadow,transform,background-color] duration-200",
@@ -225,11 +246,18 @@ export function OtpInput({
                 // `cn` is a plain join and two competing `disabled:opacity-*`
                 // utilities would resolve by stylesheet order, not class order.
                 inFlight ? "disabled:opacity-100" : "disabled:opacity-50",
+                // UI-27: заливка ошибочной ячейки — статусный токен, `dark:`-вилка
+                // уходит в переменную темы. Рамка НАМЕРЕННО остаётся литеральной
+                // `red-400/70`: ратифицированный `--danger-border` откалиброван под
+                // плашку бейджа (светлая red-200) и на поле ввода читается слабее
+                // самой обычной `border-border-control` — то есть перевод рамки на
+                // токен ослабил бы сигнал ошибки на единственном шаге входа.
+                // Вилки тем у неё нет, поэтому предмету UI-27 она не противоречит.
                 state === "error"
-                  ? "border-red-400/70 bg-red-50/60 dark:bg-red-950/30"
+                  ? "border-red-400/70 bg-danger-surface"
                   : filled
                     ? "login-otp-pop border-primary bg-primary/5"
-                    : "border-border-subtle",
+                    : "border-border-control",
                 // Reduced-motion fallback for the verifying sweep: a static
                 // tint, so the stage is still visible without any movement.
                 state === "verifying" ? "border-primary/60" : null,

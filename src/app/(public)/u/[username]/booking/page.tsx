@@ -260,7 +260,14 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
     permanentRedirect(redirectUrl);
   }
 
-  const master = await resolveMasterSelection(result.providerId);
+  // PERF-24: обе проверки берут один и тот же `result.providerId` и ничего не
+  // берут друг у друга — три round-trip'а (мастер + два счётчика) идут одним
+  // заходом вместо двух последовательных. Порядок ветвлений не тронут:
+  // `permanentRedirect` по-прежнему срабатывает раньше `redirect` на профиль.
+  const [master, studioUnbookable] = await Promise.all([
+    resolveMasterSelection(result.providerId),
+    isStudioUnbookable(result.providerId),
+  ]);
   const shouldRedirectMaster =
     (!masterParam && legacyMasterId && master?.publicUsername) ||
     (masterParam &&
@@ -279,7 +286,7 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
     permanentRedirect(redirectUrl);
   }
 
-  if (await isStudioUnbookable(result.providerId)) {
+  if (studioUnbookable) {
     redirect(`/u/${username}`);
   }
 

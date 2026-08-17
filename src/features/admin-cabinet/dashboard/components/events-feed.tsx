@@ -9,7 +9,11 @@ import type {
   AdminEventsResponse,
 } from "@/features/admin-cabinet/dashboard/types";
 
-const POLL_MS = 5_000;
+// PERF-27 (AUDIT-CAMPAIGN-02 п.4, ратифицировано владельцем): 5с → 30с — как у
+// соседнего system-health.tsx. 720 запросов/час на вкладку → 120; SSE-канал ради
+// одной админской ленты не строится (ратифицировано там же). Подпись бейджа
+// берёт интервал ОТСЮДА (POLL_MS/1000) — цифра в UI не может разойтись с кодом.
+const POLL_MS = 30_000;
 const MAX_ITEMS = 30;
 
 type Props = {
@@ -18,21 +22,31 @@ type Props = {
 
 const T = UI_TEXT.adminPanel.dashboard.feed;
 
-/** Live event feed. Initial set comes from the server (SSR), then a
- * 5-second polling loop pulls anything newer than the latest `timeMs`
- * we've already shown. New items animate in at the top, the list is
- * capped at `MAX_ITEMS` so the DOM doesn't grow unbounded during a
- * long session. Polling pauses when the tab is hidden — there's no
- * point burning rate-limit budget for a tab no admin is looking at. */
+/** Event feed. Initial set comes from the server (SSR), then a polling
+ * loop (POLL_MS) pulls anything newer than the latest `timeMs` we've
+ * already shown. New items animate in at the top, the list is capped at
+ * `MAX_ITEMS` so the DOM doesn't grow unbounded during a long session.
+ * Polling pauses when the tab is hidden — there's no point burning
+ * rate-limit budget for a tab no admin is looking at. */
 export function EventsFeed({ initial }: Props) {
   const [items, setItems] = useState<AdminEventItem[]>(initial);
   const seenIds = useRef<Set<string>>(new Set(initial.map((e) => e.id)));
   const isVisible = useRef(true);
+  // PERF-27: тик, пришедший поверх незавершённого запроса, ПРОПУСКАЕТСЯ.
+  // Раньше `setInterval` стрелял безусловно, и медленный ответ (админский
+  // запрос по событиям — не самый дешёвый) складывал запросы стопкой: чем
+  // тяжелее серверу, тем больше их в полёте одновременно. `useSerialTask`
+  // здесь не подходит намеренно — он ОТКЛАДЫВАЕТ вытесненный вход и
+  // выполняет его следом, а у опроса значение — «сейчас», и отложенный тик
+  // сразу после предыдущего это тот же лишний запрос.
+  const inFlight = useRef(false);
   const reduce = useReducedMotion();
 
   const latestMs = items.length > 0 ? items[0]!.timeMs : 0;
 
   const poll = useCallback(async (since: number) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
       const url = since
         ? `/api/admin/dashboard/events?since=${since}`
@@ -62,6 +76,8 @@ export function EventsFeed({ initial }: Props) {
     } catch {
       // Silent — next poll will retry. Avoids surfacing transient
       // network blips as user-visible errors in a live dashboard.
+    } finally {
+      inFlight.current = false;
     }
   }, []);
 
@@ -69,6 +85,11 @@ export function EventsFeed({ initial }: Props) {
     const onVisibility = () => {
       isVisible.current = document.visibilityState === "visible";
     };
+    // PERF-27: начальное значение читается с документа, а не принимается за
+    // «видно». Вкладка, открытая в фоне (Ctrl+click по ссылке на дашборд),
+    // до первого переключения фокуса опрашивала API как активная — то есть
+    // ровно в том случае, ради которого пауза и сделана.
+    onVisibility();
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
@@ -120,7 +141,7 @@ function LiveBadge() {
         aria-hidden
         className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
       />
-      {T.liveBadge}
+      {T.liveBadge(POLL_MS / 1000)}
     </span>
   );
 }

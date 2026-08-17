@@ -169,7 +169,7 @@ export default function BookFromPortfolioClient() {
             aria-disabled={!canOpenProfile}
             className={`inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold ${
               canOpenProfile
-                ? "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-[rgb(var(--accent-foreground))]"
+                ? "bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-accent-foreground"
                 : "pointer-events-none cursor-default bg-bg-input text-text-sec"
             }`}
           >

@@ -9,6 +9,10 @@ import {
   type ServiceBookingConfig,
 } from "@/features/booking/lib/booking-config";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  fetchRetryingDuplicates,
+  isDuplicateRequestResponse,
+} from "@/lib/http/idempotent-retry";
 import { SelectionPhase } from "@/features/booking/components/booking-flow/phases/selection-phase";
 import { FormPhase } from "@/features/booking/components/booking-flow/phases/form-phase";
 import { SuccessPhase } from "@/features/booking/components/booking-flow/phases/success-phase";
@@ -32,6 +36,19 @@ const T = UI_TEXT.publicProfile.bookingWidget;
 
 type Props = {
   providerId: string;
+  /**
+   * FIX-C3 · SMOKE-01 · F4 — имя мастера для карточки успеха.
+   *
+   * Раньше его здесь не было, и карточка успеха ставила `providerName: ""` с
+   * комментарием «populated by URL refresh fetch below», то есть **обязательное
+   * поле было делегировано best-effort-пути**. Тот же фетч в соседней строке
+   * честно назван «Best-effort — failure leaves the fallback card intact»:
+   * противоречие внутри одного блока. Стоило это заголовка экрана успеха
+   * основной конверсионной воронки — « ждёт вас», с ведущим пробелом вместо
+   * имени. Теперь имя приходит пропом от того же источника, что рисует всю
+   * страницу, и от сетевого запроса не зависит вовсе.
+   */
+  providerName: string;
   serviceId: string;
   serviceName: string;
   servicePrice: number;
@@ -94,6 +111,7 @@ function asConfirmedBooking(
  */
 export function BookingFlowStepper({
   providerId,
+  providerName,
   serviceId,
   serviceName,
   servicePrice,
@@ -150,6 +168,14 @@ export function BookingFlowStepper({
   // unmounted component" warning otherwise.
   const mountedRef = useRef(true);
   useEffect(() => {
+    // FIX-C3 · F4 (вторая половина): флаг выставляется на КАЖДОМ монтировании,
+    // а не только гасится на размонтировании. Прежняя форма гасила его навсегда:
+    // `reactStrictMode: true` (`next.config.ts:27`) в разработке прогоняет
+    // эффект mount → unmount → mount, cleanup ставил `false`, и обратно его не
+    // возвращал никто — то есть обогащение карточки успеха было отключено
+    // НАВСЕГДА, а не «иногда». Тот же эффект даёт любой реальный
+    // unmount/remount (мобильный лист, Activity-границы).
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -331,7 +357,7 @@ export function BookingFlowStepper({
         .filter((x): x is { questionId: string; questionText: string; answer: string } => x !== null) ?? undefined;
 
     try {
-      const res = await fetch("/api/public/bookings", {
+      const res = await fetchRetryingDuplicates("/api/public/bookings", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -358,6 +384,15 @@ export function BookingFlowStepper({
       });
 
       if (res.status === 409) {
+        // LOGIC-10: не всякий 409 — конфликт слота. `DUPLICATE_REQUEST` значит
+        // «тот же самый запрос ещё выполняется», и бронь, скорее всего, уже
+        // создана. Показать здесь «время занято» и ротировать ключ — значит
+        // отправить пользователя на второй заход, который упрётся в его же
+        // свежую бронь и получит уже НАСТОЯЩИЙ конфликт.
+        if (await isDuplicateRequestResponse(res)) {
+          setSubmitError(UI_TEXT.publicProfile.booking.submitInFlight);
+          return;
+        }
         dispatch({ type: "submitConflict" });
         // Rotate idempotency key so the retry isn't treated as a duplicate.
         idempotencyKeyRef.current =
@@ -392,7 +427,8 @@ export function BookingFlowStepper({
           state.selectedSlot.isHot && typeof state.selectedSlot.discountedPrice === "number"
             ? state.selectedSlot.discountedPrice
             : servicePrice,
-        providerName: "", // populated by URL refresh fetch below
+        // FIX-C3 · F4: имя берётся из пропа, а не «дозаполняется» фетчем ниже.
+        providerName,
         providerAddress: null,
         timezone: providerTimezone,
         clientPhoneMasked: maskRussianPhone(submitPhone),
@@ -443,6 +479,10 @@ export function BookingFlowStepper({
     consent,
     me,
     providerId,
+    // FIX-C3: имя участвует в карточке успеха, поэтому обязано быть в
+    // зависимостях — иначе обработчик закроется над именем первого рендера и
+    // при смене провайдера подставит чужое.
+    providerName,
     providerTimezone,
     serviceId,
     serviceName,

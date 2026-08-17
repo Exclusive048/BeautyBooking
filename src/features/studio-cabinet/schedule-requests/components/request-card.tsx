@@ -1,6 +1,6 @@
 "use client";
 
-import { ScheduleChangeRequestStatus } from "@prisma/client";
+import { ScheduleChangeRequestStatus } from "@/lib/prisma-enums";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";

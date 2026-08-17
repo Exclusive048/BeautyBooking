@@ -1,9 +1,12 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 import { withRequestContext } from "@/lib/api/with-request-context";
-import { fail } from "@/lib/api/response";
-import { AppError, toAppError } from "@/lib/api/errors";
+import {
+  failOAuthStart,
+  oauthStartLoginRedirect,
+  oauthStartProviderRedirect,
+  type OAuthStartNavigation,
+} from "@/lib/auth/oauth-start-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { buildYandexAuthorizeUrl, requireYandexRedirectUri } from "@/lib/yandex/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/yandex/pkce";
@@ -16,7 +19,6 @@ import {
 import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
 import { signConsentCookieValue, YANDEX_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
 import { isProduction, isYandexAuthEnabled } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
 
 // FIX-YANDEX-OAUTH — start route, bespoke-parallel to api/auth/vk/start.
 const YANDEX_NOT_CONFIGURED_CODES = new Set([
@@ -25,12 +27,13 @@ const YANDEX_NOT_CONFIGURED_CODES = new Set([
   "YANDEX_REDIRECT_URI_MISSING",
 ]);
 
-export async function GET(req: Request) {
+export async function GET(req: Request): Promise<OAuthStartNavigation> {
   return withRequestContext(req, async () => {
     // AUTH-KILLSWITCH-ENFORCE-01: refuse when Yandex auth is disabled
     // server-side (FZ-199 kill-switch), before any cred read / OAuth work.
+    // FIX-B14: та же форма ответа, что у VK-близнеца — навигация, не JSON.
     if (!isYandexAuthEnabled) {
-      return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
+      return oauthStartLoginRedirect(req, "provider_unavailable");
     }
 
     // RKN-FIX-01 — identical consent capture to the VK start route (see there
@@ -38,7 +41,7 @@ export async function GET(req: Request) {
     const consentFlags = consentFlagsFromParams(new URL(req.url).searchParams);
     const isLinkingSession = Boolean(await getSessionUser());
     if (!isLinkingSession && !hasRequiredConsents(consentFlags)) {
-      return fail(UI_TEXT.auth.loginPage.consentRequired, 400, "CONSENT_REQUIRED");
+      return oauthStartLoginRedirect(req, "consent_required");
     }
 
     try {
@@ -71,13 +74,11 @@ export async function GET(req: Request) {
         maxAge: YANDEX_STATE_TTL_SECONDS,
       });
 
-      return NextResponse.redirect(authUrl);
+      return oauthStartProviderRedirect(authUrl);
     } catch (error) {
-      const appError = error instanceof AppError ? error : toAppError(error);
-      if (YANDEX_NOT_CONFIGURED_CODES.has(appError.code)) {
-        return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
-      }
-      return fail(appError.message, appError.status, appError.code, appError.details);
+      // FIX-B14 — см. VK-близнец: оба исхода навигация, `details` в ответ не
+      // уезжает (Y9), диагностика — в лог со скрабом.
+      return failOAuthStart(req, error, YANDEX_NOT_CONFIGURED_CODES);
     }
   });
 }

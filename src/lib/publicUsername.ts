@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { ProviderType } from "@prisma/client";
+import { ProviderType } from "@/lib/prisma-enums";
 import { AppError } from "@/lib/api/errors";
 
 const USERNAME_MIN_LENGTH = 3;

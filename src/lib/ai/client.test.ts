@@ -25,6 +25,15 @@ vi.mock("@/lib/monitoring/alerts", () => ({
   trackError: vi.fn(() => 1),
 }));
 
+// FIX-B16: денежный потолок теперь стоит внутри `aiChat`. Здесь он замокан
+// «бюджет есть» — предмет ЭТОГО файла — конструкция клиента и деривация модели.
+// Поведение самого потолка (в т.ч. что при исчерпании в сеть не уходит ничего)
+// проверяется в `spend-ceiling.test.ts` и `paid-call-coverage.test.ts`.
+vi.mock("@/lib/ai/spend-ceiling", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/spend-ceiling")>()),
+  takeAiSpendBudget: vi.fn(async () => {}),
+}));
+
 // Mock the OpenAI SDK — capture constructor args and stub chat.completions.create.
 const { mockCreate, constructorCalls } = vi.hoisted(() => ({
   mockCreate: vi.fn(),
@@ -79,7 +88,7 @@ describe("aiChat — Yandex client construction", () => {
     mockEnv.YANDEX_FOLDER_ID = "b1g-folder";
 
     await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
     });
@@ -93,7 +102,7 @@ describe("aiChat — Yandex client construction", () => {
     mockEnv.YANDEX_FOLDER_ID = "b1g-folder-42";
 
     await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
     });
@@ -106,7 +115,7 @@ describe("aiChat — Yandex client construction", () => {
     mockEnv.YANDEX_FOLDER_ID = "b1g-folder";
 
     await aiChat({
-      scope: "advisor",
+      scope: "advisor-advice",
       systemPrompt: "system",
       userPrompt: "user",
       model: "gpt://b1g-folder/yandexgpt/latest",
@@ -117,7 +126,7 @@ describe("aiChat — Yandex client construction", () => {
 
   it("passes temperature + max_tokens through to underlying call", async () => {
     await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
       temperature: 0.3,
@@ -131,7 +140,7 @@ describe("aiChat — Yandex client construction", () => {
 
   it("omits max_tokens when not provided (lets API default kick in)", async () => {
     await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
     });
@@ -146,7 +155,7 @@ describe("aiChat — Yandex client construction", () => {
     });
 
     const result = await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
     });
@@ -160,7 +169,7 @@ describe("aiChat — Yandex client construction", () => {
     });
 
     const result = await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
     });
@@ -176,7 +185,7 @@ describe("aiChat — Yandex client construction", () => {
     // INTERNAL_ERROR comes from getClient() during construction — caught
     // inside aiChat's try/catch which returns null (preserves contract).
     const result = await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
     });
@@ -193,7 +202,7 @@ describe("aiChat — Yandex client construction", () => {
     mockEnv.YANDEX_FOLDER_ID = undefined;
 
     await expect(
-      aiChat({ scope: "test-scope", systemPrompt: "system", userPrompt: "user" }),
+      aiChat({ scope: "review-reply", systemPrompt: "system", userPrompt: "user" }),
     ).rejects.toThrow(/YANDEX_FOLDER_ID/);
   });
 
@@ -205,7 +214,7 @@ describe("aiChat — Yandex client construction", () => {
     mockEnv.YANDEX_FOLDER_ID = undefined;
 
     const result = await aiChat({
-      scope: "test-scope",
+      scope: "review-reply",
       systemPrompt: "system",
       userPrompt: "user",
       model: "gpt://hardcoded-folder/yandexgpt-lite/latest",

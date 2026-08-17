@@ -4,8 +4,16 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createFeatureGateError } from "@/lib/billing/guards";
-import { cancelBooking } from "@/lib/bookings/cancelBooking";
-import { resolveBookingRuntimeStatus, type BookingRuntimeStatus } from "@/lib/bookings/flow";
+import {
+  cancelBookingInTx,
+  runCancelBookingSideEffects,
+  type CancelBookingSideEffects,
+} from "@/lib/bookings/cancelBooking";
+import {
+  canCancelIndividually,
+  resolveBookingRuntimeStatus,
+  type BookingRuntimeStatus,
+} from "@/lib/bookings/flow";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderContext } from "@/lib/master/access";
 import {
@@ -14,8 +22,9 @@ import {
 } from "@/lib/notifications/booking-notifications";
 import { prisma } from "@/lib/prisma";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import {
-  applyScheduleSnapshot,
+  applyScheduleSnapshotTx,
   buildScheduleSnapshot,
   normalizeBookingRules,
   normalizeExceptionInput,
@@ -23,6 +32,7 @@ import {
   normalizeSlotStepMin,
   normalizeVisibility,
   normalizeWeekScheduleInput,
+  SCHEDULE_SNAPSHOT_TX_OPTIONS,
   serializeScheduleState,
   toScheduleEditorRequestPayload,
   type BookingRulesDto,
@@ -100,10 +110,6 @@ type RouteResponse = ScheduleEditorSnapshot & {
 
 type ExceptionWithId = EditorExceptionInput & { id?: string };
 
-function isCancellableStatus(status: BookingRuntimeStatus): boolean {
-  return status === "PENDING" || status === "CONFIRMED" || status === "CHANGE_REQUESTED";
-}
-
 function isConflictStatus(status: BookingRuntimeStatus): boolean {
   return status !== "REJECTED" && status !== "FINISHED";
 }
@@ -144,6 +150,7 @@ async function listDayOffConflicts(input: {
       status: true,
       startAtUtc: true,
       endAtUtc: true,
+      bookingPackageId: true,
     },
     orderBy: { startAtUtc: "asc" },
   });
@@ -169,7 +176,16 @@ async function listDayOffConflicts(input: {
         clientName: row.clientName,
         status: runtimeStatus,
         timeLabel,
-        canCancel: isCancellableStatus(runtimeStatus),
+        // LOGIC-13: критерий тот же, по которому судит сама отмена. Пока он
+        // здесь был свой (только статус), компонент пакета помечался
+        // отменяемым — а `cancelBooking` бросает на нём 409
+        // `PACKAGE_CANCEL_WHOLE` (инв. #34), и цикл отмен падал уже после
+        // того, как соседние брони были отменены и клиентам ушли уведомления.
+        // Теперь `assertConflictResolution` отвечает отказом ДО первой отмены.
+        canCancel: canCancelIndividually({
+          status: runtimeStatus,
+          bookingPackageId: row.bookingPackageId,
+        }),
       };
     })
     .filter((item): item is DayOffConflictBooking => item !== null);
@@ -222,18 +238,20 @@ function assertConflictResolution(input: {
   }
 }
 
-async function cancelConflictingBookings(input: {
-  conflicts: DayOffConflictBooking[];
+/**
+ * LOGIC-13: побочные эффекты отмен — ПОСЛЕ коммита общей транзакции.
+ * Инвалидация слотов и системное сообщение в чат идут через общий
+ * `runCancelBookingSideEffects` (второй реализации быть не должно),
+ * уведомление клиенту — здесь, потому что оно специфично для этого пути.
+ */
+async function runConflictCancellationSideEffects(input: {
+  effects: CancelBookingSideEffects[];
   req: Request;
 }): Promise<void> {
-  for (const booking of input.conflicts) {
-    await cancelBooking({
-      bookingId: booking.id,
-      cancelledBy: "PROVIDER",
-      reason: "День отмечен выходным в расписании мастера",
-    });
+  for (const effects of input.effects) {
+    await runCancelBookingSideEffects(effects);
     try {
-      const fullBooking = await loadBookingWithRelations(booking.id);
+      const fullBooking = await loadBookingWithRelations(effects.bookingId);
       if (fullBooking && fullBooking.status === "REJECTED") {
         await notifyCancelledByMaster(fullBooking);
       }
@@ -597,6 +615,9 @@ export async function PATCH(req: Request) {
       return jsonOk(data);
     }
 
+    // Брони, которые день-выходной обязан отменить. Сами отмены — ниже, в той
+    // же транзакции, что и запись расписания (LOGIC-13).
+    let conflictsToCancel: DayOffConflictBooking[] = [];
     if (actor.mode === "SOLO_MASTER" && body.exception !== undefined) {
       const normalizedException = normalizeExceptionInput(body.exception);
       if (!normalizedException.isWorkday) {
@@ -608,7 +629,7 @@ export async function PATCH(req: Request) {
         if (conflicts.length > 0) {
           const resolution = parseDayOffConflictResolution(body.dayOffConflictResolution);
           assertConflictResolution({ conflicts, resolution });
-          await cancelConflictingBookings({ conflicts, req });
+          conflictsToCancel = conflicts;
         }
       }
     }
@@ -645,15 +666,40 @@ export async function PATCH(req: Request) {
       return jsonOk(data);
     }
 
-    await applyScheduleSnapshot(actor.providerId, {
-      weekSchedule: nextState.weekSchedule,
-      exceptions: nextState.exceptions,
-      slotStepMin: nextState.slotStepMin,
-      bufferBetweenBookingsMin: nextState.bufferBetweenBookingsMin,
-      bookingRules: settingsPatch.bookingRules,
-      visibility: settingsPatch.visibility,
-      hotSlots: settingsPatch.hotSlots,
-    });
+    // LOGIC-13: отмены конфликтующих броней и запись расписания — ОДНА
+    // транзакция. Раньше отмены шли простым циклом до `applyScheduleSnapshot`,
+    // и любой сбой между ними оставлял состояние, из которого нет выхода:
+    // брони отменены (клиентам ушли уведомления), а день остался рабочим —
+    // отката нет, повтор действия уже не найдёт что отменять.
+    const cancelEffects = await prisma.$transaction(async (tx) => {
+      const effects: CancelBookingSideEffects[] = [];
+      for (const booking of conflictsToCancel) {
+        const result = await cancelBookingInTx(tx, {
+          bookingId: booking.id,
+          cancelledBy: "PROVIDER",
+          reason: "День отмечен выходным в расписании мастера",
+        });
+        effects.push(result.sideEffects);
+      }
+
+      await applyScheduleSnapshotTx(tx, actor.providerId, {
+        weekSchedule: nextState.weekSchedule,
+        exceptions: nextState.exceptions,
+        slotStepMin: nextState.slotStepMin,
+        bufferBetweenBookingsMin: nextState.bufferBetweenBookingsMin,
+        bookingRules: settingsPatch.bookingRules,
+        visibility: settingsPatch.visibility,
+        hotSlots: settingsPatch.hotSlots,
+      });
+
+      return effects;
+    }, SCHEDULE_SNAPSHOT_TX_OPTIONS);
+
+    // Побочные эффекты — строго после коммита (то же правило, что внутри
+    // `applyScheduleSnapshot`: до коммита кэш сбрасывать не на что, а откат
+    // оставил бы его вычищенным под старые данные).
+    await invalidateSlotsForMaster(actor.providerId);
+    await runConflictCancellationSideEffects({ effects: cancelEffects, req });
 
     if (actor.mode === "STUDIO_ADMIN" && actor.studioProviderId) {
       try {

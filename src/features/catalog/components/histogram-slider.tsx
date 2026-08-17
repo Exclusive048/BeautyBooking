@@ -2,6 +2,7 @@
 
 import { useId, useMemo } from "react";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   /** Absolute min/max from the data set — slider domain. */
@@ -26,7 +27,7 @@ function formatRub(n: number): string {
  * Dual-thumb price range slider with a histogram backdrop.
  *
  * Histogram bars in the active range render with `bg-primary/55`; bars outside
- * use `bg-bg-muted/40` for a clear "unselected" affordance. The slider thumbs
+ * use `bg-muted/40` for a clear "unselected" affordance. The slider thumbs
  * are native `<input type="range">` overlaid on a custom track — clicks on the
  * histogram itself fall through to the underlying range inputs so the widget
  * behaves predictably with keyboard and pointer.
@@ -103,7 +104,7 @@ export function HistogramSlider({ min, max, value, onChange, distribution }: Pro
         />
         <input
           id={lowId}
-          aria-label="Минимальная цена"
+          aria-label={UI_TEXT.a11y.priceMin}
           type="range"
           min={min}
           max={max}
@@ -114,7 +115,7 @@ export function HistogramSlider({ min, max, value, onChange, distribution }: Pro
         />
         <input
           id={highId}
-          aria-label="Максимальная цена"
+          aria-label={UI_TEXT.a11y.priceMax}
           type="range"
           min={min}
           max={max}

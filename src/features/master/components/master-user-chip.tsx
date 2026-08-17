@@ -47,8 +47,20 @@ export function MasterUserChip({
       )
     : PLAN_LABEL[planTier];
 
+  const initialsAvatar = (
+    <span
+      aria-hidden
+      className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-bg-input text-xs font-semibold text-text-sec ring-1 ring-border-subtle"
+    >
+      {initialsOf(name)}
+    </span>
+  );
+
   return (
     <div className="flex items-center gap-3 border-t border-border-subtle px-4 py-3">
+      {/* RES-30: инициалы — замена на ЛЮБОЕ «фото показать нечем», а не только
+          на `avatarUrl === null`. Раньше битый или неоптимизируемый URL давал
+          картинку-плейсхолдер портфолио внутри круглого аватара. */}
       {avatarUrl ? (
         <ResilientImage
           src={avatarUrl}
@@ -56,14 +68,10 @@ export function MasterUserChip({
           width={36}
           height={36}
           className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-border-subtle"
+          fallback={initialsAvatar}
         />
       ) : (
-        <span
-          aria-hidden
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-bg-input text-xs font-semibold text-text-sec ring-1 ring-border-subtle"
-        >
-          {initialsOf(name)}
-        </span>
+        initialsAvatar
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-text-main">{name}</p>

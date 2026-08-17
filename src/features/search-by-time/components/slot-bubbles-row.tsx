@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { AvailabilitySlotPreview } from "@/lib/search-by-time/types";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { providerPublicUrl, withQuery } from "@/lib/public-urls";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   provider: { id: string; publicUsername: string | null };
@@ -44,7 +45,7 @@ export function SlotBubblesRow({ provider, serviceId, slots }: Props) {
             key={slot.startAtUtc}
             href={buildSlotHref(provider, serviceId, slot.startAtUtc)}
             className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-card/65 px-3 py-1 text-xs font-medium text-text-main transition hover:bg-bg-card"
-            aria-label={`Записаться на ${slot.label}`}
+            aria-label={UI_TEXT.a11y.bookAtSlot(slot.label)}
           >
             <span>{slot.label}</span>
             {discount ? <span className="text-[10px] text-emerald-400">{discount}</span> : null}

@@ -19,7 +19,7 @@ export function TrialPromoBlock({ scope }: Props) {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-10">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/8 via-bg-card/50 to-primary-magenta/8 p-8 text-center sm:p-10">
+      <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/[0.08] via-bg-card/50 to-primary-magenta/[0.08] p-8 text-center sm:p-10">
         <Sparkles
           aria-hidden
           className="pointer-events-none absolute right-6 top-6 h-7 w-7 text-accent-text/30"

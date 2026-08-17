@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactElement } from "react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Check, User, Scissors, Building2, UserPlus, X, LogOut } from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
 import { useActiveRole, type ActiveRole } from "@/lib/hooks/use-active-role";
 import { UI_TEXT } from "@/lib/ui/text";
+import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 const t = UI_TEXT.nav;
@@ -144,6 +146,16 @@ function RoleSwitcherDrawer({
   const { activeRole, setRole, availableRoles, hasMaster, hasStudio } = useActiveRole();
   const router = useRouter();
   const reduce = useReducedMotion();
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetTitleId = useId();
+
+  // UI-13 — модальный bottom-sheet с переключателем ролей, а не «подложка
+  // навигации»: в exempt-листе ESLint так классифицирован СКРИМ, и на сам
+  // лист классификация не распространялась. Не было ни `role="dialog"`, ни
+  // Escape, ни focus-trap, ни блокировки прокрутки фона — Tab уходил на
+  // страницу под листом, колесо прокручивало её же. Контракт взят общий,
+  // разметка и анимация не тронуты.
+  useOverlayA11y({ open, onClose, containerRef: sheetRef });
 
   const switchTo = (role: ActiveRole) => {
     setRole(role);
@@ -171,6 +183,11 @@ function RoleSwitcherDrawer({
             animate={reduce ? { y: 0 } : { y: 0 }}
             exit={reduce ? { y: "100%" } : { y: "100%" }}
             transition={reduce ? { duration: 0 } : { type: "spring", damping: 30, stiffness: 340 }}
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={sheetTitleId}
+            tabIndex={-1}
             className="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
@@ -181,15 +198,22 @@ function RoleSwitcherDrawer({
 
             {/* Header */}
             <div className="flex items-center justify-between px-5 pb-3 pt-1">
-              <span className="text-sm font-semibold text-text-main">{t.roleSwitcherTitle}</span>
-              <button
-                type="button"
+              <span id={sheetTitleId} className="text-sm font-semibold text-text-main">{t.roleSwitcherTitle}</span>
+              {/* UI-26: `ghost` + `size="icon"` вместо сырого <button> —
+                  зона нажатия приходит из UI-29 (40px бокс + after:-inset-1 =
+                  46 эффективных), прежние `-m-2 p-3.5` её эмулировали руками.
+                  `text-text-sec` в className побеждает `text-text-main` варианта
+                  (замер бандла: `.text-text-main` 6041 < `.text-text-sec` 6064),
+                  поэтому кнопка остаётся тихой. */}
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={onClose}
-                className="rounded-lg p-1.5 text-text-sec hover:text-text-main"
-                aria-label="Закрыть"
+                className="-mr-2 text-text-sec hover:text-text-main"
+                aria-label={UI_TEXT.common.close}
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             {/* Role list — only shown if 2+ roles */}
@@ -202,9 +226,10 @@ function RoleSwitcherDrawer({
                   const isActive = role === activeRole;
                   const Icon = role === "CLIENT" ? User : role === "MASTER" ? Scissors : Building2;
                   return (
-                    <button
+                    <Button
                       key={role}
-                      type="button"
+                      variant="wrapper"
+                      size="none"
                       onClick={() => switchTo(role)}
                       className={cn(
                         "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
@@ -216,7 +241,7 @@ function RoleSwitcherDrawer({
                       <Icon className="h-4 w-4 shrink-0" />
                       <span className="flex-1 text-left">{ROLE_LABELS[role]}</span>
                       {isActive ? <Check className="h-4 w-4 shrink-0" /> : null}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -279,6 +304,7 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
   const { activeRole, availableRoles, hydrated } = useActiveRole();
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
+
   const isAdmin = user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPERADMIN");
   const isGuest = !user;
   const isLoggedIn = Boolean(user);
@@ -323,6 +349,7 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
       <RoleSwitcherDrawer open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       <nav
+        aria-label={UI_TEXT.a11y.mainNav}
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-bg-card/95 shadow-card backdrop-blur lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
@@ -350,15 +377,16 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
 
           {/* Role switcher tab — only when user has multiple roles */}
           {showSwitcher ? (
-            <button
-              type="button"
+            <Button
+              variant="wrapper"
+              size="none"
               onClick={() => setSwitcherOpen(true)}
               className="flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] text-text-sec transition hover:text-text-main"
               aria-label={t.switchRole}
             >
               <IconSwitch className="h-5 w-5" />
               <span className="font-medium">{ROLE_LABELS[activeRole]}</span>
-            </button>
+            </Button>
           ) : null}
         </div>
       </nav>

@@ -1,6 +1,13 @@
-import { Prisma } from "@prisma/client";
+import { BookingSource, Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
-import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import {
+  buildConflictScopeWhere,
+  buildConflictWindowWhere,
+  normalizeBufferMinutes,
+} from "@/lib/bookings/booking-core";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
 import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
@@ -8,12 +15,10 @@ import {
   assertMasterPerformsService,
   assertWithinMasterWorkHours,
   resolveSalonLocalParts,
-  type MasterWorkWindow,
 } from "@/lib/bookings/policy-enforcement";
 import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
-import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
-import { timeToMinutes } from "@/lib/schedule/time";
+import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { resolveMoveDurationMin, resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
@@ -26,101 +31,6 @@ import { invalidateAdvisorCache } from "@/lib/advisor/cache";
  * Vision-template hours (Mon-Sat 10:00-19:00) so a brand-new studio
  * master doesn't accept arbitrary times silently.
  */
-const DEFAULT_WORK_START_MIN = 10 * 60; // 10:00
-const DEFAULT_WORK_END_MIN = 19 * 60; // 19:00
-/** Sunday off, Mon-Sat working. JS Date.getUTCDay() / getDay(): 0 = Sun. */
-const DEFAULT_ACTIVE_DAYS = new Set([1, 2, 3, 4, 5, 6]);
-
-/**
- * STUDIO-RESCHEDULE-VALIDATION-A — resolves the target master's work
- * window for a given weekday by reading the `WeeklyScheduleConfig` +
- * `ScheduleOverride` for the requested date. Returns a normalized
- * `MasterWorkWindow` consumed by the pure
- * `assertWithinMasterWorkHours` helper.
- *
- * Override semantics:
- *   - if a `ScheduleOverride` row exists for `dateKey`, use it
- *     (handles holidays / one-off day-offs / different hours that
- *     day);
- *   - else fall back to the `WeeklyScheduleDay` for `weekday`;
- *   - else fall back to the project-wide defaults above.
- *
- * Per-day overrides take precedence over the weekly config — matches
- * what the schedule engine does at slot-build time.
- *
- * FIX-R2-04-B: `weekday` (0=Sun..6=Sat) and `dateKey` (YYYY-MM-DD) are
- * now SALON-LOCAL (derived by `resolveSalonLocalParts` against the
- * master's tz), not UTC-derived from the instant. For a non-UTC studio
- * a real-UTC instant near local midnight resolves to a different
- * UTC day/date than its salon-local day/date — reading them in UTC
- * looked up the wrong weekly day / override row. The `date: dateKey`
- * query still matches the UTC-midnight-stored override (overrides are
- * persisted at `Date.UTC(y,m,d,0,0,0)` of the local dateKey), exactly
- * as the engine buckets them via `toLocalDateKey(row.date, tz)`.
- */
-async function resolveMasterWorkWindow(
-  masterProviderId: string,
-  weekday: number,
-  dateKey: string,
-): Promise<MasterWorkWindow> {
-  // FIX-R2-04-B: `ScheduleOverride.date` is a DateTime stored at
-  // UTC-midnight of the salon-local date key (editor `saveException`
-  // writes `parseDateKeyToUtcStart(dateKey)`; the engine matches via
-  // `toLocalDateKey(row.date, tz)`). A bare "YYYY-MM-DD" string is
-  // rejected by Prisma 6 ("Expected ISO-8601 DateTime") — the prior
-  // `date: dateKey` (string) form threw `PrismaClientValidationError`
-  // whenever this resolver ran. Convert the salon-local dateKey to the
-  // exact stored instant so the override point-lookup actually matches.
-  const overrideDate = parseDateKeyToUtcStart(dateKey);
-  const [override, weeklyDay] = await Promise.all([
-    prisma.scheduleOverride.findFirst({
-      where: { providerId: masterProviderId, date: overrideDate },
-      include: { template: { select: { startLocal: true, endLocal: true } } },
-    }),
-    prisma.weeklyScheduleDay.findFirst({
-      where: { config: { providerId: masterProviderId }, weekday },
-      include: { template: { select: { startLocal: true, endLocal: true } } },
-    }),
-  ]);
-
-  if (override) {
-    if (override.isDayOff) {
-      return { isActive: false, startMinutes: null, endMinutes: null };
-    }
-    const startStr = override.startLocal ?? override.template?.startLocal ?? null;
-    const endStr = override.endLocal ?? override.template?.endLocal ?? null;
-    if (startStr && endStr) {
-      return {
-        isActive: true,
-        startMinutes: timeToMinutes(startStr),
-        endMinutes: timeToMinutes(endStr),
-      };
-    }
-  }
-
-  if (weeklyDay) {
-    if (!weeklyDay.isActive) {
-      return { isActive: false, startMinutes: null, endMinutes: null };
-    }
-    const startStr = weeklyDay.template?.startLocal ?? null;
-    const endStr = weeklyDay.template?.endLocal ?? null;
-    if (startStr && endStr) {
-      return {
-        isActive: true,
-        startMinutes: timeToMinutes(startStr),
-        endMinutes: timeToMinutes(endStr),
-      };
-    }
-  }
-
-  // No config — fall back to project-wide default (Mon-Sat 10-19).
-  return {
-    isActive: DEFAULT_ACTIVE_DAYS.has(weekday),
-    startMinutes: DEFAULT_ACTIVE_DAYS.has(weekday) ? DEFAULT_WORK_START_MIN : null,
-    endMinutes: DEFAULT_ACTIVE_DAYS.has(weekday) ? DEFAULT_WORK_END_MIN : null,
-  };
-}
-
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
 
@@ -245,15 +155,32 @@ export async function createStudioBooking(input: {
   // yet at create time).
   let created: { id: string };
   try {
-    created = await prisma.$transaction(
+    created = await bookingTransaction(
       async (tx) => {
+        // LOGIC-01: скоуп — из общего билдера. Пара `(providerId студии,
+        // masterProviderId)` не видела брони ТОГО ЖЕ мастера, созданные через
+        // его личный профиль (`providerId = мастер`), поэтому админ студии
+        // создавал бронь поверх существующей БЕЗ всякой гонки — у этого пути
+        // вдобавок нет предварительной availability-проверки, и in-tx предикат
+        // был его единственной защитой.
+        // LOGIC-17: окно обязательно. Без него запрос забирает всю историю
+        // броней мастера и внутри Serializable ставит predicate-lock на неё
+        // целиком — любая параллельная запись того же мастера, хоть на
+        // следующий год, становилась кандидатом на P2034 и получала ложный
+        // 409 SLOT_CONFLICT. Границы — из того же билдера, что у
+        // `ensureNoConflicts`, иначе сужение запроса начнёт терять конфликты.
         const conflicts = await tx.booking.findMany({
           where: {
-            providerId: studio.providerId,
-            masterProviderId: master.id,
+            ...buildConflictScopeWhere({
+              providerId: studio.providerId,
+              masterProviderId: master.id,
+            }),
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            startAtUtc: { not: null },
-            endAtUtc: { not: null },
+            ...buildConflictWindowWhere({
+              startAtUtc: input.startAt,
+              endAtUtc: endAt,
+              bufferMin: buffer,
+            }),
           },
           select: { startAtUtc: true, endAtUtc: true },
         });
@@ -283,10 +210,11 @@ export async function createStudioBooking(input: {
           endAtUtc: endAt,
         });
 
-        const booking = await tx.booking.create({
+        const booking = await createBookingRow(tx, {
           data: {
             providerId: studio.providerId,
-            studioId: studio.id,
+            // FIX-C1: `studioId` выводит writer из `providerId` — здесь это
+            // `studio.providerId`, то есть тот же `studio.id`, что стоял раньше.
             serviceId: service.id,
             masterProviderId: master.id,
             masterId: master.id,
@@ -300,7 +228,9 @@ export async function createStudioBooking(input: {
             notes: input.notes?.trim() || null,
             status: "PENDING",
             actionRequiredBy: "MASTER",
-            source: "MANUAL",
+            // Администратор студии заносит запись, полученную вне сайта
+            // (звонок / визит) — MANUAL здесь и есть правда.
+            source: BookingSource.MANUAL,
           },
           select: { id: true },
         });
@@ -318,7 +248,7 @@ export async function createStudioBooking(input: {
 
         return booking;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
     );
   } catch (error) {
     // A true-concurrent create race surfaces under Serializable as a
@@ -509,16 +439,25 @@ export async function moveStudioBooking(input: {
   // (`id: { not: booking.id }`) is preserved so a shift that overlaps
   // the booking's OWN current slot doesn't false-conflict.
   try {
-    await prisma.$transaction(
+    await bookingTransaction(
       async (tx) => {
+        // LOGIC-01: тот же скоуп, что у create. Exclude-self сохранён — при
+        // переносе бронь ещё занимает свой старый слот.
         const conflicts = await tx.booking.findMany({
           where: {
-            providerId: booking.providerId,
-            masterProviderId: input.targetMasterId,
+            ...buildConflictScopeWhere({
+              providerId: booking.providerId,
+              masterProviderId: input.targetMasterId,
+            }),
             id: { not: booking.id },
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            startAtUtc: { not: null },
-            endAtUtc: { not: null },
+            // LOGIC-17: см. комментарий у create — без окна predicate-lock
+            // накрывает всю историю броней целевого мастера.
+            ...buildConflictWindowWhere({
+              startAtUtc: newStart,
+              endAtUtc: newEnd,
+              bufferMin: buffer,
+            }),
           },
           select: { id: true, startAtUtc: true, endAtUtc: true },
         });
@@ -587,7 +526,8 @@ export async function moveStudioBooking(input: {
           }
         }
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31). Путь переноса
+      // прежний сторож тоже не видел — повторная проверка здесь своя.
     );
   } catch (error) {
     // A true-concurrent move/create race surfaces under Serializable as
@@ -645,6 +585,9 @@ export async function updateMasterBookingStatus(input: {
       status: true,
       startAtUtc: true,
       endAtUtc: true,
+      // LOGIC-04: принадлежность пакету — guard «пакет отменяется целиком»
+      // (инв. #34) стоял только на клиентском пути.
+      bookingPackageId: true,
       requestedBy: true,
       actionRequiredBy: true,
     },
@@ -674,7 +617,18 @@ export async function updateMasterBookingStatus(input: {
     throw new AppError("Запись уже завершена — изменить её нельзя.", 409, "VALIDATION_ERROR");
   }
 
-  if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
+  // LOGIC-05: «не пришёл» — единственное действие, для которого наступившее
+  // время приёма не помеха, а ПРЕДПОСЫЛКА. Общий гейт отбивал его 409 ровно в
+  // тот момент, когда оно только и имеет смысл, а до начала приёма — пропускал.
+  // Мастер физически не мог отметить неявку: метрика неявок всегда нулевая,
+  // политика поздних отмен опиралась на статус, который не проставляется.
+  const isNoShowAction = input.status === "NO_SHOW";
+
+  if (isNoShowAction) {
+    if (runtimeStatus === "PENDING" || runtimeStatus === "CONFIRMED" || runtimeStatus === "CHANGE_REQUESTED") {
+      throw new AppError("Приём ещё не начался — отметить неявку нельзя.", 409, "CONFLICT");
+    }
+  } else if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
     throw new AppError("Запись уже началась.", 409, "CONFLICT");
   }
 
@@ -694,6 +648,28 @@ export async function updateMasterBookingStatus(input: {
     return declineClientRescheduleRequest(booking.id, "MASTER");
   }
 
+  // LOGIC-04: компонент пакета нельзя отменить в одиночку — ни клиентом, ни
+  // мастером. Клиентский путь (`cancelBooking`) это проверял, мастерский —
+  // параллельная реализация, до `cancelBooking` не доходящая вовсе, — не
+  // проверял, и пакет оставался ACTIVE с одним REJECTED-ребёнком: Σ child
+  // `priceSnapshot` переставала сходиться с `totalKopeks`, то есть клиент
+  // платил пакетную скидку за услуги, часть которых отменена.
+  //
+  // Отказ, а не «отменить пакет целиком за мастера»: «отмена только целиком,
+  // не по частям» — ратифицированное продуктовое решение (§1 контекста,
+  // инв. #34), а тихая отмена ОСТАЛЬНЫХ компонентов по клику «отменить эту
+  // запись» была бы новым поведением, которого мастер не запрашивал. Текст и
+  // код ответа — те же, что на клиентском пути.
+  //
+  // `NO_SHOW` намеренно НЕ гейтится: неявка на один компонент — законный исход
+  // (клиент пришёл на первую услугу и не пришёл на вторую), она ничего не
+  // отменяет и Σ снапшотов не трогает.
+  if ((isRejectAction || isCancelAction) && booking.bookingPackageId) {
+    throw new AppError("Этот пакет отменяется целиком.", 409, "PACKAGE_CANCEL_WHOLE", {
+      bookingPackageId: booking.bookingPackageId,
+    });
+  }
+
   if (isRejectAction || isCancelAction) {
     ensureBookingActionWindow(booking.startAtUtc);
   }
@@ -703,19 +679,34 @@ export async function updateMasterBookingStatus(input: {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updated = await tx.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: input.status,
-        cancelledBy: "PROVIDER",
-        cancelReason: comment || null,
-        cancelledAtUtc: new Date(),
-        requestedBy: "MASTER",
-        actionRequiredBy: null,
-        proposedStartAt: null,
-        proposedEndAt: null,
-        changeComment: comment || null,
-      },
+    // LOGIC-02: переход только из наблюдённого статуса.
+    const updated = await applyBookingTransition(tx, {
+      id: booking.id,
+      expectedStatus: booking.status,
+      // LOGIC-05: неявка — не отмена. `cancelledBy`/`cancelReason`/
+      // `cancelledAtUtc` проставлялись безусловно, из-за чего `NO_SHOW` был
+      // неотличим от «отменил мастер» в любом отчёте, который смотрит на эти
+      // поля. Для неявки пишется только статус и служебные сбросы.
+      data: isNoShowAction
+        ? {
+            status: input.status,
+            requestedBy: "MASTER",
+            actionRequiredBy: null,
+            proposedStartAt: null,
+            proposedEndAt: null,
+            changeComment: comment || null,
+          }
+        : {
+            status: input.status,
+            cancelledBy: "PROVIDER",
+            cancelReason: comment || null,
+            cancelledAtUtc: new Date(),
+            requestedBy: "MASTER",
+            actionRequiredBy: null,
+            proposedStartAt: null,
+            proposedEndAt: null,
+            changeComment: comment || null,
+          },
       select: { id: true, status: true },
     });
 

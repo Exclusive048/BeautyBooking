@@ -84,7 +84,6 @@ export async function updateMeProfile(
   const updated = await prisma.userProfile.update({
     where: { id: userId },
     data: {
-      displayName: input.displayName,
       // `phone` is intentionally NOT written here — it is removed from the
       // accepted schema (SECURITY-EXPOSURE-AUDIT-01 #2). Phone is set only via
       // the OTP-verified login flow.
@@ -96,7 +95,6 @@ export async function updateMeProfile(
       firstName: input.firstName,
       lastName: input.lastName,
       middleName: input.middleName,
-      address: input.address,
       ...(input.emailNotificationsEnabled !== undefined
         ? { emailNotificationsEnabled: input.emailNotificationsEnabled }
         : {}),

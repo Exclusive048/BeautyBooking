@@ -9,6 +9,14 @@ export type MeIdentity = {
   email: string | null;
   externalPhotoUrl: string | null;
   emailNotificationsEnabled: boolean;
+  /**
+   * FIX-B5 (вариант B): адрес от OAuth — ЗАЯВКА, не владение, поэтому
+   * кабинету нужно знать состояние, чтобы честно сказать «письма не дойдут».
+   * ОПЦИОНАЛЬНОЕ намеренно: кэш `MeIdentity` живёт 30 с, и в окне после
+   * деплоя старый кадр поля не несёт. Потребители обязаны трактовать
+   * `undefined` как «не знаю» и НЕ нагнетать: отказ в сторону тишины.
+   */
+  emailVerified?: boolean;
   pushNotificationsEnabled: boolean;
 };
 
@@ -41,6 +49,7 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
       email: true,
       externalPhotoUrl: true,
       emailNotificationsEnabled: true,
+      emailVerifiedAt: true,
       pushNotificationsEnabled: true,
       isDeleted: true,
     },
@@ -55,6 +64,7 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
     email: profile.email,
     externalPhotoUrl: profile.externalPhotoUrl,
     emailNotificationsEnabled: profile.emailNotificationsEnabled,
+    emailVerified: profile.emailVerifiedAt !== null,
     pushNotificationsEnabled: profile.pushNotificationsEnabled,
   };
 }

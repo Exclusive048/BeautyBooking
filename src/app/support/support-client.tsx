@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -142,7 +143,12 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
         body: formData,
       });
 
-      let payload: { ok?: boolean; error?: string } | null = null;
+      // FIX-B18: роут переведён на конверт проекта, поэтому текст лежит в
+      // `error.message`, а не в `error`. Это единственный клиент, который
+      // читал старую форму (партнёрская форма тело отказа не смотрит вовсе),
+      // и без этой правки пользователь увидел бы дефолтную строку вместо
+      // курируемой — то есть регрессию, невидимую для сервера.
+      let payload: { ok?: boolean; error?: { message?: string } } | null = null;
       try {
         payload = await res.json();
       } catch {
@@ -155,7 +161,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
       }
 
       if (!res.ok || !payload?.ok) {
-        setError(payload?.error ?? UI_TEXT.pages.support.form.errorSendFailed);
+        setError(payload?.error?.message ?? UI_TEXT.pages.support.form.errorSendFailed);
         return;
       }
 
@@ -366,12 +372,11 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
         htmlFor={consentId}
         className="flex cursor-pointer items-start gap-2.5 text-sm leading-relaxed text-text-sec"
       >
-        <input
+        <Checkbox
           id={consentId}
-          type="checkbox"
           checked={consent}
           onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+          className="mt-0.5"
           required
         />
         <span>

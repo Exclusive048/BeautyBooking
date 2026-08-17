@@ -22,6 +22,35 @@ describe("profileUpdateSchema — phone is not an accepted field", () => {
   });
 });
 
+/**
+ * LOGIC-24 — три слоя утверждали разное: схема описывала `displayName` и
+ * `address`, роут вырезал их ДВАЖДЫ (из сырого тела и из результата разбора), а
+ * `updateMeProfile` их писал. Клиент получал `200 OK` на операцию, которой не
+ * было. Решение «эти поля здесь не пишутся» сохранено — убрана его тройная
+ * противоречивая запись.
+ */
+describe("profileUpdateSchema — displayName и address не принимаются (LOGIC-24)", () => {
+  it("отбрасывает их ключи, как и phone", async () => {
+    const { profileUpdateSchema } = await import("@/lib/users/schemas");
+    const parsed = profileUpdateSchema.parse({
+      displayName: "Новое имя",
+      address: "Москва, ул. Пушкина, 1",
+      firstName: "Иван",
+    });
+    expect(parsed).not.toHaveProperty("displayName");
+    expect(parsed).not.toHaveProperty("address");
+    expect(parsed.firstName).toBe("Иван"); // остальные поля не задеты
+  });
+
+  it("роут не держит собственных зачисток — иначе слои снова разойдутся", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const source = readFileSync(resolve(process.cwd(), "src/app/api/me/route.ts"), "utf8");
+    expect(source).not.toMatch(/delete\s+\w+\.displayName/);
+    expect(source).not.toMatch(/delete\s+\w+\.address/);
+  });
+});
+
 describe("updateMeProfile — email change resets emailVerifiedAt, no phone write", () => {
   const update = vi.hoisted(() => vi.fn());
 
@@ -77,5 +106,18 @@ describe("updateMeProfile — email change resets emailVerifiedAt, no phone writ
     await updateMeProfile("u1", { email: "new@example.com", firstName: "Пётр" } as never);
     const data = update.mock.calls[0][0].data;
     expect(data).not.toHaveProperty("phone");
+  });
+
+  it("не пишет displayName и address даже если они дошли до входа (LOGIC-24)", async () => {
+    const { updateMeProfile } = await loadWithMocks();
+    await updateMeProfile("u1", {
+      firstName: "Пётр",
+      displayName: "Новое имя",
+      address: "Москва",
+    } as never);
+    const data = update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty("displayName");
+    expect(data).not.toHaveProperty("address");
+    expect(data.firstName).toBe("Пётр");
   });
 });

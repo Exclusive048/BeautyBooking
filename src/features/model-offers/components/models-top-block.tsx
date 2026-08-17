@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { CompactHero } from "@/features/model-offers/components/compact-hero";
 import { markModelsIntroSeen } from "@/lib/model-offers/intro-seen-action";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import type { ModelOfferUserState } from "@/lib/model-offers/user-state";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -70,7 +71,7 @@ export function ModelsTopBlock({ userState, children }: Props) {
       // Wait for the AnimatePresence child to mount before scrolling so the
       // browser has a target to scroll to.
       requestAnimationFrame(() => {
-        educationalRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        educationalRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
       });
     }
   };

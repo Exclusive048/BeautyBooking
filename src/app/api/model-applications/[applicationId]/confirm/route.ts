@@ -1,4 +1,6 @@
-import { AccountType, Prisma } from "@prisma/client";
+import { AccountType, BookingSource } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -12,6 +14,8 @@ import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { prisma } from "@/lib/prisma";
 import { prismaDirect } from "@/lib/prisma-direct";
@@ -216,7 +220,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const safePrice = Number.isFinite(priceValue) && priceValue > 0 ? priceValue : 0;
 
     let siblingCascadeIds: string[] = [];
-    const bookingId = await prismaDirect.$transaction(
+    const bookingId = await bookingTransaction(
       async (tx) => {
         const [offerRow, appRow] = await Promise.all([
           tx.modelOffer.findUnique({
@@ -250,9 +254,13 @@ export async function POST(req: Request, ctx: RouteContext) {
         const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
         const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
 
-        const conflictWhere = application.offer.masterId
-          ? { providerId: offerService.providerId, masterProviderId: application.offer.masterId }
-          : { providerId: offerService.providerId };
+        // LOGIC-01: скоуп — из общего билдера. Собственная пара
+        // `(providerId, masterProviderId)` не видела брони того же мастера,
+        // созданные под другим `providerId` (личный профиль ↔ студия).
+        const conflictWhere = buildConflictScopeWhere({
+          providerId: offerService.providerId,
+          masterProviderId: application.offer.masterId ?? null,
+        });
 
         const conflicts = await tx.booking.findMany({
           where: {
@@ -275,7 +283,28 @@ export async function POST(req: Request, ctx: RouteContext) {
           throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
         }
 
-        const booking = await tx.booking.create({
+        // LOGIC-06: пятый путь создания брони пропускал guard объявленного
+        // отсутствия мастера. `FIX-TIMEBLOCK-ENFORCEMENT-01` объявляет
+        // `assertNoTimeBlockConflict` «ONE primitive reused at every create/move
+        // site» (`time-blocks.ts:22-25`) — этот сайт был единственным
+        // пропущенным, и подтверждение модель-оффера сажало бронь внутрь
+        // BREAK/BLOCK: мастер видел в календаре блок и бронь поверх него.
+        //
+        // Владелец блока — исполняющий мастер: `masterProviderId`, а для оффера
+        // без назначенного мастера — `providerId` (ровно как в
+        // `ensureNoConflicts`, чтобы определение владельца не разошлось).
+        await assertNoTimeBlockConflict(tx, {
+          masterProviderId: application.offer.masterId ?? offerService.providerId,
+          startAtUtc,
+          endAtUtc,
+        });
+
+        // FIX-C1: третий путь, не выставлявший `Booking.studioId`. Он был
+        // особенно легко пропускаем: `studioId` в этом блоке ЕСТЬ — но у
+        // соседнего `bookingServiceItem.create` (строкой ниже), а это другая
+        // таблица со своей одноимённой колонкой. Греп по файлу находил слово и
+        // успокаивал. Теперь значение выводит writer из `providerId`.
+        const booking = await createBookingRow(tx, {
           data: {
             providerId: offerService.providerId,
             serviceId: offerService.id,
@@ -291,7 +320,7 @@ export async function POST(req: Request, ctx: RouteContext) {
             clientUserId: user.id,
             status: "CONFIRMED",
             actionRequiredBy: null,
-            source: "WEB",
+            source: BookingSource.WEB,
           },
           select: { id: true },
         });
@@ -359,7 +388,10 @@ export async function POST(req: Request, ctx: RouteContext) {
 
         return booking.id;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31). Клиент здесь
+      // прямой (обход пула) — единственная причина, по которой у обёртки вообще
+      // есть параметр `client`.
+      { client: prismaDirect },
     );
 
     const fullApplication = await loadApplicationWithRelations(application.id);

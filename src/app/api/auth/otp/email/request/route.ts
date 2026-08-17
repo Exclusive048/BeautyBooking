@@ -6,6 +6,7 @@ import { withRequestContext } from "@/lib/api/with-request-context";
 import { formatZodError } from "@/lib/api/validation";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpEmailRequestRateLimit } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { otpEmailRequestSchema } from "@/lib/auth/schemas";
 import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
 import { buildOtpEmailHtml, buildOtpEmailText } from "@/lib/email/templates/otp-code";
@@ -13,6 +14,7 @@ import { logInfo } from "@/lib/logging/logger";
 import { maskEmail } from "@/lib/logging/masking";
 import { isEmailAuthEnabled, isProduction } from "@/lib/env";
 import { extractClientIp } from "@/lib/http/ip";
+import { observeAuthClientIp } from "@/lib/http/proxy-trust";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -36,12 +38,12 @@ export async function POST(req: Request) {
     const { email } = parsed.data;
     const normalizedEmail = email.toLowerCase();
 
+    // FIX-B17: см. телефонный близнец — наблюдение до лимитера, чтобы отказы
+    // самого лимитера не выключали детектор.
+    observeAuthClientIp(req, normalizedEmail);
     const rateLimit = await checkOtpEmailRequestRateLimit({ email: normalizedEmail, ip: extractClientIp(req) });
     if (!rateLimit.ok) {
-      return NextResponse.json(
-        { error: rateLimit.error, retryAfterSec: rateLimit.retryAfterSec },
-        { status: rateLimit.status, headers: { "Retry-After": String(rateLimit.retryAfterSec) } }
-      );
+      return otpRateLimitFail(rateLimit);
     }
 
     const code = generateOtpCode();

@@ -1,5 +1,6 @@
 import "server-only"; // GUARDRAILS-01: hard-fail the build if this ever reaches a client bundle
 import { PrismaClient } from "@prisma/client";
+import { withStatementTimeout } from "@/lib/prisma-datasource";
 
 const globalForPrisma = globalThis as typeof globalThis & {
   __beautyhubPrisma?: PrismaClient;
@@ -7,6 +8,8 @@ const globalForPrisma = globalThis as typeof globalThis & {
 
 const createPrismaClient = (): PrismaClient =>
   new PrismaClient({
+    // RES-24: верхняя граница одного запроса; `undefined` = datasource из схемы
+    datasourceUrl: withStatementTimeout(process.env.DATABASE_URL),
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 

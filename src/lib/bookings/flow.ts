@@ -110,3 +110,23 @@ export function canCancelOrReschedule(status: BookingStatus): boolean {
   const normalized = normalizeBookingStatus(status);
   return normalized === "PENDING" || normalized === "CONFIRMED";
 }
+
+/**
+ * LOGIC-13: может ли бронь быть отменена ОДИНОЧНОЙ отменой (`cancelBooking`).
+ *
+ * Существует, чтобы поверхности, которые ПОКАЗЫВАЮТ список отменяемых броней,
+ * отвечали ровно то же, что ответит сама отмена. Компонент пакета отменяется
+ * только целиком (инв. #34), и `cancelBooking` бросает на нём 409
+ * `PACKAGE_CANCEL_WHOLE`; поверхность, судящая только по статусу, обещает
+ * отмену, которой не будет, — и вызывающий узнаёт об этом уже посреди цикла
+ * отмен.
+ */
+export function canCancelIndividually(input: {
+  status: BookingRuntimeStatus;
+  bookingPackageId: string | null;
+}): boolean {
+  if (input.bookingPackageId !== null) return false;
+  return (
+    input.status === "PENDING" || input.status === "CONFIRMED" || input.status === "CHANGE_REQUESTED"
+  );
+}

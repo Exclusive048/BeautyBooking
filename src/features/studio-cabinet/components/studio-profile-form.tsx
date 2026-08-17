@@ -2,7 +2,7 @@
 
 import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useRef, type Ref, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useRef, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SocialLinkPreview } from "@/components/ui/social-link-preview";
@@ -34,8 +34,12 @@ type Props = {
   onVkChange: (value: string) => void;
 };
 
-const inputClass =
-  "border border-white/10 bg-white/6 focus-visible:border-white/20 focus-visible:ring-0";
+// UI-32: своих focus-состояний класс не задаёт намеренно. `focus-visible:ring-0`
+// гасил кольцо `.lux-input:focus-visible` (утилита бьёт слой компонентов), а
+// заменой служил переход бордера `white/10 → white/20` — дельта в 10% альфы,
+// кратно ниже 3:1. Оба переопределения сняты: фокус выглядит так же, как во
+// всех остальных полях продукта.
+const inputClass = "border border-white/10 bg-white/[0.06]";
 
 export function StudioProfileForm({
   name,
@@ -62,6 +66,7 @@ export function StudioProfileForm({
   onVkChange,
 }: Props) {
   const studioFormText = UI_TEXT.studio.profileForm;
+  const addressInputId = useId();
   const addressStatusTone =
     addressStatus?.tone === "success"
       ? "text-emerald-600 dark:text-emerald-400"
@@ -180,13 +185,16 @@ export function StudioProfileForm({
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-text-label">{studioFormText.addressLabel}</div>
+            <label htmlFor={addressInputId} className="block text-xs font-medium text-text-label">
+              {studioFormText.addressLabel}
+            </label>
             <div ref={addressSuggestRootRef} className="relative">
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center">
                   <MapPin className="h-4 w-4 text-text-sec" />
                 </div>
                 <input
+                  id={addressInputId}
                   ref={addressInputRef}
                   type="text"
                   value={address}

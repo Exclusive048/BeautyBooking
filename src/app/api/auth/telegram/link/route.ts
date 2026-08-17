@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { jsonFail, jsonOk } from "@/lib/api/contracts";
-import { toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { telegramLoginSchema } from "@/lib/auth/schemas";
 import { verifyTelegramLogin } from "@/lib/auth/telegram";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
-import { parseBody } from "@/lib/validation";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -21,103 +19,27 @@ function isAuthDateFresh(authDate: number, nowSeconds: number): boolean {
 }
 
 /**
- * Link-only Telegram endpoint for the cabinet profile flow. Validates the
- * widget hash with the bot token, then attaches the Telegram identity to
- * the **already-authenticated** caller — without rotating their session.
+ * FIX-B18 · TELEGRAM-LINK-POST-DEAD — здесь был `POST`, и он удалён.
  *
- * If the Telegram account is already linked to a different user, we reject
- * with `TG_ALREADY_LINKED_OTHER` so the UI can show a clear message. If
- * the user previously linked the same TG account but disabled it, we
- * simply re-enable.
+ * Это класс SEC-09: мёртвая поверхность, которая при этом **разбирает вход и
+ * пишет в БД**. У неё было ноль вызывающих в продукте (`data-auth-url` в
+ * `telegram-connect-modal.tsx` ведёт на `GET` ниже — виджет НАВИГИРУЕТ браузер,
+ * а не шлёт JSON), и единственным потребителем оставался тест килсвитча.
+ *
+ * Проверка контракта перед удалением (условие постановки задачи): OpenAPI-спека
+ * документирует `/api/telegram/link` — это **другой роут**
+ * (`src/app/api/telegram/link/`, генерация ссылки на бот-DM). Путь
+ * `/api/auth/telegram/link` в спеке отсутствует и числится waived в
+ * `scripts/openapi-route-allowlist.txt`, то есть мобильный contract-first
+ * клиент на него ссылаться не мог. Совпадение имён — единственное, что их
+ * связывает; спутать их легко, поэтому это записано здесь, а не в отчёте.
+ *
+ * Дублирование было полным: обе ноги делали одну и ту же связку (проверка
+ * хеша → freshness → anti-hijack → `$transaction`), то есть у второй копии не
+ * было даже собственного поведения, которое можно потерять.
+ *
+ * Сторож возврата — `auth/telegram-link-post-removed.test.ts`.
  */
-export async function POST(req: Request) {
-  try {
-    // AUTH-KILLSWITCH-ENFORCE-01: gate the Telegram connect (link) on the same
-    // effective kill-switch as login — a disabled provider must not link, even
-    // with a bot token present. Refuse before touching session / hash / DB.
-    if (!(await getTelegramEnabled())) {
-      return jsonFail(503, "Вход через Telegram не настроен.", "SYSTEM_FEATURE_DISABLED");
-    }
-
-    const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
-
-    const body = await parseBody(req, telegramLoginSchema);
-
-    const botToken = env.TELEGRAM_BOT_TOKEN;
-    if (!botToken) {
-      return jsonFail(503, "Вход через Telegram не настроен.", "SYSTEM_FEATURE_DISABLED");
-    }
-
-    if (!verifyTelegramLogin(body, botToken)) {
-      return jsonFail(401, "Не удалось проверить данные Telegram.", "INVALID_HASH");
-    }
-
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    if (!isAuthDateFresh(body.auth_date, nowSeconds)) {
-      return jsonFail(401, "Данные входа устарели. Попробуйте ещё раз.", "AUTH_DATE_EXPIRED");
-    }
-
-    const telegramId = String(body.id);
-
-    // Block linking when the Telegram identity already belongs to another
-    // active user. We allow re-link onto the same user (re-enable) and
-    // onto any other user iff they have NO Telegram link yet.
-    const otherOwner = await prisma.userProfile.findFirst({
-      where: { telegramId, id: { not: user.id } },
-      select: { id: true },
-    });
-    if (otherOwner) {
-      return jsonFail(
-        409,
-        "Этот Telegram-аккаунт уже привязан к другому пользователю",
-        "CONFLICT",
-      );
-    }
-
-    const linked = new Date();
-
-    await prisma.$transaction([
-      prisma.userProfile.update({
-        where: { id: user.id },
-        data: {
-          telegramId,
-          telegramUsername: body.username ?? null,
-          // Keep externalPhotoUrl if user already has one; only fill from
-          // payload when empty so we don't overwrite a curated avatar.
-          ...(body.photo_url && !user ? { externalPhotoUrl: body.photo_url } : {}),
-        },
-      }),
-      prisma.telegramLink.upsert({
-        where: { userId: user.id },
-        create: {
-          userId: user.id,
-          telegramUserId: telegramId,
-          isEnabled: true,
-          linkedAt: linked,
-        },
-        update: {
-          telegramUserId: telegramId,
-          isEnabled: true,
-          linkedAt: linked,
-        },
-      }),
-    ]);
-
-    logInfo("Telegram link completed", { userId: user.id, telegramId });
-    return jsonOk({ linked: true });
-  } catch (error) {
-    const appError = toAppError(error);
-    if (appError.status >= 500) {
-      logError("POST /api/auth/telegram/link failed", {
-        requestId: getRequestId(req),
-        route: "POST /api/auth/telegram/link",
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-    }
-    return jsonFail(appError.status, appError.message, appError.code, appError.details);
-  }
-}
 
 const CABINET_PROFILE_PATH = "/cabinet/profile";
 
@@ -194,7 +116,7 @@ export async function GET(req: NextRequest) {
     logInfo("Telegram link completed (redirect)", { userId: user.id, telegramId });
     return backToProfile("connected");
   } catch (error) {
-    const appError = toAppError(error);
+    const appError = toAuthSurfaceError(error);
     if (appError.status >= 500) {
       logError("GET /api/auth/telegram/link failed", {
         requestId: getRequestId(req),

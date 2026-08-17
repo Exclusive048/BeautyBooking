@@ -100,6 +100,11 @@ async function loadRecentMasters(userId: string): Promise<RecentMasterItem[]> {
           durationMin: true,
           isEnabled: true,
           isActive: true,
+          // PERF-08: категория приезжает вместе с услугой. Раньше
+          // `buildRecentMasterItem` перечитывал ТУ ЖЕ строку `Service`
+          // отдельным `findUnique` на каждого кандидата — ради одного поля,
+          // которое этот запрос и так может отдать.
+          category: { select: { title: true } },
         },
       },
     },
@@ -146,15 +151,11 @@ async function buildRecentMasterItem(input: {
     name: string;
     price: number;
     durationMin: number;
+    category: { title: string } | null;
   };
   lastVisit: Date;
 }): Promise<RecentMasterItem | null> {
   const { provider, service, lastVisit } = input;
-
-  const categoryRow = await prisma.service.findUnique({
-    where: { id: service.id },
-    select: { category: { select: { title: true } } },
-  });
 
   const nextSlot = await findNextSlot(provider.id, service.id, provider.timezone);
 
@@ -164,7 +165,7 @@ async function buildRecentMasterItem(input: {
       name: provider.name,
       avatarUrl: provider.avatarUrl,
       publicUsername: provider.publicUsername,
-      category: categoryRow?.category?.title ?? null,
+      category: service.category?.title ?? null,
     },
     lastService: {
       id: service.id,

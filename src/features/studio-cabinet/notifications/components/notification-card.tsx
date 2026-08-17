@@ -65,7 +65,7 @@ export function NotificationCard({ item }: Props) {
             </span>
             <span className="text-[11px] text-text-sec/80">{timeLabel}</span>
             {!item.isRead ? (
-              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary" aria-label="unread" />
+              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary" aria-label={T.unreadAria} />
             ) : null}
           </div>
           <h3 className="mt-0.5 text-sm font-semibold text-text-main">{item.title}</h3>

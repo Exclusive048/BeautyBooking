@@ -23,6 +23,14 @@ const PG = process.env.QA_PG_CONTAINER ?? "masterryadom-db";
 const DB_USER = process.env.QA_PG_USER ?? "master";
 const DB_NAME = process.env.QA_PG_DB ?? "masterryadom";
 const INDEX = "UserConsent_active_unique_idx";
+/**
+ * Каждый `psql()` — это отдельный `docker exec`, а тестов в файле три и
+ * запросов в них до пяти. Под полной параллельной нагрузкой прогона пять
+ * порождений процесса перестают укладываться в дефолтные 5 с vitest, и тест
+ * начинает мигать по причине, к его предмету не относящейся. Поднято здесь, а
+ * не глобально: медленный тут — способ добраться до БД, а не сама проверка.
+ */
+const DB_TEST_TIMEOUT_MS = 30_000;
 
 function psql(sql: string): string {
   return execFileSync("docker", ["exec", PG, "psql", "-U", DB_USER, "-d", DB_NAME, "-tAc", sql], {
@@ -69,7 +77,7 @@ maybe("partial unique — одна активная строка согласи�
     expect(def).toContain('"userId"');
     expect(def).toContain('"consentType"');
     expect(def).toContain('"documentVersion"');
-  });
+  }, DB_TEST_TIMEOUT_MS);
 
   it("БД ОТКАЗЫВАЕТ во второй активной строке — гонка двух переключений невозможна", () => {
     const uid = seedUserId();
@@ -94,7 +102,7 @@ maybe("partial unique — одна активная строка согласи�
     } finally {
       psql(`delete from "UserConsent" where "documentVersion" = '${TEST_VERSION}';`);
     }
-  });
+  }, DB_TEST_TIMEOUT_MS);
 
   it("но ОТОЗВАННЫХ строк может быть сколько угодно — это и есть история", () => {
     const uid = seedUserId();
@@ -123,5 +131,5 @@ maybe("partial unique — одна активная строка согласи�
     } finally {
       psql(`delete from "UserConsent" where "documentVersion" = '${TEST_VERSION}';`);
     }
-  });
+  }, DB_TEST_TIMEOUT_MS);
 });

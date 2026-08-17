@@ -59,7 +59,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
           <div className="text-sm text-text-sec">{tP.studioBookingDescription}</div>
           <Link
             href={studioBookingHref}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-medium text-[rgb(var(--accent-foreground))] shadow-card transition hover:shadow-hover"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-4 py-2 text-sm font-medium text-accent-foreground shadow-card transition hover:shadow-hover"
           >
             {tP.studioBookingCta}
           </Link>
@@ -77,6 +77,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
         {primaryService ? (
           <BookingFlowStepper
             providerId={provider.id}
+            providerName={provider.name}
             serviceId={primaryService.id}
             serviceName={primaryService.name}
             servicePrice={primaryService.price}
@@ -112,6 +113,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
           open={sheetOpen}
           onClose={() => setSheetOpen(false)}
           providerId={provider.id}
+          providerName={provider.name}
           serviceId={primaryService.id}
           serviceName={primaryService.name}
           servicePrice={primaryService.price}

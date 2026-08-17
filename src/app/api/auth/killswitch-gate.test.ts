@@ -83,7 +83,15 @@ vi.mock("@/lib/auth/cabinet-redirect", () => ({
 }));
 vi.mock("@/lib/auth/roles", () => ({ ensureClientRoleForUser: vi.fn(async (_id: string, r: unknown) => r) }));
 vi.mock("@/lib/billing/ensure-free-subscription", () => ({ ensureFreeSubscriptionsForRoles: vi.fn() }));
-vi.mock("@/lib/http/origin", () => ({ nextRedirect: vi.fn(() => new Response(null, { status: 307 })) }));
+// FIX-B14: мок отдаёт `Location`, а не только статус. Прежний возвращал голый
+// 307, поэтому утверждение о том, КУДА уходит браузер, здесь было невыразимо —
+// а с переводом стартовых ног на навигацию именно адрес и есть предмет.
+vi.mock("@/lib/http/origin", () => ({
+  nextRedirect: vi.fn(
+    (_req: Request, target: string) =>
+      new Response(null, { status: 307, headers: { location: target } }),
+  ),
+}));
 
 vi.mock("@/lib/vk/oauth", () => ({
   buildVkAuthorizeUrl: spies.buildVkAuthorizeUrl,
@@ -127,7 +135,7 @@ import { GET as vkIntStart } from "@/app/api/integrations/vk/start/route";
 import { GET as vkIntCallback } from "@/app/api/integrations/vk/callback/route";
 import { GET as yandexStart } from "@/app/api/auth/yandex/start/route";
 import { GET as yandexCallback } from "@/app/api/auth/yandex/callback/route";
-import { POST as tgLinkPost, GET as tgLinkGet } from "@/app/api/auth/telegram/link/route";
+import { GET as tgLinkGet } from "@/app/api/auth/telegram/link/route";
 import { GET as tgConnectLink } from "@/app/api/telegram/link/route";
 
 function req(url = "http://localhost/api/test"): Request {
@@ -152,10 +160,12 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
   });
 
   describe("VK (isVkAuthEnabled)", () => {
-    it("start disabled → 503, no authorize URL built", async () => {
+    // FIX-B14: гейт срабатывает там же и до той же работы; изменилась форма
+    // ответа — навигация возвращается на /login, а не в JSON-тупик.
+    it("start disabled → /login?error=provider_unavailable, no authorize URL built", async () => {
       const res = await vkStart(req());
-      expect(res.status).toBe(503);
-      expect(await code(res)).toContain("SERVICE_UNAVAILABLE");
+      expect(res.headers.get("location")).toContain("/login?error=provider_unavailable");
+      expect([302, 307, 308]).toContain(res.status);
       expect(spies.buildVkAuthorizeUrl).not.toHaveBeenCalled();
     });
 
@@ -168,11 +178,15 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
       expect(spies.setSessionCookies).not.toHaveBeenCalled();
     });
 
-    it("integrations start disabled → 503, no authorize URL built", async () => {
-      const res = await vkIntStart();
-      expect(res.status).toBe(503);
+    // FIX-B14: у кабинетной ноги аудитория — уже вошедший пользователь, поэтому
+    // адрес возврата не /login, а страница, с которой он нажал «подключить»
+    // (Referer; без него — дефолт /cabinet/profile). Исход тот же.
+    it("integrations start disabled → back to the connect surface with vk=provider_unavailable", async () => {
+      const res = await vkIntStart(req("http://localhost/api/integrations/vk/start"));
+      expect(res.headers.get("location")).toContain("vk=provider_unavailable");
+      expect([302, 307, 308]).toContain(res.status);
       expect(spies.buildVkAuthorizeUrl).not.toHaveBeenCalled();
-      expect(spies.requireAuth).not.toHaveBeenCalled();
+      expect(spies.getSessionUser).not.toHaveBeenCalled();
     });
 
     it("integrations callback disabled → 503, no link (payload present)", async () => {
@@ -202,10 +216,10 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
   });
 
   describe("Yandex (isYandexAuthEnabled)", () => {
-    it("start disabled → 503, no authorize URL built", async () => {
+    it("start disabled → /login?error=provider_unavailable, no authorize URL built", async () => {
       const res = await yandexStart(req());
-      expect(res.status).toBe(503);
-      expect(await code(res)).toContain("SERVICE_UNAVAILABLE");
+      expect(res.headers.get("location")).toContain("/login?error=provider_unavailable");
+      expect([302, 307, 308]).toContain(res.status);
       expect(spies.buildYandexAuthorizeUrl).not.toHaveBeenCalled();
     });
 
@@ -227,20 +241,6 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
   });
 
   describe("Telegram (getTelegramEnabled)", () => {
-    it("connect link POST disabled → 503 SYSTEM_FEATURE_DISABLED, no hash verify / session", async () => {
-      const res = await tgLinkPost(
-        new Request("http://localhost/api/auth/telegram/link", {
-          method: "POST",
-          body: JSON.stringify({}),
-          headers: { "content-type": "application/json" },
-        }),
-      );
-      expect(res.status).toBe(503);
-      expect(await code(res)).toContain("SYSTEM_FEATURE_DISABLED");
-      expect(spies.verifyTelegramLogin).not.toHaveBeenCalled();
-      expect(spies.getSessionUser).not.toHaveBeenCalled();
-    });
-
     it("connect link GET (redirect mode) disabled → back to profile with telegram=unconfigured", async () => {
       const res = await tgLinkGet(
         new NextRequest("http://localhost/api/auth/telegram/link?id=1&first_name=A&auth_date=1&hash=h"),

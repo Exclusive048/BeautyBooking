@@ -66,6 +66,12 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
       tx.portfolioItem.deleteMany({ where: { masterId: providerId } }),
       tx.hotSlot.deleteMany({ where: { providerId } }),
       tx.modelOffer.deleteMany({ where: { masterId: providerId } }),
+      // LOGIC-19: блоки времени этого мастера. До появления FK связь была
+      // голой строкой — БД про неё не знала, и блоки оставались указывать на
+      // удалённый кабинет навсегда (`loadTimeBlockRanges` ищет по `masterId`).
+      // FK добавлен, но каскад тут по-прежнему не сработает — Provider
+      // анонимизируется, а не удаляется.
+      tx.timeBlock.deleteMany({ where: { masterId: providerId } }),
       tx.scheduleOverride.deleteMany({ where: { providerId } }),
       tx.scheduleBreak.deleteMany({ where: { providerId } }),
       tx.weeklyScheduleConfig.deleteMany({ where: { providerId } }),

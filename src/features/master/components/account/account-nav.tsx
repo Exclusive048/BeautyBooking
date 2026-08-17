@@ -38,7 +38,7 @@ export function AccountNav() {
   return (
     <nav
       className="flex flex-wrap items-center gap-1 overflow-x-auto rounded-2xl border border-border-subtle bg-bg-card p-1"
-      aria-label="account-nav"
+      aria-label={T.navAria}
     >
       {ITEMS.map((item) => {
         const Icon = item.icon;

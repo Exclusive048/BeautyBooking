@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Star, Reply, Pencil, Trash2, ExternalLink, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -90,7 +91,7 @@ export function ClientReviewsPage() {
       ) : isLoading ? (
         <ReviewsListSkeleton />
       ) : filtered.length === 0 ? (
-        <EmptyState />
+        <ReviewsEmptyState />
       ) : (
         <ul className="space-y-3">
           {filtered.map((r) => (
@@ -389,17 +390,18 @@ function Avatar({
   );
 }
 
-function EmptyState() {
+/**
+ * RES-28: локальная копия называлась `EmptyState` — как общий экспорт из
+ * `@/components/ui/empty-state`. Действие и текст сохранены дословно.
+ */
+function ReviewsEmptyState() {
   return (
-    <Card className="flex flex-col items-center gap-3 p-10 text-center">
-      <MessageSquare className="h-10 w-10 text-text-sec/40" aria-hidden />
-      <div className="font-display text-base text-text-main">{T.empty}</div>
-      <Link href="/catalog">
-        <Button size="sm" variant="secondary">
-          {T.emptyCta}
-        </Button>
-      </Link>
-    </Card>
+    <EmptyState
+      variant="card"
+      icon={MessageSquare}
+      title={T.empty}
+      action={{ label: T.emptyCta, href: "/catalog", size: "sm" }}
+    />
   );
 }
 

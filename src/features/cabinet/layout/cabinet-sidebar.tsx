@@ -132,7 +132,7 @@ export function CabinetSidebar({
             </div>
           </div>
 
-          <nav className="space-y-4">
+          <nav aria-label={UI_TEXT.a11y.cabinetSections} className="space-y-4">
             {NAV_GROUPS.map((group) => (
               <div key={group.label} className="space-y-1">
                 <div className="px-2 font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">

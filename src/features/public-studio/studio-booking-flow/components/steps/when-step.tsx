@@ -8,6 +8,8 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { SlotItem } from "@/features/booking/lib/studio-booking";
 import { todayKey, buildDateBounds, STUDIO_BOOKING_DAYS_AHEAD } from "@/features/booking/lib/studio-booking";
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 type DayCell = {
   dateKey: string;
@@ -22,29 +24,38 @@ type DayCell = {
 const DOW = UI_TEXT.bookingWidget.whenStep.daysOfWeek;
 const MONTH = UI_TEXT.bookingWidget.whenStep.months;
 
-function buildStrip(daysAhead: number): DayCell[] {
+/**
+ * LOGIC-26: полоса дней строится в **salon-tz**. Раньше «Сегодня» считалось
+ * host-локальными геттерами — у клиента из другой зоны первая ячейка означала
+ * его сегодня, а не сегодня салона, и вся полоса была смещена на сутки.
+ *
+ * Ключ дня выводится из `addDaysToDateKey` (та же арифметика, что у движка), а
+ * число/месяц/день недели читаются из самого ключа — он уже salon-local, и
+ * промежуточный `Date` в чьей-то зоне тут только добавил бы возможность
+ * съехать на соседние сутки.
+ */
+function buildStrip(daysAhead: number, timeZone: string): DayCell[] {
   const out: DayCell[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const first = toLocalDateKey(new Date(), timeZone);
   for (let i = 0; i < daysAhead; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
+    const dateKey = addDaysToDateKey(first, i);
+    const [year, month, day] = dateKey.split("-").map(Number);
+    // День недели календарной даты от таймзоны не зависит: считаем его на
+    // UTC-полночь этой же даты, а не на инстант в чьей-то зоне.
+    const weekday = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay();
     out.push({
-      dateKey: `${yyyy}-${mm}-${dd}`,
+      dateKey,
       label:
         i === 0
           ? UI_TEXT.bookingWidget.whenStep.today
           : i === 1
           ? UI_TEXT.bookingWidget.whenStep.tomorrow
-          : DOW[d.getDay()]!.toUpperCase(),
-      day: d.getDate(),
-      month: MONTH[d.getMonth()]!,
+          : DOW[weekday]!.toUpperCase(),
+      day: day!,
+      month: MONTH[month! - 1]!,
       isToday: i === 0,
       isTomorrow: i === 1,
-      isWeekend: d.getDay() === 0 || d.getDay() === 6,
+      isWeekend: weekday === 0 || weekday === 6,
     });
   }
   return out;
@@ -82,8 +93,11 @@ export function WhenStep({
   onBack,
 }: Props) {
   const daysAhead = Math.max(1, Math.min(visibleSlotDays || STUDIO_BOOKING_DAYS_AHEAD, STUDIO_BOOKING_DAYS_AHEAD));
-  const strip = useMemo(() => buildStrip(daysAhead), [daysAhead]);
-  const bounds = useMemo(() => buildDateBounds(new Date(), daysAhead), [daysAhead]);
+  const strip = useMemo(() => buildStrip(daysAhead, salonTimeZone), [daysAhead, salonTimeZone]);
+  const bounds = useMemo(
+    () => buildDateBounds(new Date(), salonTimeZone, daysAhead),
+    [daysAhead, salonTimeZone]
+  );
 
   // Group slots into morning / day / evening by the SALON's local hour (a slot
   // at 13:00 salon-time is "День" in the salon's day, regardless of the viewer's
@@ -179,11 +193,11 @@ export function WhenStep({
       {loading ? (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {Array.from({ length: 9 }).map((_, idx) => (
-            <div key={idx} className="h-9 animate-pulse rounded-lg bg-bg-muted/60" />
+            <div key={idx} className="h-9 animate-pulse rounded-lg bg-muted/60" />
           ))}
         </div>
       ) : slots.length === 0 ? (
-        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-8 text-center text-sm text-text-muted">
+        <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
           {UI_TEXT.bookingWidget.whenStep.noSlots}
         </div>
       ) : (
@@ -220,7 +234,7 @@ export function WhenStep({
         </div>
       )}
 
-      <p className="sr-only">{todayKey()}</p>
+      <p className="sr-only">{todayKey(salonTimeZone)}</p>
     </section>
   );
 }

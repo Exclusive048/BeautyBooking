@@ -131,6 +131,19 @@ model Booking {
   @@index([studioId])
   @@index([masterId])
   @@index([status, startAtUtc])
+  // PERF-09 (I-1). Канбан мастера фильтрует по `masterProviderId` + окну
+  // `startAtUtc` и сортирует по `startAtUtc`. Зеркало для `providerId` есть
+  // (`[providerId, startAtUtc, endAtUtc]` выше), а для исполнителя не было —
+  // при том, что `masterPerformedBookingWhere` даёт OR по ОБОИМ, то есть одна
+  // ветвь OR шла по индексу, а вторая тянула всю историю мастера и
+  // сортировала её в памяти.
+  @@index([masterProviderId, startAtUtc])
+  // PERF-09 (I-2). «Мои записи» клиента: `where { clientUserId }` +
+  // `orderBy startAtUtc desc` + `take 300`. Без порядка в индексе `take` не
+  // спасает — сортируется весь набор клиента.
+  @@index([clientUserId, startAtUtc(sort: Desc)])
+  // PERF-09 (I-3). Клиенты студии: тот же разрыв, что I-1, для арендатора.
+  @@index([studioId, startAtUtc(sort: Desc)])
   @@index([bookingPackageId])
 }
 

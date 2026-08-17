@@ -16,7 +16,7 @@ export function ProvidersWithoutCityCard({ count }: Props) {
       ? T.hintSingle
       : T.hintPlural.replace("{count}", String(count));
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3">
+    <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
       <AlertTriangle
         className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
         aria-hidden

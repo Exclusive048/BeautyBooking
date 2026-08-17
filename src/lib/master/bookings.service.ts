@@ -171,7 +171,10 @@ export const getMasterBookingsForKanban = cache(
     // We pull both buckets in parallel: active (pending/confirmed/today/done)
     // and cancelled (separate window). The two ranges don't overlap by status
     // so we can union them in code without dedup logic.
-    const [activeRows, cancelledRows] = await Promise.all([
+    // PERF-24: таймзона кабинета зависит только от `input.masterId` и ничего не
+    // ждёт от списков — читается тем же заходом, а не третьим round-trip'ом
+    // после него.
+    const [activeRows, cancelledRows, providerTz] = await Promise.all([
       prisma.booking.findMany({
         where: {
           // F1: shared performer predicate — a studio master's bookings are
@@ -237,13 +240,13 @@ export const getMasterBookingsForKanban = cache(
           serviceItems: { select: { priceSnapshot: true } },
         },
       }),
+      // FIX-04 (QA-113): booking labels render in the master's own timezone.
+      prisma.provider.findUnique({
+        where: { id: input.masterId },
+        select: { timezone: true },
+      }),
     ]);
 
-    // FIX-04 (QA-113): booking labels render in the master's own timezone.
-    const providerTz = await prisma.provider.findUnique({
-      where: { id: input.masterId },
-      select: { timezone: true },
-    });
     const timeZone = providerTz?.timezone ?? DEFAULT_DISPLAY_TIMEZONE;
 
     const allRows = [...activeRows, ...cancelledRows];

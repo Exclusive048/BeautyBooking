@@ -245,7 +245,10 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
               >
                 <ResilientImage
                   src={item.mediaUrl}
-                  alt=""
+                  alt={T.photoAltTemplate
+                    .replace("{provider}", group.providerName)
+                    .replace("{current}", String(state.activeItemIdx + 1))
+                    .replace("{total}", String(totalItems))}
                   sizes="(max-width: 768px) 100vw, 480px"
                   fit="contain"
                   className="object-contain"

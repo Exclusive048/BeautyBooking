@@ -9,7 +9,7 @@ import { FeedCard } from "@/features/home/components/feed-card";
 import { FeedSkeleton, FeedSkeletonGrid } from "@/features/home/components/feed-skeleton";
 import { RecentMastersSection } from "@/features/home/components/recent-masters-section";
 import { StoriesRail } from "@/features/home/components/stories-rail";
-import { StoriesViewerOverlay } from "@/features/home/components/stories-viewer-overlay";
+import { StoriesViewerOverlayLazy } from "@/features/home/components/stories-viewer-overlay-lazy";
 import { StoriesViewerProvider } from "@/features/home/stories-viewer-context";
 import { fetchJson } from "@/lib/http/client";
 import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
@@ -102,7 +102,7 @@ export function HomeFeed(props: HomeFeedProps) {
     <StoriesViewerProvider>
     <div className="space-y-8">
       <StoriesRail />
-      <StoriesViewerOverlay />
+      <StoriesViewerOverlayLazy />
 
       <RecentMastersSection />
 

@@ -36,6 +36,7 @@ module.exports = {
         input: "rgb(var(--input) / <alpha-value>)",
         border: "rgb(var(--border) / <alpha-value>)",
         "border-subtle": "rgb(var(--border-subtle) / <alpha-value>)",
+        "border-control": "rgb(var(--border-control) / <alpha-value>)",
         "border-focus": "rgb(var(--border-focus) / <alpha-value>)",
         text: "rgb(var(--text) / <alpha-value>)",
         "text-muted": "rgb(var(--text-muted) / <alpha-value>)",
@@ -49,6 +50,9 @@ module.exports = {
         // Burgundy in light, gold in dark. Use `text-accent-text` for accent
         // TEXT/icons on themed surfaces; keep `text-primary` only on fixed-light fills.
         "accent-text": "rgb(var(--accent-text) / <alpha-value>)",
+        // Пара наведения к `accent-text` (UI-10). Заливочный `primary-hover`
+        // в этой роли гасит ссылку в тёмной теме — см. globals.css.
+        "accent-text-hover": "rgb(var(--accent-text-hover) / <alpha-value>)",
         "accent-hover": "rgb(var(--accent-hover) / <alpha-value>)",
         "surface-hover": "rgb(var(--surface-hover) / <alpha-value>)",
         ring: "rgb(var(--ring) / <alpha-value>)",
@@ -65,10 +69,48 @@ module.exports = {
         // Значения — из globals.css, здесь только проброс.
         success: "rgb(var(--success) / <alpha-value>)",
         warning: "rgb(var(--warning) / <alpha-value>)",
+        // UI-06 — тот же класс отказа, что выше, но для `-foreground`-пар.
+        // `primary` и `muted` объявлены СТРОКАМИ, а не объектами, поэтому
+        // производные `*-foreground` из них не генерируются (объектом объявлен
+        // только `destructive` — он и работал). Итог: `text-muted-foreground`
+        // (33 сайта, включая `<Badge variant="muted">`) и
+        // `text-primary-foreground` (активный чип фильтра уведомлений)
+        // компилировались в ничто и наследовали цвет контекста.
+        // Мосты плоские, а не объектные: `primary-hover`/`primary-magenta`/
+        // `primary-glow` — уже отдельные ключи, и превращать один `primary` в
+        // объект посреди них значило бы завести две схемы в одном списке.
+        "muted-foreground": "rgb(var(--muted-foreground) / <alpha-value>)",
+        "primary-foreground": "rgb(var(--primary-foreground) / <alpha-value>)",
+        "accent-foreground": "rgb(var(--accent-foreground) / <alpha-value>)",
+        // 🔴 Мостов `rose` и `sky` здесь НЕТ И БЫТЬ НЕ ДОЛЖНО. В разметке
+        // `rose-*`/`sky-*` — это встроенные палитры Tailwind (236 сайтов:
+        // статус-бейджи, чипы). Ключ `rose: "rgb(var(--rose))"` в `extend`
+        // ЗАМЕНИЛ бы всю шкалу, и `bg-rose-500` перестал бы существовать —
+        // «фикс» сломал бы ровно то, что выглядит починенным. Одноимённые
+        // CSS-переменные-призраки удалены из `globals.css` (потребителей
+        // не было). Сторож — `tailwind-bridge.test.ts`.
         destructive: {
           DEFAULT: "rgb(var(--destructive) / <alpha-value>)",
           foreground: "rgb(var(--destructive-foreground) / <alpha-value>)",
         },
+        // UI-26/27 (AUDIT-CAMPAIGN-02 п.8) — статусные ПОВЕРХНОСТИ: тройка
+        // surface/text/border × success/warning/danger/info, значения сняты с
+        // Badge.variantClasses. Мост БЕЗ `<alpha-value>` намеренно: тёмные
+        // значения несут запечённую альфу (…-950/0.4, …-800/0.5) в самой
+        // переменной, поэтому модификаторы прозрачности (`bg-success-surface/50`)
+        // к этим классам НЕ применяются — и не должны.
+        "success-surface": "var(--success-surface)",
+        "success-text": "var(--success-text)",
+        "success-border": "var(--success-border)",
+        "warning-surface": "var(--warning-surface)",
+        "warning-text": "var(--warning-text)",
+        "warning-border": "var(--warning-border)",
+        "danger-surface": "var(--danger-surface)",
+        "danger-text": "var(--danger-text)",
+        "danger-border": "var(--danger-border)",
+        "info-surface": "var(--info-surface)",
+        "info-text": "var(--info-text)",
+        "info-border": "var(--info-border)",
       },
       backgroundImage: {
         "brand-gradient":

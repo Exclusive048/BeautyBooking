@@ -25,8 +25,13 @@ export async function GET(req: Request) {
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const query = parseQuery(new URL(req.url), querySchema);
-    const providerId = await getCurrentMasterProviderId(user.id);
-    const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
+    // PERF-24: кабинет и тариф резолвятся от одного `user.id` и друг о друге
+    // не знают. Отказ `getCurrentMasterProviderId` (403 FORBIDDEN) сохраняется:
+    // `getCurrentPlan` не бросает вовсе — он всегда сводится к плану-фолбэку.
+    const [providerId, plan] = await Promise.all([
+      getCurrentMasterProviderId(user.id),
+      getCurrentPlan(user.id, SubscriptionScope.MASTER),
+    ]);
 
     const data = await getMasterClients({
       providerId,

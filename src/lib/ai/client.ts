@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
+import { takeAiSpendBudget, type AiSpendMeter } from "@/lib/ai/spend-ceiling";
 
 /**
  * AI chat wrapper — Yandex Cloud Foundation Models via OpenAI-compatible API.
@@ -133,7 +134,13 @@ async function sleep(ms: number): Promise<void> {
 }
 
 export type AiChatOptions = {
-  scope: string;
+  /**
+   * FIX-B16: сужен со `string` до `AiSpendMeter`. Это и есть механизм покрытия:
+   * новая AI-поверхность обязана зарегистрировать суточный потолок в
+   * `AI_SPEND_CEILINGS`, иначе её не пропустит `typecheck`. Список, который
+   * ведут руками, молча протухает (инв. #35/#38) — здесь его ведёт компилятор.
+   */
+  scope: AiSpendMeter;
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;
@@ -149,6 +156,12 @@ export type AiChatOptions = {
 export async function aiChat(options: AiChatOptions): Promise<string | null> {
   const { scope, systemPrompt, userPrompt, temperature = 0.7, maxTokens, model } = options;
   const resolvedModel = model ?? resolveDefaultChatModel();
+
+  // FIX-B16 — денежный потолок стоит ЗДЕСЬ, до первого байта в сеть, и бросает.
+  // В роутах его держать нельзя: там он был бы списком, который забывают
+  // пополнять. Одна единица бюджета на вызов `aiChat`, а не на попытку: ретрай
+  // уходит только на 429/5xx, за которые провайдер не тарифицирует.
+  await takeAiSpendBudget(scope);
 
   for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt++) {
     try {

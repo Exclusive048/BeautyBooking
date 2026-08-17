@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles, User } from "lucide-react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   fetchBookingMe,
   fetchMasterAvailability,
   todayKey,
+  buildDayOptions,
   type SlotItem,
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
@@ -25,6 +26,10 @@ import {
 } from "@/lib/bookings/package-cursor";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  fetchRetryingDuplicates,
+  isDuplicateRequestResponse,
+} from "@/lib/http/idempotent-retry";
 
 const T = UI_TEXT.publicStudio.packageBooking;
 
@@ -51,31 +56,23 @@ type Proposal = { packageName: string; totalKopeks: number; components: Proposed
 type Phase = "build" | "review" | "contacts" | "success";
 type SessionUser = { displayName: string | null; phone: string | null };
 
-function buildDays(count: number): { key: string; label: string }[] {
-  const out: { key: string; label: string }[] = [];
-  const base = new Date();
-  for (let i = 0; i < count; i += 1) {
-    const d = new Date(base);
-    d.setDate(base.getDate() + i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    out.push({
-      key,
-      label: d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", weekday: "short" }),
-    });
-  }
-  return out;
-}
-
 export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, masters }: Props) {
   const components = bundle.components;
-  const days = useMemo(() => buildDays(14), []);
+  // LOGIC-09: ключ идемпотентности живёт весь визард — повтор сабмита обязан
+  // вернуть тот же пакет, а не «это время занято».
+  const idempotencyKeyRef = useRef<string>(
+    typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`,
+  );
+  // LOGIC-26: дни визарда — в tz студии, а не посетителя (`studioTimezone`
+  // здесь уже есть пропом; прежний `buildDays` его просто не использовал).
+  const days = useMemo(() => buildDayOptions(14, studioTimezone), [studioTimezone]);
 
   const [phase, setPhase] = useState<Phase>("build");
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
 
   // Active-component picker state.
   const [selectedMasterId, setSelectedMasterId] = useState("");
-  const [selectedDay, setSelectedDay] = useState(days[0]?.key ?? todayKey());
+  const [selectedDay, setSelectedDay] = useState(days[0]?.key ?? todayKey(studioTimezone));
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -161,12 +158,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       setPhase("build");
       setPlacements({});
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey());
+      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
       setProposal(null);
       setError(null);
       setComment("");
     }
-  }, [open, days]);
+  }, [open, days, studioTimezone]);
 
   // Session prefill.
   useEffect(() => {
@@ -229,10 +226,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         },
       }));
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey());
+      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
       setError(null);
     },
-    [activeComponent, selectedMasterId, masterName, days],
+    [activeComponent, selectedMasterId, masterName, days, studioTimezone],
   );
 
   // Re-pick a placed component → cascade-clear it + every later one (their
@@ -248,10 +245,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         return next;
       });
       setSelectedMasterId("");
-      setSelectedDay(days[0]?.key ?? todayKey());
+      setSelectedDay(days[0]?.key ?? todayKey(studioTimezone));
       setError(null);
     },
-    [components, days],
+    [components, days, studioTimezone],
   );
 
   const buildSelections = useCallback(
@@ -317,9 +314,15 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/public/packages/${encodeURIComponent(bundle.id)}/studio/book`, {
+      const res = await fetchRetryingDuplicates(`/api/public/packages/${encodeURIComponent(bundle.id)}/studio/book`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // LOGIC-09 (инв. #28): без ключа повторный сабмит упирался в уже
+          // созданные сиблинги и отвечал «Это время уже занято» — пакет при
+          // этом был создан. Ключ живёт на весь визард, как в одиночном флоу.
+          "x-idempotency-key": idempotencyKeyRef.current,
+        },
         body: JSON.stringify({
           clientName: trimmedName,
           clientPhone: trimmedPhone,
@@ -335,7 +338,11 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       if (!res.ok || !json?.ok) {
         setError(json && !json.ok ? json.error.message : T.bookError);
         // A conflict means a placement went stale — send the client back to rebuild.
-        if (res.status === 409) {
+        // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
+        // выполняется», а не устаревшее размещение. Отправлять клиента
+        // пересобирать пакет, который, скорее всего, уже создан, — ровно та
+        // ложь, из-за которой одиночный флоу показывал «время занято».
+        if (res.status === 409 && !(await isDuplicateRequestResponse(res))) {
           setPhase("build");
           setProposal(null);
         }

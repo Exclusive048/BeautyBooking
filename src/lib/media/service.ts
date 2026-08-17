@@ -5,18 +5,19 @@ import {
   MediaKind,
   SubscriptionScope,
   type MediaAsset,
-  type UserProfile,
 } from "@prisma/client";
 import { Readable } from "stream";
 import { AppError } from "@/lib/api/errors";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createLimitReachedError } from "@/lib/billing/guards";
+import type { SessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getStorageProvider } from "@/lib/media/storage";
 import {
   MEDIA_ALLOWED_MIME_TYPES,
   MEDIA_MAX_FILE_SIZE_BYTES,
   MEDIA_PORTFOLIO_LIMIT,
+  MEDIA_USER_STORAGE_QUOTA_BYTES,
   toMediaAssetDto,
   type MediaAssetDto,
 } from "@/lib/media/types";
@@ -200,6 +201,45 @@ async function enforcePortfolioLimit(
 }
 
 /**
+ * SEC-17 — суммарная байтовая квота на аккаунт.
+ *
+ * Якорь — `createdByUserId`, а не провайдер: злоупотребляет аккаунт, у него уже
+ * есть индекс, и он единственный общий знаменатель для всех поверхностей
+ * загрузки (портфолио, аватар, фото карточек, вложения чата, референсы броней),
+ * тогда как `entityType`/`entityId` у них разные.
+ *
+ * Считаются только живые строки: `deleteAssetById` удаляет объект из хранилища
+ * следом за пометкой `deletedAt`, поэтому удалённый ассет места уже не занимает
+ * и держать его в сумме означало бы наказывать за уборку.
+ *
+ * Проверка стоит ПОСЛЕ веток замены и вытеснения аватара — они освобождают
+ * байты, и на границе квоты замена файла обязана проходить.
+ */
+export function exceedsStorageQuota(input: {
+  usedBytes: number;
+  incomingBytes: number;
+  quotaBytes?: number;
+}): boolean {
+  const quota = input.quotaBytes ?? MEDIA_USER_STORAGE_QUOTA_BYTES;
+  return input.usedBytes + input.incomingBytes > quota;
+}
+
+async function enforceUserStorageQuota(userId: string, incomingBytes: number): Promise<void> {
+  const used = await prisma.mediaAsset.aggregate({
+    where: { createdByUserId: userId, deletedAt: null },
+    _sum: { sizeBytes: true },
+  });
+
+  if (exceedsStorageQuota({ usedBytes: used._sum.sizeBytes ?? 0, incomingBytes })) {
+    throw new AppError(
+      "Достигнут лимит хранилища. Удалите ненужные файлы.",
+      409,
+      "MEDIA_STORAGE_QUOTA_EXCEEDED",
+    );
+  }
+}
+
+/**
  * SECURITY-EXPOSURE-AUDIT-01 #3 — is a MASTER/STUDIO/SITE portfolio-or-avatar
  * asset visible to an anonymous / non-owner caller?
  *
@@ -257,7 +297,7 @@ async function filterPublicPortfolioAssetIds(assetIds: string[]): Promise<Set<st
 }
 
 export async function listMediaAssets(
-  user: UserProfile | null,
+  user: SessionUser | null,
   input: { entityType: MediaEntityType; entityId: string; kind?: MediaKind }
 ): Promise<MediaAssetDto[]> {
   const entityId = normalizeEntityId(input.entityId);
@@ -312,7 +352,7 @@ export async function listMediaAssets(
   return assets.map(toMediaAssetDto);
 }
 
-export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInput): Promise<MediaAssetDto> {
+export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInput): Promise<MediaAssetDto> {
   validateUploadBasics(input);
   const entityId = normalizeEntityId(input.entityId);
 
@@ -352,6 +392,10 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
       await deleteAssetById(avatar.id);
     }
   }
+
+  // SEC-17: после веток замены/вытеснения — они освобождают байты, и на границе
+  // квоты замена файла обязана проходить.
+  await enforceUserStorageQuota(user.id, input.sizeBytes);
 
   const storage = getStorageProvider();
   const storageKey = buildStorageKey({ ...input, entityId });
@@ -451,7 +495,7 @@ export async function uploadMediaAsset(user: UserProfile, input: UploadMediaInpu
 }
 
 export async function uploadBookingReferenceAsset(
-  user: UserProfile | null,
+  user: SessionUser | null,
   input: {
     mimeType: string;
     sizeBytes: number;
@@ -533,7 +577,7 @@ export async function uploadBookingReferenceAsset(
  * which is what the validator checks to enforce one-shot use.
  */
 export async function uploadChatAttachmentAsset(
-  user: UserProfile,
+  user: SessionUser,
   input: {
     mimeType: string;
     sizeBytes: number;
@@ -600,7 +644,7 @@ export async function uploadChatAttachmentAsset(
   return { id: created.id };
 }
 
-export async function deleteMediaAsset(user: UserProfile, assetId: string): Promise<{ id: string }> {
+export async function deleteMediaAsset(user: SessionUser, assetId: string): Promise<{ id: string }> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },
   });
@@ -678,7 +722,7 @@ export async function deleteMediaAsset(user: UserProfile, assetId: string): Prom
 
 
 export async function updateMediaCrop(
-  user: UserProfile,
+  user: SessionUser,
   assetId: string,
   input: { cropX: number; cropY: number; cropWidth: number; cropHeight: number }
 ): Promise<MediaAssetDto> {
@@ -705,7 +749,7 @@ export async function updateMediaCrop(
 }
 
 export async function getMediaFile(
-  user: UserProfile | null,
+  user: SessionUser | null,
   assetId: string
 ): Promise<MediaFileResult> {
   const asset = await prisma.mediaAsset.findUnique({

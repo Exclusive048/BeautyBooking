@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
+// FIX-B5: переиспользуем СУЩЕСТВУЮЩУЮ модалку подтверждения, второй поток не заводим.
+import { EmailVerifyModal } from "@/features/client-cabinet/profile/modals/email-verify-modal";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -13,6 +15,8 @@ import { UI_TEXT } from "@/lib/ui/text";
 type MeUser = {
   email: string | null;
   emailNotificationsEnabled: boolean;
+  /** `undefined` = кадр кэша старше деплоя; трактуем как «не знаю» (см. lib/users/me.ts). */
+  emailVerified?: boolean;
 };
 
 function isValidEmail(value: string): boolean {
@@ -27,6 +31,7 @@ export function EmailNotificationsSection() {
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,6 +42,7 @@ export function EmailNotificationsSection() {
         setUser({
           email: json.data.user.email,
           emailNotificationsEnabled: json.data.user.emailNotificationsEnabled,
+          emailVerified: json.data.user.emailVerified,
         });
       }
     } finally {
@@ -102,6 +108,28 @@ export function EmailNotificationsSection() {
                   />
                 </div>
 
+                {/* FIX-B5 (вариант B): состояние + одно действие, ровно там, где
+                    живёт последствие — под тумблером, который пользователь и
+                    включает. Показывается ТОЛЬКО при явном `false`: у поля есть
+                    третье состояние `undefined` (кадр кэша `/api/me` старше
+                    деплоя, TTL 30 с), и в нём правильнее промолчать, чем
+                    сказать неправду про чужой адрес. Не модалка на загрузке и
+                    не баннер — индикатор состояния. */}
+                {user.emailVerified === false ? (
+                  <div className="mt-3 rounded-xl border border-warning-border bg-warning-surface px-3 py-2">
+                    <p className="text-xs font-medium text-warning-text">{t.unverifiedTitle}</p>
+                    <p className="mt-1 text-xs text-warning-text">{t.unverifiedHint}</p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-2 rounded-xl"
+                      onClick={() => setVerifyOpen(true)}
+                    >
+                      {t.verifyAction}
+                    </Button>
+                  </div>
+                ) : null}
+
                 <button
                   type="button"
                   onClick={() => setDialogOpen(true)}
@@ -132,6 +160,17 @@ export function EmailNotificationsSection() {
           </div>
         </div>
       </div>
+
+      {verifyOpen ? (
+        <EmailVerifyModal
+          currentEmail={user?.email ?? null}
+          onClose={() => setVerifyOpen(false)}
+          onSuccess={() => {
+            setVerifyOpen(false);
+            void load();
+          }}
+        />
+      ) : null}
 
       <EmailDialog
         open={dialogOpen}

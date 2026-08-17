@@ -1,4 +1,6 @@
-import { ok, fail } from "@/lib/api/response";
+import { ok, fail, tooManyRequests } from "@/lib/api/response";
+import { toAppError } from "@/lib/api/errors";
+import { AiSpendCeilingError } from "@/lib/ai/spend-ceiling";
 import { getAiFeaturesEnabled } from "@/lib/ai/config";
 import { getReviewSummary } from "@/lib/ai/review-summary";
 import { getClientIp } from "@/lib/http/ip";
@@ -38,6 +40,21 @@ export async function GET(
     const result = await getReviewSummary(provider.id);
     return ok(result);
   } catch (error) {
+    // FIX-B16: этот `catch` схлопывал ЛЮБУЮ ошибку в 500 «не удалось составить
+    // сводку» — включая курируемые `AppError`, у которых есть свой статус и своя
+    // правдивая строка. Для потолка это означало бы «у нас сломалось» вместо
+    // «лимит на сегодня исчерпан», то есть продукт врал бы о причине.
+    const appError = toAppError(error);
+    // FIX-C3: у потолка есть честный `Retry-After` (секунды до UTC-полуночи), и
+    // он здесь ТЕРЯЛСЯ — `fail()` заголовков не ставит, его ставит только
+    // `tooManyRequests()`. Курируемая строка уезжала, а машиночитаемое «когда
+    // можно повторить» — нет, хотя `AiSpendCeilingError` его уже посчитал.
+    if (error instanceof AiSpendCeilingError) {
+      return tooManyRequests(error.retryAfterSeconds, error.message, error.code);
+    }
+    if (appError.status < 500) {
+      return fail(appError.message, appError.status, appError.code);
+    }
     logError("Review summary generation failed", {
       providerId,
       error: error instanceof Error ? error.message : String(error),

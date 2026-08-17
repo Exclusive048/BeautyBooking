@@ -16,9 +16,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           so the cabinet page-headers (`top-[var(--topbar-h)]`) sit flush under
           the navbar with no bleed-band. */}
       <Topbar />
-      <main data-testid="app-main" className="flex-1 w-full">
+      {/* UI-30: это НЕ `<main>`. Лэндмарк один на документ, а здесь он был
+          вторым: кабинетные, админский и login-шеллы рендерят собственный
+          `<main>` внутри — и, что важнее, этот контейнер охватывает ещё и их
+          сайдбар, то есть навигация оказывалась внутри «основного
+          содержимого». Решение о теге принимает `AppShellContent`: он и так
+          читает pathname (для ширины) и знает, приносит ли маршрут свой
+          лэндмарк. `data-testid` сохранён — на него завязаны QA-спеки. */}
+      <div data-testid="app-main" className="flex-1 w-full">
         <AppShellContent>{children}</AppShellContent>
-      </main>
+      </div>
       {/* FIX-VISUAL-POLISH G5: hide the marketing footer on /cabinet + /admin
           workspace routes (public pages keep it). Closes the ~480px dead gap. */}
       <ConditionalFooter>

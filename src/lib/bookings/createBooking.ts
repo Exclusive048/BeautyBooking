@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
+import { BookingSource, MediaEntityType, ProviderType, Prisma } from "@prisma/client";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
   buildCreateBookingIdempotencyKey,
@@ -14,11 +15,11 @@ import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-core";
-import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
-import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
-import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { resolveBookingServicePrice } from "@/lib/bookings/hot-slot-pricing";
 import { logInfo, logError } from "@/lib/logging/logger";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
 import { emitBookingCreatedSystemMessage } from "@/lib/chat/system-messages";
@@ -50,18 +51,28 @@ export async function createBooking(input: {
   silentMode?: boolean;
   referencePhotoAssetId?: string | null;
   bookingAnswers?: BookingAnswerPayload[] | null;
-  // BOOKING-WIDGET-FOUNDATION-A: null for guest bookings. When null,
-  // idempotency + rate-limit keys are namespaced by `clientPhone`
-  // instead. Booking row stores `clientUserId: null` (column is already
-  // nullable in schema, matching the `link-guest-bookings` post-signup
-  // linking flow).
-  clientUserId: string | null;
+  /**
+   * FIX-B15 — **обязателен и не nullable**, и это не ужесточение ради
+   * аккуратности, а фиксация уже наступившего факта.
+   *
+   * BOOKING-WIDGET-FOUNDATION-A писал сюда `null` для гостя и разносил ключи
+   * идемпотентности/лимита по телефону. RKN-FIX-02 это отменил: доказательству
+   * согласия (152-ФЗ ст. 9) нужен субъект, поэтому оба вызывающих резолвят
+   * пассивный профиль по телефону ДО создания брони и передают его id. С тех
+   * пор `null` сюда не приходит — но тип продолжал его допускать, гостевая
+   * ветка продолжала читаться как живая, и на этом прочтении был построен
+   * ошибочный тезис FIX-B13 про «два бакета идемпотентности».
+   *
+   * Тип — единственная форма, которая это заканчивает: удалить ветку, оставив
+   * `string | null`, значило бы превратить мёртвый код в будущий креш. Теперь
+   * `null` не компилируется, поэтому и ветка не нужна, и «вернуть как было»
+   * нельзя молча. Колонка `Booking.clientUserId` остаётся nullable — там живут
+   * дореформенные строки, и это другой вопрос.
+   */
+  clientUserId: string;
   idempotencyKey?: string | null;
 }): Promise<BookingDto> {
-  // For guests, the phone is the stable identifier we namespace against.
-  // `clientPhone` is required by validation upstream; treat empty as
-  // unreachable so we don't blow up on an empty namespace.
-  const namespaceKey = input.clientUserId ?? `guest:${input.clientPhone}`;
+  const namespaceKey = input.clientUserId;
   let idempotencyKey: string | null = null;
   let idempotencyLockAcquired = false;
   if (input.idempotencyKey) {
@@ -81,13 +92,16 @@ export async function createBooking(input: {
 
   let createdBookingId: string | null = null;
   try {
-    const allowed = await checkRateLimit(
-      `rate:createBooking:${namespaceKey}`,
-      CREATE_BOOKING_RATE_LIMIT.limit,
-      CREATE_BOOKING_RATE_LIMIT.windowSeconds
+    // FIX-C11: обрыв Redis отвечает 503 «сервис недоступен», а не 429 «слишком
+    // много запросов» — отказ тот же (fail-closed, инв. #6), сигнал верный.
+    const refusal = resolveRateLimitRefusal(
+      await checkRateLimit(`rate:createBooking:${namespaceKey}`, {
+        maxRequests: CREATE_BOOKING_RATE_LIMIT.limit,
+        windowSeconds: CREATE_BOOKING_RATE_LIMIT.windowSeconds,
+      })
     );
-    if (!allowed) {
-      throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
+    if (refusal) {
+      throw new AppError(refusal.message, refusal.status, refusal.code);
     }
 
     const {
@@ -115,64 +129,26 @@ export async function createBooking(input: {
     referencePhotoAssetId: input.referencePhotoAssetId ?? null,
     bookingAnswers: input.bookingAnswers ?? null,
   });
-  let bookedServicePrice = service.effectivePrice;
-
-  const hotProviderId = resolvedMasterProviderId ?? (provider.type === ProviderType.MASTER ? provider.id : null);
-  if (hotProviderId) {
-    const rule = await prisma.discountRule.findUnique({
-      where: { providerId: hotProviderId },
-      select: {
-        isEnabled: true,
-        triggerHours: true,
-        discountType: true,
-        discountValue: true,
-        applyMode: true,
-        minPriceFrom: true,
-        serviceIds: true,
-      },
-    });
-    const now = new Date();
-    const hotPricing = resolveDynamicHotSlotPricing({
-      rule,
-      slotStartAtUtc: startAtUtc,
-      serviceId: service.id,
-      servicePrice: service.effectivePrice,
-      providerTimeZone: master?.timezone ?? provider.timezone,
-      now,
-    });
-    if (input.hotSlotId && !hotPricing.isHot) {
-      throw new AppError("Этот горячий слот уже занят. Выберите другое время.", 409, "BOOKING_CONFLICT");
-    }
-    if (hotPricing.isHot && hotPricing.discountedPrice !== null) {
-      bookedServicePrice = hotPricing.discountedPrice;
-      // BOOKING-WIDGET-FOUNDATION-A: anti-fraud rebook check is
-      // userId-scoped (matches by past cancellations). For guests we
-      // can't run this safely (no stable userId across attempts), so
-      // we skip — the ordinary rate-limit + idempotency guards still
-      // apply, and the discounted price is still honoured. Tracked
-      // backlog: phone-based anti-fraud for guests.
-      if (input.clientUserId) {
-        const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
-        const recentCancel = await prisma.booking.findFirst({
-          where: {
-            providerId: input.providerId,
-            clientUserId: input.clientUserId,
-            status: { in: ["REJECTED", "CANCELLED"] },
-            startAtUtc,
-            cancelledAtUtc: { gt: cutoff },
-          },
-          select: { id: true, cancelledAtUtc: true },
-        });
-        if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
-          throw new AppError(
-            "Повторная запись на тот же горячий слот после отмены недоступна. Выберите другое время.",
-            409,
-            "BOOKING_CONFLICT"
-          );
-        }
-      }
-    }
-  }
+  // FIX-C1 (фаза 3): скидка горячего слота и анти-фрод — один вызов. Прежде
+  // здесь лежала копия ~50 строк, вторая такая же жила в `createClientBooking`,
+  // и полнота этой пары ничем не проверялась (FIX-B18). Теперь получить
+  // скидочную цену, не пройдя анти-фрод, невозможно: это одна функция.
+  //
+  // FIX-B15 — сохранённый факт: анти-фрод отрабатывает и у гостей. Здесь стоял
+  // `if (input.clientUserId)` с комментарием «для гостей проверку пропускаем»,
+  // который после RKN-FIX-02 описывал не поведение, а намерение четырёхмесячной
+  // давности — гость получает пассивный профиль ДО создания брони.
+  const bookedServicePrice = await resolveBookingServicePrice({
+    providerId: input.providerId,
+    providerType: provider.type,
+    resolvedMasterProviderId,
+    clientUserId: input.clientUserId,
+    serviceId: service.id,
+    basePrice: service.effectivePrice,
+    startAtUtc,
+    providerTimeZone: master?.timezone ?? provider.timezone,
+    hotSlotRequested: Boolean(input.hotSlotId),
+  });
 
   await ensureNoConflicts(prisma, {
     providerId: input.providerId,
@@ -185,7 +161,7 @@ export async function createBooking(input: {
   const transactionStartedAt = Date.now();
   let created;
   try {
-    created = await prisma.$transaction(
+    created = await bookingTransaction(
       async (tx) => {
         await ensureNoConflicts(tx, {
           providerId: input.providerId,
@@ -195,7 +171,7 @@ export async function createBooking(input: {
           bufferMin,
         });
 
-        const created = await tx.booking.create({
+        const created = await createBookingRow(tx, {
           data: {
             providerId: input.providerId,
             serviceId: service.id,
@@ -210,10 +186,11 @@ export async function createBooking(input: {
             silentMode: input.silentMode ?? false,
             referencePhotoAssetId: bookingExtras.referencePhotoAssetId,
             bookingAnswers: bookingExtras.bookingAnswers ?? undefined,
-            // BOOKING-WIDGET-FOUNDATION-A: null for guest. The
-            // `link-guest-bookings` post-signup helper will attach
-            // this row to a user when the same phone signs up.
             clientUserId: input.clientUserId,
+            // FIX-C1 · SMOKE-01 · F1 (побочная находка): это запись,
+            // сделанная клиентом на сайте. Молчание здесь означало
+            // `@default(MANUAL)`, и журнал студии подписывал её «Звонок».
+            source: BookingSource.WEB,
             status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
             actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
           },
@@ -262,7 +239,9 @@ export async function createBooking(input: {
 
         return created;
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      // FIX-C6: уровень изоляции больше не выбирает вызывающий — его ставит
+      // `bookingTransaction` (инв. #31). Прежний аргумент был обязателен по
+      // соглашению, а его пропажу ловил регексп по исходнику.
     );
   } catch (error) {
     const conflictError = mapPrismaBookingConflict(error);
@@ -282,7 +261,7 @@ export async function createBooking(input: {
   }
 
   if (shouldAutoConfirm) {
-    await scheduleBookingReminders(created.id);
+    await scheduleBookingRemindersSafe(created.id);
   }
 
   await invalidateSlotsForBookingRange({

@@ -1,9 +1,9 @@
-import type { UserProfile } from "@prisma/client";
+import type { SessionUser } from "@/lib/auth/session";
 import { fail } from "@/lib/api/response";
 import { hasAdminRole, requireAuth } from "@/lib/auth/guards";
 
 type AdminAuthResult =
-  | { ok: true; user: UserProfile }
+  | { ok: true; user: SessionUser }
   | { ok: false; response: ReturnType<typeof fail> };
 
 export async function requireAdminAuth(): Promise<AdminAuthResult> {

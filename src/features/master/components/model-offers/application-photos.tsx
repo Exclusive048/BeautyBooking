@@ -29,11 +29,11 @@ export function ApplicationPhotos({ photos }: Props) {
         {T.photosLabel}
       </p>
       <div className="flex flex-wrap gap-2">
-        {photos.slice(0, 4).map((photo) => (
+        {photos.slice(0, 4).map((photo, index) => (
           <ResilientImage
             key={photo.id}
             src={photo.url}
-            alt=""
+            alt={T.photoAltTemplate.replace("{n}", String(index + 1))}
             width={64}
             height={64}
             className="h-16 w-16 rounded-lg border border-border-subtle bg-bg-input object-cover"

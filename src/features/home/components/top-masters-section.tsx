@@ -152,7 +152,7 @@ export async function TopMastersSection() {
       <div className="mt-10 text-center">
         <Link
           href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-primary-hover"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent-text transition-colors hover:text-accent-text-hover"
         >
           {T.seeAll}
           <ArrowRight className="h-3.5 w-3.5" aria-hidden />

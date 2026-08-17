@@ -4,9 +4,12 @@ import {
   Prisma,
   ProviderType,
   BookingPackageStatus,
+  BookingSource,
   DiscountType,
   BookingCancelledBy,
 } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import {
   ensureNoConflicts,
   resolveBookingCore,
@@ -26,7 +29,15 @@ import {
   resolveBookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
+import {
+  abortPackageIdempotency,
+  beginPackageIdempotency,
+  completePackageIdempotency,
+  type PackageBookingResult,
+} from "@/lib/bookings/package-idempotency";
 import { logError } from "@/lib/logging/logger";
+import { applyBookingTransition } from "@/lib/bookings/transition";
 
 /**
  * PACKAGE-BOOKING-MVP-1 — solo-master sequential package booking.
@@ -396,11 +407,7 @@ export async function proposeSoloPackageSelections(input: {
   };
 }
 
-export type CreateSoloPackageResult = {
-  bookingPackageId: string;
-  bookingIds: string[];
-  totalKopeks: number;
-};
+export type CreateSoloPackageResult = PackageBookingResult;
 
 /**
  * Atomic package create. Validates each chosen component slot through the
@@ -409,16 +416,52 @@ export type CreateSoloPackageResult = {
  * Serializable transaction. Any conflict / placement failure rolls the whole
  * thing back — no partial package. Commit-time P2034/P2002 → clean 409.
  */
-export async function createSoloPackageBooking(input: {
+type CreateSoloPackageInput = {
   packageId: string;
-  clientUserId: string | null;
+  /**
+   * FIX-B15 — пакет создаётся только для резолвнутого профиля (RKN-FIX-02),
+   * поэтому не nullable. Оба роута объявляют локальную переменную как `string`;
+   * тип фиксирует это на границе, а не оставляет соглашению.
+   */
+  clientUserId: string;
   clientName: string;
   clientPhone: string;
   comment?: string | null;
   silentMode?: boolean;
   /** Chosen slots, one per component. serviceId must belong to the package. */
   slots: SoloPackageSlot[];
-}): Promise<CreateSoloPackageResult> {
+  /**
+   * LOGIC-09 (инв. #28): значение заголовка `x-idempotency-key`. Без него
+   * повторный сабмит упирался в `ensureNoConflicts` уже созданных сиблингов и
+   * отвечал «Это время уже занято» — пользователю, чей пакет только что
+   * успешно создан.
+   */
+  idempotencyKey?: string | null;
+};
+
+export async function createSoloPackageBooking(
+  input: CreateSoloPackageInput,
+): Promise<CreateSoloPackageResult> {
+  const guard = await beginPackageIdempotency({
+    idempotencyKey: input.idempotencyKey,
+    clientUserId: input.clientUserId,
+  });
+  if (guard.cached) return guard.cached;
+
+  let result: CreateSoloPackageResult;
+  try {
+    result = await createSoloPackageBookingUnguarded(input);
+  } catch (error) {
+    await abortPackageIdempotency(guard.heldKey);
+    throw error;
+  }
+  await completePackageIdempotency(guard.heldKey, result.bookingPackageId);
+  return result;
+}
+
+async function createSoloPackageBookingUnguarded(
+  input: CreateSoloPackageInput,
+): Promise<CreateSoloPackageResult> {
   const pkg = await loadSoloPackage(input.packageId);
 
   // The provided slots must cover exactly the package components (by service),
@@ -478,7 +521,7 @@ export async function createSoloPackageBooking(input: {
   // 5. Atomic create — all-or-none.
   let result: CreateSoloPackageResult;
   try {
-    result = await prisma.$transaction(
+    result = await bookingTransaction(
       async (tx) => {
         const bookingPackage = await tx.bookingPackage.create({
           data: {
@@ -505,9 +548,12 @@ export async function createSoloPackageBooking(input: {
             bufferMin: core.bufferMin,
           });
 
-          const created = await tx.booking.create({
+          const created = await createBookingRow(tx, {
             data: {
               providerId: pkg.providerId,
+              // FIX-C1: соло-пакет — всегда мастер без студии (`loadPackageForBooking`
+              // отказывает остальным), поэтому writer выведет `studioId: null`.
+              source: BookingSource.WEB,
               serviceId: core.service.id,
               masterProviderId: core.resolvedMasterProviderId,
               masterId: core.resolvedMasterProviderId ?? pkg.providerId,
@@ -541,12 +587,22 @@ export async function createSoloPackageBooking(input: {
 
         return { bookingPackageId: bookingPackage.id, bookingIds, totalKopeks: finalTotal };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
     );
   } catch (error) {
     const conflict = mapPrismaBookingConflict(error);
     if (conflict) throw conflict;
     throw error;
+  }
+
+  // RES-15: напоминания 24 ч/2 ч планируются на КАЖДЫЙ компонент — компоненты
+  // могут стоять в разные дни (PACKAGE-SOLO-WIZARD-01), и одна задача на пакет
+  // покрыла бы только один из них. Дедупликация — по самой брони
+  // (`reminder24hSentAt`/`reminder2hSentAt`), как у одиночной записи.
+  if (shouldAutoConfirm) {
+    for (const bookingId of result.bookingIds) {
+      await scheduleBookingRemindersSafe(bookingId);
+    }
   }
 
   // Post-tx slot-cache invalidation per child (best-effort, non-fatal).
@@ -657,8 +713,14 @@ export async function cancelSoloPackageBooking(input: {
   const cancelledBookingIds = await prisma.$transaction(async (tx) => {
     const ids: string[] = [];
     for (const child of liveChildren) {
-      await tx.booking.update({
-        where: { id: child.id },
+      // LOGIC-02: переход только из наблюдённого статуса ребёнка. Статусы
+      // прочитаны выше и ВНЕ транзакции, поэтому безусловная запись затирала бы
+      // чужой переход по конкретному компоненту. Отказ здесь роняет всю
+      // транзакцию — и это правильно: пакет отменяется целиком (инв. #34).
+      await applyBookingTransition(tx, {
+        id: child.id,
+        expectedStatus: child.status,
+        select: { id: true },
         data: {
           status: "REJECTED",
           cancelledBy: input.cancelledBy,

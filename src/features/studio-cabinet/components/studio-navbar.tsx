@@ -81,7 +81,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
           {publicHint ? <span className="text-[11px] text-text-sec">{publicHint}</span> : null}
         </div>
 
-        <nav className="hidden items-center gap-2 md:flex">
+        <nav aria-label={UI_TEXT.a11y.cabinetSections} className="hidden items-center gap-2 md:flex">
           {NAV_ITEMS.map((item) => {
             const active = isActive(pathname, item.href);
             return (
@@ -130,7 +130,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
         </div>
       </div>
 
-      <nav className="mx-auto mt-3 flex w-full max-w-6xl items-center gap-2 overflow-x-auto pb-1 md:hidden">
+      <nav aria-label={UI_TEXT.a11y.cabinetSections} className="mx-auto mt-3 flex w-full max-w-6xl items-center gap-2 overflow-x-auto pb-1 md:hidden">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
           return (

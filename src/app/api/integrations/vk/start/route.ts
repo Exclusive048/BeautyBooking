@@ -1,24 +1,73 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
-import { fail } from "@/lib/api/response";
-import { AppError, toAppError } from "@/lib/api/errors";
-import { requireAuth } from "@/lib/auth/guards";
+import { getSessionUser } from "@/lib/auth/session";
+import {
+  classifyOAuthStartFailure,
+  logOAuthStartFailure,
+  cabinetRefererPath,
+  oauthStartCabinetRedirect,
+  oauthStartInternalRedirect,
+  oauthStartProviderRedirect,
+  type OAuthStartFailure,
+  type OAuthStartNavigation,
+} from "@/lib/auth/oauth-start-error";
 import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
 import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
 import { isProduction, isVkAuthEnabled } from "@/lib/env";
 
-export async function GET() {
+const VK_NOT_CONFIGURED_CODES = new Set([
+  "VK_CLIENT_ID_MISSING",
+  "VK_CLIENT_SECRET_MISSING",
+  "VK_REDIRECT_URI_MISSING",
+  "VK_ID_CLIENT_ID_MISSING",
+  "VK_ID_CLIENT_SECRET_MISSING",
+  "VK_ID_REDIRECT_URI_MISSING",
+]);
+
+/**
+ * FIX-B14 — третья стартовая нога, найденная свипом (в задании названы не
+ * были). Навигация сюда идёт из кабинета: `window.location.assign` в
+ * `VkNotificationsSection`, — то есть все три её отказа были ровно такими же
+ * JSON-тупиками, что и на `/login`-ногах.
+ *
+ * Назначение отличается, и это не стилистика: аудитория тут — УЖЕ вошедший
+ * пользователь в настройках кабинета, и `/login` для него неверный адрес.
+ * Поэтому исход тот же (`OAuthStartFailure`, общая классификация), а адрес
+ * выводится из страницы, с которой он ушёл: `Referer`, прогнанный через
+ * `sanitizeInternalPath` внутри `nextRedirect` (враждебное или чужое значение
+ * схлопывается в дефолт `/cabinet/profile`). Флаг `?vk=<исход>` снимает
+ * `VkNotificationsSection` — тот же компонент, что и увёл браузер, поэтому
+ * сообщение появляется на ЛЮБОЙ странице, где эта кнопка отрисована, без
+ * per-page плюмбинга.
+ *
+ * Исключение — отсутствие сессии: `/login` для неё и есть правильный адрес.
+ */
+// FIX-D1: вывод адреса переехал в `oauth-start-error.ts` — им пользуется и
+// auth-нога, у которой кнопка живёт в клиентском кабинете.
+function backToConnectSurface(req: Request, failure: OAuthStartFailure): OAuthStartNavigation {
+  return oauthStartCabinetRedirect(req, failure, "vk");
+}
+
+export async function GET(req: Request): Promise<OAuthStartNavigation> {
   // AUTH-KILLSWITCH-ENFORCE-01: the VK-connect (notifications) flow is the same
   // VK OAuth mechanism as login — gate it on the same `isVkAuthEnabled` so a
   // disabled VK provider can't be reached via the integrations entry point.
   if (!isVkAuthEnabled) {
-    return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
+    return backToConnectSurface(req, "provider_unavailable");
   }
 
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
+  // FIX-B14: `requireAuth()` отдавал JSON 401 — на навигации это тупик, причём
+  // самый достижимый из трёх (сессия истекла на открытой вкладке кабинета).
+  // Здесь `/login` — правильный адрес, и `?next=` возвращает человека ровно
+  // туда, откуда он нажал «подключить», а не в дефолтный кабинет.
+  const user = await getSessionUser();
+  if (!user) {
+    return oauthStartInternalRedirect(
+      req,
+      `/login?next=${encodeURIComponent(cabinetRefererPath(req))}`,
+    );
+  }
 
   try {
     const state = crypto.randomBytes(32).toString("hex");
@@ -43,9 +92,11 @@ export async function GET() {
       maxAge: VK_ID_STATE_TTL_SECONDS,
     });
 
-    return NextResponse.redirect(authUrl);
+    return oauthStartProviderRedirect(authUrl);
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    // FIX-B14 + Y9: `appError.details` больше не уезжает в ответ, отказ —
+    // навигация обратно на поверхность подключения.
+    logOAuthStartFailure(req, error);
+    return backToConnectSurface(req, classifyOAuthStartFailure(error, VK_NOT_CONFIGURED_CODES));
   }
 }

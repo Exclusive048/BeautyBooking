@@ -28,7 +28,7 @@ export function ReviewReportInfo({ review }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-red-500/8 p-3">
+    <div className="flex flex-col gap-1.5 rounded-xl bg-red-500/[0.08] p-3">
       <div className="flex items-center gap-1.5 text-red-700 dark:text-red-300">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="font-mono text-[10px] uppercase tracking-[0.08em]">

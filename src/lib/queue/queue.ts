@@ -418,7 +418,25 @@ export async function recoverStuckJobs(): Promise<number> {
       }
 
       // Stale lease → dead worker → recover exactly once.
-      await runQueueRedisCommand("recoverStuckJobs:lRem", client.lRem(PROCESSING_KEY, 1, raw));
+      //
+      // LOGIC-15: `lRem` — единственная точка сериализации на этом пути, и её
+      // результат обязателен. Два воркера, прочитавшие один и тот же
+      // просроченный элемент в одном тике восстановления, оба доходили сюда и
+      // оба безусловно делали `lPush`/`rPush` — то есть «recover exactly once»
+      // из комментария выше не выполнялся, и задача уезжала в очередь дважды.
+      // Redis выполняет команды по одной, поэтому удаление элемента получит
+      // ровно один из них: ненулевой ответ `lRem` и есть право на
+      // восстановление. Проигравший НЕ трогает heartbeat и заносит id в
+      // `liveIds` — иначе финальная прополка снесла бы отметку победителя (или
+      // уже нового исполнителя), и следующий цикл счёл бы задачу бесхозной.
+      const removed = await runQueueRedisCommand(
+        "recoverStuckJobs:lRem",
+        client.lRem(PROCESSING_KEY, 1, raw)
+      );
+      if (removed === 0) {
+        liveIds.add(job.id);
+        continue;
+      }
       await runQueueRedisCommand("recoverStuckJobs:hDel", client.hDel(PROCESSING_HEARTBEAT_KEY, job.id));
 
       const attempts = (job.attempts ?? 0) + 1;

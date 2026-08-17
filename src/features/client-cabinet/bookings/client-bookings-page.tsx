@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import {
@@ -18,11 +18,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
+import { ICS_FAILURE_PARAM, type IcsExportFailure } from "@/lib/bookings/ics-export-outcome";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
@@ -75,6 +77,37 @@ export function ClientBookingsPage() {
   // the row once the SWR list has loaded (rows aren't in the DOM on mount).
   useFocusHighlight(bookings.length);
 
+  // FIX-B18: `GET /api/bookings/[id]/ics` — навигация (ссылка «В календарь»), и
+  // её отказы раньше рисовали в окне JSON-конверт. Теперь она возвращает
+  // браузер сюда с `?ics=<исход>`. Форма читается из `window.location.search`,
+  // а не `useSearchParams()` — последний требует Suspense-границы у хозяина
+  // страницы (та же причина, что в `vk-notifications.tsx`). `?focus=` при этом
+  // остаётся в URL: подсветка строки — часть возврата «к своей записи».
+  const [icsError, setIcsError] = useState<string | null>(null);
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get(ICS_FAILURE_PARAM);
+    if (!raw) return;
+    const messages: Record<Exclude<IcsExportFailure, "auth_required">, string> = {
+      not_found: T.icsErrorNotFound,
+      forbidden: T.icsErrorForbidden,
+      no_time: T.icsErrorNoTime,
+      failed: T.icsErrorFailed,
+    };
+    const message = messages[raw as keyof typeof messages];
+    if (!message) return;
+    // `startTransition`, а не голый setState: правило `react-hooks/
+    // set-state-in-effect` (React Compiler) справедливо запрещает синхронное
+    // обновление в теле эффекта. Здесь это и по смыслу верно — баннер об
+    // отказе не срочнее списка записей. ⚠️ Соседний `vk-notifications.tsx`
+    // делает то же самое голым setState и правило там молчит: линтер
+    // пропускает компоненты, которые не смог скомпилировать, то есть его
+    // тишина — не разрешение. Копировать ту форму не следует.
+    startTransition(() => setIcsError(message));
+    const url = new URL(window.location.href);
+    url.searchParams.delete(ICS_FAILURE_PARAM);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
   const statusCounts = useMemo(() => {
     const all = bookings.length;
     const upcoming = bookings.filter((b) => b.isUpcoming).length;
@@ -119,6 +152,12 @@ export function ClientBookingsPage() {
         counts={statusCounts}
       />
 
+      {icsError ? (
+        <Card className="border-destructive/40 bg-destructive/5 p-4 text-sm text-text-main">
+          {icsError}
+        </Card>
+      ) : null}
+
       {error ? (
         <Card className="p-6 text-center text-sm text-text-sec">
           {UI_TEXT.clientCabinet.bookingsPanel.failedToLoad}
@@ -126,7 +165,7 @@ export function ClientBookingsPage() {
       ) : isLoading ? (
         <BookingsListSkeleton />
       ) : bookings.length === 0 ? (
-        <EmptyState />
+        <BookingsEmptyState />
       ) : (
         <div className="space-y-8" data-testid="bookings-list">
           {months.map((month) => (
@@ -542,11 +581,14 @@ function BookingActions({
             <ActionLink href={chatHref} icon={MessageSquare} label={T.actionChat} variant="primary" />
           ) : null}
           <ActionButton icon={Calendar} label={T.actionReschedule} onClick={onReschedule} />
+          {/* FIX-B18: без `download` — атрибут заставил бы браузер СКАЧАТЬ цель
+              редиректа при отказе (страницу вместо файла). На успехе он не
+              нужен: ответ несёт `Content-Disposition: attachment`, который сам
+              вызывает скачивание, не уводя пользователя со страницы. */}
           <ActionLink
             href={`/api/bookings/${booking.id}/ics`}
             icon={Download}
             label={T.actionIcs}
-            download
           />
           {mapsHref ? (
             <ActionLink href={mapsHref} icon={MapPin} label={T.actionRoute} target="_blank" />
@@ -671,17 +713,20 @@ function ActionLink({
 
 /* -------------------------------------------------------------------------- */
 
-function EmptyState() {
+/**
+ * RES-28: локальная копия называлась `EmptyState` — ровно как общий экспорт из
+ * `@/components/ui/empty-state`, из-за чего в трёх файлах `client-cabinet` жили
+ * три разных компонента с одним именем. Действие и текст сохранены дословно.
+ */
+function BookingsEmptyState() {
   return (
-    <Card className="flex flex-col items-center gap-4 p-10 text-center">
-      <div className="grid h-14 w-14 place-items-center rounded-full bg-bg-input">
-        <Calendar className="h-6 w-6 text-text-sec" aria-hidden />
-      </div>
-      <div className="font-display text-lg text-text-main">{T.empty}</div>
-      <Link href="/catalog">
-        <Button variant="primary">{T.emptyCta}</Button>
-      </Link>
-    </Card>
+    <EmptyState
+      variant="card"
+      iconSize="lg"
+      icon={Calendar}
+      title={T.empty}
+      action={{ label: T.emptyCta, href: "/catalog", variant: "primary" }}
+    />
   );
 }
 

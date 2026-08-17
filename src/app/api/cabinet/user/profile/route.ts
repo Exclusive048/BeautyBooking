@@ -44,7 +44,17 @@ export async function PATCH(req: Request) {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      return jsonFail(409, "Email уже используется", "ALREADY_EXISTS");
+      // FIX-C8: строка стала видимой (индикатор автосохранения печатает
+      // серверный текст), поэтому приведена к формулировке соседнего сайта
+      // (`email/request-verify`): называет и причину, и действие. Прежнее
+      // «Email уже используется» не говорило, что делать, а канон
+      // «Попробуйте ещё раз» здесь был бы прямо неверным советом — повтор
+      // того же адреса не пройдёт никогда (инв. #41).
+      return jsonFail(
+        409,
+        "Этот email уже используется другим аккаунтом. Укажите другой адрес.",
+        "ALREADY_EXISTS",
+      );
     }
     const appError = toAppError(error);
     if (appError.status >= 500) {

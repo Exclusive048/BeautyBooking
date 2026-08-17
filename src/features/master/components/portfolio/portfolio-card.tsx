@@ -105,12 +105,12 @@ export function PortfolioCard({
         <button
           type="button"
           onClick={() => setEditOpen(true)}
-          aria-label={T.editAriaLabel}
+          aria-label={T.editAriaTemplate.replace("{n}", String(item.globalIndex + 1))}
           className="relative block h-full w-full"
         >
           <ResilientImage
             src={item.mediaUrl}
-            alt=""
+            alt={T.imageAltTemplate.replace("{n}", String(item.globalIndex + 1))}
             loading="lazy"
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className="object-cover"
@@ -143,7 +143,7 @@ export function PortfolioCard({
             <>
               <button
                 type="button"
-                aria-label="close-menu"
+                aria-label={UI_TEXT.a11y.closeMenu}
                 className="fixed inset-0 z-10 cursor-default"
                 onClick={() => setMenuOpen(false)}
               />

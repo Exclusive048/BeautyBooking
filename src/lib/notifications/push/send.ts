@@ -8,6 +8,15 @@ type PushPayload = {
   url?: string;
 };
 
+/**
+ * RES-22 — граница запроса к push-сервису.
+ *
+ * 10 с: FCM/Mozilla/Apple отвечают за доли секунды, и push — уведомление, а не
+ * транзакция: ждать дольше нечего, ретраить самим тоже нечего (доставку
+ * гарантирует сам push-сервис после приёма).
+ */
+const PUSH_REQUEST_TIMEOUT_MS = 10_000;
+
 function getStatusCode(error: unknown): number | null {
   if (!error || typeof error !== "object") return null;
   const record = error as { statusCode?: unknown };
@@ -53,7 +62,17 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
               endpoint: sub.endpoint,
               keys: { p256dh: sub.p256dh, auth: sub.auth },
             },
-            body
+            body,
+            // RES-22: третий аргумент отсутствовал, то есть у запроса к
+            // push-сервису не было верхней границы вовсе. Адресат тут —
+            // ЧУЖОЙ сервис (FCM, Mozilla, Apple), выбранный браузером
+            // пользователя, и отправка идёт `Promise.all` по всем подпискам:
+            // один зависший эндпоинт держал бы весь пакет и слот воркера.
+            // `web-push` кладёт значение в `https.request` и на событии
+            // `timeout` рвёт сокет — то есть промис ОТКЛОНЯЕТСЯ и попадает в
+            // существующий `catch` ниже (410-ветка не срабатывает: кода
+            // статуса у такой ошибки нет, подписка не удаляется).
+            { timeout: PUSH_REQUEST_TIMEOUT_MS }
           );
           logInfo("Push sent", { userId, subscriptionId: sub.id });
         } catch (error) {

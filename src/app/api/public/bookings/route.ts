@@ -14,10 +14,11 @@ import {
 import { invalidateRecentMastersCache } from "@/lib/bookings/recent-masters";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
-import { normalizePhone } from "@/lib/auth/otp";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { getClientIp } from "@/lib/http/ip";
 import { assertRequiredConsents, recordGuestConsents } from "@/lib/legal/consent";
@@ -50,20 +51,36 @@ export async function POST(req: Request) {
       return jsonFail(400, "Не передан идентификатор запроса.", "VALIDATION_ERROR");
     }
 
-    const phoneNormalized = normalizePhone(body.clientPhone);
-    if (!phoneNormalized || phoneNormalized.length < 8) {
+    // LOGIC-30: форма телефона, а не только длина. Порог «≥ 8 символов»
+    // пропускал строки, телефоном не являющиеся, — а телефон здесь ключ
+    // склейки гостевых броней, namespace идемпотентности и рейт-лимита, и
+    // мусор в нём дороже обычной валидационной небрежности. Нормализатор тот
+    // же, что у склейки и CRM-ключа, поэтому «8 999…» приводится к
+    // каноническому «+7999…», а не сохраняется как «+8999…» (профиль с таким
+    // телефоном недостижим навсегда).
+    const phoneNormalized = normalizeRussianPhone(body.clientPhone);
+    if (!phoneNormalized) {
       return jsonFail(400, "Проверьте номер телефона.", "VALIDATION_ERROR");
     }
 
     // Two-axis rate limit — both must pass.
     const phoneKey = `rate:publicBooking:phone:${phoneNormalized}`;
     const ipKey = `rate:publicBooking:ip:${getClientIp(req)}`;
-    const [phoneAllowed, ipAllowed] = await Promise.all([
-      checkRateLimit(phoneKey, PUBLIC_BOOKING_PHONE_RATE.limit, PUBLIC_BOOKING_PHONE_RATE.windowSeconds),
-      checkRateLimit(ipKey, PUBLIC_BOOKING_IP_RATE.limit, PUBLIC_BOOKING_IP_RATE.windowSeconds),
+    // FIX-C11: перегрузка с конфигом несёт ПРИЧИНУ отказа — обрыв Redis отвечает
+    // 503, исчерпанный бюджет 429. Политика та же (fail-closed, инв. #6).
+    const [phoneLimit, ipLimit] = await Promise.all([
+      checkRateLimit(phoneKey, {
+        maxRequests: PUBLIC_BOOKING_PHONE_RATE.limit,
+        windowSeconds: PUBLIC_BOOKING_PHONE_RATE.windowSeconds,
+      }),
+      checkRateLimit(ipKey, {
+        maxRequests: PUBLIC_BOOKING_IP_RATE.limit,
+        windowSeconds: PUBLIC_BOOKING_IP_RATE.windowSeconds,
+      }),
     ]);
-    if (!phoneAllowed || !ipAllowed) {
-      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
+    const refusal = resolveRateLimitRefusal(phoneLimit, ipLimit);
+    if (refusal) {
+      return jsonFail(refusal.status, refusal.message, refusal.code);
     }
 
     // Provider sanity check — only allow public booking of published MASTER providers.
@@ -180,9 +197,8 @@ export async function POST(req: Request) {
       operation: "create-public-booking",
       code: appError.code,
     });
-    return NextResponse.json(
-      { ok: false, error: { code: appError.code, message: appError.message } },
-      { status: appError.status },
-    );
+    // FIX-B18: форма и так совпадала с конвертом, но собиралась руками — то
+    // есть без `requestId` и мимо `check:error-message-lang`.
+    return jsonFail(appError.status, appError.message, appError.code);
   }
 }

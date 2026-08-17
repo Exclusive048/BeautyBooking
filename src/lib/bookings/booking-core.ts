@@ -10,8 +10,20 @@ import {
 } from "@/lib/bookings/policy-enforcement";
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
+import type { BookingTx } from "@/lib/bookings/booking-transaction";
 
-type DbClient = Prisma.TransactionClient | typeof prisma;
+/**
+ * FIX-C6 (инв. #31) — клиент, которому позволено спрашивать про конфликт.
+ *
+ * Либо пуловый `prisma` (дешёвая предварительная проверка ДО транзакции), либо
+ * `BookingTx` — транзакция booking-домена, открытая `bookingTransaction`, то
+ * есть `Serializable` по построению. Обычный `Prisma.TransactionClient` сюда
+ * НЕ годится намеренно: под Read Committed повторная проверка не даёт ничего
+ * сверх внешней (обе транзакции читают «пусто» и обе коммитятся), а выглядит
+ * защитой. Раньше это утверждение держал регексп по исходнику; теперь —
+ * компилятор.
+ */
+type ConflictCheckClient = typeof prisma | BookingTx;
 
 export type BookingCoreContext = {
   provider: {
@@ -96,8 +108,80 @@ export function normalizeBufferMinutes(value: number | null | undefined): number
   return Math.min(30, safe);
 }
 
+/**
+ * LOGIC-01 — скоуп поиска конфликтов: «время мастера — это время мастера».
+ *
+ * Раньше предикат ключевался ПАРОЙ `(providerId, masterProviderId)`, а один и
+ * тот же мастер имеет брони под ДВУМЯ разными `providerId`: через личный
+ * профиль (`providerId = мастер`, `/api/public/bookings` при этом мастеров
+ * студии не отсекает — проверено на HEAD) и через студийный кабинет
+ * (`providerId = провайдер студии`, `masterProviderId = мастер`). Множества не
+ * пересекались, поэтому студийный админ создавал бронь поверх существующей
+ * **без всякой гонки**, а Serializable этого не ловил: транзакции читают
+ * непересекающиеся строки, цикла зависимостей нет, обе коммитятся.
+ *
+ * Правило «время мастера — это время мастера» в проекте уже принято: на нём
+ * стоят `TimeBlock` (`time-blocks.ts:50-53`, ключ только `masterId`) и
+ * генератор слотов (`schedule/usecases.ts:310-315`). Этот предикат приводится
+ * к ним же, а не изобретает пятое определение конфликта.
+ *
+ * ⚠️ Скоуп строится как **надмножество** прежнего, а не как замена. Для брони
+ * БЕЗ назначенного мастера (`masterProviderId = null`, студийная бронь на
+ * кабинет целиком) прежний широкий клоз `{ providerId }` сохранён: он ловил
+ * пересечение с любой бронью студии, и сузить его — отдельное продуктовое
+ * решение, а не побочный эффект фикса скоупа.
+ */
+export function buildConflictScopeWhere(input: {
+  providerId: string;
+  masterProviderId: string | null;
+}) {
+  const masterKey = input.masterProviderId ?? input.providerId;
+  const orClauses: Array<Record<string, unknown>> = [
+    // исполнитель — независимо от того, под каким providerId создана бронь
+    { masterProviderId: masterKey },
+    // бронь без назначенного мастера: занят сам провайдер
+    { masterProviderId: null, providerId: masterKey },
+  ];
+  if (!input.masterProviderId) {
+    orClauses.push({ providerId: input.providerId });
+  }
+  return { OR: orClauses };
+}
+
+/**
+ * LOGIC-17 — ВРЕМЕННОЕ окно поиска конфликтов (дополняет `buildConflictScopeWhere`,
+ * который задаёт скоуп «чьё это время»).
+ *
+ * Без него запрос забирает ВСЮ историю броней мастера. Помимо стоимости, внутри
+ * Serializable это ставит predicate-lock на всю историю: любая параллельная
+ * запись брони того же мастера — даже на будущий год — становится кандидатом на
+ * `P2034` и получает ложный 409 `SLOT_CONFLICT`. Частота ложных конфликтов
+ * растёт линейно с историей, то есть дефект просыпается тем сильнее, чем дольше
+ * живёт кабинет.
+ *
+ * Границы буферизованы так же, как их потом сравнивает `overlaps`: предикат БД
+ * и предикат в памяти обязаны отбирать одно и то же множество, иначе сужение
+ * запроса начнёт терять конфликты.
+ */
+export function buildConflictWindowWhere(input: {
+  startAtUtc: Date;
+  endAtUtc: Date;
+  bufferMin: number;
+}) {
+  const bufferedStart = input.bufferMin
+    ? shiftMinutes(input.startAtUtc, -input.bufferMin)
+    : input.startAtUtc;
+  const bufferedEnd = input.bufferMin
+    ? shiftMinutes(input.endAtUtc, input.bufferMin)
+    : input.endAtUtc;
+  return {
+    startAtUtc: { not: null, lt: bufferedEnd },
+    endAtUtc: { not: null, gt: bufferedStart },
+  } as const;
+}
+
 export async function ensureNoConflicts(
-  db: DbClient,
+  db: ConflictCheckClient,
   input: {
     providerId: string;
     masterProviderId: string | null;
@@ -106,23 +190,11 @@ export async function ensureNoConflicts(
     bufferMin: number;
   }
 ): Promise<void> {
-  const bufferedStart = input.bufferMin
-    ? shiftMinutes(input.startAtUtc, -input.bufferMin)
-    : input.startAtUtc;
-  const bufferedEnd = input.bufferMin
-    ? shiftMinutes(input.endAtUtc, input.bufferMin)
-    : input.endAtUtc;
-
-  const conflictWhere = input.masterProviderId
-    ? { providerId: input.providerId, masterProviderId: input.masterProviderId }
-    : { providerId: input.providerId };
-
   const conflicts = await db.booking.findMany({
     where: {
-      ...conflictWhere,
+      ...buildConflictScopeWhere(input),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      startAtUtc: { not: null, lt: bufferedEnd },
-      endAtUtc: { not: null, gt: bufferedStart },
+      ...buildConflictWindowWhere(input),
     },
     select: { id: true, startAtUtc: true, endAtUtc: true },
     take: 1,

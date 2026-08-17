@@ -6,11 +6,12 @@ import { parseISOToUTC } from "@/lib/time";
 import { createSoloPackageBooking } from "@/lib/bookings/package-booking";
 import { findOrCreateGuestUserByPhone } from "@/lib/users/find-or-create-guest";
 import { getSessionUserFromRequest } from "@/lib/auth/session";
-import { normalizePhone } from "@/lib/auth/otp";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
-import { consentFlagsSchema } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
 import { assertRequiredConsents, recordGuestConsents } from "@/lib/legal/consent";
 
 /**
@@ -49,19 +50,36 @@ export async function POST(
     const p = params instanceof Promise ? await params : params;
     const body = await parseBody(req, packageBookSchema);
 
-    const phoneNormalized = normalizePhone(body.clientPhone);
-    if (!phoneNormalized || phoneNormalized.length < 8) {
+    const idempotencyKey = req.headers.get("x-idempotency-key")?.trim() || null;
+
+    // LOGIC-30: форма телефона, а не только длина. Порог «≥ 8 символов»
+    // пропускал строки, телефоном не являющиеся, — а телефон здесь ключ
+    // склейки гостевых броней, namespace идемпотентности и рейт-лимита, и
+    // мусор в нём дороже обычной валидационной небрежности. Нормализатор тот
+    // же, что у склейки и CRM-ключа, поэтому «8 999…» приводится к
+    // каноническому «+7999…», а не сохраняется как «+8999…» (профиль с таким
+    // телефоном недостижим навсегда).
+    const phoneNormalized = normalizeRussianPhone(body.clientPhone);
+    if (!phoneNormalized) {
       return jsonFail(400, "Проверьте номер телефона.", "VALIDATION_ERROR");
     }
 
     const phoneKey = `rate:packageBook:phone:${phoneNormalized}`;
     const ipKey = `rate:packageBook:ip:${getClientIp(req)}`;
-    const [phoneAllowed, ipAllowed] = await Promise.all([
-      checkRateLimit(phoneKey, PACKAGE_BOOK_PHONE_RATE.limit, PACKAGE_BOOK_PHONE_RATE.windowSeconds),
-      checkRateLimit(ipKey, PACKAGE_BOOK_IP_RATE.limit, PACKAGE_BOOK_IP_RATE.windowSeconds),
+    // FIX-C11: причина отказа различима — 503 при обрыве, 429 при бюджете.
+    const [phoneLimit, ipLimit] = await Promise.all([
+      checkRateLimit(phoneKey, {
+        maxRequests: PACKAGE_BOOK_PHONE_RATE.limit,
+        windowSeconds: PACKAGE_BOOK_PHONE_RATE.windowSeconds,
+      }),
+      checkRateLimit(ipKey, {
+        maxRequests: PACKAGE_BOOK_IP_RATE.limit,
+        windowSeconds: PACKAGE_BOOK_IP_RATE.windowSeconds,
+      }),
     ]);
-    if (!phoneAllowed || !ipAllowed) {
-      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
+    const refusal = resolveRateLimitRefusal(phoneLimit, ipLimit);
+    if (refusal) {
+      return jsonFail(refusal.status, refusal.message, refusal.code);
     }
 
     const slots = body.slots.map((s) => ({
@@ -104,6 +122,12 @@ export async function POST(
       comment: body.comment ?? null,
       silentMode: body.silentMode ?? false,
       slots,
+      // LOGIC-09 (инв. #28): повторный сабмит обязан вернуть ТОТ ЖЕ пакет, а не
+      // «это время занято» — так выглядел двойной клик, потому что второй
+      // запрос упирался в уже созданные сиблинги. Заголовок опционален:
+      // требовать его — ломать контракт публичного роута для существующих
+      // клиентов, а не чинить находку.
+      idempotencyKey,
     });
 
     return jsonOk(result);

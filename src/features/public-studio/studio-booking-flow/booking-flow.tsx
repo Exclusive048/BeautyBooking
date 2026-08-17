@@ -72,7 +72,12 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [selectedDate, setSelectedDate] = useState(todayKey());
+  // LOGIC-26: при монтировании tz салона ещё не загружена — берём зону
+  // зрителя как единственное, что известно, и пересчитываем ниже, как только
+  // придёт профиль. К этому моменту выбрать дату пользователь не мог: полоса
+  // дней живёт за шагом «когда», а виджет до конца загрузки в состоянии
+  // `loading`.
+  const [selectedDate, setSelectedDate] = useState(() => todayKey(viewerTimeZone));
   const [serviceId, setServiceId] = useState(initialServiceId ?? "");
   const [masterId, setMasterId] = useState(initialMasterId ?? "");
   const [slotLabel, setSlotLabel] = useState("");
@@ -214,6 +219,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         if (profileRes.provider.type !== "STUDIO") throw new Error(UI_TEXT.publicStudio.studioOnlyProfileError);
         if (cancelled) return;
         setStudio(profileRes.provider);
+        // LOGIC-26: день по умолчанию — «сегодня» САЛОНА. Клиент из
+        // Калининграда (+2), открывающий екатеринбургскую студию (+5) поздно
+        // вечером, иначе видел выдачу на вчерашний по меркам салона день.
+        setSelectedDate(todayKey(profileRes.provider.timezone));
         setMasters(mastersRes.ok ? mastersRes.masters : []);
       } catch (err) {
         if (!cancelled) {
@@ -550,7 +559,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         <p className="mt-2 text-xs text-text-muted">{UI_TEXT.bookingWidget.success.hint}</p>
         <a
           href={studioBackHref}
-          className="mt-5 inline-flex rounded-xl bg-bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-bg-muted/70"
+          className="mt-5 inline-flex rounded-xl bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-muted/70"
         >
           {UI_TEXT.bookingWidget.success.backToStudio}
         </a>
@@ -715,11 +724,11 @@ function BookingFlowSkeleton() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4">
-        <div className="h-44 animate-pulse rounded-2xl bg-bg-muted/40" />
-        <div className="h-14 animate-pulse rounded-xl bg-bg-muted/40" />
-        <div className="h-72 animate-pulse rounded-2xl bg-bg-muted/40" />
+        <div className="h-44 animate-pulse rounded-2xl bg-muted/40" />
+        <div className="h-14 animate-pulse rounded-xl bg-muted/40" />
+        <div className="h-72 animate-pulse rounded-2xl bg-muted/40" />
       </div>
-      <div className="h-72 animate-pulse rounded-2xl bg-bg-muted/40" />
+      <div className="h-72 animate-pulse rounded-2xl bg-muted/40" />
     </div>
   );
 }
@@ -756,23 +765,26 @@ function renderBookingConfig(input: {
   if (!bookingConfig.requiresReferencePhoto && bookingConfig.questions.length === 0) return null;
 
   return (
-    <div className="mt-4 space-y-3 rounded-xl border border-border-subtle bg-bg-muted/30 p-4">
+    <div className="mt-4 space-y-3 rounded-xl border border-border-subtle bg-muted/30 p-4">
       <div className="text-sm font-semibold text-text">{UI_TEXT.publicProfile.booking.bookingConfigTitle}</div>
       {bookingConfig.requiresReferencePhoto ? (
         <div>
+          {/* `renderBookingConfig` — обычная функция, а не компонент (у неё
+              есть ранние return'ы), поэтому `useId` здесь звать нельзя:
+              подпись связана с контролом обёрткой, а не `htmlFor`/`id`. */}
           <label className="block text-xs text-text-muted">
             {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-red-500">*</span>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (file) onReferenceUpload(file);
+              }}
+              disabled={referenceUploading}
+              className="mt-2 block w-full text-xs text-text-muted"
+            />
           </label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              if (file) onReferenceUpload(file);
-            }}
-            disabled={referenceUploading}
-            className="mt-2 block w-full text-xs text-text-muted"
-          />
           {referenceUploading ? (
             <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.referencePhotoUploading}</div>
           ) : null}

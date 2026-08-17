@@ -1,16 +1,17 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fail, ok } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { formatZodError } from "@/lib/api/validation";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpRequestRateLimit } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { otpRequestSchema } from "@/lib/auth/schemas";
 import { logInfo } from "@/lib/logging/logger";
 import { maskPhone } from "@/lib/logging/masking";
 import { isPhoneAuthEnabled, isProduction } from "@/lib/env";
 import { sendOtpSms } from "@/lib/sms";
 import { extractClientIp } from "@/lib/http/ip";
+import { observeAuthClientIp } from "@/lib/http/proxy-trust";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -33,12 +34,14 @@ export async function POST(req: Request) {
     }
 
     const { phone } = parsed.data;
+    // FIX-B17: наблюдение стоит ДО лимитера намеренно. Схлопывание клиентского
+    // IP проявляется как раз отказами лимитера — считая только пропущенные
+    // запросы, детектор слепнет ровно тогда, когда дефект начал кусаться.
+    // Ничего не ждёт и не бросает (см. `proxy-trust.ts`).
+    observeAuthClientIp(req, phone);
     const rateLimit = await checkOtpRequestRateLimit({ phone, ip: extractClientIp(req) });
     if (!rateLimit.ok) {
-      return NextResponse.json(
-        { error: rateLimit.error, retryAfterSec: rateLimit.retryAfterSec },
-        { status: rateLimit.status, headers: { "Retry-After": String(rateLimit.retryAfterSec) } }
-      );
+      return otpRateLimitFail(rateLimit);
     }
 
     const code = generateOtpCode();
@@ -74,13 +77,13 @@ export async function POST(req: Request) {
       // (INSUFFICIENT_BALANCE / AUTH_FAILED / IP_BLOCKED), disclosing SMS-gateway
       // account state to anonymous callers. The code is still logged server-side
       // (sendOtpSms → logError); the client sees only a generic message.
-      return NextResponse.json(
-        {
-          error: "SMS_DELIVERY_FAILED",
-          message:
-            "Не удалось отправить SMS. Попробуйте ещё раз через минуту.",
-        },
-        { status: 503 },
+      // FIX-B14: тот же конверт, что у остальных отказов. Прежняя форма несла
+      // `error: "SMS_DELIVERY_FAILED"` рядом с `message` на верхнем уровне —
+      // `fetchJson` читает `error.message` и до этого текста не доходил.
+      return fail(
+        "Не удалось отправить SMS. Попробуйте ещё раз через минуту.",
+        503,
+        "SMS_DELIVERY_FAILED",
       );
     }
 

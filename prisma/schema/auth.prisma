@@ -9,7 +9,15 @@ model UserProfile {
 
   phone String? @unique
 
-  email String? @unique
+  // EMAIL-ADDRESS-OCCUPATION: уникальность email — ЧАСТИЧНАЯ, только по
+  // подтверждённым адресам (`WHERE "emailVerifiedAt" IS NOT NULL`, сырой SQL,
+  // реестр `scripts/raw-sql-objects.mjs`). Полный @@unique здесь означал бы,
+  // что ЛЮБАЯ неподтверждённая запись чужого адреса занимает его навсегда:
+  // владелец при регистрации упирался в P2002 и получал «Обратитесь в
+  // поддержку» на единственном включённом в проде канале входа. Теперь
+  // «заявить» адрес может кто угодно и сколько угодно, а «владеть» им —
+  // ровно один, и владение даёт только доказательство (инв. #41).
+  email String?
 
   emailVerifiedAt DateTime?
 
@@ -224,6 +232,13 @@ model RefreshSession {
 
   rotatedToSessionId String? @unique
 
+  /// SEC-13: идентификатор «семьи» сессий — одно устройство/вход. Ротация
+  /// создаёт новую строку, но familyId наследуется, поэтому access-токен
+  /// можно привязать к семье, а не к конкретной строке (иначе каждая ротация
+  /// обнуляла бы живой access-токен). Nullable: строки, выпущенные до
+  /// миграции, семьи не имеют и трактуются как legacy.
+  familyId String?
+
   rotatedToSession RefreshSession? @relation("RefreshSessionRotation", fields: [rotatedToSessionId], references: [id], onDelete: SetNull)
 
   rotatedFromSession RefreshSession[] @relation("RefreshSessionRotation")
@@ -236,6 +251,9 @@ model RefreshSession {
   @@index([expiresAt])
   @@index([revokedAt])
   @@index([usedAt])
+  // SEC-13: проверка «жива ли семья» идёт на КАЖДЫЙ аутентифицированный
+  // запрос — она обязана попадать в индекс.
+  @@index([userId, familyId, revokedAt])
 }
 
 model TelegramLink {

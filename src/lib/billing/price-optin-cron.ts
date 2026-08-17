@@ -6,7 +6,11 @@ import {
   PRICE_OPTIN_REMINDER_2H_MS,
   PRICE_OPTIN_REMINDER_24H_MS,
 } from "@/lib/billing/price-optin";
-import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
+import {
+  formatBillingDeadlineLabel,
+  resolveSubscriptionTimezone,
+} from "@/lib/billing/deadline-label";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import { UI_TEXT } from "@/lib/ui/text";
 
 /**
@@ -42,7 +46,11 @@ async function sendReminder(sub: {
 }): Promise<void> {
   const priceLabel =
     sub.pendingPriceKopeks !== null ? moneyRUBFromKopeks(sub.pendingPriceKopeks) : "";
-  const deadlineLabel = sub.graceUntil ? dateRU(sub.graceUntil) : "";
+  // LOGIC-25: tz-источник — salon-tz кабинета, за который платит подписка.
+  // Метка зоны обязательна: у cron-уведомления нет зрителя (см.
+  // `deadline-label.ts`).
+  const timeZone = await resolveSubscriptionTimezone(sub.userId, sub.scope);
+  const deadlineLabel = formatBillingDeadlineLabel(sub.graceUntil, timeZone);
   await createBillingNotification({
     userId: sub.userId,
     type: NotificationType.BILLING_RENEWAL_PRICE_INCREASE,

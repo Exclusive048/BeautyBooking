@@ -4,6 +4,14 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
 import { env } from "@/lib/env";
+import { getClientIp } from "@/lib/http/ip";
+import {
+  normalizeAddressQuery,
+  readAddressCache,
+  writeAddressCache,
+} from "@/lib/maps/address-cache";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 export const runtime = "nodejs";
 
@@ -24,6 +32,8 @@ type YandexGeocodeResponse = {
 };
 
 const YANDEX_GEOCODE_URL = "https://geocode-maps.yandex.ru/1.x/";
+/** RES-10 — верхняя граница запроса к геокодеру (см. комментарий у вызова). */
+const GEOCODE_REQUEST_TIMEOUT_MS = 5_000;
 
 function getGeocodeKey(): string {
   const key = env.YANDEX_GEOCODER_API_KEY ?? "";
@@ -44,7 +54,17 @@ function parsePoint(value?: string): { lat: number; lng: number } | null {
   return { lat, lng };
 }
 
-async function geocodeAddress(query: string): Promise<{ lat: number; lng: number } | null> {
+type GeocodeCoords = { lat: number; lng: number };
+
+async function geocodeAddress(query: string): Promise<GeocodeCoords | null> {
+  // SEC-04: повторный геокод того же адреса не должен стоить платного вызова.
+  const cacheParts = [normalizeAddressQuery(query)] as const;
+  const cached = await readAddressCache<{ coords: GeocodeCoords | null }>(
+    "geocode",
+    cacheParts,
+  );
+  if (cached) return cached.coords;
+
   const apiKey = getGeocodeKey();
   const url = new URL(YANDEX_GEOCODE_URL);
   url.searchParams.set("apikey", apiKey);
@@ -55,7 +75,14 @@ async function geocodeAddress(query: string): Promise<{ lat: number; lng: number
 
   let response: Response;
   try {
-    response = await fetch(url.toString(), { cache: "no-store" });
+    // RES-10: граница обязательна — роут анонимный, а зависший геокодер
+    // держит слот обработки и не даёт признака «таймаут» ни в одном логе.
+    // 5 с: адрес геокодируется за сотни миллисекунд, дольше пользователь всё
+    // равно не ждёт подсказку на вводе.
+    response = await fetch(url.toString(), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(GEOCODE_REQUEST_TIMEOUT_MS),
+    });
   } catch {
     throw new AppError("Сервис адресов временно недоступен. Попробуйте позже.", 502, "INTERNAL_ERROR", {
       reason: "fetch_failed",
@@ -77,11 +104,26 @@ async function geocodeAddress(query: string): Promise<{ lat: number; lng: number
 
   const pos =
     payload?.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject?.Point?.pos;
-  return parsePoint(pos);
+  const coords = parsePoint(pos);
+  // Ненайденный адрес кэшируется тоже — иначе «мусорный» запрос остаётся
+  // платным при каждом повторе. Поэтому значение обёрнуто в объект: `null`
+  // внутри него — это ответ, а `null` из кэша — промах.
+  await writeAddressCache("geocode", cacheParts, { coords });
+  return coords;
 }
 
 export async function GET(req: Request) {
   try {
+    // SEC-04: собственный тир — цена запроса здесь в деньгах, а не в CPU, и
+    // не должна зависеть от настроек общего публичного лимита.
+    const limit = await checkRateLimit(
+      `rl:address:geocode:${getClientIp(req)}`,
+      RATE_LIMITS.addressGeocode,
+    );
+    if (limit.limited) {
+      throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
+    }
+
     const query = parseQuery(new URL(req.url), querySchema);
     const coords = await geocodeAddress(query.q);
     return jsonOk({ coords });

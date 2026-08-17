@@ -311,7 +311,7 @@ function FavMasterCard({
             </Button>
           </Link>
           <Link href={profileHref}>
-            <Button variant="secondary" size="sm" aria-label="Открыть профиль">
+            <Button variant="secondary" size="sm" aria-label={T.openProfileAria}>
               <Eye className="h-4 w-4" aria-hidden />
             </Button>
           </Link>
@@ -374,7 +374,7 @@ function FavStudioCard({
             </Button>
           </Link>
           <Link href={profileHref}>
-            <Button variant="secondary" size="sm" aria-label="О студии">
+            <Button variant="secondary" size="sm" aria-label={T.aboutStudioAria}>
               <Eye className="h-4 w-4" aria-hidden />
             </Button>
           </Link>
@@ -429,7 +429,7 @@ function UnfavoriteButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label="Убрать из избранного"
+      aria-label={T.removeFromFavoritesAria}
       className="absolute right-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-bg-card/95 text-accent-text shadow-card backdrop-blur transition hover:scale-105"
     >
       <Heart className="h-4 w-4 fill-current" aria-hidden />

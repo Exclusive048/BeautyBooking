@@ -19,6 +19,15 @@ type UnreadResponse = {
 };
 
 const MIN_REFRESH_INTERVAL_MS = 400;
+/**
+ * RES-19 — период опроса, когда SSE закрылся окончательно.
+ *
+ * 60 с: счётчик непрочитанного — не реалтайм-критичная величина, а опрос идёт
+ * у каждой открытой вкладки, поэтому чаще означает постоянную фоновую
+ * нагрузку ради секунд задержки. Внутривкладочные действия счётчик обновляют
+ * и без этого — через шину `subscribeNotificationEvent`.
+ */
+const SSE_FALLBACK_POLL_MS = 60_000;
 
 export function useNotificationsBell(options: Options = {}) {
   const [hasUnread, setHasUnread] = useState(false);
@@ -88,6 +97,17 @@ export function useNotificationsBell(options: Options = {}) {
 
   useEffect(() => {
     const source = new EventSource("/api/notifications/stream");
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const startPolling = () => {
+      if (pollTimer) return;
+      // RES-19: фоллбэк включается ТОЛЬКО на окончательно закрытом потоке.
+      // Транзиентный обрыв `EventSource` переподключает сам, и опрос рядом с
+      // живым ретраем удвоил бы нагрузку без пользы.
+      pollTimer = setInterval(refresh, SSE_FALLBACK_POLL_MS);
+      refresh();
+    };
+
     source.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as NotificationEvent;
@@ -99,10 +119,19 @@ export function useNotificationsBell(options: Options = {}) {
       }
     };
     source.onerror = () => {
-      // Let EventSource retry automatically.
+      // RES-19: пустой обработчик покрывал только транзиентный обрыв — его
+      // `EventSource` действительно переподключает сам. Но при не-2xx или
+      // неверном `Content-Type` спека предписывает `readyState = CLOSED` БЕЗ
+      // ретрая, а именно это отдаёт роут, когда нотифаер недоступен (503
+      // `NOTIFIER_UNAVAILABLE`). Тогда счётчик замирал до полной навигации:
+      // вкладка выглядит рабочей и молча показывает устаревшее число.
+      if (source.readyState === EventSource.CLOSED) {
+        startPolling();
+      }
     };
 
     return () => {
+      if (pollTimer) clearInterval(pollTimer);
       source.close();
     };
   }, [refresh]);

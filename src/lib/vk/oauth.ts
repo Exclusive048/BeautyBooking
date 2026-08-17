@@ -3,6 +3,18 @@ import { getVkClientId, getVkClientSecret, getVkRedirectUri } from "@/lib/vk/con
 
 const VK_ID_AUTHORIZE_URL = "https://id.vk.ru/authorize";
 const VK_ID_TOKEN_URL = "https://id.vk.ru/oauth2/auth";
+/**
+ * RES-09 — верхняя граница обмена с VK ID.
+ *
+ * Оба вызова стоят в callback'е авторизации: пользователь уже сходил к
+ * провайдеру и вернулся, и его запрос висит, пока мы ходим за токеном и
+ * профилем. Без границы медленный внешний партнёр держит слот обработки
+ * бессрочно, а признака «таймаут» не появляется нигде — вход выглядит просто
+ * зависшим. 10 с: обмен кода и чтение профиля — короткие запросы, порог
+ * оставляет запас на сетевой хвост и заведомо короче терпения пользователя на
+ * экране «входим».
+ */
+const OAUTH_REQUEST_TIMEOUT_MS = 10_000;
 const VK_ID_USER_INFO_URL = "https://id.vk.ru/oauth2/user_info";
 // RKN-FIX-12: the logout endpoint constant went with `logoutVkSession` — see
 // the note at the bottom of this file.
@@ -145,6 +157,7 @@ export async function exchangeVkCodeForToken(input: {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    signal: AbortSignal.timeout(OAUTH_REQUEST_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => null)) as VkIdTokenResponse | null;
   if (!json) {
@@ -185,6 +198,7 @@ export async function fetchVkProfile(accessToken: string): Promise<VkProfile> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    signal: AbortSignal.timeout(OAUTH_REQUEST_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => null)) as VkIdUserInfoResponse | null;
   if (!json) {

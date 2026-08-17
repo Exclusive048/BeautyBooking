@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
+import type { BookingDbClient, BookingTx } from "@/lib/bookings/booking-transaction";
 
 /**
  * FIX-TIMEBLOCK-ENFORCEMENT-01 — the single source of truth that turns a
@@ -39,7 +40,21 @@ import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone
  * so a +5 salon's 16:30–17:30 block gates exactly those salon hours (SKILL-TZ-01).
  */
 
-type DbClient = Prisma.TransactionClient | typeof prisma;
+/**
+ * FIX-C6: надтип обычного клиента — `Prisma.TransactionClient` и `PrismaClient`
+ * ему присваиваются. Чтение блокировок доступно любому клиенту.
+ */
+type DbClient = BookingDbClient | typeof prisma;
+
+/**
+ * FIX-C6 (инв. #31) — клиент enforcement-примитива: пуловый `prisma` (когда
+ * проверка идёт до транзакции, из `ensureNoConflicts`) либо `BookingTx`, то
+ * есть транзакция booking-домена под `Serializable`. Обычный
+ * `Prisma.TransactionClient` отвергается компилятором: enforcement внутри
+ * транзакции со слабой изоляцией — это проверка, которая коммитится рядом с
+ * чужой такой же.
+ */
+type EnforcementClient = typeof prisma | BookingTx;
 
 /** Owner id of a `TimeBlock` — always the (studio) master's `Provider.id`. */
 export type TimeBlockRange = { startAtUtc: Date; endAtUtc: Date };
@@ -125,7 +140,7 @@ export async function hasConflictingTimeBlock(
  * Serializable transaction (pass the tx client) on the write paths.
  */
 export async function assertNoTimeBlockConflict(
-  db: DbClient,
+  db: EnforcementClient,
   input: { masterProviderId: string; startAtUtc: Date; endAtUtc: Date },
 ): Promise<void> {
   if (await hasConflictingTimeBlock(db, input)) {

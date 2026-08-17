@@ -1,5 +1,3 @@
-"use client";
-
 import { ErrorState } from "@/components/ui/error-state";
 import { UI_TEXT } from "@/lib/ui/text";
 

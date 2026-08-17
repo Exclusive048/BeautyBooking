@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
-import { scheduleBookingReminders } from "@/lib/bookings/reminders";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { MediaEntityType, ProviderType, Prisma } from "@prisma/client";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
+import { BookingSource, MediaEntityType, ProviderType, Prisma } from "@prisma/client";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
   buildCreateBookingIdempotencyKey,
@@ -15,10 +16,10 @@ import {
 import type { BookingDto } from "@/lib/bookings/dto";
 import { toBookingDto } from "@/lib/bookings/mappers";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
-import { isHotSlotRebookBlocked } from "@/lib/hot-slots/anti-fraud";
-import { HOT_SLOT_REBOOK_BLOCK_HOURS } from "@/lib/hot-slots/constants";
-import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { ensureNoConflicts, resolveBookingCore } from "@/lib/bookings/booking-core";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { resolveBookingServicePrice } from "@/lib/bookings/hot-slot-pricing";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
 
@@ -71,13 +72,15 @@ export async function createClientBooking(
 
   let createdBookingId: string | null = null;
   try {
-    const allowed = await checkRateLimit(
-      `rate:createBooking:${userId}`,
-      CREATE_BOOKING_RATE_LIMIT.limit,
-      CREATE_BOOKING_RATE_LIMIT.windowSeconds
+    // FIX-C11: как в `createBooking` — причина отказа различима (503 против 429).
+    const refusal = resolveRateLimitRefusal(
+      await checkRateLimit(`rate:createBooking:${userId}`, {
+        maxRequests: CREATE_BOOKING_RATE_LIMIT.limit,
+        windowSeconds: CREATE_BOOKING_RATE_LIMIT.windowSeconds,
+      })
     );
-    if (!allowed) {
-      throw new AppError("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
+    if (refusal) {
+      throw new AppError(refusal.message, refusal.status, refusal.code);
     }
 
     const {
@@ -104,56 +107,19 @@ export async function createClientBooking(
       referencePhotoAssetId: data.referencePhotoAssetId ?? null,
       bookingAnswers: data.bookingAnswers ?? null,
     });
-    let bookedServicePrice = service.effectivePrice;
-
-    const hotProviderId = provider.type === ProviderType.MASTER ? provider.id : resolvedMasterProviderId;
-    if (hotProviderId) {
-      const rule = await prisma.discountRule.findUnique({
-        where: { providerId: hotProviderId },
-        select: {
-          isEnabled: true,
-          triggerHours: true,
-          discountType: true,
-          discountValue: true,
-          applyMode: true,
-          minPriceFrom: true,
-          serviceIds: true,
-        },
-      });
-      const now = new Date();
-      const hotPricing = resolveDynamicHotSlotPricing({
-        rule,
-        slotStartAtUtc: startAtUtc,
-        serviceId: service.id,
-        servicePrice: service.effectivePrice,
-        providerTimeZone: master?.timezone ?? provider.timezone,
-        now,
-      });
-      if (data.hotSlotId && !hotPricing.isHot) {
-        throw new AppError("Этот горячий слот уже занят. Выберите другое время.", 409, "BOOKING_CONFLICT");
-      }
-      if (hotPricing.isHot && hotPricing.discountedPrice !== null) {
-        bookedServicePrice = hotPricing.discountedPrice;
-        const cutoff = new Date(startAtUtc.getTime() - HOT_SLOT_REBOOK_BLOCK_HOURS * 60 * 60 * 1000);
-        const recentCancel = await prisma.booking.findFirst({
-          where: {
-            providerId: data.providerId,
-            clientUserId: userId,
-            status: { in: ["REJECTED", "CANCELLED"] },
-            startAtUtc,
-            cancelledAtUtc: { gt: cutoff },
-          },
-          select: { id: true, cancelledAtUtc: true },
-        });
-        if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, startAtUtc)) {
-          throw new AppError(
-            "Повторная запись на тот же горячий слот после отмены недоступна. Выберите другое время.",
-            409,
-            "BOOKING_CONFLICT"
-          );
-        }
-      }
-    }
+    // FIX-C1 (фаза 3): та же одна функция, что и на основном пути, — вторая
+    // копия анти-фрода жила здесь.
+    const bookedServicePrice = await resolveBookingServicePrice({
+      providerId: data.providerId,
+      providerType: provider.type,
+      resolvedMasterProviderId,
+      clientUserId: userId,
+      serviceId: service.id,
+      basePrice: service.effectivePrice,
+      startAtUtc,
+      providerTimeZone: master?.timezone ?? provider.timezone,
+      hotSlotRequested: Boolean(data.hotSlotId),
+    });
 
     await ensureNoConflicts(prisma, {
       providerId: data.providerId,
@@ -166,7 +132,7 @@ export async function createClientBooking(
     const transactionStartedAt = Date.now();
     let booking;
     try {
-      booking = await prisma.$transaction(
+      booking = await bookingTransaction(
         async (tx) => {
           await ensureNoConflicts(tx, {
             providerId: data.providerId,
@@ -176,7 +142,7 @@ export async function createClientBooking(
             bufferMin,
           });
 
-          const created = await tx.booking.create({
+          const created = await createBookingRow(tx, {
             data: {
               providerId: data.providerId,
               serviceId: data.serviceId,
@@ -192,6 +158,9 @@ export async function createClientBooking(
               referencePhotoAssetId: bookingExtras.referencePhotoAssetId,
               bookingAnswers: bookingExtras.bookingAnswers ?? undefined,
               clientUserId: userId,
+              // Тот же путь записи клиентом, что и `createBooking` — легаси-ветка
+              // отличается только тем, что время приходит `slotLabel`-ом.
+              source: BookingSource.WEB,
               status: shouldAutoConfirm ? "CONFIRMED" : "PENDING",
               actionRequiredBy: shouldAutoConfirm ? null : "MASTER",
             },
@@ -240,7 +209,7 @@ export async function createClientBooking(
 
           return created;
         },
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+        // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
       );
     } catch (error) {
       const conflictError = mapPrismaBookingConflict(error);
@@ -260,7 +229,7 @@ export async function createClientBooking(
     }
 
     if (shouldAutoConfirm) {
-      await scheduleBookingReminders(booking.id);
+      await scheduleBookingRemindersSafe(booking.id);
     }
 
     await invalidateSlotsForBookingRange({

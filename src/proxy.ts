@@ -1,9 +1,13 @@
 import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isPublicReferenceApiPath } from "@/lib/api/cache-headers";
+import { rotateSessionWithTelemetry } from "@/lib/auth/session-refresh";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
+import { toApiRouteTemplate } from "@/lib/rate-limit/route-template";
 import { verifyToken } from "@/lib/auth/jwt";
 
 const PRODUCTION_ORIGIN = "https://мастеррядом.online";
@@ -47,25 +51,50 @@ const PRODUCTION_ALLOWLIST_NORMALIZED = new Set(
     .filter((value): value is string => value !== null),
 );
 
-function getAllowedOrigin(requestOrigin: string | null): string | null {
+const DEV_ALLOWLIST_NORMALIZED = new Set(
+  [...ALLOWED_DEV_ORIGINS]
+    .map(normalizeOrigin)
+    .filter((value): value is string => value !== null),
+);
+
+/**
+ * SEC-19 — dev-ветка была написана так:
+ *
+ *     if (ALLOWED_DEV_ORIGINS.has(requestOrigin)) return requestOrigin;
+ *     return requestOrigin;
+ *
+ * то есть первая строка не значила ничего: отражался ЛЮБОЙ `Origin`, и рядом
+ * `setCorsHeaders` ставит `Access-Control-Allow-Credentials: true`. Безопасно
+ * это было ровно потому, что `Dockerfile` фиксирует `ENV NODE_ENV=production`,
+ * — то есть защита держалась на переменной окружения сборки, а не на коде.
+ * Любой запуск прод-нагрузки без `NODE_ENV=production` давал полный обход CORS
+ * с куками и заодно снимал CSP (те же ветки ниже по файлу).
+ *
+ * Теперь ветка одна: аллоулист выбирается по окружению, а решение — общее.
+ * `NEXT_PUBLIC_APP_URL` признаётся в обоих окружениях: в dev это escape hatch
+ * для разработчика, открывающего приложение по LAN-адресу, и он же остаётся
+ * явным списком, а не отражением чего угодно.
+ */
+export function getAllowedOrigin(requestOrigin: string | null): string | null {
   if (!requestOrigin) return null;
 
-  if (process.env.NODE_ENV === "production") {
-    const incoming = normalizeOrigin(requestOrigin);
-    if (!incoming) return null;
-    if (PRODUCTION_ALLOWLIST_NORMALIZED.has(incoming)) {
-      return requestOrigin;
-    }
-    const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-    if (envUrl) {
-      const envNormalized = normalizeOrigin(envUrl);
-      if (envNormalized && envNormalized === incoming) return requestOrigin;
-    }
-    return null;
+  const incoming = normalizeOrigin(requestOrigin);
+  if (!incoming) return null;
+
+  const allowlist =
+    process.env.NODE_ENV === "production"
+      ? PRODUCTION_ALLOWLIST_NORMALIZED
+      : DEV_ALLOWLIST_NORMALIZED;
+
+  if (allowlist.has(incoming)) return requestOrigin;
+
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (envUrl) {
+    const envNormalized = normalizeOrigin(envUrl);
+    if (envNormalized && envNormalized === incoming) return requestOrigin;
   }
 
-  if (ALLOWED_DEV_ORIGINS.has(requestOrigin)) return requestOrigin;
-  return requestOrigin;
+  return null;
 }
 
 function setCorsHeaders(response: NextResponse, origin: string): void {
@@ -88,6 +117,15 @@ type RateLimitTier =
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
+/** FIX-C2 — две неаутентифицированные health-пробы (см. `resolveRateLimitTier`). */
+const HEALTH_LIVENESS_PATH = "/api/health";
+const HEALTH_READINESS_PATH = "/api/health/ready";
+/**
+ * RES-04 задавал верхнюю границу self-hop'а прокси в `/api/auth/refresh` (2 с).
+ * PERF-14 убрал сам хоп — обновление идёт вызовом функции, — поэтому и граница
+ * ушла: ограничивать больше нечего, а гонка вокруг ротации токена вредна
+ * (см. комментарий на месте вызова). Константа удалена намеренно, не забыта.
+ */
 const PUBLIC_PATHS = ["/login", "/register", "/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
 
 function resolveRequestId(request: NextRequest): string {
@@ -111,6 +149,18 @@ function normalizePathname(pathname: string): string {
 function resolveRateLimitTier(method: string, pathname: string): RateLimitTier | null {
   if (!pathname.startsWith("/api/")) return null;
   if (pathname === REFRESH_ENDPOINT_PATH) return null;
+  // FIX-C2: неаутентифицированные health-пробы не проходят через лимитер, и это
+  // не про их стоимость, а про независимость. Ключ лимита считается в Redis, то
+  // есть ДО обработчика каждая проба платила ~2.5 с при обрыве Redis (замер
+  // `SMOKE-01 · F5`) — проба, которая ждёт лежащую зависимость, чтобы сообщить,
+  // что зависимость лежит, отчасти воспроизводит F2 уровнем выше.
+  //
+  // Изъятие узкое и перечислено поимённо: `/api/health/status` и
+  // `/api/health/worker` гейтятся секретом, и снятие лимита открыло бы их
+  // перебору. Обе строки ниже отдают ответ, не зависящий от вызывающего, и
+  // работы не покупают: liveness не ходит никуда, readiness делает два
+  // ограниченных сверху запроса по уже открытым соединениям.
+  if (pathname === HEALTH_LIVENESS_PATH || pathname === HEALTH_READINESS_PATH) return null;
 
   if (method === "POST") {
     if (pathname === "/api/bookings") return "bookingCreate";
@@ -134,6 +184,45 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
   }
 
   return "publicApi";
+}
+
+/**
+ * SEC-08 — второй слой защиты от CSRF, рядом с `SameSite=Lax`.
+ *
+ * Куки уже стоят с явным `SameSite=Lax`, поэтому классический межсайтовый
+ * CSRF на POST закрыт. Остаточная поверхность — **same-site, cross-origin**:
+ * `SameSite` не различает поддомены, то есть любой поддомен
+ * `мастеррядом.online` (будущий staging, маркетинговый, скомпрометированный)
+ * делает полноценные аутентифицированные мутации. Второго слоя не было
+ * вообще: ни один мутирующий обработчик не смотрел ни на `Origin`, ни на
+ * `Sec-Fetch-Site`.
+ *
+ * Порядок сигналов важен и выбран под реальный состав трафика:
+ *   1. `Sec-Fetch-Site` — его шлют все актуальные браузеры, и только он
+ *      различает `same-site` (тот самый поддомен) и `same-origin`.
+ *      `none` — это адресная строка/закладка, легитимно.
+ *   2. `Origin` — запасной сигнал для старых браузеров.
+ *   3. **Ни того, ни другого — пропускаем.** Это не дыра, а необходимость:
+ *      так выглядит вебхук ЮКассы, cron-эндпоинты и будущий мобильный
+ *      клиент. Браузер, выполняя межсайтовую мутацию, обязан прислать хотя
+ *      бы один из двух заголовков — то есть класс атаки закрыт, а
+ *      server-to-server не сломан.
+ *
+ * Встраивание в чужую страницу здесь ни при чём: CSP несёт
+ * `frame-ancestors 'none'`, легитимных cross-site мутаций у продукта нет.
+ */
+const CSRF_TRUSTED_FETCH_SITES = new Set(["same-origin", "none"]);
+
+export function shouldRejectCrossSiteMutation(input: {
+  method: string;
+  fetchSite: string | null;
+  origin: string | null;
+  originAllowed: boolean;
+}): boolean {
+  if (!MUTATION_METHODS.has(input.method)) return false;
+  if (input.fetchSite) return !CSRF_TRUSTED_FETCH_SITES.has(input.fetchSite);
+  if (!input.origin) return false;
+  return !input.originAllowed;
 }
 
 function isAccessTokenValid(token: string | undefined): boolean {
@@ -170,6 +259,59 @@ function readSetCookieHeaders(headers: Headers): string[] {
   return splitCombinedSetCookieHeader(combined);
 }
 
+/**
+ * LOGIC-22 — обновлённая сессия должна действовать в ЭТОМ запросе, а не в
+ * следующем.
+ *
+ * Прокси при протухшем access-токене честно обновляет сессию server-to-server,
+ * но свежие куки клал только в ОТВЕТ. `requestHeaders`, которые уезжают в
+ * обработчик роута, оставались со старой `cookie`, поэтому обработчик видел
+ * протухшую сессию и считал вызывающего анонимом. На `/api/bookings` это не
+ * ошибка авторизации, а тихая смена ветки: зарегистрированный клиент уходил по
+ * ГОСТЕВОМУ пути, где обязателен `consent` — а клиент его не слал, потому что
+ * своим состоянием считал себя авторизованным. Итог — 400 `CONSENT_REQUIRED`
+ * на самом ответственном шаге воронки, исчезающий со второй попытки (браузер
+ * к тому моменту уже получил новую куку с ответом на упавший запрос).
+ *
+ * Слияние, а не замена: `Set-Cookie` приходит только на сессионную пару, а в
+ * запросе живут и чужие куки (баннер cookie-уведомления, OAuth-state) —
+ * затереть их значило бы сломать соседние механизмы. Удаление (`Max-Age=0`,
+ * так `clearSessionCookies` гасит пару) обязано убирать имя из запроса, иначе
+ * обработчик увидел бы отозванную сессию живой.
+ */
+export function mergeRefreshedCookies(
+  currentCookieHeader: string | null,
+  setCookieHeaders: string[],
+): string {
+  const jar = new Map<string, string>();
+  for (const part of (currentCookieHeader ?? "").split(";")) {
+    const separator = part.indexOf("=");
+    if (separator <= 0) continue;
+    const name = part.slice(0, separator).trim();
+    if (name) jar.set(name, part.slice(separator + 1).trim());
+  }
+
+  for (const setCookie of setCookieHeaders) {
+    const [pair, ...attributes] = setCookie.split(";");
+    const separator = pair?.indexOf("=") ?? -1;
+    if (!pair || separator <= 0) continue;
+    const name = pair.slice(0, separator).trim();
+    if (!name) continue;
+
+    const maxAge = attributes
+      .map((attribute) => /^\s*max-age\s*=\s*(-?\d+)\s*$/i.exec(attribute))
+      .find((match) => match !== null);
+    if (maxAge && Number(maxAge[1]) <= 0) {
+      jar.delete(name);
+      continue;
+    }
+
+    jar.set(name, pair.slice(separator + 1).trim());
+  }
+
+  return Array.from(jar, ([name, value]) => `${name}=${value}`).join("; ");
+}
+
 export async function proxy(request: NextRequest) {
   const requestId = resolveRequestId(request);
   const method = request.method.toUpperCase();
@@ -186,12 +328,59 @@ export async function proxy(request: NextRequest) {
     return preflightResponse;
   }
 
+  // SEC-08: отсекаем ДО обновления сессии — межсайтовая мутация не должна
+  // даже провоцировать ротацию refresh-токена.
+  if (
+    isApiRoute &&
+    shouldRejectCrossSiteMutation({
+      method,
+      fetchSite: request.headers.get("sec-fetch-site"),
+      origin: request.headers.get("origin"),
+      originAllowed: corsOrigin !== null,
+    })
+  ) {
+    return withRequestId(
+      NextResponse.json(
+        { error: "Запрос отклонён: недопустимый источник." },
+        { status: 403 },
+      ),
+      requestId,
+    );
+  }
+
+  // SEC-16, слой 1: заявленный перебор отсекается до входа в обработчик и до
+  // обновления сессии — как и межсайтовая мутация выше. Фактический счётчик
+  // байтов (Content-Length может отсутствовать или лгать) — в `readBodyTextCapped`.
+  if (
+    isApiRoute &&
+    exceedsDeclaredBodyLimit({
+      contentType: request.headers.get("content-type"),
+      contentLength: request.headers.get("content-length"),
+    })
+  ) {
+    return withRequestId(
+      NextResponse.json(
+        { error: "Слишком большой запрос." },
+        { status: 413 },
+      ),
+      requestId,
+    );
+  }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  // PERF-13: на публичных справочниках refresh-хоп не делается вовсе. Иначе к
+  // ответу, который сам объявил себя `public, s-maxage=…`, прикладывался бы
+  // `Set-Cookie` с сессией — а такой ответ в разделяемом кэше отдаёт чужую сессию
+  // следующему посетителю. Понизить директиву из прокси нельзя: заголовок
+  // обработчика выигрывает у заголовка middleware (проверено рантаймом), поэтому
+  // множества разводятся здесь. Ни один из этих роутов сессию не читает, а
+  // обновление произойдёт на следующем же запросе к любому другому пути.
+  const skipSessionRefresh = isPublicPath || isPublicReferenceApiPath(pathname);
   let refreshedSetCookies: string[] = [];
 
-  if (!isPublicPath) {
+  if (!skipSessionRefresh) {
     const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
     const accessToken = request.cookies.get(accessCookieName)?.value;
     const accessValid = isAccessTokenValid(accessToken);
@@ -199,16 +388,51 @@ export async function proxy(request: NextRequest) {
     if (!accessValid) {
       const refreshToken = request.cookies.get("bh_refresh")?.value;
       if (refreshToken) {
-        const refreshUrl = new URL(REFRESH_ENDPOINT_PATH, request.url);
-        const refreshRes = await fetch(refreshUrl.toString(), {
-          method: "POST",
-          headers: {
-            cookie: request.headers.get("cookie") ?? "",
-          },
-        });
+        // PERF-14: обновление сессии идёт ВЫЗОВОМ ФУНКЦИИ, а не HTTP-запросом к
+        // самому себе. Прежний self-hop держал ВХОДЯЩИЙ запрос, пока ждал
+        // ИСХОДЯЩИЙ, то есть каждый такой запрос занимал два слота обработки
+        // вместо одного, и при замедлении `/api/auth/refresh` (исчерпан пул
+        // Prisma) петля затягивалась сама: чем больше висит, тем меньше слотов
+        // остаётся тому самому роуту, которого все ждут. Путь горячий у каждого
+        // залогиненного — матчер покрывает всё кроме статики, access-токен живёт
+        // 2 ч. RES-04 ограничивал этот хоп сверху; теперь ограничивать нечего.
+        //
+        // Стало возможным потому, что прокси Next 16 работает в рантайме
+        // **Node.js** (это дефолт, и опция `runtime` в proxy-файлах вообще
+        // недоступна). Предыдущая формулировка про edge-рантайм здесь была
+        // унаследована от эпохи `middleware.ts` и уже не соответствовала коду:
+        // модуль и так импортирует `crypto` и Redis-лимитер.
+        //
+        // Таймаута тут намеренно НЕТ, и это не упущение: оборвать ротацию гонкой
+        // нельзя. `Promise.race` не отменяет запрос Prisma — refresh-токен успел
+        // бы пометиться использованным, а новая кука до клиента не доехала бы,
+        // то есть пользователя выбросило бы на /login по вине самой защиты.
+        // Верхняя граница есть и она серверная: `statement_timeout=30000`
+        // (RES-24) плюс конечные `connect_timeout`/`pool_timeout` Prisma.
+        //
+        // Отказ = продолжаем БЕЗ обновления: обработчик увидит протухшую куку и
+        // ответит 401, клиент уйдёт на /login. Хуже успешного обновления и лучше
+        // упавшего запроса — throw из прокси это 500 на КАЖДЫЙ запрос.
+        try {
+          const carrier = NextResponse.next();
+          const rotated = await rotateSessionWithTelemetry(carrier, refreshToken);
 
-        if (refreshRes.ok) {
-          refreshedSetCookies = readSetCookieHeaders(refreshRes.headers);
+          if (rotated) {
+            refreshedSetCookies = readSetCookieHeaders(carrier.headers);
+            // LOGIC-22: свежая кука уезжает и ВНУТРЬ — иначе обработчик этого же
+            // запроса продолжит читать протухшую и примет вызывающего за гостя.
+            if (refreshedSetCookies.length > 0) {
+              requestHeaders.set(
+                "cookie",
+                mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies),
+              );
+            }
+          }
+        } catch {
+          // Логгера здесь нет намеренно: `logging/logger.ts` работает через
+          // request-контекст, которого у прокси нет; отказ ротации уже виден в
+          // телеметрии `surface: "auth"`.
+          refreshedSetCookies = [];
         }
       }
     }
@@ -218,15 +442,40 @@ export async function proxy(request: NextRequest) {
 
   if (tier) {
     const ip = getClientIp(request);
-    const key = `rl:${tier}:${ip}:${method}:${pathname}`;
+    // SEC-03: ключ строится по ШАБЛОНУ роута, а не по конкретному URL. Иначе
+    // каждый id — своё ведро, и перечисление по id не throttled вообще.
+    const key = `rl:${tier}:${ip}:${method}:${toApiRouteTemplate(pathname)}`;
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
     if (result.limited) {
+      // FIX-B12: отказ по исчерпанному бюджету и отказ «не смогли посчитать»
+      // рендерились одинаково — 429 «Too many requests». Для fail-closed
+      // чувствительного роута при обрыве Redis это неверно дважды: статус учит
+      // клиента реже повторять (а повторить как раз нужно), и текст утверждает
+      // про число запросов то, чего не было. Форма конверта — та же, что у
+      // `fail()` / `tooManyRequests()`, чтобы клиент разбирал ответ прокси и
+      // ответ обработчика одинаково; собрана здесь руками, потому что
+      // `getRequestId()` работает через request-контекст, которого у прокси нет.
+      const unavailable = result.reason === "unavailable";
       return withRequestId(
         NextResponse.json(
-          { error: "Too many requests" },
           {
-            status: 429,
+            ok: false,
+            requestId,
+            error: unavailable
+              ? {
+                  message: "Сервис временно недоступен. Попробуйте позже.",
+                  code: "RATE_LIMIT_UNAVAILABLE",
+                  details: { retryAfterSeconds: result.retryAfterSeconds },
+                }
+              : {
+                  message: "Слишком много запросов. Попробуйте позже.",
+                  code: "RATE_LIMITED",
+                  details: { retryAfterSeconds: result.retryAfterSeconds },
+                },
+          },
+          {
+            status: unavailable ? 503 : 429,
             headers: {
               "Retry-After": String(result.retryAfterSeconds),
             },

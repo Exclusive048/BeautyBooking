@@ -150,7 +150,10 @@ export function FeatureGate({
 
   return (
     <div className={`relative ${className ?? ""}`}>
-      <div aria-hidden className="pointer-events-none select-none opacity-30 blur-[2px]">
+      {/* `inert` обязателен рядом с aria-hidden: aria-hidden прячет поддерево
+          от AT, но фокусируемые потомки остаются в tab-порядке — клавиатурный
+          пользователь попадал бы в невидимые для него контролы. */}
+      <div inert aria-hidden className="pointer-events-none select-none opacity-30 blur-[2px]">
         {children}
       </div>
       <div className="absolute inset-0 flex items-center justify-center p-6">

@@ -235,7 +235,7 @@ function ActiveFeaturesPanel({
           </summary>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {lockedItems.map((item) => (
-              <div key={item.key} className="flex items-start gap-2 rounded-xl border border-border-subtle/60 bg-bg-elevated/60 px-3 py-2 opacity-60">
+              <div key={item.key} className="flex items-start gap-2 rounded-xl border border-border-subtle/60 bg-elevated/60 px-3 py-2 opacity-60">
                 <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-bg-input">
                   <X className="h-2.5 w-2.5 text-text-sec" />
                 </span>

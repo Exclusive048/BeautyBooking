@@ -7,6 +7,7 @@ import { MessageSquare, CalendarClock, X } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -81,18 +82,33 @@ export function BookingRowActions({ booking }: Props) {
     setCancelling(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/master/bookings/${encodeURIComponent(booking.id)}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "CANCELLED" }),
-        },
-      );
-      if (!res.ok) throw new Error(T.cancelFailed);
+      await fetchJson(`/api/master/bookings/${encodeURIComponent(booking.id)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELLED" }),
+      });
       startTransition(() => router.refresh());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : T.cancelFailed);
+    } catch (caught) {
+      // FIX-C8 · fromServer = ПОКАЗАТЬ СЕРВЕРНОЕ. Прежняя форма — `if (!res.ok)
+      // throw new Error(T.cancelFailed)` — та самая, что называет постановка:
+      // тело не разбиралось ВООБЩЕ, поэтому `err.message` ниже всегда был
+      // собственной строкой, а `instanceof Error`-ветка создавала видимость
+      // passthrough. Три отказа этого эндпоинта каждый требуют СВОЕГО действия,
+      // и «Не удалось отменить запись. Попробуйте ещё раз.» не подсказывает
+      // ни одного:
+      //
+      //   • `PACKAGE_CANCEL_WHOLE` 409 «Этот пакет отменяется целиком.» —
+      //     инв. #34: компонент пакета в одиночку не отменяется никогда, то
+      //     есть повтор не поможет ни при какой попытке. Действие — отменить
+      //     пакет целиком.
+      //   • `BOOKING_STATUS_CHANGED` 409 (LOGIC-02) — «Статус записи
+      //     изменился. Обновите страницу»: строка мастера устарела (клиент уже
+      //     отменил сам). Действие — обновить, а не повторять отмену.
+      //   • `CANCELLATION_DEADLINE_PASSED` / `SLOT_CONFLICT` — свои курируемые
+      //     строки.
+      //
+      // Своя строка остаётся дефолтом для обрыва сети и 5xx без тела.
+      setError(serverMessageOr(caught, T.cancelFailed));
     } finally {
       setCancelling(false);
     }
@@ -139,8 +155,9 @@ export function BookingRowActions({ booking }: Props) {
         ) : null}
       </div>
 
+      {/* UI-26/27: статусная поверхность — токен, не сырой `red-*`. */}
       {error ? (
-        <p className="mt-1 text-[11px] text-red-600" role="alert">
+        <p className="mt-1 text-[11px] text-danger-text" role="alert">
           {error}
         </p>
       ) : null}

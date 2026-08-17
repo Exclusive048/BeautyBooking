@@ -4,7 +4,7 @@ import { createAdminAuditLog } from "@/lib/audit/admin-audit";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma";
-import { AppError, toAppError } from "@/lib/api/errors";
+import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { formatZodError } from "@/lib/api/validation";
 import { clearLegalDraftModeCache } from "@/lib/legal/config";
 import { logInfo } from "@/lib/logging/logger";
@@ -224,7 +224,11 @@ export async function PATCH(req: Request) {
     const flags = await readAllFlags();
     return ok(flags);
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    const appError = toAuthSurfaceError(error);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y9 / FIX-B14: граница auth не отдаёт
+    // `AppError.details`. Роут попал в неё как потребитель `@/lib/telegram/*`
+    // (он и переключает килсвитч FZ-199) — нашёл его сам сторож границы,
+    // в свипе по трём названным поверхностям его бы не было.
+    return fail(appError.message, appError.status, appError.code);
   }
 }

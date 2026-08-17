@@ -43,7 +43,7 @@ export function ReviewsDistribution({ distribution, totalCount }: Props) {
                 aria-valuenow={percent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={`${star} звёзд: ${count} (${percent}%)`}
+                aria-label={T.rowAria(star, count, percent)}
               >
                 <div
                   className={cn("h-full rounded-full transition-[width]", tone)}

@@ -5,10 +5,12 @@ const userCreate = vi.hoisted(() => vi.fn());
 const userFindUnique = vi.hoisted(() => vi.fn());
 const userFindFirst = vi.hoisted(() => vi.fn());
 const userUpdate = vi.hoisted(() => vi.fn());
+// EMAIL-ADDRESS-OCCUPATION: освобождение чужих НЕподтверждённых заявок на адрес.
+const userUpdateMany = vi.hoisted(() => vi.fn(async () => ({ count: 0 })));
 const ensureClientRole = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
+vi.mock("@/lib/prisma", () => {
+  const client: Record<string, unknown> = {
     userProfile: {
       create: userCreate,
       findUnique: userFindUnique,
@@ -16,9 +18,15 @@ vi.mock("@/lib/prisma", () => ({
       // на verified-фильтр `findFirst` и идемпотентно ставит отметку владения.
       findFirst: userFindFirst,
       update: userUpdate,
+      updateMany: userUpdateMany,
     },
-  },
-}));
+  };
+  // EMAIL-ADDRESS-OCCUPATION: создание профиля и снятие чужих заявок — одна
+  // транзакция, поэтому мок обязан её выражать. Клиент транзакции здесь тот же
+  // объект: тесты этого файла проверяют вызовы, а не изоляцию.
+  client.$transaction = vi.fn(async (fn: (tx: unknown) => unknown) => fn(client));
+  return { prisma: client };
+});
 
 vi.mock("@/lib/auth/roles", () => ({
   ensureClientRoleForUser: ensureClientRole,

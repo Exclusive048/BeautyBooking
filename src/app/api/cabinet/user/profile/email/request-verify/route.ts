@@ -6,6 +6,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { generateOtpCode, hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpEmailRequestRateLimit } from "@/lib/auth/otp-rate-limit";
+import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { extractClientIp } from "@/lib/http/ip";
 import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
 import {
@@ -61,7 +62,11 @@ export async function POST(req: Request) {
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     if (!isEmailConfigured()) {
-      return jsonFail(503, "Вход по email не настроен.", "SYSTEM_FEATURE_DISABLED");
+      // FIX-C8: строка стала видимой (модалка показывает серверный текст), а
+      // «Вход по email не настроен» здесь врала о предмете: этот роут не про
+      // вход, а про подтверждение адреса в кабинете. Гейт тот же (`isEmailConfigured`
+      // — можем ли физически отправить), формулировка — про отправку.
+      return jsonFail(503, "Отправка писем сейчас недоступна. Попробуйте позже.", "SYSTEM_FEATURE_DISABLED");
     }
 
     const body = await parseBody(req, requestSchema);
@@ -72,13 +77,7 @@ export async function POST(req: Request) {
       ip: extractClientIp(req),
     });
     if (!rateLimit.ok) {
-      return NextResponse.json(
-        { ok: false, error: { message: rateLimit.error ?? "Слишком много запросов. Попробуйте позже.", code: "RATE_LIMITED" } },
-        {
-          status: rateLimit.status,
-          headers: { "Retry-After": String(rateLimit.retryAfterSec) },
-        },
-      );
+      return otpRateLimitFail(rateLimit);
     }
 
     // Apply the email immediately and reset verification — UI shows

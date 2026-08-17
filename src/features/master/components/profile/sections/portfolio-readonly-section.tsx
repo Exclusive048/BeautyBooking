@@ -53,15 +53,18 @@ export function PortfolioReadonlySection({ data }: Props) {
       actions={actions}
     >
       <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-        {data.items.map((item) => (
+        {data.items.map((item, index) => (
           <li key={item.id} className="aspect-square">
             <Link
               href="/cabinet/master/portfolio"
               className="relative block h-full w-full overflow-hidden rounded-xl bg-bg-input transition-shadow hover:shadow-card"
             >
+              {/* UI-33: своего имени у ссылки нет — внутри только эта картинка
+                  (бейдж «скрыто» рисуется не всегда), поэтому доступное имя
+                  ссылки даёт именно `alt`. */}
               <ResilientImage
                 src={item.mediaUrl}
-                alt=""
+                alt={T.imageAltTemplate.replace("{n}", String(index + 1))}
                 className="object-cover"
                 sizes="(min-width: 640px) 16vw, 33vw"
                 loading="lazy"
@@ -70,7 +73,7 @@ export function PortfolioReadonlySection({ data }: Props) {
                 <span
                   className={cn(
                     "absolute right-1 top-1 rounded-full bg-bg-card/90 px-2 py-0.5",
-                    "font-mono text-[9px] uppercase tracking-[0.18em] text-text-sec"
+                    "font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
                   )}
                 >
                   {T.hiddenBadge}

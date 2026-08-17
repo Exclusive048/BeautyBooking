@@ -1,13 +1,14 @@
 import { ok, fail } from "@/lib/api/response";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
+import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { logError } from "@/lib/logging/logger";
 import { getAllSurfaceStatuses } from "@/lib/monitoring/status";
 import { alertDeadJobs, alertWorkerDown } from "@/lib/monitoring/api-alerts";
-import { getNotificationsNotifierRuntimeStatus, notificationsNotifier } from "@/lib/notifications/notifier";
+import { getNotificationsNotifierRuntimeStatus, getNotificationsNotifier } from "@/lib/notifications/notifier";
 import { prisma } from "@/lib/prisma";
 import { getQueueStats } from "@/lib/queue/queue";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { env, isProduction } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -32,7 +33,12 @@ function parsePingAgeSeconds(lastPingAt: number | null): number | null {
 async function isAuthorized(request: Request): Promise<boolean> {
   const expectedSecret = resolveWorkerSecret();
   const providedSecret = request.headers.get("x-worker-secret")?.trim();
-  if (expectedSecret && providedSecret && providedSecret === expectedSecret) {
+  // SEC-25: сравнение секрета — constant-time, как в соседних роутах
+  // (`health/worker`, cron-эндпоинты). Голое `===` выходит на первом же
+  // несовпавшем байте, то есть время ответа коррелирует с длиной верного
+  // префикса. Общий хелпер вдобавок хеширует обе стороны, поэтому не утекает и
+  // длина (SEC-20).
+  if (expectedSecret && providedSecret && timingSafeStringEqual(providedSecret, expectedSecret)) {
     return true;
   }
 
@@ -69,9 +75,23 @@ export async function GET(request: Request) {
 
     if (redis) {
       try {
-        await redis.ping();
+        // FIX-C4 — 🔴 обе команды были БЕЗ границы, а это главный
+        // диагностический эндпоинт runbook'а: дежурный, которого
+        // `redis-down.md` сюда посылает, получал зависание вместо картины
+        // отказа. FIX-C2 счёл роут ограниченным, потому что `getQueueStats` и
+        // `monitoring/status` обёрнуты, — но СОБСТВЕННЫЕ команды роута
+        // обёрнуты не были. Тот отчёт честно пометил это выводом по чтению, а
+        // не замером; замер показал обратное.
+        //
+        // Пост-дедлайн — существующий `catch` ниже: `redisReady` остаётся
+        // false, воркер — `alive: false`. То есть ровно то состояние, ради
+        // сообщения о котором эндпоинт и существует.
+        await withRedisCommandTimeout("health:status:ping", redis.ping());
         redisReady = true;
-        const lastPingRaw = await redis.get(WORKER_LAST_PING_KEY);
+        const lastPingRaw = await withRedisCommandTimeout(
+          "health:status:worker-ping",
+          redis.get(WORKER_LAST_PING_KEY),
+        );
         const parsed = lastPingRaw ? Number.parseInt(lastPingRaw, 10) : Number.NaN;
         workerLastPingAtMs = Number.isFinite(parsed) ? parsed : null;
         if (workerLastPingAtMs !== null) {
@@ -87,7 +107,7 @@ export async function GET(request: Request) {
 
     let notifierReady = false;
     try {
-      await notificationsNotifier;
+      await getNotificationsNotifier();
       notifierReady = true;
     } catch {
       notifierReady = false;

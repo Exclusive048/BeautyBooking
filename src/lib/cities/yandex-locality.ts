@@ -13,6 +13,15 @@ import { logError } from "@/lib/logging/logger";
  */
 
 const YANDEX_GEOCODE_URL = "https://geocode-maps.yandex.ru/1.x/";
+/**
+ * RES-10 — верхняя граница запроса к геокодеру.
+ *
+ * Этот путь дёргается при сохранении адреса кабинета (auto-grow города), то
+ * есть внутри пользовательской правки: без границы зависший геокодер держит
+ * запрос сохранения. Отказ здесь уже мягкий — `null` и `logError`, — но
+ * мягкость наступает ПОСЛЕ возврата вызова.
+ */
+const GEOCODE_REQUEST_TIMEOUT_MS = 5_000;
 
 type YandexAddressComponent = {
   kind?: string;
@@ -95,7 +104,10 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
 
   let response: Response;
   try {
-    response = await fetch(url.toString(), { cache: "no-store" });
+    response = await fetch(url.toString(), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(GEOCODE_REQUEST_TIMEOUT_MS),
+    });
   } catch (err) {
     logError("yandex-locality.fetch_failed", { error: String(err) });
     return null;

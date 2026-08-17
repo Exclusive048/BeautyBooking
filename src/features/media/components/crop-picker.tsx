@@ -1,12 +1,35 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import Cropper from "react-easy-crop";
+import dynamic from "next/dynamic";
 import type { Area } from "react-easy-crop";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+
+/**
+ * PERF-17 — `react-easy-crop` статическим импортом отсюда ехал восьми
+ * маршрутам сразу (профиль мастера, портфолио, профиль клиента, четыре
+ * страницы настроек студии, настройки админа): `CropPicker` импортируют
+ * четыре родителя, и хотя сам он рендерится только после выбора файла,
+ * граница чанка проходит по импорту, а не по рендеру.
+ *
+ * Граница поставлена внутри `CropPicker`, а не в четырёх родителях: вес —
+ * в библиотеке, а не в этом файле, поэтому одной точки хватает, и новый
+ * пятый родитель получит отложенную загрузку не задумываясь об этом.
+ *
+ * `ssr: false` ничего не меняет по смыслу — кроппер работает с DOM-мерами
+ * контейнера и на сервере полезной разметки не давал.
+ *
+ * Скелет накрывает область кроппера целиком (родитель `relative` с
+ * фиксированной высотой), поэтому подстановка проходит без сдвига.
+ */
+const CropPickerCanvas = dynamic(() => import("@/features/media/components/crop-picker-canvas"), {
+  ssr: false,
+  loading: () => <Skeleton className="absolute inset-0 h-full w-full rounded-2xl" />,
+});
 
 type CropPickerShape = "circle" | "rect";
 
@@ -142,7 +165,7 @@ export function CropPicker({
 
       {/* Cropper area */}
       <div className="relative h-[280px] overflow-hidden rounded-2xl border border-border-subtle bg-black sm:h-[340px]">
-        <Cropper
+        <CropPickerCanvas
           image={imageUrl}
           crop={crop}
           zoom={zoom}
@@ -152,13 +175,6 @@ export function CropPicker({
           onCropChange={setCrop}
           onZoomChange={setZoom}
           onCropComplete={onCropCompletePercent}
-          style={{
-            containerStyle: { borderRadius: "1rem" },
-            cropAreaStyle: {
-              border: "2px solid rgba(255,255,255,0.8)",
-              boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
-            },
-          }}
         />
       </div>
 

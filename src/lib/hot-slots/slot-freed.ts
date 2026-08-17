@@ -1,6 +1,6 @@
 import { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import * as cache from "@/lib/cache/cache";
+import { claimNotificationDedup } from "@/lib/notifications/dedup-guard";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { getAppPublicUrl } from "@/lib/telegram/config";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -68,14 +68,30 @@ export async function processSlotFreed(payload: SlotFreedPayload): Promise<void>
     bookingPath,
   };
 
-  let notified = 0;
+  /**
+   * FIX-C12 — сторож опрашивается ДО первой доставки, а не по ходу рассылки.
+   *
+   * 🔴 Отказ сторожа — свойство ПРОГОНА (зависимость недоступна), а не
+   * подписчика. Пока `claimNotificationDedup` стоял внутри цикла доставки,
+   * обрыв на k-м подписчике оставлял k−1 уже уведомлённых и ронял задачу в
+   * ретраи: то есть решение «не рассылать» принималось после того, как часть
+   * рассылки состоялась. Два прохода делают его один раз и на весь прогон —
+   * бросает здесь, когда доставок ещё ноль.
+   *
+   * Порядок «claim → deliver» сохранён и по отношению к сбою ДОСТАВКИ: ключ
+   * занимался до `deliverNotification` и раньше, поэтому проваленная доставка
+   * так же не повторяется. Это не регресс, а прежнее поведение.
+   */
+  const recipients: string[] = [];
   for (const sub of subscribers) {
     if (sub.userId === payload.cancelledByUserId) continue;
-
     const antiSpamKey = buildAntiSpamKey(sub.userId, payload.providerId);
-    const isFirst = await cache.setNx(antiSpamKey, "1", ANTI_SPAM_TTL_SECONDS);
-    if (!isFirst) continue;
+    const isFirst = await claimNotificationDedup(antiSpamKey, ANTI_SPAM_TTL_SECONDS);
+    if (isFirst) recipients.push(sub.userId);
+  }
 
+  let notified = 0;
+  for (const userId of recipients) {
     const telegramText = UI_TEXT.notifications.slotFreed.telegram(
       payload.providerName,
       dateTime,
@@ -84,7 +100,7 @@ export async function processSlotFreed(payload: SlotFreedPayload): Promise<void>
 
     try {
       await deliverNotification({
-        userId: sub.userId,
+        userId,
         type: NotificationType.SLOT_FREED,
         title,
         body,
@@ -96,7 +112,7 @@ export async function processSlotFreed(payload: SlotFreedPayload): Promise<void>
       notified++;
     } catch (error) {
       logError("slot.freed notification delivery failed", {
-        userId: sub.userId,
+        userId,
         providerId: payload.providerId,
         error: error instanceof Error ? error.message : String(error),
       });

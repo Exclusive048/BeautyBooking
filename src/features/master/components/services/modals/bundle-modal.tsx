@@ -2,9 +2,10 @@
 
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { DiscountType } from "@prisma/client";
+import { useId, useMemo, useState } from "react";
+import { DiscountType } from "@/lib/prisma-enums";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -40,6 +41,9 @@ type Props = {
  */
 export function BundleModal({ open, onClose, mode, bundle, allServices }: Props) {
   const router = useRouter();
+  // Подпись «Скидка» относится к величине; единицу выбирает соседний селект,
+  // и у него поэтому собственное имя, а не общая подпись на два контрола.
+  const discountValueId = useId();
 
   const [name, setName] = useState(bundle?.name ?? "");
   const [selected, setSelected] = useState<string[]>(bundle?.serviceIds ?? []);
@@ -179,13 +183,16 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
     >
       <div className="space-y-4">
         <Field label={T.nameLabel}>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={T.namePlaceholder}
-            maxLength={120}
-            className="h-11 rounded-xl px-3 text-sm"
-          />
+          {(controlId) => (
+            <Input
+              id={controlId}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={T.namePlaceholder}
+              maxLength={120}
+              className="h-11 rounded-xl px-3 text-sm"
+            />
+          )}
         </Field>
 
         <div>
@@ -210,11 +217,9 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
                           !service.isEnabled && "opacity-60"
                         )}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
                           onChange={() => toggleService(service.id)}
-                          className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                         />
                         <span className="flex-1 truncate text-text-main">{service.name}</span>
                         <span className="shrink-0 font-mono text-[11px] text-text-sec">
@@ -233,19 +238,24 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         </div>
 
         <div>
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <label
+            htmlFor={discountValueId}
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+          >
             {T.discountLabel}
           </label>
           <div className="mt-1.5 flex items-center gap-2">
             <select
               value={discountType}
               onChange={(event) => setDiscountType(event.target.value as DiscountType)}
+              aria-label={T.discountTypeLabel}
               className="h-11 w-24 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               <option value={DiscountType.PERCENT}>{T.discountTypePercent}</option>
               <option value={DiscountType.FIXED}>{T.discountTypeFixed}</option>
             </select>
             <Input
+              id={discountValueId}
               type="number"
               inputMode="numeric"
               min={0}
@@ -290,11 +300,9 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         ) : null}
 
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={isEnabled}
             onChange={(event) => setIsEnabled(event.target.checked)}
-            className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <span>{T.isEnabledLabel}</span>
         </label>
@@ -339,13 +347,29 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * Подпись поля, программно связанная со своим контролом (см. такой же
+ * `Field` в `service-modal.tsx`): `<label>` контрол не оборачивает, поэтому
+ * связь держится на `htmlFor`/`id`, а идентификатор выдаёт сам `Field` и
+ * отдаёт его children функцией — забыть его проставить нельзя.
+ */
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: (controlId: string) => React.ReactNode;
+}) {
+  const controlId = useId();
   return (
     <div>
-      <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <label
+        htmlFor={controlId}
+        className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+      >
         {label}
       </label>
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-1.5">{children(controlId)}</div>
     </div>
   );
 }

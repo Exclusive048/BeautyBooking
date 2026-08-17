@@ -2,8 +2,9 @@
 
 import { Crop, Replace, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
@@ -43,6 +44,8 @@ export function EditItemModal({
   masterTags,
 }: Props) {
   const router = useRouter();
+  const categorySelectId = useId();
+  const tagsInputId = useId();
   const [categoryId, setCategoryId] = useState<string>(item.globalCategoryId ?? "");
   const [serviceIds, setServiceIds] = useState<string[]>(item.serviceIds);
   const [tagIds, setTagIds] = useState<string[]>(item.tagIds);
@@ -140,7 +143,7 @@ export function EditItemModal({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.mediaUrl}
-                alt=""
+                alt={T.photoAlt}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -170,10 +173,14 @@ export function EditItemModal({
 
           <div className="space-y-4">
             <div>
-              <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+              <label
+                htmlFor={categorySelectId}
+                className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+              >
                 {T.categoryLabel}
               </label>
               <select
+                id={categorySelectId}
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
                 className="mt-1.5 block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -219,20 +226,26 @@ export function EditItemModal({
             </div>
 
             <div>
-              <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+              <label
+                htmlFor={tagsInputId}
+                className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+              >
                 {T.tagsLabel}
               </label>
               <div className="mt-1.5">
-                <TagInput value={tagIds} options={masterTags} onChange={setTagIds} />
+                <TagInput
+                  inputId={tagsInputId}
+                  value={tagIds}
+                  options={masterTags}
+                  onChange={setTagIds}
+                />
               </div>
             </div>
 
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isPublic}
                 onChange={(event) => setIsPublic(event.target.checked)}
-                className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               />
               <span>{T.isPublicLabel}</span>
             </label>

@@ -19,7 +19,16 @@ const birthDateSchema = z.preprocess(
 );
 
 export const profileUpdateSchema = z.object({
-  displayName: optionalText(120),
+  // LOGIC-24: `displayName` и `address` в схеме БЫЛИ, а роут вырезал их дважды
+  // — из сырого тела до разбора и из результата после. То есть схема описывала
+  // поля, которых эндпоинт не принимает, клиент получал `200 OK` на
+  // проигнорированную операцию, а `updateMeProfile` продолжал их писать (и
+  // получал `undefined`, потому что роут их к тому моменту уже удалил). Из трёх
+  // слоёв каждый утверждал своё. Поля убраны из схемы — Zod отбрасывает их
+  // ключи так же, как `phone` ниже, и лишних зачисток в роуте больше нет.
+  // Решение «сюда не пишутся» не меняется: обратное было бы новой возможностью
+  // продукта, а не фиксом.
+  //
   // SECURITY-EXPOSURE-AUDIT-01 #2: `phone` is the identity/login primitive and
   // the key guest bookings + studio invites are matched on. It must NOT be
   // writable here without OTP verification — an unverified write is an account-
@@ -32,7 +41,6 @@ export const profileUpdateSchema = z.object({
   lastName: optionalText(80),
   middleName: optionalText(80),
   birthDate: birthDateSchema,
-  address: optionalText(240),
   emailNotificationsEnabled: z.boolean().optional(),
   pushNotificationsEnabled: z.boolean().optional(),
 });

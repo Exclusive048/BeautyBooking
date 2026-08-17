@@ -1,5 +1,5 @@
 import { fail, ok } from "@/lib/api/response";
-import { timingSafeStringEqual } from "@/lib/auth/constant-time";
+import { isAuthorizedCronRequest } from "@/lib/api/cron-auth";
 import { prisma } from "@/lib/prisma";
 import { createRecurringPayment } from "@/lib/payments/yookassa/client";
 import { addMonthsUtc, sha256 } from "@/lib/billing/utils";
@@ -9,9 +9,14 @@ import { priceOptInDeadline, shouldEnterPriceOptIn } from "@/lib/billing/price-o
 import { processPriceOptInReminders } from "@/lib/billing/price-optin-cron";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { createBillingNotification } from "@/lib/billing/notifications";
-import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
-import { logError } from "@/lib/logging/logger";
-import { NotificationType } from "@prisma/client";
+import {
+  formatBillingDeadlineLabel,
+  resolveSubscriptionTimezone,
+} from "@/lib/billing/deadline-label";
+import { moneyRUBFromKopeks } from "@/lib/format";
+import { logError, logInfo } from "@/lib/logging/logger";
+import { NotificationType, Prisma } from "@prisma/client";
+import * as cache from "@/lib/cache/cache";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 import { env } from "@/lib/env";
 import { processTrialExpirations } from "@/lib/billing/trial-cron";
@@ -23,12 +28,85 @@ export const runtime = "nodejs";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getCronToken(req: Request): string | null {
-  const header = req.headers.get("x-cron-token");
-  if (header?.trim()) return header.trim();
+// LOGIC-07: прогон биллинга — единственный в системе, и пересекаться сам с
+// собой ему нечем: фазы 1-2 читают набор строк, а потом пишут аудит и
+// уведомления НЕ идемпотентно (`updateMany` по статусу идемпотентен,
+// `createMany` аудита и цикл уведомлений — нет). Ретрай внешнего планировщика
+// поверх ещё работающего прогона поэтому стоил бы клиенту двух писем «подписка
+// истекла» и двух строк в журнале.
+const RUN_LOCK_KEY = "billing:renew:run";
+// TTL — потолок, а не расписание: лок снимается в `finally`, а TTL страхует
+// падение процесса между строками. Прогон ходит во внешний YooKassa на каждую
+// подписку, поэтому запас крупный.
+const RUN_LOCK_TTL_SECONDS = 30 * 60;
 
-  const token = new URL(req.url).searchParams.get("token");
-  return token?.trim() ?? null;
+const PRISMA_UNIQUE_VIOLATION = "P2002";
+
+/**
+ * Гигиенический лок прогона (LOGIC-07).
+ *
+ * **Fail-OPEN при недоступности Redis — осознанно.** Третье состояние приходит
+ * явным `status: "unavailable"` (FIX-C11; прежде `cache.setNx` бросал, и здесь
+ * это ловилось руками), и различить «занято» от «Redis лежит» обязательно:
+ * отказ от прогона на время недоступности кэша
+ * означает, что подписки не продлеваются и не истекают сутками — тихий ущерб,
+ * который заметят позже, чем починят Redis. От **двойного списания** защищает
+ * не этот лок, а `BillingPayment.idempotenceKey @unique` (инв. #4) плюс
+ * idempotence-key на стороне YooKassa; лок убирает только дубли аудита и
+ * уведомлений. Поэтому CLAUDE.md rule 10 (fail-closed на чувствительных
+ * роутах) сюда не переносится: там fail-closed отказывает атакующему, здесь
+ * отказал бы сам себе, не усилив денежную гарантию.
+ */
+async function acquireRunLock(): Promise<{ acquired: boolean; release: boolean }> {
+  const claim = await cache.claimLock(
+    RUN_LOCK_KEY,
+    new Date().toISOString(),
+    RUN_LOCK_TTL_SECONDS
+  );
+  if (claim.status === "unavailable") {
+    logError("Billing renewal run lock unavailable, proceeding without it", {
+      error: claim.error instanceof Error ? claim.error.message : String(claim.error),
+    });
+    // Замок не наш — снимать его нельзя (`release: false`): иначе прогон удалил
+    // бы чужой ключ, если Redis поднялся к моменту завершения.
+    return { acquired: true, release: false };
+  }
+  const acquired = claim.status === "acquired";
+  return { acquired, release: acquired };
+}
+
+async function releaseRunLock(): Promise<void> {
+  try {
+    await cache.del(RUN_LOCK_KEY);
+  } catch (error) {
+    logError("Billing renewal run lock release failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Изоляция одного элемента батча (LOGIC-07).
+ *
+ * Цикл продлений ходит в БД и во внешний платёжный API на каждую подписку.
+ * Без этой обёртки первое же исключение выбрасывалось из цикла и заканчивало
+ * ВЕСЬ прогон: оставшиеся подписки не продлевались, а фазы после цикла
+ * (trial-cron, price-optin-cron) не запускались вовсе.
+ */
+async function runIsolated(label: string, context: Record<string, unknown>, work: () => Promise<void>): Promise<boolean> {
+  try {
+    await work();
+    return true;
+  } catch (error) {
+    logError(label, { ...context, error: error instanceof Error ? error.message : String(error) });
+    return false;
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === PRISMA_UNIQUE_VIOLATION
+  );
 }
 
 function formatDateKeyUtc(date: Date): string {
@@ -47,13 +125,28 @@ function getGraceUntil(now: Date): Date {
 // ---------------------------------------------------------------------------
 
 export async function POST(req: Request) {
-  const token = getCronToken(req);
-  const expected = env.BILLING_RENEW_SECRET?.trim();
-
-  if (!expected || !token || !timingSafeStringEqual(token, expected)) {
+  // SEC-21: только заголовок `x-cron-token`. Query-строка попадает в access-логи
+  // балансировщика и в реферер — секрету там не место.
+  if (!isAuthorizedCronRequest(req, env.BILLING_RENEW_SECRET)) {
     return fail("Доступ запрещён.", 403, "FORBIDDEN");
   }
 
+  const lock = await acquireRunLock();
+  if (!lock.acquired) {
+    logInfo("Billing renewal cron skipped: previous run still in progress", { key: RUN_LOCK_KEY });
+    return fail("Прогон продлений уже выполняется.", 409, "CONFLICT");
+  }
+
+  try {
+    return ok(await runBillingCron());
+  } finally {
+    if (lock.release) {
+      await releaseRunLock();
+    }
+  }
+}
+
+async function runBillingCron() {
   const now = new Date();
   const graceUntil = getGraceUntil(now);
 
@@ -92,17 +185,21 @@ export async function POST(req: Request) {
     });
 
     for (const s of overdue) {
-      await invalidatePlanCache(s.userId, s.scope);
-      await createBillingNotification({
-        userId: s.userId,
-        type: NotificationType.BILLING_SUBSCRIPTION_EXPIRED,
-        title: s.pendingPriceOptIn
-          ? UI_TEXT.billing.priceOptIn.lapsedTitle
-          : "Подписка истекла",
-        body: s.pendingPriceOptIn
-          ? UI_TEXT.billing.priceOptIn.lapsedBody
-          : "Льготный период оплаты истёк. Подписка отключена.",
-        payloadJson: { scope: s.scope, subscriptionId: s.id },
+      // LOGIC-07: статус уже переведён `updateMany` выше — провал уведомления
+      // одному подписчику не должен стоить прогона остальным.
+      await runIsolated("Billing expiry notification failed", { subscriptionId: s.id }, async () => {
+        await invalidatePlanCache(s.userId, s.scope);
+        await createBillingNotification({
+          userId: s.userId,
+          type: NotificationType.BILLING_SUBSCRIPTION_EXPIRED,
+          title: s.pendingPriceOptIn
+            ? UI_TEXT.billing.priceOptIn.lapsedTitle
+            : "Подписка истекла",
+          body: s.pendingPriceOptIn
+            ? UI_TEXT.billing.priceOptIn.lapsedBody
+            : "Льготный период оплаты истёк. Подписка отключена.",
+          payloadJson: { scope: s.scope, subscriptionId: s.id },
+        });
       });
     }
   }
@@ -135,13 +232,16 @@ export async function POST(req: Request) {
     });
 
     for (const s of cancelCandidates) {
-      await invalidatePlanCache(s.userId, s.scope);
-      await createBillingNotification({
-        userId: s.userId,
-        type: NotificationType.BILLING_SUBSCRIPTION_CANCELLED,
-        title: "Подписка завершена",
-        body: `Подписка ${s.plan.name} завершена.`,
-        payloadJson: { scope: s.scope, subscriptionId: s.id },
+      // LOGIC-07: та же изоляция, что и в фазе 1.
+      await runIsolated("Billing cancellation notification failed", { subscriptionId: s.id }, async () => {
+        await invalidatePlanCache(s.userId, s.scope);
+        await createBillingNotification({
+          userId: s.userId,
+          type: NotificationType.BILLING_SUBSCRIPTION_CANCELLED,
+          title: "Подписка завершена",
+          body: `Подписка ${s.plan.name} завершена.`,
+          payloadJson: { scope: s.scope, subscriptionId: s.id },
+        });
       });
     }
   }
@@ -166,9 +266,16 @@ export async function POST(req: Request) {
     },
   });
 
-  for (const subscription of candidates) {
+  let renewed = 0;
+  let processed = 0;
+  let failed = 0;
+
+  // LOGIC-07: тело цикла вынесено во вложенную функцию — так каждый элемент
+  // батча получает собственную границу ошибки (`runIsolated` ниже), а `continue`
+  // становится `return` без изменения самой логики ветвей.
+  async function processCandidate(subscription: (typeof candidates)[number]): Promise<void> {
     if (!BILLING_PERIODS.includes(subscription.periodMonths as (typeof BILLING_PERIODS)[number])) {
-      continue;
+      return;
     }
 
     // No saved payment method → move to grace period
@@ -191,7 +298,7 @@ export async function POST(req: Request) {
         body: "Для продления подписки требуется подтвердить способ оплаты.",
         payloadJson: { scope: subscription.scope, subscriptionId: subscription.id },
       });
-      continue;
+      return;
     }
 
     // FIX-BC-1: resolve the renewal amount with the SAME shared resolver the
@@ -219,7 +326,7 @@ export async function POST(req: Request) {
         action: "RENEWAL_FAILED",
         details: { reason: "MISSING_PRICE" },
       });
-      continue;
+      return;
     }
 
     // BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2): a renewal whose effective price is
@@ -269,7 +376,11 @@ export async function POST(req: Request) {
         title: UI_TEXT.billing.priceOptIn.startedTitle,
         body: UI_TEXT.billing.priceOptIn.startedBody(
           moneyRUBFromKopeks(resolvedPriceKopeks),
-          dateRU(deadline),
+          formatBillingDeadlineLabel(
+            deadline,
+            // LOGIC-25: salon-tz кабинета, а не ambient-tz процесса.
+            await resolveSubscriptionTimezone(subscription.userId, subscription.scope),
+          ),
         ),
         payloadJson: {
           scope: subscription.scope,
@@ -278,7 +389,7 @@ export async function POST(req: Request) {
           deadline: deadline.toISOString(),
         },
       });
-      continue;
+      return;
     }
 
     // Idempotency: check if a payment was already initiated today
@@ -289,7 +400,7 @@ export async function POST(req: Request) {
     });
 
     if (existing) {
-      if (existing.status === "SUCCEEDED") continue;
+      if (existing.status === "SUCCEEDED") return;
 
       if (existing.status === "PENDING") {
         await prisma.userSubscription.update({
@@ -324,7 +435,7 @@ export async function POST(req: Request) {
           action: "RENEWAL_NEEDS_CONFIRMATION",
           details: { confirmationUrl: existing.confirmationUrl },
         });
-        continue;
+        return;
       }
 
       // Payment in any other terminal failed state
@@ -340,31 +451,49 @@ export async function POST(req: Request) {
         action: "RENEWAL_FAILED",
         details: { reason: `EXISTING_${existing.status}` },
       });
-      continue;
+      return;
     }
 
-    // Create internal payment record before calling YooKassa
-    const payment = await prisma.billingPayment.create({
-      data: {
-        subscriptionId: subscription.id,
-        type: "RENEWAL",
-        status: "PENDING",
-        amountKopeks: resolvedPriceKopeks,
-        currency: "RUB",
-        periodMonths: subscription.periodMonths,
-        idempotenceKey,
-        metadata: {
-          userId: subscription.userId,
-          scope: subscription.scope,
-          planId: subscription.planId,
-          planCode: subscription.plan.code,
+    // Create internal payment record before calling YooKassa.
+    //
+    // LOGIC-07: `findUnique` выше и этот `create` — не атомарная пара, поэтому
+    // проигравший гонку получает P2002 на `idempotenceKey @unique` (инв. #4).
+    // Это и есть работающая защита от двойного списания: проигравший НЕ доходит
+    // до `createRecurringPayment`. Раньше исключение выбрасывалось из цикла и
+    // хоронило весь прогон — теперь оно читается как «эту подписку уже взял
+    // другой прогон» и стоит одной пропущенной строки, а не дня.
+    let payment: { id: string };
+    try {
+      payment = await prisma.billingPayment.create({
+        data: {
           subscriptionId: subscription.id,
-          periodMonths: subscription.periodMonths,
           type: "RENEWAL",
+          status: "PENDING",
+          amountKopeks: resolvedPriceKopeks,
+          currency: "RUB",
+          periodMonths: subscription.periodMonths,
+          idempotenceKey,
+          metadata: {
+            userId: subscription.userId,
+            scope: subscription.scope,
+            planId: subscription.planId,
+            planCode: subscription.plan.code,
+            subscriptionId: subscription.id,
+            periodMonths: subscription.periodMonths,
+            type: "RENEWAL",
+          },
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        logInfo("Renewal payment already claimed by a concurrent run", {
+          subscriptionId: subscription.id,
+        });
+        return;
+      }
+      throw error;
+    }
 
     try {
       const yookassa = await createRecurringPayment({
@@ -418,7 +547,8 @@ export async function POST(req: Request) {
           body: "Подписка успешно продлена.",
           payloadJson: { scope: subscription.scope, subscriptionId: subscription.id },
         });
-        continue;
+        renewed += 1;
+        return;
       }
 
       if (yookassa.status === "pending") {
@@ -453,7 +583,7 @@ export async function POST(req: Request) {
             confirmationUrl: yookassa.confirmationUrl,
           },
         });
-        continue;
+        return;
       }
 
       // Payment failed immediately
@@ -513,6 +643,19 @@ export async function POST(req: Request) {
     }
   }
 
+  for (const subscription of candidates) {
+    const okItem = await runIsolated(
+      "Billing renewal failed for subscription",
+      { subscriptionId: subscription.id, userId: subscription.userId },
+      () => processCandidate(subscription),
+    );
+    if (okItem) {
+      processed += 1;
+    } else {
+      failed += 1;
+    }
+  }
+
   // ─── 4. Alert on stuck PENDING payments (older than 1 hour) ──────────────
 
   const stuck = await prisma.billingPayment.findMany({
@@ -552,5 +695,13 @@ export async function POST(req: Request) {
     });
   }
 
-  return ok({ ok: true, renewed: candidates.length, trialExpirations, priceOptInReminders });
+  // LOGIC-07: сводка вместо прежнего `renewed: candidates.length` — то число
+  // было количеством КАНДИДАТОВ, а не продлений, и при обрыве батча прогон
+  // отдавал 500 без единого признака того, кто успел обработаться.
+  return {
+    ok: true,
+    renewals: { candidates: candidates.length, processed, failed, renewed },
+    trialExpirations,
+    priceOptInReminders,
+  };
 }

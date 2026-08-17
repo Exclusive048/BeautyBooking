@@ -71,12 +71,15 @@ export function verifyTelegramLoginState(
  * so a replay still requires the victim's (single-use, cleared) cookie.
  */
 export async function claimTelegramAuthHash(hash: string): Promise<boolean> {
-  try {
-    return await cache.setNx(`auth:tg:hash:${hash}`, "1", TELEGRAM_HASH_TTL_SECONDS);
-  } catch (error) {
+  const claim = await cache.claimLock(`auth:tg:hash:${hash}`, "1", TELEGRAM_HASH_TTL_SECONDS);
+  // FIX-C11: fail-OPEN здесь — прежнее осознанное решение, а не побочный эффект.
+  // Replay всё равно требует single-use state-cookie жертвы, поэтому цена отказа
+  // (вход не работает) выше цены пропуска (защита деградирует до одного слоя).
+  if (claim.status === "unavailable") {
     logError("telegram-login.hash-claim.redis-unavailable", {
-      error: error instanceof Error ? error.message : String(error),
+      error: claim.error instanceof Error ? claim.error.message : String(claim.error),
     });
     return true;
   }
+  return claim.status === "acquired";
 }

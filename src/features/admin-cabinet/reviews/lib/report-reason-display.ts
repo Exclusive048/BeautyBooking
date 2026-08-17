@@ -1,4 +1,4 @@
-import { ReviewReportReason } from "@prisma/client";
+import { ReviewReportReason } from "@/lib/prisma-enums";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.reviews.reportReasons;

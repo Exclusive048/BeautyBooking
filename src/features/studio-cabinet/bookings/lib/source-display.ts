@@ -1,4 +1,4 @@
-import { BookingSource } from "@prisma/client";
+import { BookingSource } from "@/lib/prisma-enums";
 
 export type SourceTone = "info" | "neutral";
 

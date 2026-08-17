@@ -1,5 +1,10 @@
 import { AppError } from "@/lib/api/errors";
 import { env } from "@/lib/env";
+import {
+  normalizeAddressQuery,
+  readAddressCache,
+  writeAddressCache,
+} from "@/lib/maps/address-cache";
 
 export type AddressSuggestion = {
   value: string;
@@ -16,6 +21,20 @@ type YandexSuggestItem = {
 };
 
 const YANDEX_SUGGEST_URL = "https://suggest-maps.yandex.ru/v1/suggest";
+/**
+ * RES-10 — верхняя граница запроса к Яндекс-подсказкам.
+ *
+ * `input.signal` тут был и раньше, но он про ОТМЕНУ вызывающим (клиент увёл
+ * фокус), а не про верхнюю границу: единственный серверный вызывающий —
+ * `/api/address/suggest` — сигнала не передаёт вовсе, то есть запрос был
+ * неограничен. Поверхность анонимная и стоит в вводе адреса с дебаунсом,
+ * поэтому зависший внешний сервис копит висящие запросы быстрее любого
+ * другого пути.
+ *
+ * 5 с: подсказки имеют смысл, только пока пользователь ещё печатает; ответ
+ * позже этого срока не нужен ни ему, ни нам.
+ */
+const SUGGEST_REQUEST_TIMEOUT_MS = 5_000;
 
 function clampLimit(value: number): number {
   if (!Number.isFinite(value)) return 5;
@@ -51,6 +70,12 @@ export async function suggestAddresses(input: {
   if (query.length < 2) return [];
 
   const limit = clampLimit(input.limit ?? 5);
+
+  // SEC-04: тот же запрос второй раз не должен стоить платного вызова.
+  const cacheParts = [normalizeAddressQuery(query), String(limit)] as const;
+  const cached = await readAddressCache<AddressSuggestion[]>("suggest", cacheParts);
+  if (cached) return cached;
+
   const apiKey = getSuggestKey();
 
   const url = new URL(YANDEX_SUGGEST_URL);
@@ -68,7 +93,12 @@ export async function suggestAddresses(input: {
         Accept: "application/json",
       },
       cache: "no-store",
-      signal: input.signal,
+      // Отмена вызывающим и верхняя граница — разные вещи, поэтому обе, а не
+      // «или»: сигнал вызывающего не должен отменять таймаут, а таймаут —
+      // лишать вызывающего права прервать запрос раньше.
+      signal: input.signal
+        ? AbortSignal.any([input.signal, AbortSignal.timeout(SUGGEST_REQUEST_TIMEOUT_MS)])
+        : AbortSignal.timeout(SUGGEST_REQUEST_TIMEOUT_MS),
     });
   } catch {
     throw new AppError("Подсказки адресов временно недоступны.", 503, "INTERNAL_ERROR");
@@ -98,5 +128,7 @@ export async function suggestAddresses(input: {
     if (unique.size >= limit) break;
   }
 
-  return Array.from(unique.values());
+  const suggestions = Array.from(unique.values());
+  await writeAddressCache("suggest", cacheParts, suggestions);
+  return suggestions;
 }

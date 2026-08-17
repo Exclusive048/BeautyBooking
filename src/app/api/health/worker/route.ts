@@ -1,5 +1,5 @@
 import { getQueueStats } from "@/lib/queue/queue";
-import { getRedisConnection } from "@/lib/redis/connection";
+import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { env, isProduction } from "@/lib/env";
@@ -51,7 +51,13 @@ export async function POST(request: Request) {
       return Response.json({ error: "Service unavailable" }, { status: 503 });
     }
 
-    await redis.set(WORKER_LAST_PING_KEY, String(Date.now()), { EX: WORKER_PING_TTL_SECONDS });
+    // FIX-C4: запись heartbeat ограничена сверху. Пост-дедлайн — тот же 503,
+    // что и при недоступном клиенте (catch ниже): воркер не смог отметиться,
+    // и это ровно то, о чём эндпоинт существует сообщать.
+    await withRedisCommandTimeout(
+      "health:worker:ping-write",
+      redis.set(WORKER_LAST_PING_KEY, String(Date.now()), { EX: WORKER_PING_TTL_SECONDS }),
+    );
     return Response.json({ ok: true });
   } catch {
     return Response.json({ error: "Service unavailable" }, { status: 503 });
@@ -77,7 +83,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const lastPingRaw = await redis.get(WORKER_LAST_PING_KEY);
+    // FIX-C4: чтение отметки ограничено сверху. Пост-дедлайн — ветка catch
+    // ниже: `alive: false` + 503 + текущая статистика очереди, то есть тот же
+    // ответ, что и при мёртвом воркере. Это и есть правда: отметку прочитать
+    // не удалось, значит подтвердить жизнь нечем.
+    const lastPingRaw = await withRedisCommandTimeout(
+      "health:worker:ping-read",
+      redis.get(WORKER_LAST_PING_KEY),
+    );
     const lastPingAt = lastPingRaw ? Number.parseInt(lastPingRaw, 10) : Number.NaN;
     const ageMs = Number.isFinite(lastPingAt) ? Date.now() - lastPingAt : Number.POSITIVE_INFINITY;
     const alive = Number.isFinite(ageMs) && ageMs < WORKER_ALIVE_THRESHOLD_MS;

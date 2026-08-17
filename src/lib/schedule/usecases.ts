@@ -25,9 +25,11 @@ import {
   diffDateKeys,
   isDateKey,
 } from "@/lib/schedule/dateKey";
-import { createScheduleContext } from "@/lib/schedule/engine-context";
+import { createScheduleContext, getScheduleWindow } from "@/lib/schedule/engine-context";
+import { withSingleFlight } from "@/lib/cache/single-flight";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 import { bucketRangesByDateKey, loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
+import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
 
 type RangeInput = {
   from: Date;
@@ -151,6 +153,7 @@ export async function setScheduleOverride(
   const breaks = validated.data.breaks ?? undefined;
   const existing = await prisma.scheduleOverride.findFirst({
     where: { providerId, date },
+    orderBy: SCHEDULE_OVERRIDE_PICK_ORDER, // LOGIC-11
   });
 
   const ops: Prisma.PrismaPromise<unknown>[] = [
@@ -298,115 +301,181 @@ export async function listAvailabilitySlotsPaginated(
   const bufferMin = normalizeBufferMinutes(provider.bufferBetweenBookingsMin);
   const slotStepMin = normalizeSlotStepMin(provider.slotStepMin);
 
-  const ctx = await createScheduleContext({
-    providerId,
-    timezoneHint: timezone,
-    range: { fromKey: requestedStartKey, toKeyExclusive: actualEndKeyExclusive },
-  });
+  // PERF-04: окно расписания (версия + горизонт публикации) разрешается ДО
+  // контекста, потому что из него строится ключ слот-кэша. Раньше окно
+  // приносил `createScheduleContext`, и вместе с ним безусловно приезжали
+  // недельная конфигурация, шаблоны, override'ы и перерывы — данные, нужные
+  // ТОЛЬКО на промахе. Сама версия теперь идёт через Redis
+  // (`schedule-version-cache.ts`), а не через пятиоператорную транзакцию.
+  const scheduleWindow = await getScheduleWindow(providerId, timezone);
 
-  const rangeFromUtc = dateFromLocalDateKey(requestedStartKey, timezone, 0, 0);
-  const rangeToExclusiveUtc = dateFromLocalDateKey(actualEndKeyExclusive, timezone, 0, 0);
-
-  const bookings = await prisma.booking.findMany({
-    where: {
-      OR: [
-        { masterProviderId: providerId },
-        { masterProviderId: null, providerId },
-      ],
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-      ...buildBookingOverlapWhere(rangeFromUtc, rangeToExclusiveUtc),
-    },
-    select: { startAtUtc: true, endAtUtc: true },
-    orderBy: { startAtUtc: "asc" },
-  });
-
-  const bookingRanges = bookings
-    .map((booking) =>
-      booking.startAtUtc && booking.endAtUtc
-        ? { startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc }
-        : null
-    )
-    .filter((item): item is { startAtUtc: Date; endAtUtc: Date } => item !== null);
-
-  const bookingsByDateKey = new Map<string, Array<{ startAtUtc: Date; endAtUtc: Date }>>();
-
-  for (const booking of bookingRanges) {
-    const startBookingKey = toLocalDateKey(booking.startAtUtc, timezone);
-    const endBookingKeyExclusive = toLocalDateKeyExclusive(booking.endAtUtc, timezone);
-    const clampedStart =
-      compareDateKeys(startBookingKey, requestedStartKey) < 0 ? requestedStartKey : startBookingKey;
-    const clampedEndExclusive =
-      compareDateKeys(endBookingKeyExclusive, actualEndKeyExclusive) > 0
-        ? actualEndKeyExclusive
-        : endBookingKeyExclusive;
-
-    if (compareDateKeys(clampedStart, clampedEndExclusive) >= 0) continue;
-
-    let cursor = clampedStart;
-    while (compareDateKeys(cursor, clampedEndExclusive) < 0) {
-      const list = bookingsByDateKey.get(cursor) ?? [];
-      list.push(booking);
-      bookingsByDateKey.set(cursor, list);
-      cursor = addDaysToDateKey(cursor, 1);
-    }
-  }
-
-  // FIX-TIMEBLOCK-ENFORCEMENT-01: studio/master TimeBlocks removed from the
-  // engine output, same UTC-range treatment as bookings (bucketed to salon-local
-  // days, clamped to the requested window). Block CRUD already calls
-  // `invalidateSlotsForMaster`, so the per-day slot cache regenerates fresh.
-  const blockRanges = await loadTimeBlockRanges(providerId, rangeFromUtc, rangeToExclusiveUtc);
-  const blocksByDateKey = bucketRangesByDateKey(
-    blockRanges,
-    timezone,
-    requestedStartKey,
-    actualEndKeyExclusive,
-  );
-
-  const slots: AvailabilitySlot[] = [];
-  let cursorKey = requestedStartKey;
-  const now = new Date();
-
-  while (compareDateKeys(cursorKey, actualEndKeyExclusive) < 0) {
-    const cacheKey = buildSlotsCacheKey({
-      masterId: providerId,
+  const days: Array<{ dateKey: string; cacheKey: string }> = [];
+  for (
+    let cursorKey = requestedStartKey;
+    compareDateKeys(cursorKey, actualEndKeyExclusive) < 0;
+    cursorKey = addDaysToDateKey(cursorKey, 1)
+  ) {
+    days.push({
       dateKey: cursorKey,
-      serviceId,
-      serviceDuration: durationMin,
-      bufferMin,
-      timeZone: timezone,
-      scheduleVersion: ctx.scheduleWindow.scheduleVersion,
-      publishedUntilLocal: ctx.scheduleWindow.publishedUntilLocal,
-    });
-    const cached = await getCachedSlots(cacheKey);
-    let daySlots: AvailabilitySlot[];
-
-    if (cached) {
-      daySlots = cached;
-    } else {
-      const dayPlan = await ScheduleEngine.getDayPlanFromContext(ctx, cursorKey);
-      daySlots = buildSlotsForDay({
-        dayPlan,
-        dateKey: cursorKey,
-        timeZone: timezone,
-        serviceDurationMin: durationMin,
-        bufferMin,
-        bookings: bookingsByDateKey.get(cursorKey) ?? [],
-        blocks: blocksByDateKey.get(cursorKey) ?? [],
-        now,
-        slotStepMin,
-      });
-      await setCachedSlotsForDate({
-        key: cacheKey,
+      cacheKey: buildSlotsCacheKey({
         masterId: providerId,
         dateKey: cursorKey,
-        slots: daySlots,
-      });
-    }
-
-    slots.push(...daySlots);
-    cursorKey = addDaysToDateKey(cursorKey, 1);
+        serviceId,
+        serviceDuration: durationMin,
+        bufferMin,
+        slotStepMin,
+        timeZone: timezone,
+        scheduleVersion: scheduleWindow.scheduleVersion,
+        publishedUntilLocal: scheduleWindow.publishedUntilLocal,
+      }),
+    });
   }
+
+  const slotsByDateKey = new Map<string, AvailabilitySlot[]>();
+  const cachedDays = await Promise.all(days.map((day) => getCachedSlots(day.cacheKey)));
+  days.forEach((day, index) => {
+    const cached = cachedDays[index];
+    if (cached) slotsByDateKey.set(day.dateKey, cached);
+  });
+
+  const missingDays = days.filter((day) => !slotsByDateKey.has(day.dateKey));
+  const now = new Date();
+  let loadedBookingCount = 0;
+  // Считается ВНУТРИ compute: под single-flight (PERF-10) непокрытые дни может
+  // отдать победитель замка, и тогда этот запрос не пересчитал ничего.
+  let recomputedDayCount = 0;
+
+  if (missingDays.length > 0) {
+    // PERF-10: пересчёт непокрытых дней идёт под single-flight-замком. Без него
+    // истечение TTL горячего мастера означает, что одну и ту же работу делают ВСЕ
+    // параллельные запросы. Проигравший ждёт ограниченно и, не дождавшись, считает
+    // сам — дубль дешевле отказа.
+    const computeMissingDays = async (): Promise<Map<string, AvailabilitySlot[]>> => {
+      recomputedDayCount = missingDays.length;
+      const computed = new Map<string, AvailabilitySlot[]>();
+      // Диапазон сужен до непокрытых кэшем дней: остальные дни не пересчитываются,
+      // значит их override'ы, брони и блокировки читать незачем. Полное попадание
+      // в кэш вообще не доходит до этой ветки — ни одного из запросов ниже.
+      const computeFromKey = missingDays[0].dateKey;
+      const computeToKeyExclusive = addDaysToDateKey(missingDays[missingDays.length - 1].dateKey, 1);
+
+      const ctx = await createScheduleContext({
+        providerId,
+        timezoneHint: timezone,
+        range: { fromKey: computeFromKey, toKeyExclusive: computeToKeyExclusive },
+        // Провайдер уже прочитан выше, окно уже разрешено — и окно обязано быть
+        // тем же самым: ключ чтения и ключ записи должны совпадать.
+        prefetched: { provider, scheduleWindow },
+      });
+
+      const rangeFromUtc = dateFromLocalDateKey(computeFromKey, timezone, 0, 0);
+      const rangeToExclusiveUtc = dateFromLocalDateKey(computeToKeyExclusive, timezone, 0, 0);
+
+      const bookings = await prisma.booking.findMany({
+        where: {
+          OR: [
+            { masterProviderId: providerId },
+            { masterProviderId: null, providerId },
+          ],
+          status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+          ...buildBookingOverlapWhere(rangeFromUtc, rangeToExclusiveUtc),
+        },
+        select: { startAtUtc: true, endAtUtc: true },
+        orderBy: { startAtUtc: "asc" },
+      });
+
+      const bookingRanges = bookings
+        .map((booking) =>
+          booking.startAtUtc && booking.endAtUtc
+            ? { startAtUtc: booking.startAtUtc, endAtUtc: booking.endAtUtc }
+            : null
+        )
+        .filter((item): item is { startAtUtc: Date; endAtUtc: Date } => item !== null);
+      loadedBookingCount = bookingRanges.length;
+
+      const bookingsByDateKey = new Map<string, Array<{ startAtUtc: Date; endAtUtc: Date }>>();
+
+      for (const booking of bookingRanges) {
+        const startBookingKey = toLocalDateKey(booking.startAtUtc, timezone);
+        const endBookingKeyExclusive = toLocalDateKeyExclusive(booking.endAtUtc, timezone);
+        const clampedStart =
+          compareDateKeys(startBookingKey, computeFromKey) < 0 ? computeFromKey : startBookingKey;
+        const clampedEndExclusive =
+          compareDateKeys(endBookingKeyExclusive, computeToKeyExclusive) > 0
+            ? computeToKeyExclusive
+            : endBookingKeyExclusive;
+
+        if (compareDateKeys(clampedStart, clampedEndExclusive) >= 0) continue;
+
+        let cursor = clampedStart;
+        while (compareDateKeys(cursor, clampedEndExclusive) < 0) {
+          const list = bookingsByDateKey.get(cursor) ?? [];
+          list.push(booking);
+          bookingsByDateKey.set(cursor, list);
+          cursor = addDaysToDateKey(cursor, 1);
+        }
+      }
+
+      // FIX-TIMEBLOCK-ENFORCEMENT-01: studio/master TimeBlocks removed from the
+      // engine output, same UTC-range treatment as bookings (bucketed to salon-local
+      // days, clamped to the requested window). Block CRUD already calls
+      // `invalidateSlotsForMaster`, so the per-day slot cache regenerates fresh.
+      const blockRanges = await loadTimeBlockRanges(providerId, rangeFromUtc, rangeToExclusiveUtc);
+      const blocksByDateKey = bucketRangesByDateKey(
+        blockRanges,
+        timezone,
+        computeFromKey,
+        computeToKeyExclusive,
+      );
+
+      for (const day of missingDays) {
+        const dayPlan = await ScheduleEngine.getDayPlanFromContext(ctx, day.dateKey);
+        const daySlots = buildSlotsForDay({
+          dayPlan,
+          dateKey: day.dateKey,
+          timeZone: timezone,
+          serviceDurationMin: durationMin,
+          bufferMin,
+          bookings: bookingsByDateKey.get(day.dateKey) ?? [],
+          blocks: blocksByDateKey.get(day.dateKey) ?? [],
+          now,
+          slotStepMin,
+        });
+          computed.set(day.dateKey, daySlots);
+        await setCachedSlotsForDate({
+          key: day.cacheKey,
+          masterId: providerId,
+          dateKey: day.dateKey,
+          slots: daySlots,
+        });
+      }
+
+      return computed;
+    };
+
+    const computedDays = await withSingleFlight<Map<string, AvailabilitySlot[]>>({
+      // Замок именует ровно ту работу, которую защищает: провайдер, услуга,
+      // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
+      // разными отрезками друг друга не блокируют.
+      lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}`,
+      read: async () => {
+        const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
+        // Частично заполненный набор — ещё не результат: победитель пишет дни по
+        // одному, и взять половину значило бы отдать неполный ответ.
+        if (values.some((value) => !value)) return null;
+        const filled = new Map<string, AvailabilitySlot[]>();
+        missingDays.forEach((day, index) => filled.set(day.dateKey, values[index] as AvailabilitySlot[]));
+        return filled;
+      },
+      compute: computeMissingDays,
+    });
+
+    for (const [dateKey, daySlots] of computedDays) {
+      slotsByDateKey.set(dateKey, daySlots);
+    }
+  }
+
+  const slots: AvailabilitySlot[] = days.flatMap((day) => slotsByDateKey.get(day.dateKey) ?? []);
 
   const totalDays = Math.max(0, diffDateKeys(requestedStartKey, actualEndKeyExclusive));
   const hasMore = compareDateKeys(actualEndKeyExclusive, requestedEndKeyExclusive) < 0;
@@ -421,7 +490,7 @@ export async function listAvailabilitySlotsPaginated(
   if (!isProduction) {
     const durationMs = Date.now() - startedAt;
     console.info(
-      `[availability] provider=${providerId} days=${totalDays} bookings=${bookingRanges.length} slots=${slots.length} ms=${durationMs}`
+      `[availability] provider=${providerId} days=${totalDays} missing=${missingDays.length} recomputed=${recomputedDayCount} bookings=${loadedBookingCount} slots=${slots.length} ms=${durationMs}`
     );
   }
 
@@ -513,6 +582,7 @@ export async function listAvailabilitySlots(
       serviceId,
       serviceDuration: durationMin,
       bufferMin,
+      slotStepMin,
       timeZone: timezone,
       scheduleVersion: ctx.scheduleWindow.scheduleVersion,
       publishedUntilLocal: ctx.scheduleWindow.publishedUntilLocal,

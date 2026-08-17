@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { env, isProduction } from "@/lib/env";
 import {
@@ -61,9 +62,71 @@ function parseAccessTokenPayload(token: string | null | undefined): SessionPaylo
   return verifyToken(token, "access");
 }
 
-async function loadActiveSessionUser(userId: string) {
+/**
+ * SEC-13 — access-токен действителен, только пока жива его СЕМЬЯ сессий.
+ *
+ * Раньше проверялся лишь флаг удаления пользователя, поэтому «завершить все
+ * остальные сессии» и logout гасили только refresh-строки: украденный
+ * access-токен продолжал работать до истечения своих 2 часов. Для человека,
+ * который жмёт эту кнопку ИМЕННО потому, что подозревает компрометацию, это
+ * ровно то окно, в котором злоумышленник ещё внутри.
+ *
+ * Привязка идёт к `familyId`, а не к `RefreshSession.id`: ротация помечает
+ * старую строку `revokedAt` и создаёт новую, так что привязка к строке
+ * обнуляла бы живой access-токен при каждом обновлении сессии. Семья же
+ * наследуется по цепочке ротации и умирает только от явного отзыва.
+ *
+ * Токены без `fid` (выпущенные до SEC-13) проходят как legacy — иначе деплой
+ * разлогинил бы всех разом. Они живут не дольше своего TTL.
+ */
+/**
+ * PERF-23 — что именно нужно вызывающим от «текущего пользователя».
+ *
+ * Запрос шёл без `select`, то есть на КАЖДЫЙ аутентифицированный запрос (а
+ * `getSessionUser` стоит практически в каждом защищённом роуте и в SSR
+ * публичных страниц) из БД приезжала вся строка `UserProfile` — тридцать с
+ * лишним колонок, включая адрес, ФИО, даты блокировки и причину блокировки,
+ * которых сессии не нужно ничего.
+ *
+ * Список ниже — не догадка: он выведен компилятором. Prisma сужает тип
+ * результата по `select`, поэтому любой потребитель, читающий поле не из
+ * этого списка, валит `typecheck`. То есть полнота списка проверяется
+ * гейтом, а не ревью, и новое поле нельзя начать читать молча.
+ */
+const SESSION_USER_SELECT = {
+  id: true,
+  roles: true,
+  phone: true,
+  email: true,
+  emailVerifiedAt: true,
+  displayName: true,
+  firstName: true,
+  lastName: true,
+  publicUsername: true,
+  telegramId: true,
+  externalPhotoUrl: true,
+  isDeleted: true,
+} as const;
+
+/**
+ * Пользователь текущей сессии. Именно этот тип обязаны принимать хелперы,
+ * которым его передают: объявленный в сигнатуре полный `UserProfile` —
+ * это тихое требование прочитать из БД всё, даже если функция читает `roles`.
+ */
+export type SessionUser = Prisma.UserProfileGetPayload<{
+  select: typeof SESSION_USER_SELECT;
+}>;
+
+async function loadActiveSessionUser(userId: string, familyId?: string | null) {
   return prisma.userProfile.findFirst({
-    where: { id: userId, isDeleted: false },
+    where: {
+      id: userId,
+      isDeleted: false,
+      ...(familyId
+        ? { refreshSessions: { some: { familyId, revokedAt: null } } }
+        : {}),
+    },
+    select: SESSION_USER_SELECT,
   });
 }
 
@@ -83,7 +146,7 @@ export function getAccessTokenFromRequest(req: Request): string | null {
 export async function getSessionUserFromRequest(req: Request) {
   const payload = parseAccessTokenPayload(getAccessTokenFromRequest(req));
   if (!payload?.sub) return null;
-  return loadActiveSessionUser(payload.sub);
+  return loadActiveSessionUser(payload.sub, payload.fid);
 }
 
 function buildRefreshExpiresAt(): Date {
@@ -121,10 +184,15 @@ function setRefreshCookie(response: NextResponse, refreshToken: string): void {
 }
 
 export async function setSessionCookies(response: NextResponse, payload: SessionCookiePayload): Promise<void> {
+  // SEC-13: новая сессия = новая семья. Идентификатор генерируем сами, а не
+  // берём id строки, — тогда хватает одного запроса и семья остаётся
+  // самостоятельным понятием, а не псевдонимом первой строки цепочки.
+  const familyId = crypto.randomUUID();
   const refreshSession = await prisma.refreshSession.create({
     data: {
       userId: payload.sub,
       jti: crypto.randomUUID(),
+      familyId,
       expiresAt: buildRefreshExpiresAt(),
     },
     select: {
@@ -133,7 +201,7 @@ export async function setSessionCookies(response: NextResponse, payload: Session
     },
   });
 
-  const accessToken = signAccessToken(payload);
+  const accessToken = signAccessToken({ ...payload, fid: familyId });
   const refreshToken = signRefreshToken({ sub: payload.sub, sid: refreshSession.id, jti: refreshSession.jti });
 
   setAccessCookie(response, accessToken);
@@ -184,10 +252,21 @@ export async function rotateSessionCookies(
       return null;
     }
 
+    // SEC-13: ротация продолжает ТУ ЖЕ семью, иначе живой access-токен
+    // умирал бы при каждом обновлении сессии. Строки, выпущенные до миграции,
+    // семьи не имеют — для них семьёй становится их собственный id, так что
+    // цепочка получает её со следующей ротации и дальше уже отзываема.
+    const claimedSession = await tx.refreshSession.findUnique({
+      where: { id: claims.sid },
+      select: { familyId: true },
+    });
+    const familyId = claimedSession?.familyId ?? claims.sid;
+
     const nextSession = await tx.refreshSession.create({
       data: {
         userId: user.id,
         jti: crypto.randomUUID(),
+        familyId,
         expiresAt: buildRefreshExpiresAt(),
       },
       select: { id: true, jti: true },
@@ -198,7 +277,7 @@ export async function rotateSessionCookies(
       data: { rotatedToSessionId: nextSession.id },
     });
 
-    return { user, nextSession };
+    return { user, nextSession, familyId };
   });
 
   if (!rotated) return null;
@@ -208,7 +287,7 @@ export async function rotateSessionCookies(
     phone: rotated.user.phone ?? null,
     roles: rotated.user.roles,
   };
-  const accessToken = signAccessToken(payload);
+  const accessToken = signAccessToken({ ...payload, fid: rotated.familyId });
   const nextRefreshToken = signRefreshToken({
     sub: rotated.user.id,
     sid: rotated.nextSession.id,
@@ -302,13 +381,34 @@ export function clearSessionCookies(response: NextResponse): void {
   });
 }
 
+/**
+ * SEC-13 — id тоже обязан проходить проверку сессии.
+ *
+ * Эта функция возвращала `payload.sub` прямо из токена, вообще не заглядывая в
+ * БД: ни отзыв сессии, ни даже удаление аккаунта на неё не действовали. Живой
+ * смоук поймал это на `/api/me` — устройство, у которого только что отозвали
+ * сессию, продолжало отвечать 200, потому что этот путь шёл мимо
+ * `loadActiveSessionUser`. Выбираем только `id`, чтобы не тянуть всю строку
+ * профиля ради одного поля.
+ */
 export async function getSessionUserId(): Promise<string | null> {
   const payload = await getAccessSessionPayload();
-  return payload?.sub ?? null;
+  if (!payload?.sub) return null;
+  const user = await prisma.userProfile.findFirst({
+    where: {
+      id: payload.sub,
+      isDeleted: false,
+      ...(payload.fid
+        ? { refreshSessions: { some: { familyId: payload.fid, revokedAt: null } } }
+        : {}),
+    },
+    select: { id: true },
+  });
+  return user?.id ?? null;
 }
 
 export async function getSessionUser() {
   const payload = await getAccessSessionPayload();
   if (!payload?.sub) return null;
-  return loadActiveSessionUser(payload.sub);
+  return loadActiveSessionUser(payload.sub, payload.fid);
 }

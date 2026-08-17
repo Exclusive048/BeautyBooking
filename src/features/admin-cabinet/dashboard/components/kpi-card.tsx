@@ -84,8 +84,8 @@ function DeltaBadge({ kpi }: { kpi: AdminKpi }) {
         isZero
           ? "bg-bg-input text-text-sec"
           : isPositive
-            ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
-            : "bg-red-500/12 text-red-600 dark:text-red-400",
+            ? "bg-emerald-500/[0.12] text-emerald-600 dark:text-emerald-400"
+            : "bg-red-500/[0.12] text-red-600 dark:text-red-400",
       )}
       aria-label={
         isPositive ? T.deltaTooltipPositive : T.deltaTooltipNegative

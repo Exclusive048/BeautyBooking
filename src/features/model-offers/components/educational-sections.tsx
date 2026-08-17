@@ -18,7 +18,7 @@ export function EducationalSections() {
     <>
       <FeatureGrid
         eyebrow={T.howItWorks.eyebrow}
-        title="Взаимный обмен — в чём суть"
+        title={T.howItWorks.title}
         features={[
           {
             iconName: "users",

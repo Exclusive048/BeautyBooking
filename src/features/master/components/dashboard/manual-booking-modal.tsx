@@ -9,6 +9,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
 import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
+import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-input";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -17,13 +19,15 @@ const T = UI_TEXT.cabinetMaster.dashboard.manualBooking;
 type Props = {
   services: DashboardServiceLite[];
   isSolo: boolean;
+  /**
+   * LOGIC-21 · tz-источник — **salon-tz** (`Provider.timezone` мастера). Поле
+   * `startAt` — `datetime-local`, а он всегда трактуется в таймзоне БРАУЗЕРА;
+   * зона нужна, чтобы и заполнение, и отправка шли по стенным часам салона.
+   */
+  timezone: string;
 };
 
 const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
-
-function todayDateKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Client island that opens a manual-booking dialog when the URL has
@@ -32,7 +36,7 @@ function todayDateKey(): string {
  * clears the param and refreshes the server tree so KPIs and the
  * upcoming-bookings list update without a full reload.
  */
-export function ManualBookingModal({ services, isSolo }: Props) {
+export function ManualBookingModal({ services, isSolo, timezone }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -62,9 +66,11 @@ export function ManualBookingModal({ services, isSolo }: Props) {
   // seed it via the next effect.
   useEffect(() => {
     if (!startAt && !prefillTime) {
-      setStartAt(`${todayDateKey()}T10:00`);
+      // LOGIC-21: «сегодня» — день по часам САЛОНА, а не UTC-срез и не день
+      // браузера; иначе дефолт разъезжается с тем, как поле теперь читается.
+      setStartAt(`${toLocalDateKey(new Date(), timezone)}T10:00`);
     }
-  }, [startAt, prefillTime]);
+  }, [startAt, prefillTime, timezone]);
 
   // When the modal opens fresh, default the service to the first available
   // option if the user previously cleared it.
@@ -79,15 +85,13 @@ export function ManualBookingModal({ services, isSolo }: Props) {
   // changes — keeps user edits intact mid-session.
   useEffect(() => {
     if (!isOpen || !prefillTime) return;
-    const parsed = new Date(prefillTime);
-    if (Number.isNaN(parsed.getTime())) return;
-    const y = parsed.getFullYear();
-    const m = String(parsed.getMonth() + 1).padStart(2, "0");
-    const d = String(parsed.getDate()).padStart(2, "0");
-    const hh = String(parsed.getHours()).padStart(2, "0");
-    const mm = String(parsed.getMinutes()).padStart(2, "0");
-    setStartAt(`${y}-${m}-${d}T${hh}:${mm}`);
-  }, [isOpen, prefillTime]);
+    // LOGIC-21: раскодировать UTC-инстант host-локальными геттерами значило
+    // показать мастеру СВОИ стенные часы вместо салонных. Round-trip был
+    // самосогласован в таймзоне браузера и оттого визуально незаметен.
+    const salonLocal = utcIsoToSalonInput(prefillTime, timezone);
+    if (!salonLocal) return;
+    setStartAt(salonLocal);
+  }, [isOpen, prefillTime, timezone]);
 
   // fix-04a: ESC + body-scroll-lock effects were dropped along with
   // the bespoke fixed-inset wrapper. `<ModalSurface>` now provides
@@ -109,7 +113,14 @@ export function ManualBookingModal({ services, isSolo }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const startAtIso = new Date(startAt).toISOString();
+      // LOGIC-21: введённое значение — стенные часы САЛОНА (так же оно и
+      // заполняется), поэтому в UTC его переводит salon-конвертер, а не
+      // `new Date(value)`, который читает строку в таймзоне браузера.
+      const startAtIso = salonInputToUtcIso(startAt, timezone);
+      if (!startAtIso) {
+        setError(T.invalidTime);
+        return;
+      }
       const res = await fetch("/api/master/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

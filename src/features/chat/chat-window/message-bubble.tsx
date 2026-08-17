@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { BubbleMeta } from "@/features/chat/chat-window/bubble-meta";
 import { formatTimeHm } from "@/features/chat/lib/format-time";
 import type { ThreadMessageDto } from "@/features/chat/types";
+import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
   message: ThreadMessageDto;
@@ -16,9 +17,12 @@ type Props = {
 function AttachmentImage({
   url,
   className,
+  alt,
 }: {
   url: string;
   className: string;
+  /** UI-33: ссылка-обёртка своего текста не имеет — имя ей даёт эта строка. */
+  alt: string;
 }) {
   // MASTER-CHAT-ATTACHMENT-FIX-A:
   //   - Track load + error so the bubble never collapses to the
@@ -36,17 +40,50 @@ function AttachmentImage({
   //     thin strip.
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+  /**
+   * FIX-C3 · item 3 — почему причина выясняется ВТОРЫМ запросом.
+   *
+   * Маршрут отдаёт БАЙТЫ, и добраться до него можно только `<img src>`
+   * (`next/image` переписал бы URL через оптимизатор и потерял токен). У
+   * `onError` элемента `<img>` нет ни статуса, ни тела: «доступа нет», «файла
+   * нет» и «ссылка устарела» приходят в обработчик неразличимыми — это и есть
+   * дефект. Поэтому в момент отказа — и только тогда — тот же URL
+   * запрашивается `fetch`'ем, у которого конверт виден.
+   *
+   * Цена: один запрос на СБОЙНОЕ вложение. Успешный путь не трогается вовсе.
+   *
+   * Публичные картинки этого не получают намеренно: там различать нечего
+   * («нет файла» — единственный исход), и `ResilientImage` уже показывает
+   * плейсхолдер. Второй механизм ради одинакового исхода был бы лишним.
+   */
+  const [reason, setReason] = useState<string | null>(null);
+
+  async function explainFailure() {
+    setErrored(true);
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) return; // гонка: байты доехали — сообщение не нужно
+      const json = (await res.json().catch(() => null)) as
+        | { ok: false; error?: { message?: string } }
+        | null;
+      const serverMessage = json && json.ok === false ? json.error?.message : null;
+      if (serverMessage) setReason(serverMessage);
+      else if (res.status === 403) setReason(UI_TEXT.chat.composer.attachmentNoAccess);
+    } catch {
+      // Сеть недоступна — остаётся общая строка, она здесь и верна.
+    }
+  }
 
   if (errored) {
     return (
       <div
         className={cn(
           className,
-          "flex aspect-[4/3] min-h-[200px] w-full flex-col items-center justify-center gap-2 bg-bg-input/40 text-text-sec",
+          "flex aspect-[4/3] min-h-[200px] w-full flex-col items-center justify-center gap-2 bg-bg-input/40 px-4 text-center text-text-sec",
         )}
       >
         <ImageOff className="h-6 w-6" aria-hidden />
-        <span className="text-xs">Не удалось загрузить вложение</span>
+        <span className="text-xs">{reason ?? UI_TEXT.chat.composer.attachmentLoadFailed}</span>
       </div>
     );
   }
@@ -60,14 +97,14 @@ function AttachmentImage({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
-        alt=""
+        alt={alt}
         loading="lazy"
         className={cn(
           "absolute inset-0 block h-full w-full object-cover transition-opacity duration-200",
           loaded ? "opacity-100" : "opacity-0",
         )}
         onLoad={() => setLoaded(true)}
-        onError={() => setErrored(true)}
+        onError={() => void explainFailure()}
       />
     </div>
   );
@@ -93,7 +130,18 @@ export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
             "border border-border-subtle bg-bg-input/40",
           )}
         >
-          <AttachmentImage url={attachmentUrl} className="" />
+          <AttachmentImage
+            url={attachmentUrl}
+            className=""
+            alt={
+              isMine
+                ? UI_TEXT.chat.composer.attachmentAltOwn
+                : UI_TEXT.chat.composer.attachmentAltTemplate.replace(
+                    "{name}",
+                    message.senderName
+                  )
+            }
+          />
         </a>
       ) : null}
       {hasBody ? (

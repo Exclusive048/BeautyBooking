@@ -55,6 +55,23 @@ export const memoryClient: CacheClient = {
       }
     }
   },
+  async sAdd(key: string, member: string, ttlSeconds: number): Promise<boolean> {
+    const entry = store.get(key);
+    const existing = entry && !isExpired(entry) ? parseJson<string[]>(entry.value) ?? [] : [];
+    const next = existing.includes(member) ? existing : [...existing, member];
+    const expiresAt = ttlSeconds > 0 ? nowMs() + ttlSeconds * 1000 : null;
+    store.set(key, { value: JSON.stringify(next), expiresAt });
+    return true;
+  },
+  async sMembers(key: string): Promise<string[]> {
+    const entry = store.get(key);
+    if (!entry) return [];
+    if (isExpired(entry)) {
+      store.delete(key);
+      return [];
+    }
+    return parseJson<string[]>(entry.value) ?? [];
+  },
   async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
     const existing = store.get(key);
     if (existing && !isExpired(existing)) {

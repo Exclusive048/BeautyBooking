@@ -9,7 +9,9 @@ import { toKopeks, type Kopeks } from "@/lib/money/kopeks";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import { Prisma, type BookingStatus } from "@prisma/client";
+import { BookingSource, type BookingStatus } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 
 export type MasterDayBooking = {
   id: string;
@@ -472,12 +474,14 @@ export async function createSoloMasterBooking(input: {
   };
   await ensureNoConflicts(prisma, conflictScope);
 
-  const created = await prisma.$transaction(
+  const created = await bookingTransaction(
     async (tx) => {
       await ensureNoConflicts(tx, conflictScope);
 
-      const booking = await tx.booking.create({
+      const booking = await createBookingRow(tx, {
         data: {
+          // Путь доступен ТОЛЬКО мастеру без студии (403 выше), поэтому writer
+          // выведет `studioId: null` — и это тот же ответ, что был здесь всегда.
           providerId: input.masterId,
           masterProviderId: input.masterId,
           masterId: input.masterId,
@@ -488,7 +492,8 @@ export async function createSoloMasterBooking(input: {
           clientName: input.clientName.trim(),
           clientPhone: input.clientPhone?.trim() || "",
           notes: input.notes?.trim() || null,
-          source: "MANUAL",
+          // Мастер заносит уже известную запись руками — MANUAL здесь правда.
+          source: BookingSource.MANUAL,
           status: "PENDING",
           // R2-01-D: a solo master entering a manual booking is recording a known
           // appointment — flagging the master to "action" their own booking is a
@@ -515,7 +520,7 @@ export async function createSoloMasterBooking(input: {
 
       return booking;
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
   );
 
   await invalidateSlotsForBookingRange({

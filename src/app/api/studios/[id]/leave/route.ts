@@ -30,8 +30,19 @@ export async function POST(
 
   const p = params instanceof Promise ? await params : params;
 
+  // SEC-28: `[id]` в ветке `/api/studios/[id]/**` означает **`Provider.id`** —
+  // так его трактуют все соседние хендлеры через `ensureStudioAccess`
+  // (`lib/studios/access.ts:9-11`), и так его шлют все клиентские вызывающие
+  // (`studio-cabinet/settings/*` несут об этом отдельные комментарии). Этот
+  // роут единственный читал сегмент как `Studio.id`. Эксплуатируемости не было
+  // — дальше всё скоупится на `auth.user.id`, — но это ровно ловушка «two id
+  // systems», о которой предупреждает `lib/studio/tenancy.ts:19-25`: следующий
+  // роут в этой ветке мог выбрать не ту систему и уже не так безобидно.
+  // Совместимость не нужна: у роута ноль вызывающих (живой путь ухода —
+  // `POST /api/cabinet/master/leave-studio`), а приём обоих видов id и был бы
+  // той самой двусмысленностью.
   const studio = await prisma.studio.findUnique({
-    where: { id: p.id },
+    where: { providerId: p.id },
     select: {
       id: true,
       providerId: true,

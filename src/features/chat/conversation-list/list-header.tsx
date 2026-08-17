@@ -1,6 +1,7 @@
 "use client";
 
 import { Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ChatPerspective } from "@/features/chat/types";
 
@@ -51,11 +52,10 @@ export function ListHeader({
       </label>
 
       <label className="flex cursor-pointer items-center gap-2 text-xs text-text-sec">
-        <input
-          type="checkbox"
+        <Checkbox
+          size="sm"
           checked={unreadOnly}
           onChange={(event) => onUnreadOnlyChange(event.target.checked)}
-          className="h-3.5 w-3.5 cursor-pointer accent-primary"
         />
         {T.list.unreadOnly}
       </label>

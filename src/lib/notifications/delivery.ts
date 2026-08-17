@@ -60,6 +60,34 @@ async function enqueueTelegramMessage(userId: string, text: string): Promise<voi
   }
 }
 
+/**
+ * EMAIL-ADDRESS-OCCUPATION: сервисная почта уходит ТОЛЬКО на ПОДТВЕРЖДЁННЫЙ
+ * адрес.
+ *
+ * Пока проверки `emailVerifiedAt` не было, вторая половина squat'а была не про
+ * доступность, а про ПДн: держатель заявки на чужой адрес получал письма о
+ * СВОИХ записях в ЧУЖОЙ ящик — то есть имя, услугу и время визита третьего
+ * лица уезжали постороннему человеку. Частичный уникальный индекс это НЕ
+ * закрывает: он про уникальность владения, а не про доставку.
+ *
+ * Вынесено отдельным предикатом, а не оставлено условием в теле, чтобы
+ * проверялось поведение, а не строка исходника.
+ */
+type ServiceEmailRecipient = {
+  email: string | null;
+  emailNotificationsEnabled: boolean;
+  emailVerifiedAt: Date | null;
+};
+
+export function canDeliverServiceEmail(
+  user: ServiceEmailRecipient | null,
+): user is ServiceEmailRecipient & { email: string } {
+  if (!user) return false;
+  if (!user.email) return false;
+  if (!user.emailNotificationsEnabled) return false;
+  return user.emailVerifiedAt !== null;
+}
+
 async function deliverEmailNotification(
   userId: string,
   title: string,
@@ -70,10 +98,10 @@ async function deliverEmailNotification(
 
   const user = await prisma.userProfile.findUnique({
     where: { id: userId },
-    select: { email: true, emailNotificationsEnabled: true },
+    select: { email: true, emailNotificationsEnabled: true, emailVerifiedAt: true },
   });
 
-  if (!user?.email || !user.emailNotificationsEnabled) return;
+  if (!canDeliverServiceEmail(user)) return;
 
   const baseUrl = resolvePublicAppUrl() ?? "";
   const unsubscribeUrl = `${baseUrl}/cabinet/settings`;

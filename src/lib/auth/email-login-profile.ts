@@ -2,6 +2,7 @@ import { AccountType, Prisma, type UserProfile } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import { releaseUnverifiedEmailClaims } from "@/lib/auth/email-claim";
 
 // OTP-EMAIL-LOGIN-RACE: local P2002 constant, mirroring the other
 // re-read-on-conflict sites (`detect-city.ts`, `conversation-slug.ts`).
@@ -41,12 +42,22 @@ export async function resolveEmailLoginProfile(
   try {
     // Первый успешный вход по коду с этого адреса И ЕСТЬ доказательство
     // владения — профиль создаётся сразу верифицированным.
-    return await prisma.userProfile.create({
-      data: {
-        email: normalizedEmail,
-        emailVerifiedAt: new Date(),
-        roles: [AccountType.CLIENT],
-      },
+    //
+    // EMAIL-ADDRESS-OCCUPATION: освобождение чужих НЕподтверждённых заявок и
+    // создание идут ОДНОЙ транзакцией. Порядок обязателен и именно такой:
+    // после снятия полного `@unique` создание больше не упирается в P2002,
+    // когда адрес держит чужая неподтверждённая строка, — то есть без
+    // освобождения владелец получил бы профиль, а squat остался бы висеть и
+    // продолжил получать сервисную почту на этот адрес.
+    return await prisma.$transaction(async (tx) => {
+      await releaseUnverifiedEmailClaims(tx, normalizedEmail, null);
+      return tx.userProfile.create({
+        data: {
+          email: normalizedEmail,
+          emailVerifiedAt: new Date(),
+          roles: [AccountType.CLIENT],
+        },
+      });
     });
   } catch (error) {
     if (
@@ -89,12 +100,31 @@ export async function findVerifiedEmailProfile(
   });
 }
 
-/** Идемпотентно проставляет отметку владения (повторный вход ничего не пишет). */
+/**
+ * Идемпотентно проставляет отметку владения (повторный вход ничего не пишет).
+ *
+ * EMAIL-ADDRESS-OCCUPATION: вместе с отметкой — освобождение чужих
+ * неподтверждённых заявок на этот адрес, одной транзакцией. Ветка достижима
+ * только для профиля, который уже прошёл `findVerifiedEmailProfile`, то есть
+ * ранний выход выше срабатывает почти всегда; но если сюда всё же передали
+ * неподтверждённый профиль, освобождение обязано пройти вместе с отметкой —
+ * иначе появился бы второй держатель уже подтверждённого адреса.
+ */
 async function ensureEmailVerified(profile: UserProfile): Promise<UserProfile> {
   if (profile.emailVerifiedAt) return profile;
-  return prisma.userProfile.update({
-    where: { id: profile.id },
-    data: { emailVerifiedAt: new Date() },
+  if (!profile.email) {
+    return prisma.userProfile.update({
+      where: { id: profile.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+  }
+  const email = profile.email;
+  return prisma.$transaction(async (tx) => {
+    await releaseUnverifiedEmailClaims(tx, email, profile.id);
+    return tx.userProfile.update({
+      where: { id: profile.id },
+      data: { emailVerifiedAt: new Date() },
+    });
   });
 }
 

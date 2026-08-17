@@ -1,5 +1,6 @@
 "use client";
 
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const BOOKING_OPEN_SHEET_EVENT = "booking:open-sheet";
@@ -12,7 +13,7 @@ export function MobileBookingCta() {
     const el = document.getElementById("booking");
     if (el) {
       const y = el.getBoundingClientRect().top + window.scrollY - 16;
-      window.scrollTo({ top: y, behavior: "smooth" });
+      window.scrollTo({ top: y, behavior: scrollBehavior() });
     }
   }
 
@@ -25,7 +26,7 @@ export function MobileBookingCta() {
         <button
           type="button"
           onClick={handleClick}
-          className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 py-4 text-base font-semibold text-[rgb(var(--accent-foreground))] shadow-hover transition active:scale-[0.98]"
+          className="w-full rounded-2xl bg-gradient-to-r from-primary via-primary-hover to-primary-magenta px-6 py-4 text-base font-semibold text-accent-foreground shadow-hover transition active:scale-[0.98]"
         >
           {UI_TEXT.publicProfile.page.bookNow}
         </button>

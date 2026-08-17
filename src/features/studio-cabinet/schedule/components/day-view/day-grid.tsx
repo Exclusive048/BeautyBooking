@@ -31,6 +31,7 @@ import { BookingActionMenu } from "../dialogs/booking-action-menu";
 import { CreateBookingDialog } from "../dialogs/create-booking-dialog";
 import { CurrentTimeLine } from "./current-time-line";
 import { DisabledMasterOverlay } from "./disabled-master-overlay";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { MasterColumnHeader } from "./master-column-header";
 import { TimeAxis } from "./time-axis";
 
@@ -94,7 +95,7 @@ export function DayGrid({
   useEffect(() => {
     if (!focusMasterId || !focusedColumnRef.current) return;
     focusedColumnRef.current.scrollIntoView({
-      behavior: "smooth",
+      behavior: scrollBehavior(),
       block: "nearest",
       inline: "center",
     });

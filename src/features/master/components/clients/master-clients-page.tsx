@@ -8,6 +8,7 @@ import {
   parseSort,
   parseTab,
 } from "@/lib/master/clients-view.service";
+import { CRM_CLIENTS_WINDOW_MONTHS } from "@/lib/crm/clients-window";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ClientsKpiCards } from "./clients-kpi-cards";
@@ -72,7 +73,7 @@ export async function MasterClientsPage({ searchParams }: Props) {
           { label: T.clients.breadcrumb },
         ]}
         title={T.clients.title}
-        subtitle={T.clients.subtitle}
+        subtitle={`${T.clients.subtitle} · ${T.clients.windowNote(CRM_CLIENTS_WINDOW_MONTHS)}`}
       />
 
       <div className="space-y-6 px-4 py-6 md:px-6 lg:px-8">

@@ -2,6 +2,12 @@
 
 Scope: prelaunch operations checklist for BeautyHub / МастерРядом before production deploy.
 
+> 🔴 **Этот документ предшествует аудит-кампании (FIX-C9, 2026-08-14).** Замер: **ноль** упоминаний `FIX-B*` / `FIX-C*` / `SMOKE-01` / `/api/health/ready` / `AiSpendCounter` / `noeviction` / `statement_timeout`. То есть он описывает систему **до** ~35 фикс-коммитов, и как минимум один его пункт был **прямо неверен** — §4 предлагал проверять Redis через `GET /api/health` и ставить NO-GO по `503`, тогда как после FIX-C2 этот эндпоинт **намеренно остаётся `200` при лежащем Redis** (он проверяет живость процесса). Проверка выдала бы **GO во время аварии Redis**. Исправлено ниже.
+>
+> **Авторитет для закрытого деплоя — `DEPLOY-BACKLOG.md` §B** (единая упорядоченная процедура с классификацией «доказано / стенд / прочитано / только на проде / решение владельца»). Этот файл держим как справочник по *структуре* проверок; **прежде чем опираться на конкретный пункт — сверить с кодом, а не с этим текстом.**
+>
+> ⚠️ Ссылки вида `[...](/d:/BeautyBooking/beautyhub/...)` ниже — абсолютные пути машины автора и у второго разработчика не открываются. Читать как относительные от корня репозитория.
+
 Rules:
 - Do not put secrets/tokens in this document.
 - Run checks against production-like environment before final production rollout.
@@ -124,16 +130,22 @@ Check:
 - Redis is reachable by application.
 
 How to verify:
-- Call `/api/health`.
+- 🔴 **Исправлено FIX-C9 (2026-08-14): звать `GET /api/health/ready`, НЕ `GET /api/health`.**
+  До FIX-C2 эти проверки не были разведены, и здесь стояло `/api/health`. Сегодня
+  `/api/health` — проба **живости**: она намеренно не ходит в зависимости и
+  **остаётся `200` при полностью лежащем Redis** (иначе частичная деградация
+  выводила бы единственный инстанс из ротации балансировщика). То есть прежний
+  пункт выдавал бы **GO во время аварии Redis** — ровно наоборот задуманному.
 
 Where to verify:
-- [src/app/api/health/route.ts](/d:/BeautyBooking/beautyhub/src/app/api/health/route.ts).
+- `src/app/api/health/ready/route.ts`, `src/lib/health/probe.ts`.
 
 GO condition:
-- `200` with `{ "ok": true }`.
+- `200` + `{"status":"ready","dependencies":{"db":"ok","redis":"ok"}}`, ответ в пределах ~2 с (`HEALTH_DEPENDENCY_TIMEOUT_MS`).
 
 NO-GO condition:
-- `503` or `{ "ok": false }`.
+- `503` либо `dependencies.redis` ≠ `"ok"`.
+- ⚠️ `dependencies.db: "ok"` при `redis: "down"` означает «подозреваемый один» — разбор в `docs/runbooks/redis-down.md`. Откат деплоя это **не чинит** (на образе `:previous` Redis лежит так же), поэтому автооткат гейтится только по `db`.
 
 Check:
 - Queue depth/dead queue is under control.
@@ -385,10 +397,11 @@ Check:
 - GitHub workflow quality gates is green for current commit.
 
 How to verify:
-- Check latest run of `quality-gates.yml`.
+- Check latest runs of `ci.yml` (гейты + тесты) and `build-images.yml` (сборка образов).
 
 Where to verify:
-- [.github/workflows/quality-gates.yml](/d:/BeautyBooking/beautyhub/.github/workflows/quality-gates.yml).
+- [.github/workflows/ci.yml](/d:/BeautyBooking/beautyhub/.github/workflows/ci.yml);
+- [.github/workflows/build-images.yml](/d:/BeautyBooking/beautyhub/.github/workflows/build-images.yml).
 
 GO condition:
 - Latest workflow run is successful.

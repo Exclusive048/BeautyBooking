@@ -113,6 +113,7 @@ export function FormPhase({
   onSubmit,
 }: Props) {
   const silentLabelId = useId();
+  const referencePhotoId = useId();
   const isAuthPhone = Boolean(me?.phone);
   const hasName = clientName.trim().length > 0;
   const hasPhone = clientPhone.trim().length >= 10;
@@ -216,10 +217,11 @@ export function FormPhase({
 
           {bookingConfig.requiresReferencePhoto ? (
             <div>
-              <label className="mb-1.5 block text-xs text-text-sec">
+              <label htmlFor={referencePhotoId} className="mb-1.5 block text-xs text-text-sec">
                 {TB.referencePhotoLabel} <span className="text-rose-400">*</span>
               </label>
               <input
+                id={referencePhotoId}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={(event) => {

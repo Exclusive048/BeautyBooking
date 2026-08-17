@@ -11,7 +11,7 @@ export function InfoPageLayout({ breadcrumb, children }: Props) {
   return (
     <div>
       <nav
-        aria-label="breadcrumb"
+        aria-label={UI_TEXT.a11y.breadcrumbs}
         className="-mt-2 mb-1 flex items-center gap-1 px-1 text-xs text-text-sec/70"
       >
         <Link href="/" className="hover:text-text-main transition-colors">

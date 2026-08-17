@@ -1,10 +1,39 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useSerialTask } from "@/hooks/use-serial-task";
 
 export type AutosaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type AutosaveResult = { ok: true } | { ok: false; message?: string };
+
+/**
+ * RES-07 — save-callback не имеет права бросать наружу.
+ *
+ * Все четыре inline-edit поверхности профиля мастера зовут `fetch` без
+ * `try/catch`, а `fetch` бросает при offline/обрыве DNS (в отличие от 4xx/5xx,
+ * которые возвращают `response.ok === false`). Бросок улетал мимо ветки
+ * `setStatus("error")`, то есть статус НАВСЕГДА оставался «сохраняется»: чип
+ * крутится, правка не ушла, пользователь уверен, что всё сохранено. Это тихая
+ * потеря введённого на одном сетевом дребезге.
+ *
+ * Нормализация стоит здесь, а не в каждом из четырёх вызывающих: они
+ * отличаются только формой тела запроса, а решение «сбой сети = неуспешное
+ * сохранение, а не подвисший статус» — общее, и пятая поверхность обязана
+ * унаследовать его, а не переписать.
+ */
+export async function safeSave<T>(
+  save: (value: T) => Promise<AutosaveResult>,
+  value: T
+): Promise<AutosaveResult> {
+  try {
+    return await save(value);
+  } catch {
+    // Сообщение не выдумываем: чип статуса печатает свою строку из `UI_TEXT`,
+    // а `errorMessage` остаётся каналом для содержательного ответа сервера.
+    return { ok: false };
+  }
+}
 
 type UseAutosaveOptions<T> = {
   /** Compares baseline & next value to skip no-op saves. Default: strict equality. */
@@ -44,7 +73,6 @@ export function useAutosave<T>(
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlightRef = useRef<Promise<void> | null>(null);
   const lastSavedRef = useRef<T | null>(null);
 
   const clearDebounce = () => {
@@ -60,15 +88,21 @@ export function useAutosave<T>(
     }
   };
 
-  const performSave = useCallback(
-    async (value: T) => {
-      if (lastSavedRef.current !== null && isEqual(value, lastSavedRef.current)) {
-        return;
-      }
-      setStatus("saving");
-      setErrorMessage(null);
-      const promise = (async () => {
-        const result = await save(value);
+  // LOGIC-23: `inFlightRef` здесь присваивался, но нигде не читался как гейт —
+  // то есть параллельные `performSave` ничем не сдерживались, и порядок
+  // применения результатов определялся порядком ОТВЕТОВ, а не правок.
+  // Сериализация через общую «очередь на одного»; `lastSavedRef` при этом
+  // сверяется внутри прогона, уже после ожидания, — иначе вытесненное
+  // значение сравнивалось бы с устаревшей отметкой.
+  const performSave = useSerialTask<T>(
+    useCallback(
+      async (value: T) => {
+        if (lastSavedRef.current !== null && isEqual(value, lastSavedRef.current)) {
+          return;
+        }
+        setStatus("saving");
+        setErrorMessage(null);
+        const result = await safeSave(save, value);
         if (result.ok) {
           lastSavedRef.current = value;
           setStatus("saved");
@@ -80,17 +114,9 @@ export function useAutosave<T>(
           setErrorMessage(result.message ?? null);
           setStatus("error");
         }
-      })();
-      inFlightRef.current = promise;
-      try {
-        await promise;
-      } finally {
-        if (inFlightRef.current === promise) {
-          inFlightRef.current = null;
-        }
-      }
-    },
-    [isEqual, save, savedHoldMs]
+      },
+      [isEqual, save, savedHoldMs]
+    )
   );
 
   const scheduleSave = useCallback(

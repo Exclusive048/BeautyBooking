@@ -3,7 +3,7 @@ import { withRequestContext } from "@/lib/api/with-request-context";
 import { getSessionUser } from "@/lib/auth/session";
 import { logError } from "@/lib/logging/logger";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
-import { notificationsNotifier } from "@/lib/notifications/notifier";
+import { getNotificationsNotifier } from "@/lib/notifications/notifier";
 import type { NotificationEvent } from "@/lib/notifications/types";
 import { prisma } from "@/lib/prisma";
 
@@ -108,9 +108,9 @@ export async function GET(req: Request) {
       }
     }
 
-    let notifier: Awaited<typeof notificationsNotifier>;
+    let notifier: Awaited<ReturnType<typeof getNotificationsNotifier>>;
     try {
-      notifier = await notificationsNotifier;
+      notifier = await getNotificationsNotifier();
     } catch {
       void recordSurfaceEvent({
         surface: "notifications",

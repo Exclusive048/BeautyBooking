@@ -1,4 +1,4 @@
-import { AccountType } from "@prisma/client";
+import { AccountType } from "@/lib/prisma-enums";
 
 export type CabinetKind = "user" | "master" | "studio";
 

@@ -13,21 +13,10 @@ import {
   sortByBayesianRating,
 } from "@/lib/catalog/ranking";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
-
-/** Encode an internal row ID as an opaque, URL-safe cursor token. */
-function encodeCursor(id: string): string {
-  return Buffer.from(id, "utf-8").toString("base64url");
-}
-
-/** Decode a cursor token back to the internal row ID, or return null on failure. */
-function decodeCursor(cursor: string): string | null {
-  try {
-    const decoded = Buffer.from(cursor, "base64url").toString("utf-8");
-    return decoded.length > 0 ? decoded : null;
-  } catch {
-    return null;
-  }
-}
+// SEC-12: курсорные хелперы переехали в общий модуль — их переиспользуют
+// `providers/queries.ts` и `/api/hot-slots`, которые раньше отдавали сырой id.
+import { encodeCursor, decodeCursor } from "@/lib/pagination/cursor";
+import { decodePublicId } from "@/lib/public-id";
 
 // AUDIT (section 6):
 // - Search supports smart tag presets via soft ranking.
@@ -363,6 +352,15 @@ async function resolvePriceRankedPageIds(args: PageWindow & {
   where: Prisma.ProviderWhereInput;
   direction: 1 | -1;
 }): Promise<string[]> {
+  // PERF-05: ранжирование по цене — единственная поверхность каталога, которая
+  // тянула ВСЕ услуги ВСЕХ подходящих провайдеров (у студии их бывают сотни),
+  // хотя от них нужно ровно одно число — минимальная положительная цена.
+  // `price > 0` перенесён в `where`, а `orderBy price asc` + `take: 1`
+  // (Prisma применяет take к каждой родительской строке) оставляют ту самую
+  // строку, которую раньше выбирал `Math.min`. Отбор идентичен: минимум
+  // положительных = первый по возрастанию среди положительных. Порог берётся
+  // из `service.price`, а НЕ из `MasterService.priceOverride` — так было и
+  // раньше, менять это здесь значило бы менять выдачу.
   const rows = await prisma.provider.findMany({
     where: args.where,
     orderBy: BASE_ORDER,
@@ -370,11 +368,18 @@ async function resolvePriceRankedPageIds(args: PageWindow & {
       id: true,
       priceFrom: true,
       services: {
-        where: { isEnabled: true, isActive: true },
+        where: { isEnabled: true, isActive: true, price: { gt: 0 } },
+        orderBy: { price: "asc" },
+        take: 1,
         select: { price: true },
       },
       masterServices: {
-        where: { isEnabled: true, service: { isEnabled: true, isActive: true } },
+        where: {
+          isEnabled: true,
+          service: { isEnabled: true, isActive: true, price: { gt: 0 } },
+        },
+        orderBy: { service: { price: "asc" } },
+        take: 1,
         select: { service: { select: { price: true } } },
       },
     },
@@ -481,7 +486,13 @@ async function resolveCategoryFilterIds(
   globalCategoryId: string | undefined,
   includeChildCategories: boolean | undefined
 ): Promise<string[]> {
-  const normalizedId = globalCategoryId?.trim();
+  // SEC-12: `globalCategoryId` приходит из публичного ответа (автокомплит и
+  // `/api/catalog/global-categories`), где id теперь непрозрачный. Декодируем
+  // на входе. `decodePublicId` backward-compatible: старая ссылка или закладка
+  // с сырым CUID резолвится без изменений.
+  const normalizedId = globalCategoryId?.trim()
+    ? decodePublicId(globalCategoryId.trim())
+    : undefined;
   if (!normalizedId) return [];
 
   const root = await prisma.globalCategory.findUnique({

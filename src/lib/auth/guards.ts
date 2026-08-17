@@ -1,10 +1,12 @@
 import type { UserProfile } from "@prisma/client";
 import { AccountType } from "@prisma/client";
 import { fail } from "@/lib/api/response";
-import { getSessionUser, getSessionUserFromRequest } from "@/lib/auth/session";
+import { getSessionUser, getSessionUserFromRequest, type SessionUser } from "@/lib/auth/session";
 
 type AuthResult =
-  | { ok: true; user: UserProfile }
+  // PERF-23: сессия отдаёт СУЖЕННУЮ строку — сигнатура обязана это отражать,
+  // иначе она молча требует читать из БД все колонки профиля.
+  | { ok: true; user: SessionUser }
   | { ok: false; response: ReturnType<typeof fail> };
 
 export async function requireAuth(): Promise<AuthResult> {

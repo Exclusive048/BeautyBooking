@@ -91,7 +91,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
     <section className="aurora-bg relative overflow-hidden rounded-[28px] border border-border-subtle/70 bg-bg-card">
       <div className="relative px-5 py-6 md:px-8 md:py-8">
         <nav
-          aria-label="Breadcrumb"
+          aria-label={UI_TEXT.a11y.breadcrumbs}
           className="mb-5 flex items-center gap-1.5 text-xs text-text-sec"
         >
           <Link href="/catalog" className="transition hover:text-text-main">

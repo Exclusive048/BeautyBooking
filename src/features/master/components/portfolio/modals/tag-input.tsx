@@ -15,6 +15,9 @@ type Props = {
    * `value` are expected to live here. */
   options: PortfolioTagOption[];
   onChange: (next: string[]) => void;
+  /** Id поля ввода — им вызывающий связывает свою видимую подпись. Своего
+   * имени у поля нет: placeholder гаснет, как только появился первый тег. */
+  inputId?: string;
 };
 
 /**
@@ -24,7 +27,7 @@ type Props = {
  * is on the backlog (slug generation, dedup, moderation flow). Empty
  * pool is fine — the master can simply skip the field.
  */
-export function TagInput({ value, options, onChange }: Props) {
+export function TagInput({ value, options, onChange, inputId }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -88,7 +91,7 @@ export function TagInput({ value, options, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => remove(id)}
-                aria-label="remove"
+                aria-label={UI_TEXT.a11y.removeItem(option.name)}
                 className="text-accent-text/60 hover:text-accent-text"
               >
                 <X className="h-3 w-3" aria-hidden />
@@ -97,6 +100,7 @@ export function TagInput({ value, options, onChange }: Props) {
           );
         })}
         <input
+          id={inputId}
           ref={inputRef}
           value={query}
           onChange={(event) => {

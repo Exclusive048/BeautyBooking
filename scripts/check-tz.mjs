@@ -31,17 +31,16 @@ import { extname, join, sep } from "node:path";
 const ROOTS = ["src/features", "src/app"];
 const EXT = new Set([".ts", ".tsx"]);
 
-// Time-specific renders: always candidates (viewer-tz / host-tz when unlabeled).
-const TIME_SPECIFIC_RE =
-  /\.toLocaleTimeString\s*\(|new\s+Intl\.DateTimeFormat\s*\(|\.getHours\s*\(\)|\.getMinutes\s*\(\)|\.getUTCHours\s*\(\)|\.getUTCMinutes\s*\(\)/;
-// Ambiguous renders: `.toLocaleString`/`.toLocaleDateString` also format NUMBERS
-// (`count.toLocaleString("ru-RU")`). Only a date/time render carries a date/time
-// option key — require one in the window to avoid flagging number formatting.
-const AMBIGUOUS_RE = /\.toLocaleString\s*\(|\.toLocaleDateString\s*\(/;
-const DATETIME_OPT_RE =
-  /\b(hour|minute|second|weekday|day|month|year|dateStyle|timeStyle|timeZoneName|era)\b\s*:/;
-const OPTOUT_RE = /\/\/\s*tz-ok\b/i;
-const TZ_AWARE_RE = /timeZone\s*:/;
+// LOGIC-29: паттерны живут в отдельном модуле — их проверяет тест
+// (`scripts/check-tz-patterns.test.ts`), а импортировать этот файл нельзя:
+// он при загрузке обходит дерево, печатает отчёт и зовёт process.exit.
+import {
+  AMBIGUOUS_RE,
+  DATETIME_OPT_RE,
+  OPTOUT_RE,
+  TIME_SPECIFIC_RE,
+  TZ_AWARE_RE,
+} from "./tz-patterns.mjs";
 
 function walk(dir, out) {
   let entries;

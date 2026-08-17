@@ -5,6 +5,7 @@ import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.clientCabinet.profilePage.emailVerify;
@@ -30,35 +31,46 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [resendAt, setResendAt] = useState<number | null>(null);
 
+  /**
+   * FIX-C8 · fromServer = ПОКАЗАТЬ СЕРВЕРНОЕ на обоих шагах.
+   *
+   * Здесь сходятся сразу три семейства действенных отказов, и ни одно из них
+   * прежняя ветвящаяся раскладка не показывала верно:
+   *
+   *  1. **Занятость адреса** — `EMAIL_ALREADY_USED` 409 «Этот email уже
+   *     используется другим аккаунтом. Укажите другой адрес.» (вторая половина
+   *     инв. #41). Попадала в `else` и печаталась как «Не удалось отправить
+   *     код. Попробуйте ещё раз.» — то есть пользователю предлагали повторить
+   *     то, что не сработает никогда, вместо единственного действия, которое
+   *     решает: ввести другой адрес.
+   *  2. **Близнецы лимитера** — FIX-B12/FIX-B14 РАЗВЕЛИ на проводе 429
+   *     `RATE_LIMITED` («слишком часто») и 503 `RATE_LIMIT_UNAVAILABLE` («не
+   *     смогли посчитать — повторите»), потому что для человека это
+   *     противоположные советы. Клиент знал только про `RATE_LIMITED`, а 503 и
+   *     `OTP_LOCKED` проваливались в общий текст — различие, ради которого
+   *     сервер и переделывали, до пользователя не доходило.
+   *  3. **Отказ отправки** — `EMAIL_SEND_FAILED` 502 и `SYSTEM_FEATURE_DISABLED`
+   *     503 несут собственные курируемые строки.
+   *
+   * 🔴 Ветвление по коду вдобавок ДУБЛИРОВАЛО серверную копирайт-строку на
+   * клиенте («Слишком много запросов. Попробуйте позже.» слово в слово
+   * повторяла `otp-rate-limit-response.ts`) — то есть правка текста на сервере
+   * молча расходилась бы с экраном. Одна строка теперь живёт в одном месте.
+   */
   async function requestOtp() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(
-        "/api/cabinet/user/profile/email/request-verify",
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim().toLowerCase() }),
-        },
-      );
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        const code = json?.error?.code;
-        if (code === "RATE_LIMITED") {
-          setError("Слишком много запросов. Попробуйте позже.");
-        } else if (code === "SYSTEM_FEATURE_DISABLED") {
-          setError("Email временно недоступен. Попробуйте позже.");
-        } else {
-          setError(T.sendFailed);
-        }
-        return;
-      }
+      await fetchJson("/api/cabinet/user/profile/email/request-verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
       setStep("code");
       setResendAt(Date.now() + RESEND_COOLDOWN_MS);
-    } catch {
-      setError(T.sendFailed);
+    } catch (caught) {
+      setError(serverMessageOr(caught, T.sendFailed));
     } finally {
       setSubmitting(false);
     }
@@ -68,27 +80,15 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/cabinet/user/profile/email/verify", {
+      await fetchJson("/api/cabinet/user/profile/email/verify", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        const errCode = json?.error?.code;
-        if (errCode === "CODE_NOT_FOUND") {
-          setError(T.invalidCode);
-        } else if (errCode === "RATE_LIMITED") {
-          setError("Слишком много попыток. Подождите.");
-        } else {
-          setError(T.verifyFailed);
-        }
-        return;
-      }
       onSuccess();
-    } catch {
-      setError(T.verifyFailed);
+    } catch (caught) {
+      setError(serverMessageOr(caught, T.verifyFailed));
     } finally {
       setSubmitting(false);
     }

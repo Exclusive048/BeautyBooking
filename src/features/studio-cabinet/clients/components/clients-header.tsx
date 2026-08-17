@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CRM_CLIENTS_WINDOW_MONTHS } from "@/lib/crm/clients-window";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.clientsV2.header;
+// PERF-06: подпись окна — shared-ключ обоих кабинетов (прецедент UI-33).
+const WINDOW_NOTE = UI_TEXT.cabinetMaster.clients.windowNote(CRM_CLIENTS_WINDOW_MONTHS);
 
 type Props = {
   totalCount: number;
@@ -35,7 +38,7 @@ export function ClientsHeader({ totalCount, filteredCount }: Props) {
         <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
           {T.title}
         </h1>
-        <p className="mt-1 max-w-xl text-sm text-text-sec">{T.subtitle}</p>
+        <p className="mt-1 max-w-xl text-sm text-text-sec">{`${T.subtitle} ${WINDOW_NOTE[0].toUpperCase()}${WINDOW_NOTE.slice(1)}.`}</p>
       </div>
       <Button variant="primary" asChild>
         <Link href="/cabinet/studio/calendar">

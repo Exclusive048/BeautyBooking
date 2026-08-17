@@ -1,6 +1,10 @@
 import { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import * as cache from "@/lib/cache/cache";
+import {
+  claimNotificationDedup,
+  NotificationDedupUnavailableError,
+} from "@/lib/notifications/dedup-guard";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { getAppPublicUrl } from "@/lib/telegram/config";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -88,7 +92,9 @@ async function processOneMaster(input: {
   const { providerId, ownerUserId, weekStart, weekKey } = input;
 
   const dedupKey = `${DEDUP_KEY_PREFIX}:${providerId}:${weekKey}`;
-  const isFirst = await cache.setNx(dedupKey, "1", DEDUP_TTL_SECONDS);
+  // FIX-C11: недоступный сторож = не рассылать (бросает). Дубликат «статистики
+  // за неделю» виден пользователю; пропуск ждёт следующего тика планировщика.
+  const isFirst = await claimNotificationDedup(dedupKey, DEDUP_TTL_SECONDS);
   if (!isFirst) return;
 
   const { weekStart: ws, weekEnd: we } = getWeekBounds(weekStart);
@@ -134,7 +140,9 @@ export async function runWeeklyStatsJob(now = new Date()): Promise<void> {
 
   const weekKey = getWeekKey(now);
   const runGuardKey = `weekly-stats:run:${weekKey}`;
-  const isFirstRun = await cache.setNx(runGuardKey, "1", DEDUP_TTL_SECONDS);
+  // FIX-C11: та же семантика, что у сторожа на мастера, — прогон не начинается,
+  // если посчитать «первый ли он» не удалось.
+  const isFirstRun = await claimNotificationDedup(runGuardKey, DEDUP_TTL_SECONDS);
   if (!isFirstRun) return;
 
   logInfo("runWeeklyStatsJob started", { weekKey });
@@ -170,6 +178,25 @@ export async function runWeeklyStatsJob(now = new Date()): Promise<void> {
           });
           sent++;
         } catch (error) {
+          /**
+           * FIX-C12 — отказ СТОРОЖА пробрасывается, отказ по МАСТЕРУ гасится.
+           *
+           * 🔴 Тот же класс, что у `slot-freed`, но с худшим исходом, и он был
+           * не замечен FIX-C11: сторож стоит внутри цикла, а его отказ —
+           * свойство прогона. Пока `NotificationDedupUnavailableError` гасился
+           * здесь наравне с ошибкой конкретного мастера, обрыв Redis в середине
+           * прогона давал: каждый оставшийся мастер падает и логируется, цикл
+           * доходит до конца, внешний `catch` НЕ срабатывает — и `runGuardKey`
+           * остаётся стоять с TTL 8 суток. То есть недельная статистика молча
+           * пропускалась ДЛЯ ВСЕХ на всю неделю, и почасовой ретрай (см. ниже)
+           * её не восстанавливал, потому что сторож прогона уже занят.
+           *
+           * Проброс уводит управление во внешний `catch`, который снимает
+           * `runGuardKey` — и следующий часовой тик понедельника начинает
+           * прогон заново. Ошибка КОНКРЕТНОГО мастера (БД, доставка)
+           * по-прежнему не должна ронять прогон: она гасится.
+           */
+          if (error instanceof NotificationDedupUnavailableError) throw error;
           logError("Weekly stats: failed to process master", {
             providerId: provider.id,
             error: error instanceof Error ? error.message : String(error),

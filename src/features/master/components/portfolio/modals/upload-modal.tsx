@@ -4,8 +4,10 @@ import { Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { cn } from "@/lib/cn";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import type { PortfolioCategoryOption } from "@/lib/master/portfolio-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -43,6 +45,7 @@ type QueuedFile = {
 export function UploadModal({ open, onClose, providerId, categories }: Props) {
   const router = useRouter();
   const inputId = useId();
+  const defaultCategorySelectId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const cachedProviderIdRef = useRef<string | null>(providerId ?? null);
   const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -107,15 +110,19 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
     // Empty-state contexts mount this modal without a providerId prop —
     // fall back to a one-shot lookup against the existing endpoint.
     try {
-      const response = await fetch("/api/master/profile", { cache: "no-store" });
-      const json = await response.json().catch(() => null);
-      const id = json?.data?.master?.id ?? null;
+      const data = await fetchJson<{ master?: { id?: string | null } | null }>(
+        "/api/master/profile",
+        { cache: "no-store" },
+      );
+      const id = data.master?.id ?? null;
       if (typeof id === "string" && id.length > 0) {
         cachedProviderIdRef.current = id;
         return id;
       }
     } catch {
-      // fall through
+      // fall through — этот отказ пользователю не показывается: у него нет
+      // собственного смысла («не смогли выяснить, чей кабинет»), и вызывающий
+      // ниже подставляет общий текст загрузки.
     }
     return null;
   };
@@ -139,19 +146,17 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         form.set("kind", "PORTFOLIO");
         form.set("file", entry.file);
 
-        const mediaResponse = await fetch("/api/media", { method: "POST", body: form });
-        if (!mediaResponse.ok) {
-          setError(T.errorUpload);
-          return;
-        }
-        const mediaJson = await mediaResponse.json().catch(() => null);
-        const assetId: string | null = mediaJson?.data?.asset?.id ?? null;
+        const asset = await fetchJson<{ asset: { id: string } }>("/api/media", {
+          method: "POST",
+          body: form,
+        });
+        const assetId = asset.asset?.id ?? null;
         if (!assetId) {
           setError(T.errorUpload);
           return;
         }
 
-        const portfolioResponse = await fetch("/api/master/portfolio", {
+        const created = await fetchJson<{ id?: string | null }>("/api/master/portfolio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -160,19 +165,22 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
             ...(defaultCategoryId ? { globalCategoryId: defaultCategoryId } : {}),
           }),
         });
-        if (!portfolioResponse.ok) {
-          setError(T.errorUpload);
-          return;
-        }
-        if (!defaultPublic) {
-          const created = await portfolioResponse.json().catch(() => null);
-          const itemId: string | null = created?.data?.id ?? null;
-          if (itemId) {
-            await fetch(`/api/master/portfolio/${itemId}`, {
+        if (!defaultPublic && created.id) {
+          // Прежнее поведение сохранено ДОСЛОВНО: отказ этого PATCH'а не
+          // прерывает загрузку. FIX-C8 меняет только то, КАКОЙ текст видит
+          // пользователь, и не имеет права превратить нефатальный шаг в
+          // фатальный — иначе сбой «сделать скрытой» обрывал бы загрузку
+          // остальной очереди на полпути. Видимость правится из сетки
+          // портфолио; расхождение «загрузилось публичной вместо скрытой»
+          // существовало и до этой правки и остаётся отдельной задачей.
+          try {
+            await fetchJson(`/api/master/portfolio/${created.id}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ isPublic: false }),
             });
+          } catch {
+            // намеренно проглочено — см. выше
           }
         }
         succeeded += 1;
@@ -181,6 +189,24 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
       reset();
       router.refresh();
       onClose();
+    } catch (caught) {
+      // RES-12: HTTP-ошибки тут были покрыты все четыре, а самый вероятный
+      // сценарий — обрыв сети посреди загрузки большого файла — нет: `fetch`
+      // бросает, `finally` гасит спиннер, `error` остаётся `null`. Модалка
+      // открыта, очередь на месте, объяснений ноль, а необработанный rejection
+      // уходит из обработчика клика.
+      //
+      // FIX-C8 · fromServer = ПОКАЗАТЬ СЕРВЕРНОЕ. Оба эндпоинта отвечают
+      // отказами, которые пользователь может УСТРАНИТЬ: «Достигнут лимит
+      // хранилища. Удалите ненужные файлы.» (`MEDIA_STORAGE_QUOTA_EXCEEDED`,
+      // SEC-17), «Достигнут лимит работ в портфолио.»
+      // (`MEDIA_PORTFOLIO_LIMIT_REACHED`, лимит тарифа), плюс `MEDIA_FILE_TOO_LARGE`
+      // и `MEDIA_INVALID_MIME`. Прежнее «Не удалось загрузить файл. Попробуйте
+      // ещё раз.» на всех четырёх было не просто менее полезным, а ВРЕДНЫМ
+      // советом: «попробуйте ещё раз» отправляет мастера повторять загрузку в ту
+      // же стену, тогда как выход — удалить лишнее либо сменить тариф.
+      // Своя строка остаётся дефолтом для отказа без тела (обрыв сети, 5xx).
+      setError(serverMessageOr(caught, T.errorUpload));
     } finally {
       setUploading(false);
     }
@@ -212,7 +238,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={entry.previewUrl}
-                  alt=""
+                  alt={T.previewAltTemplate.replace("{name}", entry.file.name)}
                   className={cn(
                     "aspect-square w-full rounded-xl border border-border-subtle object-cover",
                     entry.errorCode && "opacity-50"
@@ -237,10 +263,14 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         ) : null}
 
         <div>
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <label
+            htmlFor={defaultCategorySelectId}
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+          >
             {T.defaultCategoryLabel}
           </label>
           <select
+            id={defaultCategorySelectId}
             value={defaultCategoryId}
             onChange={(event) => setDefaultCategoryId(event.target.value)}
             className="mt-1.5 block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -256,11 +286,9 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         </div>
 
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={defaultPublic}
             onChange={(event) => setDefaultPublic(event.target.checked)}
-            className="h-4 w-4 rounded border border-border-subtle text-accent-text accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
           <span>{T.defaultPublicLabel}</span>
         </label>

@@ -13,7 +13,7 @@ import { StarsDisplay } from "@/features/master/components/reviews/stars-display
 import { ReviewForm } from "@/features/reviews/components/review-form";
 import { ReportReviewModal } from "@/features/reviews/components/report-review-modal";
 import type { ReviewDto } from "@/lib/reviews/types";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -137,16 +137,18 @@ export function ReviewsPreview({
       // ACTIVE_REVIEW_FILTER (invariant #17) server-side, so soft-deleted
       // reviews stay out of both the page and the offset arithmetic.
       // Ask for one row beyond the page: its presence means another page exists.
-      const res = await fetch(
+      // FIX-C8: тот же чокпоинт, что и у резюме, — но решение ДРУГОЕ. Отказ
+      // подгрузки страницы отзывов не бывает действенным (это GET-листинг;
+      // всё, что он может сказать, — «не получилось»), поэтому здесь
+      // сознательно остаётся строка поверхности. Общий разбор нужен не ради
+      // passthrough, а чтобы в файле не жила вторая, ручная форма чтения
+      // конверта: именно из неё вырастает следующий F3.
+      const data = await fetchJson<{ reviews: ReviewDto[] }>(
         `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}` +
           `&limit=${reviewsProbeLimit(REVIEWS_PAGE_SIZE)}&offset=${reviews.length}`,
         { cache: "no-store" },
       );
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ reviews: ReviewDto[] }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(t.loadFailed);
-      }
-      const batch = json.data.reviews ?? [];
+      const batch = data.reviews ?? [];
       // The probe row is a signal only — drop it, so it isn't rendered twice
       // (it returns as the first row of the next page).
       const page = batch.slice(0, REVIEWS_PAGE_SIZE);
@@ -175,22 +177,34 @@ export function ReviewsPreview({
     setSummaryLoading(true);
     setSummaryError(null);
     try {
-      const res = await fetch(
+      // FIX-C3 · SMOKE-01 · F3 — ответ разбирается общим `fetchJson`, а не
+      // руками. Прежний код тело ЧИТАЛ, но `json.error.message` не смотрел ни в
+      // одной ветке: и `!res.ok`, и `catch` печатали одну строку «Попробуйте
+      // через минуту». Для суточного потолка ИИ (FIX-B16 отдаёт 429
+      // `AI_DAILY_LIMIT_REACHED` с курируемой строкой «…дневной лимит исчерпан.
+      // Попробуйте завтра.») это врало о МАСШТАБЕ ВРЕМЕНИ: пользователь ждал
+      // минуту и жал снова, пока не решал, что продукт сломан.
+      const data = await fetchJson<{ summary: string | null; reviewsCount: number }>(
         `/api/public/providers/${encodeURIComponent(providerId)}/review-summary`,
         { cache: "no-store" },
       );
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
-        summary: string | null;
-        reviewsCount: number;
-      }> | null;
-      if (!res.ok || !json || !json.ok) throw new Error(t.summaryFailed);
-      if (!json.data.summary) {
+      if (!data.summary) {
         setSummaryError(t.summaryFewReviews);
       } else {
-        setSummaryText(json.data.summary);
+        setSummaryText(data.summary);
       }
-    } catch {
-      setSummaryError(t.summaryFailed);
+    } catch (error) {
+      // Своя строка остаётся дефолтом: она конкретнее generic-ответа и уместна,
+      // когда сервер СВОЕЙ не прислал (сеть, 500 без тела). Показывается ровно
+      // то, что сервер сказал, — и только когда он это сказал.
+      //
+      // FIX-C8: то же решение, но общим помощником. Инлайновое
+      // `error instanceof ApiClientError && error.fromServer ? … : …` было
+      // ПЕРВЫМ экземпляром паттерна, и три неподключённые ИИ-поверхности
+      // (`suggest-reply`, `suggest-description`, `advisor`) при подключении
+      // скопировали бы именно его — вместе с шансом переписать условие
+      // немного иначе на каждой.
+      setSummaryError(serverMessageOr(error, t.summaryFailed));
     } finally {
       setSummaryLoading(false);
     }

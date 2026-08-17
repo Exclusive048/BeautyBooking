@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -144,7 +143,19 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
                     <div className="grid grid-cols-3 gap-1">
                       {master.thumbs.map((thumb, index) => (
                         <div key={`${master.id}-${index}`} className="relative h-12 w-full overflow-hidden rounded-md">
-                          <Image src={thumb} alt="" fill sizes="80px" className="object-cover" />
+                          {/* RES-29: миниатюра портфолио — такой же пользовательский
+                              URL, как аватар 17 строками выше, и обязана деградировать
+                              так же. Сырой `next/image` на хосте вне `remotePatterns`
+                              БРОСАЕТ в рендере, а на мёртвой ссылке рисует сломанную
+                              картинку — без `onError` и без гейта `isOptimizableImageSrc`. */}
+                          <ResilientImage
+                            src={thumb}
+                            alt={UI_TEXT.publicStudio.masterWorkAltTemplate
+                              .replace("{name}", master.name)
+                              .replace("{n}", String(index + 1))}
+                            sizes="80px"
+                            className="object-cover"
+                          />
                         </div>
                       ))}
                     </div>

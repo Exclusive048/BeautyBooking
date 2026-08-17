@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { generateIcs } from "@/lib/bookings/ics-export";
+import {
+  ICS_FAILURE_PARAM,
+  icsFailureReturnPath,
+  type IcsExportFailure,
+} from "@/lib/bookings/ics-export-outcome";
+import { nextRedirect } from "@/lib/http/origin";
 import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 
@@ -17,16 +23,32 @@ export const runtime = "nodejs";
  * bookmark / share is not a leak vector.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } },
 ) {
+  /**
+   * FIX-B18: отказ отвечает НАВИГАЦИЕЙ, а не конвертом.
+   *
+   * FIX-B14 починил здесь тексты (машинные коды уехали из поля сообщения), но
+   * форму оставил: сюда ведёт `<a href>` из «Мои записи», и `{ok:false,…}` в
+   * окне браузера — тупик независимо от того, насколько хорош текст внутри.
+   * Возврат — к записи, а не на `/login` голый: пользователь шёл к своей
+   * брони (см. `ics-export-outcome.ts`).
+   */
+  const p = params instanceof Promise ? await params : params;
+  const backToBooking = (failure: IcsExportFailure) =>
+    nextRedirect(req, `${icsFailureReturnPath(p.id)}&${ICS_FAILURE_PARAM}=${failure}`);
+
   try {
     const user = await getSessionUser();
     if (!user) {
-      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+      // Единственный исход, ведущий не к списку: сначала вход, но с `next` на
+      // ту же строку — иначе после логина человек окажется не там, куда шёл.
+      return nextRedirect(
+        req,
+        `/login?next=${encodeURIComponent(icsFailureReturnPath(p.id))}`,
+      );
     }
-
-    const p = params instanceof Promise ? await params : params;
 
     const booking = await prisma.booking.findUnique({
       where: { id: p.id },
@@ -42,14 +64,20 @@ export async function GET(
       },
     });
 
+    // ⚠️ Различие «нет записи» / «чужая запись» СОХРАНЕНО умышленно: оно было
+    // и до этого фикса, а сведение их в один исход — отдельное решение про
+    // раскрытие существования брони, не про форму ответа. Практический риск
+    // мал (id — cuid, booking-флоу выведен из rule 12), но менять его молча,
+    // под видом правки конверта, было бы ровно тем тихим изменением
+    // семантики, против которого написан инв. #43.
     if (!booking) {
-      return NextResponse.json({ ok: false, error: "NOT_FOUND" }, { status: 404 });
+      return backToBooking("not_found");
     }
     if (booking.clientUserId !== user.id) {
-      return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+      return backToBooking("forbidden");
     }
     if (!booking.startAtUtc || !booking.endAtUtc) {
-      return NextResponse.json({ ok: false, error: "NO_TIME" }, { status: 400 });
+      return backToBooking("no_time");
     }
 
     const display = booking.masterProvider ?? booking.provider;
@@ -78,6 +106,6 @@ export async function GET(
     logError("GET /api/bookings/[id]/ics failed", {
       stack: error instanceof Error ? error.stack : undefined,
     });
-    return NextResponse.json({ ok: false, error: "INTERNAL" }, { status: 500 });
+    return backToBooking("failed");
   }
 }

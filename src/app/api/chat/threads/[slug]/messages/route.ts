@@ -7,6 +7,7 @@ import { toAppError } from "@/lib/api/errors";
 import { parseBody } from "@/lib/validation";
 import { sendConversationMessage } from "@/lib/chat/message-sender";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
@@ -45,13 +46,24 @@ export async function POST(
     const perspective =
       asParam === "client" ? "CLIENT" : asParam === "master" ? "MASTER" : isMaster ? "MASTER" : "CLIENT";
 
-    const allowed = await checkRateLimit(
-      `rate:chatSend:${user.userId}`,
-      RATE_LIMIT.limit,
-      RATE_LIMIT.windowSeconds,
+    // FIX-C12: ключ `rate:chatSend:` — в `SENSITIVE_KEY_PREFIXES` (FIX-B12), то
+    // есть при обрыве Redis отказ ЕСТЬ, и legacy-перегрузка (boolean) сообщала о
+    // нём как «Слишком много сообщений» пользователю, отправляющему ПЕРВОЕ.
+    // Политика не меняется — роут по-прежнему отказывает; меняются код и текст.
+    const refusal = resolveRateLimitRefusal(
+      await checkRateLimit(`rate:chatSend:${user.userId}`, {
+        maxRequests: RATE_LIMIT.limit,
+        windowSeconds: RATE_LIMIT.windowSeconds,
+      }),
     );
-    if (!allowed) {
-      return jsonFail(429, "Слишком много сообщений. Подождите немного.", "RATE_LIMITED");
+    if (refusal) {
+      // Своя копия текста для 429 сохранена: она точнее общей («сообщений», не
+      // «запросов»). 503 идёт общей строкой — она про сервис, не про поверхность.
+      const message =
+        refusal.code === "RATE_LIMITED"
+          ? "Слишком много сообщений. Подождите немного."
+          : refusal.message;
+      return jsonFail(refusal.status, message, refusal.code);
     }
 
     const body = await parseBody(req, bodySchema);

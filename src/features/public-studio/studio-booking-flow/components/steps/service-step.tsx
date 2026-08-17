@@ -127,7 +127,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
       ) : null}
 
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-border-subtle bg-bg-muted/40 p-8 text-center text-sm text-text-muted">
+        <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
           {query ? UI_TEXT.bookingWidget.serviceStep.searchEmpty : UI_TEXT.bookingWidget.serviceStep.noServices}
         </div>
       ) : (
@@ -138,7 +138,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                 <h3 className="font-display text-sm font-semibold text-text">
                   {group.categoryName ?? UI_TEXT.bookingWidget.serviceStep.categoryOther}
                 </h3>
-                <span className="rounded-full bg-bg-muted px-2 py-0.5 font-mono text-[10px] text-text-muted">
+                <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-text-muted">
                   {group.services.length}
                 </span>
               </div>

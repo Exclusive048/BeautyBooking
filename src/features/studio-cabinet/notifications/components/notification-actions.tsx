@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CalendarClock, Check, MessageSquare, Star, User, X } from "lucide-react";
-import { NotificationType } from "@prisma/client";
+import { NotificationType } from "@/lib/prisma-enums";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import { readNotificationPayload } from "@/features/master/components/notifications/lib/payload";

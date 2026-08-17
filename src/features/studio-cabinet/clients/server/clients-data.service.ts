@@ -2,6 +2,7 @@ import { BookingStatus, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { applyProfileNames, groupBookings, type BookingClientRow } from "@/lib/crm/clients";
 import { calculateDaysSinceLastVisit } from "@/lib/crm/clients";
+import { crmClientsWindowStart } from "@/lib/crm/clients-window";
 import { CLIENT_STATUS_THRESHOLDS } from "@/lib/master/clients-classifier";
 import { classifyStudioClient, segmentMatches, selectPrimarySegment } from "../lib/derive-segment";
 import type {
@@ -71,6 +72,9 @@ export async function loadStudioClientsData(input: LoadStudioClientsInput): Prom
       where: {
         OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
         status: { notIn: [BookingStatus.REJECTED, BookingStatus.CANCELLED, BookingStatus.NO_SHOW] },
+        // PERF-06: окно на входе группировки (см. crm/clients-window.ts).
+        // KPI и счётчики сегментов считаются из этого же оконного набора.
+        startAtUtc: { gte: crmClientsWindowStart() },
       },
       select: {
         id: true,

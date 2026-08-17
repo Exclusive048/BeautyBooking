@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * RKN-FIX-01 — the wire contract for "which boxes did the user tick".
  *
@@ -12,18 +10,23 @@ import { z } from "zod";
  * `terms` and `pdProcessing` are REQUIRED consents (152-ФЗ ст. 9): a new
  * account cannot be created without both. `marketing` is optional by law and
  * must never gate registration.
+ *
+ * PERF-03 — Zod-схема живёт отдельно, в `consent-flags-schema.ts`. Этот модуль
+ * тянут восемь клиентских компонентов (форма логина и все booking-визарды), а
+ * им нужны только тип и два предиката; вместе со схемой в браузерный бандл
+ * ехал весь `zod`. Разделение — тот же приём границы, что у
+ * `schedule/editor.ts` ↔ `editor-shared.ts` (rule 13), только повод не
+ * server-only-импорт, а вес.
  */
 
-export const consentFlagsSchema = z.object({
+export type ConsentFlags = {
   /** Пользовательское соглашение (оферта) → ConsentType.TERMS */
-  terms: z.boolean(),
+  terms: boolean;
   /** Согласие на обработку ПДн → ConsentType.PD_PROCESSING */
-  pdProcessing: z.boolean(),
+  pdProcessing: boolean;
   /** Согласие на маркетинговые коммуникации → ConsentType.MARKETING (optional) */
-  marketing: z.boolean().default(false),
-});
-
-export type ConsentFlags = z.infer<typeof consentFlagsSchema>;
+  marketing: boolean;
+};
 
 export const EMPTY_CONSENT_FLAGS: ConsentFlags = {
   terms: false,

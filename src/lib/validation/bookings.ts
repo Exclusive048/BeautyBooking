@@ -1,5 +1,37 @@
 import { z } from "zod";
-import { consentFlagsSchema } from "@/lib/legal/consent-flags";
+import { consentFlagsSchema } from "@/lib/legal/consent-flags-schema";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
+
+/**
+ * GUEST-PHONE-CANON-BOOKINGS-ROUTE (FIX-B13) — телефон канонизируется НА ГРАНИЦЕ
+ * разбора, поэтому всё, что ниже, работает с одной формой номера.
+ *
+ * До этого поле было `z.string().trim().min(1).max(40)` — то есть формата не
+ * проверяло вовсе, и `POST /api/bookings` оставался единственным из четырёх
+ * гостевых входов без нормализатора (LOGIC-30 закрыл три). Идентичность профиля
+ * при этом не страдала: чокпоинт `findOrCreateGuestUserByPhone` нормализует сам.
+ * Страдало то, что ключуется СТРОКОЙ: «8 999 123-45-67» уезжало в
+ * `Booking.clientPhone` дословно, а поиск по телефону (CRM-карточка, релинк
+ * гостевых броней — `buildPhoneVariantsForMatch`) перебирает варианты
+ * `+7…/7…/8…`, но не формы с пробелами и дефисами. То есть бронь сохранялась и
+ * становилась ненаходимой — молча.
+ *
+ * Почему в схеме, а не в роуте (как у `/api/public/bookings`): семантика та же
+ * (400 `VALIDATION_ERROR` через `formatZodError`), но забыть её нельзя — у
+ * `bookingCreateSchema` ровно один потребитель, и канонический вид попадает и в
+ * строку брони, и в namespace идемпотентности/рейт-лимита, без второго сайта,
+ * который надо помнить. Форма проверки — та же, что уже принята в
+ * `studio/schemas.ts` (transform + refine), второго подхода не заводим.
+ */
+const clientPhoneField = z
+  .string()
+  .trim()
+  .min(1, "Не указан телефон клиента.")
+  .max(40)
+  .transform((value) => normalizeRussianPhone(value))
+  .refine((value): value is string => value !== null, {
+    message: "Проверьте номер телефона.",
+  });
 
 const dateString = z
   .string()
@@ -23,7 +55,7 @@ export const bookingCreateSchema = z
     endAtUtc: dateString.optional(),
     slotLabel: z.string().trim().min(1, "Не указано окошко.").max(120),
     clientName: z.string().trim().min(1, "Не указано имя клиента.").max(120),
-    clientPhone: z.string().trim().min(1, "Не указан телефон клиента.").max(40),
+    clientPhone: clientPhoneField,
     comment: z.string().trim().max(500).nullable().optional(),
     silentMode: z.boolean().optional(),
     referencePhotoAssetId: z.string().trim().min(1).nullable().optional(),

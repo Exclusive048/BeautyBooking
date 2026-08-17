@@ -64,7 +64,7 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
 
   const cardClass =
     variant === "confirmed"
-      ? "bg-brand-gradient text-white shadow-[0_4px_14px_-4px_rgba(114,8,8,0.45)]"
+      ? "bg-brand-gradient text-white shadow-brand"
       : variant === "pending"
         ? "border border-amber-400/60 bg-amber-100/40 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200"
         : "border border-emerald-500/60 bg-emerald-100/40 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200";
@@ -89,7 +89,7 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
         {isNewClient && !isPending && showDetails ? (
           <Badge
             variant="default"
-            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 py-0 text-[9px] leading-tight text-emerald-900 dark:text-emerald-100"
+            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 py-0 text-[10px] leading-tight text-emerald-900 dark:text-emerald-100"
           >
             {T.newBadge}
           </Badge>

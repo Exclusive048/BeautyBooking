@@ -104,6 +104,23 @@ export async function seedBookings(input: Input): Promise<Booking[]> {
     if (!serviceByProvider.has(svc.providerId)) serviceByProvider.set(svc.providerId, svc);
   }
 
+  // FIX-C1 — сид обязан давать ту же форму строки, что и продуктовый путь.
+  //
+  // 🔴 Ровно этот сид и произвёл 5 из 6 «неуправляемых» броней в dev-БД: он
+  // раздаёт брони и мастерам, и студиям, а `studioId` не выставлял никому.
+  // Обратная половина того же дефекта жила в showcase-сиде: там `studioId`
+  // проставлен, и именно поэтому пропуск в `createBooking` был невидим —
+  // фикстура утверждала то, что код нарушал (см. «Опасность фикстуры» в
+  // `docs/QUALITY-GATES.md`).
+  const studioIdByProviderId = new Map<string, string>();
+  for (const studio of input.studios) {
+    const row = await prisma.studio.findUnique({
+      where: { providerId: studio.provider.id },
+      select: { id: true },
+    });
+    if (row) studioIdByProviderId.set(studio.provider.id, row.id);
+  }
+
   const created: Booking[] = [];
   for (const bucket of buckets) {
     const count = STATUS_COUNTS[bucket.status];
@@ -128,10 +145,14 @@ export async function seedBookings(input: Input): Promise<Booking[]> {
           startAtUtc: startAt,
           endAtUtc: endAt,
           slotLabel: buildSlotLabel(startAt, service.durationMin),
+          // Идемпотентный сид обязан ЧИНИТЬ уже засеянные строки, иначе пять
+          // дефектных броней переживут любой повторный прогон без `reset`.
+          studioId: studioIdByProviderId.get(provider.providerId) ?? null,
         },
         create: {
           id,
           providerId: provider.providerId,
+          studioId: studioIdByProviderId.get(provider.providerId) ?? null,
           serviceId: service.id,
           clientUserId: client.id,
           status: bucket.status,

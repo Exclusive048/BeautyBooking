@@ -30,11 +30,11 @@ export default function NotFound() {
       {/* Ambient gradient blobs */}
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/4 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/8 blur-[100px]"
+        className="pointer-events-none absolute left-1/2 top-1/4 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.08] blur-[100px]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/3 top-2/3 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-magenta/6 blur-[80px]"
+        className="pointer-events-none absolute left-1/3 top-2/3 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-magenta/[0.06] blur-[80px]"
       />
 
       <motion.div

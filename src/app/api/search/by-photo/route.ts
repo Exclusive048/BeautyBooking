@@ -12,14 +12,24 @@ import type {
 } from "@/lib/visual-search/contracts";
 import { searchByImage } from "@/lib/visual-search/searcher";
 import { getVisualSearchEnabled } from "@/lib/visual-search/config";
+import {
+  byPhotoImageHash,
+  getCachedByPhotoResult,
+  setCachedByPhotoResult,
+} from "@/lib/visual-search/by-photo-guards";
+import { AiSpendCeilingError } from "@/lib/ai/spend-ceiling";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+// SEC-04 (AUDIT-CAMPAIGN-02 п.7): 10/60с → 3/60с — запрос стоит 2 vision +
+// 1 embedding, а загрузка файла руками не бывает чаще; дедуп-хиты в тир
+// всё равно не упираются редко (лимит проверяется первым — дешёвый отказ
+// раньше чтения тела).
 const VISUAL_SEARCH_RATE_LIMIT = {
   windowSeconds: 60,
-  maxRequests: 10,
+  maxRequests: 3,
 };
 
 const imagePayloadSchema = z.object({
@@ -76,16 +86,32 @@ export async function POST(req: Request) {
       return jsonFail(400, UI_TEXT.home.visualSearch.messages.invalidFile, "VALIDATION_ERROR");
     }
 
-    const result = await searchByImage(new Uint8Array(imageBuffer));
-    if (!result.ok) {
-      return jsonOk<VisualSearchHttpResponse>({
-        ...result,
-        message: mapReasonToMessage(result.reason),
-      });
+    // SEC-04 п.7, слой 2 — дедуп: тот же файл в течение суток отдаёт
+    // кэшированный ответ, не тратя ни бюджет, ни платные вызовы.
+    const imageHash = byPhotoImageHash(imageBuffer);
+    const cached = await getCachedByPhotoResult(imageHash);
+    if (cached) {
+      return jsonOk<VisualSearchHttpResponse>(cached);
     }
 
-    return jsonOk<VisualSearchHttpResponse>(result);
+    // FIX-B16: суточный ДЕНЕЖНЫЙ потолок сработает внутри `searchByImage` — он
+    // живёт в чокпойнте провайдера, чтобы покрывать и путь индексации, у
+    // которого запроса нет. Роут ловит его отдельно от общего `catch` только
+    // ради `Retry-After`: форма отказа (честный 429 + курируемая строка вместо
+    // 500) — ратифицированное поведение SEC-04, и её надо сохранить.
+    const result = await searchByImage(new Uint8Array(imageBuffer));
+    const response: VisualSearchHttpResponse = result.ok
+      ? result
+      : { ...result, message: mapReasonToMessage(result.reason) };
+    await setCachedByPhotoResult(imageHash, response);
+    return jsonOk<VisualSearchHttpResponse>(response);
   } catch (error) {
+    if (error instanceof AiSpendCeilingError) {
+      return tooManyRequests(
+        error.retryAfterSeconds,
+        UI_TEXT.home.visualSearch.messages.budgetExhausted
+      );
+    }
     const appError = toAppError(error);
     if (appError.status >= 500) {
       logError("POST /api/search/by-photo failed", {

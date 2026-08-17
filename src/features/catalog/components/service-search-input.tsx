@@ -20,7 +20,8 @@ export type AutocompleteCategory = {
 };
 
 export type AutocompleteProvider = {
-  id: string;
+  // SEC-12: `id` (сырой CUID провайдера) из ответа убран — потребителя у него
+  // не было, переход идёт по `publicUsername`.
   name: string;
   publicUsername: string | null;
   type: "master" | "studio";
@@ -178,7 +179,7 @@ export function ServiceSearchInput({
         }}
         placeholder={UI_TEXT.catalog2.searchBar.searchPlaceholder}
         aria-label={UI_TEXT.catalog2.searchBar.searchPlaceholder}
-        className="h-11 w-full rounded-xl bg-transparent pl-9 pr-9 text-base text-text-main placeholder:text-text-sec transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="h-11 w-full rounded-xl bg-transparent pl-9 pr-9 text-base text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
       />
 
       {loading ? (
@@ -224,13 +225,21 @@ export function ServiceSearchInput({
                 </div>
                 {results.providers.map((p) => (
                   <button
-                    key={p.id}
+                    // SEC-12: id из ответа убран; `publicUsername` уникален, а
+                    // индекс страхует провайдера без него (кнопка disabled).
+                    key={p.publicUsername ?? `provider-${p.name}`}
                     type="button"
                     onClick={() => handleProviderClick(p)}
                     disabled={!p.publicUsername}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-input/70 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-magenta/10 text-primary-magenta">
+                    {/* UI-10: иконка брала ЗАЛИВОЧНЫЙ `primary-magenta` как
+                        цвет переднего плана — 2.89:1 в тёмной теме. Сосед на
+                        30 строк выше (`bg-primary/10 text-accent-text`) уже
+                        держит санкционированный раскол, так что здесь не новое
+                        решение, а выравнивание отставшей плашки: 10.30 / 6.27.
+                        Различает секции подложка и сама иконка, не её цвет. */}
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-magenta/10 text-accent-text">
                       {p.type === "studio" ? (
                         <Building2 className="h-3.5 w-3.5" aria-hidden />
                       ) : (

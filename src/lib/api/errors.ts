@@ -1,4 +1,7 @@
 const ERROR_CODES = [
+  // FIX-B18: код существовал только литералом в master/profile (и уезжал в поле
+  // сообщения). При переводе роута на конверт он стал настоящим ErrorCode.
+  "ADDRESS_COORDS_REQUIRED",
   "ADDRESS_REQUIRED",
   "AUTH_DATE_EXPIRED",
   "AUTO_CONFIRM_NOT_ALLOWED_FOR_STUDIO",
@@ -14,6 +17,8 @@ const ERROR_CODES = [
   "BOOKING_CONFLICT",
   "BOOKING_NOT_FOUND",
   "BOOKING_TIME_REQUIRED",
+  // LOGIC-02: статус брони изменился между чтением и записью
+  "BOOKING_STATUS_CHANGED",
   "PACKAGE_NOT_FOUND",
   "PACKAGE_NOT_SOLO",
   "PACKAGE_NOT_STUDIO",
@@ -74,6 +79,8 @@ const ERROR_CODES = [
   "MEDIA_INVALID_MIME",
   "MEDIA_PORTFOLIO_LIMIT_REACHED",
   "MEDIA_REPLACE_ASSET_MISMATCH",
+  // SEC-17: суммарная байтовая квота аккаунта исчерпана (`media/types.ts`)
+  "MEDIA_STORAGE_QUOTA_EXCEEDED",
   "PHOTO_LIMIT_REACHED",
   "LIMIT_REACHED",
   "NAME_REQUIRED",
@@ -86,10 +93,26 @@ const ERROR_CODES = [
   "PROVIDER_NOT_FOUND",
   "RANGE_INVALID",
   "RATE_LIMITED",
+  /**
+   * FIX-C11: посчитать лимит НЕ УДАЛОСЬ (обрыв Redis), запрос отклонён
+   * fail-closed. Отдельный код от `RATE_LIMITED` по той же причине, что и
+   * `AI_DAILY_LIMIT_REACHED`: 429 учит клиента «шлёшь слишком часто», а здесь
+   * гость, делающий ПЕРВЫЙ запрос, читал именно это. Верный сигнал — 503
+   * «сервис временно недоступен, повторите». Код уже отдавал `otp-rate-limit.ts`
+   * (RES-11) сырой строкой; здесь он внесён в реестр.
+   */
+  "RATE_LIMIT_UNAVAILABLE",
+  // FIX-B16: суточный ДЕНЕЖНЫЙ потолок платной AI-поверхности исчерпан.
+  // Отдельный код от `RATE_LIMITED` намеренно: тот про бюджет запросов
+  // конкретного клиента, этот — про общий бюджет расходов, и клиент,
+  // сделавший один запрос, не должен читать «вы шлёте слишком часто».
+  "AI_DAILY_LIMIT_REACHED",
   "REFERENCE_PHOTO_REQUIRED",
   "REFERENCE_PHOTO_NOT_FOUND",
   "REFERENCE_PHOTO_INVALID",
   "REFERENCE_PHOTO_USED",
+  // SEC-16: тело запроса перевалило за планку размера (`lib/http/body-limit.ts`)
+  "REQUEST_BODY_TOO_LARGE",
   "REVIEW_ALREADY_EXISTS",
   "REVIEW_NOT_ALLOWED",
   "REVIEW_TARGET_NOT_FOUND",
@@ -178,8 +201,39 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * FIX-B5 — распознавание нарушения уникальности Prisma без импорта Prisma.
+ *
+ * `P2002` — известная форма ошибки, и до этой правки `toAppError` её НЕ узнавал:
+ * у сырой ошибки поле `code` равно строке `"P2002"`, которая не проходит
+ * `isErrorCode` (коды проекта — SCREAMING_SNAKE), а `status` отсутствует вовсе.
+ * Итог — общий 500 «Не удалось выполнить операцию» там, где на деле конфликт.
+ * На OAuth-колбэках это давало JSON-500 ПОСРЕДИ редиректа провайдера.
+ *
+ * ⚠️ Проверка СТРУКТУРНАЯ, а не `instanceof Prisma.PrismaClientKnownRequestError`,
+ * и это не стилистика: `Prisma` — **value**-импорт из `@prisma/client`, а этот
+ * модуль сидит в графе достижимости клиентских компонентов. Такой импорт тихо
+ * утащил бы рантайм Prisma в браузерный бандл, не сломав билд, — ровно дефект
+ * PERF-11 (инв. §3, `lib/prisma-enums.ts`).
+ *
+ * Безопасно по построению: 26 файлов ловят `P2002` у себя, на своём вызове, то
+ * есть до `toAppError` он доходит только там, где обработки нет вообще.
+ */
+function isPrismaUniqueViolation(input: unknown): boolean {
+  if (!isRecord(input)) return false;
+  return (input as Record<string, unknown>).code === "P2002";
+}
+
 export function toAppError(input: unknown): AppError {
   if (input instanceof AppError) return input;
+
+  if (isPrismaUniqueViolation(input)) {
+    return new AppError(
+      "Такая запись уже существует. Проверьте данные и попробуйте ещё раз.",
+      409,
+      "ALREADY_EXISTS",
+    );
+  }
 
   if (input instanceof Error && isRecord(input)) {
     const record = input as Record<string, unknown>;

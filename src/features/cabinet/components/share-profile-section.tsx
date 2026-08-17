@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Copy, Download } from "lucide-react";
-import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QrCodeCanvas } from "@/components/ui/qr-code-canvas";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
+// UI-04: canvas принимает только строку цвета — берём её из зеркала токенов,
+// а не литералом. Белые заливки ниже намеренно остаются чистым `#ffffff`:
+// это бумага печатной карточки и тихая зона QR, где важна не палитра, а
+// контраст для сканера.
+import { BRAND_COLORS } from "@/lib/ui/brand-colors";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type PublicUsernamePayload = {
@@ -99,16 +104,16 @@ export function ShareProfileSection({ endpoint }: Props) {
       ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
     }
 
-    ctx.fillStyle = "#1e1e24";
+    ctx.fillStyle = BRAND_COLORS.textMain;
     ctx.font = "bold 36px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(username ? `/u/${username}` : url, CARD_DOWNLOAD_WIDTH / 2, 760);
 
-    ctx.fillStyle = "#a0a0a0";
+    ctx.fillStyle = BRAND_COLORS.textSecondary;
     ctx.font = "24px sans-serif";
     ctx.fillText(BRAND_NAME, CARD_DOWNLOAD_WIDTH / 2, 810);
 
-    ctx.fillStyle = "#c6a97e";
+    ctx.fillStyle = BRAND_COLORS.brandFrom;
     ctx.font = "20px sans-serif";
     ctx.fillText(url, CARD_DOWNLOAD_WIDTH / 2, 860);
 
@@ -131,6 +136,10 @@ export function ShareProfileSection({ endpoint }: Props) {
         <label className="mb-1.5 block text-xs text-text-sec">{t.yourLink}</label>
         <div className="relative">
           <Input readOnly value={url} className="pr-12" />
+          {/* ⚠️ UI-29: у size="icon" теперь `relative` (hit-зона 44px) — класс
+              `absolute` на самой кнопке будет ПЕРЕБИТ (cn — плоский join, а
+              `.relative` в CSS позже). Компонент сейчас сирота (0 импортёров);
+              при оживлении перенести позиционирование на обёртку-span. */}
           <Button
             variant="ghost"
             size="icon"
@@ -148,13 +157,13 @@ export function ShareProfileSection({ endpoint }: Props) {
       {/* QR Code */}
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-border-subtle bg-white p-6 dark:bg-white">
         <div ref={qrRef}>
-          <QRCodeCanvas
+          <QrCodeCanvas
             value={url}
             size={QR_SIZE}
             level="M"
             marginSize={2}
             bgColor="#ffffff"
-            fgColor="#1e1e24"
+            fgColor={BRAND_COLORS.textMain}
           />
         </div>
       </div>

@@ -152,6 +152,20 @@ export function parseSmscBalanceResponse(payload: unknown): SmsBalanceResult {
   return { success: false, error: "Не удалось распознать баланс." };
 }
 
+/**
+ * RES-08 — верхняя граница запроса к SMSC.
+ *
+ * Fail-soft у этого провайдера построен на возврате `PROVIDER_UNAVAILABLE`,
+ * то есть отрабатывает ПОСЛЕ того, как вызов вернулся, — а без границы
+ * возврата может не быть вовсе: вызов инлайновый на пути выпуска OTP
+ * (`otp/request/route.ts`), и зависший шлюз держит запрос пользователя.
+ * Сегодня это P2 только потому, что `PHONE_AUTH_ENABLED` в проде выключен;
+ * в момент включения телефонного входа цена станет той же, что у SMTP.
+ *
+ * 10 с: HTTP-API шлюза отвечает за сотни миллисекунд, но SMS-трафик идёт
+ * через операторов, и короткий порог дал бы ложные отказы на живой отправке.
+ */
+const SMSC_REQUEST_TIMEOUT_MS = 10_000;
 export function createSmscProvider(config: SmscConfig): SmsProvider {
   const fetchImpl = config.fetchImpl ?? fetch;
 
@@ -161,7 +175,10 @@ export function createSmscProvider(config: SmscConfig): SmsProvider {
     async send(phone, message) {
       const url = buildSmscSendUrl({ config, phone, message });
       try {
-        const response = await fetchImpl(url, { method: "GET" });
+        const response = await fetchImpl(url, {
+          method: "GET",
+          signal: AbortSignal.timeout(SMSC_REQUEST_TIMEOUT_MS),
+        });
         if (!response.ok) {
           return {
             success: false,
@@ -184,7 +201,10 @@ export function createSmscProvider(config: SmscConfig): SmsProvider {
     async checkBalance() {
       const url = buildSmscBalanceUrl(config);
       try {
-        const response = await fetchImpl(url, { method: "GET" });
+        const response = await fetchImpl(url, {
+          method: "GET",
+          signal: AbortSignal.timeout(SMSC_REQUEST_TIMEOUT_MS),
+        });
         if (!response.ok) {
           return { success: false, error: `HTTP ${response.status}` };
         }

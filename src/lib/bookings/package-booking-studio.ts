@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { AppError, type ErrorCode, toAppError } from "@/lib/api/errors";
-import { Prisma, BookingPackageStatus } from "@prisma/client";
+import { BookingPackageStatus, BookingSource } from "@prisma/client";
+import { createBookingRow } from "@/lib/bookings/booking-row";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import {
   ensureNoConflicts,
   resolveBookingCore,
@@ -19,6 +21,12 @@ import {
   type CreateSoloPackageResult,
 } from "@/lib/bookings/package-booking";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
+import {
+  abortPackageIdempotency,
+  beginPackageIdempotency,
+  completePackageIdempotency,
+} from "@/lib/bookings/package-idempotency";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { logError } from "@/lib/logging/logger";
 
@@ -208,16 +216,47 @@ export async function proposeStudioPackagePlacement(input: {
  * Bookings + N BookingServiceItems in ONE Serializable transaction. Any
  * conflict / placement failure rolls the whole thing back — no partial package.
  */
-export async function createStudioPackageBooking(input: {
+type CreateStudioPackageInput = {
   packageId: string;
-  clientUserId: string | null;
+  /**
+   * FIX-B15 — пакет создаётся только для резолвнутого профиля (RKN-FIX-02),
+   * поэтому не nullable. Оба роута объявляют локальную переменную как `string`;
+   * тип фиксирует это на границе, а не оставляет соглашению.
+   */
+  clientUserId: string;
   clientName: string;
   clientPhone: string;
   comment?: string | null;
   silentMode?: boolean;
   /** Chosen master + slot, one per component. serviceId must belong to the package. */
   selections: StudioPackageSelection[];
-}): Promise<CreateSoloPackageResult> {
+  /** LOGIC-09 (инв. #28) — см. одноимённый параметр solo-близнеца. */
+  idempotencyKey?: string | null;
+};
+
+export async function createStudioPackageBooking(
+  input: CreateStudioPackageInput,
+): Promise<CreateSoloPackageResult> {
+  const guard = await beginPackageIdempotency({
+    idempotencyKey: input.idempotencyKey,
+    clientUserId: input.clientUserId,
+  });
+  if (guard.cached) return guard.cached;
+
+  let result: CreateSoloPackageResult;
+  try {
+    result = await createStudioPackageBookingUnguarded(input);
+  } catch (error) {
+    await abortPackageIdempotency(guard.heldKey);
+    throw error;
+  }
+  await completePackageIdempotency(guard.heldKey, result.bookingPackageId);
+  return result;
+}
+
+async function createStudioPackageBookingUnguarded(
+  input: CreateStudioPackageInput,
+): Promise<CreateSoloPackageResult> {
   const pkg = await loadStudioPackage(input.packageId);
   const ordered = orderSelections(pkg, input.selections);
 
@@ -281,7 +320,7 @@ export async function createStudioPackageBooking(input: {
   // 5. Atomic create — all-or-none.
   let result: CreateSoloPackageResult;
   try {
-    result = await prisma.$transaction(
+    result = await bookingTransaction(
       async (tx) => {
         const bookingPackage = await tx.bookingPackage.create({
           data: {
@@ -310,10 +349,13 @@ export async function createStudioPackageBooking(input: {
             bufferMin: core.bufferMin,
           });
 
-          const created = await tx.booking.create({
+          const created = await createBookingRow(tx, {
             data: {
               providerId: pkg.providerId,
-              studioId: pkg.studioId,
+              // FIX-C1: `studioId` больше не передаётся — writer выводит его из
+              // `providerId` (у студийного пакета это провайдер студии, то есть
+              // ровно тот `Studio.id`, что стоял здесь раньше).
+              source: BookingSource.WEB,
               serviceId: core.service.id,
               masterProviderId: core.resolvedMasterProviderId,
               masterId: core.resolvedMasterProviderId ?? pkg.providerId,
@@ -348,12 +390,20 @@ export async function createStudioPackageBooking(input: {
 
         return { bookingPackageId: bookingPackage.id, bookingIds, totalKopeks: finalTotal };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
     );
   } catch (error) {
     const conflict = mapPrismaBookingConflict(error);
     if (conflict) throw conflict;
     throw error;
+  }
+
+  // RES-15: напоминания на каждый компонент — см. соло-путь. Здесь компоненты
+  // ещё и у разных мастеров, но напоминание привязано к брони, а не к мастеру.
+  if (shouldAutoConfirm) {
+    for (const bookingId of result.bookingIds) {
+      await scheduleBookingRemindersSafe(bookingId);
+    }
   }
 
   // Post-tx slot-cache + advisor invalidation per child (best-effort, non-fatal).

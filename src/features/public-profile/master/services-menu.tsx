@@ -21,6 +21,13 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
   return (
     <section className="lux-card rounded-[28px] p-5">
       <h2 className="text-lg font-semibold text-text-main">{UI_TEXT.publicProfile.services.title}</h2>
+      {groups.length === 0 ? (
+        // FIX-D1 (F7): то же оформление, что у «Портфолио» — заголовок без
+        // содержимого читается как сломанная страница независимо от причины.
+        <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/70 p-4 text-sm text-text-sec">
+          {UI_TEXT.publicProfile.services.empty}
+        </div>
+      ) : (
       <div className="mt-4 space-y-6">
         {groups.map((group) => (
           <div key={group.categoryName ?? "__uncat"} className="space-y-3">
@@ -78,6 +85,7 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
           </div>
         ))}
       </div>
+      )}
     </section>
   );
 }

@@ -102,7 +102,18 @@ async function buildDayData(
     }),
     prisma.booking.findMany({
       where: {
-        OR: [{ studioId }, { providerId }],
+        OR: [
+          { studioId },
+          { providerId },
+          // LOGIC-01: бронь того же мастера, созданная через его ЛИЧНЫЙ профиль,
+          // имеет `studioId = null` и `providerId = мастер` — ни один из двух
+          // прежних клозов её не матчил, и календарь показывал слот свободным.
+          // Админ не видел занятость собственного мастера, а предикат конфликта
+          // (тоже поправленный) отказывал бы «на пустом месте» с его точки
+          // зрения. Фильтр по связи, а не по списку id, чтобы не разрывать
+          // `Promise.all` с запросом мастеров.
+          { masterProvider: { studioId: providerId } },
+        ],
         startAtUtc: { gte: dayStart, lt: dayEnd },
         status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
       },
