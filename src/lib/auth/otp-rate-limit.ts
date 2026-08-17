@@ -1,5 +1,12 @@
-import crypto from "crypto";
 import { AppError } from "@/lib/api/errors";
+import {
+  hashOtpKeyPart,
+  otpRequestIdentityIpKey,
+  otpRequestIdentityKey,
+  otpRequestIpKey,
+  otpVerifyFailKey,
+  otpVerifyLockKey,
+} from "@/lib/auth/otp-rate-limit-keys";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import { alertOtpRateLimitTriggered } from "@/lib/monitoring/api-alerts";
@@ -60,9 +67,9 @@ export type OtpRateLimitRefusal = {
 
 type RateLimitResult = { ok: true } | OtpRateLimitRefusal;
 
-function hashKey(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
+// FIX-D1: вывод имён ключей живёт в `otp-rate-limit-keys.ts` — там же, откуда
+// его берёт QA-харнесс. Вторая копия вывода уже протухала дважды (SMOKE-02 · Ф-2).
+const hashKey = hashOtpKeyPart;
 
 /**
  * Scope the verify-failure counter/lock by (identity + client IP), not by the
@@ -83,9 +90,6 @@ function hashKey(value: string): string {
  * degrades to per-identity — i.e. today's behaviour — never worse, and correct
  * once the proxy hops are set. Flagged in the deploy checklist.
  */
-function verifyScopeId(identity: string, ip: string | null): string {
-  return `${hashKey(identity)}:${hashKey(ip?.trim() || "unknown")}`;
-}
 
 /**
  * RES-11 — каждая команда Redis здесь идёт через `withRedisCommandTimeout`.
@@ -133,13 +137,13 @@ export async function checkOtpRequestRateLimit(input: {
     return { ok: false, status: 503, error: "RATE_LIMIT_UNAVAILABLE", retryAfterSec: 60 };
   }
 
-  const ipKey = `otp:request:ip:${hashKey(input.ip?.trim() || "unknown")}`;
+  const ipKey = otpRequestIpKey(input.ip);
   // SEC-26: бюджет одного источника. Прежний ключ `otp:request:phone:<hash>`
   // ключевался только идентичностью, поэтому чужой запрос списывал бюджет
   // владельца.
-  const identityIpKey = `otp:request:phone-ip:${verifyScopeId(input.phone, input.ip)}`;
+  const identityIpKey = otpRequestIdentityIpKey("phone", input.phone, input.ip);
   // Потолок отправок на идентичность — защита от бомбардировки и расхода шлюза.
-  const identityKey = `otp:request:phone:${hashKey(input.phone)}`;
+  const identityKey = otpRequestIdentityKey("phone", input.phone);
 
   let ipCount = 0;
   let identityIpCount = 0;
@@ -185,7 +189,7 @@ export async function checkOtpVerifyLock(phone: string, ip: string | null): Prom
   }
 
   try {
-    const lockKey = `otp:verify:lock:${verifyScopeId(phone, ip)}`;
+    const lockKey = otpVerifyLockKey("phone", phone, ip);
     const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
     if (ttl > 0) {
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl };
@@ -211,15 +215,14 @@ export async function registerOtpVerifyFailure(phone: string, ip: string | null)
   }
 
   try {
-    const scope = verifyScopeId(phone, ip);
-    const key = `otp:verify:fail:${scope}`;
+    const key = otpVerifyFailKey("phone", phone, ip);
     const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
     if (count === 1) {
       await withRedisCommandTimeout("otp:expire", client.expire(key, OTP_VERIFY_LOCK_SECONDS));
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
       alertOtpRateLimitTriggered(ip, phone);
-      const lockKey = `otp:verify:lock:${scope}`;
+      const lockKey = otpVerifyLockKey("phone", phone, ip);
       await withRedisCommandTimeout("otp:set", client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS }));
       const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl > 0 ? ttl : OTP_VERIFY_LOCK_SECONDS };
@@ -241,9 +244,8 @@ export async function clearOtpVerifyFailures(phone: string, ip: string | null): 
   if (!client) return;
 
   try {
-    const scope = verifyScopeId(phone, ip);
-    const failKey = `otp:verify:fail:${scope}`;
-    const lockKey = `otp:verify:lock:${scope}`;
+    const failKey = otpVerifyFailKey("phone", phone, ip);
+    const lockKey = otpVerifyLockKey("phone", phone, ip);
     await Promise.all([
       withRedisCommandTimeout("otp:del", client.del(failKey)),
       withRedisCommandTimeout("otp:del", client.del(lockKey)),
@@ -276,11 +278,11 @@ export async function checkOtpEmailRequestRateLimit(input: {
   }
 
   const normalizedEmail = input.email.toLowerCase();
-  const ipKey = `otp:request:ip:${hashKey(input.ip?.trim() || "unknown")}`;
+  const ipKey = otpRequestIpKey(input.ip);
   // SEC-26: бюджет одного источника (см. телефонный близнец выше).
-  const emailIpKey = `otp:request:email-ip:${verifyScopeId(normalizedEmail, input.ip)}`;
+  const emailIpKey = otpRequestIdentityIpKey("email", normalizedEmail, input.ip);
   // Потолок отправок на адрес — защита от бомбардировки почтового ящика.
-  const emailKey = `otp:request:email:${hashKey(normalizedEmail)}`;
+  const emailKey = otpRequestIdentityKey("email", normalizedEmail);
 
   let ipCount = 0;
   let emailIpCount = 0;
@@ -326,7 +328,7 @@ export async function checkOtpEmailVerifyLock(email: string, ip: string | null):
   }
 
   try {
-    const lockKey = `otp:verify:email:lock:${verifyScopeId(email.toLowerCase(), ip)}`;
+    const lockKey = otpVerifyLockKey("email", email, ip);
     const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
     if (ttl > 0) {
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl };
@@ -352,15 +354,14 @@ export async function registerOtpEmailVerifyFailure(email: string, ip: string | 
   }
 
   try {
-    const scope = verifyScopeId(email.toLowerCase(), ip);
-    const key = `otp:verify:email:fail:${scope}`;
+    const key = otpVerifyFailKey("email", email, ip);
     const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
     if (count === 1) {
       await withRedisCommandTimeout("otp:expire", client.expire(key, OTP_VERIFY_LOCK_SECONDS));
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
       alertOtpRateLimitTriggered(ip, email);
-      const lockKey = `otp:verify:email:lock:${scope}`;
+      const lockKey = otpVerifyLockKey("email", email, ip);
       await withRedisCommandTimeout("otp:set", client.set(lockKey, "1", { EX: OTP_VERIFY_LOCK_SECONDS }));
       const ttl = await withRedisCommandTimeout("otp:ttl", client.ttl(lockKey));
       return { ok: false, status: 429, error: "OTP_LOCKED", retryAfterSec: ttl > 0 ? ttl : OTP_VERIFY_LOCK_SECONDS };
@@ -382,9 +383,8 @@ export async function clearOtpEmailVerifyFailures(email: string, ip: string | nu
   if (!client) return;
 
   try {
-    const scope = verifyScopeId(email.toLowerCase(), ip);
-    const failKey = `otp:verify:email:fail:${scope}`;
-    const lockKey = `otp:verify:email:lock:${scope}`;
+    const failKey = otpVerifyFailKey("email", email, ip);
+    const lockKey = otpVerifyLockKey("email", email, ip);
     await Promise.all([
       withRedisCommandTimeout("otp:del", client.del(failKey)),
       withRedisCommandTimeout("otp:del", client.del(lockKey)),

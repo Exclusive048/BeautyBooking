@@ -2,8 +2,12 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import {
-  failOAuthStart,
+  classifyOAuthStartFailure,
+  isCabinetReferer,
+  logOAuthStartFailure,
+  oauthStartCabinetRedirect,
   oauthStartLoginRedirect,
+  type OAuthStartFailure,
   oauthStartProviderRedirect,
   type OAuthStartNavigation,
 } from "@/lib/auth/oauth-start-error";
@@ -24,6 +28,25 @@ const VK_NOT_CONFIGURED_CODES = new Set([
   "VK_ID_REDIRECT_URI_MISSING",
 ]);
 
+/**
+ * FIX-D1 — куда вернуть браузер при отказе.
+ *
+ * Кнопка «Подключить VK» есть в ДВУХ местах, и адрес отказа у них разный:
+ *   · `/login` — там кнопка входа, и `/login?error=` есть правильный адрес;
+ *   · клиентский кабинет (`client-profile-page.tsx` → `window.location.href =
+ *     "/api/auth/vk/start"`) — пользователь УЖЕ вошёл, и отправлять его на
+ *     страницу входа значит показывать тупик вместо объяснения.
+ *
+ * До FIX-D1 второй случай уходил на `/login?error=`; SMOKE-02 · Ф-1 намерил это
+ * с другой стороны — `?vk=` на странице профиля не снимался, потому что его
+ * туда никто не ставил.
+ */
+function backToStartSurface(req: Request, failure: OAuthStartFailure): OAuthStartNavigation {
+  return isCabinetReferer(req)
+    ? oauthStartCabinetRedirect(req, failure, "vk")
+    : oauthStartLoginRedirect(req, failure);
+}
+
 export async function GET(req: Request): Promise<OAuthStartNavigation> {
   return withRequestContext(req, async () => {
     // AUTH-KILLSWITCH-ENFORCE-01: refuse when the provider is disabled
@@ -33,7 +56,7 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
     // FIX-B14: отказ по-прежнему происходит здесь и до всего; изменилась только
     // его ФОРМА — навигация возвращается на `/login`, а не в JSON-тупик.
     if (!isVkAuthEnabled) {
-      return oauthStartLoginRedirect(req, "provider_unavailable");
+      return backToStartSurface(req, "provider_unavailable");
     }
 
     // RKN-FIX-01: the consent the visitor ticked on /login travels with the
@@ -48,7 +71,7 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
     const consentFlags = consentFlagsFromParams(new URL(req.url).searchParams);
     const isLinkingSession = Boolean(await getSessionUser());
     if (!isLinkingSession && !hasRequiredConsents(consentFlags)) {
-      return oauthStartLoginRedirect(req, "consent_required");
+      return backToStartSurface(req, "consent_required");
     }
 
     try {
@@ -88,7 +111,10 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
       // тащил наружу payload ошибки, который SECURITY-EXPOSURE-AUDIT-01 · Y9
       // намеренно снял с колбэков; на старте это осталось незамеченным.
       // Оба исхода теперь навигация, а диагностика уезжает в лог со скрабом.
-      return failOAuthStart(req, error, VK_NOT_CONFIGURED_CODES);
+      // FIX-D1: тот же выбор адреса, что и у двух исходов выше — иначе
+      // `start_failed` из кабинета продолжал бы уводить на `/login`.
+      logOAuthStartFailure(req, error);
+      return backToStartSurface(req, classifyOAuthStartFailure(error, VK_NOT_CONFIGURED_CODES));
     }
   });
 }

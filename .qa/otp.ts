@@ -22,9 +22,13 @@
 // is mirrored exactly rather than approximated.
 
 import { execFileSync } from "node:child_process";
-import { createHmac, createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+// FIX-D1: вывод имён ключей — из того же модуля, которым пользуется рантайм.
+// Модуль намеренно без зависимостей (только `crypto`), поэтому импортируется
+// из обычного tsx-скрипта, минуя `server-only` у redis-корня.
+import { allOtpRateLimitKeys } from "../src/lib/auth/otp-rate-limit-keys";
 
 // Container names drift (compose adds a `-1` suffix: `beautyhub-redis` ->
 // `beautyhub-redis-1`), which silently broke every `docker exec` in PASS-01.
@@ -104,10 +108,6 @@ function psql(sql: string): string {
 
 function hashOtp(identity: string, code: string, secret: string): string {
   return createHmac("sha256", secret).update(`${identity}:${code}`).digest("hex");
-}
-
-function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
 }
 
 /**
@@ -220,38 +220,43 @@ export async function recoverOtp(identity: OtpIdentity): Promise<string> {
  * ⚠️ QA-HARNESS-EMAIL-01 — у email СВОИ ключи, и это ровно тот же класс бага,
  * что чинил GATES-FIX-01, только на втором канале. Verify-тир у email лежит под
  * ДРУГИМ префиксом — `otp:verify:email:lock:` против фонового
- * `otp:verify:lock:` — так что «почистили телефон» не чистит email ничего.
- * Полная карта (источник — `src/lib/auth/otp-rate-limit.ts`):
+ * `otp:verify:lock:`.
  *
- *   request/IP     otp:request:ip:<sha256(ip)>            ← ОБЩИЙ для обоих каналов
- *   request/phone  otp:request:phone:<sha256(phone)>       3 / 5 мин
- *   request/email  otp:request:email:<sha256(email))>      3 / 5 мин
- *   verify/phone   otp:verify:{lock,fail}:<scope>
- *   verify/email   otp:verify:email:{lock,fail}:<scope>
- *   где scope = `${sha256(identity)}:${sha256(ip)}`
+ * 🔴 **FIX-D1 — карта ключей больше здесь НЕ ведётся.** Она велась (список из
+ * шести строк, «источник — `src/lib/auth/otp-rate-limit.ts`») и протухла молча
+ * дважды, что и нашёл SMOKE-02 · Ф-2:
  *
- * Общий request/IP-ключ (5 / 60 с) — причина, по которой смешанный прогон
- * «смоук по телефонам + email-спека» упирается в 429 быстрее, чем ожидаешь:
- * бюджет один на оба канала.
+ *   1. предполагалось, что на localhost продукт хеширует строку `"unknown"`;
+ *      на деле `extractClientIp` возвращает `::1`, поэтому IP-счётчик не
+ *      снимался НИКОГДА;
+ *   2. SEC-26 добавил второе измерение (`otp:request:{phone,email}-ip:`), и
+ *      список про него не узнал вовсе.
+ *
+ * Цена — не неудобство: серия холодных логинов упирается в `429`, а по симптому
+ * это неотличимо от сломанного логина, то есть инструмент проверки продукта сам
+ * производит ложные отказы. Поэтому имена ключей теперь ИМПОРТИРУЮТСЯ из
+ * `src/lib/auth/otp-rate-limit-keys.ts` — того самого модуля, из которого их
+ * берёт рантайм. Новое измерение лимита появляется здесь само.
+ *
+ * ⚠️ Единственное, что харнесс всё ещё угадывает, — сам IP: он средовой, и узнать
+ * его со стороны нельзя. Поэтому чистится набор петлевых форм (`::1`,
+ * `::ffff:127.0.0.1`, `127.0.0.1`) плюс `null`-случай (`"unknown"`). Это ВХОД
+ * вывода, а не сам вывод; вывод — общий.
  */
-export function clearOtpRateLimit(identities: OtpIdentity[], ip = "unknown"): void {
+/**
+ * Петлевые формы, в которых продукт может увидеть локального клиента, плюс
+ * `null`-случай. Дешевле почистить все, чем угадать одну и снова получить 429,
+ * неотличимый от поломки логина.
+ */
+const LOCAL_IP_FORMS = ["::1", "::ffff:127.0.0.1", "127.0.0.1", "unknown"] as const;
+
+export function clearOtpRateLimit(identities: OtpIdentity[], ip?: string): void {
   const keys = new Set<string>();
-  const ipHash = sha256(ip);
-  // Счётчик запросов по IP. На localhost XFF нет → extractClientIp вернёт null
-  // → продукт хеширует строку "unknown". Общий для phone и email.
-  keys.add(`otp:request:ip:${ipHash}`);
+  const ipForms = ip ? [ip] : LOCAL_IP_FORMS;
   for (const identity of identities) {
     const id = resolveIdentity(identity);
-    const h = sha256(id.value);
-    if (id.channel === "phone") {
-      keys.add(`otp:request:phone:${h}`);
-      // verifyScopeId = `${sha256(identity)}:${sha256(ip)}` — обе половины.
-      keys.add(`otp:verify:lock:${h}:${ipHash}`);
-      keys.add(`otp:verify:fail:${h}:${ipHash}`);
-    } else {
-      keys.add(`otp:request:email:${h}`);
-      keys.add(`otp:verify:email:lock:${h}:${ipHash}`);
-      keys.add(`otp:verify:email:fail:${h}:${ipHash}`);
+    for (const form of ipForms) {
+      for (const key of allOtpRateLimitKeys(id.channel, id.value, form)) keys.add(key);
     }
   }
   try {

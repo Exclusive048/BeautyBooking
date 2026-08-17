@@ -4,6 +4,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import {
   classifyOAuthStartFailure,
   logOAuthStartFailure,
+  cabinetRefererPath,
+  oauthStartCabinetRedirect,
   oauthStartInternalRedirect,
   oauthStartProviderRedirect,
   type OAuthStartFailure,
@@ -41,21 +43,10 @@ const VK_NOT_CONFIGURED_CODES = new Set([
  *
  * Исключение — отсутствие сессии: `/login` для неё и есть правильный адрес.
  */
-function connectSurfacePath(req: Request): string {
-  const referer = req.headers.get("referer");
-  if (!referer) return "/cabinet/profile";
-  try {
-    const url = new URL(referer);
-    return `${url.pathname}${url.search}`;
-  } catch {
-    return "/cabinet/profile";
-  }
-}
-
+// FIX-D1: вывод адреса переехал в `oauth-start-error.ts` — им пользуется и
+// auth-нога, у которой кнопка живёт в клиентском кабинете.
 function backToConnectSurface(req: Request, failure: OAuthStartFailure): OAuthStartNavigation {
-  const path = connectSurfacePath(req);
-  const separator = path.includes("?") ? "&" : "?";
-  return oauthStartInternalRedirect(req, `${path}${separator}vk=${failure}`);
+  return oauthStartCabinetRedirect(req, failure, "vk");
 }
 
 export async function GET(req: Request): Promise<OAuthStartNavigation> {
@@ -74,7 +65,7 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
   if (!user) {
     return oauthStartInternalRedirect(
       req,
-      `/login?next=${encodeURIComponent(connectSurfacePath(req))}`,
+      `/login?next=${encodeURIComponent(cabinetRefererPath(req))}`,
     );
   }
 

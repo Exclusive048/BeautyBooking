@@ -23,7 +23,12 @@ const BASE: Record<string, string> = {
   REDIS_URL: "redis://localhost:6379",
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
-  NEXT_PUBLIC_APP_URL: "https://example.com",
+  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ, а не только на
+  // наличие (well-formed значение на чужом домене молча уводит письма, пуши и
+  // logout к третьей стороне). Эти тесты про другое, поэтому в фикстуре стоит
+  // канонический хост — иначе прод-кейсы падают на чужом refine. Сам refine
+  // покрыт в `env-public-url.test.ts`. Тот же приём, что с s3 ниже/выше.
+  NEXT_PUBLIC_APP_URL: "https://мастеррядом.online",
 };
 
 const S3_ON = {

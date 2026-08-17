@@ -24,7 +24,11 @@ const BASE_ENV: Record<string, string> = {
   REDIS_URL: "redis://localhost:6379",
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
-  NEXT_PUBLIC_APP_URL: "https://example.com",
+  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ (well-formed
+  // значение на чужом домене молча уводит письма, пуши и logout к третьей
+  // стороне). Этот файл про tri-state флаг, поэтому фикстура несёт канонический
+  // хост; сам refine покрыт в `env-public-url.test.ts`.
+  NEXT_PUBLIC_APP_URL: "https://мастеррядом.online",
   // QA-003 pre-step: включённый в проде phone-auth теперь ТРЕБУЕТ настроенного
   // SMS-провайдера (иначе mock логировал бы plaintext-OTP). Эти тесты про
   // резолв самого флага, а не про валидность env целиком, поэтому провайдер

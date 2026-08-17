@@ -41,6 +41,8 @@ import { TelegramConnectModal } from "./modals/telegram-connect-modal";
 import { isTelegramEnabled } from "@/lib/env";
 
 const T = UI_TEXT.clientCabinet.profilePage;
+// FIX-D1: исходы стартовой ноги VK — те же строки, что у студийного кабинета.
+const vkStartText = UI_TEXT.settings.vk.connectFailure;
 
 type Props = {
   /** Server-loaded user id needed for the AvatarEditor (entityType=USER). */
@@ -88,12 +90,36 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
   }
 }
 
+/**
+ * FIX-D1 — исход стартовой ноги VK → текст. Близнец `telegramConnectResult`
+ * выше и намеренно той же формы: оба читают флаг, который навигация оставила в
+ * адресе, и оба обязаны это делать в ИНИЦИАЛИЗАТОРЕ состояния, а не в эффекте
+ * (`react-hooks/set-state-in-effect`; эффект остаётся только чистить адрес).
+ */
+function vkConnectFailureMessage(value: string | null): string | null {
+  switch (value) {
+    case "provider_unavailable":
+      return vkStartText.providerUnavailable;
+    case "start_failed":
+      return vkStartText.startFailed;
+    case "consent_required":
+      return vkStartText.consentRequired;
+    default:
+      return null;
+  }
+}
+
 export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled = false }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
   );
-  const [stubMessage, setStubMessage] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  // FIX-D1: отказ подключения VK показывается на этой же странице — см.
+  // `vkConnectFailureMessage`. Через инициализатор, а не эффектом.
+  const [stubMessage, setStubMessage] = useState<string | null>(() =>
+    vkConnectFailureMessage(searchParams.get("vk")),
+  );
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [tgModalOpen, setTgModalOpen] = useState(false);
 
@@ -102,7 +128,6 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
   // and strip the param so a refresh doesn't re-show it (replaceState only — no
   // setState in the effect). The connected state itself re-renders from fresh
   // SSR/SWR data after the full-navigation round-trip.
-  const searchParams = useSearchParams();
   const [tgResult, setTgResult] = useState(() =>
     telegramConnectResult(searchParams.get("telegram")),
   );
@@ -110,10 +135,13 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
   useEffect(() => {
     if (tgUrlCleaned.current) return;
     tgUrlCleaned.current = true;
-    if (searchParams.get("telegram")) {
+    // FIX-D1: чистим оба флага навигации — telegram и vk, — иначе обновление
+    // страницы показывало бы уже показанный отказ повторно.
+    if (searchParams.get("telegram") || searchParams.get("vk")) {
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, [searchParams]);
+
 
   const { status, errorMessage, scheduleSave } = useProfileAutosave({
     onSaved: (next) => {
@@ -181,6 +209,7 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
   function handleVkConnect() {
     window.location.href = "/api/auth/vk/start";
   }
+
 
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_320px]">

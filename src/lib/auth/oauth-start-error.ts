@@ -131,6 +131,64 @@ export function oauthStartLoginRedirect(
   return oauthStartInternalRedirect(req, `/login?error=${failure}`);
 }
 
+/**
+ * FIX-D1 — возврат на КАБИНЕТНУЮ поверхность, с которой ушёл браузер.
+ *
+ * Механизм построил FIX-B14 для интеграционной ноги и оставил жить внутри её
+ * файла. Оказалось, что кнопка есть и во втором кабинете, а адресат отказа —
+ * нет: клиентский профиль зовёт **auth**-ногу (`/api/auth/vk/start`, потому что
+ * для клиента это связывание аккаунта, а не подключение уведомлений провайдера),
+ * и её отказ уходил на `/login?error=…`. То есть уже вошедшего пользователя
+ * отправляли на страницу входа — тупик хуже, чем отсутствие сообщения
+ * (SMOKE-02 · Ф-1: параметр не снимался, потому что его никто не ставил).
+ *
+ * Поэтому вывод адреса переехал сюда и параметризован ключом: `/login` остаётся
+ * верным адресом там, где браузер оттуда и пришёл, а кабинет получает свой
+ * возврат. Враждебный `Referer` схлопывается в дефолт внутри `nextRedirect`
+ * (`sanitizeInternalPath`).
+ */
+export function oauthStartCabinetRedirect(
+  req: Request,
+  failure: OAuthStartFailure,
+  queryKey: string,
+): OAuthStartNavigation {
+  const path = cabinetRefererPath(req);
+  const separator = path.includes("?") ? "&" : "?";
+  return oauthStartInternalRedirect(req, `${path}${separator}${queryKey}=${failure}`);
+}
+
+const DEFAULT_CABINET_SURFACE = "/cabinet/profile";
+
+export function cabinetRefererPath(req: Request): string {
+  const referer = req.headers.get("referer");
+  if (!referer) return DEFAULT_CABINET_SURFACE;
+  try {
+    const url = new URL(referer);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return DEFAULT_CABINET_SURFACE;
+  }
+}
+
+/**
+ * Пришёл ли браузер с кабинетной страницы. Определяет, какой адрес отказа
+ * верен: `/login` для входа, страница-источник для кабинета.
+ *
+ * ⚠️ Судим по `Referer`, и это осознанно слабый признак — он может отсутствовать
+ * (тогда `/login`, прежнее поведение) и его нельзя доверять как авторизации. Он
+ * и не используется как авторизация: это выбор МЕСТА показа сообщения, а адрес
+ * всё равно прогоняется через `sanitizeInternalPath`.
+ */
+export function isCabinetReferer(req: Request): boolean {
+  const referer = req.headers.get("referer");
+  if (!referer) return false;
+  try {
+    return new URL(referer).pathname.startsWith("/cabinet");
+  } catch {
+    return false;
+  }
+}
+
 /** Лог + редирект одним вызовом — форма, в которой это нужно в `catch`. */
 export function failOAuthStart(
   req: Request,
