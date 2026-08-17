@@ -30,6 +30,7 @@ description: Авторитет по live-QA через Playwright (MCP-брау
 | **Реестр ролей** | `.qa/roles.ts` → `ROLES[]` | 5 seeded showcase-аккаунтов + `expectedLanding` |
 | Smoke | `.qa/smoke.spec.ts` | 5-role login smoke; пишет `.qa/auth/<role>.json` (storage-state) |
 | MCP-браузер | `mcp__playwright__browser_*` | ad-hoc driving (навигация/клик/скриншот) без спеки |
+| **Мобильное переполнение** | `.qa/no-horizontal-overflow.spec.ts` (FIX-D2) | Публичные поверхности помещаются в экран телефона: `innerWidth === documentElement.clientWidth` в мобильной эмуляции + реальный тач-пан. ⚠️ НЕ мерить `window.scrollX` после `scrollTo`: в мобильной эмуляции он 0 по построению (layout-viewport растягивается до содержимого), в desktop — `scroll-behavior: smooth` даёт 0 при чтении сразу после вызова |
 
 **Prereqs для live-QA (иначе OTP-рекавери и логин не работают):**
 - Dev-сервер поднят на `:3000` (`npm run dev`).

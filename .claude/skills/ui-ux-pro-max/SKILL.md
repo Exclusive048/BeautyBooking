@@ -457,6 +457,22 @@ cn("animate-pulse bg-bg-input/50",
 
 ⚠️ **Это НЕ тот дефект, что UI-01/02/03.** Там правило не генерируется вовсе, и его ловит `check:dead-classes`. Здесь правило есть и проигрывает — `check:dead-classes` слеп к этому по построению. Путать их нельзя.
 
+### Горизонтальная полоса — скроллер и дорожка на РАЗНЫХ элементах
+
+**FIX-D2 (2026-08-17).** Вкладки, чипы, карусели, которым на мобильном не хватает ширины, прокручиваются **внутри себя**, а страница остаётся ровно шириной экрана. Форма одна на весь проект (`clients-tabs`, `notifications-tabs`, `filter-chips`, `recent-masters-section`, `studio-masters-carousel`, `public-profile/master/section-nav`):
+
+```tsx
+{/* скроллер: bleed до краёв + свой overflow; scroll-px повторяет px, иначе snap съедает гаттер */}
+<div className="-mx-4 overflow-x-auto px-4 scroll-px-4 scrollbar-hide">
+  {/* дорожка: шире контейнера — это и есть то, что он прокручивает */}
+  <ul className="flex min-w-max gap-2">
+    <li className="shrink-0 snap-start">…</li>
+  </ul>
+</div>
+```
+
+🔴 **`min-w-max` и `overflow-x-auto` на ОДНОМ элементе — самозапирающаяся полоса, легитимного случая нет.** `min-width` сильнее `max-width` и `width`: элемент не может стать у́же содержимого, содержимое из него не выпадает, `overflow-x-auto` мёртв по построению — лишняя ширина уезжает в документ. Так жила полоса секций публичного профиля: на 375 px `documentElement.scrollWidth` = 459, а на телефоне мобильный layout-viewport растягивается до содержимого (459×994 при экране 375×812), и всё `fixed bottom-0` — CTA «Записаться», нижняя навигация — оказывается ЗА нижней кромкой экрана. Ни `typecheck`, ни `lint`, ни `check:dead-classes` этого не видят (классы валидны, правила есть). Сторож формы — `lib/ui/horizontal-strip.test.ts` (CI; ловит и разнос по аргументам `cn()`, и `md:`-варианты; слепая форма — класс, принесённый переменной или пропом); сторож поведения — `.qa/no-horizontal-overflow.spec.ts` (живой харнесс: `innerWidth === documentElement.clientWidth` в мобильной эмуляции + реальный тач-пан). ⚠️ **Мерить дефект надо НЕ `window.scrollX` после `scrollTo`:** в мобильной эмуляции он 0 по построению, а в desktop-эмуляции `html { scroll-behavior: smooth }` делает чтение сразу после вызова нулём — так SMOKE-01 записал живой дефект в ложные срабатывания.
+
 ### Card-with-toggle (premium feature card)
 
 Большая branded card (brand-gradient, decorative orbs) с toggle. Sub-controls появляются при `isEnabled`. Pre-PRO state — locked card с `Lock` icon + ссылка на `/cabinet/billing`.
