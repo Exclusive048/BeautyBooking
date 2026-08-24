@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AccountType } from "@prisma/client";
@@ -103,10 +103,22 @@ describe("2 · подтверждение владельца освобожда�
 
 describe("3 · двух ПОДТВЕРЖДЁННЫХ держателей одного адреса быть не может", () => {
   const ROOT = path.resolve(__dirname, "..", "..", "..");
-  const MIGRATION = path.join(
-    ROOT,
-    "prisma/schema/migrations/20260812104330_email_partial_unique_verified_only/migration.sql",
-  );
+  const MIGRATIONS_DIR = path.join(ROOT, "prisma/schema/migrations");
+
+  /**
+   * Читаем ВСЕ миграции, а не одну по имени. Прежняя редакция зашивала путь
+   * `20260812104330_email_partial_unique_verified_only/migration.sql`, и это
+   * была проверка ИМЕНИ ФАЙЛА, а не свойства схемы: MIGRATION-SQUASH-01
+   * объединил историю в один baseline, и сторож упал бы не потому, что индекс
+   * пропал, а потому что файл переехал. Утверждение здесь — «какая-то миграция
+   * создаёт этот индекс с этим предикатом», и обход каталога выражает его
+   * буквально (правило GUARD-INTEGRITY «свойство вместо имени», инв. #43).
+   */
+  const migrationsSql = readdirSync(MIGRATIONS_DIR)
+    .filter((entry) => statSync(path.join(MIGRATIONS_DIR, entry)).isDirectory())
+    .sort()
+    .map((entry) => readFileSync(path.join(MIGRATIONS_DIR, entry, "migration.sql"), "utf8"))
+    .join("\n");
 
   /**
    * Гарантия здесь — уровня БД (частичный уникальный индекс), а не приложения:
@@ -117,7 +129,7 @@ describe("3 · двух ПОДТВЕРЖДЁННЫХ держателей одн
    * миграцию — ровно та ловушка, что сработала с HNSW семь раз).
    */
   it("миграция создаёт ЧАСТИЧНЫЙ уникальный индекс с нужным предикатом", () => {
-    const sql = readFileSync(MIGRATION, "utf8");
+    const sql = migrationsSql;
     expect(sql).toMatch(/CREATE UNIQUE INDEX\s+"UserProfile_email_verified_unique_idx"/);
     expect(sql).toMatch(/ON\s+"UserProfile"\s*\(\s*"email"\s*\)/);
     // Предикат обязан дословно совпадать с фильтром `findVerifiedEmailProfile`.

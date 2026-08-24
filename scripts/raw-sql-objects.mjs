@@ -52,7 +52,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "index",
     name: "media_asset_embeddings_embedding_hnsw_idx",
     table: "media_asset_embeddings",
-    migration: "20260713120000_reduce_embedding_dimensions_yandex",
+    migration: "20260324190000_init_squashed (исходно 20260713120000_reduce_embedding_dimensions_yandex)",
     why: "pgvector HNSW: Prisma не знает тип индекса `Hnsw` (проверено на 6.19.2 — P1012), а колонка объявлена как Unsupported(\"vector(256)\")",
     costIfLost:
       "ANN-поиск visual-search деградирует в seq-scan по всей таблице эмбеддингов — молча, без единой ошибки. Сейчас visual-search dormant, поэтому цена нулевая; в день включения (VISUAL_SEARCH_ENABLED=true) она становится боевой",
@@ -61,7 +61,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "index",
     name: "UserConsent_active_unique_idx",
     table: "UserConsent",
-    migration: "20260803123705_rkn_fix_18_consent_withdrawal",
+    migration: "20260324190000_init_squashed (исходно 20260803123705_rkn_fix_18_consent_withdrawal)",
     why: "partial unique (`WHERE \"revokedAt\" IS NULL`): Prisma не выражает частичные уникальные индексы, а полный @@unique здесь нельзя — он запрещал бы вторую строку той же версии и тем самым заставлял ОЖИВЛЯТЬ отозванную, стирая историю отзыва",
     costIfLost:
       "Исчезает гарантия БД «одна АКТИВНАЯ строка согласия на (user, цель, версия)». Останется только прикладная проверка в lib/legal/consent.ts (инв. #37), то есть гонка двух одновременных переключений сможет создать два активных согласия на одну цель — и журнал согласий станет неоднозначным ровно там, где он служит доказательством",
@@ -70,7 +70,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "index",
     name: "UserProfile_email_verified_unique_idx",
     table: "UserProfile",
-    migration: "20260812104330_email_partial_unique_verified_only",
+    migration: "20260324190000_init_squashed (исходно 20260812104330_email_partial_unique_verified_only)",
     why: "partial unique (`WHERE \"emailVerifiedAt\" IS NOT NULL`): Prisma частичные уникальные индексы не выражает, а полный @@unique здесь вреден — записать чужой адрес себе в профиль может любой аутентифицированный пользователь (пять путей), и под полным констрейнтом такая НЕПОДТВЕРЖДЁННАЯ строка занимала адрес навсегда: владелец упирался в P2002",
     costIfLost:
       "Исчезает гарантия «подтверждённый адрес принадлежит ровно одному профилю» — та самая, на которой стоит инв. #41 и весь email-вход. Прикладной защиты, дублирующей её, НЕТ: `releaseUnverifiedEmailClaims` освобождает чужие НЕподтверждённые заявки, но от гонки двух одновременных подтверждений одного адреса защищает только индекс. Потеря молчалива: вход продолжит работать, а `findVerifiedEmailProfile` (`findFirst`) начнёт возвращать произвольную из двух строк",
@@ -79,7 +79,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "index",
     name: "Review_active_target_createdAt_idx",
     table: "Review",
-    migration: "20260806084318_add_perf_composite_indexes",
+    migration: "20260324190000_init_squashed (исходно 20260806084318_add_perf_composite_indexes)",
     why: "partial index (`WHERE \"deletedAt\" IS NULL`): Prisma частичные индексы не выражает. Полная форма без предиката (`@@index([targetType, targetId, deletedAt, createdAt])`) здесь бесполезна — проверено EXPLAIN'ом: Postgres берёт `IS NULL` как условие индекса, но не как равенство, сохраняющее порядок по `createdAt`, и `Sort` из плана не уходит",
     costIfLost:
       "Список активных отзывов провайдера (ACTIVE_REVIEW_FILTER, инв. #17) возвращается к «доступ по (targetType, targetId) → фильтр soft-delete → сортировка всего набора». На публичном профиле мастера с тысячами отзывов это сортировка на каждый показ — молча, без ошибок. Предикат индекса обязан дословно совпадать с ACTIVE_REVIEW_FILTER: при расхождении планировщик просто перестанет его подхватывать",
@@ -88,7 +88,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "constraint",
     name: "BookingServiceItem_priceSnapshot_nonnegative_check",
     table: "BookingServiceItem",
-    migration: "20260805183412_logic_20_numeric_range_checks",
+    migration: "20260324190000_init_squashed (исходно 20260805183412_logic_20_numeric_range_checks)",
     why: "CHECK: Prisma не выражает check-констрейнты в датамодели (нет `@db.Check` на 6.19.x)",
     costIfLost:
       "Отрицательная цена в снапшоте брони перестаёт отвергаться БД. Сегодня её отвергает Zod на всех путях записи, поэтому цена потери — не сегодняшний баг, а возвращение к состоянию «инвариант живёт только в приложении»: следующий путь записи, миграция данных или сид сохранят её молча",
@@ -97,7 +97,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "constraint",
     name: "BookingServiceItem_durationSnapshotMin_positive_check",
     table: "BookingServiceItem",
-    migration: "20260805183412_logic_20_numeric_range_checks",
+    migration: "20260324190000_init_squashed (исходно 20260805183412_logic_20_numeric_range_checks)",
     why: "CHECK: Prisma не выражает check-констрейнты в датамодели",
     costIfLost:
       "Нулевая/отрицательная длительность услуги в снапшоте брони. Именно из снапшотов выводится конец окна при переносе (LOGIC-03), то есть строка с нулевой длительностью сделала бы бронь бесконечно узкой и пролезающей между чужими",
@@ -106,7 +106,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "constraint",
     name: "Review_rating_range_check",
     table: "Review",
-    migration: "20260805183412_logic_20_numeric_range_checks",
+    migration: "20260324190000_init_squashed (исходно 20260805183412_logic_20_numeric_range_checks)",
     why: "CHECK: Prisma не выражает check-констрейнты в датамодели",
     costIfLost:
       "Оценка вне шкалы 1..5 попадает в агрегат рейтинга провайдера (reviews/recalculate-ratings.ts) и искажает публичное число, которое исправить можно только пересчётом",
@@ -115,7 +115,7 @@ export const RAW_SQL_OBJECTS = [
     kind: "constraint",
     name: "Provider_bufferBetweenBookingsMin_range_check",
     table: "Provider",
-    migration: "20260805183412_logic_20_numeric_range_checks",
+    migration: "20260324190000_init_squashed (исходно 20260805183412_logic_20_numeric_range_checks)",
     why: "CHECK: Prisma не выражает check-констрейнты в датамодели",
     costIfLost:
       "Буфер вне 0..30 участвует в предикате конфликта броней (buildConflictWindowWhere + overlaps): отрицательный сужает окно поиска и ПРОПУСКАЕТ реальные пересечения, чрезмерный блокирует расписание целиком",

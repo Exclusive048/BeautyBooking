@@ -4,8 +4,9 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  * EMAIL-ADDRESS-OCCUPATION — семантика освобождения адреса.
  *
  * Модель владения после перехода на частичный уникальный индекс
- * (`WHERE "emailVerifiedAt" IS NOT NULL`, миграция
- * `20260812104330_email_partial_unique_verified_only`):
+ * (`WHERE "emailVerifiedAt" IS NOT NULL`; индекс создаётся в объединённом
+ * baseline `20260324190000_init_squashed`, исходно —
+ * `20260812104330_email_partial_unique_verified_only`, MIGRATION-SQUASH-01):
  *
  *   ЗАЯВИТЬ адрес может кто угодно и сколько угодно профилей — это просто
  *   строка без доказательства. ВЛАДЕТЬ им может ровно один, и владение даёт
