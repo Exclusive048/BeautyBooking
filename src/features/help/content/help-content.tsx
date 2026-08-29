@@ -43,7 +43,7 @@ export const MASTER_HELP: ReadonlyArray<HelpCategory> = [
         id: "username",
         question: "Что такое публичный username и как его изменить?",
         answer:
-          "Username — это ваш короткий адрес страницы вида мастеррядом.online/u/anna_nails. Указать его можно в настройках профиля. Username — на латинице, без пробелов. Если выбранный занят — попробуйте другой.",
+          "Username — это ваш короткий адрес страницы вида masterryadom.ru/u/anna_nails. Указать его можно в настройках профиля. Username — на латинице, без пробелов. Если выбранный занят — попробуйте другой.",
       },
       {
         id: "portfolio-photos",

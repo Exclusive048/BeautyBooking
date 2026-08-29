@@ -9,7 +9,7 @@ const C = BRAND_COLORS;
  * Cyrillic domain matches the actual production deploy. EMAIL-BRAND-URL-FIX-A
  * (2026-06-02) closed the pre-fix hardcode to the dead `beautyhub.art` domain.
  */
-const BRAND_URL = env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online";
+const BRAND_URL = env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru";
 
 export function buildNotificationEmailHtml(opts: {
   title: string;

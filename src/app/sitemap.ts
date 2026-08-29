@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { logError } from "@/lib/logging/logger";
 
-const FALLBACK_BASE_URL = "https://мастеррядом.online";
+const FALLBACK_BASE_URL = "https://masterryadom.ru";
 const PAGE_SIZE = 1000;
 
 function buildStaticRoutes(baseUrl: string): MetadataRoute.Sitemap {

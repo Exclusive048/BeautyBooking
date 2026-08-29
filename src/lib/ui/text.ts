@@ -69,7 +69,7 @@ export const UI_TEXT = {
   brand: {
     name: "МастерРядом",
     tagline: "Маркетплейс мастеров красоты",
-    domain: "мастеррядом.online",
+    domain: "masterryadom.ru",
   },
   // RKN-FIX-06: an informational NOTICE, not a consent form. The census found
   // every cookie here technically necessary and no analytics anywhere, so the
@@ -1092,7 +1092,7 @@ export const UI_TEXT = {
       subtitle: "Настройте публичную ссылку и поделитесь профилем.",
       usernameLabel: "Публичный адрес",
       usernameHint: "Только латинские буквы, цифры и дефис. Мин. 3 символа.",
-      urlPreview: (username: string) => `мастеррядом.online/u/${username}`,
+      urlPreview: (username: string) => `masterryadom.ru/u/${username}`,
       copyLink: "Скопировать ссылку",
       copied: "Скопировано!",
       qrTitle: "QR-код профиля",
@@ -3004,7 +3004,7 @@ export const UI_TEXT = {
         taglineLabel: "Должность / специализация",
         taglinePlaceholder: "Например: мастер маникюра и педикюра",
         usernameLabel: "Никнейм (для ссылки)",
-        usernamePrefix: "мастеррядом.рф/u/",
+        usernamePrefix: "masterryadom.ru/u/",
         usernameNotSet: "Будет задан автоматически",
         usernamePlaceholder: "anna-master",
         usernameHint:
@@ -3014,7 +3014,7 @@ export const UI_TEXT = {
         usernameUnchangedHint: "Новый никнейм совпадает с текущим.",
         usernameConfirmTitle: "Изменить никнейм?",
         usernameConfirmMessageTemplate:
-          "Новый адрес — мастеррядом.рф/u/{username}. Старая ссылка будет автоматически перенаправлять на новую. Платформа хранит до 10 прошлых вариантов; после этого самые старые могут перестать работать.",
+          "Новый адрес — masterryadom.ru/u/{username}. Старая ссылка будет автоматически перенаправлять на новую. Платформа хранит до 10 прошлых вариантов; после этого самые старые могут перестать работать.",
         usernameConfirmCta: "Изменить никнейм",
         usernameErrorTaken: "Этот никнейм уже занят. Попробуйте другой.",
         usernameErrorGeneric: "Не удалось сохранить никнейм. Попробуйте ещё раз.",

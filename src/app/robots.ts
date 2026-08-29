@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { isProduction } from "@/lib/env";
 
-const FALLBACK_BASE_URL = "https://мастеррядом.online";
+const FALLBACK_BASE_URL = "https://masterryadom.ru";
 
 export default function robots(): MetadataRoute.Robots {
   const baseUrl = resolvePublicAppUrl() ?? FALLBACK_BASE_URL;

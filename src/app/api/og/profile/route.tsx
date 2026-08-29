@@ -8,7 +8,7 @@ const CARD_WIDTH = 1200;
 const CARD_HEIGHT = 630;
 
 const BRAND_NAME = "МастерРядом";
-const BRAND_DOMAIN = "мастеррядом.online";
+const BRAND_DOMAIN = "masterryadom.ru";
 
 /**
  * UI-04: satori понимает только инлайновые стили, поэтому цвета берутся из

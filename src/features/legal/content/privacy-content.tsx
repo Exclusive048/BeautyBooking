@@ -43,7 +43,7 @@ export function PrivacyContent() {
         сервис.
       </p>
       <p>
-        Действие Политики распространяется на сайт <a href="https://мастеррядом.online">мастеррядом.online</a>
+        Действие Политики распространяется на сайт <a href="https://masterryadom.ru">masterryadom.ru</a>
         , мобильную PWA-версию и связанные с сервисом каналы (push-уведомления, email).
       </p>
 

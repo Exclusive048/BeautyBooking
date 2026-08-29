@@ -10,8 +10,21 @@ import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { toApiRouteTemplate } from "@/lib/rate-limit/route-template";
 import { verifyToken } from "@/lib/auth/jwt";
 
-const PRODUCTION_ORIGIN = "https://мастеррядом.online";
-const PRODUCTION_WWW_ORIGIN = "https://www.мастеррядом.online";
+/**
+ * Прод-ориджины для CORS и CSRF-слоя (SEC-08).
+ *
+ * ⚠️ Смена домена (2026-08-30): продом стал `masterryadom.ru`. Прежний
+ * `мастеррядом.online` оставлен на время переезда — пока старый хост отвечает,
+ * его вкладки не должны получать отказ на мутациях. Вычистить вместе с
+ * `.online`-формами в `CANONICAL_PUBLIC_HOSTS` (`src/lib/env.ts`), когда старый
+ * домен будет погашен: списки обязаны оставаться в локстепе.
+ */
+const PRODUCTION_ORIGINS = [
+  "https://masterryadom.ru",
+  "https://www.masterryadom.ru",
+  "https://мастеррядом.online",
+  "https://www.мастеррядом.online",
+];
 const ALLOWED_DEV_ORIGINS = new Set([
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -46,7 +59,7 @@ export function normalizeOrigin(origin: string): string | null {
 }
 
 const PRODUCTION_ALLOWLIST_NORMALIZED = new Set(
-  [PRODUCTION_ORIGIN, PRODUCTION_WWW_ORIGIN]
+  PRODUCTION_ORIGINS
     .map(normalizeOrigin)
     .filter((value): value is string => value !== null),
 );

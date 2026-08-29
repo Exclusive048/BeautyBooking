@@ -80,7 +80,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? "https://мастеррядом.online"),
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru"),
   title: {
     default: UI_TEXT.meta.title,
     template: `%s | ${UI_TEXT.brand.name}`,
@@ -163,7 +163,7 @@ const SITE_JSON_LD = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "МастерРядом",
-  url: "https://мастеррядом.online",
+  url: "https://masterryadom.ru",
   description: "Маркетплейс онлайн-записи к мастерам красоты",
   applicationCategory: "LifestyleApplication",
   operatingSystem: "Web, iOS, Android",
