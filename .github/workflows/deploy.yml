@@ -17,10 +17,14 @@
 # не включает время сборки) → healthcheck → при неуспехе автооткат на :previous
 # и ненулевой exit. Подробности и ручной откат — DEPLOY-BACKLOG.md.
 #
-# APP-TIER-SPLIT-01 (2026-08-30): ярус приложения — ОДИН образ beautyhub-app,
-# ДВА контейнера (web — страницы, api — /api/*) за внутренним nginx `edge`,
-# который держит прежний порт 127.0.0.1:3000. Собирается только `web` (api
-# берёт тот же тег); healthcheck ждёт все три; откат перекатывает web+api+worker.
+# APP-TIER-SPLIT-02 (2026-08-31, сверено с боевым стендом): каталог `/opt/app`,
+# принадлежит root; ярус приложения — ОДИН образ beautyhub-app, ДВА контейнера
+# (web — страницы, api — /api/*) за traefik из того же compose (TLS, LE);
+# Postgres — на отдельном хосте (профиль `db`), поэтому миграция идёт
+# `--profile db run --rm --no-deps migrate`. Собирается только `web` (api берёт
+# тот же тег); healthcheck ждёт web+api; откат перекатывает web+api+worker.
+# Если SSH-пользователь не root — весь docker/git идёт через `sudo -n`
+# (у деплой-пользователя passwordless sudo).
 
 name: Deploy to Production
 
@@ -87,8 +91,17 @@ jobs:
           script: |
             set -eu
 
-            APP_DIR="/opt/masterryadom"
-            COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
+            APP_DIR="/opt/app"
+
+            # Каталог и docker на стенде принадлежат root. Зашли не root'ом —
+            # docker/git идут через sudo (passwordless у деплой-пользователя);
+            # `-n` = никогда не ждать пароль, лучше упасть сразу.
+            SUDO=""
+            if [ "$(id -u)" -ne 0 ]; then SUDO="sudo -n"; fi
+            GIT="$SUDO git"
+            DOCKER="$SUDO docker"
+            COMPOSE_BASE="$SUDO docker compose --env-file .env.production -f docker-compose.prod.yml"
+            COMPOSE="$COMPOSE_BASE --profile app"
 
             cd "$APP_DIR"
 
@@ -98,17 +111,16 @@ jobs:
             # версия продолжает работать (состояние БД — тема снапшота, DEPLOY-BACKLOG §2).
             rollback_and_fail() {
               echo "❌ $1 — автооткат на :previous."
-              if ! docker image inspect beautyhub-app:previous >/dev/null 2>&1; then
+              if ! $DOCKER image inspect beautyhub-app:previous >/dev/null 2>&1; then
                 echo "Образа beautyhub-app:previous НЕТ (первый деплой) — откатываться не на что."
                 exit 1
               fi
-              docker image tag beautyhub-app:previous beautyhub-app:latest
-              docker image tag beautyhub-worker:previous beautyhub-worker:latest 2>/dev/null || true
+              $DOCKER image tag beautyhub-app:previous beautyhub-app:latest
+              $DOCKER image tag beautyhub-worker:previous beautyhub-worker:latest 2>/dev/null || true
               # --no-deps: migrate повторно не гоняем. Применённые миграции НЕ
               # откатываются — код :previous обязан жить с новой схемой (миграции
               # аддитивны by policy; деструктивные идут со снапшотом БД).
-              # edge не перекатываем: его образ (nginx) деплой не собирает, а web/api
-              # он резолвит по имени в момент запроса — новые контейнеры подхватит сам.
+              # traefik не перекатываем: web/api он находит по docker-меткам сам.
               $COMPOSE up -d --no-deps web api worker
               echo "Откат выполнен: web/api/worker подняты из :previous. Деплой ПРОВАЛЕН (exit 1)."
               exit 1
@@ -116,17 +128,17 @@ jobs:
 
             echo "=== 1/6 Код: git pull (--ff-only: расхождение = громкий отказ, не тихая перезапись) ==="
             # .env.production не в git (untracked) — pull его не трогает; проверка в DEPLOY-BACKLOG.
-            git fetch origin "$GIT_REF"
-            git checkout "$GIT_REF"
-            git pull --ff-only origin "$GIT_REF"
-            DEPLOY_SHA="$(git rev-parse --short=8 HEAD)"
+            $GIT fetch origin "$GIT_REF"
+            $GIT checkout "$GIT_REF"
+            $GIT pull --ff-only origin "$GIT_REF"
+            DEPLOY_SHA="$($GIT rev-parse --short=8 HEAD)"
             echo "HEAD: $DEPLOY_SHA"
 
             echo "=== 2/6 Страховка отката: текущие образы → :previous (строго ДО сборки) ==="
-            docker image tag beautyhub-app:latest beautyhub-app:previous 2>/dev/null \
+            $DOCKER image tag beautyhub-app:latest beautyhub-app:previous 2>/dev/null \
               && echo "app:previous ← прежний latest" \
               || echo "app: прежнего образа нет (первый деплой) — автоотката не будет"
-            docker image tag beautyhub-worker:latest beautyhub-worker:previous 2>/dev/null \
+            $DOCKER image tag beautyhub-worker:latest beautyhub-worker:previous 2>/dev/null \
               && echo "worker:previous ← прежний latest" \
               || echo "worker: прежнего образа нет (первый деплой)"
 
@@ -151,33 +163,30 @@ jobs:
             free -m
 
             echo "=== 4/6 Миграции (снапшот БД перед деструктивными — DEPLOY-BACKLOG §2) ==="
-            $COMPOSE run --rm migrate
+            # Postgres живёт на отдельном хосте: --no-deps не даёт compose поднять
+            # ЛОКАЛЬНЫЙ postgres из профиля db; миграция идёт по DATABASE_URL.
+            $COMPOSE_BASE --profile db run --rm --no-deps migrate
 
             echo "=== 5/6 Подъём готовыми образами ==="
             # --remove-orphans снимает контейнер прежнего монолитного сервиса `app`
-            # при первом деплое после APP-TIER-SPLIT-01 — иначе он держал бы
-            # 127.0.0.1:3000 и edge не поднялся бы.
+            # при первом деплое после разделения web/api.
             $COMPOSE up -d --remove-orphans || rollback_and_fail "up -d не поднял стек (возможно смешанное старое/новое состояние)"
 
-            echo "=== 6/6 Healthcheck: web + api (compose-проба /api/health), edge (сквозной маршрут через 127.0.0.1:3000) + liveness воркера ==="
-            # Ждём healthy у каждого из трёх. Проба web/api — in-container liveness
-            # (FIX-C2), проба edge — сквозная: /api/health через nginx доказывает
-            # маршрут в api, /robots.txt — маршрут в web. Один общий бюджет 180 с
-            # на сервис.
+            echo "=== 6/6 Healthcheck: web + api (compose-проба /api/health), маршрутизация traefik, liveness воркера ==="
+            # Проба web/api — in-container liveness (FIX-C2). Один бюджет 180 с на сервис.
             wait_healthy() {
               local svc="$1" cid status=unknown
               cid="$($COMPOSE ps -q "$svc")"
               for i in $(seq 1 36); do
-                status="$(docker inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo unknown)"
+                status="$($DOCKER inspect -f '{{.State.Health.Status}}' "$cid" 2>/dev/null || echo unknown)"
                 if [ "$status" = "healthy" ]; then echo "$svc: healthy"; return 0; fi
                 sleep 5
               done
-              docker logs --tail 100 "$cid" 2>&1 || true
+              $DOCKER logs --tail 100 "$cid" 2>&1 || true
               rollback_and_fail "$svc не стал healthy за 180 с (статус: $status)"
             }
             wait_healthy web
             wait_healthy api
-            wait_healthy edge
 
             # FIX-C2: compose-проба выше — LIVENESS («процесс обслуживает»), и
             # она намеренно НЕ краснеет на обрыве Redis: иначе частичная
@@ -194,7 +203,9 @@ jobs:
             # виден в истории, а не выглядел безоблачным.
             for svc in web api; do
               CID="$($COMPOSE ps -q "$svc")"
-              READY_JSON="$(docker exec "$CID" node -e                 "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>r.text()).then(t=>{console.log(t)}).catch(e=>{console.log(JSON.stringify({ok:false,dependencies:{db:'unreachable'},error:String(e)}))})"                 2>/dev/null || echo '{"ok":false,"dependencies":{"db":"unreachable"},"error":"docker exec failed"}')"
+              READY_JSON="$($DOCKER exec "$CID" node -e \
+                "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>r.text()).then(t=>{console.log(t)}).catch(e=>{console.log(JSON.stringify({ok:false,dependencies:{db:'unreachable'},error:String(e)}))})" \
+                2>/dev/null || echo '{"ok":false,"dependencies":{"db":"unreachable"},"error":"docker exec failed"}')"
               echo "readiness[$svc]: $READY_JSON"
               case "$READY_JSON" in
                 *'"db":"ok"'*) : ;;
@@ -208,6 +219,19 @@ jobs:
               esac
             done
 
+            # Маршрутизация traefik сквозная: /api/health обязан уйти в api, /robots.txt —
+            # в web (роут без БД). Host подставляется через --resolve на loopback, поэтому
+            # проверяется именно боевой роутер, а не прямой порт контейнера.
+            if command -v curl >/dev/null 2>&1; then
+              for path in /api/health /robots.txt; do
+                CODE="$(curl -sk -o /dev/null -w '%{http_code}' --resolve masterryadom.ru:443:127.0.0.1 "https://masterryadom.ru$path" || echo 000)"
+                echo "traefik $path → $CODE"
+                [ "$CODE" = "200" ] || rollback_and_fail "traefik не довёл $path до приложения (HTTP $CODE)"
+              done
+            else
+              echo "⚠️  curl на ВМ нет — сквозная проверка traefik пропущена (проверить руками: DEPLOY-CHECKLIST 3.2)"
+            fi
+
             # У воркера нет HTTP-healthcheck'а — liveness по его собственному
             # логу «Worker started» + счётчику рестартов: краш-луп воркера без
             # этой проверки давал бы «✅ деплой успешен» при мёртвых напоминаниях,
@@ -215,16 +239,16 @@ jobs:
             WORKER_ID="$($COMPOSE ps -q worker)"
             WORKER_OK=0
             for i in $(seq 1 18); do
-              RESTARTS="$(docker inspect -f '{{.RestartCount}}' "$WORKER_ID" 2>/dev/null || echo 1)"
+              RESTARTS="$($DOCKER inspect -f '{{.RestartCount}}' "$WORKER_ID" 2>/dev/null || echo 1)"
               if [ "$RESTARTS" != "0" ]; then break; fi
-              if docker logs "$WORKER_ID" 2>&1 | grep -q "Worker started"; then WORKER_OK=1; break; fi
+              if $DOCKER logs "$WORKER_ID" 2>&1 | grep -q "Worker started"; then WORKER_OK=1; break; fi
               sleep 5
             done
             if [ "$WORKER_OK" != "1" ]; then
-              docker logs --tail 100 "$WORKER_ID" 2>&1 || true
+              $DOCKER logs --tail 100 "$WORKER_ID" 2>&1 || true
               rollback_and_fail "Worker не дошёл до «Worker started» (рестартов: ${RESTARTS:-?})"
             fi
 
-            docker image prune -f >/dev/null
-            echo "✅ Деплой $DEPLOY_SHA успешен — web/api/edge healthy, worker started."
+            $DOCKER image prune -f >/dev/null
+            echo "✅ Деплой $DEPLOY_SHA успешен — web/api healthy, traefik маршрутизирует, worker started."
             exit 0

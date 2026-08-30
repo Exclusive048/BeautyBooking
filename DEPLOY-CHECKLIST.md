@@ -24,7 +24,7 @@
 
 ## 1️⃣ Конфигурация — до первого старта  *(развёрнуто: §B.1)*
 
-- [ ] `.env.production` в `/opt/masterryadom`, untracked → `git check-ignore .env.production` отвечает
+- [ ] `.env.production` в `/opt/app`, untracked → `git check-ignore .env.production` отвечает
 - [ ] **Все 13 `NEXT_PUBLIC_*`** там же — они уходят и в сборку. Пропущенная запекается **пустой без ошибки**; пустой `NEXT_PUBLIC_APP_URL` роняет сборку
 - [ ] `STORAGE_PROVIDER=s3` + `S3_*` — `local` даёт отказ на старте (`V3`)
 - [ ] `EMAIL_AUTH_ENABLED` unset/`true` + живой SMTP — **единственный канал входа** закрытого деплоя
@@ -47,7 +47,7 @@
       **Контрольная проба обязательна:** запрос с `X-Forwarded-For: 1.2.3.4` обязан вернуть **настоящий** адрес. Вернулся `1.2.3.4` → per-IP лимитов у продукта фактически нет.
       *Единственная проверка, чей пропуск не имеет симптома: ни ошибки, ни лога, ни красного теста.*
 - [ ] **3.2** `GET /api/health` → 200 · `GET /api/health/ready` → 200 `{"db":"ok","redis":"ok"}` за ~2 с
-- [ ] **3.2a** `docker compose ps`: `edge`, `web`, `api` — healthy; с ВМ `curl -s http://127.0.0.1:3000/api/health` → 200 и `curl -sI http://127.0.0.1:3000/robots.txt` → 200 — сквозные маршруты в api и в web через внутренний edge (APP-TIER-SPLIT-01; `edge` не хоп для `TRUSTED_PROXY_HOPS`, см. 3.1)
+- [ ] **3.2a** `docker compose --env-file .env.production -f docker-compose.prod.yml --profile app ps`: `traefik`/`worker`/`redis` Up, `web` и `api` — healthy, старого `app` нет. С ВМ: `curl -s http://127.0.0.1:3000/api/health` (api напрямую) → 200; сквозь traefik: `curl -sk --resolve masterryadom.ru:443:127.0.0.1 https://masterryadom.ru/api/health` → 200 и `…/robots.txt` → 200 (маршруты в api и в web; APP-TIER-SPLIT-02)
 - [ ] **3.3 🚩 Балансировщику указать `/api/health`, НЕ `/ready`** — `/ready` краснеет на обрыве Redis, а это частичная деградация by design; иначе частичный отказ станет полным
 - [ ] **3.4** `GET /api/health/worker` (`x-worker-secret`) → 200, `alive: true`
 - [ ] **3.5** Четыре cron-эндпоинта — секрет **только заголовком** `x-cron-token`; **проверить по ответу**: 403 значит планировщик настроен на удалённую `?token=` форму и молча не работает
