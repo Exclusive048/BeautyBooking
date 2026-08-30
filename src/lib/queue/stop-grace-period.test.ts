@@ -9,8 +9,13 @@ import { resolve } from "node:path";
  * Цикл воркера проверяет `isShuttingDown` только на витке: текущую джобу он
  * дорабатывает, а SIGKILL её обрывает. Потери при этом нет — джоба остаётся в
  * `queue:processing`, и `recoverStuckJobs` подберёт её по staleness, — но это
- * +5 минут задержки и лишний attempt на КАЖДЫЙ деплой. У `app` те же 10 c —
+ * +5 минут задержки и лишний attempt на КАЖДЫЙ деплой. У приложения те же 10 c —
  * верхняя граница на добивание in-flight запросов.
+ *
+ * APP-TIER-SPLIT-01 (2026-08-30): сервис `app` разведён на `web` + `api`
+ * (один образ, два контейнера). Долгий легитимный запрос (загрузка медиа с
+ * re-encode) идёт через `api`, но оба блока обязаны нести запас — они зеркальны
+ * по контракту (паритет пиннит `http/edge-topology.test.ts`).
  *
  * Тест сторожит наличие и осмысленность значений: цена регрессии здесь
  * невидима на глаз (всё «работает», просто медленнее и с лишними попытками).
@@ -35,8 +40,8 @@ describe("RES-16 · SIGTERM не обрывает длинную работу", 
     expect(seconds!).toBeGreaterThanOrEqual(30);
   });
 
-  it("app получает запас на добивание in-flight запросов", () => {
-    const seconds = graceSecondsOf("app");
+  it.each(["web", "api"])("%s получает запас на добивание in-flight запросов", (service) => {
+    const seconds = graceSecondsOf(service);
     expect(seconds).not.toBeNull();
     expect(seconds!).toBeGreaterThan(10);
   });

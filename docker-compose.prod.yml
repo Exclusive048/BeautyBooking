@@ -3,8 +3,25 @@
 #
 # Usage (порядок деплоя автоматизирован в .github/workflows/deploy.yml):
 #   docker compose --env-file .env.production -f docker-compose.prod.yml build worker
-#   docker compose --env-file .env.production -f docker-compose.prod.yml build app
+#   docker compose --env-file .env.production -f docker-compose.prod.yml build web
 #   docker compose --env-file .env.production -f docker-compose.prod.yml up -d
+#
+# ── Топология яруса приложения (APP-TIER-SPLIT-01, 2026-08-30) ─────────────────
+# Один образ `beautyhub-app` поднимается ДВУМЯ контейнерами — `web` (страницы,
+# RSC, `/_next/*`, service worker) и `api` (`/api/*`: REST, SSE, вебхуки,
+# OAuth-колбэки, cron/health) — а перед ними стоит внутренний nginx `edge`,
+# который и делит трафик (deploy/edge/default.conf). Смысл — независимый
+# рестарт и масштабирование двух половин БЕЗ правок кода: обе — тот же
+# `node server.js`, различаются только тем, какой трафик до них доходит.
+#
+# Контракт с внешним миром НЕ менялся: наружу (loopback ВМ) торчит ровно один
+# порт `127.0.0.1:3000` — раньше его держал Next, теперь nginx. Внешний обратный
+# прокси / TLS-терминатор (вне репозитория) форвардит туда же и ничего про
+# web/api не знает. `build:` объявлен ТОЛЬКО у `web` — `api` берёт тот же тег,
+# образ собирается один раз (как `migrate` берёт образ `worker`).
+# 🔴 `edge` — НЕ хоп для `TRUSTED_PROXY_HOPS`: заголовки X-Forwarded-* идут
+# сквозными, см. шапку deploy/edge/default.conf. Значение хопов при переходе
+# не меняется; сторож топологии — src/lib/http/edge-topology.test.ts.
 #
 # Required env (in .env.production):
 #   POSTGRES_DB       - database name
@@ -14,16 +31,17 @@
 #   DATABASE_URL      - postgresql://user:pass@postgres:5432/db
 #   REDIS_URL         - redis://:pass@redis:6379
 #   NEXT_PUBLIC_APP_URL - ИМЕННО под этим именем (алиас APP_PUBLIC_URL, который
-#                       понимает runtime-env.ts, в build-args НЕ интерполируется);
-#                       пустое/отсутствующее значение РОНЯЕТ сборку app —
+#                       понимает env.ts, в build-args НЕ интерполируется);
+#                       пустое/отсутствующее значение РОНЯЕТ сборку web —
 #                       new URL("") в root-layout бросает на сборе page-data.
 #
 # ⚠️ NEXT_PUBLIC_* — тоже в .env.production, и это НЕ только runtime-env: compose
-# интерполирует их в build-args сервиса `app` (см. ниже). Каждый NEXT_PUBLIC_*
-# инлайнится в клиентский бандл НА СБОРКЕ (src/lib/env.ts `clientEnv`); значение,
-# заданное только в runtime, до браузера НЕ доедет — прецедент «8 переменных
-# запеклись пустыми» (DOCKER-READINESS-AUDIT-01). Список args обязан оставаться
-# в локстепе с ARG-блоком Dockerfile и с build-images.yml (CI-заглушки).
+# интерполирует их в build-args сервиса `web` (см. ниже). Каждый NEXT_PUBLIC_*
+# инлайнится в клиентский бандл НА СБОРКЕ (src/lib/env.client.ts `clientEnv`);
+# значение, заданное только в runtime, до браузера НЕ доедет — прецедент
+# «8 переменных запеклись пустыми» (DOCKER-READINESS-AUDIT-01). Список args
+# обязан оставаться в локстепе с ARG-блоком Dockerfile и с build-images.yml
+# (CI-заглушки).
 #
 # BUILD_NODE_OPTIONS (опционально): heap-кап для `next build` на ВМ — сборка идёт
 # рядом с работающим приложением, дефолт --max-old-space-size=2048 защищает от OOM.
@@ -31,7 +49,7 @@
 
 services:
   # One-shot schema migration — `prisma migrate deploy` against Postgres, then
-  # exits 0. app/worker gate on its successful completion so a fresh
+  # exits 0. web/api/worker gate on its successful completion so a fresh
   # `docker compose up -d` (the usage documented at the top of this file) never
   # starts the app against an unmigrated database. Idempotent — migrate deploy
   # applies only pending migrations — so it is safe to re-run on every `up`. Uses
@@ -56,7 +74,58 @@ services:
         max-size: "20m"
         max-file: "3"
 
-  app:
+  # Внутренний edge (APP-TIER-SPLIT-01) — единственный сервис с опубликованным
+  # портом. `/api/*` → api, остальное → web; SSE без буферизации; access-log
+  # без query-строки. Конфиг — deploy/edge/default.conf (bind-mount, read-only:
+  # правка конфига = `up -d edge`, пересборки образов не требует).
+  #
+  # depends_on: service_started, а НЕ service_healthy — намеренно. nginx резолвит
+  # web/api в момент запроса (resolver + переменные в proxy_pass), поэтому может
+  # стартовать раньше них и отдавать 502 на мёртвую половину, продолжая
+  # обслуживать живую. Ожидание healthy связало бы старт edge с ОБЕИМИ
+  # половинами — ровно та связность, от которой разделение избавляет.
+  #
+  # Healthcheck сквозной: /api/health через edge доказывает маршрут в api,
+  # /robots.txt — маршрут в web (роут без БД: только env). `wget` — busybox из
+  # образа nginx:alpine, curl туда не входит.
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+      api:
+        condition: service_started
+    networks:
+      - internal
+    # 🔴 ТОЛЬКО loopback. Сквозная передача X-Forwarded-For в default.conf
+    # безопасна ровно потому, что сюда может постучаться только внешний edge на
+    # этой же машине. 0.0.0.0 здесь = доверить клиентскому XFF (обход per-IP лимитов).
+    ports:
+      - "127.0.0.1:3000:80"
+    volumes:
+      - ./deploy/edge/default.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "wget -q --spider http://127.0.0.1/api/health && wget -q --spider http://127.0.0.1/robots.txt"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # web/api сами стартуют до 40 с (их start_period) — edge ждёт с запасом.
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── web / api: один образ, два контейнера ──────────────────────────────────
+  # Блоки обязаны оставаться ЗЕРКАЛЬНЫМИ, кроме двух отличий: `build:` есть только
+  # у web, портов нет ни у кого (наружу — только edge). Паритет пиннится
+  # сторожем src/lib/http/edge-topology.test.ts, поэтому правка одного блока без
+  # второго валит CI, а не расходится молча.
+  web:
     image: beautyhub-app:latest
     build:
       context: .
@@ -92,8 +161,6 @@ services:
         condition: service_completed_successfully
     networks:
       - internal
-    ports:
-      - "127.0.0.1:3000:3000"
     healthcheck:
       # Node 20 ships a global fetch(), so no curl/wget is needed in the slim
       # runner image.
@@ -112,6 +179,39 @@ services:
       # NOTE: `restart: unless-stopped` does NOT restart on unhealthy — plain
       # Compose has no such behaviour. This status is consumed by deploy.yml and
       # by whatever external monitor DevOps wires up, nothing else.
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  api:
+    # Тот же образ, что у web — собирается `build web`, здесь build: нет намеренно.
+    image: beautyhub-app:latest
+    restart: unless-stopped
+    # RES-16 — см. web; у api тот же самый долгий легитимный запрос (загрузка медиа).
+    stop_grace_period: 30s
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    healthcheck:
+      # Liveness in-container, зеркало web (FIX-C2 — см. комментарий там).
       test:
         - "CMD"
         - "node"
