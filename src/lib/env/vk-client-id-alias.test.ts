@@ -10,8 +10,11 @@ import { describe, it, expect, afterEach, vi } from "vitest";
  * no VK button AND got a 503 from `/api/auth/vk/start` — with working
  * credentials present. Both now read one resolved value.
  *
- * This does not turn VK on: `NEXT_PUBLIC_VK_ENABLED` still gates it, and
- * production ships that flag false.
+ * ENV-SPLIT-01 (2026-08-30): флаг `NEXT_PUBLIC_VK_ENABLED` удалён — VK-вход
+ * включён САМИМ наличием client id (под любым из двух имён). Выключить =
+ * убрать креды. Строка `NEXT_PUBLIC_VK_ENABLED=false` в чьём-то старом `.env`
+ * больше ничего не выключает — это пиннится отдельным кейсом ниже, потому что
+ * иначе оператор, «выключивший VK флагом», получил бы живую кнопку молча.
  */
 
 const BASE_ENV: Record<string, string> = {
@@ -21,12 +24,9 @@ const BASE_ENV: Record<string, string> = {
   REDIS_URL: "redis://localhost:6379",
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
-  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ, а не только на
-  // наличие (well-formed значение на чужом домене молча уводит письма, пуши и
-  // logout к третьей стороне). Эти тесты про другое, поэтому в фикстуре стоит
-  // канонический хост — иначе прод-кейсы падают на чужом refine. Сам refine
-  // покрыт в `env-public-url.test.ts`. Тот же приём, что с s3 ниже/выше.
-  NEXT_PUBLIC_APP_URL: "https://мастеррядом.online",
+  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ; сам refine покрыт
+  // в `env-public-url.test.ts`.
+  NEXT_PUBLIC_APP_URL: "https://masterryadom.ru",
   NODE_ENV: "development",
 };
 
@@ -52,9 +52,8 @@ afterEach(() => {
 });
 
 describe("VK client-id alias — gate and resolver agree", () => {
-  it("alias-only creds + flag on → ENABLED (the regression this closes)", async () => {
+  it("alias-only creds → ENABLED (the regression this closes)", async () => {
     const { isVkAuthEnabled, getVkClientId } = await loadWithEnv({
-      NEXT_PUBLIC_VK_ENABLED: "true",
       VK_ID_CLIENT_ID: "54447",
       VK_CLIENT_ID: undefined,
     });
@@ -62,9 +61,8 @@ describe("VK client-id alias — gate and resolver agree", () => {
     expect(getVkClientId()).toBe("54447");
   });
 
-  it("canonical-only creds + flag on → ENABLED (unchanged)", async () => {
+  it("canonical-only creds → ENABLED (unchanged)", async () => {
     const { isVkAuthEnabled, getVkClientId } = await loadWithEnv({
-      NEXT_PUBLIC_VK_ENABLED: "true",
       VK_CLIENT_ID: "12345",
       VK_ID_CLIENT_ID: undefined,
     });
@@ -74,22 +72,22 @@ describe("VK client-id alias — gate and resolver agree", () => {
 
   it("alias wins over canonical (precedence preserved)", async () => {
     const { getVkClientId } = await loadWithEnv({
-      NEXT_PUBLIC_VK_ENABLED: "true",
       VK_ID_CLIENT_ID: "alias",
       VK_CLIENT_ID: "canonical",
     });
     expect(getVkClientId()).toBe("alias");
   });
 
-  it("flag OFF + creds present → DISABLED (the kill-switch still rules)", async () => {
-    const { isVkAuthEnabled } = await loadWithEnv({
+  it("удалённый NEXT_PUBLIC_VK_ENABLED=false ничего не выключает — конфигурация решает (ENV-SPLIT-01)", async () => {
+    const { isVkAuthEnabled, getVkClientId } = await loadWithEnv({
       NEXT_PUBLIC_VK_ENABLED: "false",
       VK_ID_CLIENT_ID: "54447",
     });
-    expect(isVkAuthEnabled).toBe(false);
+    expect(isVkAuthEnabled).toBe(true);
+    expect(getVkClientId()).toBe("54447");
   });
 
-  it("no creds under either name → DISABLED even with the flag on", async () => {
+  it("no creds under either name → DISABLED (и никакой флаг этого не перебьёт)", async () => {
     const { isVkAuthEnabled, getVkClientId } = await loadWithEnv({
       NEXT_PUBLIC_VK_ENABLED: "true",
       VK_ID_CLIENT_ID: undefined,
@@ -101,7 +99,6 @@ describe("VK client-id alias — gate and resolver agree", () => {
 
   it("blank/whitespace creds do not count as configured", async () => {
     const { isVkAuthEnabled, getVkClientId } = await loadWithEnv({
-      NEXT_PUBLIC_VK_ENABLED: "true",
       VK_ID_CLIENT_ID: "   ",
       VK_CLIENT_ID: "",
     });
@@ -115,7 +112,6 @@ describe("VK start route with alias-only creds", () => {
     vi.resetModules();
     for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, BASE_ENV, {
-      NEXT_PUBLIC_VK_ENABLED: "true",
       VK_ID_CLIENT_ID: "54447",
       VK_ID_CLIENT_SECRET: "secret",
       VK_ID_REDIRECT_URI: "https://example.com/api/auth/vk/callback",

@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
-import { isTelegramEnabled } from "@/lib/env";
+import { isTelegramEnabled } from "@/lib/env.client";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type TelegramSettingsResponse = {

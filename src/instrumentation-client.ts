@@ -21,7 +21,7 @@
  * facade in `observability/report.ts`, not through the SDK directly.
  */
 
-import { isBrowserErrorTrackingEnabled } from "@/lib/env";
+import { isBrowserErrorTrackingEnabled } from "@/lib/env.client";
 
 if (isBrowserErrorTrackingEnabled) {
   void import("@/lib/observability/browser")

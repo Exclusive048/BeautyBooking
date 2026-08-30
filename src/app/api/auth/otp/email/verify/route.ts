@@ -14,7 +14,6 @@ import {
 } from "@/lib/auth/otp-rate-limit";
 import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { findVerifiedEmailProfile, resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
-import { isEmailAuthEnabled } from "@/lib/env";
 import { otpEmailVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
@@ -29,13 +28,6 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
-    // FIX-SEC-EMAIL-IDENTITY-01: килсвитч канала — до любой работы, как в
-    // AUTH-GATE-01 у телефона. Гейтится и `verify`, а не только `request`:
-    // иначе выключение канала не отзывает уже выданные коды.
-    if (!isEmailAuthEnabled) {
-      return fail("Вход по email временно недоступен.", 503, "SYSTEM_FEATURE_DISABLED");
-    }
-
     const body = await req.json().catch(() => null);
     const parsed = otpEmailVerifySchema.safeParse(body);
     if (!parsed.success) {

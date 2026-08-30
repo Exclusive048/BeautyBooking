@@ -8,7 +8,8 @@ const T = UI_TEXT.auth.loginPage.unavailable;
 
 /**
  * AUTH-GATE-01 — what `/login` renders when NO auth method is available
- * (phone gated off via `PHONE_AUTH_ENABLED`, and no email/VK/Yandex/Telegram).
+ * (phone off — SMS-провайдер не сконфигурирован (ENV-SPLIT-01), and no
+ * email/VK/Yandex/Telegram).
  *
  * Deliberately a calm terminal state, not an error: nothing failed, the door is
  * simply not open yet. So there is no `role="alert"`, no destructive tone, and

@@ -20,9 +20,10 @@ import { getTelegramEnabled } from "@/lib/telegram/feature";
  *     when NOTHING is left to click through to;
  *   • `/login` renders its graceful "скоро" state on `!any`.
  *
- * With the launch `.env.production.example` (VK off, Yandex off, Telegram off)
- * and `PHONE_AUTH_ENABLED` unset, `any` collapses to whether SMTP is
- * configured — which is exactly the intended pre-SMS behaviour.
+ * With the launch `.env.production.example` (VK/Yandex/Telegram creds empty,
+ * SMS creds empty — ENV-SPLIT-01: фичи включаются конфигурацией, флагов нет),
+ * `any` collapses to whether SMTP is configured — exactly the intended
+ * pre-SMS behaviour.
  *
  * 🔴 Server-only (reads server-only env + a SystemConfig row). Client
  * components receive the resolved object as a prop; they must never import

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
-import { isYandexAuthEnabled } from "@/lib/env";
 
 // FIX-YANDEX-OAUTH — login button, bespoke-parallel to VkLoginButton.
 type YandexLoginButtonProps = {
@@ -13,9 +12,10 @@ type YandexLoginButtonProps = {
   /** RKN-FIX-01 — see `VkLoginButton.consent`; identical contract. */
   consent?: SocialConsent;
   /**
-   * QA-001: Yandex-enabled flag resolved SERVER-side and passed down so server +
-   * client render the same branch (avoids the env-via-alias hydration mismatch).
-   * When provided the prop wins; omitting it falls back to the computed flag.
+   * QA-001 / ENV-SPLIT-01: Yandex-enabled is SERVER-resolved
+   * (`isYandexAuthEnabled` = наличие YANDEX_OAUTH_CLIENT_ID — секретная
+   * половина env, клиенту недоступна) and passed down. Omitting the prop
+   * renders nothing.
    */
   enabled?: boolean;
 };
@@ -34,9 +34,8 @@ export default function YandexLoginButton({
   enabled,
   consent,
 }: YandexLoginButtonProps) {
-  // QA-001: prefer the server-passed prop (deterministic across SSR/CSR).
-  const yandexEnabled = enabled !== undefined ? enabled : isYandexAuthEnabled;
-  if (!yandexEnabled) return null;
+  // QA-001 / ENV-SPLIT-01: the server-passed prop is the only source.
+  if (!enabled) return null;
 
   const label = UI_TEXT.auth.yandex.loginButton;
   const blockedByConsent = consent !== undefined && !consent.granted;

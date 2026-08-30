@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { env } from "@/lib/env";
+import { clientEnv } from "@/lib/env.client";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -31,7 +31,7 @@ export function TelegramConnectModal({ onClose }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const initedRef = useRef(false);
 
-  const botUsername = env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const botUsername = clientEnv.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
 
   useEffect(() => {
     if (!botUsername || initedRef.current) return;

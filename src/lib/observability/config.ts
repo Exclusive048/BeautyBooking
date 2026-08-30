@@ -1,5 +1,5 @@
 /**
- * OBSERVABILITY-GLITCHTIP-01 — shared configuration resolved from `env.ts`.
+ * OBSERVABILITY-GLITCHTIP-01 / ENV-SPLIT-01 — СЕРВЕРНАЯ половина конфига.
  *
  * All values go through `env` (CLAUDE.md rule 11) — never `process.env`. The
  * vars are named `GLITCHTIP_*` rather than `SENTRY_*` on purpose: the Sentry
@@ -8,40 +8,22 @@
  * bypasses the Zod schema. With `GLITCHTIP_*` names there is exactly one path
  * into the SDK: the options object built here.
  *
- * Client-safe — `env.ts` is evaluated in the browser bundle too, and only the
- * `NEXT_PUBLIC_*` values are read on that side.
+ * Браузерная половина (`resolveBrowserObservabilityConfig`) — в
+ * `config.client.ts`: серверный `env.ts` несёт `server-only`, и импорт отсюда
+ * в браузерный граф ронял бы сборку. Тип и общие резолверы среды/релиза живут
+ * там же (они читают только NEXT_PUBLIC_* и работают на обеих сторонах).
  */
 
 import { env } from "@/lib/env";
+import {
+  resolveEnvironmentName,
+  resolveRelease,
+  trimmed,
+  type ObservabilityConfig,
+} from "@/lib/observability/config.client";
 
-export type ObservabilityConfig = {
-  dsn: string;
-  environment: string;
-  release: string | undefined;
-  sampleRate: number;
-};
-
-function trimmed(value: string | undefined): string | undefined {
-  const out = typeof value === "string" ? value.trim() : "";
-  return out.length > 0 ? out : undefined;
-}
-
-/**
- * Deployment name shown in GlitchTip. Defaults to `NODE_ENV` so a dev machine
- * that opts in is never confused with production.
- */
-export function resolveEnvironmentName(): string {
-  return trimmed(env.NEXT_PUBLIC_GLITCHTIP_ENVIRONMENT) ?? env.NODE_ENV ?? "development";
-}
-
-/**
- * Release identifier used to group events by deploy. Optional — GlitchTip
- * accepts events without one; readable stack traces from minified client code
- * additionally need source-map upload, which is deferred (see BACKLOG).
- */
-export function resolveRelease(): string | undefined {
-  return trimmed(env.NEXT_PUBLIC_GLITCHTIP_RELEASE);
-}
+export { resolveEnvironmentName, resolveRelease };
+export type { ObservabilityConfig };
 
 function resolveSampleRate(): number {
   const raw = Number(env.GLITCHTIP_SAMPLE_RATE);
@@ -64,19 +46,4 @@ export function resolveServerObservabilityConfig(): ObservabilityConfig | null {
   };
 }
 
-/**
- * Browser config. Deliberately a SEPARATE var from the server DSN so the two
- * can point at different GlitchTip projects (frontend noise never buries
- * backend failures), and so enabling backend tracking does not automatically
- * ship a DSN to every visitor.
- */
-export function resolveBrowserObservabilityConfig(): ObservabilityConfig | null {
-  const dsn = trimmed(env.NEXT_PUBLIC_GLITCHTIP_DSN);
-  if (!dsn) return null;
-  return {
-    dsn,
-    environment: resolveEnvironmentName(),
-    release: resolveRelease(),
-    sampleRate: 1,
-  };
-}
+

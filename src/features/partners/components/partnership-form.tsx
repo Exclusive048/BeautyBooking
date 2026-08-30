@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { isTelegramEnabled } from "@/lib/env";
+import { isTelegramEnabled } from "@/lib/env.client";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.partners.form;

@@ -6,10 +6,11 @@ import { prisma } from "@/lib/prisma";
  * FIX-TELEGRAM-KILLSWITCH — user-facing Telegram is a legal launch-blocker and
  * is gated behind a TWO-LAYER flag:
  *
- *   1. Env ceiling `NEXT_PUBLIC_TELEGRAM_ENABLED` (default false, fail-safe OFF)
- *      → `isTelegramEnabled` (src/lib/env.ts). This is the LEGAL GUARANTEE:
- *      when off, Telegram is absent from the UI + inert in delivery, with no DB
- *      read required.
+ *   1. Env ceiling — `isTelegramEnabled` (src/lib/env.ts). ENV-SPLIT-01:
+ *      прежний флаг NEXT_PUBLIC_TELEGRAM_ENABLED удалён, потолок теперь —
+ *      НАЛИЧИЕ NEXT_PUBLIC_TELEGRAM_BOT_USERNAME (выключить = убрать username
+ *      из env). This is the LEGAL GUARANTEE: when off, Telegram is absent from
+ *      the UI + inert in delivery, with no DB read required.
  *   2. Admin toggle in `SystemConfig` (key `telegramEnabled`), default ON, but
  *      only effective *within* an env that already allows Telegram.
  *

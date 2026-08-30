@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
-import { env } from "@/lib/env";
 
 type VkLoginButtonProps = {
   iconOnly?: boolean;
@@ -17,10 +16,10 @@ type VkLoginButtonProps = {
    */
   consent?: SocialConsent;
   /**
-   * QA-001: VK-enabled flag resolved SERVER-side and passed down so server +
-   * client render the same branch (env-via-alias is `undefined` on the client →
-   * server renders the button, client renders `null` → hydration mismatch). When
-   * provided the prop wins; omitting it keeps the legacy env fallback.
+   * QA-001 / ENV-SPLIT-01: VK-enabled is SERVER-resolved (`isVkAuthEnabled` =
+   * наличие VK client id — секрет, клиенту недоступен) and passed down. The
+   * legacy client-side env fallback is gone with NEXT_PUBLIC_VK_ENABLED;
+   * omitting the prop renders nothing.
    */
   enabled?: boolean;
 };
@@ -39,9 +38,8 @@ export default function VkLoginButton({
   enabled,
   consent,
 }: VkLoginButtonProps) {
-  // QA-001: prefer the server-passed prop (deterministic across SSR/CSR).
-  const vkEnabled = enabled !== undefined ? enabled : String(env.NEXT_PUBLIC_VK_ENABLED) === "true";
-  if (!vkEnabled) return null;
+  // QA-001 / ENV-SPLIT-01: the server-passed prop is the only source.
+  if (!enabled) return null;
 
   const label = UI_TEXT.auth.vk.loginButton;
   const blockedByConsent = consent !== undefined && !consent.granted;

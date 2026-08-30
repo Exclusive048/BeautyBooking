@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import { env } from "@/lib/env";
+import { clientEnv } from "@/lib/env.client";
 import {
   getPushPermission,
   isPushSupported,
@@ -73,7 +73,7 @@ export function PushNotificationsSection() {
       setError(null);
       try {
         if (next) {
-          const vapidKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+          const vapidKey = clientEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
           if (!vapidKey || !isPushSupported()) {
             setError(t.unsupported);
             setPermission(getPushPermission());

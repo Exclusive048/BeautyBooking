@@ -47,6 +47,9 @@ const SRC = path.join(ROOT, "src");
 /** Точные пути (от корня репозитория), которым `process.env` разрешён. */
 const ALLOWED_FILES = new Set([
   "src/lib/env.ts",
+  // ENV-SPLIT-01: фронт-половина env — NEXT_PUBLIC_* обязаны быть ЛИТЕРАЛАМИ
+  // `process.env.X`, иначе webpack их не инлайнит (QA-001/FIX-09).
+  "src/lib/env.client.ts",
   "src/lib/prisma.ts",
   "src/lib/prisma-direct.ts",
   "src/lib/startup.ts",

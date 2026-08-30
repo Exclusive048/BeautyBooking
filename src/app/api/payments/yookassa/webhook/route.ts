@@ -33,17 +33,15 @@ export const runtime = "nodejs";
 
 // HARDENING-08 FIX-17: `extractClientIp` peels `TRUSTED_PROXY_HOPS` trusted hops
 // from the RIGHT of X-Forwarded-For (no longer the spoofable leftmost), so the
-// allowlist CAN enforce correctly when switched on.
+// allowlist check reads a meaningful source IP.
 //
-// PAY-SEC-01 (2026-07-31) — but it deliberately STAYS OFF in production. It is
-// defence-in-depth, never the authenticity anchor: a wrong `TRUSTED_PROXY_HOPS`
-// or an unannounced change to YooKassa's published ranges would drop LEGITIMATE
-// payment notifications, and IP checks buy nothing the worker's API re-fetch
-// does not already guarantee. Log-only keeps the signal (unexpected source IPs
-// are still recorded + surfaced) without the false-negative risk. Flipping it on
-// remains a one-env-var, no-code-change decision if the proxy chain ever
-// stabilises enough to want the extra layer.
-const IP_ALLOWLIST_ENFORCED = env.YOOKASSA_IP_ALLOWLIST_ENFORCED;
+// PAY-SEC-01 (2026-07-31) → ENV-SPLIT-01 (2026-08-30): allowlist — ВСЕГДА
+// log-only; env-флаг YOOKASSA_IP_ALLOWLIST_ENFORCED удалён вместе с остальными
+// переключалками. Log-only и была ратифицированная прод-поза: подлинность
+// держит worker API re-fetch (инв. #5), а enforce за ALB хрупок (неверный
+// `TRUSTED_PROXY_HOPS` или смена диапазонов ЮКассы молча роняла бы ЛЕГИТИМНЫЕ
+// платёжные уведомления). Unexpected source IPs по-прежнему логируются и
+// попадают в surface-телеметрию — сигнал сохранён, false-negative-риска нет.
 
 // Warn at most once per process when the optional URL secret is unset in prod —
 // avoids logging the same warning on every notification.
@@ -87,25 +85,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // ── 2. IP allowlist — log-only pre-filter (see IP_ALLOWLIST_ENFORCED) ────
+    // ── 2. IP allowlist — log-only pre-filter (см. комментарий у шапки) ──────
     const allowlistCheck = checkYookassaIpAllowlist(extractClientIp(req));
     if (!allowlistCheck.allowed) {
       logInfo("YooKassa webhook: source IP not in allowlist", {
         level: "warn",
         ip: allowlistCheck.ip,
         reason: allowlistCheck.reason,
-        enforced: IP_ALLOWLIST_ENFORCED,
       });
       void recordSurfaceEvent({
         surface: "webhook",
-        outcome: IP_ALLOWLIST_ENFORCED ? "denied" : "success",
+        outcome: "success",
         operation: "yookassa-ingress",
         code: "IP_NOT_ALLOWED",
       });
-      if (IP_ALLOWLIST_ENFORCED) {
-        alertWebhookFailure("yookassa", "IP_NOT_ALLOWED", { ip: allowlistCheck.ip });
-        return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
-      }
     }
 
     // ── 3. Minimal parse — only { event, object.id } is propagated ──────────

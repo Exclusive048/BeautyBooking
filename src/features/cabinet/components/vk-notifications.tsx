@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { isVkNotificationsEnabled } from "@/lib/env";
+import { VK_NOTIFICATIONS_AVAILABLE } from "@/lib/vk/notifications-availability";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -135,16 +135,16 @@ export function VkNotificationsSection({
           // shown — login/connection stays intact. Tooltip explains
           // the temporary lock so the user doesn't think it's broken.
           <Switch
-            checked={isVkNotificationsEnabled ? enabled : false}
+            checked={VK_NOTIFICATIONS_AVAILABLE ? enabled : false}
             onCheckedChange={(next) => void onToggle(next)}
-            disabled={saving || !isVkNotificationsEnabled}
-            title={!isVkNotificationsEnabled ? vkText.temporarilyUnavailable : undefined}
+            disabled={saving || !VK_NOTIFICATIONS_AVAILABLE}
+            title={!VK_NOTIFICATIONS_AVAILABLE ? vkText.temporarilyUnavailable : undefined}
             className="shrink-0"
           />
         ) : (
           // FIX-EXTERNAL-GATING-01 (G-3): this is a VK-OAuth *link* action. It
           // intentionally doesn't gate on the notifications-delivery flag
-          // (`isVkNotificationsEnabled`); the VK-auth gate (`isVkAuthEnabled`,
+          // (`VK_NOTIFICATIONS_AVAILABLE`); the VK-auth gate (`isVkAuthEnabled`,
           // server-only) is applied by every call-site that mounts this section,
           // so an unlinked user only reaches this button when VK auth is on.
           <Button
@@ -160,7 +160,7 @@ export function VkNotificationsSection({
 
       <p className="mt-2 text-xs text-text-sec">{hintText}</p>
       {linked ? <p className="mt-2 text-xs text-text-sec">{enabled ? legacyVkText.enabled : legacyVkText.disabled}</p> : null}
-      {!isVkNotificationsEnabled ? (
+      {!VK_NOTIFICATIONS_AVAILABLE ? (
         <p className="mt-2 rounded-lg bg-bg-input/60 px-2.5 py-2 text-xs text-text-sec">
           {vkText.temporarilyUnavailableHint}
         </p>

@@ -11,9 +11,11 @@ export type { SmsProvider, SmsSendResult, SmsBalanceResult, SmsErrorCode } from 
 let _provider: SmsProvider | null = null;
 
 /**
- * Lazy singleton. Selects SMSC.ru when `isSmsConfigured` (login+password set
- * and `SMS_PROVIDER_ENABLED=true`), otherwise the mock provider that logs
- * the OTP locally — preserves dev workflow when no SMS account is wired.
+ * Lazy singleton. Selects SMSC.ru when `isSmsConfigured` (login+password set;
+ * ENV-SPLIT-01 — флаг SMS_PROVIDER_ENABLED удалён), otherwise the mock
+ * provider that logs the OTP locally — preserves dev workflow when no SMS
+ * account is wired. В production без кредов phone-вход выключен целиком
+ * (`isPhoneAuthEnabled`), так что mock туда недостижим.
  *
  * Use `resetSmsProvider()` in tests to switch implementations between cases.
  */

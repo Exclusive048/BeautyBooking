@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
-import { isProduction } from "@/lib/env";
+import { isProduction } from "@/lib/env.client";
 
 export function PWAUpdatePrompt() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);

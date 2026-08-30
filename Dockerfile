@@ -20,16 +20,12 @@ RUN npx prisma generate
 # at runtime (compose `env_file`) NEVER reaches the client. The FULL public set
 # must therefore be passed here as --build-arg (wired in deploy.yml). Omitting one
 # bakes it EMPTY and the feature is silently dead in the browser regardless of
-# .env.production — e.g. the legal ИНН footer (152-ФЗ), the Yandex login button,
-# and browser-side error reporting. Keep this list in lockstep with the
-# `clientEnv` object in src/lib/env.ts. See docs/DOCKER-READINESS.md (env table).
+# .env.production — e.g. the legal ИНН footer (152-ФЗ) and browser-side error
+# reporting. Keep this list in lockstep with the `clientEnv` object in
+# src/lib/env.client.ts (ENV-SPLIT-01). See docs/DOCKER-READINESS.md (env table).
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
 ARG NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
-ARG NEXT_PUBLIC_TELEGRAM_ENABLED=false
-ARG NEXT_PUBLIC_VK_ENABLED=false
-ARG NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=false
-ARG NEXT_PUBLIC_YANDEX_ENABLED=false
 ARG NEXT_PUBLIC_YANDEX_MAPS_API_KEY
 ARG NEXT_PUBLIC_LEGAL_INN
 ARG NEXT_PUBLIC_VK_COMMUNITY_URL
@@ -40,10 +36,6 @@ ARG NEXT_PUBLIC_GLITCHTIP_RELEASE
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY \
     NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=$NEXT_PUBLIC_TELEGRAM_BOT_USERNAME \
-    NEXT_PUBLIC_TELEGRAM_ENABLED=$NEXT_PUBLIC_TELEGRAM_ENABLED \
-    NEXT_PUBLIC_VK_ENABLED=$NEXT_PUBLIC_VK_ENABLED \
-    NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=$NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED \
-    NEXT_PUBLIC_YANDEX_ENABLED=$NEXT_PUBLIC_YANDEX_ENABLED \
     NEXT_PUBLIC_YANDEX_MAPS_API_KEY=$NEXT_PUBLIC_YANDEX_MAPS_API_KEY \
     NEXT_PUBLIC_LEGAL_INN=$NEXT_PUBLIC_LEGAL_INN \
     NEXT_PUBLIC_VK_COMMUNITY_URL=$NEXT_PUBLIC_VK_COMMUNITY_URL \

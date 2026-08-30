@@ -15,7 +15,7 @@
  */
 
 import * as Sentry from "@sentry/browser";
-import { resolveBrowserObservabilityConfig } from "@/lib/observability/config";
+import { resolveBrowserObservabilityConfig } from "@/lib/observability/config.client";
 import { BROWSER_DENY_URLS, BROWSER_IGNORE_ERRORS, shouldDropError } from "@/lib/observability/noise";
 import { scrubEvent } from "@/lib/observability/scrub";
 import { setReporter, type ReportContext } from "@/lib/observability/report";

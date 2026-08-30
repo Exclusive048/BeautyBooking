@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useMe } from "@/lib/hooks/use-me";
-import { env, isProduction } from "@/lib/env";
+import { clientEnv, isProduction } from "@/lib/env.client";
 import { syncExistingSubscription } from "@/lib/notifications/push/push-client";
 
 /**
@@ -31,7 +31,7 @@ export function PushManager() {
     if (!user.pushNotificationsEnabled) return;
     if (attempted.current) return;
 
-    const vapidPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    const vapidPublicKey = clientEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidPublicKey) return;
 
     attempted.current = true;

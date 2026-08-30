@@ -69,10 +69,6 @@ jobs:
             NEXT_PUBLIC_APP_URL=https://ci.masterryadom.invalid
             NEXT_PUBLIC_VAPID_PUBLIC_KEY=
             NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=
-            NEXT_PUBLIC_TELEGRAM_ENABLED=false
-            NEXT_PUBLIC_VK_ENABLED=false
-            NEXT_PUBLIC_VK_NOTIFICATIONS_ENABLED=false
-            NEXT_PUBLIC_YANDEX_ENABLED=false
             NEXT_PUBLIC_YANDEX_MAPS_API_KEY=
             NEXT_PUBLIC_LEGAL_INN=
             NEXT_PUBLIC_VK_COMMUNITY_URL=

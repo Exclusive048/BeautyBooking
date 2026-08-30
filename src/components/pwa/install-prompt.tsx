@@ -6,7 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
 import { UI_TEXT } from "@/lib/ui/text";
-import { isProduction } from "@/lib/env";
+import { isProduction } from "@/lib/env.client";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;

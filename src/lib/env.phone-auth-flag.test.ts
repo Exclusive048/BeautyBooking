@@ -1,19 +1,27 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 
 /**
- * AUTH-GATE-01 — `isPhoneAuthEnabled` tri-state resolution.
+ * AUTH-GATE-01 → ENV-SPLIT-01 — `isPhoneAuthEnabled` выводится из конфигурации,
+ * а не из флага.
  *
- * `PHONE_AUTH_ENABLED` deliberately does NOT use the shared `boolFlag` helper
- * (which defaults everything to false), because "unset" has to mean different
- * things per environment: dev keeps phone login (seed accounts + the `.qa/`
- * Playwright harness log in by phone), production must fail safe to OFF while
- * the SMS gateway is unfunded. That asymmetry is the whole point of the flag,
- * so it gets pinned here.
+ * Флаг `PHONE_AUTH_ENABLED` (tri-state: unset ⇒ ON в dev / OFF в проде) удалён
+ * решением владельца 2026-08-30 вместе с остальными env-переключалками. Новое
+ * правило — ОДНА строка в `env.ts`: `!isProduction || isSmsConfigured`.
+ *   • dev/test → всегда ON: mock-провайдер логирует OTP, на этом живут seed-
+ *     аккаунты и `.qa/`-харнесс;
+ *   • production → ON ровно тогда, когда заданы SMS_PROVIDER_LOGIN +
+ *     SMS_PROVIDER_PASSWORD. Без кредов phone-роуты отвечают 503 до генерации
+ *     кода, то есть инвариант QA-003 («прод + phone-вход + SMS не настроен =
+ *     plaintext-OTP в логах») держится КОНСТРУКТИВНО, без рефайна.
  *
- * Each case re-imports `@/lib/env` with a fresh `process.env`. A COMPLETE env
- * is supplied so the Zod parse succeeds — a failed parse under
- * `NODE_ENV=production` calls `process.exit(1)`, which would take the test
- * runner down with it.
+ * Здесь пиннится таблица резолва. Отдельно — что удалённый флаг ни на что не
+ * влияет: строка `PHONE_AUTH_ENABLED=...` в чьём-то старом `.env` не должна ни
+ * включать, ни выключать канал (второй файл — `env/phone-auth-sms-guard.test.ts`,
+ * там же — отсутствие override-ключа).
+ *
+ * Каждый кейс переимпортирует `@/lib/env` со свежим `process.env`. Фикстура
+ * ПОЛНАЯ: под `NODE_ENV=production` проваленный Zod-парс зовёт `process.exit(1)`
+ * и уронил бы раннер.
  */
 
 const BASE_ENV: Record<string, string> = {
@@ -24,33 +32,25 @@ const BASE_ENV: Record<string, string> = {
   REDIS_URL: "redis://localhost:6379",
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
-  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ (well-formed
-  // значение на чужом домене молча уводит письма, пуши и logout к третьей
-  // стороне). Этот файл про tri-state флаг, поэтому фикстура несёт канонический
-  // хост; сам refine покрыт в `env-public-url.test.ts`.
-  NEXT_PUBLIC_APP_URL: "https://мастеррядом.online",
-  // QA-003 pre-step: включённый в проде phone-auth теперь ТРЕБУЕТ настроенного
-  // SMS-провайдера (иначе mock логировал бы plaintext-OTP). Эти тесты про
-  // резолв самого флага, а не про валидность env целиком, поэтому провайдер
-  // добавлен в базовую фикстуру — иначе прод-кейсы падают на новом refine.
-  // Отдельно этот refine покрыт в `env/phone-auth-sms-guard.test.ts`.
-  SMS_PROVIDER_ENABLED: "true",
-  SMS_PROVIDER_LOGIN: "sms-login",
-  SMS_PROVIDER_PASSWORD: "sms-password",
-  // SEC-23: `STORAGE_PROVIDER=local` в проде теперь отвергается на старте
-  // (файлы local-провайдера отдаются мимо `ensureCanReadMedia`). Эти тесты про
-  // другое, поэтому в базовую фикстуру добавлено валидное s3-хранилище — иначе
-  // прод-кейсы падают на чужом refine. Сам refine покрыт в
-  // `env/local-storage-prod-guard.test.ts`.
+  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ; сам refine покрыт
+  // в `env-public-url.test.ts`.
+  NEXT_PUBLIC_APP_URL: "https://masterryadom.ru",
+  // SEC-23: `STORAGE_PROVIDER=local` в проде отвергается на старте; сам refine
+  // покрыт в `env/local-storage-prod-guard.test.ts`.
   STORAGE_PROVIDER: "s3",
   S3_BUCKET: "bucket",
   S3_ACCESS_KEY: "s3-key",
   S3_SECRET_KEY: "s3-secret",
 };
 
+const SMS_CREDS = {
+  SMS_PROVIDER_LOGIN: "sms-login",
+  SMS_PROVIDER_PASSWORD: "sms-password",
+};
+
 const originalEnv = { ...process.env };
 
-async function loadFlag(overrides: Record<string, string | undefined>): Promise<boolean> {
+async function loadEnv(overrides: Record<string, string | undefined>) {
   vi.resetModules();
   for (const key of Object.keys(process.env)) delete process.env[key];
   Object.assign(process.env, BASE_ENV);
@@ -58,7 +58,11 @@ async function loadFlag(overrides: Record<string, string | undefined>): Promise<
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-  const mod = await import("@/lib/env");
+  return import("@/lib/env");
+}
+
+async function loadFlag(overrides: Record<string, string | undefined>): Promise<boolean> {
+  const mod = await loadEnv(overrides);
   return mod.isPhoneAuthEnabled;
 }
 
@@ -68,38 +72,43 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe("AUTH-GATE-01 — isPhoneAuthEnabled", () => {
-  it("unset in development → ON (dev login + .qa harness keep working)", async () => {
-    await expect(loadFlag({ NODE_ENV: "development", PHONE_AUTH_ENABLED: undefined })).resolves.toBe(true);
+describe("ENV-SPLIT-01 — isPhoneAuthEnabled = !isProduction || isSmsConfigured", () => {
+  it("development без SMS-кредов → ON (dev login + .qa harness keep working)", async () => {
+    await expect(loadFlag({ NODE_ENV: "development" })).resolves.toBe(true);
   });
 
-  it("unset in test → ON (vitest + seeded phone fixtures)", async () => {
-    await expect(loadFlag({ NODE_ENV: "test", PHONE_AUTH_ENABLED: undefined })).resolves.toBe(true);
+  it("test без SMS-кредов → ON (vitest + seeded phone fixtures)", async () => {
+    await expect(loadFlag({ NODE_ENV: "test" })).resolves.toBe(true);
   });
 
-  it("unset in production → OFF (fail-safe: never ship OTP-to-logs as login)", async () => {
-    await expect(loadFlag({ NODE_ENV: "production", PHONE_AUTH_ENABLED: undefined })).resolves.toBe(false);
+  it("production без SMS-кредов → OFF (QA-003: OTP-в-логи как канал входа недостижим)", async () => {
+    await expect(loadFlag({ NODE_ENV: "production" })).resolves.toBe(false);
   });
 
-  it("empty string in production → OFF (a blank Docker build arg must not enable it)", async () => {
-    await expect(loadFlag({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "" })).resolves.toBe(false);
+  it("production с пустыми строками кредов → OFF (пустая строка в .env не есть конфигурация)", async () => {
+    await expect(
+      loadFlag({ NODE_ENV: "production", SMS_PROVIDER_LOGIN: "", SMS_PROVIDER_PASSWORD: "" }),
+    ).resolves.toBe(false);
   });
 
-  it('"true" in production → ON (the deliberate post-SMS flip)', async () => {
-    await expect(loadFlag({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "true" })).resolves.toBe(true);
+  it("production с полными SMS-кредами → ON (единственный способ включить phone-вход в проде)", async () => {
+    await expect(loadFlag({ NODE_ENV: "production", ...SMS_CREDS })).resolves.toBe(true);
   });
 
-  it('"TRUE" / " true " → ON (case- and whitespace-tolerant)', async () => {
-    await expect(loadFlag({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "TRUE" })).resolves.toBe(true);
-    await expect(loadFlag({ NODE_ENV: "production", PHONE_AUTH_ENABLED: " true " })).resolves.toBe(true);
+  it("production с частичными кредами → OFF (зеркалит isSmsConfigured: нужны И логин, И пароль)", async () => {
+    await expect(
+      loadFlag({ NODE_ENV: "production", SMS_PROVIDER_LOGIN: "sms-login" }),
+    ).resolves.toBe(false);
+    await expect(
+      loadFlag({ NODE_ENV: "production", SMS_PROVIDER_PASSWORD: "sms-password" }),
+    ).resolves.toBe(false);
   });
 
-  it('"false" in development → OFF (explicit opt-out overrides the dev default)', async () => {
-    await expect(loadFlag({ NODE_ENV: "development", PHONE_AUTH_ENABLED: "false" })).resolves.toBe(false);
-  });
-
-  it("garbage value → OFF (anything that is not `true` is off)", async () => {
-    await expect(loadFlag({ NODE_ENV: "development", PHONE_AUTH_ENABLED: "yes" })).resolves.toBe(false);
-    await expect(loadFlag({ NODE_ENV: "development", PHONE_AUTH_ENABLED: "1" })).resolves.toBe(false);
+  it("флаг и isSmsConfigured в проде совпадают в обе стороны", async () => {
+    const off = await loadEnv({ NODE_ENV: "production" });
+    expect(off.isPhoneAuthEnabled).toBe(off.isSmsConfigured);
+    const on = await loadEnv({ NODE_ENV: "production", ...SMS_CREDS });
+    expect(on.isPhoneAuthEnabled).toBe(on.isSmsConfigured);
+    expect(on.isPhoneAuthEnabled).toBe(true);
   });
 });

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
-import { env } from "@/lib/env";
+import { clientEnv } from "@/lib/env.client";
 
 type TelegramLoginButtonProps = {
   iconOnly?: boolean;
@@ -56,7 +56,7 @@ export default function TelegramLoginButton({
   // QA-001: prefer the server-passed prop (deterministic across SSR/CSR); fall
   // back to env only for callers that don't pass it.
   const botUsername =
-    botUsernameProp !== undefined ? botUsernameProp : env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+    botUsernameProp !== undefined ? botUsernameProp : clientEnv.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
   const label = UI_TEXT.auth.telegram.loginButton;
 
   useEffect(() => {

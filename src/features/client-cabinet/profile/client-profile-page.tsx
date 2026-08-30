@@ -38,7 +38,7 @@ import {
 } from "./hooks/use-profile-autosave";
 import { EmailVerifyModal } from "./modals/email-verify-modal";
 import { TelegramConnectModal } from "./modals/telegram-connect-modal";
-import { isTelegramEnabled } from "@/lib/env";
+import { isTelegramEnabled } from "@/lib/env.client";
 
 const T = UI_TEXT.clientCabinet.profilePage;
 // FIX-D1: исходы стартовой ноги VK — те же строки, что у студийного кабинета.

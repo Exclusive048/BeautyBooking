@@ -10,9 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockEnv = vi.hoisted(() => ({
   YOOKASSA_WEBHOOK_TOKEN: "test-secret" as string | undefined,
   NODE_ENV: "test" as string,
-  // HARDENING-08 FIX-17: IP allowlist enforce + trusted-proxy config read by the
-  // route and by `@/lib/http/ip` (both import `@/lib/env`, which this mocks).
-  YOOKASSA_IP_ALLOWLIST_ENFORCED: false as boolean,
+  // HARDENING-08 FIX-17: trusted-proxy config read by the route and by
+  // `@/lib/http/ip` (both import `@/lib/env`, which this mocks).
+  // ENV-SPLIT-01: YOOKASSA_IP_ALLOWLIST_ENFORCED удалён — allowlist всегда log-only.
   TRUSTED_PROXY_HOPS: 1 as number,
   TRUSTED_REAL_IP_HEADER: "" as string,
 }));
@@ -40,7 +40,10 @@ vi.mock("@/lib/logging/logger", async (importOriginal) => {
   return { ...actual, logError: vi.fn(), logInfo: vi.fn() };
 });
 
+import { readFileSync } from "node:fs";
 import { timingSafeStringEqual } from "@/lib/auth/constant-time";
+import { logInfo } from "@/lib/logging/logger";
+import { stripComments } from "@/lib/testing/source-scan";
 import { POST } from "./route";
 
 const URL_BASE = "http://localhost/api/payments/yookassa/webhook";
@@ -60,7 +63,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockEnv.YOOKASSA_WEBHOOK_TOKEN = "test-secret";
   mockEnv.NODE_ENV = "test";
-  mockEnv.YOOKASSA_IP_ALLOWLIST_ENFORCED = false;
   mockEnv.TRUSTED_PROXY_HOPS = 1;
   mockEnv.TRUSTED_REAL_IP_HEADER = "";
   enqueue.mockResolvedValue(undefined);
@@ -154,56 +156,62 @@ describe("YooKassa webhook route (HARDENING-02)", () => {
   });
 });
 
-describe("YooKassa webhook IP allowlist enforce (HARDENING-08 FIX-17)", () => {
+/**
+ * PAY-SEC-01 → ENV-SPLIT-01 — IP-allowlist вебхука ВСЕГДА log-only.
+ *
+ * Флаг `YOOKASSA_IP_ALLOWLIST_ENFORCED` удалён (2026-08-30): log-only и была
+ * ратифицированная прод-поза — подлинность держит worker API re-fetch (инв. #5),
+ * а enforce за ALB хрупок (неверный `TRUSTED_PROXY_HOPS` или смена диапазонов
+ * ЮКассы молча роняли бы ЛЕГИТИМНЫЕ платёжные уведомления). Пиннятся обе
+ * половины позы: (1) чужой source-IP НЕ отклоняется, уведомление доезжает до
+ * очереди; (2) сигнал сохранён — warn-лог с НАСТОЯЩИМ адресом (правый край XFF,
+ * FIX-17) и причиной. Плюс (3) в роуте нет ветки enforce вообще — удалённый флаг
+ * не читается, поэтому «включить обратно одной строкой env» невозможно.
+ */
+describe("YooKassa webhook IP allowlist — всегда log-only (PAY-SEC-01 / ENV-SPLIT-01)", () => {
   const LISTED_YOOKASSA_IP = "185.71.76.1"; // in 185.71.76.0/27
   const OUTSIDE_IP = "8.8.8.8";
   const VALID_BODY = { event: "payment.succeeded", object: { id: "yk-777" } };
 
-  // The route captures `IP_ALLOWLIST_ENFORCED` at module load, so re-import a
-  // fresh copy after flipping the env flag (the `enqueue` spy is a hoisted
-  // singleton, so it survives the reset and still records calls).
-  async function loadRouteWithEnforce(enforced: boolean) {
-    vi.resetModules();
-    mockEnv.YOOKASSA_IP_ALLOWLIST_ENFORCED = enforced;
-    const mod = await import("./route");
-    return mod.POST;
-  }
+  const allowlistWarn = () =>
+    vi.mocked(logInfo).mock.calls.find(([msg]) => String(msg).includes("not in allowlist"));
 
-  it("enforce ON + non-listed source IP → 403, nothing enqueued", async () => {
-    const post = await loadRouteWithEnforce(true);
-    const res = await post(makeRequest({ token: "test-secret", body: VALID_BODY, xff: OUTSIDE_IP }));
-    expect(res.status).toBe(403);
-    expect(enqueue).not.toHaveBeenCalled();
-  });
-
-  it("enforce ON + listed YooKassa source IP → 200, enqueued", async () => {
-    const post = await loadRouteWithEnforce(true);
-    const res = await post(
+  it("listed YooKassa source IP → 200, enqueued, warn-лога об allowlist нет", async () => {
+    const res = await POST(
       makeRequest({ token: "test-secret", body: VALID_BODY, xff: LISTED_YOOKASSA_IP }),
     );
     expect(res.status).toBe(200);
     expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(allowlistWarn()).toBeUndefined();
   });
 
-  it("enforce OFF (default) + non-listed source IP → 200 (logged, NOT rejected)", async () => {
-    const post = await loadRouteWithEnforce(false);
-    const res = await post(makeRequest({ token: "test-secret", body: VALID_BODY, xff: OUTSIDE_IP }));
+  it("non-listed source IP → 200 и enqueued (логируется, НЕ отклоняется)", async () => {
+    const res = await POST(makeRequest({ token: "test-secret", body: VALID_BODY, xff: OUTSIDE_IP }));
     expect(res.status).toBe(200);
     expect(enqueue).toHaveBeenCalledTimes(1);
+    const warn = allowlistWarn();
+    expect(warn).toBeDefined();
+    expect(warn![1]).toMatchObject({ level: "warn", ip: OUTSIDE_IP });
   });
 
-  it("enforce ON ignores a forged leftmost XFF entry — a spoofed listed IP does NOT pass", async () => {
-    const post = await loadRouteWithEnforce(true);
-    // Attacker prepends a listed IP but the real (rightmost) hop is outside.
-    const res = await post(
+  it("forged leftmost XFF entry → всё равно 200 (log-only), в лог идёт настоящий правый адрес", async () => {
+    const res = await POST(
       makeRequest({
         token: "test-secret",
         body: VALID_BODY,
         xff: `${LISTED_YOOKASSA_IP}, ${OUTSIDE_IP}`,
       }),
     );
-    expect(res.status).toBe(403);
-    expect(enqueue).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(allowlistWarn()?.[1]).toMatchObject({ ip: OUTSIDE_IP });
+  });
+
+  it("в роуте нет ветки enforce: удалённый флаг не читается", () => {
+    // stripComments (FIX-C5): шапка роута ЗАКОННО упоминает удалённый флаг в прозе —
+    // сторож судит о коде, а не о комментариях.
+    const source = stripComments(readFileSync(new URL("./route.ts", import.meta.url), "utf8"));
+    expect(source).not.toContain("YOOKASSA_IP_ALLOWLIST_ENFORCED");
   });
 });
 

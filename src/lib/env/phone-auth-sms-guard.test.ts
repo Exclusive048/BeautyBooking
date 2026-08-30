@@ -1,15 +1,27 @@
-import { describe, it, expect } from "vitest";
-
-import { envSchemaForTests } from "@/lib/env";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 /**
- * QA-003 pre-step — «прод + вход по телефону + SMS не настроен» больше не
- * стартует.
+ * QA-003 → ENV-SPLIT-01 — «прод + вход по телефону + SMS не настроен» больше
+ * не отказ на старте, а НЕВЫРАЗИМОЕ состояние.
  *
- * Почему это код, а не строка в чеклисте: mock-провайдер выбирается по
- * КОНФИГУ (`!isSmsConfigured`), а не по окружению, и логирует тело сообщения
- * вместе с OTP. До сих пор от утечки защищал только дефолт tri-state
- * `PHONE_AUTH_ENABLED` — то есть отсутствие действия, а не проверка.
+ * До ENV-SPLIT-01 инвариант держал рефайн: `PHONE_AUTH_ENABLED=true` в проде
+ * без SMS-кредов ронял старт. Флаг удалён (решение владельца 2026-08-30), и
+ * вход по телефону в проде включается САМИМ наличием кредов:
+ * `isPhoneAuthEnabled = !isProduction || isSmsConfigured`. Значит комбинация
+ * «phone-вход ON, провайдер mock» в проде не может быть записана в env вообще —
+ * запрещать нечего.
+ *
+ * Здесь пиннится ровно это свойство и его границы:
+ *   1. в production `isPhoneAuthEnabled ⇒ isSmsConfigured` на ЛЮБОЙ комбинации
+ *      кредов (полные / частичные / пустые / отсутствующие);
+ *   2. удалённые флаги (`PHONE_AUTH_ENABLED`, `SMS_PROVIDER_ENABLED`) Zod
+ *      вырезает из результата и они ни на что не влияют — старая строка в
+ *      чьём-то `.env` не включит канал без кредов и не выключит его с кредами;
+ *   3. override-ключа не существует.
+ *
+ * Модуль переимпортируется со свежим `process.env` (как в
+ * `env.phone-auth-flag.test.ts`); фикстура ПОЛНАЯ — проваленный парс под
+ * `NODE_ENV=production` зовёт `process.exit(1)`.
  */
 
 const BASE: Record<string, string> = {
@@ -19,92 +31,93 @@ const BASE: Record<string, string> = {
   REDIS_URL: "redis://localhost:6379",
   WORKER_SECRET: "worker-secret",
   MEDIA_DELIVERY_SECRET: "media-secret",
-  // FIX-D1: публичный URL проверяется по каноническому ХОСТУ, а не только на
-  // наличие (well-formed значение на чужом домене молча уводит письма, пуши и
-  // logout к третьей стороне). Эти тесты про другое, поэтому в фикстуре стоит
-  // канонический хост — иначе прод-кейсы падают на чужом refine. Сам refine
-  // покрыт в `env-public-url.test.ts`. Тот же приём, что с s3 ниже/выше.
-  NEXT_PUBLIC_APP_URL: "https://мастеррядом.online",
-  // SEC-23: `STORAGE_PROVIDER=local` в проде теперь отвергается на старте
-  // (файлы local-провайдера отдаются мимо `ensureCanReadMedia`). Эти тесты про
-  // другое, поэтому в базовую фикстуру добавлено валидное s3-хранилище — иначе
-  // прод-кейсы падают на чужом refine. Сам refine покрыт в
-  // `env/local-storage-prod-guard.test.ts`.
+  // FIX-D1 (канонический хост) и SEC-23 (s3 в проде) — чужие рефайны, покрыты
+  // своими файлами; здесь только чтобы прод-парс проходил.
+  NEXT_PUBLIC_APP_URL: "https://masterryadom.ru",
   STORAGE_PROVIDER: "s3",
   S3_BUCKET: "bucket",
   S3_ACCESS_KEY: "s3-key",
   S3_SECRET_KEY: "s3-secret",
+  NODE_ENV: "production",
 };
 
-const parse = (over: Record<string, string | undefined>) => {
-  const input: Record<string, string> = { ...BASE };
-  for (const [k, v] of Object.entries(over)) {
-    if (v === undefined) delete input[k];
-    else input[k] = v;
+const originalEnv = { ...process.env };
+
+async function loadEnv(overrides: Record<string, string | undefined>) {
+  vi.resetModules();
+  for (const key of Object.keys(process.env)) delete process.env[key];
+  Object.assign(process.env, BASE);
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
   }
-  return envSchemaForTests.safeParse(input);
-};
+  return import("@/lib/env");
+}
 
-const SMS_ON = {
-  SMS_PROVIDER_ENABLED: "true",
-  SMS_PROVIDER_LOGIN: "login",
-  SMS_PROVIDER_PASSWORD: "pass",
-};
+afterEach(() => {
+  for (const key of Object.keys(process.env)) delete process.env[key];
+  Object.assign(process.env, originalEnv);
+  vi.resetModules();
+});
 
-const msg = (r: ReturnType<typeof parse>) =>
-  r.success ? "" : r.error.issues.map((i) => i.message).join("\n");
+const CRED_COMBOS: Array<Record<string, string | undefined>> = [
+  {},
+  { SMS_PROVIDER_LOGIN: "login" },
+  { SMS_PROVIDER_PASSWORD: "pass" },
+  { SMS_PROVIDER_LOGIN: "", SMS_PROVIDER_PASSWORD: "" },
+  { SMS_PROVIDER_LOGIN: "  ", SMS_PROVIDER_PASSWORD: "pass" },
+  { SMS_PROVIDER_LOGIN: "login", SMS_PROVIDER_PASSWORD: "pass" },
+];
 
-describe("PHONE_AUTH_ENABLED × SMS provider guard", () => {
-  it("prod + phone auth ON + SMS НЕ настроен → отказ на старте", () => {
-    const res = parse({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "true" });
-    expect(res.success).toBe(false);
-    const m = msg(res);
-    expect(m).toContain("PHONE_AUTH_ENABLED=true in production requires a configured SMS provider");
-    // Сообщение обязано назвать РИСК, а не только условие.
-    expect(m).toContain("PLAINTEXT OTP");
-    // И порядок действий.
-    expect(m).toContain("configure the SMS provider first");
-  });
-
-  it("prod + phone auth ON + SMS настроен полностью → ок", () => {
-    expect(
-      parse({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "true", ...SMS_ON }).success,
-    ).toBe(true);
-  });
-
-  it("prod + phone auth ВЫКЛЮЧЕН (unset ⇒ OFF в проде) → ок", () => {
-    expect(parse({ NODE_ENV: "production" }).success).toBe(true);
-  });
-
-  it("prod + phone auth явно false → ок", () => {
-    expect(parse({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "false" }).success).toBe(true);
-  });
-
-  it("dev + phone auth ON + SMS не настроен → ок (mock тут и задуман)", () => {
-    expect(
-      parse({ NODE_ENV: "development", PHONE_AUTH_ENABLED: "true" }).success,
-    ).toBe(true);
-  });
-
-  it("частичные SMS-креды НЕ считаются настроенным провайдером", () => {
-    // Зеркалит isSmsConfigured: нужны флаг И логин И пароль.
-    for (const partial of [
-      { SMS_PROVIDER_ENABLED: "true" },
-      { SMS_PROVIDER_ENABLED: "true", SMS_PROVIDER_LOGIN: "login" },
-      { SMS_PROVIDER_LOGIN: "login", SMS_PROVIDER_PASSWORD: "pass" },
-    ]) {
-      const res = parse({ NODE_ENV: "production", PHONE_AUTH_ENABLED: "true", ...partial });
-      expect(res.success, JSON.stringify(partial)).toBe(false);
+describe("ENV-SPLIT-01 · phone-вход в проде ⇒ SMS-провайдер настроен", () => {
+  it("на любой комбинации кредов isPhoneAuthEnabled влечёт isSmsConfigured", async () => {
+    for (const combo of CRED_COMBOS) {
+      const mod = await loadEnv(combo);
+      expect(mod.isProduction, JSON.stringify(combo)).toBe(true);
+      if (mod.isPhoneAuthEnabled) {
+        expect(mod.isSmsConfigured, JSON.stringify(combo)).toBe(true);
+      }
     }
   });
 
-  it("override-флага не существует — обойти guard нечем", () => {
-    const res = parse({
-      NODE_ENV: "production",
+  it("включается только ПОЛНОЙ парой login+password — частичные и пустые не считаются", async () => {
+    const full = await loadEnv({ SMS_PROVIDER_LOGIN: "login", SMS_PROVIDER_PASSWORD: "pass" });
+    expect(full.isSmsConfigured).toBe(true);
+    expect(full.isPhoneAuthEnabled).toBe(true);
+
+    for (const partial of CRED_COMBOS.slice(0, 4)) {
+      const mod = await loadEnv(partial);
+      expect(mod.isSmsConfigured, JSON.stringify(partial)).toBe(false);
+      expect(mod.isPhoneAuthEnabled, JSON.stringify(partial)).toBe(false);
+    }
+  });
+
+  it("удалённый PHONE_AUTH_ENABLED ни включает без кредов, ни выключает с кредами", async () => {
+    const forcedOn = await loadEnv({ PHONE_AUTH_ENABLED: "true" });
+    expect(forcedOn.isPhoneAuthEnabled).toBe(false);
+    expect((forcedOn.env as Record<string, unknown>).PHONE_AUTH_ENABLED).toBeUndefined();
+
+    const forcedOff = await loadEnv({
+      PHONE_AUTH_ENABLED: "false",
+      SMS_PROVIDER_LOGIN: "login",
+      SMS_PROVIDER_PASSWORD: "pass",
+    });
+    expect(forcedOff.isPhoneAuthEnabled).toBe(true);
+  });
+
+  it("удалённый SMS_PROVIDER_ENABLED тоже вырезан и не заменяет креды", async () => {
+    const mod = await loadEnv({ SMS_PROVIDER_ENABLED: "true" });
+    expect(mod.isSmsConfigured).toBe(false);
+    expect(mod.isPhoneAuthEnabled).toBe(false);
+    expect((mod.env as Record<string, unknown>).SMS_PROVIDER_ENABLED).toBeUndefined();
+  });
+
+  it("override-ключа не существует — mock-провайдер в проде недостижим ничем", async () => {
+    const mod = await loadEnv({
       PHONE_AUTH_ENABLED: "true",
       ALLOW_MOCK_SMS_IN_PRODUCTION: "true",
-availability: "yes",
     });
-    expect(res.success).toBe(false);
+    expect(mod.isSmsConfigured).toBe(false);
+    expect(mod.isPhoneAuthEnabled).toBe(false);
   });
 });
