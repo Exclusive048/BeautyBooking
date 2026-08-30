@@ -593,10 +593,18 @@ export default function CatalogPageClient({
   // dropdown / free-text submit, while the sidebar drives faceted browse.
   // Mixing them confuses results, so we wipe the input as the user steps
   // into "browse" mode.
-  const clearSearchInput = useCallback(() => {
-    setDraftServiceQuery("");
-    updateParams({ serviceQuery: null, serviceId: null });
-  }, [updateParams]);
+  //
+  // CATALOG-FILTER-DEBOUNCE: очистка поиска и сам фильтр идут ОДНИМ
+  // `updateParams`, а не двумя подряд. Два вызова = два `router.replace` на
+  // одно намерение, причём второй строился от ещё не обновлённого
+  // `searchParams` и молча терял удаление `serviceQuery` из первого.
+  const withSearchCleared = useCallback(
+    (updates: Record<string, string | null>) => {
+      setDraftServiceQuery("");
+      updateParams({ serviceQuery: null, serviceId: null, ...updates });
+    },
+    [updateParams],
+  );
 
   // Shared filter props for sidebar and drawer
   const filterProps = {
@@ -609,39 +617,40 @@ export default function CatalogPageClient({
     entityType,
     availableToday,
     onGlobalCategoryChange: (value: string | null) => {
-      clearSearchInput();
-      updateParams({ globalCategoryId: value });
+      withSearchCleared({ globalCategoryId: value });
     },
     onDistrictChange: (value: string) => {
-      clearSearchInput();
-      updateParams({ district: value || null });
+      withSearchCleared({ district: value || null });
     },
     onRatingMinChange: (value: string) => {
-      clearSearchInput();
-      updateParams({ ratingMin: value || null });
+      withSearchCleared({ ratingMin: value || null });
     },
     onPriceChange: (min: string, max: string) => {
-      clearSearchInput();
-      updateParams({
+      withSearchCleared({
         priceMin: min.length > 0 ? min : null,
         priceMax: max.length > 0 ? max : null,
       });
     },
     onToggleHot: () => {
-      clearSearchInput();
-      updateParams({ hot: hot ? null : "true" });
+      withSearchCleared({ hot: hot ? null : "true" });
     },
     onEntityTypeChange: (value: EntityType) => {
-      clearSearchInput();
-      updateParams({ entityType: value === "all" ? null : value });
+      withSearchCleared({ entityType: value === "all" ? null : value });
     },
     onToggleAvailableToday: () => {
-      clearSearchInput();
-      updateParams({ availableToday: availableToday ? null : "true" });
+      withSearchCleared({ availableToday: availableToday ? null : "true" });
     },
     onReset: () => {
-      clearSearchInput();
-      resetFilters();
+      withSearchCleared({
+        globalCategoryId: null,
+        district: null,
+        ratingMin: null,
+        priceMin: null,
+        priceMax: null,
+        hot: null,
+        entityType: null,
+        availableToday: null,
+      });
     },
     activeCount: activeFilterCount,
     priceDistribution: data.priceDistribution,

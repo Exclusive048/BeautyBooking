@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DistrictSuggestInput } from "@/features/catalog/components/district-suggest-input";
 import { HistogramSlider } from "@/features/catalog/components/histogram-slider";
+import { useDeferredCommit } from "@/hooks/use-deferred-commit";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
@@ -48,6 +49,18 @@ const PRICE_FALLBACK_MAX = 20000;
 const CATEGORIES_VISIBLE_BY_DEFAULT = 10;
 
 const RATING_STEPS = [0, 3, 3.5, 4, 4.5, 5];
+
+/**
+ * CATALOG-FILTER-DEBOUNCE (2026-08-31) — ползунки цены и рейтинга шлют `change`
+ * на КАЖДЫЙ пиксель перетаскивания, а фильтр живёт в URL: каждое событие было
+ * навигацией + запросом `/api/catalog/search`. Черновик рисуется мгновенно, а
+ * в URL (и в запрос) значение уходит после `FILTER_COMMIT_DELAY_MS` тишины —
+ * см. `useDeferredCommit`. Кнопки/переключатели дебаунса не требуют: это
+ * дискретные клики, у них одно событие = одно намерение.
+ */
+const FILTER_COMMIT_DELAY_MS = 300;
+const priceRangeEqual = (a: [number, number], b: [number, number]) =>
+  a[0] === b[0] && a[1] === b[1];
 
 type CategoriesSectionProps = {
   topCategories: Category[];
@@ -147,6 +160,26 @@ export function CatalogSidebar({
   const parsedLow = priceMin ? Math.max(sliderMin, Number(priceMin) || sliderMin) : sliderMin;
   const parsedHigh = priceMax ? Math.min(sliderMax, Number(priceMax) || sliderMax) : sliderMax;
 
+  // Цена: черновик — сразу на ползунке, в URL — через FILTER_COMMIT_DELAY_MS.
+  const committedPrice = useMemo<[number, number]>(
+    () => [parsedLow, parsedHigh],
+    [parsedLow, parsedHigh],
+  );
+  const commitPrice = useCallback(
+    ([nextLow, nextHigh]: [number, number]) => {
+      const minStr = nextLow > sliderMin ? String(Math.round(nextLow)) : "";
+      const maxStr = nextHigh < sliderMax ? String(Math.round(nextHigh)) : "";
+      onPriceChange(minStr, maxStr);
+    },
+    [onPriceChange, sliderMin, sliderMax],
+  );
+  const [priceValue, setPriceValue] = useDeferredCommit(
+    committedPrice,
+    commitPrice,
+    FILTER_COMMIT_DELAY_MS,
+    priceRangeEqual,
+  );
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -172,6 +205,18 @@ export function CatalogSidebar({
   );
 
   const ratingValue = parseFloat(ratingMin) || 0;
+
+  // Рейтинг: тот же приём, что у цены, — ползунок и подпись «N+» ходят за
+  // черновиком, URL догоняет через FILTER_COMMIT_DELAY_MS.
+  const commitRating = useCallback(
+    (next: number) => onRatingMinChange(next === 0 ? "" : String(next)),
+    [onRatingMinChange],
+  );
+  const [ratingDraft, setRatingDraft] = useDeferredCommit(
+    ratingValue,
+    commitRating,
+    FILTER_COMMIT_DELAY_MS,
+  );
 
   // All sections share the same shell: a font-mono uppercase eyebrow title,
   // 24px bottom padding, and a 1px subtle bottom border (suppressed on the
@@ -222,13 +267,9 @@ export function CatalogSidebar({
         <HistogramSlider
           min={sliderMin}
           max={sliderMax}
-          value={[parsedLow, parsedHigh]}
+          value={priceValue}
           distribution={priceDistribution ?? []}
-          onChange={([nextLow, nextHigh]) => {
-            const minStr = nextLow > sliderMin ? String(Math.round(nextLow)) : "";
-            const maxStr = nextHigh < sliderMax ? String(Math.round(nextHigh)) : "";
-            onPriceChange(minStr, maxStr);
-          }}
+          onChange={setPriceValue}
         />
       </section>
 
@@ -238,7 +279,7 @@ export function CatalogSidebar({
             {UI_TEXT.catalog.sidebar.rating}
           </div>
           <span className="font-mono text-sm tabular-nums text-text-main">
-            {ratingValue === 0 ? UI_TEXT.catalog.sidebar.ratingAny : `${ratingValue}+`}
+            {ratingDraft === 0 ? UI_TEXT.catalog.sidebar.ratingAny : `${ratingDraft}+`}
           </span>
         </div>
         <input
@@ -246,11 +287,8 @@ export function CatalogSidebar({
           min={0}
           max={5}
           step={0.5}
-          value={ratingValue}
-          onChange={(e) => {
-            const next = parseFloat(e.target.value);
-            onRatingMinChange(next === 0 ? "" : String(next));
-          }}
+          value={ratingDraft}
+          onChange={(e) => setRatingDraft(parseFloat(e.target.value))}
           className="h-2 w-full cursor-pointer accent-primary"
           aria-label={UI_TEXT.catalog.sidebar.rating}
         />
