@@ -54,9 +54,15 @@ const PROD_BASE: Record<string, string | undefined> = {
 };
 
 beforeEach(() => {
+  // Ожидаемый stderr: на каждом «запрещённом» значении env.ts честно печатает
+  // «❌ Invalid environment variables» перед выходом — это и есть проверяемое
+  // поведение, а не сбой. В выводе `npm run test` он читался как падение,
+  // поэтому глушится здесь; сам отказ старта проверяется через `rejects.toThrow`.
+  vi.spyOn(console, "error").mockImplementation(() => {});
   process.env = { ...ORIGINAL };
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   process.env = { ...ORIGINAL };
   vi.resetModules();
 });
