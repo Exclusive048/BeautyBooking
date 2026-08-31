@@ -307,11 +307,14 @@ services:
       - "traefik.http.middlewares.maintenance-json.errors.status=502-504"
       - "traefik.http.middlewares.maintenance-json.errors.service=maintenance"
       - "traefik.http.middlewares.maintenance-json.errors.query=/api/maintenance"
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/index.html"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+    # 🔴 Healthcheck здесь НАМЕРЕННО отсутствует. Docker-провайдер traefik не
+    # читает метки контейнера, пока его healthcheck в состоянии `starting`, а
+    # именно на этих метках определены middleware `maintenance-*`, на которые
+    # ссылаются роутеры web/api. С healthcheck'ом (первая проба через 30 с)
+    # роутеры web/api всё это окно отключены — «middleware does not exist» —
+    # и traefik отдаёт 404 на ВСЁ; так провалился первый автодеплой
+    # (MAINTENANCE-PAGE-01, прогон 33449906187). Без healthcheck'а nginx
+    # виден traefik'у с первой миллисекунды. Пин — app-tier-topology.test.ts.
     logging:
       driver: "json-file"
       options:

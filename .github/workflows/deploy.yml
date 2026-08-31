@@ -344,11 +344,18 @@ jobs:
             # Маршрутизация traefik сквозная: /api/health обязан уйти в api, /robots.txt —
             # в web (роут без БД). Host подставляется через --resolve на loopback, поэтому
             # проверяется именно боевой роутер, а не прямой порт контейнера.
+            # Traefik сходится не мгновенно (docker-события, throttle ~2 с, метки новых
+            # контейнеров), поэтому — до 10 попыток с шагом 3 с, а не один выстрел.
             if command -v curl >/dev/null 2>&1; then
               for path in /api/health /robots.txt; do
-                CODE="$(curl -sk -o /dev/null -w '%{http_code}' --resolve masterryadom.ru:443:127.0.0.1 "https://masterryadom.ru$path" || echo 000)"
-                echo "traefik $path → $CODE"
-                [ "$CODE" = "200" ] || rollback_and_fail "traefik не довёл $path до приложения (HTTP $CODE)"
+                CODE=000
+                for i in $(seq 1 10); do
+                  CODE="$(curl -sk -o /dev/null -w '%{http_code}' --resolve masterryadom.ru:443:127.0.0.1 "https://masterryadom.ru$path" || echo 000)"
+                  [ "$CODE" = "200" ] && break
+                  sleep 3
+                done
+                echo "traefik $path → $CODE (попыток: $i)"
+                [ "$CODE" = "200" ] || rollback_and_fail "traefik не довёл $path до приложения (HTTP $CODE после $i попыток)"
               done
             else
               echo "⚠️  curl на ВМ нет — сквозная проверка traefik пропущена (проверить руками: DEPLOY-CHECKLIST 3.2)"

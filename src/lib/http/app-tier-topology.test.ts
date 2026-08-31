@@ -221,6 +221,13 @@ describe("APP-TIER-SPLIT-02 · deploy.yml согласован с тополог
     expect(DEPLOY).not.toMatch(/wait_healthy edge\b/);
   });
 
+  it("сквозная проверка traefik — с ретраями на сходимость, а не одним выстрелом", () => {
+    // Первый автодеплой откатился на одиночной пробе, попавшей в окно сходимости.
+    const script = DEPLOY.slice(DEPLOY.indexOf("script: |"));
+    const block = script.slice(script.indexOf("for path in /api/health /robots.txt"));
+    expect(block).toMatch(/for i in \$\(seq 1 \d+\); do[\s\S]*?curl -sk[\s\S]*?sleep \d+/);
+  });
+
   it("ждёт healthy у web и api, проверяет readiness у обеих половин", () => {
     for (const svc of ["web", "api"]) {
       expect(DEPLOY, `деплой не ждёт healthy у ${svc}`).toMatch(new RegExp(`wait_healthy ${svc}\\b`));
@@ -277,6 +284,13 @@ describe("MAINTENANCE-PAGE-01 · страница работ поднимает�
     expect(maintenance!).toMatch(/\.\/deploy\/maintenance\/index\.html:\/usr\/share\/nginx\/html\/index\.html:ro/);
     expect(maintenance!).toMatch(/\.\/deploy\/maintenance\/nginx\.conf:\/etc\/nginx\/conf\.d\/default\.conf:ro/);
     expect(maintenance!).toMatch(/\.\/\.maintenance-state:\/usr\/share\/nginx\/html\/state:ro/);
+  });
+
+  it("у maintenance НЕТ healthcheck'а: пока он `starting`, traefik не видит его метки, а на них — middleware web/api", () => {
+    // Прогон 33449906187: с healthcheck'ом (первая проба через 30 с) роутеры web/api
+    // были отключены — «middleware maintenance-html@docker does not exist» — и
+    // traefik отдавал 404 на всё; деплой откатился. Healthcheck здесь = отказ.
+    expect(hasServiceKey(maintenance!, "healthcheck")).toBe(false);
   });
 
   it("errors-middleware: web → HTML, api → JSON, оба на 502–504 из сервиса maintenance", () => {
