@@ -119,6 +119,13 @@ describe("APP-TIER-SPLIT-02 · compose: один образ, web + api за trae
     }
   });
 
+  it("worker несёт hairpin-маппинг на host-gateway (пинг живости идёт по публичному домену)", () => {
+    // WORKER-PING-HAIRPIN-01: healthcheck-ping.ts строит URL из NEXT_PUBLIC_APP_URL,
+    // а публичный IP из контейнера через облачный NAT недостижим. Без маппинга
+    // /api/health/worker всегда отвечает «воркер мёртв» при живом воркере.
+    expect(serviceBlock("worker")!).toMatch(/^ {6}- "masterryadom\.ru:host-gateway"$/m);
+  });
+
   it("порты наружу — только у traefik (80/443); 3000 — только у api и только на loopback", () => {
     expect(portsOf(traefik!).sort()).toEqual(["443:443", "80:80"]);
     expect(portsOf(web!), "web не должен публиковать порт: страницы ходят через traefik").toEqual([]);

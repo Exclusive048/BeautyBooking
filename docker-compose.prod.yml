@@ -281,6 +281,16 @@ services:
     # 60 c: с запасом перекрывает и джобу, и `flushReports(2000)` в конце.
     stop_grace_period: 60s
     env_file: .env.production
+    # WORKER-PING-HAIRPIN-01 (2026-09-01): воркер каждые 30 с пингует
+    # `NEXT_PUBLIC_APP_URL`/api/health/worker (lib/queue/healthcheck-ping.ts) —
+    # без этой строки запрос идёт на ПУБЛИЧНЫЙ IP, а облачный NAT изнутри ВМ
+    # назад не заворачивает (hairpin) → вечный таймаут, и /api/health/worker
+    # всегда отвечает «воркер мёртв» при живом воркере. Маппинг ведёт домен на
+    # host-gateway (docker0 хоста), где traefik слушает 443 с настоящим
+    # сертификатом — TLS/SNI работают, кода правка не требует. Действует
+    # только внутри контейнера worker.
+    extra_hosts:
+      - "masterryadom.ru:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

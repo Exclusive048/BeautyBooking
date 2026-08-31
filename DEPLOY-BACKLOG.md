@@ -275,7 +275,7 @@ FIX-C7 перепробовал шесть сторожей правдоподо
 
 ### 1.2. Домены и OAuth-приложения
 
-- **env → `мастеррядом.online`**: `VK_REDIRECT_URI` / `VK_ID_REDIRECT_URI` + `APP_PUBLIC_URL` в prod env. Tracked-шаблоны и `next.config.ts` уже вычищены от stale-доменов (FIX-PREDEPLOY-GAPS). ⚠️ Домен кириллический (IDN) — для OAuth redirect_uri значение должно **byte-match** консоли провайдера.
+- **env → `masterryadom.ru`** (DOMAIN-CUTOVER-01, 2026-09-01 — прежний кириллический `мастеррядом.online` погашен и вычищен из кода/allowlist'ов): `VK_REDIRECT_URI` / `VK_ID_REDIRECT_URI` + `APP_PUBLIC_URL` в prod env. Tracked-шаблоны и `next.config.ts` вычищены от stale-доменов. ⚠️ Для OAuth redirect_uri значение должно **byte-match** консоли провайдера — записи в консолях VK и Яндекса надо перерегистрировать на новый домен, иначе вход упадёт с redirect_uri mismatch. ⚠️ `NEXT_PUBLIC_APP_URL`/`APP_PUBLIC_URL` на старом домене теперь роняют старт (рефайн `CANONICAL_PUBLIC_HOSTS`).
 - **VK** — зарегистрировать redirect_uri + live round-trip с реальными creds. ⚠️ Перед включением подтвердить готовность VK-приложения (см. VK-checklist в `BACKLOG.md`).
 - **Yandex OAuth** — зарегистрировать app на oauth.yandex.ru (scopes `login:info` / `login:email` / `login:avatar`), выставить `YANDEX_OAUTH_CLIENT_ID` / `YANDEX_OAUTH_SECRET` / `YANDEX_OAUTH_REDIRECT_URI` (→ `…/api/auth/yandex/callback`) + `NEXT_PUBLIC_YANDEX_ENABLED=true`. Код-комплит; callback round-trip проверяется только на staging с реальным app.
 - **Telegram** — live round-trip (login + connect-modal). ⚠️ Держать `NEXT_PUBLIC_TELEGRAM_ENABLED` **unset/false** до юридического ревью (FZ-199) — это гейт этапа 2, не этапа 1.
@@ -289,6 +289,9 @@ FIX-C7 перепробовал шесть сторожей правдоподо
 - **Удалить `OPENAI_API_KEY`** из prod env — последний потребитель ушёл (visual-search мигрировал на Yandex). Zod strip'ает безвредно, но чистим явно.
 - **Email infra** — SMTP provider + DNS (DKIM / SPF / DMARC).
 - **NEXT_PUBLIC_* — в `.env.production` на ВМ, и это покрывает И сборку.** Прецедент DOCKER-READINESS-AUDIT-01: `NEXT_PUBLIC_*` инлайнятся **на этапе сборки**, runtime-env до браузера не доезжает (уже случалось: 8 переменных запеклись пустыми, включая ИНН и Yandex-кнопку). Со схемой «сборка на ВМ» (§1.4) источник ОДИН: `docker-compose.prod.yml` интерполирует build-args сервиса `app` из `.env.production` (`--env-file`), то есть переменная, заданная там, попадает и в сборку, и в runtime — отдельного места для build-args больше нет. ⚠️ Пропущенная переменная по-прежнему запекается ПУСТОЙ без ошибки — держать полный список (см. args в compose). `NEXT_PUBLIC_GLITCHTIP_RELEASE` задавать не надо — его экспортирует деплой-скрипт (короткий SHA).
+
+- **WORKER-PING-HAIRPIN-01 (2026-09-01)** — пинг живости воркера идёт на `NEXT_PUBLIC_APP_URL`/api/health/worker, и изнутри контейнера публичный IP через облачный NAT недостижим (hairpin) — в логе воркера это вечное `Worker healthcheck ping failed: The operation was aborted due to timeout` каждые 30 с, а `/api/health/worker` отвечает «мёртв» при живом воркере. Закрыто в compose: `extra_hosts: masterryadom.ru → host-gateway` у сервиса worker (запрос уходит в traefik этой же ВМ, TLS настоящий). Ошибка этого класса НЕ уходит в Telegram намеренно (`__skipAlert`) — искать её только в логах.
+- **Redis: `vm.overcommit_memory=1` на ВМ приложения** *(2026-09-01, из лога Redis: «WARNING Memory overcommit must be enabled!»)* — без него background-save/AOF-rewrite может падать при нехватке памяти. Разово: `sysctl vm.overcommit_memory=1`; навсегда: строка `vm.overcommit_memory = 1` в `/etc/sysctl.conf` (или файл в `/etc/sysctl.d/`). Хост-настройка, в compose не выражается.
 
 ### 1.4. Схема деплоя: сборка на ВМ, без реестра (CI-DEPLOY-NOREGISTRY-01, 2026-08-10)
 
