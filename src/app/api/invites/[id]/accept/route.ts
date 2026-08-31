@@ -17,6 +17,8 @@ export async function POST(
   const result = await acceptStudioInvite(p.id, {
     id: auth.user.id,
     phone: auth.user.phone,
+    // PHONE-CLAIM-01: инвайт принимает только доказанный владелец номера.
+    phoneVerifiedAt: auth.user.phoneVerifiedAt,
     roles: auth.user.roles,
   });
 

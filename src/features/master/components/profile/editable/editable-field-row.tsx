@@ -3,11 +3,36 @@
 import { Pencil } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import {
+  formatRussianPhoneInput,
+  formatRussianPhoneInputOnChange,
+  isCompleteRussianPhoneInput,
+} from "@/lib/phone/input-format";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
 import { useAutosave } from "./use-autosave";
 
 const T = UI_TEXT.cabinetMaster.profile.editable;
+
+/**
+ * PHONE-CLAIM-01 — масочные крючки выбираются по СЕРИАЛИЗУЕМОМУ пропу `mask`,
+ * а не передаются функциями: `ContactsSection` — серверный компонент, и
+ * функция-проп через RSC-границу не проезжает (§13: string id + lookup map).
+ * `formatValue` идемпотентен (форматирует и ввод, и канон сервера);
+ * `formatOnChange` — маска на каждый keystroke; пока `validate` возвращает
+ * текст, сохранение НЕ уходит — иначе debounce отправлял бы каждый недобранный
+ * номер и мигал ошибкой валидации.
+ */
+const MASKS = {
+  phone: {
+    formatValue: formatRussianPhoneInput,
+    formatOnChange: formatRussianPhoneInputOnChange,
+    validate: (draft: string): string | null =>
+      draft === "" || isCompleteRussianPhoneInput(draft)
+        ? null
+        : UI_TEXT.cabinetMaster.profile.contacts.phoneIncomplete,
+  },
+} as const;
 
 type Props = {
   label: string;
@@ -21,6 +46,8 @@ type Props = {
   maxLength?: number;
   /** Optional value normaliser run before save. */
   normalize?: (value: string) => string;
+  /** Маска ввода — см. `MASKS` выше (RSC-safe id вместо функций-пропов). */
+  mask?: keyof typeof MASKS;
 };
 
 /**
@@ -43,10 +70,19 @@ export function EditableFieldRow({
   placeholder,
   maxLength,
   normalize,
+  mask,
 }: Props) {
+  const maskConfig = mask ? MASKS[mask] : null;
+  const formatValue = maskConfig?.formatValue;
+  const formatOnChange = maskConfig?.formatOnChange;
+  const validate = maskConfig?.validate;
   const inputId = useId();
+  const errorId = useId();
   const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const toDisplay = (raw: string) => (formatValue ? formatValue(raw) : raw);
+  const [draft, setDraft] = useState(() => toDisplay(value));
+  /** Локальная ошибка валидации (незавершённый ввод) — блокирует сохранение. */
+  const [invalidMessage, setInvalidMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync to props (React 19 — compare during render). The previous-prop
@@ -56,7 +92,7 @@ export function EditableFieldRow({
   if (prevValue !== value) {
     setPrevValue(value);
     if (!isEditing) {
-      setDraft(value);
+      setDraft(toDisplay(value));
     }
   }
 
@@ -67,14 +103,29 @@ export function EditableFieldRow({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [fieldKey]: normalized }),
     });
-    if (!response.ok) return { ok: false };
+    if (!response.ok) {
+      // FIX-C8: действенный отказ («номер уже используется…») показывается
+      // дословно — канонический «Попробуйте ещё раз» на 409 прямо неверен.
+      let message: string | undefined;
+      try {
+        const body: unknown = await response.json();
+        const serverMessage = (body as { error?: { message?: unknown } } | null)?.error?.message;
+        if (typeof serverMessage === "string" && serverMessage.trim().length > 0) {
+          message = serverMessage;
+        }
+      } catch {
+        // Тело не JSON — остаёмся на каноне чипа.
+      }
+      return { ok: false, message };
+    }
     return { ok: true };
   });
 
   const enterEdit = () => {
     if (isEditing) return;
-    autosave.setBaseline(value);
-    setDraft(value);
+    autosave.setBaseline(toDisplay(value));
+    setDraft(toDisplay(value));
+    setInvalidMessage(null);
     setIsEditing(true);
     // Focus the input on the next tick — `useRef` isn't populated until
     // React paints the input.
@@ -83,15 +134,31 @@ export function EditableFieldRow({
 
   const exitEdit = () => {
     autosave.cancel();
+    setInvalidMessage(null);
     setIsEditing(false);
   };
 
-  const handleChange = (next: string) => {
+  const handleChange = (raw: string) => {
+    const next = formatOnChange ? formatOnChange(draft, raw) : raw;
     setDraft(next);
+    const invalid = validate ? validate(next) : null;
+    setInvalidMessage(invalid);
+    if (invalid) {
+      // Не отправлять заведомо невалидное: отменяем и уже взведённый debounce.
+      autosave.cancel();
+      return;
+    }
     autosave.scheduleSave(next);
   };
 
   const handleBlur = () => {
+    if (validate && validate(draft) !== null) {
+      // Невалидный черновик на blur не сохраняется и не остаётся висеть —
+      // строка возвращается к последнему сохранённому значению.
+      setDraft(toDisplay(value));
+      exitEdit();
+      return;
+    }
     void autosave.flush(draft);
     setIsEditing(false);
   };
@@ -99,16 +166,18 @@ export function EditableFieldRow({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       event.preventDefault();
+      if (validate && validate(draft) !== null) return;
       void autosave.flush(draft);
       setIsEditing(false);
     } else if (event.key === "Escape") {
       event.preventDefault();
-      setDraft(value);
+      setDraft(toDisplay(value));
       exitEdit();
     }
   };
 
   const isEmpty = !value || value.trim().length === 0;
+  const feedback = invalidMessage ?? autosave.errorMessage;
 
   return (
     <div className="group flex items-start gap-3 border-b border-border-subtle py-3 last:border-0">
@@ -133,9 +202,11 @@ export function EditableFieldRow({
               onKeyDown={handleKeyDown}
               maxLength={maxLength}
               placeholder={placeholder}
+              aria-invalid={invalidMessage ? true : undefined}
+              aria-describedby={feedback ? errorId : undefined}
               className="mt-1 block w-full border-0 border-b-2 border-primary bg-transparent py-1 text-sm text-text-main outline-none focus:ring-0"
             />
-            {maxLength ? (
+            {maxLength && !formatOnChange ? (
               <p className="mt-1 font-mono text-[10px] text-text-sec">
                 {draft.length} / {maxLength}
               </p>
@@ -150,9 +221,14 @@ export function EditableFieldRow({
               isEmpty ? "italic text-text-sec" : "text-text-main"
             )}
           >
-            {isEmpty ? T.emptyValue : value}
+            {isEmpty ? T.emptyValue : toDisplay(value)}
           </button>
         )}
+        {feedback ? (
+          <p id={errorId} className="mt-1 text-xs text-danger-text">
+            {feedback}
+          </p>
+        ) : null}
       </div>
       {!isEditing ? (
         <button

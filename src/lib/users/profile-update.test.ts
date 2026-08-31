@@ -1,18 +1,42 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
- * SECURITY-EXPOSURE-AUDIT-01 #2 — `PATCH /api/me` must NOT persist an
- * unverified phone (the identity/login primitive + guest-booking/invite key),
- * and any email change must reset verification so an unverified email is never
- * left flagged verified.
+ * PHONE-CLAIM-01 (пересматривает пин SECURITY-EXPOSURE-AUDIT-01 #2, решение
+ * владельца 2026-08-31) — `PATCH /api/me` снова принимает `phone`, но как
+ * ЗАЯВКУ без силы: канонизация на границе разбора, запись только через
+ * единственный примитив `claimPhoneForUser` (сброс отметки владения, 409 на
+ * занятый номер), и НИКОГДА прямым `data.phone` в `updateMeProfile` — прямой
+ * путь обошёл бы и сброс `phoneVerifiedAt`, и освобождение guest-class
+ * держателя. Email-инвариант прежний: смена адреса сбрасывает верификацию.
  */
 
-describe("profileUpdateSchema — phone is not an accepted field", () => {
-  it("strips an incoming phone rather than persisting it", async () => {
+describe("profileUpdateSchema — phone принимается и канонизируется (PHONE-CLAIM-01)", () => {
+  it("канонизирует все принятые формы к +7XXXXXXXXXX", async () => {
     const { profileUpdateSchema } = await import("@/lib/users/schemas");
-    const parsed = profileUpdateSchema.parse({ phone: "+79995559999", firstName: "Иван" });
-    expect(parsed).not.toHaveProperty("phone");
-    expect(parsed.firstName).toBe("Иван");
+    for (const input of ["+79995559999", "89995559999", "8 999 555-99-99", "+7 (999) 555-99-99"]) {
+      const parsed = profileUpdateSchema.parse({ phone: input, firstName: "Иван" });
+      expect(parsed.phone).toBe("+79995559999");
+      expect(parsed.firstName).toBe("Иван");
+    }
+  });
+
+  it("пустая строка и null означают «убрать номер»", async () => {
+    const { profileUpdateSchema } = await import("@/lib/users/schemas");
+    expect(profileUpdateSchema.parse({ phone: "" }).phone).toBeNull();
+    expect(profileUpdateSchema.parse({ phone: null }).phone).toBeNull();
+  });
+
+  it("не-номер отклоняется на границе разбора", async () => {
+    const { profileUpdateSchema } = await import("@/lib/users/schemas");
+    for (const input of ["12345678", "+7999555999", "abc", "+123456789012"]) {
+      expect(profileUpdateSchema.safeParse({ phone: input }).success).toBe(false);
+    }
+  });
+
+  it("отсутствующий ключ phone остаётся отсутствующим (не превращается в null-очистку)", async () => {
+    const { profileUpdateSchema } = await import("@/lib/users/schemas");
+    const parsed = profileUpdateSchema.parse({ firstName: "Иван" });
+    expect(parsed.phone).toBeUndefined();
   });
 
   it("still accepts email (verification is reset at the write layer)", async () => {
@@ -30,7 +54,7 @@ describe("profileUpdateSchema — phone is not an accepted field", () => {
  * противоречивая запись.
  */
 describe("profileUpdateSchema — displayName и address не принимаются (LOGIC-24)", () => {
-  it("отбрасывает их ключи, как и phone", async () => {
+  it("отбрасывает их ключи", async () => {
     const { profileUpdateSchema } = await import("@/lib/users/schemas");
     const parsed = profileUpdateSchema.parse({
       displayName: "Новое имя",
@@ -51,12 +75,15 @@ describe("profileUpdateSchema — displayName и address не принимают
   });
 });
 
-describe("updateMeProfile — email change resets emailVerifiedAt, no phone write", () => {
+describe("updateMeProfile — email reset + телефон только через claim-примитив", () => {
   const update = vi.hoisted(() => vi.fn());
+  const claimPhone = vi.hoisted(() => vi.fn());
 
   beforeEach(() => {
     vi.resetModules();
     update.mockReset();
+    claimPhone.mockReset();
+    claimPhone.mockResolvedValue(undefined);
     update.mockResolvedValue({
       id: "u1",
       roles: ["CLIENT"],
@@ -82,6 +109,9 @@ describe("updateMeProfile — email change resets emailVerifiedAt, no phone writ
         provider: { findFirst: vi.fn().mockResolvedValue(null) },
       },
     }));
+    vi.doMock("@/lib/auth/phone-claim", () => ({
+      claimPhoneForUser: claimPhone,
+    }));
     vi.doMock("@/lib/logging/logger", () => ({ logInfo: vi.fn(), logError: vi.fn() }));
     return import("@/lib/users/profile");
   }
@@ -100,12 +130,18 @@ describe("updateMeProfile — email change resets emailVerifiedAt, no phone writ
     expect(data).not.toHaveProperty("emailVerifiedAt");
   });
 
-  it("never writes a phone field", async () => {
+  it("телефон уходит в claimPhoneForUser и НЕ пишется прямым data.phone", async () => {
     const { updateMeProfile } = await loadWithMocks();
-    // Even if a phone somehow reaches the input, the write must not include it.
-    await updateMeProfile("u1", { email: "new@example.com", firstName: "Пётр" } as never);
+    await updateMeProfile("u1", { email: "new@example.com", phone: "+79995559999" });
+    expect(claimPhone).toHaveBeenCalledWith("u1", "+79995559999");
     const data = update.mock.calls[0][0].data;
     expect(data).not.toHaveProperty("phone");
+  });
+
+  it("без ключа phone claim-примитив не зовётся вовсе", async () => {
+    const { updateMeProfile } = await loadWithMocks();
+    await updateMeProfile("u1", { firstName: "Пётр" });
+    expect(claimPhone).not.toHaveBeenCalled();
   });
 
   it("не пишет displayName и address даже если они дошли до входа (LOGIC-24)", async () => {

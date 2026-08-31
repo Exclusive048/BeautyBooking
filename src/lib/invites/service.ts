@@ -19,9 +19,21 @@ type InviteRejectResult = {
   inviteId: string;
 };
 
-function hasInvitePhoneAccess(userPhone: string | null, invitePhone: string): boolean {
-  if (!userPhone) return false;
-  const normalizedUserPhone = normalizeRussianPhone(userPhone);
+/**
+ * PHONE-CLAIM-01: приглашение адресовано ВЛАДЕЛЬЦУ номера, а не заявителю.
+ * `phoneVerifiedAt === null` — кабинетная заявка без OTP-доказательства; матч
+ * по ней позволял бы занять чужой номер в своём профиле и принять инвайт,
+ * адресованный этому мастеру («invite takeover», SECURITY-EXPOSURE-AUDIT-01
+ * #2). В проде до включения SMS подтверждённых номеров нет ни у кого — но там
+ * и раньше не было НИКАКИХ номеров (phone писал только OTP-вход, а он off), то
+ * есть инвайт-флоу этот гейт не сузил, а сохранил статус-кво.
+ */
+function hasInvitePhoneAccess(
+  user: { phone: string | null; phoneVerifiedAt: Date | null },
+  invitePhone: string,
+): boolean {
+  if (!user.phone || !user.phoneVerifiedAt) return false;
+  const normalizedUserPhone = normalizeRussianPhone(user.phone);
   const normalizedInvitePhone = normalizeRussianPhone(invitePhone);
   if (!normalizedUserPhone || !normalizedInvitePhone) return false;
   return normalizedUserPhone === normalizedInvitePhone;
@@ -29,7 +41,7 @@ function hasInvitePhoneAccess(userPhone: string | null, invitePhone: string): bo
 
 export async function acceptStudioInvite(
   inviteId: string,
-  user: { id: string; phone: string | null; roles: AccountType[] }
+  user: { id: string; phone: string | null; phoneVerifiedAt: Date | null; roles: AccountType[] }
 ): Promise<Result<InviteAcceptResult>> {
   const invite = await prisma.studioInvite.findUnique({
     where: { id: inviteId },
@@ -46,7 +58,7 @@ export async function acceptStudioInvite(
     return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
-  if (!hasInvitePhoneAccess(user.phone, invite.phone)) {
+  if (!hasInvitePhoneAccess(user, invite.phone)) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
@@ -198,7 +210,7 @@ export async function acceptStudioInvite(
 
 export async function rejectStudioInvite(
   inviteId: string,
-  user: { id: string; phone: string | null }
+  user: { id: string; phone: string | null; phoneVerifiedAt: Date | null }
 ): Promise<Result<InviteRejectResult>> {
   const invite = await prisma.studioInvite.findUnique({
     where: { id: inviteId },
@@ -215,7 +227,7 @@ export async function rejectStudioInvite(
     return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
-  if (!hasInvitePhoneAccess(user.phone, invite.phone)) {
+  if (!hasInvitePhoneAccess(user, invite.phone)) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 

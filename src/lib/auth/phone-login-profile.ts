@@ -1,6 +1,13 @@
 import { AccountType, Prisma, type UserProfile } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import {
+  classifyPhoneLoginTarget,
+  releaseUnverifiedPhoneClaims,
+  type PhoneLoginTarget,
+} from "@/lib/auth/phone-claim";
+import { logInfo } from "@/lib/logging/logger";
+import { maskPhone } from "@/lib/logging/masking";
 
 // OTP-PHONE-LOGIN-RACE: local P2002 constant, mirroring the other
 // re-read-on-conflict sites (`email-login-profile.ts`, `detect-city.ts`,
@@ -10,46 +17,79 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
 /**
  * Resolve the {@link UserProfile} for a phone-OTP login.
  *
- * Three cases, all landing on the same row a single request would:
- *  - **returning user** (`existing` non-null) → ensure the CLIENT role is present;
- *  - **first-time user** → create a fresh `[CLIENT]` profile;
- *  - **race loser** → two near-simultaneous first-time logins for the same new
- *    phone both pass the caller's `findUnique` (both see no row), then both
- *    `create`; the loser hits **P2002** on `UserProfile.phone @unique`. Catch it,
- *    re-read the winner's row and continue idempotently (ensuring CLIENT role).
+ * PHONE-CLAIM-01: с появлением кабинетных ЗАЯВОК на номер (без OTP-
+ * доказательства) строка, найденная по телефону, больше не означает «этот
+ * человек вернулся». Каршрут триажа — `classifyPhoneLoginTarget`
+ * (`phone-claim.ts`), маршрут зовёт его сам (ответ нужен гейту согласий ДО
+ * сжигания кода) и передаёт сюда:
  *
- * This is the 7th re-read-on-conflict P2002 site; it mirrors the recovery in
- * `src/lib/auth/email-login-profile.ts` (the 6th site) exactly — phone is the
- * primary login path, so closing the email race while leaving phone open would
- * be inconsistent (catch P2002 → re-read → continue; rethrow anything else).
+ *  - **OWNER** (`phoneVerifiedAt` стоит) → обычный вход, ensure CLIENT role;
+ *  - **GUEST_CONVERSION** (guest-class строка) → вход + отметка владения:
+ *    пассивный профиль гостевых броней становится аккаунтом — прежнее
+ *    поведение, теперь со штампом;
+ *  - **FOREIGN_CLAIM** (заявка установившегося аккаунта) → вход в него был бы
+ *    перехватом (зеркало FIX-SEC-EMAIL-IDENTITY-01, только канал — телефон).
+ *    Заявка освобождается, доказавший получает СВЕЖИЙ профиль с
+ *    `phoneVerifiedAt = now()` — ровно как email-модель: заявки не резолвят
+ *    личность, владение даёт только код;
+ *  - **NONE** → первый вход, свежий профиль сразу с отметкой владения.
  *
- * `existing` is passed in (not re-fetched here) so the caller keeps its
- * parallel `Promise.all` lookup — the normal (non-racing) path is unchanged:
- * a fresh create returns directly without an extra role round-trip.
+ * Race loser: два одновременных первых входа для одного номера оба проходят
+ * `findUnique` (оба видят пустоту), оба `create`; проигравший ловит **P2002**
+ * на `UserProfile.phone @unique`, перечитывает строку победителя и — важно —
+ * ПЕРЕтриажирует её (7th re-read-on-conflict site): выигравшей могла оказаться
+ * и параллельная кабинетная заявка, входить в неё нельзя и после гонки.
  */
 export async function resolvePhoneLoginProfile(
   normalizedPhone: string,
-  existing: UserProfile | null,
+  target: PhoneLoginTarget,
+  attempt = 0,
 ): Promise<UserProfile> {
-  if (existing) {
-    return withClientRole(existing);
+  if (target.kind === "OWNER") {
+    return withClientRole(target.profile);
+  }
+
+  if (target.kind === "GUEST_CONVERSION") {
+    // Отметка владения идемпотентна: guard `phoneVerifiedAt: null` в where не
+    // трогает уже подтверждённую строку (повторный вход, параллельный запрос).
+    await prisma.userProfile.updateMany({
+      where: { id: target.profile.id, phoneVerifiedAt: null },
+      data: { phoneVerifiedAt: new Date() },
+    });
+    return withClientRole({ ...target.profile, phoneVerifiedAt: target.profile.phoneVerifiedAt ?? new Date() });
+  }
+
+  if (target.kind === "FOREIGN_CLAIM") {
+    const released = await releaseUnverifiedPhoneClaims(prisma, normalizedPhone, null);
+    logInfo("phone-otp login released a foreign unverified claim", {
+      phone: maskPhone(normalizedPhone),
+      released,
+    });
   }
 
   try {
     return await prisma.userProfile.create({
-      data: { phone: normalizedPhone, roles: [AccountType.CLIENT] },
+      data: {
+        phone: normalizedPhone,
+        // Владение доказано только что введённым кодом — свежий профиль
+        // рождается подтверждённым (зеркало email-логина, инв. #41).
+        phoneVerifiedAt: new Date(),
+        roles: [AccountType.CLIENT],
+      },
     });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === PRISMA_UNIQUE_VIOLATION
+      error.code === PRISMA_UNIQUE_VIOLATION &&
+      attempt < 2
     ) {
-      // Race: the parallel request just created this profile. Re-read it.
+      // Race: параллельный запрос успел занять номер. Перечитать И перетриажировать.
       const recovered = await prisma.userProfile.findUnique({
         where: { phone: normalizedPhone },
       });
       if (recovered) {
-        return withClientRole(recovered);
+        const recoveredTarget = await classifyPhoneLoginTarget(recovered);
+        return resolvePhoneLoginProfile(normalizedPhone, recoveredTarget, attempt + 1);
       }
     }
     throw error;

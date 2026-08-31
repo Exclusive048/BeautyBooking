@@ -90,12 +90,18 @@ export async function ensureUserByPhone(input: EnsureUserInput): Promise<UserPro
   // перестают входить по email, и `.qa`-харнесс (для которого email —
   // первоклассный канал после QA-HARNESS-EMAIL-01) краснеет на логине.
   const emailVerifiedAt = new Date();
+  // PHONE-CLAIM-01: та же логика для телефона. Phone-OTP-вход резолвит только
+  // ВЛАДЕНИЕ (или guest-class строку); сид-аккаунт с заявкой вместо владения —
+  // established-строка, и холодный логин `.qa`-харнесса ушёл бы веткой
+  // FOREIGN_CLAIM в свежий пустой профиль вместо showcase-кабинета.
+  const phoneVerifiedAt = new Date();
 
   return prisma.userProfile.upsert({
     where: { phone },
     update: {
       email,
       emailVerifiedAt,
+      phoneVerifiedAt,
       publicUsername: desiredPublicUsername,
       firstName: input.firstName,
       lastName: input.lastName,
@@ -104,6 +110,7 @@ export async function ensureUserByPhone(input: EnsureUserInput): Promise<UserPro
     },
     create: {
       phone,
+      phoneVerifiedAt,
       email,
       emailVerifiedAt,
       publicUsername: desiredPublicUsername,

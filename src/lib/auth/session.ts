@@ -97,6 +97,9 @@ const SESSION_USER_SELECT = {
   id: true,
   roles: true,
   phone: true,
+  // PHONE-CLAIM-01: потребители, для которых телефон — ключ матчинга (инвайты,
+  // бейдж/центр уведомлений), обязаны отличать владение от заявки.
+  phoneVerifiedAt: true,
   email: true,
   emailVerifiedAt: true,
   displayName: true,

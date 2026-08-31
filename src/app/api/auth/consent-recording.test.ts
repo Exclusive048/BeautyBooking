@@ -198,7 +198,15 @@ describe("phone OTP", () => {
   });
 
   it("EXISTING user without consent → login proceeds, no rows written", async () => {
-    state.existingProfile = { id: "old-user", roles: ["CLIENT"], phone: "+79990000000" };
+    // PHONE-CLAIM-01: «существующий пользователь» = ДОКАЗАННЫЙ владелец номера
+    // (phoneVerifiedAt). Строка без отметки — это заявка/гость, и для неё вход
+    // классифицируется иначе (см. classifyPhoneLoginTarget).
+    state.existingProfile = {
+      id: "old-user",
+      roles: ["CLIENT"],
+      phone: "+79990000000",
+      phoneVerifiedAt: new Date("2026-01-01T00:00:00Z"),
+    };
     const res = await phoneVerify(jsonReq("http://localhost/api/auth/otp/verify", {
       phone: "+79990000000",
       code: "123456",

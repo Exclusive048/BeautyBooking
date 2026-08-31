@@ -17,6 +17,8 @@ export async function POST(
   const result = await rejectStudioInvite(p.id, {
     id: auth.user.id,
     phone: auth.user.phone,
+    // PHONE-CLAIM-01: отклонить инвайт может тоже только доказанный владелец.
+    phoneVerifiedAt: auth.user.phoneVerifiedAt,
   });
 
   if (!result.ok) return fail(result.message, result.status, result.code);

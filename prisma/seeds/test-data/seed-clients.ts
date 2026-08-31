@@ -34,10 +34,13 @@ export async function seedClients(): Promise<UserProfile[]> {
     // выражается: `where` у `upsert` принимает лишь уникальные поля. Ключ сидов —
     // телефон (он `@unique` и остаётся им), а seed-email лишь проставляется.
     // Идемпотентность сохранена: повторный прогон найдёт ту же строку.
+    // PHONE-CLAIM-01: сид изображает состоявшихся пользователей — номер у них
+    // ВЛАДЕНИЕ, не заявка (иначе phone-OTP-вход ушёл бы веткой FOREIGN_CLAIM).
     const row = await prisma.userProfile.upsert({
       where: { phone: seedPhone(CLIENT_PHONE_BASE + i) },
       update: {
         email: seedEmail("client", slug),
+        phoneVerifiedAt: new Date(),
         firstName: first,
         lastName: last,
         displayName: `${first} ${last}`,
@@ -45,6 +48,7 @@ export async function seedClients(): Promise<UserProfile[]> {
       create: {
         email: seedEmail("client", slug),
         phone: seedPhone(CLIENT_PHONE_BASE + i),
+        phoneVerifiedAt: new Date(),
         firstName: first,
         lastName: last,
         displayName: `${first} ${last}`,

@@ -157,6 +157,47 @@ function describeScheduleRequest(payloadJson: unknown): string {
   return date ? `Изменение графика на ${date}` : "Запрос на изменение графика";
 }
 
+/**
+ * PHONE-CLAIM-01: инвайты матчатся по телефону, а телефон бывает кабинетной
+ * ЗАЯВКОЙ без OTP-доказательства — показывать по ней чужие приглашения нельзя
+ * (заявитель номера видел бы инвайты, адресованные его владельцу). Гейт живёт
+ * здесь, а не в контракте вызывающих: одно PK-чтение вместо флага, который
+ * каждый вызывающий обязан был бы не забыть. Зеркало —
+ * `countPendingInvitesForVerifiedOwner` в `badge.ts`.
+ */
+async function listPendingInvitesForVerifiedOwner(userId: string, normalizedPhone: string) {
+  const owner = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: { phoneVerifiedAt: true },
+  });
+  if (!owner?.phoneVerifiedAt) return [];
+  return prisma.studioInvite.findMany({
+    where: {
+      phone: normalizedPhone,
+      status: MembershipStatus.PENDING,
+    },
+    select: {
+      id: true,
+      createdAt: true,
+      studio: {
+        select: {
+          id: true,
+          provider: {
+            select: {
+              name: true,
+              tagline: true,
+              avatarUrl: true,
+              publicUsername: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+}
+
 export async function getNotificationCenterData(input: {
   userId: string;
   phone: string | null;
@@ -175,31 +216,7 @@ export async function getNotificationCenterData(input: {
       select: { id: true },
     }),
     normalizedPhone
-      ? prisma.studioInvite.findMany({
-          where: {
-            phone: normalizedPhone,
-            status: MembershipStatus.PENDING,
-          },
-            select: {
-              id: true,
-              createdAt: true,
-              studio: {
-                select: {
-                  id: true,
-                  provider: {
-                    select: {
-                      name: true,
-                      tagline: true,
-                      avatarUrl: true,
-                      publicUsername: true,
-                    },
-                  },
-                },
-              },
-            },
-          orderBy: { createdAt: "desc" },
-          take: 30,
-        })
+      ? listPendingInvitesForVerifiedOwner(input.userId, normalizedPhone)
       : Promise.resolve([]),
     prisma.notification.findMany({
       where: { userId: input.userId, deletedAt: null },

@@ -1610,20 +1610,24 @@ export const openApiSpec = {
         },
       },
       // LOGIC-24: `displayName` и `address` объявлены здесь не были приняты
-      // роутом никогда — он вырезал их дважды. `phone` убран из принимаемых
-      // ещё в SECURITY-EXPOSURE-AUDIT-01 #2 (непроверенная запись
-      // идентификатора входа = вектор захвата аккаунта), но в опубликованном
-      // контракте остался. Спека — самый внешний слой того же расхождения:
-      // интегратор (мобильный клиент, `MOBILE-API` в бэклоге) реализовал бы по
-      // ней вызовы, которые молча ничего не делают.
+      // роутом никогда — он вырезал их дважды; из контракта убраны.
+      // PHONE-CLAIM-01: `phone` снова принимается — как ЗАЯВКА без силы
+      // (канон +7XXXXXXXXXX либо null; отметку владения ставит только
+      // phone-OTP; занятый номер → 409). История: убран был в
+      // SECURITY-EXPOSURE-AUDIT-01 #2, возвращён решением владельца
+      // 2026-08-31 вместе с claim-моделью (см. lib/auth/phone-claim.ts).
       MeUpdateInput: {
         type: "object",
         properties: {
+          phone: { type: "string", nullable: true, description: "Канон +7XXXXXXXXXX; null снимает номер" },
           email: { type: "string" },
           firstName: { type: "string" },
           lastName: { type: "string" },
           middleName: { type: "string" },
           birthDate: { type: "string" },
+          // ME-PATCH-CONTRACT-GAPS (2): роут принимал их всегда — спека отставала.
+          emailNotificationsEnabled: { type: "boolean" },
+          pushNotificationsEnabled: { type: "boolean" },
         },
       },
       MoveStudioBookingInput: {

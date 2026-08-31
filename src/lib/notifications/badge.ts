@@ -35,12 +35,31 @@ export async function getUnreadBadgeCount(input: {
   const [unreadCount, inviteCount] = await Promise.all([
     getUnreadCount(input.userId, context === "all" ? undefined : context),
     includeInvites && normalizedPhone
-      ? prisma.studioInvite.count({
-          where: { phone: normalizedPhone, status: MembershipStatus.PENDING },
-        })
+      ? countPendingInvitesForVerifiedOwner(input.userId, normalizedPhone)
       : Promise.resolve(0),
   ]);
 
   const count = unreadCount + inviteCount;
   return { count, hasUnread: count > 0 };
+}
+
+/**
+ * PHONE-CLAIM-01: инвайты матчятся по телефону, а телефон бывает кабинетной
+ * ЗАЯВКОЙ без OTP-доказательства — считать по ней чужие приглашения нельзя
+ * (утечка факта инвайта заявителю номера). Гейт живёт ЗДЕСЬ, а не в контракте
+ * вызывающих: одно PK-чтение вместо флага, который каждый из шести вызывающих
+ * обязан был бы не забыть.
+ */
+async function countPendingInvitesForVerifiedOwner(
+  userId: string,
+  normalizedPhone: string,
+): Promise<number> {
+  const owner = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: { phoneVerifiedAt: true },
+  });
+  if (!owner?.phoneVerifiedAt) return 0;
+  return prisma.studioInvite.count({
+    where: { phone: normalizedPhone, status: MembershipStatus.PENDING },
+  });
 }

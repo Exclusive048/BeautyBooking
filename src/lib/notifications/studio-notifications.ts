@@ -90,8 +90,11 @@ function buildPhoneCandidates(phone: string): string[] {
 async function resolveInviteRecipientUserId(phone: string): Promise<string | null> {
   const phoneCandidates = buildPhoneCandidates(phone);
   if (phoneCandidates.length === 0) return null;
+  // PHONE-CLAIM-01: уведомление об инвайте — только ДОКАЗАННОМУ владельцу
+  // номера. Кабинетная заявка (phoneVerifiedAt = null) уведомление не получает:
+  // это была бы утечка факта приглашения заявителю чужого номера.
   const invitedUser = await prisma.userProfile.findFirst({
-    where: { phone: { in: phoneCandidates } },
+    where: { phone: { in: phoneCandidates }, phoneVerifiedAt: { not: null } },
     select: { id: true },
   });
   return invitedUser?.id ?? null;
@@ -99,8 +102,10 @@ async function resolveInviteRecipientUserId(phone: string): Promise<string | nul
 
 async function resolveInviteUserLabel(invite: InviteWithRelations): Promise<string> {
   const phoneCandidates = buildPhoneCandidates(invite.phone);
+  // PHONE-CLAIM-01: имя в тексте уведомления — тоже только от владельца, иначе
+  // студия увидела бы имя заявителя чужого номера.
   const profile = await prisma.userProfile.findFirst({
-    where: { phone: { in: phoneCandidates } },
+    where: { phone: { in: phoneCandidates }, phoneVerifiedAt: { not: null } },
     select: { displayName: true, firstName: true, lastName: true, phone: true },
   });
   return resolveUserLabel({

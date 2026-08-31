@@ -3033,12 +3033,12 @@ export const UI_TEXT = {
         notSetLabel: "Не задан",
         accountFootnoteText: "Эти поля редактируются в",
         accountFootnoteCta: "настройках аккаунта",
-        // AUTH-GATE-01: was «Номер задаётся при входе по SMS-коду…». Names a
-        // login channel that may be gated off, and is simply wrong for anyone
-        // who signed in via email/VK/Yandex. Now describes the field, not the
-        // channel that populated it.
+        // PHONE-CLAIM-01: прежний текст обещал «здесь не меняется» — теперь
+        // номер редактируется (заявка без SMS-подтверждения, см.
+        // lib/auth/phone-claim.ts), и подсказка описывает ровно это.
         phoneVerifyHint:
-          "Номер подставляется из вашего аккаунта и здесь не меняется. Смена номера с подтверждением — скоро.",
+          "Номер сохраняется в вашем аккаунте. Подтверждение по SMS появится позже.",
+        phoneIncomplete: "Введите номер полностью: +7 (900) 000-00-00.",
       },
       about: {
         title: "О себе",
@@ -5600,6 +5600,10 @@ export const UI_TEXT = {
         hideAgeYearHint: "Год рождения не будет виден другим",
         phone: "Телефон",
         phoneVerified: "Подтверждён",
+        // PHONE-CLAIM-01: поле стало редактируемым (заявка на номер).
+        phonePlaceholder: "+7 (___) ___-__-__",
+        phoneHint: "Для записи к мастеру и напоминаний.",
+        phoneIncomplete: "Введите номер полностью: +7 (900) 000-00-00.",
         email: "Электронная почта",
         emailVerify: "Подтвердить",
         emailVerified: "Подтверждена",

@@ -132,10 +132,13 @@ async function ensureUser(args: {
   // Прежний комментарий утверждал обратное — «phone may collide, а email
   // защищён @unique»; после миграции всё ровно наоборот. Идемпотентность на
   // месте: телефоны сидов детерминированы (`seedPhone`) и уникальны.
+  // PHONE-CLAIM-01: сид изображает состоявшихся пользователей — номер у них
+  // ВЛАДЕНИЕ, не заявка (иначе phone-OTP-вход ушёл бы веткой FOREIGN_CLAIM).
   return prisma.userProfile.upsert({
     where: { phone: args.phone },
     update: {
       email: args.email,
+      phoneVerifiedAt: new Date(),
       firstName: args.firstName,
       lastName: args.lastName,
       displayName: `${args.firstName} ${args.lastName}`,
@@ -145,6 +148,7 @@ async function ensureUser(args: {
     create: {
       email: args.email,
       phone: args.phone,
+      phoneVerifiedAt: new Date(),
       firstName: args.firstName,
       lastName: args.lastName,
       displayName: `${args.firstName} ${args.lastName}`,

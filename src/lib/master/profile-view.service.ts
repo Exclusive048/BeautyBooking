@@ -21,8 +21,9 @@ import { prisma } from "@/lib/prisma";
  */
 
 export type ProfileContacts = {
-  /** Auth-anchored fields. Editing happens through dedicated account
-   * flows (OTP for phone, OAuth for telegram/vk) — never inline here. */
+  /** PHONE-CLAIM-01: phone + email редактируются inline (PATCH /api/me);
+   * телефон — заявка без OTP-доказательства (см. lib/auth/phone-claim.ts).
+   * Telegram/VK по-прежнему только из OAuth-линка. */
   phone: string | null;
   email: string | null;
   telegramUsername: string | null;

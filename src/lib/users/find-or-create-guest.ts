@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
+import { isGuestClassProfile } from "@/lib/legal/consent";
 import { logInfo } from "@/lib/logging/logger";
 import { maskPhone } from "@/lib/logging/masking";
 
@@ -43,11 +44,40 @@ export async function findOrCreateGuestUserByPhone(input: {
 
   const existing = await prisma.userProfile.findUnique({ where: { phone } });
   if (existing) {
-    const nextRoles = await ensureClientRoleForUser(existing.id, existing.roles);
-    return {
-      profile: nextRoles === existing.roles ? existing : { ...existing, roles: nextRoles },
-      wasCreated: false,
-    };
+    // PHONE-CLAIM-01: строка с номером — это либо ДОКАЗАННЫЙ владелец
+    // (phoneVerifiedAt; владелец сам бронирует разлогиненным — задуманное
+    // поведение), либо guest-class пассивный профиль (прежний путь), либо
+    // кабинетная ЗАЯВКА установившегося аккаунта без доказательства. Прикрепить
+    // бронь к заявителю значило бы показать ему чужую историю записей — ровно
+    // «guest-booking takeover» из SECURITY-EXPOSURE-AUDIT-01 #2. Заявку при этом
+    // НЕ освобождаем — анонимный POST не должен уметь мутировать чужой аккаунт
+    // (grief-примитив); бронь уезжает в БЕЗНОМЕРНОЙ пассивный профиль ниже:
+    // `Booking.clientPhone` всё равно несёт номер, поэтому CRM-поиск и
+    // усыновление при OTP-входе (`linkGuestBookingsToUserByPhone` матчится по
+    // брони, не по профилю) работают как прежде.
+    const attachable =
+      existing.phoneVerifiedAt !== null || (await isGuestClassProfile(existing.id));
+    if (attachable) {
+      const nextRoles = await ensureClientRoleForUser(existing.id, existing.roles);
+      return {
+        profile: nextRoles === existing.roles ? existing : { ...existing, roles: nextRoles },
+        wasCreated: false,
+      };
+    }
+
+    const orphanDisplayName = input.displayName?.trim() || null;
+    const orphan = await prisma.userProfile.create({
+      data: {
+        displayName: orphanDisplayName,
+        firstName: orphanDisplayName,
+        roles: [AccountType.CLIENT],
+      },
+    });
+    logInfo("guest user created without phone key — number is claimed by an established account", {
+      userId: orphan.id,
+      phone: maskPhone(phone),
+    });
+    return { profile: orphan, wasCreated: true };
   }
 
   const displayName = input.displayName?.trim() || null;

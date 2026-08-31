@@ -135,6 +135,8 @@ export async function deleteUserAccount(userId: string): Promise<void> {
       where: { id: userId },
       data: {
         phone: null,
+        // PHONE-CLAIM-01: вместе с номером уходит и отметка владения.
+        phoneVerifiedAt: null,
         email: null,
         displayName: "Удалённый пользователь",
         telegramId: null,

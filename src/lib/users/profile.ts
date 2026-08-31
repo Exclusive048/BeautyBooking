@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { claimPhoneForUser } from "@/lib/auth/phone-claim";
 import { logInfo } from "@/lib/logging/logger";
 import type { ProfileUpdateInput } from "@/lib/users/schemas";
 
@@ -81,12 +82,18 @@ export async function updateMeProfile(
 ): Promise<MeProfile> {
   const birthDate = toBirthDate(input.birthDate);
 
+  // PHONE-CLAIM-01: телефон пишется ТОЛЬКО через единственный примитив —
+  // кабинетная запись это заявка (phoneVerifiedAt сбрасывается при смене),
+  // занятый номер → AppError 409 с курируемой строкой. Прямой `data.phone`
+  // здесь запрещён: он обошёл бы и сброс отметки владения, и освобождение
+  // guest-class держателя (см. lib/auth/phone-claim.ts).
+  if (input.phone !== undefined) {
+    await claimPhoneForUser(userId, input.phone);
+  }
+
   const updated = await prisma.userProfile.update({
     where: { id: userId },
     data: {
-      // `phone` is intentionally NOT written here — it is removed from the
-      // accepted schema (SECURITY-EXPOSURE-AUDIT-01 #2). Phone is set only via
-      // the OTP-verified login flow.
       email: input.email,
       // Any email change resets verification (mirrors the client-cabinet path,
       // profile.service.ts): an email set here is unverified until the

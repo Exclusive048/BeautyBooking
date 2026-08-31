@@ -17,23 +17,26 @@ type Props = {
  * `PATCH /api/me`). Telegram + VK stay read-only because they sync
  * from the social-login provider on link.
  *
- * fix-02: phone + email moved from read-only chips to
- * `<EditableFieldRow>`. Phone changes still ship **without** OTP
- * verification — pre-launch blocker tracked in BACKLOG. The footnote
- * documents the SMS-pending state.
+ * PHONE-CLAIM-01: до этого `fieldKey="phone"` уходил в `/api/me`, который
+ * МОЛЧА отбрасывал ключ (Zod strip после SECURITY-EXPOSURE-AUDIT-01 #2) — поле
+ * выглядело редактируемым и не сохранялось. Теперь номер снова принимается,
+ * но как ЗАЯВКА без силы (см. lib/auth/phone-claim.ts); ввод идёт под маской
+ * «+7 (…)», незавершённый номер не отправляется.
  */
 export function ContactsSection({ data }: Props) {
   return (
     <SectionShell anchor="contacts" icon={Phone} title={T.title} subtitle={T.subtitle}>
       <ul className="divide-y divide-border-subtle">
         <li>
+          {/* `mask` — сериализуемый id, не функции: эта секция — RSC (§13). */}
           <EditableFieldRow
             label={T.phoneLabel}
             value={data.phone ?? ""}
             fieldKey="phone"
             apiPath="/api/me"
             placeholder={T.phonePlaceholder}
-            maxLength={40}
+            maxLength={18}
+            mask="phone"
           />
         </li>
         <li>

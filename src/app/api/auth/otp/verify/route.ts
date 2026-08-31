@@ -7,6 +7,7 @@ import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
 import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
+import { classifyPhoneLoginTarget, isPhoneLoginRegistration } from "@/lib/auth/phone-claim";
 import { resolvePhoneLoginProfile } from "@/lib/auth/phone-login-profile";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
@@ -89,13 +90,20 @@ export async function POST(req: Request) {
     // code is burned — refusing a first-time login for missing consent must not
     // cost the user their one-time code. So this lookup is pulled out of the
     // side-effect batch below and awaited first.
+    //
+    // PHONE-CLAIM-01: «строка с этим номером существует» больше НЕ означает
+    // «пользователь вернулся» — номер может быть кабинетной ЗАЯВКОЙ чужого
+    // аккаунта (FOREIGN_CLAIM), и тогда доказавший владение получит СВЕЖИЙ
+    // профиль, то есть это регистрация со всеми согласиями. Триаж один на оба
+    // вопроса (гейт согласий + чей профиль) — `classifyPhoneLoginTarget`.
     const existingProfile = await prisma.userProfile.findUnique({ where: { phone } });
+    const loginTarget = await classifyPhoneLoginTarget(existingProfile);
 
     // Server-side enforcement, not just UI gating: creating an account without
     // consent to the offer AND to PD processing is exactly what 152-ФЗ ст. 9
     // (ред. 156-ФЗ) forbids. Existing users are never blocked — their consent
     // is already on record and a login is not a new registration.
-    if (!existingProfile && !hasRequiredConsents(consent)) {
+    if (isPhoneLoginRegistration(loginTarget) && !hasRequiredConsents(consent)) {
       void recordSurfaceEvent({
         surface: "auth",
         outcome: "denied",
@@ -116,7 +124,7 @@ export async function POST(req: Request) {
     // OTP-PHONE-LOGIN-RACE: create-or-recover is delegated so a P2002 from two
     // simultaneous first-time logins re-reads the winner's row instead of
     // erroring (7th re-read-on-conflict site — see phone-login-profile.ts).
-    const profile = await resolvePhoneLoginProfile(phone, existingProfile);
+    const profile = await resolvePhoneLoginProfile(phone, loginTarget);
     logInfo("OTP verify primary DB queries done", {
       userProfileId: profile.id,
       ms: Date.now() - verifyDbStartedAt,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import {
@@ -23,6 +23,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  formatRussianPhoneInput,
+  formatRussianPhoneInputOnChange,
+  isCompleteRussianPhoneInput,
+} from "@/lib/phone/input-format";
 import type {
   ProfileDTO,
   ProfileUpdatePatch,
@@ -173,6 +178,12 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
       contacts: {
         ...data.contacts,
         ...(patch.email !== undefined ? { email: patch.email ?? null } : {}),
+        // PHONE-CLAIM-01: оптимистично едет отформатированная строка; сервер
+        // вернёт канон +7XXXXXXXXXX, а маска идемпотентна к обоим видам.
+        // Смена номера — заявка, бейдж владения гаснет сразу.
+        ...(patch.phone !== undefined
+          ? { phone: patch.phone ?? null, phoneVerified: false }
+          : {}),
       },
     };
     void mutate(next, { revalidate: false });
@@ -506,7 +517,7 @@ function ContactsCard({
 
       <FieldRow
         label={T.fields.phone}
-        hint="Для входа и СМС-напоминаний."
+        hint={T.fields.phoneHint}
         action={
           data.contacts.phoneVerified ? (
             <Badge variant="success">
@@ -516,13 +527,10 @@ function ContactsCard({
           ) : null
         }
       >
-        <div className="relative">
-          <Phone
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
-            aria-hidden
-          />
-          <Input value={data.contacts.phone ?? ""} disabled className="pl-9" />
-        </div>
+        <PhoneField
+          value={data.contacts.phone}
+          onPatch={onPatch}
+        />
       </FieldRow>
 
       <FieldRow
@@ -560,6 +568,77 @@ function ContactsCard({
         </div>
       </FieldRow>
     </Card>
+  );
+}
+
+/**
+ * PHONE-CLAIM-01 — редактируемый телефон с прогрессивной маской «+7 (…)».
+ *
+ * Сохраняется через общий автосейв страницы, но ТОЛЬКО когда номер полный
+ * (10 цифр) либо поле очищено: debounce 700 мс переживает паузу набора, и без
+ * этого гейта каждый недобранный номер уезжал бы PATCH'ем и мигал ошибкой
+ * валидации. Незавершённый ввод живёт в локальном черновике с подсказкой.
+ */
+function PhoneField({
+  value,
+  onPatch,
+}: {
+  value: string | null;
+  onPatch: (p: Partial<ProfileUpdatePatch>) => void;
+}) {
+  const hintId = useId();
+  const [draft, setDraft] = useState(() => formatRussianPhoneInput(value ?? ""));
+
+  // Синхронизация с сервером во время рендера (React 19, паттерн
+  // EditableFieldRow): внешнее значение меняется только нашим же optimistic-
+  // мержем или ревалидацией — незавершённый черновик оно не перетирает,
+  // потому что при наборе `value` не меняется вовсе.
+  const [prevValue, setPrevValue] = useState(value);
+  if (prevValue !== value) {
+    setPrevValue(value);
+    const formatted = formatRussianPhoneInput(value ?? "");
+    if (formatted !== draft) setDraft(formatted);
+  }
+
+  const incomplete = draft !== "" && !isCompleteRussianPhoneInput(draft);
+
+  function handleChange(raw: string) {
+    const next = formatRussianPhoneInputOnChange(draft, raw);
+    setDraft(next);
+    if (next === "") {
+      if (value !== null) onPatch({ phone: null });
+      return;
+    }
+    if (isCompleteRussianPhoneInput(next)) {
+      onPatch({ phone: next });
+    }
+  }
+
+  return (
+    <div>
+      <div className="relative">
+        <Phone
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
+          aria-hidden
+        />
+        <Input
+          value={draft}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={T.fields.phonePlaceholder}
+          inputMode="tel"
+          autoComplete="tel"
+          maxLength={18}
+          className="pl-9"
+          aria-invalid={incomplete || undefined}
+          aria-describedby={incomplete ? hintId : undefined}
+        />
+      </div>
+      {incomplete ? (
+        <p id={hintId} className="mt-1 text-xs text-warning-text">
+          {T.fields.phoneIncomplete}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

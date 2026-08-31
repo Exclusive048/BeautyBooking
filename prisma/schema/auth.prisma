@@ -9,6 +9,19 @@ model UserProfile {
 
   phone String? @unique
 
+  // PHONE-CLAIM-01: зеркало email-модели (инв. #41) для телефона. «Заявить»
+  // номер может любой аутентифицированный пользователь из кабинета (SMS-шлюза
+  // нет, доказать владение нечем), «владеть» — только доказавший через
+  // phone-OTP. Любая запись phone вне OTP-verify обязана оставлять
+  // phoneVerifiedAt = null; все места, где телефон работает ключом матчинга
+  // (phone-OTP-вход, гостевые брони, студийные инвайты, бейдж/центр
+  // уведомлений), принимают ТОЛЬКО подтверждённый номер либо guest-class
+  // профиль — иначе заявка чужого номера = перехват гостевых броней/инвайтов
+  // (SECURITY-EXPOSURE-AUDIT-01 #2). Уникальность phone остаётся ПОЛНОЙ (в
+  // отличие от email): заявка занимает слот, но отпускается доказательством
+  // (releaseUnverifiedPhoneClaims) — см. src/lib/auth/phone-claim.ts.
+  phoneVerifiedAt DateTime?
+
   // EMAIL-ADDRESS-OCCUPATION: уникальность email — ЧАСТИЧНАЯ, только по
   // подтверждённым адресам (`WHERE "emailVerifiedAt" IS NOT NULL`, сырой SQL,
   // реестр `scripts/raw-sql-objects.mjs`). Полный @@unique здесь означал бы,

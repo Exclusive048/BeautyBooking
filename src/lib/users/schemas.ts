@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 
 const emptyToNull = (value: unknown) => {
   if (typeof value !== "string") return value;
@@ -18,6 +19,40 @@ const birthDateSchema = z.preprocess(
     .optional()
 );
 
+/**
+ * PHONE-CLAIM-01 — телефон снова принимается, но как ЗАЯВКА, а не владение.
+ *
+ * История: SECURITY-EXPOSURE-AUDIT-01 #2 убрал `phone` отсюда целиком — тогда
+ * непроверенный номер работал ключом матчинга (гостевые брони, инвайты,
+ * phone-OTP-вход), и запись без OTP была вектором перехвата. Решение владельца
+ * (2026-08-31): номер нужен как контакт и без SMS-шлюза, поэтому вместо запрета
+ * записи выключена СИЛА непроверенного номера — модель «заявка ≠ владение»
+ * (зеркало инв. #41): `phoneVerifiedAt` ставит только phone-OTP, а все места
+ * матчинга принимают лишь подтверждённый номер либо guest-class профиль.
+ * Запись идёт через единственный примитив `claimPhoneForUser`
+ * (`lib/auth/phone-claim.ts`) — он сбрасывает отметку владения при смене и
+ * освобождает guest-class держателя.
+ *
+ * Канонизация — на границе разбора (форма `bookingCreateSchema`, второго
+ * подхода не заводим): вглубь уезжает только `+7XXXXXXXXXX` либо null.
+ */
+const phoneClaimField = z.preprocess(
+  emptyToNull,
+  z
+    .union([
+      z.null(),
+      z
+        .string()
+        .trim()
+        .max(40)
+        .transform((value) => normalizeRussianPhone(value))
+        .refine((value): value is string => value !== null, {
+          message: "Проверьте номер телефона: нужен формат +7 900 000-00-00.",
+        }),
+    ])
+    .optional(),
+);
+
 export const profileUpdateSchema = z.object({
   // LOGIC-24: `displayName` и `address` в схеме БЫЛИ, а роут вырезал их дважды
   // — из сырого тела до разбора и из результата после. То есть схема описывала
@@ -25,17 +60,9 @@ export const profileUpdateSchema = z.object({
   // проигнорированную операцию, а `updateMeProfile` продолжал их писать (и
   // получал `undefined`, потому что роут их к тому моменту уже удалил). Из трёх
   // слоёв каждый утверждал своё. Поля убраны из схемы — Zod отбрасывает их
-  // ключи так же, как `phone` ниже, и лишних зачисток в роуте больше нет.
-  // Решение «сюда не пишутся» не меняется: обратное было бы новой возможностью
-  // продукта, а не фиксом.
-  //
-  // SECURITY-EXPOSURE-AUDIT-01 #2: `phone` is the identity/login primitive and
-  // the key guest bookings + studio invites are matched on. It must NOT be
-  // writable here without OTP verification — an unverified write is an account-
-  // takeover vector. There is no verified phone-change flow yet; until one
-  // exists (backlog: PHONE-CHANGE-VERIFIED-FLOW), phone is only established at
-  // signup via the OTP login flow. Removed from the accepted fields entirely;
-  // Zod strips an incoming `phone` key rather than persisting it.
+  // ключи, и лишних зачисток в роуте больше нет. Решение «сюда не пишутся» не
+  // меняется: обратное было бы новой возможностью продукта, а не фиксом.
+  phone: phoneClaimField,
   email: optionalText(120),
   firstName: optionalText(80),
   lastName: optionalText(80),

@@ -2,13 +2,31 @@ import { BookingStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { z } from "zod";
 import { AppError } from "@/lib/api/errors";
 import { resolveLinkState } from "@/lib/auth/link-state";
+import { claimPhoneForUser } from "@/lib/auth/phone-claim";
 import { isTelegramEnabled } from "@/lib/env";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const updateProfileSchema = z.object({
   firstName: z.string().trim().max(100).optional().nullable(),
+  // PHONE-CLAIM-01: заявка на номер (см. lib/auth/phone-claim.ts + rule в
+  // lib/users/schemas.ts — та же модель у /api/me). Канонизация на границе
+  // разбора, форма из bookingCreateSchema — второго подхода не заводим.
+  phone: z
+    .union([
+      z.null(),
+      z
+        .string()
+        .trim()
+        .max(40)
+        .transform((value) => normalizeRussianPhone(value))
+        .refine((value): value is string => value !== null, {
+          message: "Проверьте номер телефона: нужен формат +7 900 000-00-00.",
+        }),
+    ])
+    .optional(),
   lastName: z.string().trim().max(100).optional().nullable(),
   city: z.string().trim().max(200).optional().nullable(),
   birthDate: z
@@ -129,6 +147,10 @@ function computeCompletion(input: {
 }): ProfileDTO["completion"] {
   const items = {
     nameLastname: Boolean(input.firstName?.trim() && input.lastName?.trim()),
+    // PHONE-CLAIM-01: чеклист заполненности считает ПРИСУТСТВИЕ номера, а не
+    // владение — подтвердить заявку в проде нечем (SMS-шлюз off), и вечный
+    // недостижимый пункт делал бы 100% фиктивным. Ключ исторический
+    // (`phoneVerified`), переименование сломало бы маппинг чеклиста в UI.
     phoneVerified: Boolean(input.phone),
     emailVerified: input.emailVerified,
     birthday: input.birthDate !== null,
@@ -159,6 +181,7 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
         birthDate: true,
         hideAgeYear: true,
         phone: true,
+        phoneVerifiedAt: true,
         email: true,
         emailVerifiedAt: true,
         externalPhotoUrl: true,
@@ -225,7 +248,10 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
     },
     contacts: {
       phone: user.phone,
-      phoneVerified: Boolean(user.phone),
+      // PHONE-CLAIM-01: бейдж «Подтверждён» — только доказанное владение
+      // (phone-OTP), а не сам факт заполненности. Кабинетная заявка бейджа не
+      // получает — подтвердить её без SMS-шлюза пока нечем.
+      phoneVerified: Boolean(user.phoneVerifiedAt),
       email: user.email,
       emailVerified,
     },
@@ -258,6 +284,13 @@ export async function updateClientProfile(
   userId: string,
   patch: ProfileUpdatePatch,
 ): Promise<ProfileDTO> {
+  // PHONE-CLAIM-01: телефон — только через единственный примитив заявки
+  // (сброс отметки владения при смене, освобождение guest-class держателя,
+  // 409 на занятый номер). Прямой `data.phone` запрещён.
+  if (patch.phone !== undefined) {
+    await claimPhoneForUser(userId, patch.phone);
+  }
+
   const data: Record<string, unknown> = {};
 
   if (patch.firstName !== undefined) {
