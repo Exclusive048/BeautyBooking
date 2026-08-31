@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, FileText, LifeBuoy, Mail, Phone } from "lucide-react";
+import { Search, FileText, LifeBuoy, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FAQAccordionItem } from "@/components/ui/faq-accordion";
 import { Card } from "@/components/ui/card";

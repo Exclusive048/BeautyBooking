@@ -53,7 +53,7 @@
 | # | Что | Чем доказано |
 |---|---|---|
 | V1 | **Миграции применяются ДО подъёма приложения** | **кодом, а не процедурой**: `docker-compose.prod.yml` — сервис `migrate` (`prisma migrate deploy`, `restart: "no"`), и у `app` и `worker` стоит `depends_on: migrate: condition: service_completed_successfully`. Плюс `deploy.yml` гоняет `compose run --rm migrate` отдельным видимым шагом 4/6 **перед** `up -d` (5/6). То есть даже голый `docker compose up -d` не поднимет приложение против немигрированной БД |
-| V2 | `PHONE_AUTH_ENABLED=true` в prod без SMS-провайдера → **отказ на старте** | env-refine + `src/lib/env/phone-auth-sms-guard.test.ts` |
+| V2 | Phone-вход в prod включается ТОЛЬКО настроенным SMS-провайдером (ENV-SPLIT-01: флага `PHONE_AUTH_ENABLED` больше нет — `isPhoneAuthEnabled = isSmsConfigured`; выключен = креды не заданы, случайно включить нечем; строка флага в старом env — no-op) | `env.ts` + `src/lib/env/phone-auth-sms-guard.test.ts` + `src/lib/env.phone-auth-flag.test.ts` |
 | V3 | `STORAGE_PROVIDER=local` в prod → **отказ на старте** | SEC-23, `env.ts` |
 | V4 | `YOOKASSA_WEBHOOK_TOKEN` при включённых платежах → **отказ на старте** | HARDENING-MISC-01 |
 | V5 | Cron-секрет **только заголовком**; `?token=` даёт 403 | SEC-21, `lib/api/cron-auth.ts` |
@@ -122,11 +122,11 @@
 | 1 | `pgvector ≥ 0.5.0` на прод-Postgres (`D3`) | `SELECT extversion FROM pg_extension WHERE extname='vector';` → ≥ 0.5.0 | **Стоп.** Объединённый baseline создаёт HNSW-индекс (секция `[25/36] …reduce_embedding_dimensions_yandex`) и упадёт **на середине**, оставив базу частично созданной |
 | 2 | `.env.production` в `/opt/app` по `.env.production.example` | `git check-ignore .env.production` → игнорируется; `git status --short` его не показывает | Виден в `status` → `git pull --ff-only` может конфликтовать; вынести из индекса |
 | 3 | 🚩 `YOOKASSA_WEBHOOK_TOKEN` — **до** первого старта (§1.1) | секрет заведён **и** `?token=<value>` прописан в ЛК ЮКассы | Приложение **не стартует** (V4). Это by design. Поднять без платежей можно, сняв обе `YOOKASSA_*` |
-| 4 | 🚩 Все `NEXT_PUBLIC_*` — в тот же `.env.production` (§1.3) | 13 переменных из build-args compose (V13) | Пропущенная запекается в бандл **пустой без ошибки**; пустой `NEXT_PUBLIC_APP_URL` **роняет сборку** (`new URL("")`) |
+| 4 | 🚩 Все `NEXT_PUBLIC_*` — в тот же `.env.production` (§1.3) | **9 живых** переменных — список = `src/lib/env.client.ts` (ENV-SPLIT-01 удалил 4 флага; ARG-блок Dockerfile/compose пока несёт их мёртвыми — не заполнять) | Пропущенная запекается в бандл **пустой без ошибки**; пустой `NEXT_PUBLIC_APP_URL` **роняет сборку** (`new URL("")`) |
 | 5 | `STORAGE_PROVIDER=s3` + `S3_*` (§2) | `s3` | `local` → **отказ на старте** (V3) |
-| 6 | `PHONE_AUTH_ENABLED` не трогать (остаётся OFF) | unset либо `false` | `true` без SMS → **отказ на старте** (V2). Это защита, не помеха |
-| 7 | `EMAIL_AUTH_ENABLED` оставить unset/`true` + SMTP заведён | канал входа закрытого деплоя — **единственный** | `false` гасит вход **всем**; без SMTP `request` вернёт 503 даже при включённом флаге |
-| 8 | `NEXT_PUBLIC_TELEGRAM_ENABLED` unset/`false`; VAPID-ключи **не** заводить | оба выключены | Это гейты **этапа 2** (FZ-199 / трансграничный push) |
+| 6 | SMS-креды **не задавать** (`SMS_PROVIDER_LOGIN`/`SMS_PROVIDER_PASSWORD` отсутствуют) | phone-вход выключен их отсутствием — флага `PHONE_AUTH_ENABLED` больше нет (ENV-SPLIT-01, V2) | Заданные креды = включённый phone-вход: SMSC начнёт слать реальные SMS |
+| 7 | SMTP заведён и живой (`SMTP_HOST/PORT/USER/PASS/FROM`) | email-OTP — **единственный** канал входа закрытого деплоя; килсвитча `EMAIL_AUTH_ENABLED` больше нет: канал включён самим наличием SMTP-кредов | Без SMTP `request` вернёт 503 — входа нет ни у кого |
+| 8 | `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` пустой + `TELEGRAM_BOT_TOKEN` не заводить; VAPID-ключи **не** заводить | Telegram и push выключены (потолок Telegram — наличие username, ENV-SPLIT-01) | Это гейты **этапа 2** (FZ-199 / трансграничный push); username без токена в проде → отказ на старте (env-refine) |
 | 9 | `TRUSTED_PROXY_HOPS` — предварительно по топологии (§1.1) | число обратных прокси перед приложением | Проверяется только после деплоя — шаг B.3.1. Дефолт `1` верен ровно для одной топологии |
 | 10 | Удалить `OPENAI_API_KEY` из prod-env | отсутствует | Безвредно, но чистим явно — потребителя нет |
 | 11 | Три секрета GitHub: `PROD_HOST` / `PROD_USER` / `PROD_SSH_KEY` | заданы в окружении `production` | Не заданы → job деплоя **«пропущен», не «упал»** (это ожидаемо до провижининга) |
