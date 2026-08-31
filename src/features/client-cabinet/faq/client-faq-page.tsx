@@ -151,15 +151,6 @@ export function ClientFaqPage() {
                   {T.contactEmailAddress}
                 </a>
               </li>
-              <li>
-                <a
-                  href="tel:+78001112233"
-                  className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
-                >
-                  <Phone className="h-4 w-4 text-text-sec" aria-hidden />
-                  8 800 111 22 33
-                </a>
-              </li>
             </ul>
           </Card>
 
