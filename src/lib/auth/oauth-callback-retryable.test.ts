@@ -46,7 +46,7 @@ import { fetchVkProfile } from "@/lib/vk/oauth";
 
 const DECLARED_TIMEOUT_MS = 10_000;
 
-const req = () => new Request("https://мастеррядом.online/api/auth/vk/callback?code=x");
+const req = () => new Request("https://masterryadom.ru/api/auth/vk/callback?code=x");
 
 const LOGIN_CLIENT_SOURCE = readFileSync(
   resolve(process.cwd(), "src", "app", "login", "login-client.tsx"),

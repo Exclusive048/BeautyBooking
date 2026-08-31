@@ -38,7 +38,7 @@ const uniqueViolation = () =>
     clientVersion: "6.19.3",
   });
 
-const req = () => new Request("https://мастеррядом.online/api/auth/vk/callback?code=x");
+const req = () => new Request("https://masterryadom.ru/api/auth/vk/callback?code=x");
 
 describe("1 · конфликт в колбэке возвращает пользователя в приложение, а не JSON", () => {
   it("отдаёт редирект на /login с разбираемой причиной", () => {

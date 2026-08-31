@@ -5,8 +5,8 @@ const BRAND = "МастерРядом";
 const C = BRAND_COLORS;
 /**
  * Brand URL для email body links. Production resolves via `NEXT_PUBLIC_APP_URL`
- * (Zod refine enforces non-empty in production). Dev fallback к canonical
- * Cyrillic domain matches the actual production deploy. EMAIL-BRAND-URL-FIX-A
+ * (Zod refine enforces non-empty in production). Dev fallback — канонический
+ * прод-домен `masterryadom.ru` (DOMAIN-CUTOVER-01). EMAIL-BRAND-URL-FIX-A
  * (2026-06-02) closed the pre-fix hardcode to the dead `beautyhub.art` domain.
  */
 const BRAND_URL = env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru";

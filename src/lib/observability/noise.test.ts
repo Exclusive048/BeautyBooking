@@ -87,6 +87,6 @@ describe("browser filters", () => {
   it("denies stack frames originating in browser extensions", () => {
     expect(matches(BROWSER_DENY_URLS, "chrome-extension://abcdef/content.js")).toBe(true);
     expect(matches(BROWSER_DENY_URLS, "moz-extension://abcdef/inject.js")).toBe(true);
-    expect(matches(BROWSER_DENY_URLS, "https://мастеррядом.online/_next/static/chunks/main.js")).toBe(false);
+    expect(matches(BROWSER_DENY_URLS, "https://masterryadom.ru/_next/static/chunks/main.js")).toBe(false);
   });
 });

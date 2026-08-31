@@ -86,7 +86,7 @@ export async function GET(
     const address = display.address ?? booking.provider.address ?? null;
 
     const ics = generateIcs({
-      uid: `booking-${booking.id}@masterryadom.online`,
+      uid: `booking-${booking.id}@masterryadom.ru`,
       summary: `${serviceTitle} — ${display.name}`,
       start: booking.startAtUtc.toISOString(),
       end: booking.endAtUtc.toISOString(),

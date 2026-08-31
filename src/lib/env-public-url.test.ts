@@ -71,27 +71,33 @@ describe("FIX-D1 · публичный URL проверяется по хост�
     ).rejects.toThrow();
   });
 
-  it("канонический хост (unicode) — старт разрешён", async () => {
+  it("канонический хост — старт разрешён (bare и www)", async () => {
     await expect(
-      loadEnv({ ...PROD_BASE, NEXT_PUBLIC_APP_URL: "https://мастеррядом.online", APP_PUBLIC_URL: undefined }),
+      loadEnv({ ...PROD_BASE, NEXT_PUBLIC_APP_URL: "https://masterryadom.ru", APP_PUBLIC_URL: undefined }),
+    ).resolves.toBeDefined();
+    await expect(
+      loadEnv({ ...PROD_BASE, NEXT_PUBLIC_APP_URL: "https://www.masterryadom.ru", APP_PUBLIC_URL: undefined }),
     ).resolves.toBeDefined();
   });
 
-  it("канонический хост (punycode) — тоже разрешён", async () => {
-    // Домен кириллический, и какая из форм попадёт в env — зависит от того, кто
-    // копировал. `new URL().host` одну в другую НЕ приводит, поэтому обе в списке.
+  it("🔴 погашенный кириллический домен — старт запрещён в обеих формах (DOMAIN-CUTOVER-01)", async () => {
+    // Ровно тот откат, от которого защищает рефайн: значение «как раньше»
+    // валидно по форме, но письма/пуши/OAuth уехали бы на мёртвый хост.
+    await expect(
+      loadEnv({ ...PROD_BASE, NEXT_PUBLIC_APP_URL: "https://мастеррядом.online", APP_PUBLIC_URL: undefined }),
+    ).rejects.toThrow();
     await expect(
       loadEnv({
         ...PROD_BASE,
         NEXT_PUBLIC_APP_URL: "https://xn--80aic0adlmagk0m.online",
         APP_PUBLIC_URL: undefined,
       }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow();
   });
 
   it("http на каноническом хосте — запрещён (ссылки в письмах уехали бы по http)", async () => {
     await expect(
-      loadEnv({ ...PROD_BASE, NEXT_PUBLIC_APP_URL: "http://мастеррядом.online", APP_PUBLIC_URL: undefined }),
+      loadEnv({ ...PROD_BASE, NEXT_PUBLIC_APP_URL: "http://masterryadom.ru", APP_PUBLIC_URL: undefined }),
     ).rejects.toThrow();
   });
 

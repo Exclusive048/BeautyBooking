@@ -13,17 +13,15 @@ import { verifyToken } from "@/lib/auth/jwt";
 /**
  * Прод-ориджины для CORS и CSRF-слоя (SEC-08).
  *
- * ⚠️ Смена домена (2026-08-30): продом стал `masterryadom.ru`. Прежний
- * `мастеррядом.online` оставлен на время переезда — пока старый хост отвечает,
- * его вкладки не должны получать отказ на мутациях. Вычистить вместе с
- * `.online`-формами в `CANONICAL_PUBLIC_HOSTS` (`src/lib/env.ts`), когда старый
- * домен будет погашен: списки обязаны оставаться в локстепе.
+ * Смена домена завершена (2026-09-01, DOMAIN-CUTOVER-01): прод — только
+ * `masterryadom.ru`. `.online`-формы прежнего кириллического домена вычищены
+ * по команде владельца, в локстепе с `CANONICAL_PUBLIC_HOSTS`
+ * (`src/lib/env.ts`) — вкладки старого хоста теперь получают отказ на
+ * мутациях, это ожидаемо.
  */
 const PRODUCTION_ORIGINS = [
   "https://masterryadom.ru",
   "https://www.masterryadom.ru",
-  "https://мастеррядом.online",
-  "https://www.мастеррядом.online",
 ];
 const ALLOWED_DEV_ORIGINS = new Set([
   "http://localhost:3000",
@@ -35,11 +33,13 @@ const CORS_HEADERS = "Content-Type, Authorization, x-idempotency-key";
 /**
  * Normalize an origin string into the canonical form `new URL` produces.
  *
- * Critical for МастерРядом's Cyrillic IDN domain: browsers serialize the
- * `Origin` header as Punycode (e.g. `https://xn--80aic0adlmagk0m.online`)
- * while the source code spells it in Cyrillic (`https://мастеррядом.online`).
- * `new URL().origin` normalizes both forms to the same Punycode canonical,
- * so allowlist comparison must run BOTH sides through this function.
+ * Написана в эпоху кириллического IDN-домена (`мастеррядом.online`): браузеры
+ * шлют `Origin` в punycode, а исходники писали кириллицу — сравнивать можно
+ * было только после `new URL().origin` с ОБЕИХ сторон. Текущий домен
+ * `masterryadom.ru` — латиница, нормализация для него тождественна, но
+ * функция ОСТАЁТСЯ обязательной: она отрезает path/query/hash из сравнения и
+ * канонизирует порт/регистр, а look-alike-IDN во входящем `Origin` продолжает
+ * нормализоваться и честно НЕ совпадать с allowlist'ом.
  *
  * Closes two CORS bugs found by PRE-LAUNCH-QUICK-AUDITS-A (2026-05-31):
  *   1. www-subdomain comparison built `"www.${host}"` WITHOUT `https://`
@@ -205,7 +205,7 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
  * Куки уже стоят с явным `SameSite=Lax`, поэтому классический межсайтовый
  * CSRF на POST закрыт. Остаточная поверхность — **same-site, cross-origin**:
  * `SameSite` не различает поддомены, то есть любой поддомен
- * `мастеррядом.online` (будущий staging, маркетинговый, скомпрометированный)
+ * `masterryadom.ru` (будущий staging, маркетинговый, скомпрометированный)
  * делает полноценные аутентифицированные мутации. Второго слоя не было
  * вообще: ни один мутирующий обработчик не смотрел ни на `Origin`, ни на
  * `Sec-Fetch-Site`.

@@ -51,7 +51,7 @@ function buildFooterLinks() {
     { label: UI_TEXT.footer.links.faq, href: "/faq" },
     hasSupportPage
       ? { label: UI_TEXT.footer.links.contact, href: "/support" }
-      : { label: UI_TEXT.footer.links.contact, href: "mailto:support@мастеррядом.online", external: true },
+      : { label: UI_TEXT.footer.links.contact, href: "mailto:support@masterryadom.ru", external: true },
     { label: UI_TEXT.footer.links.terms, href: "/terms" },
     { label: UI_TEXT.footer.links.privacy, href: "/privacy" },
   ];

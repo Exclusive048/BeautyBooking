@@ -28,7 +28,16 @@ import {
   shouldRejectCrossSiteMutation,
 } from "./proxy";
 
+// DOMAIN-CUTOVER-01 (2026-09-01): прод переехал на ASCII-домен masterryadom.ru,
+// но IDN-поведение normalizeOrigin ОСТАЁТСЯ под пином — на нём держится отказ
+// look-alike-IDN-ориджинов. Кириллические строки ниже — бывший домен, оставлен
+// как реалистичный IDN-пример; принадлежность домена для функции не важна.
 describe("normalizeOrigin — IDN + protocol canonicalization", () => {
+  it("текущий ASCII-домен нормализация не меняет (тождество)", () => {
+    expect(normalizeOrigin("https://masterryadom.ru")).toBe("https://masterryadom.ru");
+    expect(normalizeOrigin("https://www.masterryadom.ru")).toBe("https://www.masterryadom.ru");
+  });
+
   it("normalizes Cyrillic IDN to Punycode form", () => {
     expect(normalizeOrigin("https://мастеррядом.online")).toBe(
       "https://xn--80aic0adlmagk0m.online",
@@ -69,8 +78,8 @@ describe("normalizeOrigin — IDN + protocol canonicalization", () => {
   });
 
   it("strips path / query / hash from the origin (security-critical — only scheme+host+port match)", () => {
-    expect(normalizeOrigin("https://мастеррядом.online/admin?x=1#hash")).toBe(
-      "https://xn--80aic0adlmagk0m.online",
+    expect(normalizeOrigin("https://masterryadom.ru/admin?x=1#hash")).toBe(
+      "https://masterryadom.ru",
     );
   });
 });
@@ -78,10 +87,12 @@ describe("normalizeOrigin — IDN + protocol canonicalization", () => {
 describe("CORS allowlist via normalizeOrigin — both bugs regression-pinned", () => {
   // Mirror of PRODUCTION_ALLOWLIST_NORMALIZED inside proxy.ts. The Set
   // semantics + normalization are what the real getAllowedOrigin() does.
+  // DOMAIN-CUTOVER-01: список — только masterryadom.ru; прежние .online-формы
+  // обязаны отвергаться (см. негативные кейсы ниже).
   const PRODUCTION_ALLOWLIST = new Set(
     [
-      "https://мастеррядом.online",
-      "https://www.мастеррядом.online",
+      "https://masterryadom.ru",
+      "https://www.masterryadom.ru",
     ]
       .map(normalizeOrigin)
       .filter((value): value is string => value !== null),
@@ -94,23 +105,22 @@ describe("CORS allowlist via normalizeOrigin — both bugs regression-pinned", (
   }
 
   // Bug 1 regression (www subdomain comparison missing protocol)
-  it("allows browser-sent www form в Cyrillic", () => {
-    expect(isAllowed("https://www.мастеррядом.online")).toBe(true);
+  it("allows browser-sent www form", () => {
+    expect(isAllowed("https://www.masterryadom.ru")).toBe(true);
   });
 
-  it("allows browser-sent www form в Punycode (Bug 1 regression)", () => {
-    // This was blocked PRE-fix because the broken `"www.мастеррядом.online"`
-    // string also wouldn't match the Punycode form.
-    expect(isAllowed("https://www.xn--80aic0adlmagk0m.online")).toBe(true);
+  it("allows bare origin", () => {
+    expect(isAllowed("https://masterryadom.ru")).toBe(true);
   });
 
-  // Bug 2 regression (Punycode allowlist mismatch)
-  it("allows bare Cyrillic origin", () => {
-    expect(isAllowed("https://мастеррядом.online")).toBe(true);
-  });
-
-  it("allows bare Punycode origin (Bug 2 regression — browsers send this form)", () => {
-    expect(isAllowed("https://xn--80aic0adlmagk0m.online")).toBe(true);
+  // DOMAIN-CUTOVER-01: прежний кириллический домен погашен — обе его формы
+  // (unicode и punycode, bare и www) обязаны отвергаться. Это регрессия
+  // против «забытая строка в allowlist оставила старый домен доверенным».
+  it("rejects the retired Cyrillic domain in every form", () => {
+    expect(isAllowed("https://мастеррядом.online")).toBe(false);
+    expect(isAllowed("https://xn--80aic0adlmagk0m.online")).toBe(false);
+    expect(isAllowed("https://www.мастеррядом.online")).toBe(false);
+    expect(isAllowed("https://www.xn--80aic0adlmagk0m.online")).toBe(false);
   });
 
   // Negative cases — security-critical to confirm normalization didn't
@@ -119,14 +129,13 @@ describe("CORS allowlist via normalizeOrigin — both bugs regression-pinned", (
     expect(isAllowed("https://evil.example.com")).toBe(false);
   });
 
-  it("rejects wrong protocol (http instead of https) — IDN normalization preserves protocol", () => {
-    expect(isAllowed("http://мастеррядом.online")).toBe(false);
-    expect(isAllowed("http://xn--80aic0adlmagk0m.online")).toBe(false);
+  it("rejects wrong protocol (http instead of https)", () => {
+    expect(isAllowed("http://masterryadom.ru")).toBe(false);
   });
 
   it("rejects look-alike domain (subdomain hijack defense)", () => {
-    // Trying to fake www.мастеррядом.online by registering xn--80aic0adlmagk0m.online.evil.com
-    expect(isAllowed("https://xn--80aic0adlmagk0m.online.evil.com")).toBe(false);
+    // Trying to fake the host by registering masterryadom.ru.evil.com
+    expect(isAllowed("https://masterryadom.ru.evil.com")).toBe(false);
   });
 
   it("rejects empty/malformed Origin", () => {
@@ -134,10 +143,10 @@ describe("CORS allowlist via normalizeOrigin — both bugs regression-pinned", (
     expect(isAllowed("not-a-url")).toBe(false);
   });
 
-  it("rejects unauthorized subdomain (e.g. api.мастеррядом.online)", () => {
+  it("rejects unauthorized subdomain (e.g. api.masterryadom.ru)", () => {
     // Only bare + www are allowed; arbitrary subdomains must NOT be admitted
-    expect(isAllowed("https://api.мастеррядом.online")).toBe(false);
-    expect(isAllowed("https://admin.мастеррядом.online")).toBe(false);
+    expect(isAllowed("https://api.masterryadom.ru")).toBe(false);
+    expect(isAllowed("https://admin.masterryadom.ru")).toBe(false);
   });
 });
 
@@ -145,7 +154,7 @@ describe("CORS allowlist via normalizeOrigin — both bugs regression-pinned", (
  * SEC-08 — второй слой против CSRF поверх `SameSite=Lax`.
  *
  * `SameSite=Lax` закрывает классический межсайтовый CSRF, но НЕ различает
- * поддомены: любой поддомен `мастеррядом.online` мог делать аутентифицированные
+ * поддомены: любой поддомен `masterryadom.ru` мог делать аутентифицированные
  * мутации. Ключевой кейс здесь — `sec-fetch-site: same-site`, а не `cross-site`.
  *
  * Второе обязательство теста — не сломать server-to-server: вебхук ЮКассы и
@@ -204,7 +213,7 @@ describe("shouldRejectCrossSiteMutation — SEC-08", () => {
       shouldRejectCrossSiteMutation({
         method: "POST",
         fetchSite: null,
-        origin: "https://мастеррядом.online",
+        origin: "https://masterryadom.ru",
         originAllowed: true,
       }),
     ).toBe(false);
@@ -215,7 +224,7 @@ describe("shouldRejectCrossSiteMutation — SEC-08", () => {
       shouldRejectCrossSiteMutation({
         method: "POST",
         fetchSite: "same-site",
-        origin: "https://мастеррядом.online",
+        origin: "https://masterryadom.ru",
         originAllowed: true,
       }),
     ).toBe(true);
@@ -263,13 +272,13 @@ describe("getAllowedOrigin — SEC-19", () => {
     expect(getAllowedOrigin("http://172.29.32.2:3000")).toBeNull();
   });
 
-  it("в production поведение прежнее: канонический домен и его punycode-форма", () => {
+  it("в production допущен только канонический домен (bare + www)", () => {
     vi.stubEnv("NODE_ENV", "production");
-    expect(getAllowedOrigin("https://мастеррядом.online")).toBe("https://мастеррядом.online");
-    expect(getAllowedOrigin("https://xn--80aic0adlmagk0m.online")).toBe(
-      "https://xn--80aic0adlmagk0m.online",
-    );
-    expect(getAllowedOrigin("https://www.мастеррядом.online")).toBe("https://www.мастеррядом.online");
+    expect(getAllowedOrigin("https://masterryadom.ru")).toBe("https://masterryadom.ru");
+    expect(getAllowedOrigin("https://www.masterryadom.ru")).toBe("https://www.masterryadom.ru");
+    // DOMAIN-CUTOVER-01: погашенный кириллический домен не проходит ни в одной форме
+    expect(getAllowedOrigin("https://мастеррядом.online")).toBeNull();
+    expect(getAllowedOrigin("https://xn--80aic0adlmagk0m.online")).toBeNull();
     // dev-адреса в проде не проходят — списки не смешались
     expect(getAllowedOrigin("http://localhost:3000")).toBeNull();
   });

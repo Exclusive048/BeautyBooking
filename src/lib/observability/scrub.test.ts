@@ -52,7 +52,7 @@ function buildRealisticEvent(): Record<string, unknown> {
     },
     request: {
       method: "POST",
-      url: `https://xn--80aic0adlmagk0m.online/api/auth/otp/request?phone=${PHONE}&token=abc`,
+      url: `https://masterryadom.ru/api/auth/otp/request?phone=${PHONE}&token=abc`,
       query_string: `phone=${PHONE}`,
       cookies: { bh_session: SESSION_JWT, bh_refresh: "refresh-jti-value-12345678" },
       headers: {
@@ -105,7 +105,7 @@ function buildRealisticEvent(): Record<string, unknown> {
     breadcrumbs: [
       {
         category: "fetch",
-        message: `POST https://xn--80aic0adlmagk0m.online/api/auth/otp/request?phone=${PHONE}`,
+        message: `POST https://masterryadom.ru/api/auth/otp/request?phone=${PHONE}`,
         data: { url: `https://x.online/api/bookings?clientPhone=${PHONE}`, status_code: 500, otpCode: OTP },
       },
       {
@@ -167,7 +167,7 @@ describe("scrubEvent — PII must not survive", () => {
 
   it("strips the query string but keeps the route path", () => {
     const request = scrubbed.request as Record<string, unknown>;
-    expect(request.url).toBe("https://xn--80aic0adlmagk0m.online/api/auth/otp/request");
+    expect(request.url).toBe("https://masterryadom.ru/api/auth/otp/request");
     expect(request.method).toBe("POST");
   });
 

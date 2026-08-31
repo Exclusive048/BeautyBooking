@@ -146,9 +146,9 @@ export const UI_TEXT = {
         "Документ требует юридического ревью перед публикацией. Сейчас содержит технический черновик, описывающий реальный функционал платформы.",
     },
     contacts: {
-      legal: "legal@мастеррядом.online",
-      privacy: "privacy@мастеррядом.online",
-      support: "support@мастеррядом.online",
+      legal: "legal@masterryadom.ru",
+      privacy: "privacy@masterryadom.ru",
+      support: "support@masterryadom.ru",
     },
     requisites: {
       entityType: "Индивидуальный предприниматель",
@@ -218,8 +218,8 @@ export const UI_TEXT = {
     },
     alternativeContact: {
       description: "Другие способы связаться:",
-      email: "support@мастеррядом.online",
-      emailHref: "mailto:support@мастеррядом.online",
+      email: "support@masterryadom.ru",
+      emailHref: "mailto:support@masterryadom.ru",
     },
   },
   partners: {
@@ -279,17 +279,17 @@ export const UI_TEXT = {
       submit: "Отправить заявку",
       submitting: "Отправляем…",
       genericError:
-        "Не удалось отправить. Попробуйте ещё раз или напишите на partners@мастеррядом.online.",
+        "Не удалось отправить. Попробуйте ещё раз или напишите на partners@masterryadom.ru.",
       success: {
         title: "Заявка отправлена",
         description:
-          "Мы получили ваше сообщение и ответим в течение 3 рабочих дней. Если вопрос срочный — напишите на partners@мастеррядом.online.",
+          "Мы получили ваше сообщение и ответим в течение 3 рабочих дней. Если вопрос срочный — напишите на partners@masterryadom.ru.",
       },
     },
     alternativeContact: {
       description: "Если ваше обращение срочное или вы предпочитаете прямой контакт:",
-      email: "partners@мастеррядом.online",
-      emailHref: "mailto:partners@мастеррядом.online",
+      email: "partners@masterryadom.ru",
+      emailHref: "mailto:partners@masterryadom.ru",
     },
   },
   catalog2: {
@@ -5550,12 +5550,13 @@ export const UI_TEXT = {
       contactsTitle: "Контакты",
       contactsDescription: "Если вопрос срочный — пишите напрямую.",
       contactEmail: "Почта",
-      // EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A: canonical support address with
-      // Cyrillic local part. Mirrors precedent in UI_TEXT.support.alternativeContact
-      // (storing both display + mailto pre-built). Yandex Mail EAI configuration
-      // required to receive this address — see DEVOPS Q4 in BACKLOG.
-      contactEmailAddress: "support@мастеррядом.online",
-      contactEmailHref: "mailto:support@мастеррядом.online",
+      // EMAIL-SUPPORT-ADDRESS-CONSOLIDATE-A: canonical support address.
+      // Mirrors precedent in UI_TEXT.support.alternativeContact (storing both
+      // display + mailto pre-built). DOMAIN-CUTOVER-01: домен ASCII
+      // (masterryadom.ru, почта на Яндекс 360 — MAIL-MIGRATION-01), прежняя
+      // EAI-оговорка про кириллический адрес неактуальна.
+      contactEmailAddress: "support@masterryadom.ru",
+      contactEmailHref: "mailto:support@masterryadom.ru",
       contactPhone: "Телефон",
       contactTelegram: "Telegram",
       docsTitle: "Документы",

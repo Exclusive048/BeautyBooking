@@ -26,7 +26,7 @@ const BASE: Record<string, string> = {
   // logout к третьей стороне). Эти тесты про другое, поэтому в фикстуре стоит
   // канонический хост — иначе прод-кейсы падают на чужом refine. Сам refine
   // покрыт в `env-public-url.test.ts`. Тот же приём, что с s3 ниже/выше.
-  NEXT_PUBLIC_APP_URL: "https://мастеррядом.online",
+  NEXT_PUBLIC_APP_URL: "https://masterryadom.ru",
   // SEC-23: `STORAGE_PROVIDER=local` в проде теперь отвергается на старте
   // (файлы local-провайдера отдаются мимо `ensureCanReadMedia`). Эти тесты про
   // другое, поэтому в базовую фикстуру добавлено валидное s3-хранилище — иначе

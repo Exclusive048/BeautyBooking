@@ -65,8 +65,6 @@ const nextConfig = {
   allowedDevOrigins: [
     "https://masterryadom.ru",
     "https://www.masterryadom.ru",
-    "https://мастеррядом.online",
-    "https://www.мастеррядом.online",
   ],
   async redirects() {
     return [
