@@ -230,3 +230,79 @@ describe("APP-TIER-SPLIT-02 · deploy.yml согласован с тополог
     expect(DEPLOY).not.toMatch(/--no-deps app worker/);
   });
 });
+
+/**
+ * AUTO-DEPLOY-01 (2026-09-01) — деплой по зелёному CI на main, снимок БД
+ * перед миграциями, уведомления.
+ *
+ * Что сторожится:
+ *   1. Триггер — `workflow_run` по workflow `CI` на `main`, и preflight гейтится
+ *      `conclusion == 'success'`: красный CI не должен доходить даже до
+ *      «пропущенного» деплоя, иначе каждый провал CI рисовал бы деплой в истории.
+ *   2. Снимок БД стоит СТРОГО до миграций и проверяется чтением
+ *      (`pg_restore --list`): миграции откатом не отменяются, а при автодеплое
+ *      рядом нет человека со снимком.
+ *   3. Страховка «деплоим тот SHA, что прошёл CI» есть с обеих сторон: job guard
+ *      (API) и скрипт на ВМ после pull.
+ *   4. Скрипт на ВМ исполняет dash — башизмы вида `${VAR:0:8}` / `[[` тихо
+ *      ломают его на стенде, а в CI-раннере (bash) прошли бы.
+ *   5. notify — всегда, оба канала, без сторонних экшенов для Telegram.
+ *
+ * @probe 2026-09-01: `conclusion == 'success'` → `'failure'` — красный;
+ *   перестановка шага snapshot ниже migrate — красный («снимок идёт после
+ *   миграций»); `${DEPLOY_SHA}` → `${DEPLOY_SHA:0:8}` в имени снимка (внутри
+ *   скрипта ВМ) — красный. ⚠️ Тот же башизм в `run:`-шаге job notify зелёный
+ *   НАМЕРЕННО: там bash раннера GitHub, проверка сужена до скрипта ВМ — первая
+ *   проба била мимо области и это выяснилось ровно так.
+ */
+describe("AUTO-DEPLOY-01 · deploy.yml: автозапуск по CI, снимок БД, уведомления", () => {
+  it("автозапуск — workflow_run по CI на main, только на зелёном результате", () => {
+    expect(DEPLOY).toMatch(/workflow_run:\n\s+workflows: \["CI"\]\n\s+types: \[completed\]\n\s+branches: \[main\]/);
+    expect(DEPLOY).toMatch(/github\.event\.workflow_run\.conclusion == 'success'/);
+    // Ручной запуск сохранён — повторы и откат вперёд.
+    expect(DEPLOY).toMatch(/workflow_dispatch:/);
+  });
+
+  it("снимок БД — до миграций, читается pg_restore, с ретенцией", () => {
+    // Порядок судится по СКРИПТУ на ВМ, а не по всему файлу: шапка-комментарий
+    // упоминает команду миграции раньше любого шага.
+    const script = DEPLOY.slice(DEPLOY.indexOf("script: |"));
+    const snapshotAt = script.indexOf("pg_dump --format=custom");
+    const migrateAt = script.indexOf("--profile db run --rm --no-deps migrate");
+    const upAt = script.indexOf("up -d --remove-orphans");
+    expect(snapshotAt, "нет шага pg_dump").toBeGreaterThan(-1);
+    expect(snapshotAt, "снимок идёт после миграций").toBeLessThan(migrateAt);
+    expect(migrateAt).toBeLessThan(upAt);
+    expect(script).toMatch(/pg_restore --list/);
+    expect(script).toMatch(/tail -n \+\$\(\(BACKUP_KEEP \+ 1\)\)/);
+    // DATABASE_URL Prisma несёт ?schema=public — libpq такого параметра не знает.
+    expect(script).toMatch(/DB_URL="\$\{DB_URL%%\\\?\*\}"/);
+  });
+
+  it("деплоится ровно тот SHA, что прошёл CI — проверка в job guard И на ВМ после pull", () => {
+    expect(DEPLOY).toMatch(/branches\/main" --jq \.commit\.sha/);
+    expect(DEPLOY).toMatch(/skip=true/);
+    expect(DEPLOY).toMatch(/rev-parse HEAD\)" != "\$EXPECTED_SHA"/);
+  });
+
+  it("скрипт для ВМ — POSIX sh: без башизмов (login-shell деплой-пользователя — dash)", () => {
+    const scriptStart = DEPLOY.indexOf("script: |");
+    const scriptEnd = DEPLOY.indexOf("\n  notify:");
+    const script = DEPLOY.slice(scriptStart, scriptEnd);
+    expect(script).not.toMatch(/\$\{[A-Za-z_]+:\d+:\d+\}/);
+    expect(script).not.toMatch(/\[\[ /);
+    expect(script).not.toMatch(/set -o pipefail/);
+    expect(script).not.toMatch(/\blocal\b/);
+  });
+
+  it("уведомления — всегда, Telegram через Bot API и письмо через SMTP", () => {
+    const notifyAt = DEPLOY.indexOf("\n  notify:");
+    expect(notifyAt).toBeGreaterThan(-1);
+    const notify = DEPLOY.slice(notifyAt);
+    expect(notify).toMatch(/if: always\(\)/);
+    expect(notify).toMatch(/api\.telegram\.org\/bot\$\{TG_BOT_TOKEN\}\/sendMessage/);
+    expect(notify).toMatch(/dawidd6\/action-send-mail@v3/);
+    expect(notify).toMatch(/server_address: smtp\.yandex\.ru/);
+    expect(notify).toMatch(/secure: true/);
+  });
+});
