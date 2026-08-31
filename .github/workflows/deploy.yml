@@ -177,8 +177,15 @@ jobs:
             # Зовётся при провале up -d и при провале health/liveness-проверок.
             # Провал МИГРАЦИЙ отката не требует: рестарт ещё не выполнялся, прежняя
             # версия продолжает работать (состояние БД — тема снимка, шаг 4/7).
+            # MAINTENANCE-PAGE-01: ориентир окончания работ для страницы «идут
+            # работы» (deploy/maintenance). Пишется перед up -d, снимается после
+            # успеха или отката — без файла страница показывает общую формулировку.
+            ETA_FILE="$APP_DIR/.maintenance-state/eta.json"
+            clear_eta() { $SUDO rm -f "$ETA_FILE" 2>/dev/null || true; }
+
             rollback_and_fail() {
               echo "❌ $1 — автооткат на :previous."
+              clear_eta
               if ! $DOCKER image inspect beautyhub-app:previous >/dev/null 2>&1; then
                 echo "Образа beautyhub-app:previous НЕТ (первый деплой) — откатываться не на что."
                 exit 1
@@ -278,6 +285,10 @@ jobs:
             $COMPOSE_BASE --profile db run --rm --no-deps migrate
 
             echo "=== 6/7 Подъём готовыми образами ==="
+            # Ориентир для страницы работ: подъём + healthcheck укладываются в 5 минут.
+            $SUDO mkdir -p "$APP_DIR/.maintenance-state"
+            ETA_UNTIL="$(date -u -d '+5 minutes' +%Y-%m-%dT%H:%M:%SZ)"
+            $SUDO sh -c "printf '{\"until\":\"%s\",\"reason\":\"deploy\",\"sha\":\"%s\"}' '$ETA_UNTIL' '$DEPLOY_SHA' > '$ETA_FILE'"
             # --remove-orphans снимает контейнер прежнего монолитного сервиса `app`
             # при первом деплое после разделения web/api.
             $COMPOSE up -d --remove-orphans || rollback_and_fail "up -d не поднял стек (возможно смешанное старое/новое состояние)"
@@ -360,6 +371,7 @@ jobs:
               rollback_and_fail "Worker не дошёл до «Worker started» (рестартов: ${RESTARTS:-?})"
             fi
 
+            clear_eta
             $DOCKER image prune -f >/dev/null
             echo "✅ Деплой $DEPLOY_SHA успешен — web/api healthy, traefik маршрутизирует, worker started."
             exit 0

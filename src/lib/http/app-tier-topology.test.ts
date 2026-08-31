@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { BRAND_COLORS } from "@/lib/ui/brand-colors";
+import { UI_TEXT } from "@/lib/ui/text";
+
 /**
  * APP-TIER-SPLIT-02 (2026-08-31) — ярус приложения в проде: один образ, два
  * контейнера (`web` — страницы, `api` — `/api/*`) за traefik из того же compose.
@@ -228,6 +231,119 @@ describe("APP-TIER-SPLIT-02 · deploy.yml согласован с тополог
   it("откат поднимает web api worker", () => {
     expect(DEPLOY).toMatch(/up -d --no-deps web api worker/);
     expect(DEPLOY).not.toMatch(/--no-deps app worker/);
+  });
+});
+
+/**
+ * MAINTENANCE-PAGE-01 (2026-09-01) — страница «идут работы» появляется сама,
+ * когда приложение не отвечает.
+ *
+ * Два механизма traefik, и оба обязаны быть на месте:
+ *   1. fallback-роутер сервиса `maintenance` с приоритетом НИЖЕ web и api —
+ *      когда их контейнеры остановлены, роутеры исчезают из traefik и трафик
+ *      достаётся странице;
+ *   2. errors-middleware на роутерах web (HTML) и api (JSON-конверт) — когда
+ *      контейнер есть, но ещё не слушает или упал (502–504).
+ * Сама страница — вне Next (nginx), поэтому её цвета и тексты — ЗЕРКАЛА
+ * `brand-colors.ts` (UI-04) и `UI_TEXT.pages.maintenance`; зеркало расходится
+ * молча, отсюда лок-степ ниже. Ориентир времени пишет деплой перед `up -d`.
+ *
+ * @probe 2026-09-01: priority maintenance `1` → `30` — красный («приоритет
+ *   страницы работ обязан быть ниже web и api»); удалена строка
+ *   `routers.api.middlewares` — красный; в HTML `#720808` → `#7c3aed` — красный
+ *   (расхождение с brand-colors); текст `Идут работы` → `Идут работы!` — в
+ *   первой редакции ЗЕЛЁНЫЙ (голый `toContain` — подстрока), проверка
+ *   ужесточена до фрагментов с границами тегов, после чего — красный.
+ */
+describe("MAINTENANCE-PAGE-01 · страница работ поднимается сама", () => {
+  const maintenance = serviceBlock("maintenance");
+  const HTML = readFileSync(resolve(ROOT, "deploy/maintenance/index.html"), "utf8");
+  const NGINX = readFileSync(resolve(ROOT, "deploy/maintenance/nginx.conf"), "utf8");
+
+  it("сервис maintenance: fallback-роутер с приоритетом ниже web и api, TLS, порт 80", () => {
+    expect(maintenance, "нет сервиса maintenance").toBeTruthy();
+    const l = labelsOf(maintenance!);
+    const web = labelsOf(serviceBlock("web")!);
+    const api = labelsOf(serviceBlock("api")!);
+    const prio = Number(l["traefik.http.routers.maintenance.priority"]);
+    expect(Number.isFinite(prio)).toBe(true);
+    expect(prio, "приоритет страницы работ обязан быть ниже web и api").toBeLessThan(
+      Math.min(Number(web["traefik.http.routers.web.priority"]), Number(api["traefik.http.routers.api.priority"])),
+    );
+    expect(l["traefik.http.routers.maintenance.rule"]).toBe("Host(`masterryadom.ru`)");
+    expect(l["traefik.http.routers.maintenance.entrypoints"]).toBe("websecure");
+    expect(l["traefik.http.routers.maintenance.tls.certresolver"]).toBe("letsencrypt");
+    expect(l["traefik.http.services.maintenance.loadbalancer.server.port"]).toBe("80");
+    expect(maintenance!).toMatch(/\.\/deploy\/maintenance\/index\.html:\/usr\/share\/nginx\/html\/index\.html:ro/);
+    expect(maintenance!).toMatch(/\.\/deploy\/maintenance\/nginx\.conf:\/etc\/nginx\/conf\.d\/default\.conf:ro/);
+    expect(maintenance!).toMatch(/\.\/\.maintenance-state:\/usr\/share\/nginx\/html\/state:ro/);
+  });
+
+  it("errors-middleware: web → HTML, api → JSON, оба на 502–504 из сервиса maintenance", () => {
+    const l = labelsOf(maintenance!);
+    for (const name of ["maintenance-html", "maintenance-json"]) {
+      expect(l[`traefik.http.middlewares.${name}.errors.status`]).toBe("502-504");
+      expect(l[`traefik.http.middlewares.${name}.errors.service`]).toBe("maintenance");
+    }
+    expect(l["traefik.http.middlewares.maintenance-html.errors.query"]).toBe("/index.html");
+    expect(l["traefik.http.middlewares.maintenance-json.errors.query"]).toBe("/api/maintenance");
+    expect(labelsOf(serviceBlock("web")!)["traefik.http.routers.web.middlewares"]).toBe("maintenance-html");
+    expect(labelsOf(serviceBlock("api")!)["traefik.http.routers.api.middlewares"]).toBe("maintenance-json");
+  });
+
+  it("nginx: страница — 503 + Retry-After, /api/* — JSON-конверт 503, ориентир из /state/", () => {
+    expect(NGINX).toMatch(/error_page 503 \/index\.html;/);
+    expect(NGINX).toMatch(/location \/ \{\s*return 503;\s*\}/);
+    expect(NGINX).toMatch(/Retry-After/);
+    expect(NGINX).toMatch(/location = \/api\/maintenance \{[\s\S]*?return 503 '\{"ok":false,"error":\{"code":"MAINTENANCE"/);
+    expect(NGINX).toMatch(/location \^~ \/api\/ \{[\s\S]*?return 503 '\{"ok":false/);
+    expect(NGINX).toMatch(/location \^~ \/state\/ \{[\s\S]*?no-store/);
+    expect(NGINX).toContain(UI_TEXT.pages.maintenance.apiMessage);
+  });
+
+  it("HTML зеркалит UI_TEXT.pages.maintenance — тексты в одном месте, точной разметкой", () => {
+    const t = UI_TEXT.pages.maintenance;
+    // Границы тегов обязательны: голый `toContain(строка)` пропускал «Идут работы!»
+    // (проба P4 первой редакции была зелёной на дрейфе).
+    const fragments = [
+      `<h1>${t.title.replace(" приложение", " <em>приложение</em>")}</h1>`,
+      `<span>${t.status}</span>`,
+      `<p>${t.subtitle}</p>`,
+      `>${t.etaUnknown}</div>`,
+      `"${t.etaUntilPrefix} <strong>"`,
+      `"</strong> ${t.etaUntilSuffix}"`,
+      `>${t.reload}</button>`,
+      `${t.contactPrefix} <a href="mailto:support@masterryadom.ru">`,
+    ];
+    for (const f of fragments) {
+      expect(HTML, `в HTML нет фрагмента: ${f}`).toContain(f);
+    }
+  });
+
+  it("HTML зеркалит brand-colors (UI-04): бренд-градиент и обе поверхности", () => {
+    const c = BRAND_COLORS;
+    for (const hex of [c.brandFrom, c.brandVia, c.brandDeep, c.brandAccent, c.surfacePage, c.surfaceCard, c.textMain, c.textSecondary, c.borderSubtle, c.darkSurfacePage, c.darkSurfaceCard, c.darkTextMain, c.darkTextSecondary, c.darkBorderSubtle]) {
+      expect(HTML, `в HTML нет цвета ${hex} из brand-colors.ts`).toContain(hex);
+    }
+    // Чужой палитре здесь не место — прежний фиолетово-розовый набор (UI-04).
+    expect(HTML).not.toMatch(/#7c3aed|#ec4899/i);
+    // Тёмная тема — через prefers-color-scheme, а не отдельная страница.
+    expect(HTML).toMatch(/@media \(prefers-color-scheme: dark\)/);
+    // Никаких внешних ресурсов: страница обязана работать, когда лежит всё.
+    expect(HTML).not.toMatch(/<link[^>]+href="https?:/);
+    expect(HTML).not.toMatch(/<script[^>]+src=/);
+  });
+
+  it("deploy.yml пишет ориентир перед up -d и снимает после успеха и при откате", () => {
+    const script = DEPLOY.slice(DEPLOY.indexOf("script: |"));
+    const etaAt = script.indexOf("> '$ETA_FILE'");
+    const upAt = script.indexOf("up -d --remove-orphans");
+    expect(etaAt, "нет записи eta.json").toBeGreaterThan(-1);
+    expect(etaAt).toBeLessThan(upAt);
+    expect(script).toMatch(/rollback_and_fail\(\) \{\n[^\n]*\n\s+clear_eta/);
+    const successAt = script.indexOf("✅ Деплой $DEPLOY_SHA успешен");
+    const clearAt = script.lastIndexOf("clear_eta", successAt);
+    expect(clearAt).toBeGreaterThan(upAt);
   });
 });
 

@@ -176,6 +176,9 @@ services:
       - "traefik.http.routers.web.tls.certresolver=letsencrypt"
       - "traefik.http.routers.web.service=web"
       - "traefik.http.services.web.loadbalancer.server.port=3000"
+      # MAINTENANCE-PAGE-01: пока web поднимается или лежит (502–504), traefik
+      # подменяет ответ страницей работ из сервиса maintenance.
+      - "traefik.http.routers.web.middlewares=maintenance-html"
     healthcheck:
       # Node 20 ships a global fetch(), so no curl/wget is needed in the slim
       # runner image.
@@ -248,6 +251,8 @@ services:
       - "traefik.http.routers.api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api.service=api"
       - "traefik.http.services.api.loadbalancer.server.port=3000"
+      # MAINTENANCE-PAGE-01: для API — JSON-конверт 503, не HTML.
+      - "traefik.http.routers.api.middlewares=maintenance-json"
     healthcheck:
       # Liveness in-container, зеркало web (FIX-C2 — см. комментарий там).
       test:
@@ -264,6 +269,54 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+
+  # ── Страница «идут работы» (MAINTENANCE-PAGE-01, 2026-09-01) ─────────────────
+  # Статический nginx с одной страницей в стиле продукта (deploy/maintenance/).
+  # Включать/выключать не нужно — она появляется ровно тогда, когда приложение
+  # не отвечает, двумя механизмами traefik:
+  #   (1) fallback-роутер с приоритетом 1 (ниже web=10 и api=20): когда
+  #       контейнеры web/api остановлены, их роутеры исчезают из traefik, и
+  #       трафик достаётся этому;
+  #   (2) errors-middleware на роутерах web/api: ответы 502–504 (контейнер
+  #       есть, но ещё не слушает / упал) подменяются телом отсюда — HTML для
+  #       страниц, JSON-конверт для /api/*.
+  # Ориентир окончания работ (/state/eta.json) пишет deploy.yml перед `up -d`
+  # и снимает после успеха; без файла страница показывает общую формулировку.
+  maintenance:
+    profiles: ["app"]
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    networks:
+      - internal
+    volumes:
+      - ./deploy/maintenance/index.html:/usr/share/nginx/html/index.html:ro
+      - ./deploy/maintenance/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.maintenance-state:/usr/share/nginx/html/state:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.maintenance.rule=Host(`masterryadom.ru`)"
+      - "traefik.http.routers.maintenance.priority=1"
+      - "traefik.http.routers.maintenance.entrypoints=websecure"
+      - "traefik.http.routers.maintenance.tls=true"
+      - "traefik.http.routers.maintenance.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.maintenance.service=maintenance"
+      - "traefik.http.services.maintenance.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.maintenance-html.errors.status=502-504"
+      - "traefik.http.middlewares.maintenance-html.errors.service=maintenance"
+      - "traefik.http.middlewares.maintenance-html.errors.query=/index.html"
+      - "traefik.http.middlewares.maintenance-json.errors.status=502-504"
+      - "traefik.http.middlewares.maintenance-json.errors.service=maintenance"
+      - "traefik.http.middlewares.maintenance-json.errors.query=/api/maintenance"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
 
   worker:
     profiles: ["app"]

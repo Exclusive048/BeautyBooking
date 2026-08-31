@@ -121,3 +121,6 @@ session-audit/
 # SEC-23: корень локального медиа-хранилища (dev). Намеренно вне public/ —
 # иначе Next раздавал бы приватные вложения статикой мимо ensureCanReadMedia.
 /.media-uploads/
+
+# MAINTENANCE-PAGE-01: ориентир окончания работ, пишется деплоем на ВМ (eta.json)
+.maintenance-state/

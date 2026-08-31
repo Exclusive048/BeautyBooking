@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<!-- Без JS страница перезагрузится сама раз в полторы минуты. -->
+<meta http-equiv="refresh" content="90">
+<title>Обновляем приложение — МастерРядом</title>
+<!--
+  MAINTENANCE-PAGE-01 (2026-09-01) — страница «идут работы».
+
+  Отдаётся сервисом `maintenance` (nginx) из docker-compose.prod.yml ДВУМЯ
+  путями: (1) fallback-роутер traefik с самым низким приоритетом ловит трафик,
+  когда контейнеры web/api остановлены; (2) errors-middleware traefik подменяет
+  ответы 502–504 от web/api этой страницей, пока они поднимаются. Включать и
+  выключать её не нужно — она появляется ровно тогда, когда приложение не
+  отвечает, и исчезает, когда ответило.
+
+  Стиль — бренд проекта: значения цветов — литералы из src/lib/ui/brand-colors.ts
+  (UI-04: поверхность вне Tailwind), тексты — зеркало UI_TEXT.pages.maintenance
+  (src/lib/ui/text.ts). Оба зеркала сторожит src/lib/http/app-tier-topology.test.ts.
+  Никаких внешних ресурсов: шрифт — системный serif-стек, иконок нет, JS инлайн.
+-->
+<style>
+  :root {
+    --bg-page: #F6F0EA;
+    --bg-card: #FFFCF8;
+    --text-main: #2A0A10;
+    --text-sec: #876770;
+    --border-subtle: #E0D0C8;
+    --brand-from: #720808;
+    --brand-via: #A10728;
+    --brand-deep: #560505;
+    --brand-accent: #C6A97E;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-page: #1F1417;
+      --bg-card: #302026;
+      --text-main: #FDF2F0;
+      --text-sec: #C79BA2;
+      --border-subtle: #5A1820;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+    background: var(--bg-page);
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    line-height: 1.6;
+  }
+  .card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 24px;
+    padding: 40px 32px;
+    box-shadow: 0 12px 40px -8px rgba(114, 8, 8, 0.20);
+    text-align: center;
+  }
+  .brand {
+    display: inline-block;
+    font-size: 14px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-sec);
+  }
+  .bar {
+    height: 4px;
+    width: 64px;
+    margin: 20px auto 28px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--brand-from) 0%, var(--brand-via) 55%, var(--brand-deep) 100%);
+  }
+  h1 {
+    margin: 0;
+    font-size: 32px;
+    line-height: 1.15;
+    font-weight: 600;
+  }
+  h1 em { font-style: italic; font-weight: 500; }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text-sec);
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--brand-accent);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+  p { margin: 20px 0 0; font-size: 16px; color: var(--text-sec); }
+  .eta {
+    margin-top: 24px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-subtle);
+    font-size: 15px;
+    color: var(--text-main);
+  }
+  .eta strong { font-weight: 600; }
+  .actions { margin-top: 28px; }
+  button {
+    font: inherit;
+    font-size: 15px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-main);
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--brand-via); }
+  button:focus-visible { outline: 2px solid var(--brand-via); outline-offset: 2px; }
+  .contact { margin-top: 24px; font-size: 13px; }
+  .contact a { color: inherit; }
+</style>
+</head>
+<body>
+  <main class="card" role="main" aria-live="polite">
+    <span class="brand">МастерРядом</span>
+    <div class="bar" aria-hidden="true"></div>
+    <h1>Обновляем <em>приложение</em></h1>
+    <div class="status"><span class="dot" aria-hidden="true"></span><span>Идут работы</span></div>
+    <p>Ведутся работы по обновлению МастерРядом. Это займёт несколько минут — страница обновится сама, когда всё будет готово.</p>
+    <div class="eta" id="eta">Обычно это занимает не больше пяти минут</div>
+    <div class="actions">
+      <button type="button" onclick="location.reload()">Обновить страницу</button>
+    </div>
+    <div class="contact">Если срочно — <a href="mailto:support@masterryadom.ru">support@masterryadom.ru</a></div>
+  </main>
+  <script>
+    (function () {
+      var eta = document.getElementById("eta");
+      // Ориентир пишет деплой-скрипт перед подъёмом контейнеров (/state/eta.json)
+      // и снимает после успеха. Нет файла или срок прошёл — общая формулировка.
+      fetch("/state/eta.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j || !j.until) return;
+          var until = new Date(j.until);
+          if (isNaN(until.getTime()) || until.getTime() < Date.now()) return;
+          var hm = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Moscow" }).format(until);
+          eta.innerHTML = "Ориентировочно до <strong>" + hm + "</strong> (МСК)";
+        })
+        .catch(function () {});
+
+      // Приложение вернулось — уходим на живую страницу. /api/health в режиме
+      // работ отвечает 503 (это тот же nginx), поэтому ложных перезагрузок нет.
+      function probe() {
+        fetch("/api/health", { cache: "no-store" })
+          .then(function (r) { if (r.ok) location.reload(); })
+          .catch(function () {});
+      }
+      setInterval(probe, 15000);
+    })();
+  </script>
+</body>
+</html>
