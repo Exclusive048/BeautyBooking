@@ -1,7 +1,8 @@
 "use client";
 
 import { Pencil } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
@@ -25,6 +26,11 @@ type Props = {
  * Multi-line variant. Same autosave lifecycle as `EditableFieldRow`, but
  * Enter inserts a newline (Cmd/Ctrl+Enter saves and exits). Skill rule:
  * "Cmd/Ctrl+Enter → save (для textarea)".
+ *
+ * PWA-FIX-04 — режим просмотра печатает `savedValue`, а не проп `value`;
+ * причина и контракт — в док-блоке `EditableFieldRow` (тот же дефект: после
+ * blur строка возвращалась к серверному значению, и «О себе» выглядело
+ * несохранённым до перезагрузки).
  */
 export function EditableTextareaRow({
   label,
@@ -36,16 +42,27 @@ export function EditableTextareaRow({
   saveOnPlainEnter = false,
   counterTemplate,
 }: Props) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const inputId = useId();
   const [isEditing, setIsEditing] = useState(false);
+  /** Что показывает режим просмотра (оптимистично). */
+  const [savedValue, setSavedValue] = useState(value);
   const [draft, setDraft] = useState(value);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  /** Последнее значение, которое подтвердил сервер, — точка отката при отказе. */
+  const confirmedRef = useRef(value);
 
   const [prevValue, setPrevValue] = useState(value);
   if (prevValue !== value) {
     setPrevValue(value);
+    setSavedValue(value);
     if (!isEditing) setDraft(value);
   }
+
+  useEffect(() => {
+    confirmedRef.current = value;
+  }, [value]);
 
   const autosave = useAutosave<string>(async (next) => {
     const response = await fetch(apiPath, {
@@ -53,14 +70,19 @@ export function EditableTextareaRow({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [fieldKey]: next }),
     });
-    if (!response.ok) return { ok: false };
+    if (!response.ok) {
+      setSavedValue(confirmedRef.current);
+      return { ok: false };
+    }
+    confirmedRef.current = next;
+    setSavedValue(next);
     return { ok: true };
   });
 
   const enterEdit = () => {
     if (isEditing) return;
-    autosave.setBaseline(value);
-    setDraft(value);
+    autosave.setBaseline(savedValue);
+    setDraft(savedValue);
     setIsEditing(true);
     queueMicrotask(() => textareaRef.current?.focus());
   };
@@ -70,25 +92,33 @@ export function EditableTextareaRow({
     autosave.scheduleSave(next);
   };
 
-  const handleBlur = () => {
-    void autosave.flush(draft);
+  /** См. `EditableFieldRow.commit` — optimistic + flush + refresh при правке. */
+  const commit = () => {
+    const changed = draft !== savedValue;
+    setSavedValue(draft);
     setIsEditing(false);
+    void autosave.flush(draft).then(() => {
+      if (changed) startTransition(() => router.refresh());
+    });
+  };
+
+  const handleBlur = () => {
+    commit();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey || saveOnPlainEnter)) {
       event.preventDefault();
-      void autosave.flush(draft);
-      setIsEditing(false);
+      commit();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      setDraft(value);
+      setDraft(savedValue);
       autosave.cancel();
       setIsEditing(false);
     }
   };
 
-  const isEmpty = !value || value.trim().length === 0;
+  const isEmpty = !savedValue || savedValue.trim().length === 0;
   const counter = counterTemplate
     ? counterTemplate.replace("{value}", String(draft.length)).replace("{max}", String(maxLength ?? ""))
     : maxLength
@@ -134,7 +164,7 @@ export function EditableTextareaRow({
               isEmpty ? "italic text-text-sec" : "text-text-main"
             )}
           >
-            {isEmpty ? T.emptyValue : value}
+            {isEmpty ? T.emptyValue : savedValue}
           </button>
         )}
       </div>

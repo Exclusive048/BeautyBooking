@@ -13,6 +13,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export type DrawerSide = "left" | "right" | "bottom";
@@ -56,8 +57,6 @@ type Props = {
   initialFocusRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 };
-
-const isBrowser = typeof document !== "undefined";
 
 const SIDE_SIZE_CLASS: Record<Exclude<DrawerSide, "bottom">, Record<DrawerSize, string>> = {
   right: {
@@ -131,7 +130,9 @@ export function Drawer({
   // оверлеями, которые примитивами не оборачиваются.
   useOverlayA11y({ open, onClose, containerRef: sheetRef, initialFocusRef });
 
-  if (!isBrowser) return null;
+  // MODAL-SSR-OPEN-HYDRATION: см. `ModalSurface` — тот же контракт портала.
+  const isHydrated = useIsHydrated();
+  if (!isHydrated) return null;
 
   const isBottom = side === "bottom";
   const isRight = side === "right";

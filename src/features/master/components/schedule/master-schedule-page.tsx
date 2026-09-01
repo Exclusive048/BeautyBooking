@@ -7,6 +7,7 @@ import { ScheduleLegend } from "@/features/master/components/schedule/schedule-l
 import { WeekGrid } from "@/features/master/components/schedule/week-grid";
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
+import { ScheduleSettingsLink } from "@/features/master/components/schedule/schedule-settings-link";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterScheduleWeek } from "@/lib/master/schedule.service";
@@ -69,6 +70,7 @@ export async function MasterSchedulePage({ searchParams }: Props) {
         subtitle={subtitle}
         actions={
           <>
+            <ScheduleSettingsLink />
             <RefreshButton />
             <NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" />
           </>

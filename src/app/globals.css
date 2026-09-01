@@ -309,6 +309,29 @@
   }
   option { background-color: rgb(var(--surface)); color: rgb(var(--text)); }
 
+  /* PWA-FIX-04 — нативные поля даты/времени не шире своего контейнера.
+     У `datetime-local` в iOS Safari (то есть в PWA) собственная минимальная
+     ширина по содержимому: `width: 100%` от `Input` он принимает, но у́же
+     содержимого не становится и вылезает за край диалога (замечено владельцем
+     в диалоге ручной записи мастера). `min-width: 0` снимает нижнюю границу,
+     `appearance: none` — внутренние размеры нативного вида (поле остаётся
+     кликабельным: пикер открывается по тапу как раньше). Значение у iOS по
+     умолчанию центрировано — выравниваем влево, как у остальных полей. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    min-width: 0;
+    max-width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+    min-height: 1.5em;
+  }
+
   :root {
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
     --safe-area-inset-right: env(safe-area-inset-right, 0px);

@@ -25,6 +25,7 @@ import {
   isBookingPastModifyWindow,
 } from "@/lib/bookings/action-state";
 import { cn } from "@/lib/cn";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -77,11 +78,8 @@ export function BookingCardActionsMenu({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // MODAL-SSR-OPEN-HYDRATION: общий гейт портала вместо setState в эффекте.
+  const mounted = useIsHydrated();
 
   const reposition = useCallback(() => {
     const trigger = triggerRef.current;

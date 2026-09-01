@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 
 export type ModalSurfaceSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -49,8 +50,6 @@ type Props = {
   children: ReactNode;
   className?: string;
 };
-
-const isBrowser = typeof document !== "undefined";
 
 const SIZE_CLASS: Record<ModalSurfaceSize, string> = {
   sm: "max-w-md",
@@ -120,7 +119,11 @@ export function ModalSurface({
   // оверлеи, написанные мимо примитивов, берут ровно её.
   useOverlayA11y({ open, onClose, containerRef: panelRef, initialFocusRef });
 
-  if (!isBrowser) return null;
+  // MODAL-SSR-OPEN-HYDRATION: портала нет в серверной разметке, поэтому и
+  // первый клиентский рендер обязан отдать `null` — иначе диалог, открытый на
+  // первом рендере (`open` из URL), даёт hydration mismatch.
+  const isHydrated = useIsHydrated();
+  if (!isHydrated) return null;
 
   const headerTitle = header?.title ?? title ?? null;
   const ariaLabelledBy = headerTitle ? titleId : undefined;

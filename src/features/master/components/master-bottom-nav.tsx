@@ -16,6 +16,9 @@ import {
   ExternalLink,
   CreditCard,
   Sparkles,
+  SlidersHorizontal,
+  Bell,
+  MessageSquare,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +29,9 @@ import { UI_TEXT } from "@/lib/ui/text";
 
 const t = UI_TEXT.master.bookingsPage;
 const tNav = UI_TEXT.master.topbar.nav;
+// Подписи разделов те же, что в десктопном сайдбаре (`MasterSidebar`) — один
+// раздел не должен называться по-разному на двух носителях.
+const tItems = UI_TEXT.cabinetMaster.nav.items;
 
 type TabItem = {
   href: string;
@@ -41,7 +47,17 @@ const TABS: TabItem[] = [
   { href: "/cabinet/master/profile", label: tNav.profile, icon: User },
 ];
 
+/**
+ * PWA-FIX-04 — лист «Ещё» несёт ВСЕ разделы десктопного сайдбара, у которых нет
+ * своей вкладки. До этого «Настройки расписания», «Уведомления» и «Сообщения»
+ * жили только в `MasterSidebar` (`lg:` и шире): с телефона / из PWA мастер не
+ * мог настроить график вообще — единственный вход был условной ссылкой в блоке
+ * «Требует внимания» на дашборде. Паритет держит `master-nav-parity.test.ts`.
+ */
 const MORE_ITEMS = [
+  { href: "/cabinet/master/schedule/settings", label: tItems.scheduleSettings, icon: SlidersHorizontal },
+  { href: "/cabinet/master/notifications", label: tItems.notifications, icon: Bell },
+  { href: "/cabinet/master/messages", label: tItems.messages, icon: MessageSquare },
   { href: "/cabinet/master/clients", label: t.menuClients, icon: Users },
   { href: "/cabinet/master/model-offers", label: t.menuModels, icon: Sparkles },
   { href: "/cabinet/master/reviews", label: t.menuReviews, icon: Star },

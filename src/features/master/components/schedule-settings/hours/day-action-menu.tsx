@@ -12,9 +12,8 @@ import { createPortal } from "react-dom";
 import { Copy, MoreVertical, Trash2, type LucideIcon } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { UI_TEXT } from "@/lib/ui/text";
-
-const isBrowser = typeof document !== "undefined";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.week.actionMenu;
 
@@ -66,6 +65,9 @@ export function DayActionMenu({
     }
     setCoords({ top: rect.bottom + 4, left });
   }, []);
+
+  // MODAL-SSR-OPEN-HYDRATION: общий гейт портала (см. `ModalSurface`).
+  const isHydrated = useIsHydrated();
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -156,7 +158,7 @@ export function DayActionMenu({
         <MoreVertical className="h-4 w-4" aria-hidden />
       </button>
 
-      {isBrowser && menuContent ? createPortal(menuContent, document.body) : null}
+      {isHydrated && menuContent ? createPortal(menuContent, document.body) : null}
 
       {confirmModal}
     </>

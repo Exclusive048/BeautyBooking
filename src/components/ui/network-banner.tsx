@@ -1,19 +1,13 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { UI_TEXT } from "@/lib/ui/text";
 
-function subscribe() {
-  return () => {};
-}
-
-function useIsMounted() {
-  return useSyncExternalStore(subscribe, () => true, () => false);
-}
-
 export function NetworkBanner() {
-  const mounted = useIsMounted();
+  // MODAL-SSR-OPEN-HYDRATION: локальная копия хука вынесена в общий
+  // `useIsHydrated` — тот же идиом теперь гейтит и портальные примитивы.
+  const mounted = useIsHydrated();
   const { isOnline, justReconnected } = useNetworkStatus();
 
   if (!mounted) return null;

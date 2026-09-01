@@ -19,6 +19,7 @@ import { useStoriesViewer, type ViewerState } from "@/features/home/stories-view
 import { markItemViewed } from "@/features/home/stories-viewed-storage";
 import type { StoriesGroup, StoryItem } from "@/features/home/types/stories";
 import { formatRelativeTime } from "@/lib/utils/relative-time";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const STORY_DURATION_MS = 5000;
@@ -420,12 +421,8 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
 
 export function StoriesViewerOverlay() {
   const { state, close, next, prev, bumpViewedRevision } = useStoriesViewer();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
+  // MODAL-SSR-OPEN-HYDRATION: общий гейт портала вместо setState в эффекте.
+  const mounted = useIsHydrated();
 
   const handleItemViewed = useMemo(
     () => () => bumpViewedRevision(),
