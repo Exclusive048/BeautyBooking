@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { resolveLinkState } from "@/lib/auth/link-state";
 import { claimPhoneForUser } from "@/lib/auth/phone-claim";
 import { isTelegramEnabled } from "@/lib/env";
+import { buildMediaFileUrl } from "@/lib/media/types";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 
@@ -131,7 +132,10 @@ async function resolveAvatarUrl(
     select: { id: true },
   });
   if (avatarAsset) {
-    return `/api/media/${avatarAsset.id}/file`;
+    // PWA-FIX-01: путь именно `/api/media/file/<id>`. Форма `/api/media/<id>/file`
+    // была единственной в дереве и роута такого нет (`src/app/api/media/file/[id]`),
+    // то есть аватар клиента отдавал 404 — «загрузили фото, а оно не показывается».
+    return buildMediaFileUrl(avatarAsset.id);
   }
   return externalPhotoUrl;
 }

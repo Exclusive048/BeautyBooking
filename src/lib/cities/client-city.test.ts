@@ -95,4 +95,65 @@ describe("client-city", () => {
 
     expect(getCurrentCitySlug()).toBe("krasnodar");
   });
+
+  /**
+   * PWA-FIX-01 — «отложенный» попап выбора города.
+   *
+   * @probe Проба выполнена на правдоподобной форме дефекта, а не на минимальной:
+   * возврат к прежнему поведению — это НЕ удаление функции (такое не собралось
+   * бы), а `handleClose`, который просто не пишет факт отказа. Смоделировано
+   * вызовом `isCityPromptDismissed()` без предшествующего `dismissCityPrompt()`
+   * — тест краснеет на «expected false to be true». Отдельно проверено, что
+   * отметка ИСТЕКАЕТ: с вечным флагом (сравнение возраста убрано) падает кейс
+   * с `now` за пределами TTL.
+   */
+  describe("city prompt dismissal", () => {
+    it("не считается отложенным, пока пользователь не закрыл попап", async () => {
+      const { isCityPromptDismissed } = await import("@/lib/cities/client-city");
+      expect(isCityPromptDismissed()).toBe(false);
+    });
+
+    it("после закрытия остаётся отложенным — это и есть предмет фикса", async () => {
+      const { dismissCityPrompt, isCityPromptDismissed } = await import(
+        "@/lib/cities/client-city"
+      );
+      const now = Date.UTC(2026, 8, 1);
+
+      dismissCityPrompt(now);
+
+      expect(isCityPromptDismissed(now)).toBe(true);
+      expect(isCityPromptDismissed(now + 29 * 24 * 60 * 60 * 1000)).toBe(true);
+    });
+
+    it("отметка истекает — один крестик не лишает выбора города навсегда", async () => {
+      const { dismissCityPrompt, isCityPromptDismissed, CITY_PROMPT_DISMISS_TTL_MS } =
+        await import("@/lib/cities/client-city");
+      const now = Date.UTC(2026, 8, 1);
+
+      dismissCityPrompt(now);
+
+      expect(isCityPromptDismissed(now + CITY_PROMPT_DISMISS_TTL_MS + 1)).toBe(false);
+    });
+
+    it("испорченное значение трактуется как «не откладывали», а не как вечное «да»", async () => {
+      const { isCityPromptDismissed, CITY_PROMPT_DISMISSED_KEY } = await import(
+        "@/lib/cities/client-city"
+      );
+
+      window.localStorage.setItem(CITY_PROMPT_DISMISSED_KEY, "не-число");
+
+      expect(isCityPromptDismissed()).toBe(false);
+    });
+
+    it("выбор города и отказ — разные ключи: отказ не притворяется выбором", async () => {
+      const { dismissCityPrompt, getCurrentCitySlug } = await import(
+        "@/lib/cities/client-city"
+      );
+
+      dismissCityPrompt();
+
+      // Город по-прежнему не выбран — SSR и каталог обязаны это видеть.
+      expect(getCurrentCitySlug()).toBeNull();
+    });
+  });
 });

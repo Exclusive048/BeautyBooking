@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding FREE billing plans...");
-  await ensureFreePlans();
+  await ensureFreePlans(prisma);
 
   const plans = await prisma.billingPlan.findMany({
     where: { tier: "FREE" },

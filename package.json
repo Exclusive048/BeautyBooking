@@ -35,6 +35,7 @@
     "seed:test": "npx tsx prisma/seeds/test-data/index.ts",
     "seed:test:reset": "npx tsx prisma/seeds/test-data/reset.ts",
     "seed:billing": "npx tsx scripts/seed-billing-plans.ts",
+    "seed:reference": "npx tsx scripts/seed-reference-data.ts",
     "seed:plans": "npx tsx scripts/seed-billing-plans.ts",
     "seed:review-tags": "npx tsx scripts/seed-review-tags.ts",
     "migrate:billing": "npx tsx scripts/migrate-billing-plans.ts",

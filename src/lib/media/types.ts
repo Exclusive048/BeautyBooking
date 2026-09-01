@@ -52,6 +52,20 @@ export type MediaAssetDto = {
   createdAt: string;
 };
 
+/**
+ * PWA-FIX-01 — единственная форма ссылки на байты ассета.
+ *
+ * Роут лежит в `src/app/api/media/file/[id]`, то есть id — ПОСЛЕДНИЙ сегмент.
+ * Строка собиралась вручную в семи местах, и одно из них перепутало порядок
+ * (`/api/media/<id>/file`, `client-cabinet/profile.service.ts`) — такой ссылки
+ * нет ни в одном роуте, поэтому аватар клиента молча отдавал 404 и на экране
+ * оставался плейсхолдер. Опечатка в литерале не ловится ни typecheck'ом, ни
+ * гейтами; вызов функции — ловится.
+ */
+export function buildMediaFileUrl(assetId: string): string {
+  return `/api/media/file/${assetId}`;
+}
+
 export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
   return {
     id: asset.id,
@@ -61,7 +75,7 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     mimeType: asset.mimeType,
     sizeBytes: asset.sizeBytes,
     originalFilename: asset.originalFilename,
-    url: `/api/media/file/${asset.id}`,
+    url: buildMediaFileUrl(asset.id),
     cropX: asset.cropX ?? null,
     cropY: asset.cropY ?? null,
     cropWidth: asset.cropWidth ?? null,

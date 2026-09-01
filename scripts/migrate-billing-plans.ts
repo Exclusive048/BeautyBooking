@@ -124,7 +124,7 @@ async function main() {
 
   // ── Step 2: Run official seed to create any missing plans & prices ────────
   console.log("\n📦 Running ensureDefaultPlans (creates missing plans, skips features on existing)…");
-  await ensureDefaultPlans();
+  await ensureDefaultPlans(prisma);
 
   // ── Step 3: Wire up inheritsFromPlanId ────────────────────────────────────
   console.log("\n🔗 Setting up inheritance chain…");

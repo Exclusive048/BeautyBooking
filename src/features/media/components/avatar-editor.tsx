@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Crop, Pencil, Trash2 } from "lucide-react";
 import type { MediaEntityType } from "@prisma/client";
+import { MediaEntityType as MediaEntityTypeValue } from "@/lib/prisma-enums";
 import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { assetHasCrop } from "@/lib/media/types";
@@ -54,6 +55,24 @@ export function AvatarEditor({
 
   const activeAsset = assets[0] ?? null;
   const imageUrl = activeAsset?.url ?? fallbackUrl ?? null;
+  /**
+   * PWA-FIX-01 — приватный аватар нельзя пускать через оптимизатор `next/image`.
+   *
+   * Оптимизатор забирает байты САМ, внутренним запросом (`fetchInternalImage` →
+   * `createRequestResponseMocks({url, method, socket})`), и заголовки исходного
+   * запроса в него не передаются вовсе — то есть куки сессии там нет. Аватары
+   * мастера/студии это переживают: они отдаются публичной веткой
+   * `/api/media/file/[id]` (`PUBLIC_MEDIA_ENTITY_TYPES` = MASTER/STUDIO/SITE).
+   * Аватар пользователя в этот набор не входит by design (152-ФЗ) и требует
+   * сессию — значит внутренний запрос получает 401, `onError` подставляет
+   * плейсхолдер, и пользователь видит «фото загрузилось, но не отображается».
+   * Тот же вывод уже сделан для вложений чата (`message-bubble.tsx`).
+   *
+   * `unoptimized` возвращает загрузку браузеру: same-origin запрос идёт с кукой
+   * и проходит ACL. Цена — картинка не пережимается; для аватара 80–200px это
+   * несколько десятков килобайт, приватность дороже.
+   */
+  const isPrivateAvatar = entityType === MediaEntityTypeValue.USER;
   const isClickableVariant = interactionVariant === "clickable";
 
   const load = useCallback(async () => {
@@ -150,6 +169,7 @@ export function AvatarEditor({
       cropWidth={activeAsset?.cropWidth ?? null}
       cropHeight={activeAsset?.cropHeight ?? null}
       sizes="(max-width: 768px) 30vw, 200px"
+      unoptimized={isPrivateAvatar}
       className="object-cover"
     />
   ) : (
@@ -176,6 +196,7 @@ export function AvatarEditor({
                 cropWidth={activeAsset?.cropWidth ?? null}
                 cropHeight={activeAsset?.cropHeight ?? null}
                 sizes="(max-width: 768px) 30vw, 200px"
+                unoptimized={isPrivateAvatar}
                 className="object-cover"
               />
             ) : (

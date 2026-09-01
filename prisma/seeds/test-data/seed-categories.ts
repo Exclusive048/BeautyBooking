@@ -1,33 +1,15 @@
 import { CategoryStatus, type GlobalCategory } from "@prisma/client";
 import { prisma } from "./helpers/prisma";
 import { logSeed } from "./helpers/log";
+import { REFERENCE_CATEGORIES } from "../reference/catalog-reference";
 
-type CategorySpec = {
-  slug: string;
-  name: string;
-  icon: string | null;
-  parentSlug: string | null;
-  orderIndex: number;
-};
-
-// Top-level categories drive the CategoryPills row (22a) — the four pills
-// `nails / hair / brows / skin` map to these slugs verbatim. Sub-categories
-// power deeper filtering and per-service `globalCategoryId` linking.
-const SPEC: ReadonlyArray<CategorySpec> = [
-  { slug: "nails", name: "Маникюр и педикюр", icon: "💅", parentSlug: null, orderIndex: 1 },
-  { slug: "hair", name: "Парикмахерские услуги", icon: "💇", parentSlug: null, orderIndex: 2 },
-  { slug: "brows", name: "Брови и ресницы", icon: "👁️", parentSlug: null, orderIndex: 3 },
-  { slug: "skin", name: "Косметология и уход", icon: "✨", parentSlug: null, orderIndex: 4 },
-  { slug: "massage", name: "Массаж и СПА", icon: "💆", parentSlug: null, orderIndex: 5 },
-  { slug: "makeup", name: "Макияж", icon: "💄", parentSlug: null, orderIndex: 6 },
-
-  { slug: "manicure", name: "Маникюр", icon: null, parentSlug: "nails", orderIndex: 1 },
-  { slug: "pedicure", name: "Педикюр", icon: null, parentSlug: "nails", orderIndex: 2 },
-  { slug: "haircut", name: "Стрижка", icon: null, parentSlug: "hair", orderIndex: 1 },
-  { slug: "coloring", name: "Окрашивание", icon: null, parentSlug: "hair", orderIndex: 2 },
-  { slug: "lashes", name: "Наращивание ресниц", icon: null, parentSlug: "brows", orderIndex: 1 },
-  { slug: "browarchitect", name: "Оформление бровей", icon: null, parentSlug: "brows", orderIndex: 2 },
-];
+/**
+ * PWA-FIX-01: перечень категорий переехал в
+ * `prisma/seeds/reference/catalog-reference.ts` — его же сеет боевой
+ * провижининг (`npm run seed:reference`). Здесь остался только upsert, чтобы
+ * фикстуры и прод не разошлись двумя копиями справочника.
+ */
+const SPEC = REFERENCE_CATEGORIES;
 
 /**
  * Upsert categories in two passes: top-level first so we can resolve each

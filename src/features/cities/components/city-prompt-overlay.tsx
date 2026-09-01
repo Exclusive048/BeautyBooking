@@ -6,7 +6,12 @@ import useSWR from "swr";
 import { X } from "lucide-react";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { fetchJson } from "@/lib/http/client";
-import { getCurrentCitySlug, setCurrentCitySlug } from "@/lib/cities/client-city";
+import {
+  dismissCityPrompt,
+  getCurrentCitySlug,
+  isCityPromptDismissed,
+  setCurrentCitySlug,
+} from "@/lib/cities/client-city";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type CityItem = {
@@ -42,12 +47,21 @@ export function CityPromptOverlay() {
       return;
     }
     const slug = getCurrentCitySlug();
-    setShow(!slug);
+    // PWA-FIX-01: закрытый попап остаётся закрытым (см. `dismissCityPrompt`).
+    setShow(!slug && !isCityPromptDismissed());
   }, [pathname]);
 
-  if (!hydrated || isLoading) return null;
-
   const cities = data?.items ?? [];
+
+  // PWA-FIX-01: попап без единого города — модальный тупик. Он перекрывал
+  // страницу на каждом переходе, блокировал прокрутку и предлагал ВЫБРАТЬ из
+  // пустого списка («Платформа только запускается»), то есть закрыть его было
+  // единственным доступным действием. Диалог выбора имеет смысл ровно тогда,
+  // когда есть из чего выбирать; сообщение «городов пока нет» — не повод
+  // прерывать просмотр. Проверено на проде 2026-09-01: `/api/cities` отдавал
+  // `[]`, и попап всплывал на КАЖДОЙ публичной навигации.
+  if (!hydrated || isLoading || cities.length === 0) return null;
+
   const T = UI_TEXT.cities.prompt;
 
   const handleChoose = (slug: string) => {
@@ -58,9 +72,11 @@ export function CityPromptOverlay() {
 
   const handleClose = () => {
     // Don't write a city — user dismissed without picking. The selector in the
-    // navbar still says "Сменить город" until they pick. We just hide the
-    // overlay for this navigation; it won't pop up again until SPA reload OR
-    // until they reach a path that re-mounts the overlay.
+    // navbar still says "Сменить город" until they pick.
+    // PWA-FIX-01: отказ ЗАПОМИНАЕТСЯ (30 дней). Раньше он жил только в стейте
+    // компонента, а решение показывать пересчитывалось в эффекте по `pathname`
+    // — то есть каждый переход возвращал попап, и «закрыть» не значило ничего.
+    dismissCityPrompt();
     setShow(false);
   };
 
@@ -85,29 +101,21 @@ export function CityPromptOverlay() {
       <h2 id="city-prompt-title" className="font-display text-2xl font-semibold text-text-main">
         {T.title}
       </h2>
-      <p className="mt-2 text-sm text-text-sec">
-        {cities.length > 0 ? T.description : T.descriptionEmpty}
-      </p>
+      <p className="mt-2 text-sm text-text-sec">{T.description}</p>
 
-      {cities.length > 0 ? (
-        <div className="mt-6 max-h-[320px] space-y-2 overflow-y-auto pr-1">
-          {cities.map((city) => (
-            <button
-              key={city.id}
-              type="button"
-              onClick={() => handleChoose(city.slug)}
-              className="flex w-full items-center justify-between rounded-xl border border-border-subtle/60 px-4 py-3 text-left text-sm font-medium text-text-main transition-colors hover:border-primary hover:bg-primary/5"
-            >
-              <span>{city.name}</span>
-              <span aria-hidden className="text-text-sec">→</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-6 rounded-xl border border-dashed border-border-subtle/60 p-6 text-center text-sm text-text-sec">
-          {T.empty}
-        </p>
-      )}
+      <div className="mt-6 max-h-[320px] space-y-2 overflow-y-auto pr-1">
+        {cities.map((city) => (
+          <button
+            key={city.id}
+            type="button"
+            onClick={() => handleChoose(city.slug)}
+            className="flex w-full items-center justify-between rounded-xl border border-border-subtle/60 px-4 py-3 text-left text-sm font-medium text-text-main transition-colors hover:border-primary hover:bg-primary/5"
+          >
+            <span>{city.name}</span>
+            <span aria-hidden className="text-text-sec">→</span>
+          </button>
+        ))}
+      </div>
 
       <p className="mt-5 text-center text-xs text-text-sec">{T.note}</p>
     </ModalSurface>

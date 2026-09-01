@@ -30,12 +30,17 @@ export function ApplicationPhotos({ photos }: Props) {
       </p>
       <div className="flex flex-wrap gap-2">
         {photos.slice(0, 4).map((photo, index) => (
+          /* PWA-FIX-01: фото отклика приватное — ссылка несёт `?mt=`-токен, а
+             SEC-10 требует к нему ещё и сессию. Оптимизатор `next/image` ходит
+             за байтами внутренним запросом без куки → 401 → плейсхолдер, то есть
+             «мёртвым токеном» выглядел бы КАЖДЫЙ отклик. Байты берёт браузер. */
           <ResilientImage
             key={photo.id}
             src={photo.url}
             alt={T.photoAltTemplate.replace("{n}", String(index + 1))}
             width={64}
             height={64}
+            unoptimized
             className="h-16 w-16 rounded-lg border border-border-subtle bg-bg-input object-cover"
             loading="lazy"
           />

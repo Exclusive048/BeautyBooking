@@ -306,12 +306,19 @@ export function ClientCardDrawer({
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
                 {photos.map((photo, index) => (
                   <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
+                    {/* PWA-FIX-01: фото карточки клиента приватное
+                        (CLIENT_CARD/CLIENT_CARD_PHOTO — только владелец карточки),
+                        а оптимизатор `next/image` забирает байты внутренним
+                        запросом без куки сессии → 401 → плейсхолдер. Байты берёт
+                        браузер сам; тот же вывод у вложений чата и аватара
+                        клиента. */}
                     <ResilientImage
                       src={photo.url}
                       alt={UI_TEXT.cabinetMaster.clients.cardPhotoAltTemplate
                         .replace("{name}", clientName)
                         .replace("{n}", String(index + 1))}
                       sizes="(max-width: 640px) 50vw, 33vw"
+                      unoptimized
                       className="object-cover"
                     />
                     <Button

@@ -1,6 +1,6 @@
 import { Prisma, SubscriptionScope } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { STUDIO_TEAM_CAP_BY_TIER } from "@/lib/billing/constants";
-import { prisma } from "@/lib/prisma";
 
 // Only FREE plans are seeded. PRO and PREMIUM are created and configured
 // by admins through /admin/billing. This prevents overwriting admin-managed
@@ -81,9 +81,29 @@ const FREE_PLANS: Array<{
   },
 ];
 
-export async function ensureFreePlans(): Promise<void> {
+/**
+ * PWA-FIX-01 — клиент приходит АРГУМЕНТОМ, а не берётся из `@/lib/prisma`.
+ *
+ * 🔴 Прежняя форма делала сидер незапускаемым, причём молча по симптому:
+ * `src/lib/prisma.ts` первой строкой импортирует `server-only`, а тот вне
+ * рантайма Next (условие экспорта `react-server` не выставлено) бросает
+ * «This module cannot be imported from a Client Component module». То есть
+ * `npm run seed:plans` падал ЕЩЁ ДО первой строки `main()` — на импорте, — и
+ * сообщение говорило про клиентские компоненты, к которым сид отношения не
+ * имеет. Цена в проде прямая: без строк `MASTER_FREE`/`STUDIO_FREE` не
+ * выдаётся бесплатная подписка (`ensureFreeSubscription`) и пуста страница
+ * «Тарифы» (`/api/billing/plans` на masterryadom.ru отдавал пустые списки
+ * 2026-09-01).
+ *
+ * Параметр — не «гибкость на будущее», а способ НЕ тащить рантайм-клиент в
+ * процесс, которому он не нужен: у сида свой `new PrismaClient()`. Рантайм
+ * этих функций не зовёт вовсе — единственные потребители суть скрипты.
+ */
+export async function ensureFreePlans(
+  client: Pick<PrismaClient, "billingPlan">,
+): Promise<void> {
   for (const plan of FREE_PLANS) {
-    await prisma.billingPlan.upsert({
+    await client.billingPlan.upsert({
       where: { code: plan.code },
       create: {
         code: plan.code,

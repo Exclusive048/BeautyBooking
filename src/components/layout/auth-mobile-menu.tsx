@@ -215,6 +215,21 @@ export function AuthMobileMenu({
                   >
                     {UI_TEXT.nav.profile}
                   </Link>
+                  {/* PWA-FIX-01: единственный путь к профессиональным ролям на
+                      мобильном. Ссылка была ТОЛЬКО в десктопном <AuthUserMenu>,
+                      а второй вход — bottom-sheet переключателя ролей — требует
+                      `availableRoles.length > 1`, то есть у клиента без кабинета
+                      он не рендерится вовсе, и внутри /cabinet глобальный
+                      <BottomNav> скрыт в пользу <CabinetBottomNav>. Итог: с
+                      телефона кабинет мастера/студии было не создать. Позиция
+                      зеркалит десктоп (профиль → роли → настройки). */}
+                  <Link
+                    href="/cabinet/roles"
+                    className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
+                    onClick={closeMenu}
+                  >
+                    {UI_TEXT.nav.professionalRoles}
+                  </Link>
                   <Link
                     href="/cabinet/settings"
                     className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
