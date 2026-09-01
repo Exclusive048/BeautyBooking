@@ -25,6 +25,25 @@ COPY tsconfig.json ./
 COPY prisma ./prisma
 COPY src ./src
 
+# PWA-FIX-01: операционные скрипты (`scripts/`) — тот же образ.
+#
+# 🔴 Их отсутствие делало невыполнимой не одну инструкцию, а класс инструкций.
+# Прод-образ приложения (`Dockerfile`) — standalone-бандл: там нет ни
+# `package.json` со скриптами, ни `tsx`, ни исходников. Этот образ —
+# единственный на стенде, где всё это есть (`tsx` и `prisma` намеренно в
+# `dependencies`), и именно им уже гоняются миграции (сервис `migrate` в
+# `docker-compose.prod.yml` берёт `beautyhub-worker`). Но `scripts/` в него не
+# копировался, поэтому `npm run seed:reference` / `seed:review-tags` / `seed:plans`
+# и операционные бэкфиллы, на которые ссылается `DEPLOY-BACKLOG.md`
+# (`backfill-trial-conversion`, `cleanup-duplicate-billing-plans`,
+# `recompute-available-today`), выполнить на ВМ было НЕЧЕМ — команда падала
+# «Cannot find module», и обнаружилось бы это в день деплоя.
+#
+# Копируется каталог целиком, а не перечень файлов: список сидов и бэкфиллов
+# растёт, и забытый `COPY` дал бы ровно тот же отказ. Проверочные гейты
+# (`check-*.mjs`) едут заодно — они безвредны и не запускаются сами.
+COPY scripts ./scripts
+
 ENV NODE_ENV=production
 
 # Drop root: run as the image's built-in unprivileged `node` user (uid 1000).

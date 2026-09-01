@@ -21,9 +21,17 @@
  * не создаёт дублей и не трогает то, что администратор поменял руками, кроме
  * полей самого справочника.
  *
- * Использование:
- *   npm run seed:reference                # Москва + категории + FREE-планы
+ * Использование локально:
+ *   npm run seed:reference                 # Москва + категории + FREE-планы
  *   npm run seed:reference -- --cities=all # все справочные города
+ *
+ * Использование на боевом стенде (`/opt/app`) — образом `beautyhub-worker`, тем
+ * же приёмом, что миграции. 🔴 В контейнерах `web`/`api` это не выполнить: у них
+ * standalone-бандл без `package.json`, `tsx` и исходников; скрипты есть только в
+ * worker-образе (и попали туда лишь 2026-09-01 — до этого `.dockerignore`
+ * исключал `scripts`, то есть выполнить было НЕЧЕМ):
+ *   C="docker compose --env-file .env.production -f docker-compose.prod.yml"
+ *   $C --profile db run --rm --no-deps migrate npm run seed:reference
  *
  * Что НЕ входит и почему:
  *   · PRO/PREMIUM-планы — их цены и фичи ведёт админ через /admin/billing

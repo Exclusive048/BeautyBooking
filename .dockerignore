@@ -45,10 +45,23 @@ vitest.config.ts
 
 # Docs and scripts
 docs
-scripts
 DEPLOY_GUIDE.md
 *.md
 !README.md
+
+# PWA-FIX-01: `scripts` больше НЕ исключается.
+#
+# Каталог нужен в контексте, потому что worker-образ (`Dockerfile.worker`) —
+# единственное место на стенде, где можно выполнить операционный скрипт: у
+# app-образа standalone-бандл без `package.json`, `tsx` и исходников. Пока
+# каталог был исключён, `npm run seed:reference` / `seed:review-tags` /
+# `seed:plans` и бэкфиллы из `DEPLOY-BACKLOG.md` на ВМ было НЕЧЕМ выполнить.
+#
+# ⚠️ В app-образ (`Dockerfile`, `COPY . .` в стадии builder) каталог теперь тоже
+# попадает — это осознанно и безопасно: финальная стадия копирует только
+# `.next/standalone`, `.next/static` и `public`, то есть в артефакт скрипты не
+# едут. Тесты по-прежнему исключены (`**/*.test.ts` выше), и именно их отъезд
+# БЕЗ `scripts` когда-то ломал `next build` в образе — см. комментарий там же.
 
 # Docker files themselves
 Dockerfile*
