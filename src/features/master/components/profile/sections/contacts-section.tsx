@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BadgeCheck, Phone, Send, User } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ProfileContacts } from "@/lib/master/profile-view.service";
@@ -8,6 +9,9 @@ import { SectionShell } from "./section-shell";
 
 const T = UI_TEXT.cabinetMaster.profile.contacts;
 
+/** Кабинет клиента — единственное место, где привязывается аккаунт (см. шапку). */
+const ACCOUNT_LINK_HREF = "/cabinet/profile";
+
 type Props = {
   data: ProfileContacts;
 };
@@ -16,6 +20,15 @@ type Props = {
  * Contacts section — phone + email are inline-editable (autosave via
  * `PATCH /api/me`). Telegram + VK stay read-only because they sync
  * from the social-login provider on link.
+ *
+ * PWA-FIX-03 (решение владельца 2026-09-01): у непривязанной строки появилась
+ * ссылка «Привязать» на кабинет клиента. Read-only строка без действия читалась
+ * как сломанное поле — владелец так её и прочитал, — потому что привязка
+ * аккаунта живёт НЕ здесь: VK подключается в `/cabinet/profile`
+ * (`VkNotificationsSection`), и другого входа у мастера нет. ⚠️ Это НЕ ссылка на
+ * страницу ВКонтакте: та редактируется отдельным полем в секции «Соцсети»
+ * (`socialVk`), и две одноимённые строки в одном экране — как раз то, что
+ * вызвало путаницу.
  *
  * PHONE-CLAIM-01: до этого `fieldKey="phone"` уходил в `/api/me`, который
  * МОЛЧА отбрасывал ключ (Zod strip после SECURITY-EXPOSURE-AUDIT-01 #2) — поле
@@ -62,6 +75,7 @@ export function ContactsSection({ data }: Props) {
                   : null
             }
             verified={data.telegramConnected}
+            linkHref={ACCOUNT_LINK_HREF}
           />
         )}
         <ReadonlyRow
@@ -69,6 +83,7 @@ export function ContactsSection({ data }: Props) {
           label={T.vkLabel}
           value={data.vkConnected ? `id${data.vkUserId ?? ""}`.trim() : null}
           verified={data.vkConnected}
+          linkHref={ACCOUNT_LINK_HREF}
         />
       </ul>
       <p className="mt-3 text-xs text-text-sec">{T.phoneVerifyHint}</p>
@@ -81,11 +96,14 @@ function ReadonlyRow({
   label,
   value,
   verified,
+  linkHref,
 }: {
   icon: typeof Phone;
   label: string;
   value: string | null;
   verified: boolean;
+  /** Куда вести за привязкой. Ссылка показывается только у непривязанной строки. */
+  linkHref?: string;
 }) {
   const isEmpty = !value || value.trim().length === 0;
   return (
@@ -112,6 +130,16 @@ function ReadonlyRow({
           <BadgeCheck className="h-3 w-3" aria-hidden />
           {T.verifiedLabel}
         </span>
+      ) : linkHref ? (
+        <Link
+          href={linkHref}
+          // `aria-label` — потому что «Привязать» ×2 в одном списке неразличимы
+          // на слух: ротор читает ссылки вне контекста строки.
+          aria-label={`${T.linkAction} — ${label}`}
+          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          {T.linkAction}
+        </Link>
       ) : null}
     </li>
   );

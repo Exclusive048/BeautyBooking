@@ -513,7 +513,15 @@ export async function proxy(request: NextRequest) {
     // blocked it → telegram login/connect dead in prod. Scoped to the exact
     // host only (keeps same-origin frames; no wildcard). VK uses a top-level
     // redirect (no frame), so it needs nothing here.
-    "frame-src 'self' https://oauth.telegram.org",
+    // PWA-FIX-02: Яндекс-карта в кабинете мастера (блок «Локация») —
+    // `<iframe src="https://yandex.ru/map-widget/v1/…">` (map-display.tsx).
+    // Под прежним списком браузер её блокировал: пользователь видел серый
+    // прямоугольник с «контент заблокирован» и решал, что не сохранился адрес,
+    // хотя координаты в БД лежали (замер 2026-09-01: geoLat/geoLng заполнены,
+    // карта пуста). Поддомен добавлен потому, что виджет вправе увести на
+    // `maps.yandex.ru`; JS-API каталога (`api-maps.yandex.ru`) сюда не
+    // относится — он идёт под `script-src`, где `https:` уже разрешён.
+    "frame-src 'self' https://oauth.telegram.org https://yandex.ru https://*.yandex.ru",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https:`,
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
