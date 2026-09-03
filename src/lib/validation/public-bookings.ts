@@ -5,7 +5,7 @@ const isoDateString = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Некорректная дата." });
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Проверьте дату записи." });
 
 const answerSchema = z.object({
   questionId: z.string().trim().min(1),
@@ -51,7 +51,7 @@ export const publicBookingCreateSchema = z
     if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "endAtUtc должен быть позже startAtUtc.",
+        message: "Время окончания должно быть позже начала.",
         path: ["endAtUtc"],
       });
     }

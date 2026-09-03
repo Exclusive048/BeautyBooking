@@ -95,7 +95,7 @@ export async function POST(
   if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
   const phone = normalizeInvitePhone(parsed.data.phone);
   if (!phone || phone.length < 8) {
-    return fail("Некорректный номер телефона.", 400, "VALIDATION_ERROR");
+    return fail("Проверьте номер телефона.", 400, "VALIDATION_ERROR");
   }
 
   const studio = await prisma.studio.findUnique({

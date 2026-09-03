@@ -88,7 +88,7 @@ export function buildPlanEditedSummary(diff: PlanEditDiff): string | null {
 
   if (parts.length === 0) return null;
 
-  return `В вашем тарифе изменились параметры — ${parts.join("; ")}.`;
+  return `В вашем тарифе кое-что изменилось — ${parts.join("; ")}.`;
 }
 
 export function buildSubscriptionCancelledByAdminBody(opts: {

@@ -70,7 +70,7 @@ async function clearSystemConfigFocal(key: string): Promise<void> {
 
 function validateUploadBasics(input: UploadMediaInput): void {
   if (!input.entityId.trim()) {
-    throw new AppError("Не указан идентификатор объекта.", 400, "MEDIA_ENTITY_ID_REQUIRED");
+    throw new AppError("Не удалось загрузить фото. Обновите страницу и попробуйте ещё раз.", 400, "MEDIA_ENTITY_ID_REQUIRED");
   }
   if (!MEDIA_ALLOWED_MIME_TYPES.includes(input.mimeType as (typeof MEDIA_ALLOWED_MIME_TYPES)[number])) {
     throw new AppError("Неподдерживаемый формат изображения.", 400, "MEDIA_INVALID_MIME");
@@ -196,7 +196,7 @@ async function enforcePortfolioLimit(
     if (limitKey) {
       throw createLimitReachedError(limitKey, limit, count);
     }
-    throw new AppError("Достигнут лимит работ в портфолио.", 409, "MEDIA_PORTFOLIO_LIMIT_REACHED");
+    throw new AppError("В портфолио больше работ не поместится. Удалите старую или перейдите на тариф выше.", 409, "MEDIA_PORTFOLIO_LIMIT_REACHED");
   }
 }
 
@@ -232,7 +232,7 @@ async function enforceUserStorageQuota(userId: string, incomingBytes: number): P
 
   if (exceedsStorageQuota({ usedBytes: used._sum.sizeBytes ?? 0, incomingBytes })) {
     throw new AppError(
-      "Достигнут лимит хранилища. Удалите ненужные файлы.",
+      "Место для файлов закончилось. Удалите ненужные файлы.",
       409,
       "MEDIA_STORAGE_QUOTA_EXCEEDED",
     );
@@ -373,7 +373,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
       replaceAsset.entityId !== entityId ||
       replaceAsset.kind !== input.kind
     ) {
-      throw new AppError("Заменяемый файл не совпадает.", 400, "MEDIA_REPLACE_ASSET_MISMATCH");
+      throw new AppError("Фото изменилось. Обновите страницу и попробуйте ещё раз.", 400, "MEDIA_REPLACE_ASSET_MISMATCH");
     }
     await deleteAssetById(replaceAsset.id);
   }

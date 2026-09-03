@@ -59,7 +59,7 @@ let client: OpenAI | null = null;
 export function resolveDefaultChatModel(): string {
   const folderId = env.YANDEX_FOLDER_ID?.trim();
   if (!folderId) {
-    throw new AppError("Не настроен YANDEX_FOLDER_ID.", 500, "INTERNAL_ERROR");
+    throw new AppError("Подсказки сейчас недоступны. Попробуйте позже.", 500, "INTERNAL_ERROR", { missing: "YANDEX_FOLDER_ID" });
   }
   return `gpt://${folderId}/yandexgpt-lite/latest`;
 }
@@ -68,7 +68,7 @@ function getClient(): OpenAI {
   if (!client) {
     const apiKey = env.YANDEX_API_KEY?.trim();
     if (!apiKey) {
-      throw new AppError("Не настроен YANDEX_API_KEY.", 500, "INTERNAL_ERROR");
+      throw new AppError("Подсказки сейчас недоступны. Попробуйте позже.", 500, "INTERNAL_ERROR", { missing: "YANDEX_API_KEY" });
     }
     client = new OpenAI({ apiKey, baseURL: YANDEX_BASE_URL });
   }

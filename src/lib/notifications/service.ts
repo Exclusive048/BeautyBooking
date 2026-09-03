@@ -271,7 +271,7 @@ export function buildBookingRequestBody(snapshot: BookingNotificationSnapshot): 
 type BookingConfirmMode = "AUTO" | "MANUAL";
 
 export function buildBookingConfirmedTitle(mode: BookingConfirmMode): string {
-  return mode === "AUTO" ? "Новая запись (авто)" : "Запись подтверждена";
+  return mode === "AUTO" ? "Новая запись — подтверждена автоматически" : "Запись подтверждена";
 }
 
 export function buildBookingConfirmedBody(
@@ -282,7 +282,7 @@ export function buildBookingConfirmedBody(
   const serviceName = resolveServiceLabel(snapshot.service);
   const whenLabel = formatDateLabel(snapshot.startAtUtc, snapshot.provider.timezone);
   if (audience === "MASTER") {
-    const prefix = mode === "AUTO" ? "Автоподтверждение" : "Запись подтверждена";
+    const prefix = mode === "AUTO" ? "Подтверждено автоматически" : "Запись подтверждена";
     if (whenLabel) {
       return `${prefix}: клиент ${snapshot.clientName} на ${serviceName} ${whenLabel}`;
     }
@@ -302,9 +302,9 @@ export function buildBookingDeclinedBody(snapshot: BookingNotificationSnapshot):
   const serviceName = resolveServiceLabel(snapshot.service);
   const whenLabel = formatDateLabel(snapshot.startAtUtc, snapshot.provider.timezone);
   if (whenLabel) {
-    return `Запись на ${serviceName} ${whenLabel} была отклонена.`;
+    return `Запись на ${serviceName} ${whenLabel} не подтвердили. Выберите другое окошко.`;
   }
-  return `Запись на ${serviceName} была отклонена.`;
+  return `Запись на ${serviceName} не подтвердили. Выберите другое окошко.`;
 }
 
 function resolveReminderType(kind: BookingReminderKind): NotificationType {

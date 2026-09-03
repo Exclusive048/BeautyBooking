@@ -10,7 +10,7 @@ export type TelegramStatus = {
   botUsername: string;
 };
 
-const TELEGRAM_STATUS_ERROR = "Не удалось загрузить статус Telegram";
+const TELEGRAM_STATUS_ERROR = "Не удалось проверить подключение Telegram. Попробуйте ещё раз.";
 
 async function fetchTelegramStatus(url: string): Promise<TelegramStatus> {
   const res = await fetch(url, { cache: "no-store" });

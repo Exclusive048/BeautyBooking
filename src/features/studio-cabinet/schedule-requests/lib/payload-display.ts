@@ -68,10 +68,10 @@ function formatBreak(entry: BreakDto): string {
 function summarizeDay(day: DayScheduleDto): string {
   if (!day.isWorkday) return "Выходной";
   if (day.scheduleMode === "FIXED") {
-    if (day.fixedSlotTimes.length === 0) return "Без слотов";
+    if (day.fixedSlotTimes.length === 0) return "Без окошек";
     const list = day.fixedSlotTimes.slice(0, 6).join(", ");
     const rest = day.fixedSlotTimes.length - 6;
-    return rest > 0 ? `Слоты: ${list} +${rest}` : `Слоты: ${list}`;
+    return rest > 0 ? `Окошки: ${list} +${rest}` : `Окошки: ${list}`;
   }
   return formatTimeRange(day.startTime, day.endTime) || "—";
 }
@@ -79,10 +79,10 @@ function summarizeDay(day: DayScheduleDto): string {
 function summarizeException(entry: EditorExceptionInput): string {
   if (!entry.isWorkday) return "Выходной";
   if (entry.scheduleMode === "FIXED") {
-    if (entry.fixedSlotTimes.length === 0) return "Без слотов";
+    if (entry.fixedSlotTimes.length === 0) return "Без окошек";
     const list = entry.fixedSlotTimes.slice(0, 6).join(", ");
     const rest = entry.fixedSlotTimes.length - 6;
-    return rest > 0 ? `Слоты: ${list} +${rest}` : `Слоты: ${list}`;
+    return rest > 0 ? `Окошки: ${list} +${rest}` : `Окошки: ${list}`;
   }
   return formatTimeRange(entry.startTime, entry.endTime) || "—";
 }
@@ -131,9 +131,9 @@ export function buildSchedulePayloadPreview(payload: unknown): SchedulePayloadPr
     const weeklyDays = Array.isArray(obj.weekly?.days) ? obj.weekly!.days!.length : 0;
     const overrides = Array.isArray(obj.overrides) ? obj.overrides.length : 0;
     const parts: string[] = [];
-    if (templates > 0) parts.push(`Шаблонов: ${templates}`);
+    if (templates > 0) parts.push(`Шаблонов графика: ${templates}`);
     if (weeklyDays > 0) parts.push(`Дней в неделе: ${weeklyDays}`);
-    if (overrides > 0) parts.push(`Исключений: ${overrides}`);
+    if (overrides > 0) parts.push(`Особых дней: ${overrides}`);
     return {
       format: "LEGACY",
       summary: parts.length > 0 ? parts.join(" · ") : "Изменения расписания",

@@ -9,6 +9,7 @@ import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { BRAND_COLORS, withAlpha } from "@/lib/ui/brand-colors";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type Payload = {
   username: string;
@@ -373,7 +374,7 @@ export function PublicSettingsClient({
       const res = await fetchWithAuth(endpoint, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<Payload> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setUsername(json.data.username);
       setUrl(json.data.url);
@@ -466,7 +467,7 @@ export function PublicSettingsClient({
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<Payload> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setUsername(json.data.username);
       setUrl(json.data.url);

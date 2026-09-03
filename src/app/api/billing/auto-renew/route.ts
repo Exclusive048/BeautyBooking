@@ -17,7 +17,7 @@ const bodySchema = z.object({
 
 export async function PATCH(req: Request) {
   const user = await getSessionUser();
-  if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
+  if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
   const body = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);

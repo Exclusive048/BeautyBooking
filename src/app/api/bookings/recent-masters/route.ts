@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
+    if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
     const rl = await checkRateLimit(`recent-masters:${user.id}`, RATE_LIMITS.publicApi);
     if (rl.limited) return fail("Слишком много запросов.", 429, "RATE_LIMITED");

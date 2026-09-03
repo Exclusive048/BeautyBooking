@@ -103,7 +103,7 @@ export async function cancelBookingInTx(
 
   if (!declinesMasterChange) {
     if (!canCancelOrReschedule(booking.status)) {
-      throw new AppError("Запись нельзя отменить в текущем статусе.", 409, "CONFLICT");
+      throw new AppError("Эту запись уже нельзя отменить.", 409, "CONFLICT");
     }
     if (input.cancelledBy === "CLIENT") {
       ensureBookingActionWindow(booking.startAtUtc);

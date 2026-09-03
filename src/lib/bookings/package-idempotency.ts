@@ -90,7 +90,7 @@ export async function beginPackageIdempotency(input: {
 
   if (resolved.result) return { cached: resolved.result, heldKey: null };
   if (!resolved.lockAcquired) {
-    throw new AppError("Повторный запрос.", 409, "DUPLICATE_REQUEST");
+    throw new AppError("Этот пакет уже записан. Откройте «Мои записи».", 409, "DUPLICATE_REQUEST");
   }
   return { cached: null, heldKey: key };
 }

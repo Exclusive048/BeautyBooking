@@ -155,7 +155,7 @@ export async function ensureFeatureAccess(input: {
 }): Promise<AnalyticsPlanInfo> {
   const plan = await getPlanFeaturesForUser({ userId: input.userId, scope: input.scope });
   if (!plan.features[input.feature]) {
-    throw new AppError("Функция недоступна на текущем тарифе.", 403, "FEATURE_GATE", {
+    throw new AppError("Этот отчёт недоступен на вашем тарифе.", 403, "FEATURE_GATE", {
       feature: input.feature,
       requiredPlan: FEATURE_REQUIRED_PLAN[input.feature],
     });
@@ -179,7 +179,7 @@ export async function resolveAnalyticsContext(input: {
     });
 
     if (!provider) {
-      throw new AppError("Недостаточно прав для доступа к аналитике мастера.", 403, "FORBIDDEN_ROLE");
+      throw new AppError("Эта аналитика доступна только мастеру.", 403, "FORBIDDEN_ROLE");
     }
 
     return {
@@ -224,7 +224,7 @@ export async function resolveAnalyticsContext(input: {
   });
 
   if (studios.length === 0) {
-    throw new AppError("Недостаточно прав для доступа к аналитике студии.", 403, "FORBIDDEN_ROLE");
+    throw new AppError("Эта аналитика доступна только студии.", 403, "FORBIDDEN_ROLE");
   }
 
   const scored = studios.map((studio) => {
@@ -250,7 +250,7 @@ export async function resolveAnalyticsContext(input: {
       select: { id: true },
     });
     if (!master) {
-      throw new AppError("Мастер не принадлежит студии.", 403, "FORBIDDEN");
+      throw new AppError("Этот мастер не работает в вашей студии.", 403, "FORBIDDEN");
     }
     masterFilterId = master.id;
   }

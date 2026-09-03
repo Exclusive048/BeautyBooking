@@ -68,7 +68,7 @@ export function useAutoSave<T>(opts: Options<T>): void {
         } catch (error) {
           if (!mountedRef.current) return;
           setStatus("error");
-          setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить.");
+          setErrorMessage(error instanceof Error ? error.message : "Не удалось сохранить. Попробуйте ещё раз.");
         }
       },
       [setStatus, setErrorMessage]

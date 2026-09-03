@@ -37,6 +37,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 // NOTIFICATIONS-REDESIGN-01: was `"all" | "master" | "studio" | "system" |
 // "invites"` — channel buckets offered identically to every viewer. Now a
@@ -391,7 +392,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
     const res = await fetchWithAuth("/api/notifications/center", { cache: "no-store" });
     const json = (await res.json().catch(() => null)) as ApiResponse<NotificationCenterData> | null;
     if (!res.ok || !json || !json.ok) {
-      throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+      throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
     }
     setInvites(json.data.invites);
     setNotifications(json.data.notifications);
@@ -412,7 +413,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setNotifications((current) =>
         current.map((note) => {
@@ -459,7 +460,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setNotifications((current) =>
         current.map((note) => {

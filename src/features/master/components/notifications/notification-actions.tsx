@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { NotificationPayload } from "./lib/payload";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.notifications.actions;
 const ERR = UI_TEXT.cabinetMaster.notifications.errors;
@@ -66,7 +67,7 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
       );
       const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!response.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API ${response.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       await fetch(`/api/notifications/${notificationId}/read`, { method: "POST" }).catch(
         () => null,

@@ -383,7 +383,7 @@ export async function createReview(input: {
     nowUtc: input.nowUtc ?? new Date(),
   });
   if (!isAllowed) {
-    throw new AppError("Оставить отзыв нельзя.", 403, "REVIEW_NOT_ALLOWED");
+    throw new AppError("Оставить отзыв на эту запись нельзя.", 403, "REVIEW_NOT_ALLOWED");
   }
 
   const target = requireReviewTarget(booking);

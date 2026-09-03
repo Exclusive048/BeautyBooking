@@ -31,7 +31,7 @@ export async function GET(req: Request) {
 
     const appUrl = resolvePublicAppUrl(req.url);
     if (!appUrl) {
-      throw new AppError("Не настроен APP_PUBLIC_URL.", 500, "APP_PUBLIC_URL_MISSING");
+      throw new AppError("Не удалось собрать ссылку на профиль. Попробуйте ещё раз.", 500, "APP_PUBLIC_URL_MISSING");
     }
 
     const provider = await prisma.provider.findFirst({
@@ -71,7 +71,7 @@ export async function POST(req: Request) {
 
     const appUrl = resolvePublicAppUrl(req.url);
     if (!appUrl) {
-      throw new AppError("Не настроен APP_PUBLIC_URL.", 500, "APP_PUBLIC_URL_MISSING");
+      throw new AppError("Не удалось собрать ссылку на профиль. Попробуйте ещё раз.", 500, "APP_PUBLIC_URL_MISSING");
     }
 
     const body = await parseBody(req, bodySchema);
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     }
 
     if (await isUsernameTaken(prisma, normalized)) {
-      return jsonFail(409, "Этот username уже занят. Попробуйте другой.", "CONFLICT");
+      return jsonFail(409, "Этот адрес профиля уже занят. Придумайте другой.", "CONFLICT");
     }
 
     const current = await prisma.provider.findUnique({

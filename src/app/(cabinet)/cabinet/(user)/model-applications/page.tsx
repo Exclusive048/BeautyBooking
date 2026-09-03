@@ -13,7 +13,7 @@ export default async function ClientModelApplicationsRoute() {
     <div className="space-y-6">
       <HeaderBlock
         title="Мои заявки на модель"
-        subtitle="Отслеживайте отклики на офферы и подтверждайте предложенное время."
+        subtitle="Отслеживайте отклики на предложения и подтверждайте предложенное время."
       />
       <ClientModelApplicationsPage />
     </div>

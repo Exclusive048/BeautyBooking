@@ -14,7 +14,7 @@ const FREE_PLANS: Array<{
 }> = [
   {
     code: "MASTER_FREE",
-    name: "Free",
+    name: "FREE",
     scope: SubscriptionScope.MASTER,
     features: {
       // Base features (always available)
@@ -47,7 +47,7 @@ const FREE_PLANS: Array<{
   },
   {
     code: "STUDIO_FREE",
-    name: "Free",
+    name: "FREE",
     scope: SubscriptionScope.STUDIO,
     features: {
       // Base features

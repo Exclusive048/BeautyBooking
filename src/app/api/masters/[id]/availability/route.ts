@@ -58,12 +58,12 @@ export async function GET(
     const limitRaw = url.searchParams.get("limit");
 
     if (!serviceId) return fail("Укажите услугу.", 400, "SERVICE_REQUIRED");
-    if (!isDateKey(fromKey)) return fail("Некорректная дата начала.", 400, "DATE_INVALID");
-    if (toKey && !isDateKey(toKey)) return fail("Некорректная дата окончания.", 400, "DATE_INVALID");
+    if (!isDateKey(fromKey)) return fail("Проверьте дату начала.", 400, "DATE_INVALID");
+    if (toKey && !isDateKey(toKey)) return fail("Проверьте дату окончания.", 400, "DATE_INVALID");
 
     const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
     if (limitRaw && !Number.isFinite(limit)) {
-      return fail("Некорректное значение limit.", 400, "LIMIT_INVALID");
+      return fail("Слишком длинный список. Сузьте поиск.", 400, "LIMIT_INVALID");
     }
 
     // SEC-05: сначала — публичный резолв с обязательной публикацией (тот же

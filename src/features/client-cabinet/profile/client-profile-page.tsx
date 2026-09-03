@@ -85,7 +85,7 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
     case "connected":
       return { tone: "success", text: "Telegram подключён." };
     case "conflict":
-      return { tone: "error", text: "Этот Telegram-аккаунт уже привязан к другому пользователю." };
+      return { tone: "error", text: "Этот Telegram-аккаунт уже привязан к другому аккаунту." };
     case "unconfigured":
       return { tone: "error", text: "Подключение Telegram временно недоступно. Попробуйте позже." };
     case "error":
@@ -253,7 +253,7 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
 
         <DangerZoneCard
           onDelete={() =>
-            setStubMessage("Удаление аккаунта — в следующем спринте")
+            setStubMessage("Удаление аккаунта скоро появится")
           }
         />
 

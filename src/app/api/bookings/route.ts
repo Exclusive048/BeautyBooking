@@ -189,7 +189,7 @@ export async function POST(req: Request) {
     // this change, which would otherwise have let a guest slip into a path
     // that was never adapted for them.
     if (!sessionUser) {
-      return jsonFail(400, "startAtUtc/endAtUtc обязательны для гостевой брони.", "VALIDATION_ERROR");
+      return jsonFail(400, "Выберите дату и время записи.", "VALIDATION_ERROR");
     }
 
     const booking = await createClientBooking(sessionUser.id, {

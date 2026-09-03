@@ -39,7 +39,7 @@ function parseScheduleMode(value: unknown): "FLEXIBLE" | "FIXED" {
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");
@@ -97,7 +97,7 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");
@@ -108,7 +108,7 @@ export async function PATCH(req: Request) {
       | { scheduleMode?: unknown; fixedSlotTimes?: unknown }
       | null;
     if (!body || typeof body !== "object") {
-      return jsonFail(400, "Некорректное тело запроса.", "INVALID_BODY");
+      return jsonFail(400, "Не удалось сохранить график. Обновите страницу и попробуйте ещё раз.", "INVALID_BODY");
     }
 
     const current = await prisma.provider.findUnique({

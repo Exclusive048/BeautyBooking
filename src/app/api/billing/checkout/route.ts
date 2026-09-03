@@ -48,7 +48,7 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
-  if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
+  if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
   const body = await req.json().catch(() => null);
   const parsed = bodySchema.safeParse(body);
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
     return fail("Тариф не найден.", 404, "NOT_FOUND");
   }
   if (plan.scope !== scope) {
-    return fail("Тариф не относится к выбранному разделу.", 400, "VALIDATION_ERROR");
+    return fail("Этот тариф не подходит вашему кабинету. Выберите другой.", 400, "VALIDATION_ERROR");
   }
 
   const now = new Date();

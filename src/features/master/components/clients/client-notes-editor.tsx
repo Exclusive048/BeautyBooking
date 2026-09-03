@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.notes;
 
@@ -93,7 +94,7 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
         | ApiResponse<{ card: { notes: string | null } }>
         | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       const serverValue = json.data.card.notes ?? "";
       setSaved(serverValue);

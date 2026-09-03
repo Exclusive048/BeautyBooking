@@ -44,7 +44,7 @@ async function loadProvider(providerId: string): Promise<ProviderForHotSlots> {
     },
   });
   if (!provider) {
-    throw new AppError("Провайдер не найден.", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "PROVIDER_NOT_FOUND");
   }
   return provider;
 }

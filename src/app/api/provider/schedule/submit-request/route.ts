@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     const body = (await req.json().catch(() => null)) as { payload?: SchedulePayload } | null;
     if (!body || !body.payload) {
-      return jsonFail(400, "Некорректное тело запроса.", "INVALID_BODY");
+      return jsonFail(400, "Не удалось отправить график на согласование. Обновите страницу и попробуйте ещё раз.", "INVALID_BODY");
     }
 
     const created = await prisma.scheduleChangeRequest.create({

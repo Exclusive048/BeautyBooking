@@ -284,7 +284,7 @@ export function BillingPage({ scope }: BillingPageProps) {
       setPlans(plansJson.data);
       setStatus(statusJson.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить данные.");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить тарифы. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -298,7 +298,7 @@ export function BillingPage({ scope }: BillingPageProps) {
     const periodMonths = selectedPeriod[selectedScope];
     const totalAmountKopeks = getCheckoutAmountKopeks(plan, periodMonths);
     if (totalAmountKopeks === null) {
-      setError("Не удалось определить стоимость тарифа.");
+      setError("Не удалось рассчитать стоимость. Попробуйте ещё раз.");
       return;
     }
 
@@ -422,11 +422,11 @@ export function BillingPage({ scope }: BillingPageProps) {
   }, [scopePlans, status, scope]);
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загрузка...</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загружаем…</div>;
   }
 
   if (!scopePlans) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Тарифы недоступны.</div>;
+    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Тарифы пока не загрузились. Обновите страницу.</div>;
   }
 
   const subscription = status?.subscriptions[scope] ?? null;
@@ -440,7 +440,7 @@ export function BillingPage({ scope }: BillingPageProps) {
     <section className="space-y-8">
       <header>
         <h1 className="text-2xl font-semibold text-text-main">Подписка</h1>
-        <p className="mt-1 text-sm text-text-sec">Тарифы для выбранного кабинета.</p>
+        <p className="mt-1 text-sm text-text-sec">Тарифы вашего кабинета.</p>
       </header>
 
       {error ? (
@@ -505,7 +505,7 @@ export function BillingPage({ scope }: BillingPageProps) {
                 ) : null}
               </div>
             ) : (
-              <div className="mt-1 text-xs text-text-sec">Подписка не активна.</div>
+              <div className="mt-1 text-xs text-text-sec">Подписка не оформлена.</div>
             )}
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-xs text-text-sec">
@@ -571,7 +571,7 @@ export function BillingPage({ scope }: BillingPageProps) {
               subscription?.plan.id === plan.id &&
               (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE");
 
-            let displayPriceLabel = "Нет цены";
+            let displayPriceLabel = "Цена уточняется";
             if (displayMonthlyPriceKopeks !== null) {
               displayPriceLabel =
                 displayMonthlyPriceKopeks > 0

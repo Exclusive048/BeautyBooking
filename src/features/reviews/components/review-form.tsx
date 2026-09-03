@@ -8,6 +8,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
 import type { ReviewDto, ReviewTagDto } from "@/lib/reviews/types";
 import type { ApiResponse } from "@/lib/types/api";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type Props = {
   bookingId: string;
@@ -111,7 +112,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         const res = await fetch("/api/reviews/tags", { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as ApiResponse<ReviewTagsResponse> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+          throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
         }
         if (cancelled) return;
         setPublicTags(json.data.publicTags);
@@ -174,7 +175,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
                 .find((v) => v.trim().length > 0)
             : undefined;
         throw new Error(
-          fieldMessage || (json && !json.ok ? json.error.message : `API error: ${res.status}`)
+          fieldMessage || (json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE)
         );
       }
       onSubmitted(json.data.review);

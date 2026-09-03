@@ -58,7 +58,7 @@ export const UI_TEXT = {
     ratingOutOfFive: (value: string) => `Рейтинг ${value} из 5`,
     priceMin: "Минимальная цена",
     priceMax: "Максимальная цена",
-    clientLoading: "Загрузка клиента",
+    clientLoading: "Загружаем клиента",
     clientsFilter: "Фильтр клиентов",
     notificationsFilter: "Фильтр уведомлений",
     serviceCategories: "Категории услуг",
@@ -141,7 +141,7 @@ export const UI_TEXT = {
     draft: {
       title: "Черновик",
       description:
-        "Документ требует юридического ревью перед публикацией. Сейчас содержит технический черновик, описывающий реальный функционал платформы.",
+        "Документ ещё проверяют юристы. Пока здесь черновик, который описывает, как платформа работает на самом деле.",
     },
     contacts: {
       legal: "legal@masterryadom.ru",
@@ -319,12 +319,12 @@ export const UI_TEXT = {
       // FIX-EXP-CONTENT-GRAMMAR (EXP-008): the count is all published providers
       // (masters AND studios), so the truthful collective is «специалист», not
       // «мастер» (which excludes studios like Vision / Аура).
-      pluralOne: "специалист",
-      pluralFew: "специалиста",
-      pluralMany: "специалистов",
+      pluralOne: "мастер",
+      pluralFew: "мастера",
+      pluralMany: "мастеров",
     },
     sort: {
-      label: "Сорт:",
+      label: "Сортировка",
       relevance: "По релевантности",
       rating: "По рейтингу",
       "price-asc": "Цена ↑",
@@ -339,7 +339,7 @@ export const UI_TEXT = {
     chips: {
       today: "Свободно сегодня",
       verified: "Только проверенные",
-      premium: "Premium",
+      premium: "PREMIUM",
       home: "Выезд на дом",
       resetAll: "Сбросить все",
       pricePrefix: "до",
@@ -352,7 +352,7 @@ export const UI_TEXT = {
       when: "Когда",
       district: "Район / метро",
       additional: "Дополнительно",
-      apply: "Применить",
+      apply: "Показать",
       moreServices: "+ Ещё {count} услуг",
       districtSearchPlaceholder: "Поиск метро или района",
       ratingAny: "Любой",
@@ -376,13 +376,13 @@ export const UI_TEXT = {
     additional: {
       home: "Выезд на дом",
       verified: "Только проверенные",
-      premium: "Premium-мастера",
+      premium: "PREMIUM-мастера",
       withReviews: "С отзывами клиентов",
       acceptCard: "Принимают карту",
     },
     card: {
       fromPrice: "от",
-      premiumBadge: "PRO",
+      premiumBadge: "PREMIUM",
       saveAria: "Сохранить мастера",
       saveTooltip: "Сохранить мастера",
       saveTodoToast: "Скоро будет доступно",
@@ -403,7 +403,7 @@ export const UI_TEXT = {
     },
     empty: {
       title: "Никого не нашли по этим фильтрам",
-      description: "Попробуйте изменить параметры или сбросить фильтры.",
+      description: "Попробуйте смягчить фильтры или сбросить их.",
       resetCta: "Сбросить фильтры",
     },
     pagination: {
@@ -413,7 +413,7 @@ export const UI_TEXT = {
     favoriteToggle: {
       addAria: "Добавить в избранное",
       removeAria: "Убрать из избранного",
-      errorRateLimited: "Слишком частые запросы. Подождите немного.",
+      errorRateLimited: "Слишком часто. Подождите немного и попробуйте ещё раз.",
       errorGeneric: "Не удалось обновить избранное. Попробуйте ещё раз.",
     },
     loginRequired: {
@@ -429,7 +429,7 @@ export const UI_TEXT = {
       eyebrow: "Тарифы",
       titleBefore: "Подписка вместо",
       titleItalic: "комиссий",
-      description: "Выберите план под вашу нагрузку. Изменить можно в любой момент.",
+      description: "Выберите тариф под вашу загрузку. Изменить можно в любой момент.",
     },
     tabs: {
       master: "Для мастеров",
@@ -444,7 +444,7 @@ export const UI_TEXT = {
       savingsBadge: "−{pct}%",
       perMonth: "/мес",
       free: "навсегда",
-      placeholder: "[Уточняется]",
+      placeholder: "Уточняется",
       // FIX-EXP-PRICING-COPY (EXP-014): public neutral "coming soon" copy — must
       // NOT reference the administrator / internal process. Fires whenever the
       // marketing resolver (FIX-R2-05-AB) returns no positive price; replaces
@@ -497,19 +497,19 @@ export const UI_TEXT = {
           id: "trial-activation",
           question: "Как получить пробный период PREMIUM?",
           answer:
-            "Просто зарегистрируйтесь как мастер или студия — пробный период активируется автоматически на 30 дней. Карта не нужна. После окончания аккаунт переходит на бесплатный тариф, если вы не оформили платную подписку. Все ваши данные (записи, портфолио, клиенты) сохраняются.",
+            "Просто зарегистрируйтесь как мастер или студия — пробный период начнётся сам и продлится 30 дней. Карта не нужна. После окончания аккаунт переходит на бесплатный тариф, если вы не оформили платную подписку. Все ваши данные (записи, портфолио, клиенты) сохраняются.",
         },
         {
           id: "change-plan",
           question: "Можно ли поменять тариф после оформления?",
           answer:
-            "Да, в любой момент в кабинете → «Подписка». При апгрейде доплачиваете разницу за оставшийся период. При даунгрейде изменения вступают в силу со следующего платёжного периода.",
+            "Да, в любой момент в кабинете → «Подписка». Если переходите на тариф выше — доплачиваете разницу за оставшийся период. Если на тариф ниже — изменения начнут действовать со следующего платёжного периода.",
         },
         {
           id: "cancel",
           question: "Можно ли отменить подписку?",
           answer:
-            "Да. Подписка прекращается со следующего периода — деньги за текущий не возвращаются, но платный функционал остаётся доступен до конца оплаченного периода.",
+            "Да. Подписка прекращается со следующего периода — деньги за текущий не возвращаются, но платные возможности останутся до конца оплаченного периода.",
         },
         {
           id: "grace",
@@ -521,7 +521,7 @@ export const UI_TEXT = {
           id: "commissions",
           question: "Берёт ли платформа комиссию с услуг?",
           answer:
-            "Нет. Платформа берёт только месячную подписку — каждый рубль от клиента приходит вам полностью. ЮКасса берёт свою комиссию за обработку онлайн-платежей — это плата платёжного процессора, не платформы.",
+            "Нет. Платформа берёт только месячную подписку — каждый рубль от клиента приходит вам полностью. ЮКасса берёт свою комиссию за онлайн-оплату — это плата платёжному сервису, а не платформе.",
         },
         {
           id: "payment-methods",
@@ -533,7 +533,7 @@ export const UI_TEXT = {
           id: "refund",
           question: "Возможен ли возврат средств?",
           answer:
-            "Возврат возможен в течение 14 дней с момента оплаты, если вы не использовали платный функционал. Подробности — в Пользовательском соглашении.",
+            "Возврат возможен в течение 14 дней с момента оплаты, если вы не пользовались платными возможностями. Подробности — в Пользовательском соглашении.",
         },
       ],
     },
@@ -578,9 +578,9 @@ export const UI_TEXT = {
     list: {
       titleWithCity: "Предложения в городе {city}",
       titleAllCities: "Все предложения",
-      countLabelOne: "{count} оффер",
-      countLabelFew: "{count} оффера",
-      countLabelMany: "{count} офферов",
+      countLabelOne: "{count} предложение",
+      countLabelFew: "{count} предложения",
+      countLabelMany: "{count} предложений",
       categoryAll: "Все услуги",
     },
     card: {
@@ -596,7 +596,7 @@ export const UI_TEXT = {
       titleWithCity: "Пока нет предложений в {city}",
       titleNoCity: "Пока нет активных предложений",
       description:
-        "Мастера регулярно публикуют новые офферы — особенно в выходные и перед сезоном съёмок. Загляните позже или попробуйте другой город.",
+        "Мастера регулярно публикуют новые предложения — особенно в выходные и перед сезоном съёмок. Загляните позже или попробуйте другой город.",
       changeCityHint: "Сменить город можно в шапке сайта",
       fallbackPrompt: "Ищете обычного мастера, не для практики?",
       fallbackLink: "Перейти в каталог",
@@ -604,8 +604,8 @@ export const UI_TEXT = {
     forMasters: {
       title: "Вы мастер?",
       description:
-        "Опубликуйте оффер для модели — клиенты подадут заявку, вы выберете подходящего и согласуете время. Без переписок в директе.",
-      cta: "Опубликовать оффер",
+        "Опубликуйте предложение для модели — клиенты подадут заявку, вы выберете подходящего и согласуете время. Без переписок в директе.",
+      cta: "Опубликовать предложение",
     },
   },
   faq: {
@@ -623,7 +623,7 @@ export const UI_TEXT = {
   meta: {
     title: "МастерРядом — запись к мастерам красоты онлайн",
     description:
-      "Найди мастера маникюра, массажа или стрижки рядом. Онлайн-запись без звонков.",
+      "Найдите мастера маникюра, массажа или стрижки рядом. Онлайн-запись без звонков.",
   },
   actions: {
     save: "Сохранить",
@@ -645,7 +645,7 @@ export const UI_TEXT = {
     goTo: "Перейти",
   },
   status: {
-    saving: "Сохранение…",
+    saving: "Сохраняем…",
     saved: "Сохранено",
     loading: "Загрузка…",
     enabled: "Включено",
@@ -659,7 +659,7 @@ export const UI_TEXT = {
     logoutPending: "Выход…",
     loginPage: {
       heroTitle: "Запишитесь к мастеру без звонков",
-      heroSubtitle: "Выбирайте по фото и отзывам, а время бронируйте онлайн",
+      heroSubtitle: "Выбирайте по фото и отзывам, а время выбирайте онлайн",
       title: "Вход по номеру телефона",
       subtitle: "Введите номер — пришлём код. Без пароля.",
       // AUTH-GATE-01: the heading used to say «Вход по номеру телефона» even
@@ -679,7 +679,7 @@ export const UI_TEXT = {
       phonePlaceholderMask: "+7 (___) ___-__-__",
       codeLabel: "Код из SMS",
       codePlaceholder: "123456",
-      invalidPhone: "Введите телефон в формате +7XXXXXXXXXX, например +79001234567",
+      invalidPhone: "Проверьте номер: он должен начинаться с +7, например +79001234567",
       sendCodeFailed: "Не удалось отправить код. Попробуйте ещё раз.",
       enterCode: "Введите код",
       invalidCode: "Неверный код",
@@ -714,7 +714,7 @@ export const UI_TEXT = {
       // остальных отказов колбэка тем, что повторить ЕСТЬ смысл — поэтому и
       // сообщение говорит про медленный ответ, а не «произошла ошибка».
       oauthProviderTimeout:
-        "Провайдер входа не ответил вовремя. Попробуйте войти ещё раз.",
+        "Сервис входа не ответил вовремя. Попробуйте войти ещё раз.",
       // FIX-B14: стартовая нога OAuth — навигация браузера, поэтому её отказы
       // тоже возвращают человека сюда. Провайдер выключен килсвитчем или не
       // сконфигурирован: повторять нечего, но другие способы входа на этой же
@@ -726,12 +726,12 @@ export const UI_TEXT = {
       oauthStartFailed:
         "Не удалось начать вход через этот сервис. Попробуйте ещё раз.",
       heroFeature1: "Находите мастеров по портфолио и отзывам",
-      heroFeature2: "Бронируйте время онлайн — без звонков",
+      heroFeature2: "Записывайтесь онлайн — без звонков",
       heroFeature3: "Напоминания и перенос в пару кликов",
       socialProofMasters: "2 000+",
       // FIX-EXP-CONTENT-GRAMMAR (EXP-008): `stats.masters` counts all published
       // providers (masters + studios) — truthful label is «специалистов».
-      socialProofMastersLabel: "специалистов на платформе",
+      socialProofMastersLabel: "мастеров на платформе",
       socialProofBookings: "15 000+",
       socialProofBookingsLabel: "успешных записей",
       resendCode: "Отправить повторно",
@@ -748,14 +748,18 @@ export const UI_TEXT = {
       changeEmail: "Изменить email",
       codeFromEmail: "Код из письма",
       emailNotConfigured: "Вход по email временно недоступен",
-      brandSubtitle: "BEAUTY MARKETPLACE",
+      brandSubtitle: "Маркетплейс мастеров красоты",
       heroTitleAccent: "30 секунд",
       // LOGIN-REDESIGN-01 — brand-stage copy.
       // Headline is split into words for the word-rise animation; the accented
       // word carries the shimmer. Kept as one visible phrase.
+      // COPY-BEAUTY-01 (2026-09-03, решение владельца): «Красота начинается
+      // с тебя» — слоган обращён к человеку, а не к форме входа. «Ты» здесь
+      // осознанное: это бренд-строка, а не инструкция продукта (правило «вы»
+      // UI-18 — про императивы и подсказки интерфейса).
       brandHeadlineLead: "Красота начинается",
-      brandHeadlineWith: "со",
-      brandHeadlineAccent: "входа",
+      brandHeadlineWith: "с",
+      brandHeadlineAccent: "тебя",
       brandTagline: "Запись к мастеру за 30 секунд — без звонков и переписок. Выбирайте по работам, платите после процедуры.",
       // Divider above the social-login buttons.
       socialDividerLabel: "или войти через",
@@ -785,7 +789,7 @@ export const UI_TEXT = {
     },
     telegram: {
       loginButton: "Войти через Telegram",
-      botNotConfigured: "Telegram bot username не настроен.",
+      botNotConfigured: "Вход через Telegram сейчас недоступен.",
       loginFailed: "Не удалось войти через Telegram. Попробуйте ещё раз.",
     },
     vk: {
@@ -801,7 +805,7 @@ export const UI_TEXT = {
     catalog: "Каталог",
     myBookings: "Мои записи",
     profile: "Профиль",
-    professionalRoles: "Профессиональные роли",
+    professionalRoles: "Мои кабинеты",
     settings: "Настройки",
     adminPanel: "🛡️ Админ-панель",
     masterWorkspace: "Мастер",
@@ -838,8 +842,8 @@ export const UI_TEXT = {
     roleClient: "Клиент",
     roleMaster: "Мастер",
     roleStudio: "Студия",
-    switchRole: "Сменить роль",
-    activeRole: "Активная роль",
+    switchRole: "Сменить кабинет",
+    activeRole: "Текущий кабинет",
     roleSwitcherTitle: "Кабинет",
     becomeMasterCta: "Стать мастером",
     createStudioCta: "Создать студию",
@@ -871,11 +875,11 @@ export const UI_TEXT = {
       subtitle: "Начните принимать клиентов онлайн уже сегодня",
       subtitleAccent: "Бесплатно",
       button: "Создать профиль бесплатно",
-      hint: "Настрой свой кабинет так, как тебе удобно",
+      hint: "Настройте кабинет так, как удобно вам",
     },
     ctaMasters: {
       badge: "Для мастеров",
-      title: "Принимаешь клиентов? Платформа уже всё умеет",
+      title: "Принимаете клиентов? Платформа уже всё умеет",
       subtitle:
         "Расписание, онлайн-запись, отзывы и аналитика — в одном кабинете. Первые 3 месяца — без комиссии.",
       metric1Value: "+34%",
@@ -886,7 +890,7 @@ export const UI_TEXT = {
     },
     ctaModels: {
       badge: "Для моделей",
-      title: "Хочешь модный образ со скидкой?",
+      title: "Хотите модный образ со скидкой?",
       subtitle:
         "Мастера ищут моделей для отработки техник и портфолио. Услуги −40…−70%, всё официально и безопасно.",
       metric1Value: "1 240",
@@ -906,7 +910,7 @@ export const UI_TEXT = {
       howItWorks: "Как это работает",
       partners: "Партнёрам",
       careers: "Вакансии",
-      howToBook: "Как забронировать",
+      howToBook: "Как записаться",
       popularServices: "Популярные услуги",
       mastersNearby: "Мастера рядом",
       offersForModels: "Предложения для моделей",
@@ -959,7 +963,7 @@ export const UI_TEXT = {
   // ещё раз» здесь была бы неправдой: до конца суток ответ не изменится.
   ai: {
     dailyLimitReached:
-      "Функция сегодня недоступна — дневной лимит ИИ-запросов исчерпан. Попробуйте завтра.",
+      "Подсказки от ИИ на сегодня закончились. Попробуйте завтра.",
     temporarilyUnavailable: "ИИ-функции временно недоступны. Попробуйте позже.",
   },
   deletion: {
@@ -969,7 +973,7 @@ export const UI_TEXT = {
     masterWarning:
       "Удаление кабинета мастера необратимо. Все услуги, расписание и портфолио будут удалены. История завершённых записей сохраняется в соответствии с законодательством.",
     studioWarning:
-      "Все мастера студии получат уведомление о расформировании. Удаление невозможно если есть незавершённые записи.",
+      "Все мастера студии получат уведомление о закрытии студии. Удалить её можно, только когда не осталось незавершённых записей.",
     confirmPrompt: "Для подтверждения введите «{keyword}»",
     activeBookingsWarning: "Сначала завершите или отмените все активные записи ({count} шт.)",
     accountTitle: "Удаление аккаунта",
@@ -985,17 +989,17 @@ export const UI_TEXT = {
       title: "Итоги недели",
       body: (bookings: number, revenue: number) =>
         `На прошлой неделе: ${bookings} ${bookings === 1 ? "запись" : bookings < 5 ? "записи" : "записей"}, ${revenue.toLocaleString("ru-RU")} ₽`,
-      motivationGrowth: (pct: number) => `Рост на ${pct}%! Так держать 🚀`,
+      motivationGrowth: (pct: number) => `Рост на ${pct}% — так держать 🚀`,
       motivationDecline: "Добавьте горящие окошки, чтобы заполнить расписание",
-      motivationFirst: "Отличное начало! Продолжайте в том же духе ✨",
+      motivationFirst: "Отличное начало — продолжайте в том же духе ✨",
     },
     slotFreed: {
-      title: "Освободилось окно",
+      title: "Освободилось окошко",
       body: (masterName: string, dateTime: string) =>
-        `У ${masterName} освободилось окно ${dateTime}. Записаться?`,
+        `У ${masterName} освободилось окошко ${dateTime}. Записаться?`,
       telegram: (masterName: string, dateTime: string, link: string | null) =>
         [
-          `🔔 У ${masterName} освободилось окно ${dateTime}`,
+          `🔔 У ${masterName} освободилось окошко ${dateTime}`,
           link ? `Записаться: ${link}` : null,
         ]
           .filter(Boolean)
@@ -1005,12 +1009,12 @@ export const UI_TEXT = {
   billing: {
     featureGate: {
       ctaLabel: "Посмотреть тарифы",
-      loading: "Загрузка компонента…",
+      loading: "Загружаем…",
       title: "Только для тарифа {plan}",
       description: "Перейдите на {plan}, чтобы разблокировать эту функцию.",
-      notificationsTitle: "Уведомления в Telegram и ВКонтакте — тариф Про",
+      notificationsTitle: "Уведомления в Telegram и ВКонтакте — тариф PRO",
       notificationsHint: "Подключите Telegram или ВКонтакте, чтобы не пропустить ни одной записи",
-      cta: "Перейти на Про",
+      cta: "Перейти на PRO",
       // FIX-27 — unified locked-state card. {plan} is the required tier derived
       // from the live plan-config (findMinPlanName over /api/billing/plans),
       // never a hardcoded string (closes PLAN-GATE-HINT-DIVERGENCE).
@@ -1049,7 +1053,7 @@ export const UI_TEXT = {
         `Новая стоимость тарифа — ${priceLabel}. Примите новую цену до ${deadlineLabel}, чтобы сохранить подписку.`,
       lapsedTitle: "Подписка приостановлена",
       lapsedBody:
-        "Новая стоимость тарифа не была принята в отведённый срок. Подписка отключена — вы можете оформить её заново в любой момент.",
+        "Вы не подтвердили новую цену в срок, и подписка приостановлена — оформить её заново можно в любой момент.",
       bannerTitle: "Цена тарифа выросла",
       bannerBody: (priceLabel: string, deadlineLabel: string) =>
         `Новая стоимость — ${priceLabel}. Продлите по новой цене до ${deadlineLabel}, чтобы сохранить доступ.`,
@@ -1092,7 +1096,7 @@ export const UI_TEXT = {
       usernameHint: "Только латинские буквы, цифры и дефис. Мин. 3 символа.",
       urlPreview: (username: string) => `masterryadom.ru/u/${username}`,
       copyLink: "Скопировать ссылку",
-      copied: "Скопировано!",
+      copied: "Скопировано",
       qrTitle: "QR-код профиля",
       qrHint: "Разместите QR-код на визитке или в салоне.",
       downloadQr: "Скачать QR",
@@ -1100,10 +1104,10 @@ export const UI_TEXT = {
       downloadCardSocial: "Для соцсетей",
       cardSectionTitle: "Визитка",
       cardSectionHint: "Скачайте визитку с QR-кодом для публикации или печати.",
-      cardPreviewAlt: "Превью визитки",
-      cardGenerating: "Генерируем…",
+      cardPreviewAlt: "Так выглядит визитка",
+      cardGenerating: "Готовим визитку…",
       saveUsername: "Сохранить",
-      saving: "Сохранение…",
+      saving: "Сохраняем…",
       saveFailed: "Не удалось сохранить. Попробуйте ещё раз.",
       saved: "Сохранено",
       openProfile: "Открыть профиль",
@@ -1113,11 +1117,11 @@ export const UI_TEXT = {
     mode: {
       label: "Режим расписания",
       flexible: "Гибкий — клиент выбирает любое время",
-      fixed: "Фиксированный — только заданные окна",
+      fixed: "Фиксированное время — только ваши окошки",
     },
     fixedSlots: {
-      title: "Фиксированные окна",
-      add: "Добавить окно",
+      title: "Фиксированное время",
+      add: "Добавить окошко",
       hint: "Клиенты смогут записаться только в эти часы",
     },
   },
@@ -1159,22 +1163,22 @@ export const UI_TEXT = {
         workday: "Рабочий день",
         dayOff: "Выходной",
         flexible: "Гибкое время",
-        fixed: "Фиксированные окна",
+        fixed: "Фиксированное время",
         fixedHint: "Клиенты смогут записаться только в эти часы",
         addBreak: "+ Добавить перерыв",
-        addSlot: "+ Добавить окно",
+        addSlot: "+ Добавить окошко",
         copyToDays: "Скопировать на другие дни…",
         copyModalTitle: "Скопировать на дни",
         applyException: "Сохранить день",
         resetToBase: "Вернуть по графику недели",
         makeHoliday: "Сделать выходным",
         makeWorkday: "Сделать рабочим",
-        exceptionApplied: "⚠️ Настроено исключение",
-        futureExceptions: "Будущие исключения",
-        noExceptions: "Нет запланированных исключений",
+        exceptionApplied: "День настроен отдельно",
+        futureExceptions: "Особые дни впереди",
+        noExceptions: "Особых дней пока нет",
         legendFlexible: "Гибкий",
         legendFixed: "Фиксированный",
-        legendException: "Исключение",
+        legendException: "Особый день",
         calendar: "Календарь",
         loading: "Загрузка…",
         saved: "Сохранено",
@@ -1183,20 +1187,20 @@ export const UI_TEXT = {
         cancel: "Отмена",
         add: "Добавить",
         shiftPrefix: "Смена",
-        customLabel: "Кастом",
+        customLabel: "Свой",
         templateLabelShort: "Шаблон",
         byDateTemplateLabel: "Шаблон по дате",
         errors: {
           load: "Не удалось загрузить расписание. Попробуйте ещё раз.",
-          loadOverrides: "Не удалось загрузить исключения. Попробуйте ещё раз.",
+          loadOverrides: "Не удалось загрузить особые дни. Попробуйте ещё раз.",
           saveWeek: "Не удалось сохранить график. Попробуйте ещё раз.",
-          saveException: "Не удалось сохранить исключение. Попробуйте ещё раз.",
-          deleteException: "Не удалось удалить исключение. Попробуйте ещё раз.",
+          saveException: "Не удалось сохранить особый день. Попробуйте ещё раз.",
+          deleteException: "Не удалось удалить особый день. Попробуйте ещё раз.",
           loadDayBookings: "Не удалось загрузить записи дня. Попробуйте ещё раз.",
-          submitRequest: "Не удалось отправить запрос. Попробуйте ещё раз.",
+          submitRequest: "Не удалось отправить график на согласование. Попробуйте ещё раз.",
           templateNameRequired: "Укажите название шаблона.",
           timeRangeRequired: "Укажите время начала и окончания.",
-          invalidSlotTime: "Некорректное время окна. Используйте формат HH:mm.",
+          invalidSlotTime: "Проверьте время окошка — например, 10:30.",
         },
         info: {
           savedWeek: "График сохранён.",
@@ -1217,11 +1221,11 @@ export const UI_TEXT = {
           submitHintStudio: "Изменения отправляются на согласование администратора студии.",
           submitHintSolo: "Сохраните изменения, чтобы обновить график.",
           settingsTitle: "Настройки",
-          settingsSubtitle: "Шаблоны, неделя и исключения.",
+          settingsSubtitle: "Шаблоны, неделя и особые дни.",
           tabs: {
             templates: "Шаблоны",
             week: "Неделя",
-            overrides: "Исключения",
+            overrides: "Особые дни",
           },
           breaksPrefix: "Перерывы",
           editTemplate: "Редактировать",
@@ -1231,14 +1235,14 @@ export const UI_TEXT = {
           breaksLimit: "Перерывы (до 3)",
           addBreak: "+ Перерыв",
           addTemplate: "Добавить шаблон",
-          templateLimitReached: "Достигнут лимит 7 шаблонов.",
+          templateLimitReached: "Больше 7 шаблонов не получится — удалите ненужный.",
           noTemplateOption: "Нет шаблона",
-          noOverrides: "Исключений пока нет.",
+          noOverrides: "Особых дней пока нет.",
           calendarTitle: "Календарь",
-          calendarSubtitle: "План по неделе и исключения.",
+          calendarSubtitle: "Неделя и особые дни.",
           dayActionsTitle: "Действия с днём",
-          basedOnPlan: "По плану:",
-          overrideLabel: "Исключение",
+          basedOnPlan: "По графику недели:",
+          overrideLabel: "Особый день",
           editTimeTitle: "Изменить время",
           breaksTitle: "Перерывы",
           saveTime: "Сохранить время",
@@ -1249,10 +1253,10 @@ export const UI_TEXT = {
           sending: "Отправляем…",
           deleteWindowAria: "Удалить окно",
           deleteBreakAria: "Удалить перерыв",
-          deleteOverrideAria: "Удалить исключение",
+          deleteOverrideAria: "Удалить особый день",
         },
         baseStatusWorkflexible: (start: string, end: string) => `Рабочий (${start}–${end})`,
-        baseStatusWorkFixed: "Рабочий (Фикс. окна)",
+        baseStatusWorkFixed: "Рабочий (фиксированное время)",
         baseStatusHoliday: "Выходной",
         changeThisDay: "Настроить этот день",
         editDayAria: "Изменить график",
@@ -1261,7 +1265,7 @@ export const UI_TEXT = {
         addBookingCta: "+ Добавить запись",
         dayFreeState: "Записей нет. День свободен.",
         offDayConflictTitle: (count: number) =>
-          `На этот день уже есть ${count} записей. Если сделать его выходным, записи нужно будет перенести или отменить.`,
+          `На этот день уже есть ${count} ${pluralize(count, "запись", "записи", "записей")}. Если сделать его выходным, записи нужно будет перенести или отменить.`,
         offDayConflictCannotAutoCancel: "— нельзя отменить автоматически",
         offDayConflictConfirm: "Отменить записи и сделать выходным",
         offDayConflictKeep: "Оставить как есть",
@@ -1278,11 +1282,11 @@ export const UI_TEXT = {
   },
   settings: {
     title: "Настройки",
-    subtitle: "Управление профилем и автоматизация",
+    subtitle: "Профиль, правила записи и напоминания",
     sections: {
       publicPage: "Публичная страница",
       bookingRules: "Правила записи",
-      proFeatures: "Доп. услуги",
+      proFeatures: "Дополнительные услуги",
     },
     publicLink: {
       copied: "Скопировано",
@@ -1314,7 +1318,7 @@ export const UI_TEXT = {
       // users understand why the toggle is locked.
       temporarilyUnavailable: "Уведомления через ВКонтакте временно недоступны.",
       temporarilyUnavailableHint:
-        "Мы дорабатываем доставку. Подключение к VK сохранится — уведомления включатся автоматически, когда канал заработает.",
+        "Мы дорабатываем отправку уведомлений. Подключение к VK сохранится — уведомления включатся сами, как только всё заработает.",
       // FIX-B14: исходы стартовой ноги `/api/integrations/vk/start`. Она —
       // навигация, поэтому её отказ возвращает браузер на эту же страницу с
       // `?vk=<исход>`, а не рисует JSON-конверт поверх кабинета.
@@ -1344,7 +1348,7 @@ export const UI_TEXT = {
     hotSlots: {
       title: "Горящие окошки",
       description: "Автоскидки на ближайшие свободные окошки.",
-      hint: "Предлагай скидку на свободные окна и заполняй расписание",
+      hint: "Предлагайте скидку на свободные окошки и заполняйте расписание",
       configure: "Настроить",
       whenToApply: "Когда применять",
       trigger48: "За 48 ч.",
@@ -1373,9 +1377,9 @@ export const UI_TEXT = {
     },
     billing: {
       featureGate: {
-        title: "Доступно в тарифе Про",
-        hint: "Перейдите на Про, чтобы разблокировать эту функцию.",
-        cta: "Перейти на Про",
+        title: "Доступно на тарифе PRO",
+        hint: "Перейдите на PRO, чтобы разблокировать эту функцию.",
+        cta: "Перейти на PRO",
       },
     },
     notifications: {
@@ -1388,7 +1392,7 @@ export const UI_TEXT = {
         // profile «Связанные аккаунты» card. Notification surfaces toggle delivery
         // and, when the account isn't linked yet, point to the canonical card.
         connectInProfile: "Подключить в профиле →",
-        hint: "Если уведомления прервались, откройте бота и нажмите Start.",
+        hint: "Если уведомления прервались, откройте бота и нажмите «Запустить».",
         connectFailed: "Не удалось подключить Telegram. Попробуйте ещё раз.",
         updateFailed: "Не удалось обновить настройки Telegram. Попробуйте ещё раз.",
       },
@@ -1423,15 +1427,15 @@ export const UI_TEXT = {
         toggleFailed: "Не удалось изменить настройки уведомлений. Попробуйте ещё раз.",
       },
       push: {
-        title: "Push-уведомления",
-        desc: "Получайте уведомления о записях в браузере, даже когда сайт закрыт.",
-        receiveToggle: "Получать push-уведомления",
+        title: "Уведомления на телефон",
+        desc: "Уведомления о записях приходят на телефон или в браузер, даже когда сайт закрыт.",
+        receiveToggle: "Получать уведомления на телефон",
         permissionPrompt: "При включении браузер попросит разрешение на уведомления.",
-        unsupported: "Ваш браузер не поддерживает push-уведомления.",
+        unsupported: "Ваш браузер не умеет показывать такие уведомления.",
         denied:
           "Уведомления запрещены в браузере. Разрешите их в настройках сайта, затем включите снова.",
-        enableFailed: "Не удалось включить push-уведомления. Попробуйте ещё раз.",
-        toggleFailed: "Не удалось изменить настройки push-уведомлений. Попробуйте ещё раз.",
+        enableFailed: "Не удалось включить уведомления. Попробуйте ещё раз.",
+        toggleFailed: "Не удалось изменить настройки уведомлений. Попробуйте ещё раз.",
       },
     },
   },
@@ -1462,24 +1466,24 @@ export const UI_TEXT = {
       instagramPlaceholder: "https://instagram.com/username",
     },
     profilePage: {
-      loading: "Загрузка профиля студии…",
+      loading: "Загружаем профиль студии…",
       loadFailed: "Не удалось загрузить профиль студии. Попробуйте ещё раз.",
       saveFailed: "Не удалось сохранить профиль студии. Попробуйте ещё раз.",
       uploadBannerFailed: "Не удалось загрузить обложку. Попробуйте ещё раз.",
-      deadlineValidation: "Укажите значение от 0 до 168.",
+      deadlineValidation: "Укажите от 0 до 168 часов.",
       deleteFailed: "Не удалось удалить кабинет студии. Попробуйте ещё раз.",
-      bannerFocusTitle: "Точка фокуса",
+      bannerFocusTitle: "Главное на обложке",
     },
     settingsPanel: {
       settingsSubtitle: "Правила записи, уведомления и горящие окошки для всей студии.",
       hotSlotsTitle: "Горящие окошки",
       hotSlotsDescription:
-        "Автоскидки на свободные окна по правилам студии.",
+        "Автоскидки на свободные окошки по правилам студии.",
       cancellationTitle: "Политика отмены",
       cancellationHint:
-        "Клиент может отменить запись не позднее указанного срока. Пустое значение — без ограничений, 0 — отмена запрещена.",
+        "Клиент может отменить запись не позднее указанного срока. Оставьте поле пустым — отменять можно в любой момент; 0 — отмена запрещена.",
       cancellationPlaceholder: "Например, 24",
-      currentValueLabel: "Текущее значение: ",
+      currentValueLabel: "Сейчас: ",
       noLimit: "Без ограничений",
       hoursValue: (hours: number) => `${hours} ч.`,
       remindersTitle: "Напоминания",
@@ -1511,8 +1515,8 @@ export const UI_TEXT = {
       profile: {
         title: "Профиль мастера",
         namePlaceholder: "Имя",
-        statusPlaceholder: "Статус",
-        activeLabel: "Активен",
+        statusPlaceholder: "О себе одной строкой",
+        activeLabel: "Работает",
         save: "Сохранить",
         saving: "Сохраняем…",
       },
@@ -1530,7 +1534,7 @@ export const UI_TEXT = {
   },
   cabinetHub: {
     title: "Как вы хотите работать сегодня?",
-    subtitle: "Выберите ваше пространство в МастерРядом.",
+    subtitle: "Выберите, в каком кабинете работать.",
     clientTitle: "Клиент",
     clientDescription: "Личный профиль, ваши записи и уведомления.",
     masterTitle: "Мастер",
@@ -1543,10 +1547,10 @@ export const UI_TEXT = {
     master: {
       title: "Я — мастер",
       description: "Создайте профиль, добавьте услуги и принимайте клиентов.",
-      working: "Принимаю заказы",
+      working: "Принимаю записи",
       notWorking: "Не принимаю записи",
       photoFallback: "Фото",
-      reviewsTemplate: (rating: string, count: number) => `★ ${rating} (${count} отзывов)`,
+      reviewsTemplate: (rating: string, count: number) => `★ ${rating} (${count} ${pluralize(count, "отзыв", "отзыва", "отзывов")})`,
       openCabinet: "Открыть кабинет",
       deleteCabinet: "Удалить кабинет мастера",
     },
@@ -1556,7 +1560,7 @@ export const UI_TEXT = {
       upsellTitle: "Расширяйтесь до студии",
       upsellDescription: "Добавьте команду мастеров и управляйте расписанием в одном месте",
       openCabinet: "Открыть кабинет",
-      deleteRole: "Удалить роль студии",
+      deleteRole: "Удалить кабинет студии",
       logoFallback: "Лого",
       label: "Студия",
       statusPublished: "Опубликована",
@@ -1581,14 +1585,14 @@ export const UI_TEXT = {
   },
   notificationsCenter: {
     title: "Уведомления",
-    subtitle: "Единый центр приглашений и системных событий.",
+    subtitle: "Приглашения и всё важное по вашим записям — в одном месте.",
     invitesTitle: "Приглашения в студии",
-    timelineTitle: "Лента событий",
+    timelineTitle: "Что происходило",
     // `phoneRequired` removed (NOTIFICATIONS-REDESIGN-01): the invites card now
     // renders only when there ARE invites, and invites are matched by phone
     // server-side — so «добавьте телефон» was advice that could only ever show
     // to someone who had no invites to see. Its only caller is gone.
-    emptyTimeline: "По выбранному фильтру пока нет событий.",
+    emptyTimeline: "Здесь пока пусто — попробуйте другой раздел.",
     noActiveInvites: "Нет активных приглашений.",
     openAction: "Открыть",
     // NOTIFICATIONS-REDESIGN-01: filters were channel-based (Все/Мастер/Студия/
@@ -1620,8 +1624,8 @@ export const UI_TEXT = {
       noShow: "Неявка",
     },
     bookingActions: {
-      resolveForConfirmFailed: "Не удалось определить запись для подтверждения. Попробуйте ещё раз.",
-      resolveForDeclineFailed: "Не удалось определить запись для отклонения. Попробуйте ещё раз.",
+      resolveForConfirmFailed: "Не удалось подтвердить запись. Попробуйте ещё раз.",
+      resolveForDeclineFailed: "Не удалось отклонить запись. Попробуйте ещё раз.",
       confirmSuccess: "Запись подтверждена",
       confirmFailed: "Не удалось подтвердить запись. Попробуйте ещё раз.",
       declineSuccess: "Запись отклонена",
@@ -1633,7 +1637,7 @@ export const UI_TEXT = {
     showAll: "Показать все",
     markAllRead: "Прочитать все",
     invites: {
-      titlePrefix: "Админ студии",
+      titlePrefix: "Студия",
       titleSuffix: "приглашает вас стать мастером",
       accept: "Принять",
       reject: "Отклонить",
@@ -1677,7 +1681,7 @@ export const UI_TEXT = {
     addToFavorites: "Добавить в избранное",
     removeFromFavorites: "Убрать из избранного",
     similarWorks: "Похожие работы",
-    nearestSlots: "Ближайшие окна",
+    nearestSlots: "Ближайшие окошки",
     total: "Итого",
     whatOnPhoto: "Что на фото",
     showMore: "Показать ещё",
@@ -1685,20 +1689,20 @@ export const UI_TEXT = {
     emptyTitle: "Пока нет работ",
     emptyDesc: "Добавьте первые работы в портфолио, чтобы клиенты вас замечали.",
     retry: "Повторить",
-    loading: "Загрузка ленты…",
+    loading: "Загружаем ленту…",
     loadFailed: "Не удалось загрузить ленту. Попробуйте ещё раз.",
     detailsFailed: "Не удалось загрузить детали работы. Попробуйте ещё раз.",
-    noSlots: "Нет данных по ближайшим окнам",
+    noSlots: "Свободных окошек пока нет",
     byMaster: "Мастер",
     byStudio: "Студия",
     durationHourShort: "ч",
     durationMinuteShort: "м",
   },
   homeGuest: {
-    eyebrow: "BEAUTY MARKETPLACE",
+    eyebrow: "Мастера красоты рядом",
     // FIX-EXP-CONTENT-GRAMMAR (EXP-008): stat counts all published providers
     // (masters + studios) — truthful term is «специалистов», not «мастеров».
-    eyebrowMastersSuffix: "специалистов",
+    eyebrowMastersSuffix: "мастеров",
     heroTitle: "Запишитесь к лучшим",
     heroTitleAccent: "мастерам",
     heroTitleAfter: "красоты — без звонков и переписок",
@@ -1711,7 +1715,7 @@ export const UI_TEXT = {
     hotSlots: {
       title: "Горящие окошки",
       titleAccent: "сегодня",
-      subtitle: "Скидки до 30% на освободившиеся места",
+      subtitle: "Скидки до 30% на освободившиеся окошки",
       seeAll: "Все горящие окошки",
     },
     howItWorks: {
@@ -1741,7 +1745,7 @@ export const UI_TEXT = {
     becomeMaster: {
       title: "Вы мастер красоты?",
       subtitle: "Получайте клиентов без рекламы. Бесплатно для соло-мастеров",
-      cta: "Стать партнёром",
+      cta: "Стать мастером",
       ctaSecondary: "Узнать больше",
     },
     faq: {
@@ -1765,7 +1769,7 @@ export const UI_TEXT = {
         },
         {
           q: "Что если мастер опаздывает или не вышел?",
-          a: "Напишите в чат брони — мастер ответит. Если не выходит на связь — обратитесь в поддержку, мы вернём предоплату.",
+          a: "Напишите в чат записи — мастер ответит. Если не выходит на связь — обратитесь в поддержку, мы вернём предоплату.",
         },
       ],
     },
@@ -1814,10 +1818,10 @@ export const UI_TEXT = {
   home: {
     accountDeleted: "Ваш аккаунт удалён",
     hero: {
-      title: "Запишись к мастеру",
+      title: "Запишитесь к мастеру",
       titleHighlight: "онлайн",
       subtitle:
-        "Находи специалистов по портфолио, смотри отзывы и бронируй время без звонков и ожидания",
+        "Выбирайте мастера по работам, читайте отзывы и записывайтесь онлайн — без звонков и ожидания",
       ctaFind: "Найти мастера",
       ctaBecome: "Стать мастером",
       statMastersLabel: "мастеров",
@@ -1860,21 +1864,21 @@ export const UI_TEXT = {
       },
       selectedFile: "Файл: {name}",
       messages: {
-        unrecognized: "Не удалось определить тип услуги. Попробуйте другое фото.",
+        unrecognized: "Не поняли, что на фото. Попробуйте другое.",
         lowConfidence:
-          "Фото не распознано с достаточной уверенностью. Попробуйте более чёткое фото.",
+          "Фото получилось нечётким. Попробуйте снимок крупнее и при хорошем свете.",
         notEnoughIndexed: "Пока мало работ в этой категории — попробуйте позже.",
         disabled: "Поиск по фото временно недоступен.",
         fileRequired: "Выберите файл изображения.",
-        invalidFile: "Поддерживаются только JPEG, PNG или WebP до 5 МБ.",
-        rateLimited: "Слишком много запросов. Попробуйте через минуту.",
+        invalidFile: "Подойдёт фото JPEG, PNG или WebP до 5 МБ.",
+        rateLimited: "Слишком часто. Попробуйте через минуту.",
         // SEC-04 п.7: суточный бюджет инстанса исчерпан — деградация честная
         // (429 + Retry-After до конца UTC-суток), не 500.
-        budgetExhausted: "Поиск по фото сегодня недоступен — дневной лимит исчерпан. Попробуйте завтра.",
+        budgetExhausted: "Поиск по фото на сегодня закончился. Попробуйте завтра.",
         searchFailed: "Не удалось выполнить поиск. Попробуйте позже.",
       },
     },
-    loading: "Загрузка ленты…",
+    loading: "Загружаем ленту…",
     loadFailed: "Не удалось загрузить ленту. Попробуйте ещё раз.",
     empty: "Пока нет работ",
     detailsFailed: "Не удалось загрузить работу. Попробуйте ещё раз.",
@@ -1899,8 +1903,8 @@ export const UI_TEXT = {
       title: "Записаться снова",
       bookAgain: "Записаться",
       lastVisit: "Последний визит",
-      nextSlot: "Ближайшее окно",
-      noSlots: "Нет свободных окон",
+      nextSlot: "Ближайшее окошко",
+      noSlots: "Свободных окошек нет",
       loadFailed: "Не удалось загрузить мастеров. Попробуйте ещё раз.",
     },
     greeting: {
@@ -1914,18 +1918,18 @@ export const UI_TEXT = {
       step1Title: "Найдите мастера",
       step1Desc: "Смотрите портфолио, читайте отзывы и выбирайте по стилю",
       step2Title: "Выберите время",
-      step2Desc: "Бронируйте любое удобное окошко прямо в приложении",
+      step2Desc: "Выбирайте любое удобное окошко прямо в приложении",
       step3Title: "Готово",
       step3Desc: "Получите подтверждение и напоминание о визите",
     },
     categories: {
       title: "Популярные категории",
-      subtitle: "Найдите специалиста по вашей задаче",
+      subtitle: "Найдите мастера под вашу задачу",
       showAll: "Смотреть всех",
     },
     hotSlotsPreview: {
       title: "Горящие окошки",
-      subtitle: "Скидки до конца дня — свободные окна прямо сейчас",
+      subtitle: "Скидки до конца дня — свободные окошки прямо сейчас",
       book: "Записаться",
       showAll: "Все окошки",
       discountPercent: (v: number) => `-${v}%`,
@@ -1940,7 +1944,7 @@ export const UI_TEXT = {
       rating: "средний рейтинг",
       categories: "категорий",
       usp1Title: "Только проверенные мастера",
-      usp1Desc: "Портфолио, отзывы и рейтинг перед бронью",
+      usp1Desc: "Портфолио, отзывы и рейтинг — до записи",
       usp2Title: "Онлайн без звонков",
       usp2Desc: "Запись, подтверждение и напоминания автоматически",
       usp3Title: "Удобный перенос",
@@ -1973,9 +1977,9 @@ export const UI_TEXT = {
       freeInTime: "Свободно в выбранное время",
       selectServiceFirst: "Сначала выберите услугу",
       selectDateFirst: "Сначала выберите дату",
-      emptyTitle: "Нет свободных окон",
+      emptyTitle: "Свободных окошек нет",
       emptyDesc: "Попробуйте другой диапазон времени или дату.",
-      loadFailed: "Не удалось подобрать свободные окна. Попробуйте ещё раз.",
+      loadFailed: "Не удалось подобрать окошки. Попробуйте ещё раз.",
       noServices: "Ничего не найдено",
     },
     chips: {
@@ -1987,7 +1991,7 @@ export const UI_TEXT = {
       privateMasters: "Частные мастера",
       priceMinPlaceholder: "Мин",
       priceMaxPlaceholder: "Макс",
-      apply: "Подтвердить",
+      apply: "Показать",
       reset: "Сбросить",
     },
     sidebar: {
@@ -1998,34 +2002,34 @@ export const UI_TEXT = {
       districtClear: "Очистить район",
       rating: "Рейтинг",
       ratingAny: "Любой",
-      hot: "Горящие окна",
+      hot: "Горящие окошки",
       availableToday: "Свободно сегодня",
-      entityType: "Тип",
+      entityType: "Кто принимает",
       entityAll: "Все",
       entityMaster: "Мастер",
       entityStudio: "Студия",
       reset: "Сбросить всё",
-      apply: "Показать результаты",
+      apply: "Показать",
       filtersButton: "Фильтры",
       activeFiltersCount: (n: number) => `${n}`,
     },
-    resultsCount: "Результатов",
+    resultsCount: "Нашлось",
     viewList: "Список",
     viewMap: "На карте",
     priceFrom: "от",
     priceAllIncluded: "всё включено",
     priceOnRequest: "Цена по запросу",
-    noSlots: "Нет мест",
+    noSlots: "Окошек нет",
     nextSlotLabel: "Ближайшее окошко",
-    todaySlotsLabel: "Окна сегодня",
+    todaySlotsLabel: "Окошки сегодня",
     reviewsLabel: "отзывов",
     newLabel: "Новый",
-    mapPlaceholderTitle: "Карта будет здесь",
-    mapPlaceholderDesc: "Подключим интерактивную карту в следующем шаге.",
+    mapPlaceholderTitle: "Карта скоро появится",
+    mapPlaceholderDesc: "Мы её готовим — пока смотрите список.",
     mapPointsTitle: "Точки на карте",
     carouselPrev: "Предыдущее фото",
     carouselNext: "Следующее фото",
-    highlightBadge: "Premium",
+    highlightBadge: "PREMIUM",
     loadMore: "Показать ещё",
     loading: "Загружаем каталог…",
     loadFailed: "Не удалось загрузить каталог. Попробуйте ещё раз.",
@@ -2039,7 +2043,7 @@ export const UI_TEXT = {
       retry: "Повторить",
       updatingResults: "Обновляем результаты…",
       emptyArea: "В этой области ничего не найдено. Передвиньте карту и нажмите «Поиск в этой области».",
-      missingCoords: (count: number) => `Не отображены ${count} профилей без координат`,
+      missingCoords: (count: number) => `Без адреса на карте: ${count}`,
       yourLocation: "Ваше местоположение:",
       geoAccessDenied: "Разрешите доступ к геолокации, чтобы показывать мастеров рядом с вами.",
       geoError: "Не удалось определить местоположение. Попробуйте ещё раз.",
@@ -2047,7 +2051,7 @@ export const UI_TEXT = {
       myLocation: "Моё местоположение",
       ratingHint: (title: string, rating: number) => `${title} • Рейтинг ${rating.toFixed(1)}`,
       foundInPoint: (count: number) => `Найдено в этой точке: ${count}`,
-      clusterHint: "Выберите кластер, чтобы увидеть список мастеров.",
+      clusterHint: "Нажмите на кружок с цифрой, чтобы увидеть мастеров.",
     },
   },
   analytics: {
@@ -2096,8 +2100,8 @@ export const UI_TEXT = {
     scheduleSettings: {
       breadcrumb: "Настройки расписания",
       title: "Настройки расписания",
-      subtitle: "Часы, перерывы, исключения и правила бронирования",
-      previewCta: "Открыть превью клиента",
+      subtitle: "Часы, перерывы, особые дни и правила записи",
+      previewCta: "Посмотреть глазами клиента",
       studioApproval: {
         infoTemplate:
           "Вы в команде студии «{studio}». Изменения расписания отправляются на одобрение студии — текущее расписание не меняется, пока студия не подтвердит.",
@@ -2114,7 +2118,7 @@ export const UI_TEXT = {
       },
       tabs: {
         hours: "Часы",
-        exceptions: "Исключения",
+        exceptions: "Особые дни",
         breaks: "Перерывы",
         rules: "Правила",
         visibility: "Видимость",
@@ -2122,25 +2126,28 @@ export const UI_TEXT = {
       },
       mode: {
         sectionTitle: "Режим",
-        flexibleLabel: "Диапазон и перерывы",
+        flexibleLabel: "Часы работы и перерывы",
         flexibleHint:
-          "Например: 10:00–20:00 с обедом 13:00–14:00. Слоты строятся автоматически по длительности услуги.",
-        fixedLabel: "Фиксированные окна",
+          "Например: с 10:00 до 20:00 с обедом 13:00–14:00. Свободные окошки складываются сами — по длительности услуги.",
+        fixedLabel: "Фиксированное время",
         fixedHint:
-          "Жёсткие точки старта: 10:00, 13:00, 16:00. Подходит для длинных услуг с равными интервалами.",
+          "Клиенты записываются только на выбранное вами время — например, 10:00, 13:00 и 16:00. Удобно для долгих процедур одной длительности.",
       },
       slotStep: {
-        sectionTitle: "Шаг слота",
-        hint: "Минимальный квант, к которому привязывается запись",
+        // COPY-BEAUTY-01 — «шаг слота / квант» заменены на язык мастера:
+        // окошко — то, что клиент видит и выбирает; шаг — как часто окошки
+        // начинаются. Пример в подсказке важнее определения.
+        sectionTitle: "Шаг окошек",
+        hint: "Как часто начинаются свободные окошки. Например, при шаге 30 минут клиент видит 10:00, 10:30, 11:00.",
         options: {
           "15": "15 мин",
           "30": "30 мин",
-          "60": "60 мин",
+          "60": "1 час",
         },
       },
       week: {
-        sectionTitle: "Шаблон по неделе",
-        hint: "Повторяется каждую неделю. Конкретный день можно переопределить во вкладке «Исключения».",
+        sectionTitle: "Обычная неделя",
+        hint: "Повторяется каждую неделю. Конкретный день можно изменить во вкладке «Особые дни».",
         startLabel: "Начало",
         endLabel: "Конец",
         breaksLabel: "Перерывы",
@@ -2148,10 +2155,10 @@ export const UI_TEXT = {
         removeBreakAria: "Убрать перерыв",
         offLabel: "Выходной",
         onLabel: "Рабочий",
-        fixedTimesLabel: "Окна старта",
-        fixedTimesEmpty: "Пока нет окон старта",
-        addFixedTime: "Окно",
-        removeFixedTimeAria: "Удалить окно",
+        fixedTimesLabel: "Время приёма",
+        fixedTimesEmpty: "Пока нет времени приёма — добавьте, например, 10:00",
+        addFixedTime: "Время",
+        removeFixedTimeAria: "Удалить время",
         hoursLabel: "ч",
         days: {
           mon: "Пн",
@@ -2163,7 +2170,7 @@ export const UI_TEXT = {
           sun: "Вс",
         },
         footerDisclaimer:
-          "Изменения вступят в силу с понедельника. Существующие записи не сместятся.",
+          "Изменения начнут действовать с понедельника. Существующие записи не сместятся.",
         actionMenu: {
           triggerAria: "Действия с днём",
           copyToWorkdays: "Скопировать на все рабочие дни",
@@ -2171,7 +2178,7 @@ export const UI_TEXT = {
           clearDay: "Очистить день",
           clearConfirmTitle: "Очистить день?",
           clearConfirmMessage:
-            "Все настройки для этого дня будут сброшены. День станет выходным.",
+            "Часы и перерывы этого дня очистятся. День станет выходным.",
           clearConfirmCta: "Очистить",
         },
       },
@@ -2186,7 +2193,7 @@ export const UI_TEXT = {
       },
       placeholders: {
         exceptions: {
-          title: "Исключения и отпуск",
+          title: "Особые дни и отпуск",
           body: "Здесь появятся одноразовые изменения расписания: отгулы, особые часы на конкретные даты, отпуск.",
         },
         breaks: {
@@ -2194,12 +2201,12 @@ export const UI_TEXT = {
           body: "Тут можно будет настроить повторяющиеся перерывы — обед, мастер-классы, регулярные паузы между записями.",
         },
         rules: {
-          title: "Правила бронирования",
-          body: "Буфер между записями, минимальное окно для отмены, автоподтверждение и напоминания.",
+          title: "Правила записи",
+          body: "Пауза между записями, за сколько можно отменить, автоподтверждение и напоминания.",
         },
         visibility: {
           title: "Видимость и публикация",
-          body: "Управление публичной страницей, виден ли мастер в каталоге, окно записи на будущее.",
+          body: "Ваша страница, показ в каталоге и на сколько вперёд открыта запись.",
         },
         comingSoon: "Скоро",
       },
@@ -2207,9 +2214,9 @@ export const UI_TEXT = {
         bookingWindow: {
           title: "Когда можно записаться",
           minTitle: "Минимум за",
-          minSubtitle: "Раньше этого окна окошко скрывается",
+          minSubtitle: "Окошки, до которых осталось меньше, клиент уже не увидит",
           maxTitle: "Максимум вперёд",
-          maxSubtitle: "Жёсткий лимит. После этого окна записаться нельзя даже по прямой ссылке",
+          maxSubtitle: "Дальше этой даты записаться нельзя — даже по прямой ссылке",
           minOptions: {
             "1": "1 час",
             "2": "2 часа",
@@ -2230,14 +2237,14 @@ export const UI_TEXT = {
             "Клиент видит «Подтверждено» сразу. Проще для клиента, меньше работы вам.",
           manualLabel: "Вручную",
           manualDescription:
-            "Запись висит в статусе «Ожидает», пока вы не подтвердите. Контроль над расписанием.",
+            "Запись ждёт вашего ответа — клиент видит «Ожидает». Вы сами решаете, кого принять.",
         },
         cancellation: {
           title: "Отмена и перенос",
           freeTitle: "Бесплатная отмена",
           freeSubtitle: "За сколько до записи можно отменить без последствий",
-          afterTitle: "После — статус",
-          afterSubtitle: "Что происходит, если клиент отменил позже",
+          afterTitle: "Если отменили позже",
+          afterSubtitle: "Что делать, когда клиент отменяет уже после этого срока",
           freeOptions: {
             "1": "1 час",
             "2": "2 часа",
@@ -2247,14 +2254,14 @@ export const UI_TEXT = {
           afterOptions: {
             none: "ничего",
             reminder: "напоминание",
-            fine: "отметить в CRM",
+            fine: "отметить в карточке",
           },
         },
         hotSlots: {
           badge: "Горящие окошки",
           title: "Снижайте цену для близких окошек",
           body:
-            "Если до окна осталось мало времени — автоматически предложите скидку. Клиенты подтянутся, окошко не пропадёт.",
+            "Если до окошка осталось мало времени — автоматически предложите скидку. Клиенты подтянутся, окошко не пропадёт.",
           locked: "Доступно в PRO и выше",
           lockedCta: "Обновить тариф",
           triggerTitle: "Скидка включается",
@@ -2280,7 +2287,7 @@ export const UI_TEXT = {
         slot: {
           title: "Как клиенты видят окошки",
           publishedTitle: "Показывать в каталоге",
-          publishedSubtitle: "Профиль участвует в поиске и фильтрах",
+          publishedSubtitle: "Вас находят в поиске и подборках",
           publishedOptions: {
             yes: "Да",
             link: "Только по ссылке",
@@ -2308,23 +2315,23 @@ export const UI_TEXT = {
         },
       },
       exceptions: {
-        title: "Исключения и выходные",
-        subtitle: "Переопределяют шаблон в конкретные дни. Имеют приоритет над неделей.",
+        title: "Особые дни и выходные",
+        subtitle: "Дни, которые отличаются от обычной недели: отпуск, праздники, сокращённый день.",
         addCta: "Добавить",
-        emptyTitle: "Пока нет исключений",
+        emptyTitle: "Пока нет особых дней",
         emptyBody: "Добавьте отпуск, праздники или сокращённый день.",
-        emptyCta: "Добавить исключение",
+        emptyCta: "Добавить особый день",
         editCta: "Изменить",
         deleteAria: "Удалить",
-        deleteConfirm: "Удалить исключение?",
+        deleteConfirm: "Удалить особый день?",
         modal: {
-          addTitle: "Новое исключение",
-          editTitle: "Изменить исключение",
+          addTitle: "Новый особый день",
+          editTitle: "Изменить особый день",
           typeLabel: "Тип",
           offLabel: "Не работаю",
           offDescription: "Целый день или несколько дней",
           shortLabel: "Сокращённый день",
-          shortDescription: "Кастомные часы работы",
+          shortDescription: "Свои часы на этот день",
           noteLabel: "Название (необязательно)",
           notePlaceholderOff: "Например: Майские праздники",
           notePlaceholderShort: "Например: Корпоратив",
@@ -2345,9 +2352,9 @@ export const UI_TEXT = {
       },
       breaks: {
         buffer: {
-          title: "Буфер между записями",
+          title: "Пауза между записями",
           subtitle:
-            "Автоматический отступ на уборку и подготовку — клиенты не смогут забронировать окошко вплотную.",
+            "Запас времени на уборку и подготовку — клиент не сможет записаться вплотную к предыдущей записи.",
           options: {
             "0": "нет",
             "5": "5 мин",
@@ -2381,7 +2388,7 @@ export const UI_TEXT = {
           cancel: "Отмена",
         },
         footerHint: {
-          title: "Кликните в календаре, чтобы заблокировать одиночное окошко",
+          title: "Нажмите в календаре, чтобы закрыть одно окошко",
           body: "Разовые паузы между клиентами проще ставить прямо в расписании — не нужно создавать правило.",
         },
       },
@@ -2393,10 +2400,10 @@ export const UI_TEXT = {
     notifications: {
       breadcrumb: "Уведомления",
       title: "Уведомления",
-      subtitle: "События по работе с клиентами",
+      subtitle: "Всё по работе с клиентами",
       emptyTitle: "Здесь пока пусто",
       emptyBody:
-        "Новые записи, отзывы и сообщения от клиентов будут появляться тут. А приглашения от студий и события по аккаунту — на странице «Личные».",
+        "Новые записи, отзывы и сообщения от клиентов будут появляться тут. А приглашения от студий и новости по аккаунту — на странице «Личные».",
       personalLink: "Личные уведомления",
       markAllRead: "Прочитать всё",
       markRead: "Отметить прочитанным",
@@ -2407,20 +2414,20 @@ export const UI_TEXT = {
         unreadValueTemplate: "{unread} из {total}",
         todayLabel: "Сегодня",
         todayValueTemplate: "{count} {word}",
-        todayWordOne: "событие",
-        todayWordFew: "события",
-        todayWordMany: "событий",
+        todayWordOne: "уведомление",
+        todayWordFew: "уведомления",
+        todayWordMany: "уведомлений",
         waitingLabel: "Ждут ответа",
         waitingValueTemplate: "{count} {word}",
         waitingWordOne: "запись",
         waitingWordFew: "записи",
         waitingWordMany: "записей",
         waitingNone: "Нет ожидающих",
-        pushLabel: "Push в приложении",
+        pushLabel: "Уведомления на телефон",
         pushOn: "Включены",
         pushOff: "Выключены",
-        pushOnHint: "Дублируются автоматически",
-        pushOffCta: "Включить push",
+        pushOnHint: "Приходят автоматически",
+        pushOffCta: "Включить уведомления",
       },
       tabs: {
         all: "Все",
@@ -2431,7 +2438,7 @@ export const UI_TEXT = {
         reminder: "Напоминания",
         review: "Отзывы",
         message: "Сообщения",
-        system: "Системные",
+        system: "От платформы",
       },
       sort: {
         label: "Порядок",
@@ -2439,7 +2446,7 @@ export const UI_TEXT = {
         oldest: "Сначала старые",
       },
       notice:
-        "Это лента бизнес-событий. Они автоматически дублируются в push на телефон. Личные приглашения, биллинг и оповещения по аккаунту — на странице ",
+        "Здесь всё про клиентов и записи — то же приходит уведомлением на телефон. Приглашения, оплата и аккаунт — на странице ",
       noticeLink: "Личные уведомления",
       actions: {
         confirm: "Подтвердить",
@@ -2455,14 +2462,14 @@ export const UI_TEXT = {
         statusFinished: "Запись завершена",
         statusNoShow: "Клиент не пришёл",
         statusInProgress: "В работе",
-        statusHandled: "Уже обработано",
+        statusHandled: "Вы уже ответили",
       },
       timeAgoNow: "только что",
       timeAgoMinutes: "{n} мин назад",
       timeAgoHours: "{n} ч назад",
       timeAgoDays: "{n} дн назад",
       noticeSplit:
-        "Это лента бизнес-событий. Личные приглашения, биллинг и оповещения по аккаунту — на странице ",
+        "Здесь всё про клиентов и записи. Приглашения, оплата и аккаунт — на странице ",
       noticeSplitLink: "Личные уведомления",
       errors: {
         markRead: "Не удалось отметить прочитанным. Попробуйте ещё раз.",
@@ -2474,10 +2481,10 @@ export const UI_TEXT = {
     reviews: {
       breadcrumb: "Отзывы",
       title: "Отзывы",
-      subtitle: "Управляйте репутацией — отвечайте на отзывы и собирайте обратную связь",
+      subtitle: "Отвечайте на отзывы и слушайте клиентов — так растёт репутация",
       hero: {
         outOfFive: "/ 5",
-        basedOnTemplate: "Основано на {count} {word} · {rate}% с ответом",
+        basedOnTemplate: "По {count} {word} · вы ответили на {rate}%",
         wordOne: "отзыве",
         wordFew: "отзывах",
         wordMany: "отзывах",
@@ -2485,7 +2492,7 @@ export const UI_TEXT = {
         trendDownTemplate: "{value} за месяц",
       },
       distribution: {
-        heading: "Распределение оценок",
+        heading: "Сколько каких оценок",
         rowAria: (star: number, count: number, percent: number) =>
           `${star} звёзд: ${count} (${percent}%)`,
         rowTemplate: "{count} · {percent}%",
@@ -2505,7 +2512,7 @@ export const UI_TEXT = {
         bad: "1–3★",
       },
       card: {
-        newBadge: "new",
+        newBadge: "новый",
         unansweredBadge: "без ответа",
         answeredBadge: "ответ есть",
         replyCta: "Ответить",
@@ -2521,9 +2528,9 @@ export const UI_TEXT = {
         submitCreate: "Опубликовать",
         submitEdit: "Сохранить",
         savingCreate: "Публикация…",
-        savingEdit: "Сохранение…",
+        savingEdit: "Сохраняем…",
         quickReplies: [
-          "Спасибо за отзыв! 🙏",
+          "Спасибо за отзыв 🙏",
           "Будем рады видеть снова",
           "Извините за неудобство",
         ],
@@ -2599,7 +2606,7 @@ export const UI_TEXT = {
         emptyResetCta: "Сбросить фильтры",
         backToList: "К списку",
         noVisits: "Без визитов",
-        visitsTemplate: "{n} {word} · посл. {when}",
+        visitsTemplate: "{n} {word} · последний {when}",
         visitWordOne: "визит",
         visitWordFew: "визита",
         visitWordMany: "визитов",
@@ -2619,14 +2626,14 @@ export const UI_TEXT = {
         tooltips: {
           new: "Первый визит в течение 30 дней или ещё нет завершённых записей.",
           regular: "5 или больше завершённых записей у вас.",
-          vip: "Сумма расходов клиента от 50 000 ₽.",
+          vip: "Оставил у вас от 50 000 ₽.",
           sleeping: "Был хотя бы один визит, но более 90 дней назад.",
         },
       },
       detail: {
         emptyTitle: "Выберите клиента",
         emptyBody:
-          "Кликните на клиента из списка слева — посмотрите его историю и заметки.",
+          "Нажмите на клиента в списке слева — увидите его историю и заметки.",
         contactPhone: "Телефон",
         contactEmail: "Email",
         contactTelegram: "Telegram",
@@ -2640,7 +2647,7 @@ export const UI_TEXT = {
         // мастера. Параллельный indicator к auto-classified `statuses`
         // badges. Tooltip объясняет смысл «они в моём pool но не были
         // выбраны — можно повторно пригласить».
-        modelApplicantBadge: "Откликался на модельные",
+        modelApplicantBadge: "Откликался на предложения для моделей",
         modelApplicantTooltipTemplate:
           "Клиент откликался на ваши модельные предложения {count} {plural}, но не был выбран. Контакт сохранён — можно пригласить снова.",
         modelApplicantPluralOne: "раз",
@@ -2655,12 +2662,12 @@ export const UI_TEXT = {
         // disabled (it's not «работа в процессе», it's «уже есть
         // автоматическое»).
         addTagDisabled: "Категории назначаются автоматически по истории визитов.",
-        addTagLabel: "тег",
+        addTagLabel: "метка",
         stats: {
           visits: "Визитов",
           ltv: "Выручка",
           avgCheck: "Средний чек",
-          next: "Следующий",
+          next: "Следующий визит",
         },
         notes: {
           heading: "Заметки мастера",
@@ -2696,20 +2703,20 @@ export const UI_TEXT = {
       breadcrumb: "Модели",
       title: "Модели",
       subtitle:
-        "Опубликуйте окно для модели — клиенты подадут заявку, а вы выберете подходящую",
+        "Опубликуйте окошко для модели — клиенты подадут заявку, а вы выберете подходящую",
       kpi: {
-        activeOffersLabel: "Активные офферы",
+        activeOffersLabel: "Открытые предложения",
         activeOffersEmpty: "Опубликуйте первый",
         pendingLabel: "Ждут решения",
         pendingEmpty: "Все рассмотрены",
-        conversionLabel: "Конверсия в запись",
+        conversionLabel: "Дошли до записи",
         conversionEmpty: "—",
         archivedLabel: "В архиве",
         archivedEmpty: "—",
       },
       activeSection: {
-        heading: "Активные офферы",
-        soonAction: "Создать оффер",
+        heading: "Открытые предложения",
+        soonAction: "Создать предложение",
         soonHint: "Доступно скоро",
       },
       pendingSection: {
@@ -2717,15 +2724,15 @@ export const UI_TEXT = {
         countTemplateOne: "{count} заявка",
         countTemplateFew: "{count} заявки",
         countTemplateMany: "{count} заявок",
-        filterLabel: "По офферу",
-        filterAll: "Все офферы",
+        filterLabel: "По предложению",
+        filterAll: "Все предложения",
         filterReset: "Сбросить фильтр",
       },
       archiveSection: {
         heading: "Архив",
-        countTemplateOne: "{count} оффер",
-        countTemplateFew: "{count} оффера",
-        countTemplateMany: "{count} офферов",
+        countTemplateOne: "{count} предложение",
+        countTemplateFew: "{count} предложения",
+        countTemplateMany: "{count} предложений",
       },
       offerCard: {
         durationTemplate: "{minutes} мин",
@@ -2743,19 +2750,19 @@ export const UI_TEXT = {
         requirementsEmpty: "Без особых условий",
         actions: {
           edit: "Редактировать",
-          editLockedHint: "Нельзя редактировать после поданных заявок",
-          close: "Закрыть оффер",
+          editLockedHint: "Пока есть заявки, менять нельзя",
+          close: "Закрыть предложение",
           archive: "В архив",
-          confirmClose: "Закрыть оффер?",
+          confirmClose: "Закрыть предложение?",
           confirmCloseWithAppsTemplate:
-            "Закрыть оффер? {count} активных заявок будут отклонены — клиенты получат уведомление.",
-          confirmArchive: "Архивировать оффер? Он исчезнет из активных списков.",
-          errorClose: "Не удалось закрыть оффер. Попробуйте ещё раз.",
-          errorArchive: "Не удалось архивировать оффер. Попробуйте ещё раз.",
+            "Закрыть предложение? Все заявки ({count}) будут отклонены — клиенты получат уведомление.",
+          confirmArchive: "Убрать в архив? Предложение уйдёт из открытых.",
+          errorClose: "Не удалось закрыть предложение. Попробуйте ещё раз.",
+          errorArchive: "Не удалось убрать предложение в архив. Попробуйте ещё раз.",
         },
         status: {
-          active: "Активен",
-          closed: "Закрыт",
+          active: "Открыто",
+          closed: "Закрыто",
           archived: "В архиве",
         },
       },
@@ -2770,7 +2777,7 @@ export const UI_TEXT = {
         offerLinkTemplate: "К окошку {date} · {time}",
         actions: {
           approveQuick: "Одобрить как есть",
-          approveWithTime: "Одобрить + время",
+          approveWithTime: "Одобрить и предложить время",
           reject: "Отклонить",
           chat: "Написать клиенту",
           chatComingSoon: "Чат скоро появится",
@@ -2785,7 +2792,7 @@ export const UI_TEXT = {
       },
       modals: {
         create: {
-          title: "Новый оффер для модели",
+          title: "Новое предложение для модели",
           subtitle:
             "Опубликуйте окно — клиенты подадут заявку и приложат фото-портфолио.",
           serviceLabel: "Услуга",
@@ -2794,27 +2801,27 @@ export const UI_TEXT = {
           serviceMetaNoPrice: "{minutes} мин",
           dateLabel: "Дата",
           datePlaceholder: "ГГГГ-ММ-ДД",
-          timeStartLabel: "Начало окна",
-          timeEndLabel: "Конец окна",
+          timeStartLabel: "Начало окошка",
+          timeEndLabel: "Конец окошка",
           priceLabel: "Цена для модели",
-          pricePlaceholder: "₽ — пусто означает бесплатно",
+          pricePlaceholder: "₽ — оставьте пустым, если бесплатно",
           freeHint: "Бесплатно для модели",
           discountHintTemplate: "Скидка {percent}% от обычной цены",
           requirementsLabel: "Условия (необязательно)",
           requirementsPlaceholder: "Например: натуральные ногти",
           requirementsHelp:
-            "Нажмите Enter, чтобы добавить пункт. Максимум 5.",
-          submit: "Создать оффер",
+            "Нажмите Enter, чтобы добавить условие. Не больше пяти.",
+          submit: "Создать предложение",
           submitting: "Создание…",
           cancel: "Отмена",
-          errorCreate: "Не удалось создать оффер. Попробуйте ещё раз.",
+          errorCreate: "Не удалось создать предложение. Попробуйте ещё раз.",
         },
         edit: {
-          title: "Редактировать оффер",
-          subtitle: "Изменения мгновенно применятся ко всем будущим заявкам.",
+          title: "Изменить предложение",
+          subtitle: "Изменения сразу увидят все, кто подаст заявку.",
           submit: "Сохранить",
-          submitting: "Сохранение…",
-          errorUpdate: "Не удалось обновить оффер. Попробуйте ещё раз.",
+          submitting: "Сохраняем…",
+          errorUpdate: "Не удалось обновить предложение. Попробуйте ещё раз.",
         },
         reject: {
           title: "Отклонить заявку",
@@ -2824,7 +2831,7 @@ export const UI_TEXT = {
           reasonChips: {
             experience: "Не подходит по опыту",
             photos: "Недостаточно фото",
-            time: "Время не удобно",
+            time: "Время не подходит",
             other: "Другое",
           },
           customLabel: "Опишите причину",
@@ -2842,9 +2849,9 @@ export const UI_TEXT = {
           slotsLabel: "Свободные окошки (30 мин)",
           slotsLoading: "Загрузка…",
           slotsEmpty:
-            "Нет свободных окошек в этом диапазоне. Закройте оффер или измените окно.",
+            "В этом окошке свободного времени нет. Закройте предложение или измените время.",
           footnote:
-            "После предложения клиент сможет подтвердить и автоматически создаст запись.",
+            "Клиент подтвердит время — и запись создастся сама.",
           submit: "Предложить время",
           submitting: "Отправка…",
           cancel: "Отмена",
@@ -2857,18 +2864,18 @@ export const UI_TEXT = {
       empty: {
         offersTitle: "Здесь пока пусто",
         offersBody:
-          "Когда опубликуете первый оффер для моделей — он появится здесь. На каждом оффере увидите заявки от клиентов и сможете выбрать подходящую.",
+          "Когда опубликуете первое предложение для моделей — оно появится здесь. У каждого предложения вы увидите заявки клиентов и сможете выбрать подходящую.",
         applicationsTitle: "Нет новых заявок",
         applicationsBody:
-          "Активные офферы есть, но заявок пока не пришло. Поделитесь ссылкой в соцсетях — это ускорит отклик.",
+          "Открытые предложения есть, но заявок пока не пришло. Поделитесь ссылкой в соцсетях — это ускорит отклик.",
         applicationsBodyFiltered:
-          "Под выбранный фильтр заявок пока нет. Попробуйте сбросить фильтр или посмотреть другие офферы.",
+          "Под выбранный фильтр заявок пока нет. Попробуйте сбросить фильтр или посмотреть другие предложения.",
       },
     },
     analytics: {
       breadcrumb: "Аналитика",
       title: "Аналитика",
-      subtitle: "Тренды бизнеса и инсайты для роста",
+      subtitle: "Как идут дела и что можно улучшить",
       period: {
         chips: {
           d7: "7 дней",
@@ -2892,27 +2899,27 @@ export const UI_TEXT = {
         utilizationLabel: "Загрузка",
         prevTemplate: "было {value}",
         prevNoData: "нет данных за прошлый период",
-        ppShort: "п.п.",
-        ofMaxHint: "относительно пика за период",
+        ppShort: "пунктов",
+        ofMaxHint: "от самого загруженного времени",
       },
       revenue: {
         heading: "Динамика выручки",
         legendCurrent: "Текущий период",
         legendPrevious: "Прошлый",
-        vsTemplate: "vs {value}",
+        vsTemplate: "было {value}",
         emptyTitle: "Пока нет выручки",
         emptyBody: "Когда появятся завершённые записи — здесь будет график.",
       },
       heatmap: {
         heading: "Загрузка по дням и часам",
-        subtitle: "Видно когда у вас пик и где дыры",
+        subtitle: "Видно, когда густо, а когда пусто",
         labelHint: "Относительно пика за период",
         legendLow: "0%",
         legendHigh: "100%",
         insightTemplate:
           "Свободные окошки в {weekday} {hour} стабильно пустуют. Запустить акцию?",
         emptyTitle: "Нет данных",
-        emptyBody: "Когда появятся записи — здесь будет тепловая карта.",
+        emptyBody: "Когда появятся записи — здесь будет карта загрузки.",
         weekdayColumnAria: "День недели",
       },
       topServices: {
@@ -2924,7 +2931,7 @@ export const UI_TEXT = {
       },
       lock: {
         title: "Доступно в PRO",
-        body: "Получите расширенную аналитику — выручка, услуги, тепловая карта.",
+        body: "Получите расширенную аналитику — доход, услуги, карта загрузки.",
         cta: "Перейти на PRO",
       },
       funnel: {
@@ -2936,7 +2943,7 @@ export const UI_TEXT = {
           returned: "Вернулись (2-й визит)",
           regular: "Стали постоянными",
         },
-        fromPreviousTemplate: "{value}% от пред.",
+        fromPreviousTemplate: "{value}% от предыдущего шага",
         emptyTitle: "Нет данных",
         emptyBody: "За выбранный период не было новых записей.",
       },
@@ -2952,10 +2959,10 @@ export const UI_TEXT = {
             "«{name}» приносит {share}% выручки, +{growthPct}% к прошлому периоду. Можно поднять цену.",
           retention_drop_title: "Возвращаемость просела",
           retention_drop_body:
-            "Только {currentPct}% клиентов возвращаются на 2-й визит. Раньше было {prevPct}%. Проверьте опыт после 1-го визита.",
+            "Только {currentPct}% клиентов возвращаются на 2-й визит. Раньше было {prevPct}%. Подумайте, что можно улучшить после первого визита.",
           avg_check_decline_title: "Средний чек снижается",
           avg_check_decline_body:
-            "Средний чек упал на {declinePct}% к прошлому периоду. Возможно, активны скидки или дешёвые услуги.",
+            "Средний чек упал на {declinePct}% к прошлому периоду. Возможно, много скидок или дешёвых услуг.",
           cancellation_high_title: "Много отмен",
           cancellation_high_body:
             "{cancelPct}% записей отменено за период. Подумайте про окно отмены или предоплату.",
@@ -2982,11 +2989,11 @@ export const UI_TEXT = {
         portfolio: "Портфолио",
       },
       preview: {
-        eyebrow: "Превью для клиента",
-        title: "Превью карточки скоро",
+        eyebrow: "Глазами клиента",
+        title: "Скоро покажем вашу карточку",
         body:
-          "Здесь будет видно, как ваша карточка выглядит для клиентов в каталоге и на странице записи. Появится после редизайна публичных страниц.",
-        footnote: "Будет обновляться автоматически при изменении любого поля",
+          "Здесь будет видно, как ваша карточка выглядит для клиентов в каталоге и на странице записи. Появится совсем скоро.",
+        footnote: "Будет обновляться сама, как только вы что-то поменяете",
       },
       editable: {
         savingLabel: "Сохраняется",
@@ -2999,20 +3006,20 @@ export const UI_TEXT = {
       header: {
         title: "Шапка профиля",
         nameLabel: "Имя для клиентов",
-        taglineLabel: "Должность / специализация",
+        taglineLabel: "Чем занимаетесь",
         taglinePlaceholder: "Например: мастер маникюра и педикюра",
-        usernameLabel: "Никнейм (для ссылки)",
+        usernameLabel: "Адрес вашей страницы",
         usernamePrefix: "masterryadom.ru/u/",
         usernameNotSet: "Будет задан автоматически",
         usernamePlaceholder: "anna-master",
         usernameHint:
-          "От 3 до 32 символов: латиница, цифры и дефис. Без пробелов и подчёркиваний.",
+          "От 3 до 32 знаков: английские буквы, цифры и дефис. Без пробелов и подчёркиваний.",
         usernameSaveCta: "Сохранить",
         usernameCancelCta: "Отмена",
         usernameUnchangedHint: "Новый никнейм совпадает с текущим.",
         usernameConfirmTitle: "Изменить никнейм?",
         usernameConfirmMessageTemplate:
-          "Новый адрес — masterryadom.ru/u/{username}. Старая ссылка будет автоматически перенаправлять на новую. Платформа хранит до 10 прошлых вариантов; после этого самые старые могут перестать работать.",
+          "Новый адрес — masterryadom.ru/u/{username}. Старая ссылка будет автоматически перенаправлять на новую. Мы помним до 10 прошлых адресов — самые старые со временем перестанут открываться.",
         usernameConfirmCta: "Изменить никнейм",
         usernameErrorTaken: "Этот никнейм уже занят. Попробуйте другой.",
         usernameErrorGeneric: "Не удалось сохранить никнейм. Попробуйте ещё раз.",
@@ -3066,9 +3073,9 @@ export const UI_TEXT = {
         mapMissingTitle: "Адрес не указан",
         mapMissingBody: "Заполните адрес, чтобы клиенты увидели вас на карте.",
         timezoneLabel: "Часовой пояс",
-        timezoneAutoHint: "По умолчанию — по городу",
+        timezoneAutoHint: "Обычно берём из города",
         timezoneHint:
-          "Время записей, напоминаний и расписания считается в этом поясе. Обычно определяется по адресу — измените, если нужно.",
+          "Время записей, напоминаний и расписания показываем по этому поясу. Обычно определяется по адресу — измените, если нужно.",
         timezoneSaving: "Сохраняем…",
         timezoneSaved: "Сохранено",
         timezoneError: "Не удалось сохранить часовой пояс. Попробуйте ещё раз.",
@@ -3077,7 +3084,7 @@ export const UI_TEXT = {
         title: "Услуги и цены",
         subtitleTemplate: "{count} услуг в {categories} категориях",
         subtitleSingleCategory: "{count} услуг в 1 категории",
-        subtitleEmpty: "Пока нет активных услуг",
+        subtitleEmpty: "Пока нет включённых услуг",
         manageCta: "Управлять услугами",
         emptyTitle: "Добавьте первую услугу",
         emptyBody: "Без услуг клиенты не смогут записаться. Это занимает 30 секунд.",
@@ -3138,7 +3145,7 @@ export const UI_TEXT = {
         body:
           "Клиенты охотнее записываются к мастерам с примерами работ. Чем больше работ — тем больше доверия.",
         cta: "Добавить работы",
-        tip1: "JPEG · PNG · WebP",
+        tip1: "Обычные фото с телефона",
         tip2: "До 10 МБ",
         tip3: "Несколько за раз",
       },
@@ -3147,12 +3154,12 @@ export const UI_TEXT = {
         dropZoneTitle: "Перетащите фото сюда",
         dropZoneSubtitle: "или нажмите, чтобы выбрать",
         dropZoneActive: "Отпустите, чтобы добавить",
-        selectFileCta: "Выбрать с диска",
-        defaultCategoryLabel: "Категория по умолчанию",
+        selectFileCta: "Выбрать фото",
+        defaultCategoryLabel: "Категория для всех фото",
         defaultCategoryHint: "Можно изменить для каждой работы отдельно",
         defaultCategoryNone: "— Без категории —",
         defaultPublicLabel: "Сразу показывать в каталоге",
-        previewRemoveAria: "Удалить из очереди",
+        previewRemoveAria: "Убрать фото",
         // UI-33: имя файла нигде не отрисовано — оно есть только в самой
         // миниатюре, поэтому очередь из трёх фото звучала как три пустых
         // элемента с одинаковой кнопкой удаления.
@@ -3164,7 +3171,7 @@ export const UI_TEXT = {
         submitting: "Загрузка…",
         errorUpload: "Не удалось загрузить файл. Попробуйте ещё раз.",
         errorSize: "Файл больше 10 МБ — выберите поменьше.",
-        errorType: "Поддерживаются JPEG, PNG и WebP.",
+        errorType: "Подойдут обычные фото — JPG, PNG или WebP.",
       },
       edit: {
         title: "Редактирование работы",
@@ -3179,25 +3186,25 @@ export const UI_TEXT = {
         categoryNone: "— Без категории —",
         servicesLabel: "Связанные услуги",
         servicesEmpty: "Не выбраны",
-        tagsLabel: "Теги",
+        tagsLabel: "Метки",
         tagsPlaceholder: "Например: френч",
         tagsHelp:
-          "Подсказки берутся из ваших ранее использованных тегов. Создание новых — скоро.",
+          "Подсказываем метки, которые вы уже ставили. Новые можно будет добавить скоро.",
         tagsNoResults: "Нет совпадений",
         isPublicLabel: "Показывать в каталоге",
         deleteCta: "Удалить работу",
         confirmDelete: "Удалить эту работу из портфолио?",
         cancel: "Отмена",
         submit: "Сохранить",
-        submitting: "Сохранение…",
+        submitting: "Сохраняем…",
         errorUpdate: "Не удалось сохранить. Попробуйте ещё раз.",
         errorDelete: "Не удалось удалить. Попробуйте ещё раз.",
       },
       crop: {
         title: "Обрезать фото",
         cancel: "Отмена",
-        submit: "Сохранить обрезку",
-        submitting: "Сохранение…",
+        submit: "Сохранить",
+        submitting: "Сохраняем…",
         errorCrop: "Не удалось сохранить обрезку. Попробуйте ещё раз.",
       },
       reorder: {
@@ -3215,18 +3222,18 @@ export const UI_TEXT = {
         account: "Аккаунт",
       },
       notifications: {
-        channelsHeading: "Каналы уведомлений",
+        channelsHeading: "Куда присылать уведомления",
         // FIX-EXTERNAL-GATING-01 (G-2): provider-neutral — the individual
         // channel rows below are each flag-gated, so the intro must not name a
         // specific provider (which could be a killed/disabled one).
         channelsSubtitle:
-          "Включите нужные каналы, чтобы получать оповещения о записях, отзывах и платежах.",
-        perEventTitle: "Настройки по типу события",
+          "Выберите, куда присылать оповещения о записях, отзывах и оплатах.",
+        perEventTitle: "Что именно присылать",
         perEventBody:
-          "Скоро здесь можно будет точечно выбирать, какие события приходят по каждому каналу отдельно.",
+          "Скоро здесь можно будет выбирать, что и куда приходит.",
       },
       security: {
-        identityHeading: "Идентификация",
+        identityHeading: "Контакты для входа",
         phoneLabel: "Телефон",
         emailLabel: "Email",
         verifiedBadge: "Подтверждён",
@@ -3246,24 +3253,27 @@ export const UI_TEXT = {
         connectionsManageInProfile:
           "Подключение и отключение аккаунтов — в вашем профиле, для входа и оповещений.",
         connectionsOpenProfile: "Открыть профиль",
-        sessionsHeading: "Активные сессии",
-        sessionsCountTemplateOne: "{count} активная сессия",
-        sessionsCountTemplateFew: "{count} активных сессии",
-        sessionsCountTemplateMany: "{count} активных сессий",
+        // COPY-BEAUTY-01 — «сессия» в бьюти-продукте читается как сеанс у
+        // мастера (см. «бесплатные сессии» у модель-офферов), поэтому здесь —
+        // «входы» и «устройства», без «разлогинит».
+        sessionsHeading: "Где вы вошли",
+        sessionsCountTemplateOne: "{count} активный вход",
+        sessionsCountTemplateFew: "{count} активных входа",
+        sessionsCountTemplateMany: "{count} активных входов",
         sessionsBody:
-          "Кнопка «Завершить другие сессии» разлогинит вас на всех остальных устройствах — например, если вы заходили с чужого телефона и забыли выйти. Текущая сессия останется активной. Подробный список устройств появится позже.",
-        revokeOthersCta: "Завершить другие сессии",
+          "Кнопка «Выйти на других устройствах» завершит вход везде, кроме этого устройства — например, если вы заходили с чужого телефона и забыли выйти. Подробный список устройств появится позже.",
+        revokeOthersCta: "Выйти на других устройствах",
         revokeOthersConfirm:
-          "Завершить все другие сессии? Текущее устройство останется в системе.",
-        revokeOthersError: "Не удалось завершить сессии. Попробуйте ещё раз.",
-        revokeOthersSuccessTemplate: "Завершено сессий: {count}",
-        revokeOthersOnlyCurrent: "Других активных сессий не найдено.",
+          "Выйти на всех других устройствах? На этом устройстве вы останетесь.",
+        revokeOthersError: "Не удалось выйти на других устройствах. Попробуйте ещё раз.",
+        revokeOthersSuccessTemplate: "Готово — вышли на других устройствах: {count}",
+        revokeOthersOnlyCurrent: "Других входов не найдено.",
       },
       account: {
         planHeading: "Тариф",
-        planTierFree: "FREE Мастер",
-        planTierPro: "PRO Мастер",
-        planTierPremium: "PREMIUM Мастер",
+        planTierFree: "FREE",
+        planTierPro: "PRO",
+        planTierPremium: "PREMIUM",
         planTierUnknown: "Тариф",
         planActiveUntilTemplate: "Активен до {date}",
         planActiveIndefinite: "Без срока окончания",
@@ -3279,16 +3289,16 @@ export const UI_TEXT = {
         roleStudio: "Студия",
         roleStudioAdmin: "Админ студии",
         roleAdmin: "Администратор",
-        roleSuperadmin: "Суперадмин",
+        roleSuperadmin: "Главный администратор",
         manageRolesCta: "Управлять ролями",
-        exportHeading: "Экспорт данных",
+        exportHeading: "Копия ваших данных",
         exportBody:
-          "Скоро вы сможете запросить копию всех своих данных в формате JSON: профиль, бронирования, отзывы, портфолио.",
+          "Скоро вы сможете запросить копию всех своих данных одним файлом: профиль, записи, отзывы, портфолио.",
         exportSoonCta: "Скоро",
-        dangerZoneHeading: "Опасная зона",
+        dangerZoneHeading: "Необратимые действия",
         dangerZoneTitle: "Удаление аккаунта",
         dangerZoneBody:
-          "Удаление аккаунта необратимо. Все личные данные будут удалены безвозвратно согласно №152-ФЗ. Историческая активность (бронирования, отзывы) сохраняется в обезличенном виде.",
+          "Удаление аккаунта необратимо. Все личные данные будут удалены безвозвратно согласно №152-ФЗ. Записи и отзывы останутся без вашего имени.",
       },
     },
     servicesPage: {
@@ -3376,21 +3386,21 @@ export const UI_TEXT = {
         priceLabel: "Цена, ₽",
         pricePlaceholder: "1500",
         descriptionLabel: "Описание (необязательно)",
-        descriptionPlaceholder: "Используется в материалах, технике, особенности",
-        isEnabledLabel: "Доступна для бронирования",
+        descriptionPlaceholder: "Расскажите про материалы, технику и особенности",
+        isEnabledLabel: "Доступна для записи",
         onlinePaymentLabel: "Принимать онлайн-оплату",
         onlinePaymentLockedHint: "Доступно в PRO",
         deleteCta: "Удалить",
-        confirmDelete: "Удалить услугу? Если есть активные записи — отключите её вместо этого.",
+        confirmDelete: "Удалить услугу? Если на неё уже записаны — лучше отключите.",
         cancel: "Отмена",
         submitCreate: "Создать",
         submitEdit: "Сохранить",
-        submitting: "Сохранение…",
+        submitting: "Сохраняем…",
         errorCreate: "Не удалось создать услугу. Попробуйте ещё раз.",
         errorUpdate: "Не удалось сохранить. Попробуйте ещё раз.",
         errorDelete: "Не удалось удалить. Попробуйте ещё раз.",
         errorHasBookings:
-          "Услугу нельзя удалить — есть активные записи. Отключите её вместо этого.",
+          "Услугу нельзя удалить — на неё уже записаны. Отключите её.",
       },
       bundle: {
         title: {
@@ -3403,20 +3413,20 @@ export const UI_TEXT = {
         servicesHint: "минимум 2",
         servicesEmpty: "Сначала создайте услуги",
         discountLabel: "Скидка",
-        discountTypeLabel: "Единица скидки",
+        discountTypeLabel: "Скидка в",
         discountTypePercent: "%",
         discountTypeFixed: "₽",
         previewSumLabel: "Сумма услуг",
         previewDiscountLabel: "Скидка",
         previewFinalLabel: "Итого",
         previewDurationLabel: "Длительность",
-        isEnabledLabel: "Доступен для бронирования",
+        isEnabledLabel: "Доступен для записи",
         deleteCta: "Удалить",
         confirmDelete: "Удалить пакет?",
         cancel: "Отмена",
         submitCreate: "Создать пакет",
         submitEdit: "Сохранить",
-        submitting: "Сохранение…",
+        submitting: "Сохраняем…",
         errorCreate: "Не удалось создать пакет. Попробуйте ещё раз.",
         errorUpdate: "Не удалось сохранить. Попробуйте ещё раз.",
         errorDelete: "Не удалось удалить пакет. Попробуйте ещё раз.",
@@ -3441,6 +3451,9 @@ export const UI_TEXT = {
         nextWeek: "Следующая неделя",
         today: "Сегодня",
         refresh: "Обновить",
+        // PWA-FIX-05 — подписанная кнопка входа в настройки со страницы
+        // расписания (CTA-инфинитив: действие со страницы, не имя раздела).
+        settings: "Настроить расписание",
       },
       kpi: {
         weekBookings: "Записей на неделе",
@@ -3452,21 +3465,21 @@ export const UI_TEXT = {
         freeTodaySlotFew: "окошка",
         freeTodaySlotMany: "окошек",
         freeTodayAfterTemplate: "после {time}",
-        freeTodayNone: "нет окон",
+        freeTodayNone: "нет окошек",
       },
       legend: {
         confirmed: "Подтверждено",
         pending: "Ожидает",
         newClient: "Новый клиент",
-        blocked: "Заблокировано",
+        blocked: "Закрыто",
       },
       dayOff: "Выходной",
       timeBlockBreak: "Перерыв",
-      timeBlockBlocked: "Заблокировано",
-      footerHintCreate: "Кликните на пустую ячейку чтобы создать запись",
+      timeBlockBlocked: "Закрыто",
+      footerHintCreate: "Нажмите на свободное место, чтобы добавить запись",
       footerUpdatedTemplate: "обновлено в {time}",
       bookingCard: {
-        newBadge: "NEW",
+        newBadge: "Новая",
         actionsAria: "Действия",
         confirm: "Подтвердить",
         decline: "Отклонить",
@@ -3495,26 +3508,26 @@ export const UI_TEXT = {
         newTimeLabel: "Новое время",
         cancel: "Отмена",
         submit: "Перенести",
-        commentLabel: "Комментарий клиенту (опционально)",
+        commentLabel: "Комментарий клиенту (необязательно)",
         commentPlaceholder: "Например: «Перенесла на час позже из-за форс-мажора»",
         submitting: "Переносим…",
         conflictError: "Это время занято — выберите другое.",
         genericError: "Не удалось перенести запись. Попробуйте ещё раз.",
-        contextLoading: "Загружаем данные брони…",
-        contextError: "Не удалось загрузить данные брони. Попробуйте обновить страницу.",
-        slotsLoading: "Загружаем свободные окна…",
-        slotsError: "Не удалось загрузить свободные окна. Попробуйте ещё раз.",
-        noSlots: "Свободных окон в этот день нет. Попробуйте другую дату.",
-        pendingTitle: "На запись уже отправлен запрос переноса",
+        contextLoading: "Загружаем запись…",
+        contextError: "Не удалось загрузить запись. Попробуйте обновить страницу.",
+        slotsLoading: "Загружаем свободные окошки…",
+        slotsError: "Не удалось загрузить свободные окошки. Попробуйте ещё раз.",
+        noSlots: "Свободных окошек в этот день нет. Попробуйте другую дату.",
+        pendingTitle: "Вы уже предложили перенос этой записи",
         pendingBody:
-          "Дождитесь ответа второй стороны — пока запрос в ожидании, новый перенос отправить нельзя.",
+          "Дождитесь ответа клиента — пока он не ответил, новый перенос отправить нельзя.",
       },
       emptyCellHint: "+ Запись",
     },
     bookings: {
       breadcrumb: "Записи",
       title: "Записи",
-      subtitle: "Воронка по статусам",
+      subtitle: "От заявки до завершённой записи",
       toolbar: {
         searchPlaceholder: "Поиск по клиенту или услуге",
         tabAll: "Все",
@@ -3525,15 +3538,15 @@ export const UI_TEXT = {
         statConfirmed: "Подтверждено",
       },
       columns: {
-        pending: { title: "Ждут подтверждения", hint: "Реагируйте за 30 мин" },
+        pending: { title: "Ждут подтверждения", hint: "Ответьте в течение 30 минут" },
         confirmed: { title: "Подтверждены", hint: "Готовы к визиту" },
         today: { title: "Сегодня", hint: "В работе" },
         done: { title: "Завершены", hint: "Запросить отзыв" },
         cancelled: { title: "Отменены", hint: "За 30 дней" },
       },
       card: {
-        newBadge: "NEW",
-        inProgressBadge: "В РАБОТЕ",
+        newBadge: "Новая",
+        inProgressBadge: "В работе",
         confirm: "Подтвердить",
         decline: "Отклонить",
         reschedule: "Перенести",
@@ -3561,11 +3574,11 @@ export const UI_TEXT = {
       confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
     },
     userChip: {
-      trialStatusTemplate: "Премиум · {days}д",
+      trialStatusTemplate: "PREMIUM · {days} дн.",
       planLabels: {
-        free: "Free",
+        free: "FREE",
         pro: "PRO",
-        premium: "Premium",
+        premium: "PREMIUM",
       },
     },
     dashboard: {
@@ -3587,7 +3600,7 @@ export const UI_TEXT = {
         todayBookingsSub: "загрузка дня",
         todayBookingsValueTemplate: "{count} из {capacity}ч",
         weekRevenue: "Выручка за неделю",
-        weekRevenueSub: "vs прошлая неделя",
+        weekRevenueSub: "к прошлой неделе",
         newClients: "Новые клиенты",
         newClientsValueTemplate: "{count} за 7д",
         returningClientsTemplate: "повторных: {count}",
@@ -3597,7 +3610,7 @@ export const UI_TEXT = {
         subtitleTemplate: "Сегодня · ещё {count} {plural}",
         seeAll: "Все записи",
         emptyTitle: "На сегодня записей нет",
-        emptyDescription: "Можно подкрутить расписание или добавить запись вручную.",
+        emptyDescription: "Можно поправить расписание или добавить запись вручную.",
         pendingBadge: "Ожидает",
         confirmAction: "Подтвердить",
         declineAction: "Отклонить",
@@ -3607,7 +3620,7 @@ export const UI_TEXT = {
         cancelAction: "Отменить",
         cancelConfirmTitle: "Отменить запись?",
         cancelConfirmMessage:
-          "Клиент получит уведомление об отмене. Действие нельзя отменить.",
+          "Клиент получит уведомление об отмене. Вернуть запись не получится.",
         cancelConfirmCta: "Отменить запись",
         cancelFailed: "Не удалось отменить запись. Попробуйте ещё раз.",
         // MASTER-DASHBOARD-FIX-A #3: tooltips for disabled actions
@@ -3615,9 +3628,9 @@ export const UI_TEXT = {
         // "less than 60 minutes before start" — UI surfaces the same
         // rule preemptively via tooltip on the disabled button.
         modifyWindowExpiredTooltip:
-          "Перенос и отмена доступны не позже чем за 60 минут до начала.",
+          "Перенести или отменить можно не позже чем за час до начала.",
         confirmWindowExpiredTooltip:
-          "Время записи уже наступило — подтверждение больше неактуально.",
+          "Время записи уже наступило — подтверждать уже поздно.",
       },
       attention: {
         title: "Требуют внимания",
@@ -3631,9 +3644,9 @@ export const UI_TEXT = {
         confirmBookingBusy: "Подтверждаем…",
         unansweredReviewTitle: "Ответить на отзыв",
         unansweredReviewCta: "Ответить",
-        freeSlotTitle: "Свободное окно {from}–{to}",
+        freeSlotTitle: "Свободное окошко {from}–{to}",
         freeSlotDescription:
-          "{minutes} мин простоя сегодня. Настройте автоматические скидки.",
+          "{minutes} мин сегодня пустуют. Настройте автоматические скидки.",
         freeSlotCta: "Настроить горящие окошки",
       },
       quickActions: {
@@ -3641,7 +3654,7 @@ export const UI_TEXT = {
         subtitle: "В одно касание",
         addBooking: "Добавить запись",
         addBookingSub: "Вручную в расписание",
-        blockTime: "Заблокировать время",
+        blockTime: "Закрыть время",
         blockTimeSub: "Перерыв или выходной",
         sharePublic: "Поделиться профилем",
         sharePublicSub: "Ссылка для соцсетей",
@@ -3663,7 +3676,7 @@ export const UI_TEXT = {
         cancel: "Отмена",
         create: "Создать запись",
         saving: "Сохраняем…",
-        notSoloHint: "Эта функция доступна только мастерам без студии.",
+        notSoloHint: "Так можно только мастерам, которые работают без студии.",
         invalidTime: "Не удалось создать запись. Проверьте дату и время.",
       },
       bookingActions: {
@@ -3687,17 +3700,17 @@ export const UI_TEXT = {
      */
     pageTitles: {
       home: { title: "Главная", subtitle: "Сводка дня и быстрые действия" },
-      bookings: { title: "Записи", subtitle: "Все клиенты, ожидающие подтверждения и подтверждённые" },
-      notifications: { title: "Уведомления", subtitle: "События по работе с клиентами" },
-      schedule: { title: "Расписание", subtitle: "Свободные окна и план дня" },
-      scheduleSettings: { title: "Настройки расписания", subtitle: "Часы работы, перерывы, исключения" },
-      clients: { title: "Клиенты", subtitle: "База клиентов и история обращений" },
+      bookings: { title: "Записи", subtitle: "Ждут подтверждения и уже подтверждённые" },
+      notifications: { title: "Уведомления", subtitle: "Всё по работе с клиентами" },
+      schedule: { title: "Расписание", subtitle: "Свободные окошки и план дня" },
+      scheduleSettings: { title: "Настройки расписания", subtitle: "Часы работы, перерывы, особые дни" },
+      clients: { title: "Клиенты", subtitle: "Ваши клиенты и история визитов" },
       reviews: { title: "Отзывы", subtitle: "Оценки и обратная связь от клиентов" },
       analytics: { title: "Аналитика", subtitle: "Динамика выручки и поведение клиентов" },
       profile: { title: "Мой профиль", subtitle: "Имя, услуги, портфолио и публичная страница" },
-      accountSettings: { title: "Настройки аккаунта", subtitle: "Безопасность, уведомления, биллинг" },
-      modelOffers: { title: "Модели", subtitle: "Поиск и заявки на бесплатные сессии" },
-      billing: { title: "Подписка", subtitle: "Тариф и история платежей" },
+      accountSettings: { title: "Настройки аккаунта", subtitle: "Безопасность, уведомления, подписка" },
+      modelOffers: { title: "Модели", subtitle: "Поиск моделей на бесплатные процедуры" },
+      billing: { title: "Подписка", subtitle: "Ваш тариф и платежи" },
       fallback: { title: "Кабинет мастера", subtitle: "" },
     },
   },
@@ -3725,14 +3738,14 @@ export const UI_TEXT = {
       lockedHint: "Доступно с тарифа PRO",
       settings: "Настройки",
       settingsProfile: "Профиль",
-      settingsFeatures: "Функции",
+      settingsFeatures: "Возможности",
       settingsPublic: "Публичная страница",
       settingsBilling: "Тариф",
     },
     clients: {
       title: "Клиенты",
       subtitle: "База клиентов по вашим записям",
-      loading: "Загрузка клиентов…",
+      loading: "Загружаем клиентов…",
       loadFailed: "Не удалось загрузить клиентов. Попробуйте ещё раз.",
       daysAgo: (n: number) => {
         const mod10 = n % 10;
@@ -3746,7 +3759,7 @@ export const UI_TEXT = {
     bookingsPage: {
       title: "Записи",
       subtitle: "Ваши записи",
-      loading: "Загрузка записей…",
+      loading: "Загружаем записи…",
       loadFailed: "Не удалось загрузить записи. Попробуйте ещё раз.",
       searchPlaceholder: "Имя клиента или услуга",
       filterAll: "Все",
@@ -3758,7 +3771,7 @@ export const UI_TEXT = {
       emptyTodayHint: "Отдыхайте или создайте горящее окошко",
       emptyTodayCta: "Горящее окошко",
       empty: "Записей нет",
-      emptyHint: "Записи появятся после первых бронирований",
+      emptyHint: "Записи появятся после первых клиентов",
       confirm: "Подтвердить",
       reject: "Отклонить",
       confirming: "Подтверждение…",
@@ -3777,7 +3790,7 @@ export const UI_TEXT = {
       title: "Советы для роста",
       refresh: "Обновить",
       refreshing: "Обновляем…",
-      staleSuccess: "Всё отлично!",
+      staleSuccess: "Всё отлично",
       aiInsightTitle: "Совет от ИИ",
       errors: {
         load: "Не удалось загрузить советы. Попробуйте ещё раз.",
@@ -3786,19 +3799,19 @@ export const UI_TEXT = {
     },
     notifications: {
       title: "Центр уведомлений",
-      subtitle: "Приглашения и события по вашему кабинету",
-      timelineTitle: "Лента событий",
-      timelineSoon: "Новые события будут отображаться здесь.",
+      subtitle: "Приглашения и новости по вашему кабинету",
+      timelineTitle: "Что происходило",
+      timelineSoon: "Новые уведомления появятся здесь.",
       filterAll: "Все",
       filterBookings: "Записи",
-      filterSystem: "Система",
+      filterSystem: "От платформы",
       bookingCreatedLabel: "Новая запись",
       bookingCancelledLabel: "Отмена записи",
       bookingRescheduledLabel: "Перенос записи",
-      systemLabel: "Системное уведомление",
+      systemLabel: "Сообщение от платформы",
       newBadge: "Новое",
-      publishHotWindow: "Опубликовать как «Горящее окно»",
-      hotWindowUnavailable: "Публикация «горящего окна» пока недоступна",
+      publishHotWindow: "Опубликовать как «Горящее окошко»",
+      hotWindowUnavailable: "Горящее окошко пока опубликовать нельзя",
       markAllRead: "Отметить всё прочитанным",
       actionFailed: "Не удалось выполнить действие. Попробуйте ещё раз.",
       networkError: "Сеть недоступна или сервер не отвечает",
@@ -3828,12 +3841,12 @@ export const UI_TEXT = {
         loadDay: "Не удалось загрузить данные дня. Попробуйте ещё раз.",
         loadSlots: "Не удалось загрузить свободные окошки. Попробуйте ещё раз.",
         commentRequired: "Комментарий обязателен",
-        updateStatus: "Не удалось обновить статус. Попробуйте ещё раз.",
+        updateStatus: "Не удалось изменить запись. Попробуйте ещё раз.",
         createBooking: "Не удалось создать запись. Попробуйте ещё раз.",
         createImage: "Не удалось создать изображение. Попробуйте ещё раз.",
-        saveStories: "Не удалось сохранить stories. Попробуйте ещё раз.",
+        saveStories: "Не удалось сохранить сторис. Попробуйте ещё раз.",
         bookingDurationUnknown: "Не удалось определить длительность записи. Попробуйте ещё раз.",
-        invalidStartDateTime: "Некорректная дата или время начала",
+        invalidStartDateTime: "Проверьте дату и время начала",
         sendRescheduleRequest: "Не удалось отправить запрос на перенос. Попробуйте ещё раз.",
       },
       prompts: {
@@ -3846,37 +3859,37 @@ export const UI_TEXT = {
         dayTitle: "Мой день",
         newBookings: "Новые",
         addBooking: "Добавить запись",
-        addBookingDisabled: "Добавление записи доступно администратору студии",
+        addBookingDisabled: "Записывать клиентов может администратор студии",
         manualBookingButton: "Записать клиента вручную",
         todayOff: "Сегодня выходной",
         change: "Изменить",
-        workingHoursToday: "Рабочее время сегодня: {start}–{end} • буфер {buffer} {minutes}",
+        workingHoursToday: "Рабочее время сегодня: {start}–{end} • пауза {buffer} {minutes}",
         workingHoursNotSet: "Рабочее время не настроено",
         setup: "Настроить",
         silenceBadge: "🤫 Тишина",
         chat: "Чат",
         emptyBookingsTitle: "Пока нет записей",
         emptyBookingsDesc: "На сегодня записей нет. Можно добавить запись вручную или проверить расписание.",
-        balanceTitle: "Мой баланс (месяц)",
+        balanceTitle: "Доход за месяц",
         balanceToggleAria: "Скрыть или показать баланс",
         hideBalance: "Скрыть",
         showBalance: "Показать",
         nextSlotsTitle: "Ближайшие свободные окошки",
         refresh: "Обновить",
         refreshSlotsAria: "Обновить окошки",
-        publishStories: "Опубликовать в Stories",
-        slotsLoading: "Загрузка окошек…",
+        publishStories: "Опубликовать в сторис",
+        slotsLoading: "Загружаем окошки…",
         notificationsTitle: "Уведомления (новые отзывы)",
         noReviews: "Пока отзывов нет.",
-        slotsOnDate: "Окна на {date}",
+        slotsOnDate: "Окошки на {date}",
         savedCardsTitle: "Сохранённые карточки",
       },
       freeSlots: {
-        title: "Свободные окна сегодня",
+        title: "Свободные окошки сегодня",
         empty: "Сегодня всё занято 🎉",
         allFit: "{duration} мин",
         partialFit: "до {duration} мин",
-        roundingExact: "Точное",
+        roundingExact: "Точное время",
         rounding30min: "30 мин",
         rounding1hour: "1 час",
       },
@@ -3884,11 +3897,11 @@ export const UI_TEXT = {
         brand: "МастерРядом",
         slotsTitle: "Свободные окошки · {date}",
         cardTitle: "Карточка {index}/{total}",
-        saveToMedia: "Сохранить в медиа",
-        download: "Скачать PNG",
+        saveToMedia: "Сохранить в галерею",
+        download: "Скачать картинку",
         share: "Поделиться",
         previewTitle: "Создать сторис",
-        cardAlt: "Карточка Stories",
+        cardAlt: "Карточка для сторис",
         allServices: "Все услуги",
         bgGradient: "Градиент",
         bgLight: "Светлый",
@@ -3897,7 +3910,7 @@ export const UI_TEXT = {
         moreSlots: "и ещё {n} окошек",
         noSlots: "Нет свободных окошек",
         today: "Сегодня",
-        generating: "Генерируем…",
+        generating: "Готовим карточку…",
       },
       dateNav: {
         today: "Сегодня",
@@ -3906,7 +3919,7 @@ export const UI_TEXT = {
         refresh: "Обновить",
       },
       manualBooking: {
-        title: "Ручная запись",
+        title: "Записать клиента",
         chooseService: "Выберите услугу",
         clientNamePlaceholder: "Имя клиента",
         phonePlaceholder: "Телефон",
@@ -3915,7 +3928,7 @@ export const UI_TEXT = {
       },
       status: {
         pending: "Ожидает подтверждения",
-        changeRequested: "Ожидает решения второй стороны",
+        changeRequested: "Ждём ответа по переносу",
         inProgress: "В процессе",
         finished: "Завершено",
         confirmed: "Подтверждено",
@@ -3931,22 +3944,22 @@ export const UI_TEXT = {
     },
     modelOffers: {
       status: {
-        active: "Активен",
+        active: "Открыто",
         closed: "Закрыт",
         archived: "Архив",
       },
-      noCategoryWarning: "Сначала добавь категории к своим услугам",
+      noCategoryWarning: "Сначала добавьте категории к своим услугам",
       goToServices: "Перейти к услугам →",
       messages: {
         uncategorizedServicesWarning:
           "Сначала добавьте категорию к вашим услугам в разделе",
-        servicesSectionLink: "Профиль -> Услуги",
+        servicesSectionLink: "Профиль → Услуги",
         uncategorizedCategoryName: "Без категории",
-        loadingOffers: "Загружаем офферы…",
-        emptyTitle: "Пока нет офферов",
+        loadingOffers: "Загружаем предложения…",
+        emptyTitle: "Пока нет предложений",
         emptySubtitle: "Создайте первое объявление, чтобы найти модель на удобное время.",
         categoryFirstHint: "Сначала выберите категорию.",
-        extraBusyHint: "время на съёмку/контент",
+        extraBusyHint: "время на съёмку и фото",
         offerVisibleHint: "После публикации объявление появится в каталоге моделей.",
         servicesNotSelected: "Услуги не выбраны",
         requirementsNotProvided: "Требования не указаны",
@@ -3959,7 +3972,7 @@ export const UI_TEXT = {
       },
       create: {
         title: "Ищу модель для работы",
-        subtitle: "Расскажите что нужно модели, и объявление увидят в каталоге.",
+        subtitle: "Расскажите, что нужно модели, — и предложение увидят в каталоге.",
       },
       labels: {
         category: "Категория",
@@ -3967,7 +3980,7 @@ export const UI_TEXT = {
         date: "Дата",
         startTime: "Время начала",
         endTime: "Время окончания",
-        extraBusy: "Доп. занятость (мин.)",
+        extraBusy: "Запас времени на съёмку, мин",
         price: "Цена",
         requirements: "Требования",
       },
@@ -3983,19 +3996,19 @@ export const UI_TEXT = {
         retry: "Повторить",
       },
       validation: {
-        maxRequirements: "Максимум 5 требований.",
+        maxRequirements: "Не больше 5 требований.",
         categoryRequired: "Выберите категорию",
         serviceRequired: "Выберите услугу",
         dateRequired: "Укажите дату",
-        timeRangeRequired: "Укажите диапазон времени",
+        timeRangeRequired: "Укажите время начала и окончания",
         timeRangeInvalid: "Время начала должно быть раньше времени окончания",
-        invalidPrice: "Укажите корректную цену",
-        invalidExtraBusy: "Введите значение от 0 до 240",
+        invalidPrice: "Проверьте цену",
+        invalidExtraBusy: "Укажите от 0 до 240 минут",
         tooManyRequirements: "Можно добавить не более 5 требований",
       },
       errors: {
-        loadOffers: "Не удалось загрузить офферы. Попробуйте ещё раз.",
-        createOffer: "Не удалось создать оффер. Попробуйте ещё раз.",
+        loadOffers: "Не удалось загрузить предложения. Попробуйте ещё раз.",
+        createOffer: "Не удалось создать предложение. Попробуйте ещё раз.",
       },
       applications: {
         title: "Отклики",
@@ -4014,7 +4027,7 @@ export const UI_TEXT = {
         modal: {
           title: "Предложить время",
           timeLabel: "Время встречи",
-          range: "Доступный диапазон: {start}–{end}",
+          range: "Свободно с {start} до {end}",
           timeRequired: "Укажите время",
           cancel: "Отмена",
           submit: "Предложить",
@@ -4056,7 +4069,7 @@ export const UI_TEXT = {
         deleteCabinet: "Не удалось удалить кабинет мастера. Попробуйте ещё раз.",
         updateSettings: "Не удалось обновить настройки. Попробуйте ещё раз.",
         updateReminders: "Не удалось обновить напоминания. Попробуйте ещё раз.",
-        invalidCancellationHours: "Укажите значение от 0 до 168.",
+        invalidCancellationHours: "Укажите от 0 до 168 часов.",
         updateCancellationDeadline: "Не удалось обновить срок отмены. Попробуйте ещё раз.",
         saveServices: "Не удалось сохранить услуги. Попробуйте ещё раз.",
         displayNameRequired: "Укажите имя",
@@ -4067,7 +4080,7 @@ export const UI_TEXT = {
         proposeCategory: "Не удалось создать категорию. Попробуйте ещё раз.",
         loadAvatar: "Не удалось загрузить аватар. Попробуйте ещё раз.",
         deleteAvatar: "Не удалось удалить аватар. Попробуйте ещё раз.",
-        portfolioLimitReached: "Достигнут лимит портфолио. Удалите фото или обновите тариф.",
+        portfolioLimitReached: "В портфолио больше нет места. Удалите фото или перейдите на тариф выше.",
         uploadPhoto: "Не удалось загрузить фото. Попробуйте ещё раз.",
         savePhotoDescription: "Не удалось сохранить описание фото. Попробуйте ещё раз.",
         removePhoto: "Не удалось удалить фото из портфолио. Попробуйте ещё раз.",
@@ -4081,7 +4094,7 @@ export const UI_TEXT = {
       },
       onlinePayments: {
         proRequired: "Онлайн-оплата доступна на PRO и выше.",
-        disabledByAdmin: "Функция временно отключена администрацией",
+        disabledByAdmin: "Онлайн-оплата временно отключена",
       },
       preview: {
         nameFallback: "Имя мастера",
@@ -4095,7 +4108,7 @@ export const UI_TEXT = {
         openAsClient: "Посмотреть как клиент",
         title: "Предпросмотр витрины",
       },
-      loading: "Загрузка профиля…",
+      loading: "Загружаем профиль…",
       invite: {
         title: "Приглашение в студию",
         description: "Примите или отклоните приглашение, чтобы начать работать в студии.",
@@ -4104,7 +4117,7 @@ export const UI_TEXT = {
         profileShowcaseTitle: "Профиль и витрина",
         profileShowcaseDesc: "То, что видят клиенты в поиске и на витрине.",
         settingsTitle: "Настройки",
-        settingsDesc: "Автоматизация и внешние каналы уведомлений.",
+        settingsDesc: "Автоподтверждение записей и уведомления в мессенджерах.",
         servicesTitle: "Услуги и прайс",
         servicesDesc: "Управляйте стоимостью, длительностью и доступностью услуг.",
         portfolioTitle: "Портфолио",
@@ -4134,7 +4147,7 @@ export const UI_TEXT = {
         title: "Автоматизация",
         desc: "Настройки подтверждения записей.",
         autoConfirmTitle: "Автоподтверждение записи",
-        autoConfirmDesc: "Если включено, новые записи будут подтверждаться автоматически.",
+        autoConfirmDesc: "Новые записи будут подтверждаться сами — без вашего участия.",
       },
       reminders: {
         title: "Напоминания",
@@ -4145,15 +4158,15 @@ export const UI_TEXT = {
       cancellation: {
         title: "Политика отмены",
         desc:
-          "Клиент может отменить запись не позднее указанного срока. Пустое значение — без ограничений, 0 — отмена запрещена.",
+          "Клиент может отменить запись не позднее указанного срока. Оставьте поле пустым — отменять можно в любой момент; 0 — отмена запрещена.",
         label: "Срок отмены (часы)",
         placeholder: "Например, 24",
-        currentValue: "Текущее значение:",
+        currentValue: "Сейчас:",
         hoursShort: "ч.",
       },
       hotSlots: {
         title: "Горящие окошки",
-        desc: "Подсветите свободные окна и получите больше записей.",
+        desc: "Подсветите свободные окошки и получите больше записей.",
       },
       deleteCabinet: {
         title: "Удаление кабинета мастера",
@@ -4166,7 +4179,7 @@ export const UI_TEXT = {
       services: {
         newServiceTitle: "Новая услуга",
         hide: "Скрыть",
-        globalCategoryLabel: "Глобальная категория",
+        globalCategoryLabel: "Категория из общего каталога",
         selectCategory: "Выберите категорию",
         selectCategoryHint: "Выберите категорию, чтобы услуга отображалась на сайте.",
         categoryPendingSuffix: " (на модерации)",
@@ -4182,7 +4195,7 @@ export const UI_TEXT = {
         addService: "Добавить услугу",
         selectStudioService: "Выберите услугу из каталога студии",
         noCategoryOption: "Нет категории",
-        noCategoryHint: "Нет категории. Добавьте категорию, чтобы услуга участвовала в поиске и офферах.",
+        noCategoryHint: "Нет категории. Добавьте категорию, чтобы услуга находилась в поиске и подходила для предложений моделям.",
         addOwnCategoryCta: "+ Своя категория",
         proposeCategoryTitle: "Предложить категорию",
         proposeCategoryPlaceholder: "Название категории",
@@ -4194,16 +4207,16 @@ export const UI_TEXT = {
         columnTitle: "Название услуги",
         columnPrice: "Цена",
         columnDuration: "Длительность",
-        columnEnabled: "Вкл.",
-        priceManagedHint: "Цена управляется студией, доступен только тайминг.",
+        columnEnabled: "Показывать",
+        priceManagedHint: "Цену задаёт студия — вы меняете только длительность.",
         onlinePaymentsLabel: "Онлайн-оплата",
         addServiceCta: "+ Добавить услугу",
         emptyTitle: "Услуг пока нет",
         emptyDesc: "Добавьте услуги чтобы клиенты могли записаться",
         descriptionLabel: "Описание",
         descriptionPlaceholder: "Расскажите о процедуре, особенностях, результате",
-        suggestDescription: "Сгенерировать описание",
-        suggestDescriptionLoading: "Генерируем…",
+        suggestDescription: "Подсказать описание",
+        suggestDescriptionLoading: "Подбираем слова…",
         suggestDescriptionFailed: "Не удалось сгенерировать описание. Попробуйте ещё раз.",
       },
       bookingConfig: {
@@ -4222,12 +4235,12 @@ export const UI_TEXT = {
         required: "Обязательный",
       },
       portfolio: {
-        limitReached: "Лимит достигнут.",
+        limitReached: "Больше фото добавить нельзя.",
         plans: "Тарифы",
         dropTitle: "Перетащите фото сюда",
-        dropSubtitle: "или нажмите, чтобы выбрать файл",
+        dropSubtitle: "или нажмите, чтобы выбрать фото",
         uploadingSuffix: "— загружаем…",
-        draftLabel: "Черновик загрузки",
+        draftLabel: "Фото загружается",
         draftAlt: "Черновик фото",
         addDescription: "Добавить описание",
         photoUnavailable: "Фото недоступно",
@@ -4295,7 +4308,7 @@ export const UI_TEXT = {
     },
     reviews: {
       title: "Отзывы",
-      subtitle: "Что клиенты говорят о твоей работе",
+      subtitle: "Что клиенты говорят о вашей работе",
       rating: "Рейтинг",
       statsTitle: "Рейтинг",
       totalReviews: (n: number) => `${n} ${pluralize(n, "отзыв", "отзыва", "отзывов")}`,
@@ -4316,7 +4329,7 @@ export const UI_TEXT = {
       replyCancel: "Отмена",
       replyFailed: "Не удалось отправить ответ. Попробуйте ещё раз.",
       suggestReply: "Предложить ответ",
-      suggestReplyLoading: "Генерируем…",
+      suggestReplyLoading: "Подбираем ответ…",
       suggestReplyFailed: "Не удалось сгенерировать ответ. Попробуйте ещё раз.",
       report: "Пожаловаться",
       reportPrompt: "Причина жалобы",
@@ -4326,15 +4339,15 @@ export const UI_TEXT = {
       reportAlreadySent: "Вы уже пожаловались на этот отзыв",
       reportOwnReview: "Нельзя пожаловаться на свой отзыв",
       reportModalTitle: "Пожаловаться на отзыв",
-      reportModalDesc: "Укажите причину. Мы рассмотрим жалобу и примем меры при необходимости.",
+      reportModalDesc: "Укажите причину. Мы рассмотрим жалобу и примем меры, если нарушение подтвердится.",
       reportReasonLabel: "Причина",
       reportCommentLabel: "Дополнительно (необязательно)",
       reportCommentPlaceholder: "Опишите проблему подробнее…",
       reportSubmit: "Отправить жалобу",
       reportReasonSpam: "Спам или реклама",
       reportReasonFake: "Фейковый отзыв",
-      reportReasonOffensive: "Оскорбительный контент",
-      reportReasonInappropriate: "Неприемлемый контент",
+      reportReasonOffensive: "Оскорбления",
+      reportReasonInappropriate: "Неприемлемые фото или текст",
       reportReasonOther: "Другое",
       reportReasonPlaceholder: "— выберите причину —",
       verified: "Проверенный отзыв",
@@ -5187,7 +5200,7 @@ export const UI_TEXT = {
       deleteFailed: "Не удалось удалить фото. Попробуйте ещё раз.",
     },
     focalPoint: {
-      title: "Точка фокуса",
+      title: "Главное на фото",
       hint: "Нажмите на главный объект фото — лицо или ключевой элемент.",
       save: "Сохранить",
       skip: "Пропустить",
@@ -5201,7 +5214,7 @@ export const UI_TEXT = {
       zoomLabel: "Масштаб",
       zoomOut: "Уменьшить",
       zoomIn: "Увеличить",
-      previewLabel: "Превью",
+      previewLabel: "Предпросмотр",
       save: "Применить",
       saving: "Сохраняем…",
       skip: "Пропустить",
@@ -5211,7 +5224,7 @@ export const UI_TEXT = {
     },
     portfolio: {
       addPhoto: "Добавить фото",
-      limitReached: "Лимит достигнут",
+      limitReached: "Больше фото добавить нельзя",
       loadFailed: "Не удалось загрузить портфолио. Попробуйте ещё раз.",
       uploadFailed: "Не удалось загрузить фото. Попробуйте ещё раз.",
       deleteFailed: "Не удалось удалить фото. Попробуйте ещё раз.",
@@ -5233,7 +5246,7 @@ export const UI_TEXT = {
     },
     settings: {
       title: "Настройки",
-      subtitle: "Общее управление профилем и данными.",
+      subtitle: "Ваш профиль и настройки.",
     },
     common: {
       profile: "Профиль",
@@ -5243,7 +5256,7 @@ export const UI_TEXT = {
     },
     telegram: {
       sectionTitle: "Подключенные аккаунты",
-      sectionSubtitle: "Управляйте внешними каналами уведомлений.",
+      sectionSubtitle: "Выберите, куда присылать уведомления.",
       title: "Уведомления в Telegram",
       connected: "Подключено",
       notConnected: "Не подключено",
@@ -5256,9 +5269,9 @@ export const UI_TEXT = {
         "Нажмите «Открыть Telegram», затем запустите бота кнопкой Start, чтобы связать уведомления.",
       connectModalExpiresAt: "Ссылка действует до {datetime}.",
       connectModalOpen: "Открыть Telegram",
-      connectModalCheck: "Проверить статус",
+      connectModalCheck: "Проверить подключение",
       connectModalClose: "Закрыть",
-      loadFailed: "Не удалось загрузить статус Telegram. Попробуйте ещё раз.",
+      loadFailed: "Не удалось проверить подключение Telegram. Попробуйте ещё раз.",
       linkFailed: "Не удалось получить ссылку Telegram. Попробуйте ещё раз.",
       settingsFailed: "Не удалось обновить настройки. Попробуйте ещё раз.",
     },
@@ -5271,7 +5284,7 @@ export const UI_TEXT = {
       hint: "Если уведомления не приходят, переподключите VK.",
       connectButton: "Подключить",
       disconnectButton: "Отключить VK",
-      loadFailed: "Не удалось загрузить статус VK. Попробуйте ещё раз.",
+      loadFailed: "Не удалось проверить подключение VK. Попробуйте ещё раз.",
       linkFailed: "Не удалось подключить VK. Попробуйте ещё раз.",
       settingsFailed: "Не удалось обновить настройки. Попробуйте ещё раз.",
     },
@@ -5280,7 +5293,7 @@ export const UI_TEXT = {
       confirmed: "Подтверждено",
       cancelled: "Отменено",
       inProgress: "В процессе",
-      finished: "Завершена",
+      finished: "Завершено",
       changeRequested: "Ожидает подтверждения",
       waitsMaster: "Ожидает подтверждения мастера",
       goToMaster: "К мастеру",
@@ -5292,10 +5305,10 @@ export const UI_TEXT = {
       confirmFailed: "Не удалось подтвердить запись. Попробуйте ещё раз.",
       chooseDate: "Выберите дату",
       chooseTime: "Выберите время",
-      noSlots: "Нет доступных окошек",
+      noSlots: "Свободных окошек нет",
       loadSlotsFailed: "Не удалось загрузить окошки. Попробуйте ещё раз.",
-      submitFailed: "Не удалось отправить запись. Попробуйте ещё раз.",
-      chooseCorrectSlot: "Выберите корректное окошко",
+      submitFailed: "Не удалось создать запись. Попробуйте ещё раз.",
+      chooseCorrectSlot: "Выберите свободное окошко",
       morning: "Утро",
       day: "День",
       evening: "Вечер",
@@ -5326,13 +5339,13 @@ export const UI_TEXT = {
       publicTagsTitle: "Что понравилось больше всего (до 3 пунктов)",
       privateTagsTitle: "Что можно улучшить (до 3 пунктов)",
       privateTagsHint: "Эти отметки видит только мастер",
-      tagsLoading: "Загружаем теги…",
+      tagsLoading: "Загружаем отметки…",
       tagsLimit: "Можно выбрать до {count}",
       textPlaceholder: "Расскажите, как прошла запись — это поможет другим клиентам",
       submit: "Отправить",
       sending: "Отправляем…",
       cancel: "Отмена",
-      loadTagsFailed: "Не удалось загрузить теги. Попробуйте ещё раз.",
+      loadTagsFailed: "Не удалось загрузить отметки. Попробуйте ещё раз.",
       submitFailed: "Не удалось отправить отзыв. Попробуйте ещё раз.",
     },    profile: {
       subtitle: "Личные данные и контактная информация",
@@ -5370,17 +5383,17 @@ export const UI_TEXT = {
       address: "Адрес",
       addressPlaceholder: "Город, улица, дом…",
       mapHint:
-        "Адрес используется для отображения в вашем профиле и каталоге.",
+        "Адрес покажем в вашем профиле и в каталоге.",
       rolesLabel: "Роли:",
-      saving: "Сохранение…",
+      saving: "Сохраняем…",
       profileSectionTitle: "Личные данные",
       profileSectionSubtitle: "Основная информация, которая отображается в вашем профиле.",
       integrationsTitle: "Подключенные аккаунты",
-      integrationsSubtitle: "Управляйте внешними каналами уведомлений.",
+      integrationsSubtitle: "Выберите, куда присылать уведомления.",
       securityTitle: "Безопасность",
-      securitySubtitle: "Контроль доступа и действия с аккаунтом.",
-      securityHint: "Проверяйте подключённые каналы и номер телефона для входа.",
-      phonePlaceholder: "+7XXXXXXXXXX",
+      securitySubtitle: "Вход и безопасность аккаунта.",
+      securityHint: "Проверьте, куда приходят уведомления и с какого номера вы входите.",
+      phonePlaceholder: "+7 (___) ___-__-__",
       emailPlaceholder: "mail@example.com",
     },
     nav: {
@@ -5392,11 +5405,11 @@ export const UI_TEXT = {
       profile: "Профиль",
       settings: "Настройки",
       roles: "Роли",
-      modelApplications: "Заявки на модель",
+      modelApplications: "Заявки моделью",
       favorites: "Избранное",
       reviews: "Мои отзывы",
       notifications: "Уведомления",
-      faq: "Поддержка и FAQ",
+      faq: "Поддержка и частые вопросы",
       more: "Ещё",
       groupActivity: "Активность",
       groupAccount: "Аккаунт",
@@ -5431,8 +5444,8 @@ export const UI_TEXT = {
       // minimal mapping (no slot indicator, no portfolio carousel).
     },
     dashboard: {
-      greeting: (name: string) => `Здравствуйте, ${name}!`,
-      greetingDefault: "Добро пожаловать!",
+      greeting: (name: string) => `Здравствуйте, ${name}`,
+      greetingDefault: "Рады вас видеть",
       findMaster: "Найти мастера",
       nextBookingTitle: "Ближайшая запись",
       noUpcomingTitle: "Нет предстоящих записей",
@@ -5446,7 +5459,7 @@ export const UI_TEXT = {
         `Через ${n} ${n === 1 ? "день" : n < 5 ? "дня" : "дней"}`,
       bookingInHours: (n: number) =>
         `Через ${n} ${n === 1 ? "час" : n < 5 ? "часа" : "часов"}`,
-      loading: "Загружаем данные…",
+      loading: "Загружаем ваш кабинет…",
       loadFailed: "Не удалось загрузить данные. Попробуйте ещё раз.",
       reschedule: "Перенести",
       cancel: "Отменить",
@@ -5517,7 +5530,7 @@ export const UI_TEXT = {
     },
     notifications: {
       title: "Уведомления",
-      subtitle: "Записи, напоминания, отзывы и системные события",
+      subtitle: "Записи, напоминания, отзывы и новости платформы",
       filterAll: "Все",
       filterBookings: "Записи",
       filterReminders: "Напоминания",
@@ -5525,7 +5538,7 @@ export const UI_TEXT = {
       filterPromo: "Акции",
       filterSystem: "Система",
       onlyUnread: "Только непрочитанные",
-      markAllRead: "Отметить все",
+      markAllRead: "Отметить всё прочитанным",
       markRead: "Отметить как прочитанное",
       markUnread: "Отметить как непрочитанное",
       empty: "Уведомлений нет.",
@@ -5533,15 +5546,15 @@ export const UI_TEXT = {
       actionLeaveReview: "Оставить отзыв",
       actionView: "Посмотреть",
       loadFailed: "Не удалось загрузить уведомления. Попробуйте ещё раз.",
-      markFailed: "Не удалось обновить статус. Попробуйте ещё раз.",
+      markFailed: "Не удалось отметить уведомление. Попробуйте ещё раз.",
     },
     faq: {
-      title: "Поддержка и FAQ",
+      title: "Поддержка и частые вопросы",
       subtitle: "Ответы на популярные вопросы и контакты команды",
       searchPlaceholder: "Опишите проблему или вопрос…",
       heroEyebrow: "Чем помочь?",
       heroTitle: "Найдите ответ за пару секунд",
-      heroDescription: "База знаний обновляется регулярно. Если ответа нет — напишите нам.",
+      heroDescription: "Мы регулярно добавляем новые ответы. Если ответа нет — напишите нам.",
       categoryAll: "Все",
       categoryBookings: "Записи",
       categoryPayment: "Оплата",
@@ -5635,7 +5648,7 @@ export const UI_TEXT = {
         linkedDeliveryOff: "Подключено · уведомления выключены",
       },
       completion: {
-        rail: "Заполнено профиля",
+        rail: "Профиль заполнен на",
         ofTotal: (n: number, total: number) => `${n} из ${total}`,
         checklistTitle: "Что осталось",
         items: {
@@ -5740,9 +5753,9 @@ export const UI_TEXT = {
       shareFailed: "Не удалось поделиться. Попробуйте ещё раз.",
       premiumBadge: "PREMIUM",
       availableTodayTemplate: "Сегодня свободно с {time}",
-      availableLaterTemplate: "Ближайшее окно — {date}",
-      availableNone: "Ближайших окон нет",
-      experienceTemplate: "На платформе {value}",
+      availableLaterTemplate: "Ближайшее окошко — {date}",
+      availableNone: "Свободных окошек пока нет",
+      experienceTemplate: "На МастерРядом {value}",
       experienceMonthsTemplate: "{count} мес.",
       experienceYearsTemplate: "{count} {unit}",
       yearUnitOne: "год",
@@ -5775,7 +5788,7 @@ export const UI_TEXT = {
       durationTemplate: "{minutes} мин",
       finalPriceLabel: "Цена комплекта",
       youSaveTemplate: "Экономия {amount}",
-      bookingComingSoon: "Бронирование комплектов скоро",
+      bookingComingSoon: "Запись на пакеты — скоро",
       bookingComingSoonDesc: "Сейчас доступна запись на отдельные услуги из комплекта.",
     },
     packageBooking: {
@@ -5785,9 +5798,9 @@ export const UI_TEXT = {
       componentLabel: "Услуга {index} из {total}",
       waitingPrevious: "Доступно после выбора предыдущих услуг",
       change: "Изменить",
-      noSlotsAfterPrevious: "После предыдущей услуги в этот день окон не осталось. Выберите другой день.",
+      noSlotsAfterPrevious: "После предыдущей услуги в этот день окошек не осталось. Выберите другой день.",
       startNote: "Все услуги пакета — у одного мастера, одна оплата со скидкой комплекта.",
-      proposeError: "Не удалось рассчитать пакет. Проверьте выбранное время.",
+      proposeError: "Не удалось собрать пакет. Проверьте выбранное время.",
       proposing: "Рассчитываем…",
       toReview: "Продолжить",
       networkError: "Не удалось связаться с сервером. Попробуйте ещё раз.",
@@ -5804,9 +5817,9 @@ export const UI_TEXT = {
       bookingAs: "Записываем как {name}",
       nameRequired: "Укажите имя.",
       phoneInvalid: "Проверьте номер телефона.",
-      submit: "Записать пакет",
+      submit: "Записаться на пакет",
       submitting: "Записываем…",
-      successTitle: "Пакет забронирован",
+      successTitle: "Вы записаны на пакет",
       successBody: "Все услуги пакета записаны последовательно. Мастер подтвердит запись.",
       close: "Закрыть",
     },
@@ -5871,19 +5884,19 @@ export const UI_TEXT = {
       phoneLabel: "Телефон",
       phonePlaceholder: "+79001234567",
       loginAndContinue: "Войти и продолжить",
-      success: "Запись создана — ждём вас!",
+      success: "Запись создана — ждём вас",
       submitFailed: "Не удалось создать запись. Попробуйте ещё раз.",
       // LOGIC-10: ответ «этот же запрос ещё выполняется» — не отказ и не
       // занятое время. Раньше на его месте показывался экран «время занято»,
       // хотя бронь, скорее всего, уже создана.
-      submitInFlight: "Запись уже обрабатывается. Подождите несколько секунд и обновите страницу.",
-      bookingConfigLoading: "Загружаем настройки записи…",
+      submitInFlight: "Мы уже создаём вашу запись. Подождите несколько секунд и обновите страницу.",
+      bookingConfigLoading: "Загружаем вопросы мастера…",
       bookingConfigTitle: "Вопросы для клиента",
       referencePhotoLabel: "Фото-референс",
       referencePhotoUploading: "Загружаем фото…",
       referencePhotoAlt: "Фото-референс",
       bookingAnswerPlaceholder: "Ваш ответ",
-      bookingConfigLoadFailed: "Не удалось загрузить требования записи. Попробуйте ещё раз.",
+      bookingConfigLoadFailed: "Не удалось загрузить вопросы мастера. Попробуйте ещё раз.",
       referencePhotoRequired: "Нужен фото-референс для записи.",
       requiredQuestions: "Ответьте на обязательные вопросы.",
       silentModeAria: "Хочу помолчать",
@@ -5903,13 +5916,13 @@ export const UI_TEXT = {
       prevWeek: "Предыдущая неделя",
       chooseDay: "Когда удобно?",
       chooseSlot: "Выберите время",
-      emptyForDay: "Нет доступных окон на этот день",
-      noSlotsForDay: "На выбранный день свободных окон нет.",
-      loadFailed: "Не удалось загрузить свободные окна. Попробуйте ещё раз.",
+      emptyForDay: "Свободных окошек на этот день нет",
+      noSlotsForDay: "На выбранный день свободных окошек нет.",
+      loadFailed: "Не удалось загрузить свободные окошки. Попробуйте ещё раз.",
       slotTaken: "Это время уже заняли — выберите другое.",
       hotBadge: "Горящее окошко",
       subscribeHot: "Уведомить о горящих окошках",
-      unsubscribeHot: "Подписка активна",
+      unsubscribeHot: "Вы подписаны",
       subscribeLoading: "Сохраняем…",
       // FIX-C8: дефолт кнопки подписки — только для отказа БЕЗ тела (обрыв
       // сети, 5xx). Действенные отказы («Достигнут лимит подписок.») приходят
@@ -5960,8 +5973,8 @@ export const UI_TEXT = {
         "декабря",
       ] as string[],
       slotsLoading: "Загружаем окошки…",
-      noSlotsForDay: "На этот день нет свободных окон",
-      slotsLoadFailed: "Не удалось загрузить свободные окна. Попробуйте ещё раз.",
+      noSlotsForDay: "На этот день нет свободных окошек",
+      slotsLoadFailed: "Не удалось загрузить свободные окошки. Попробуйте ещё раз.",
       summarySelectDateTime: "Выберите дату и время",
       summaryService: "Услуга",
       summaryDateTime: "Дата и время",
@@ -5971,8 +5984,8 @@ export const UI_TEXT = {
       confirmPhone: "Телефон",
       confirmComment: "Комментарий",
       confirmNoComment: "Без комментария",
-      confirmSilentMode: "Тихий режим включён",
-      successTitle: "Запись создана!",
+      confirmSilentMode: "Режим тишины включён",
+      successTitle: "Запись создана",
       successSubtitle: "Ждём вас — увидимся скоро.",
       successMyBookings: "Мои записи",
       successBackToMaster: "Вернуться к мастеру",
@@ -5988,8 +6001,8 @@ export const UI_TEXT = {
       // "мастер занят" implied the master is busy; for an exhausted today the
       // window has simply passed. `emptyDayToday` is shown when the selected day
       // is today (provider tz) and no bookable slots remain.
-      emptyDay: "Свободных окон в этот день нет",
-      emptyDayToday: "На сегодня свободных окон не осталось",
+      emptyDay: "Свободных окошек в этот день нет",
+      emptyDayToday: "На сегодня свободных окошек не осталось",
       summaryTotal: "Итого",
       summaryDateTimePending: "Выберите дату и время",
       continueCta: "Продолжить",
@@ -6016,7 +6029,7 @@ export const UI_TEXT = {
       commentPlaceholder: "Любые пожелания",
       errorPhoneInvalid: "Проверьте номер телефона.",
       errorNameRequired: "Укажите имя.",
-      errorNetwork: "Сетевая ошибка. Попробуйте ещё раз.",
+      errorNetwork: "Не удалось связаться с сервером. Попробуйте ещё раз.",
       successEyebrow: "Вы записаны",
       successHeadlineTemplate: "{name} ждёт вас",
       successConfirmationSentTo: "Подтверждение отправлено на",
@@ -6047,7 +6060,7 @@ export const UI_TEXT = {
   studioCabinet: {
     layout: {
       studioFallbackName: "Студия",
-      publicUsernameHint: "Задайте публичный username, чтобы получить ссылку",
+      publicUsernameHint: "Придумайте короткий адрес страницы — по нему клиенты вас найдут",
     },
     teamTabs: {
       all: "Все мастера",
@@ -6059,7 +6072,7 @@ export const UI_TEXT = {
       statusFree: "Свободен",
       statusBusy: "Занят",
       shiftTemplate: "Смена {start}–{end}",
-      bookingsInfoTemplate: "Записей: {count} • Следующее окно {time}",
+      bookingsInfoTemplate: "Записей: {count} • Ближайшее окошко в {time}",
       emptyActiveShifts: "Сегодня нет активных смен.",
     },
     teamAdd: {
@@ -6077,7 +6090,7 @@ export const UI_TEXT = {
       services: "Услуги и прайс",
       portfolio: "Портфолио",
       general: "Настройки записей",
-      features: "Функции",
+      features: "Возможности",
       publicPage: "Публичная страница",
       billing: "Тариф",
     },
@@ -6173,7 +6186,7 @@ export const UI_TEXT = {
     },
     calendar: {
       title: "Календарь",
-      subtitle: "Записи и блоки студии в одном месте.",
+      subtitle: "Записи и закрытое время студии в одном месте.",
       day: "День",
       week: "Неделя",
       month: "Месяц",
@@ -6181,13 +6194,13 @@ export const UI_TEXT = {
       allMasters: "Все мастера",
       allCategories: "Все категории",
       allServices: "Все услуги",
-      allStatuses: "Все статусы",
-      loading: "Загрузка календаря…",
+      allStatuses: "Все записи",
+      loading: "Загружаем календарь…",
       noMasters: "Нет мастеров",
       noMastersHint: "Сначала добавьте мастеров в команду.",
       goToTeam: "К команде",
-      blocksLabel: "Блоки",
-      noItemsForDay: "На этот день событий нет.",
+      blocksLabel: "Закрытое время",
+      noItemsForDay: "На этот день ничего нет.",
       dayDetails: "Детали дня",
       timeNotSet: "Время не указано",
       loadFailed: "Не удалось загрузить календарь. Попробуйте ещё раз.",
@@ -6195,7 +6208,7 @@ export const UI_TEXT = {
       masterScheduleDescription: "Выберите мастера и настройте его личный график.",
       masterPublished: "Профиль опубликован",
       masterHidden: "Профиль скрыт",
-      draftNote: "Черновик изменений хранится отдельно для каждого мастера, пока вы не нажмёте сохранение в его графике.",
+      draftNote: "У каждого мастера свой черновик — он не пропадёт, пока вы не сохраните его график.",
       scheduleOf: "Расписание мастера:",
       editing: "Редактируете:",
       weekdays: {
@@ -6213,7 +6226,7 @@ export const UI_TEXT = {
       subtitle: "База клиентов студии",
     },
     profile: {
-      loading: "Загрузка профиля студии…",
+      loading: "Загружаем профиль студии…",
       sectionTitle: "Профиль студии",
       portfolioTitle: "Портфолио",
       profileSaved: "Профиль сохранён",
@@ -6266,12 +6279,12 @@ export const UI_TEXT = {
       servicesTitle: "Услуги",
       servicesSubtitle: "Прайс, категории и назначение мастеров.",
       teamTitle: "Команда",
-      teamSubtitle: "Добавляйте мастеров и отслеживайте их статусы.",
+      teamSubtitle: "Добавляйте мастеров и смотрите, кто сейчас работает.",
       clientsTitle: "Клиенты",
       clientsSubtitle: "Список клиентов из записей студии.",
     },
     services: {
-      loading: "Загрузка услуг…",
+      loading: "Загружаем услуги…",
       summary: "Разделы: {categories} / Услуги: {services}",
       createSection: "Создать раздел",
       addService: "Добавить услугу",
@@ -6282,7 +6295,7 @@ export const UI_TEXT = {
       durationMin: "мин",
       currency: "₽",
       visibleInSearch: "Виден в поиске",
-      visibleInSearchHint: "Если включено, услуга отображается в каталоге и поиске.",
+      visibleInSearchHint: "Услуга будет видна в каталоге и поиске.",
       createSectionTitle: "Новый раздел",
       sectionTitlePlaceholder: "Название раздела",
       createServiceTitle: "Новая услуга",
@@ -6297,14 +6310,14 @@ export const UI_TEXT = {
       proposeCategorySent: "Категория отправлена на модерацию.",
       proposeCategoryFailed: "Не удалось отправить категорию на модерацию. Попробуйте ещё раз.",
       sectionLabel: "Раздел в студии",
-      sectionHint: "Группировка услуг в вашем кабинете",
+      sectionHint: "Так услуги сгруппированы в вашем кабинете",
       defaultSectionName: "Основные",
       autoSectionFailed: "Не удалось создать раздел. Попробуйте ещё раз.",
       assignMastersToggle: "Назначить мастеров сразу",
       noMastersHint: "Сначала добавьте мастеров студии.",
       selectAll: "Выбрать всех",
       clearSelection: "Очистить",
-      assignPartialError: "Услуга создана, но назначения мастеров сохранились частично ({failed}/{total}).",
+      assignPartialError: "Услуга создана, но не всех мастеров удалось назначить ({failed} из {total}). Проверьте список.",
       updateCategoryFailed: "Не удалось обновить категорию услуги. Попробуйте ещё раз.",
       masterFallbackName: "Мастер",
       notAssigned: "Не назначено ни одному мастеру",
@@ -6313,8 +6326,8 @@ export const UI_TEXT = {
       noCategoryBadge: "Без категории",
       savingCategory: "Сохраняем…",
       saveCategory: "Сохранить категорию",
-      activeOn: "Вкл",
-      activeOff: "Выкл",
+      activeOn: "Включена",
+      activeOff: "Выключена",
       serviceTitlePlaceholder: "Например: Маникюр с гель-лаком",
       pricePlaceholder: "1500",
       durationPlaceholder: "60",
@@ -6327,24 +6340,24 @@ export const UI_TEXT = {
       createServiceFailed: "Не удалось создать услугу. Попробуйте ещё раз.",
     },
     team: {
-      loading: "Загрузка команды…",
+      loading: "Загружаем команду…",
       mastersCount: "Мастеров: {count}",
       noLimit: "Без ограничений",
-      limitReachedMessage: "Лимит команды достигнут. Обновите тариф, чтобы добавить больше мастеров.",
+      limitReachedMessage: "На вашем тарифе больше мастеров не добавить. Перейдите на тариф выше.",
       viewPlans: "Смотреть тарифы",
       addMaster: "Добавить мастера",
       noMastersTitle: "Мастеров пока нет",
       noMastersDescription: "Пригласите первого мастера — и сразу начнёте принимать записи.",
       pending: "Ожидает подтверждения",
-      active: "Активен",
+      active: "Работает",
       addMasterTitle: "Новый мастер",
       masterNamePlaceholder: "Имя мастера",
-      phonePlaceholder: "Телефон: +7XXXXXXXXXX или 8XXXXXXXXXX",
+      phonePlaceholder: "+7 999 123-45-67",
       titlePlaceholder: "Должность",
       cancel: "Отмена",
       save: "Сохранить",
       creating: "Сохраняем…",
-      requiredError: "Имя, телефон и должность обязательны. Формат телефона: +7XXXXXXXXXX или 8XXXXXXXXXX.",
+      requiredError: "Заполните имя, телефон и должность. Телефон — в формате +7 999 123-45-67.",
       loadFailed: "Не удалось загрузить мастеров. Попробуйте ещё раз.",
       createFailed: "Не удалось добавить мастера. Попробуйте ещё раз.",
       removeFailed: "Не удалось удалить мастера из студии. Попробуйте ещё раз.",
@@ -6363,17 +6376,17 @@ export const UI_TEXT = {
       new: "Новые",
       unanswered: "Неотвеченные",
       all: "Все",
-      loading: "Загрузка отзывов…",
+      loading: "Загружаем отзывы…",
       emptyFilter: "По выбранному фильтру отзывов пока нет.",
       noText: "Без текста",
     },
     clients: {
-      loading: "Загрузка клиентов…",
-      empty: "Клиентов пока нет — список формируется автоматически из записей.",
+      loading: "Загружаем клиентов…",
+      empty: "Клиентов пока нет — они появятся сами после первых записей.",
       loadFailed: "Не удалось загрузить клиентов. Попробуйте ещё раз.",
       moneySuffix: "₽",
       upgradeTitle: "Доступно на тарифе PRO",
-      upgradeDescription: "Заметки, теги, фото работ и история визитов доступны с тарифа PRO.",
+      upgradeDescription: "Заметки, метки, фото работ и история визитов доступны с тарифа PRO.",
       upgradeCta: "Перейти к тарифам",
       columns: {
         client: "Клиент",
@@ -6394,14 +6407,14 @@ export const UI_TEXT = {
       kpis: {
         revenue: {
           label: "Выручка за 30 дней",
-          subtitle: "vs. прошлый месяц",
+          subtitle: "к прошлому месяцу",
         },
         bookings: {
           label: "Записей за 30 дней",
           averageCheckTemplate: "средний чек {amount}",
         },
         occupancy: {
-          label: "Загрузка студии",
+          label: "Загружаем студию",
           subtitle: "{count} мастеров на смене",
         },
         rating: {
@@ -6465,20 +6478,20 @@ export const UI_TEXT = {
       breadcrumb: "Настройки расписания",
       title: "Настройки расписания",
       studioSubtitle:
-        "Часы работы, правила бронирования и исключения — отдельно для каждого мастера студии.",
+        "Часы работы, правила записи и особые дни — отдельно для каждого мастера студии.",
       noMastersTitle: "Нет активных мастеров",
       noMastersHint:
-        "Чтобы настроить расписание, добавьте хотя бы одного мастера в студию и активируйте его.",
+        "Чтобы настроить расписание, добавьте в студию хотя бы одного мастера и допустите его к записи.",
       tabs: {
         hours: "Часы",
         rules: "Правила",
-        exceptions: "Исключения",
+        exceptions: "Особые дни",
         breaks: "Перерывы",
         visibility: "Видимость",
       },
       masterPicker: {
         label: "Мастер",
-        hint: "Все настройки ниже применяются к выбранному мастеру.",
+        hint: "Всё, что ниже, — про выбранного мастера.",
       },
       hours: {
         workdayAriaTemplate: "Рабочий день: {day}",
@@ -6492,7 +6505,7 @@ export const UI_TEXT = {
       rules: {
         minHoursTitle: "Минимум за",
         minHoursHint:
-          "Через сколько часов до записи клиенту нужно её создать (в часах).",
+          "За сколько часов до визита клиент должен записаться.",
         maxDaysTitle: "Максимум за",
         maxDaysHint: "На сколько дней вперёд открыта запись.",
         autoConfirmTitle: "Автоподтверждение",
@@ -6500,7 +6513,7 @@ export const UI_TEXT = {
           "Запись подтверждается автоматически без участия мастера.",
         freeCancelTitle: "Бесплатная отмена за",
         freeCancelHint:
-          "За сколько часов до записи клиент может отменить без условий (в часах).",
+          "За сколько часов до визита клиент может отменить бесплатно.",
         freeCancelToggleAria: "Включить бесплатную отмену",
         saveLabel: "Сохранить",
         savingLabel: "Сохраняем…",
@@ -6509,19 +6522,19 @@ export const UI_TEXT = {
       errors: {
         save: "Не удалось сохранить. Попробуйте ещё раз.",
         // STUDIO-SCHEDULE-SETTINGS-A Phase B — exception validation.
-        exceptionDatePast: "Дата исключения не может быть в прошлом.",
+        exceptionDatePast: "Дата особого дня не может быть в прошлом.",
         exceptionEndBeforeStart:
           "Время окончания должно быть позже времени начала.",
         exceptionDuplicateDate:
-          "Исключение на эту дату уже добавлено. Измените существующее.",
+          "Особый день на эту дату уже добавлен. Измените существующее.",
       },
       // STUDIO-SCHEDULE-SETTINGS-A Phase B — Exceptions tab.
       exceptions: {
-        emptyTitle: "Исключений пока нет",
+        emptyTitle: "Особых дней пока нет",
         emptyHint:
           "Добавьте дату, если в этот день мастер не работает или работает по другому графику.",
-        addLabel: "Добавить исключение",
-        addFormTitle: "Новое исключение",
+        addLabel: "Добавить особый день",
+        addFormTitle: "Новый особый день",
         dateLabel: "Дата",
         workdayToggle: "Мастер работает",
         fromLabel: "с",
@@ -6531,8 +6544,8 @@ export const UI_TEXT = {
         confirmAddLabel: "Сохранить",
         cancelLabel: "Отмена",
         savingLabel: "Сохраняем…",
-        savedHint: "Исключения сохранены.",
-        deleteAria: "Удалить исключение",
+        savedHint: "Особые дни сохранены.",
+        deleteAria: "Удалить особый день",
         cardDayOff: "выходной",
         cardWorkingHoursTemplate: "работа {from}–{to}",
       },
@@ -6541,12 +6554,12 @@ export const UI_TEXT = {
       // editor was rolled back — single source of truth is the
       // schedule editor itself).
       breaks: {
-        bufferTitle: "Перерыв между записями",
+        bufferTitle: "Пауза между записями",
         bufferHint:
-          "Минут после каждой записи, в которые не примем следующую.",
+          "Сколько минут после каждой записи не принимать следующую — на уборку и подготовку.",
         minutesSuffix: "мин",
         recurringBreaksHint:
-          "Регулярные перерывы (например, обед) задаются прямо в расписании на вкладке «Часы». Здесь — только буфер между записями.",
+          "Регулярные перерывы (например, обед) задаются прямо в расписании на вкладке «Часы». Здесь — только пауза между записями.",
         saveLabel: "Сохранить",
         savingLabel: "Сохраняем…",
         savedHint: "Настройка сохранена.",
@@ -6556,16 +6569,16 @@ export const UI_TEXT = {
         publishedTitle: "Виден в каталоге",
         publishedHint:
           "Если выключить, мастер не появится в публичном поиске и каталоге.",
-        slotPrecisionTitle: "Точность слотов",
+        slotPrecisionTitle: "Точность времени",
         slotPrecisionHint:
-          "Что видит клиент в каталоге — конкретное время / занятость дня / только даты.",
+          "Что видит клиент в каталоге: точное время, «сегодня свободно» или только даты.",
         slotPrecisionLabels: {
           exact: "Точное время",
           today_free: "Сегодня свободно",
           date_only: "Только дата",
         },
-        visibleSlotDaysTitle: "Горизонт слотов",
-        visibleSlotDaysHint: "Сколько дней вперёд клиент видит свободные слоты.",
+        visibleSlotDaysTitle: "Сколько окошек вперёд",
+        visibleSlotDaysHint: "Сколько дней вперёд клиент видит свободные окошки.",
         acceptNewClientsTitle: "Принимает новых клиентов",
         acceptNewClientsHint:
           "Если выключить, новые клиенты не смогут записаться. Существующие — смогут.",
@@ -6587,11 +6600,11 @@ export const UI_TEXT = {
         refreshedAtTemplate: "обновлено {time}",
         addBooking: "Добавить запись",
         manageBreaks: "Перерывы",
-        salonTimeNote: "Время салона",
+        salonTimeNote: "Время студии",
       },
       breakDialog: {
         title: "Перерывы мастеров",
-        subtitle: "Управляйте перерывами и блоками рабочего времени для текущего дня.",
+        subtitle: "Перерывы и закрытое время мастеров на этот день.",
         existingTitle: "Перерывы дня",
         addTitle: "Новый перерыв",
         masterLabel: "Мастер",
@@ -6613,7 +6626,7 @@ export const UI_TEXT = {
         revenueSubtitle: "сумма по записям",
         occupancy: "Загрузка",
         occupancyContextTemplate: "{masters} мастеров на смене",
-        freeWindows: "Свободные окна",
+        freeWindows: "Свободные окошки",
         freeWindowsHint: "до конца дня",
       },
       legend: {
@@ -6636,7 +6649,7 @@ export const UI_TEXT = {
       // TZ-DISPLAY-SALON-PARITY-01: the datetime-local inputs in the
       // create/move dialogs are edited as SALON-local wall-clock (converted
       // via salon tz), so a cross-tz admin knows they're not editing browser tz.
-      salonTimeInputHint: "время салона",
+      salonTimeInputHint: "время студии",
       actions: {
         menuTitle: "Действия с записью",
         // STUDIO-CLEANUP-FIX-A #1г: `details` key removed alongside
@@ -6708,17 +6721,17 @@ export const UI_TEXT = {
       },
       errors: {
         create: "Не удалось создать запись. Попробуйте ещё раз.",
-        move: "Не удалось перенести запись. Возможно, конфликт времени.",
+        move: "Не удалось перенести запись. Возможно, это время уже занято.",
         cancel: "Не удалось отменить запись. Попробуйте ещё раз.",
         // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline of a client-proposed
         // reschedule failed (e.g. the new time now conflicts).
         bookingReschedule:
-          "Не удалось выполнить действие. Попробуйте ещё раз.",
+          "Не удалось ответить на перенос. Попробуйте ещё раз.",
         masterRequired: "Выберите мастера.",
         serviceRequired: "Выберите услугу.",
         clientNameRequired: "Укажите имя клиента.",
         clientPhoneRequired: "Укажите телефон клиента.",
-        clientPhoneInvalid: "Некорректный номер телефона.",
+        clientPhoneInvalid: "Проверьте номер телефона.",
         // STUDIO-BOOKINGS-FIX-A #3б: explicit error when the header
         // «Новая запись» button is used but the studio admin didn't
         // pick a time. Pre-fix the form fell back to generic «create»
@@ -6748,14 +6761,14 @@ export const UI_TEXT = {
         averageCheckDelta: "за 30 дней",
         withoutMaster: "Услуги без мастера",
         withoutMasterContext: "все услуги назначены",
-        withoutMasterWarn: "требуют назначения",
+        withoutMasterWarn: "нужен мастер",
       },
       categories: {
         title: "Категории",
         addCategory: "Категория",
         empty: "Создайте первую категорию",
-        pendingBadge: "PENDING",
-        pendingHint: "Категория на модерации — видна только вам, пока админ не одобрит",
+        pendingBadge: "На модерации",
+        pendingHint: "Категория на модерации — видна только вам, пока мы её не одобрим",
         // STUDIO-SERVICES-SORT-A: «Скрыть пустые» toggle label +
         // actionable hint when every category is hidden by the
         // filter (admin can switch off, or add services).
@@ -6773,10 +6786,10 @@ export const UI_TEXT = {
         noMasterBadge: "без мастера",
       },
       detail: {
-        caption: "УСЛУГА · S{id}",
+        caption: "УСЛУГА",
         empty: {
           title: "Выберите услугу",
-          hint: "Кликните по услуге слева, чтобы редактировать её параметры.",
+          hint: "Выберите услугу слева, чтобы изменить цену и время.",
         },
         nameLabel: "Название",
         priceLabel: "Цена, ₽",
@@ -6785,8 +6798,8 @@ export const UI_TEXT = {
         categoryNone: "— Без категории —",
         pendingSuffix: "на модерации",
         isActiveLabel: "Услуга активна",
-        isActiveHint: "Выключенные услуги не показываются в записи и каталоге.",
-        mastersLabel: "Мастера, оказывающие услугу · {count}",
+        isActiveHint: "Выключенную услугу не видно в каталоге, и записаться на неё нельзя.",
+        mastersLabel: "Кто делает эту услугу · {count}",
         mastersEmpty: "Назначьте хотя бы одного мастера, чтобы клиенты могли записаться.",
         assignMaster: "Назначить мастера",
         unassignMaster: "Снять мастера",
@@ -6809,7 +6822,7 @@ export const UI_TEXT = {
         pendingSuffix: "на модерации",
         proposeCategory: "Новая категория",
         proposeHint:
-          "Категория будет создана со статусом «на модерации». Вы сможете сразу привязать к ней услугу.",
+          "Категорию проверит модератор. Услугу можно добавить в неё сразу.",
         proposePlaceholder: "Например: Ногти",
         proposeSubmit: "Создать",
         proposeSubmitting: "Создаём…",
@@ -6832,7 +6845,7 @@ export const UI_TEXT = {
         subtitle: "Выберите мастера — он сможет оказывать эту услугу.",
         masterLabel: "Мастер",
         noAvailable:
-          "Все доступные мастера уже назначены. Мастера с приглашением в ожидании появятся в списке после принятия.",
+          "Все мастера уже назначены. Приглашённые появятся здесь, когда примут приглашение.",
         cancel: "Отмена",
         submit: "Назначить",
         submitting: "Назначаем…",
@@ -6847,8 +6860,8 @@ export const UI_TEXT = {
       },
       errors: {
         titleRequired: "Укажите название услуги.",
-        priceInvalid: "Цена должна быть неотрицательным числом.",
-        durationInvalid: "Длительность должна быть положительным числом.",
+        priceInvalid: "Укажите цену — 0 или больше.",
+        durationInvalid: "Укажите, сколько минут занимает услуга.",
         categoryRequired: "Выберите категорию.",
         masterRequired: "Выберите мастера.",
         categoryTitleRequired: "Укажите название категории.",
@@ -6880,7 +6893,7 @@ export const UI_TEXT = {
         componentsLabel: "Состав · {count} услуг",
         componentDisabled: "выключена",
         warningDisabledComponents:
-          "В пакете есть выключенные услуги — клиент не сможет забронировать его.",
+          "В пакете есть выключенные услуги — клиент не сможет на него записаться.",
         finalPriceLabel: "Цена пакета",
         savingsTemplate: "выгода {amount}",
         durationTemplate: "{min} мин",
@@ -6893,12 +6906,12 @@ export const UI_TEXT = {
         servicesLabel: "Услуги в пакете",
         servicesEmpty:
           "Сначала добавьте услуги в прайс — без них пакет не создать.",
-        minServicesHint: "Минимум 2 услуги. Клиент бронирует пакет целиком.",
+        minServicesHint: "Минимум 2 услуги. Клиент записывается на весь пакет сразу.",
         minShort: "мин",
         disabledTag: "выключена",
         discountLabel: "Скидка пакета",
         discountPercent: "Процент",
-        discountFixed: "Фикс ₽",
+        discountFixed: "Сумма, ₽",
         previewTotal: "Сумма услуг",
         previewDiscount: "Скидка",
         previewFinal: "Итоговая цена",
@@ -6922,7 +6935,7 @@ export const UI_TEXT = {
       header: {
         caption: "ВСЕ ЗАПИСИ · {count} на экране",
         title: "Журнал записей",
-        subtitle: "Все записи всех мастеров. Фильтруйте по статусу, мастеру, времени.",
+        subtitle: "Все записи всех мастеров. Отбирайте по мастеру, времени и состоянию записи.",
         newBooking: "Новая запись",
       },
       kpis: {
@@ -6944,7 +6957,7 @@ export const UI_TEXT = {
           week: "Неделя",
           all: "Все",
         },
-        statusAll: "Все статусы",
+        statusAll: "Все записи",
         masterAll: "Все мастера",
         searchPlaceholder: "Поиск клиента или услуги",
         statusLabels: {
@@ -6968,7 +6981,7 @@ export const UI_TEXT = {
         colService: "Услуга",
         colPrice: "Цена",
         colSource: "Источник",
-        colStatus: "Статус",
+        colStatus: "Состояние",
         todayPrefix: "сегодня",
         tomorrowPrefix: "завтра",
         durationTemplate: "{min} мин",
@@ -6988,9 +7001,9 @@ export const UI_TEXT = {
       },
       empty: {
         title: "Нет записей",
-        hint: "Записи появятся после первых бронирований.",
+        hint: "Записи появятся после первых клиентов.",
         filteredTitle: "Под фильтр ничего не попало",
-        filteredHint: "Измените параметры или сбросьте фильтры.",
+        filteredHint: "Измените условия или сбросьте фильтры.",
         resetCta: "Сбросить фильтры",
       },
       pagination: {
@@ -7012,7 +7025,7 @@ export const UI_TEXT = {
         ownerTeam: "Владелец и команда",
         notifications: "Уведомления и связь",
         policy: "Правила студии",
-        danger: "Опасная зона",
+        danger: "Необратимые действия",
       },
       portfolio: {
         cardTitle: "Портфолио",
@@ -7030,7 +7043,7 @@ export const UI_TEXT = {
           "Время записей, напоминаний и расписания студии считается в этом поясе. Обычно определяется по адресу — измените, если нужно.",
         submitting: "Сохраняем…",
         addressTitle: "Адрес и местоположение",
-        addressDesc: "Используется при бронировании и в публичной карточке.",
+        addressDesc: "Клиенты видят адрес при записи и на странице студии.",
         cityLabel: "Город",
         addressLabel: "Адрес",
         districtLabel: "Район",
@@ -7043,15 +7056,15 @@ export const UI_TEXT = {
         ownerDesc: "Только владелец может удалить студию и менять права команды.",
         ownerMissing: "Владелец не определён. Свяжитесь с поддержкой.",
         transferHint:
-          "Передача прав владения временно недоступна — нужен отдельный безопасный флоу. Появится в обновлении.",
+          "Передать студию другому владельцу пока нельзя — добавим в одном из обновлений.",
         teamTitle: "Команда управления",
         teamDesc:
           "Администраторы видят все записи студии. Мастера управляются в разделе «Мастера».",
         adminsEmpty: "Пока нет других администраторов кроме владельца.",
         inviteHint:
-          "Приглашение администраторов появится позже. Пока добавлять администраторов нельзя через интерфейс.",
+          "Приглашение администраторов появится позже. Пока приглашать администраторов нельзя — добавим позже.",
         roleOwner: "Владелец",
-        roleAdmin: "Админ",
+        roleAdmin: "Администратор",
         youChip: "Вы",
       },
       notifications: {
@@ -7066,24 +7079,24 @@ export const UI_TEXT = {
         // provider-neutral (FIX-EXTERNAL-GATING-01 G-2) and stays correct
         // whichever channels are enabled.
         channelsDesc:
-          "События студии приходят в приложение и по подключённым каналам.",
-        channelPush: "Push в приложении",
+          "Новости студии приходят в приложение и туда, куда вы подключили.",
+        channelPush: "Уведомления на телефон",
         pushEnabled: "Включены",
         pushDisabled: "Выключены",
         pushHint:
-          "Включаются автоматически при установке PWA. Per-team настройка типов появится в обновлении.",
+          "Включаются сами, когда приложение добавлено на экран телефона. Выбор уведомлений для команды появится позже.",
         telegramTitle: "Telegram",
-        telegramDesc: "Дублировать события студии в личный Telegram-чат.",
+        telegramDesc: "Присылать новости студии вам в Telegram.",
         vkTitle: "VK",
-        vkDesc: "Дублировать события в чат VK.",
+        vkDesc: "Присылать новости студии вам в VK.",
       },
       policy: {
         title: "Правила записи",
         description:
-          "Видны клиенту при бронировании. Управление — в настройках расписания мастера.",
+          "Клиент видит их при записи. Менять — в настройках расписания мастера.",
         minBookingAhead: "Минимум за",
         maxBookingAhead: "Максимум вперёд",
-        cancellationDeadline: "Окно отмены без штрафа",
+        cancellationDeadline: "Бесплатная отмена за",
         lateCancelAction: "При поздней отмене",
         acceptNewClients: "Новые клиенты",
         remindersEnabled: "Напоминания",
@@ -7095,9 +7108,9 @@ export const UI_TEXT = {
         lateActions: {
           none: "Ничего не делать",
           reminder: "Только напоминание",
-          fine: "Штраф (в разработке)",
+          fine: "Штраф (скоро)",
         },
-        editHint: "Изменить значения можно через",
+        editHint: "Изменить их можно через",
         editLink: "настройки расписания",
       },
       danger: {
@@ -7110,7 +7123,7 @@ export const UI_TEXT = {
         archivedBadge: "Архивирована",
         deleteTitle: "Удалить студию навсегда",
         deleteDesc:
-          "Все мастера будут отвязаны, записи и подписки удалены. Действие необратимо.",
+          "Мастера покинут студию, а записи и подписки будут удалены. Вернуть их нельзя.",
         deleteButton: "Удалить студию",
         deleting: "Удаляем…",
         deleteDialogTitle: "Подтвердите удаление",
@@ -7120,13 +7133,13 @@ export const UI_TEXT = {
         deleteCancel: "Отмена",
         deleteConfirm: "Удалить навсегда",
         activeBookingsError:
-          "Есть активные записи. Сначала отмените или завершите их, затем повторите.",
+          "Сначала отмените или завершите записи, которые ещё впереди.",
       },
       save: "Сохранить",
       cancel: "Отмена",
       toasts: {
         saved: "Изменения сохранены",
-        error: "Не удалось выполнить действие. Попробуйте ещё раз.",
+        error: "Не удалось сохранить настройки. Попробуйте ещё раз.",
       },
     },
     analyticsV2: {
@@ -7199,7 +7212,7 @@ export const UI_TEXT = {
         colLifetime: "Выручка",
         empty: {
           title: "Нет клиентов за период",
-          hint: "Когорты появятся при накоплении статистики.",
+          hint: "Как только записей станет больше, здесь появятся группы клиентов.",
         },
       },
     },
@@ -7208,19 +7221,19 @@ export const UI_TEXT = {
         caption: "УВЕДОМЛЕНИЯ · {unread} непрочитано из {total}",
         title: "Уведомления",
         subtitle:
-          "События студии в одной ленте. Уведомления о записях к мастеру дублируются в его личный кабинет.",
+          "Всё по студии в одной ленте. Уведомления о записях к мастеру приходят и в его личный кабинет.",
       },
       kpis: {
         unread: "Непрочитанных",
         unreadTemplate: "{count} из {total}",
         today: "Сегодня",
-        todayTemplate: "{count} событий",
+        todayTemplate: "{count} уведомлений",
         needsDecision: "Ждут решения",
         needsDecisionTemplate: "{count} от владельца",
-        push: "Push в приложении",
+        push: "Уведомления на телефон",
         pushEnabled: "Включены",
         pushDisabled: "Выключены",
-        pushHint: "Дублируются автоматически",
+        pushHint: "Приходят автоматически",
       },
       filters: {
         all: "Все",
@@ -7232,13 +7245,13 @@ export const UI_TEXT = {
         messages: "Сообщения",
         team: "Команда",
         finance: "Финансы",
-        system: "Системные",
+        system: "От платформы",
         sortNewest: "Сначала новые",
         sortOldest: "Сначала старые",
         markAllRead: "Прочитать всё",
       },
       infoBanner:
-        "Кто из команды получает push — настраивается в {settingsLink}. Уведомления о записях к мастеру дублируются в его личный кабинет.",
+        "Кому из команды приходят уведомления на телефон — настраивается в {settingsLink}. Уведомления о записях к мастеру приходят и в его личный кабинет.",
       infoBannerLink: "Настройках студии",
       card: {
         relatesTo: "Касается",
@@ -7259,11 +7272,11 @@ export const UI_TEXT = {
       },
       empty: {
         title: "Нет уведомлений",
-        hint: "События студии появятся здесь по мере поступления.",
+        hint: "Уведомления появятся здесь, как только что-то произойдёт.",
       },
       errors: {
-        scheduleRequest: "Не удалось выполнить действие. Попробуйте ещё раз.",
-        bookingReschedule: "Не удалось обработать перенос. Попробуйте ещё раз.",
+        scheduleRequest: "Не удалось ответить на заявку. Попробуйте ещё раз.",
+        bookingReschedule: "Не удалось ответить на перенос. Попробуйте ещё раз.",
       },
     },
     reviewsV2: {
@@ -7322,7 +7335,7 @@ export const UI_TEXT = {
       toasts: {
         replyPosted: "Ответ опубликован",
         reported: "Жалоба отправлена",
-        error: "Не удалось выполнить действие. Попробуйте ещё раз.",
+        error: "Не удалось отправить ответ. Попробуйте ещё раз.",
       },
     },
     clientsV2: {
@@ -7337,12 +7350,12 @@ export const UI_TEXT = {
         totalSub: "+{count} за месяц",
         active: "Активных за 30 дней",
         activeSub: "{percent}% от базы",
-        avgLifetime: "Средняя пожизненная",
+        avgLifetime: "Приносит в среднем",
         avgLifetimeSub: "по студии в среднем",
         vip: "VIP-клиенты",
         vipSub: "{percent}% выручки",
         sleeping: "Спящие · 60+ дней",
-        sleepingSub: "потенциал реактивации",
+        sleepingSub: "их можно вернуть",
       },
       segments: {
         title: "Сегменты",
@@ -7360,8 +7373,8 @@ export const UI_TEXT = {
         colClient: "Клиент",
         colPhone: "Телефон",
         colVisits: "Визитов",
-        colLtv: "LTV",
-        colLast: "Последний",
+        colLtv: "Всего оставил",
+        colLast: "Последний визит",
         colMainMaster: "Основной мастер",
         mastersCountTemplate: "у {count} мастеров",
         avgCheckTemplate: "ср. {amount}",
@@ -7407,7 +7420,7 @@ export const UI_TEXT = {
         },
       },
       status: {
-        active: "Активен",
+        active: "Работает",
         invited: "Новый",
         disabled: "Пауза",
       },
@@ -7432,7 +7445,7 @@ export const UI_TEXT = {
       detail: {
         empty: {
           title: "Выберите мастера",
-          hint: "Кликните по карточке слева, чтобы увидеть подробности.",
+          hint: "Выберите мастера слева, чтобы посмотреть подробности.",
         },
         youChip: "Это вы",
         joinedTemplate: "в студии с {date}",
@@ -7446,7 +7459,7 @@ export const UI_TEXT = {
           schedule: "Расписание",
           publicProfile: "Публичный профиль",
           pause: "Поставить на паузу",
-          activate: "Активировать",
+          activate: "Вернуть к работе",
           // FIX-STUDIO-02 (F7): revoke a still-pending invite (INVITED status).
           revoke: "Отозвать приглашение",
         },
@@ -7464,7 +7477,7 @@ export const UI_TEXT = {
         },
         weekSchedule: {
           title: "Расписание · эта неделя",
-          subtitle: "Мастер управляет своим расписанием через подачу заявок",
+          subtitle: "Мастер меняет своё расписание через заявку вам",
           seeCalendar: "В календарь →",
           slotsTemplate: "{booked}/{total}",
           dayOff: "Выходной",
@@ -7473,7 +7486,7 @@ export const UI_TEXT = {
       inviteDialog: {
         title: "Пригласить мастера",
         // AUTH-GATE-01: see inviteCard.subtitle — no SMS is sent for invites.
-        subtitle: "Введите номер телефона — мастер появится в команде со статусом «Приглашён».",
+        subtitle: "Введите номер телефона — мастер появится в команде с пометкой «Приглашён».",
         phoneLabel: "Телефон",
         phonePlaceholder: "+7 999 123-45-67",
         nameLabel: "Имя",
@@ -7492,17 +7505,17 @@ export const UI_TEXT = {
         submitting: "Сохраняем…",
       },
       activateDialog: {
-        title: "Активировать мастера",
+        title: "Вернуть мастера к работе",
         bodyTemplate: "Мастер {name} снова сможет принимать новые записи.",
         cancel: "Отмена",
-        confirm: "Активировать",
+        confirm: "Вернуть к работе",
         submitting: "Сохраняем…",
       },
       // FIX-STUDIO-02 (F7): confirm dialog for revoking a pending invite.
       revokeDialog: {
         title: "Отозвать приглашение",
         bodyTemplate:
-          "Приглашение мастеру {name} будет отменено, а ссылка перестанет работать. Место в команде не освобождается — приглашение его не занимало.",
+          "Приглашение мастеру {name} будет отменено, а ссылка перестанет работать. Место в команде не изменится.",
         cancel: "Отмена",
         confirm: "Отозвать приглашение",
         submitting: "Отзываем…",
@@ -7512,14 +7525,14 @@ export const UI_TEXT = {
         nameRequired: "Укажите имя мастера.",
         taglineRequired: "Укажите специализацию.",
         inviteFailed: "Не удалось отправить приглашение. Попробуйте ещё раз.",
-        actionFailed: "Не удалось выполнить действие. Попробуйте ещё раз.",
+        actionFailed: "Не удалось изменить мастера. Попробуйте ещё раз.",
         // FIX-STUDIO-02 (F6): localized team-cap block. The enforcement
         // (`ensureStudioTeamLimit`) is unchanged — only the message. Says what
         // the limit is and how to raise it, instead of the raw «Limit reached».
         teamCapReached:
           "На вашем тарифе можно держать до {max} активных мастеров. Чтобы добавить больше, перейдите на тариф выше.",
         teamCapReachedGeneric:
-          "Достигнут лимит активных мастеров на вашем тарифе. Чтобы добавить больше, перейдите на тариф выше.",
+          "На вашем тарифе больше активных мастеров не добавить. Чтобы добавить, перейдите на тариф выше.",
         // FIX-STUDIO-02 (F7): revoke-invite failure.
         revokeFailed: "Не удалось отозвать приглашение. Попробуйте ещё раз.",
       },
@@ -7545,7 +7558,7 @@ export const UI_TEXT = {
       },
       preview: {
         weekTitle: "Недельный график",
-        exceptionsTitle: "Исключения",
+        exceptionsTitle: "Особые дни",
         breaksLabel: "Перерывы",
         legacyTitle: "Изменения расписания",
       },
@@ -7585,8 +7598,8 @@ export const UI_TEXT = {
     ownerViewManageCta: "Управлять студией",
     slotBar: {
       label: "ЗАПИСЬ НА УСЛУГУ",
-      headline: "Свободные окна сегодня и в ближайшие дни",
-      subline: "Выберите услугу — мы покажем доступные слоты у каждого мастера.",
+      headline: "Свободные окошки сегодня и в ближайшие дни",
+      subline: "Выберите услугу — покажем свободные окошки у каждого мастера.",
       book: "Записаться",
     },
     teamTitle: "Мастера студии",
@@ -7616,9 +7629,9 @@ export const UI_TEXT = {
     loadingStudio: "Загружаем студию…",
     loadingProfile: "Загружаем страницу студии…",
     loadFailedTitle: "Не удалось открыть страницу студии. Попробуйте ещё раз.",
-    blockLoadFailed: "Не удалось загрузить блок. Попробуйте ещё раз.",
+    blockLoadFailed: "Не удалось загрузить этот раздел. Попробуйте ещё раз.",
     profileLoadFailed: "Не удалось загрузить профиль студии. Попробуйте ещё раз.",
-    bookingLoadFailed: "Не удалось загрузить запись. Попробуйте ещё раз.",
+    bookingLoadFailed: "Не удалось открыть форму записи. Попробуйте ещё раз.",
     studioDataLoadFailed: "Не удалось загрузить данные студии. Попробуйте ещё раз.",
     servicesLoadFailed: "Не удалось загрузить услуги. Попробуйте ещё раз.",
     reviewsLoadFailed: "Не удалось загрузить отзывы. Попробуйте ещё раз.",
@@ -7630,12 +7643,12 @@ export const UI_TEXT = {
     typeStudio: "Студия",
     availableToday: "Свободно сегодня",
     noCategories: "Без категорий",
-    studioOnlyProfileError: "Профиль доступен только для студии",
+    studioOnlyProfileError: "Эта страница — только для студий",
     from: "от",
     fallbackValue: "—",
     loadingMasters: "Подбираем мастеров…",
-    loadingSlots: "Подбираем свободные окна…",
-    noSlots: "На выбранную дату свободных окон нет.",
+    loadingSlots: "Подбираем свободные окошки…",
+    noSlots: "На эту дату свободных окошек нет.",
     noMastersWithService: "По выбранной услуге пока нет доступных мастеров.",
     selectServiceFirst: "Сначала выберите услугу",
     selectMasterFirst: "Сначала выберите мастера",
@@ -7643,7 +7656,7 @@ export const UI_TEXT = {
     selectedDate: "Дата",
     selectedTime: "Время",
     bookingError: "Не удалось создать запись. Попробуйте ещё раз.",
-    bookingSuccess: "Запись создана — ждём вас!",
+    bookingSuccess: "Запись создана — ждём вас",
     authRequiredTitle: "Войдите, чтобы завершить запись",
     authRequiredText: "Нужен только номер телефона — займёт 30 секунд.",
     login: "Войти",
@@ -7693,9 +7706,9 @@ export const UI_TEXT = {
       waitingPrevious: "Доступно после выбора предыдущих услуг",
       change: "Изменить",
       slotsLoading: "Загружаем свободные окна…",
-      slotsError: "Не удалось загрузить окна. Попробуйте другой день.",
-      noSlots: "На этот день свободных окон нет.",
-      proposeError: "Не удалось рассчитать пакет. Проверьте выбранное время.",
+      slotsError: "Не удалось показать окошки. Попробуйте другой день.",
+      noSlots: "На этот день свободных окошек нет.",
+      proposeError: "Не удалось собрать пакет на это время. Выберите другое.",
       proposing: "Рассчитываем…",
       networkError: "Не удалось связаться с сервером. Попробуйте ещё раз.",
       bookError: "Не удалось записать пакет. Попробуйте ещё раз.",
@@ -7714,8 +7727,8 @@ export const UI_TEXT = {
       phoneInvalid: "Проверьте номер телефона.",
       submit: "Записать пакет",
       submitting: "Записываем…",
-      successTitle: "Пакет забронирован",
-      successBody: "Все услуги записаны последовательно. Студия подтвердит запись.",
+      successTitle: "Вы записаны на пакет",
+      successBody: "Услуги идут одна за другой. Студия подтвердит запись.",
       close: "Закрыть",
       priceNote: "Итоговая цена зависит от выбранных мастеров.",
     },
@@ -7758,7 +7771,7 @@ export const UI_TEXT = {
       title: "Кто из мастеров?",
       subtitle: "Все делают «{service}»",
       anyMaster: "Любой свободный",
-      anyMasterSub: "по ближайшему окну",
+      anyMasterSub: "по ближайшему окошку",
       pickThis: "Выбрать",
       noMasters: "По выбранной услуге пока нет доступных мастеров.",
       back: "Назад к услуге",
@@ -7766,11 +7779,11 @@ export const UI_TEXT = {
     whenStep: {
       title: "Когда вам удобно?",
       subtitleMaster: "Свободное время {master}",
-      subtitleAny: "Ближайшие окна команды",
+      subtitleAny: "Ближайшие окошки команды",
       morning: "Утро",
       day: "День",
       evening: "Вечер",
-      noSlots: "На выбранную дату свободных окон нет.",
+      noSlots: "На эту дату свободных окошек нет.",
       back: "Назад",
       today: "Сегодня",
       tomorrow: "Завтра",
@@ -7789,7 +7802,7 @@ export const UI_TEXT = {
       phoneLabel: "Телефон",
       phonePlaceholder: "+7 999 000 00 00",
       silentLabel: "Хочу помолчать",
-      silentHint: "Мастер поздоровается, уточнит детали и работает без разговоров.",
+      silentHint: "Мастер поздоровается, уточнит детали и будет работать молча.",
       commentLabel: "Комментарий",
       commentPlaceholder: "Что-то важное — расскажите",
       back: "Назад",
@@ -7824,16 +7837,16 @@ export const UI_TEXT = {
       // (outside working hours / day-off) — the old «только что заняли» falsely
       // implied someone took it. Plain "not available, pick another" reads
       // correctly for both.
-      slotTaken: "Это время недоступно для записи. Выберите другое свободное окно.",
-      tooSoon: "Запись возможна не раньше чем за {hours} ч. Выберите время позже.",
-      tooFar: "Запись возможна не далее чем на {days} дней вперёд.",
+      slotTaken: "Это время уже занято. Выберите другое свободное окошко.",
+      tooSoon: "Записаться нужно минимум за {hours} ч. Выберите время позже.",
+      tooFar: "Записаться можно максимум на {days} дней вперёд.",
       newClientsClosed: "Мастер временно не принимает новых клиентов.",
-      forbidden: "Нельзя бронировать у самого себя.",
+      forbidden: "Записаться к самому себе нельзя.",
       generic: "Не удалось создать запись. Попробуйте ещё раз.",
       networkGeneric: "Не удалось связаться с сервером. Попробуйте ещё раз.",
     },
     success: {
-      title: "Вы записаны!",
+      title: "Вы записаны",
       detailsTemplate: "{service} · {master} · {when}",
       hint: "Мы пришлём напоминание перед визитом.",
       backToStudio: "Вернуться к странице студии",
@@ -7850,7 +7863,7 @@ export const UI_TEXT = {
       headingHighlight: "бесплатно",
       lead:
         "Мастера ищут моделей для практики и портфолио. Получите услугу бесплатно или со скидкой.",
-      heroBadge: "Уникальная фича",
+      heroBadge: "Только у нас",
       heroStats: "Сотни предложений каждую неделю",
       cityLabel: "Город",
       cityPlaceholder: "Введите город",
@@ -7860,7 +7873,7 @@ export const UI_TEXT = {
       submit: "Найти",
       empty:
         "Пока нет активных предложений.",
-      emptyHint: "Попробуйте изменить фильтры или заходите позже — мастера регулярно добавляют офферы.",
+      emptyHint: "Попробуйте изменить фильтры или заходите позже — мастера регулярно добавляют новые предложения.",
       emptyFilteredHint: "Попробуйте выбрать другую категорию или сбросить фильтры.",
       emptyCta: "Перейти в каталог",
       cityFallback: "Город не указан",
@@ -7881,7 +7894,7 @@ export const UI_TEXT = {
       // <SupportPageClient> (production-ready form, not redesigned in this commit).
       form: {
         contactLabel: "Как с вами связаться",
-        contactPlaceholder: "Номер телефона / почта / Telegram ID",
+        contactPlaceholder: "Телефон, почта или ник в Telegram",
         contactCustomAction: "Указать другой способ связи",
         contactAddAction: "Добавить способ связи",
         errorTitleRequired: "Укажите заголовок обращения.",
@@ -7904,7 +7917,7 @@ export const UI_TEXT = {
         titlePlaceholderSuggestion: "Например: добавить фильтр по времени",
         descriptionLabel: "Описание",
         descriptionPlaceholderBug:
-          "Опишите что происходит, на каком шаге возникает ошибка, какое устройство и браузер используете.",
+          "Расскажите, что происходит и на каком шаге. Напишите, с телефона вы или с компьютера.",
         descriptionPlaceholderSuggestion:
           "Опишите идею подробно: зачем это нужно, как должно работать, кому поможет.",
         attachmentLabel: "Вложение",
@@ -7942,13 +7955,13 @@ export const UI_TEXT = {
     },
     forbidden: {
       title: "Нет доступа",
-      subtitle: "У вашей учетной записи нет прав для этой страницы.",
+      subtitle: "У вас нет доступа к этой странице.",
       goHome: "На главную",
       login: "Войти",
     },
     globalError: {
       title: "Что-то пошло не так",
-      subtitle: "Произошла непредвиденная ошибка. Попробуйте обновить страницу.",
+      subtitle: "Что-то сломалось. Попробуйте обновить страницу.",
       retry: "Попробовать ещё раз",
       goHome: "На главную",
     },
@@ -7971,7 +7984,7 @@ export const UI_TEXT = {
     },
     notFound: {
       title: "Страница не найдена",
-      subtitle: "Запрашиваемая страница не существует или была удалена.",
+      subtitle: "Такой страницы нет — возможно, её удалили.",
       goHome: "На главную",
       goCatalog: "Перейти в каталог",
       master: {
@@ -7980,11 +7993,11 @@ export const UI_TEXT = {
       },
       provider: {
         title: "Профиль не найден",
-        subtitle: "Запрашиваемый профиль не найден или не опубликован.",
+        subtitle: "Такого профиля нет или он пока скрыт.",
       },
       modelOffer: {
         title: "Предложение не найдено",
-        subtitle: "Возможно, оффер уже закрыт или ссылка устарела. Посмотрите другие актуальные предложения.",
+        subtitle: "Возможно, предложение уже закрыли или ссылка устарела. Посмотрите другие.",
         goOffers: "Все предложения",
       },
       cabinetRoute: {
@@ -8018,14 +8031,14 @@ export const UI_TEXT = {
         },
         {
           tag: "Функция",
-          title: "Импорт клиентской базы из YClients",
+          title: "Переносим клиентов из YClients",
           desc: "Переходите на МастерРядом без потери данных — перенесите клиентов и историю визитов в один клик.",
           date: "Скоро",
         },
         {
           tag: "Гид",
           title: "Как настроить расписание: полный разбор",
-          desc: "Недельный режим, цикличное расписание, шаблоны смен, исключения и блокировки времени.",
+          desc: "Недельный режим, цикличное расписание, шаблоны смен, особые дни и закрытое время.",
           date: "Скоро",
         },
       ],
@@ -8040,12 +8053,12 @@ export const UI_TEXT = {
       plannedTitle: "Что планируется:",
       plannedItems: [
         "Сертификаты на фиксированную сумму",
-        "Электронная доставка на email или через мессенджер",
+        "Отправим на почту или в мессенджер",
         "Именной дизайн с текстом от вас",
         "Срок действия — 12 месяцев",
         "Принимается у любого мастера на платформе",
       ],
-      footerText: "Подарочные карты появятся совсем скоро.",
+      footerText: "Подарочные сертификаты появятся совсем скоро.",
     },
     publicProfile: {
       notFoundTitle: "Профиль не найден | МастерРядом",
@@ -8054,7 +8067,7 @@ export const UI_TEXT = {
       masterDescriptionFallback:
         "Запись онлайн к мастеру {name}. Услуги, цены, отзывы и свободные окна.",
       titleTemplate: "{name} — запись онлайн",
-      nameFallback: "Специалист",
+      nameFallback: "Мастер",
       servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
       ogBookOnline: "Записаться онлайн",
       ogReviews: "отзывов",
@@ -8079,7 +8092,7 @@ export const UI_TEXT = {
       masterDescriptionFallback:
         "Запись онлайн к мастеру {name}. Выберите услуги и свободное время.",
       titleTemplate: "{name} — запись онлайн",
-      nameFallback: "Специалист",
+      nameFallback: "Мастер",
     },
     modelOffer: {
       notFoundTitle: "Предложение не найдено | МастерРядом",
@@ -8106,21 +8119,21 @@ export const UI_TEXT = {
       applyLoginPrompt: "Войдите, чтобы откликнуться",
       applyLoginCta: "Войти",
       applyPhotoLabel: "Фото для заявки",
-      applyPhotoHint: "Максимум 3 фото — JPG, PNG или WebP",
+      applyPhotoHint: "До 3 фото — обычные снимки с телефона подойдут",
       applyPhotoSelected: "Выбрано: {names}",
       applyNoteLabel: "Сообщение мастеру",
       applyNotePlaceholder: "Коротко расскажите о себе",
-      applyConsentText: "Я согласен(а) на съёмку и использование фото в портфолио мастера",
-      applyConsentError: "Необходимо дать согласие на съёмку",
+      applyConsentText: "Разрешаю съёмку и публикацию фото в портфолио мастера",
+      applyConsentError: "Отметьте согласие на съёмку",
       applyPhotoError: "Добавьте 1–3 фото для заявки",
       applyDefaultError: "Не удалось отправить заявку. Попробуйте ещё раз.",
       applySubmitLoading: "Отправляем…",
       applySubmitCta: "Подать заявку",
-      applySuccessTitle: "Заявка отправлена!",
+      applySuccessTitle: "Заявка отправлена",
       applySuccessText: "Мастер рассмотрит её и свяжется с вами.",
       applySuccessLink: "Мои заявки →",
       closedTitle: "Предложение закрыто",
-      closedText: "Этот оффер уже недоступен. Посмотрите другие предложения.",
+      closedText: "Это предложение уже закрыто. Посмотрите другие.",
       closedCta: "Смотреть все предложения",
     },
   },
@@ -8138,7 +8151,7 @@ export const UI_TEXT = {
       send: "Отправить",
     },
     states: {
-      closedAfterVisit: "Чат закрыт для отправки (после визита). История доступна 24 часа.",
+      closedAfterVisit: "После визита писать уже нельзя. Переписка сохранится ещё 24 часа.",
       closed: "Чат закрыт. История доступна.",
       empty: "Сообщений пока нет.",
     },
@@ -8176,7 +8189,7 @@ export const UI_TEXT = {
     header: {
       statusOpen: "запись активна",
       statusClosed: "запись завершена",
-      composeHintMaster: "клиент сейчас без активной записи",
+      composeHintMaster: "у клиента сейчас нет записи к вам",
       composeHintClient: "у вас нет активной записи",
       bookCta: "Записаться",
       openBookingCta: "Открыть запись",
@@ -8201,7 +8214,7 @@ export const UI_TEXT = {
         "Здравствуйте! Хочу записаться",
         "Подскажите свободные окна",
         "Можно перенести запись?",
-        "Спасибо!",
+        "Спасибо",
       ] as string[],
     },
     composer: {
@@ -8218,14 +8231,14 @@ export const UI_TEXT = {
       disabledClient:
         "Чтобы написать, у вас должна быть активная запись у этого мастера.",
       disabledReadonly:
-        "Запись завершена — есть 24 часа на финальные сообщения.",
+        "Визит завершён — написать можно ещё 24 часа.",
       footer:
-        "ENTER — отправить · SHIFT+ENTER — новая строка · личные сообщения видны только вам и собеседнику",
+        "Enter — отправить · Shift+Enter — новая строка · переписку видите только вы и собеседник",
       attachAria: "Прикрепить фото",
       attachUploading: "Загружаем фото…",
       attachUploadFailed: "Не удалось загрузить фото. Попробуйте ещё раз.",
-      attachInvalidType: "Поддерживаются JPEG, PNG, WebP.",
-      attachTooLarge: "Файл слишком большой.",
+      attachInvalidType: "Можно прикрепить только фото.",
+      attachTooLarge: "Фото слишком большое — выберите поменьше.",
       attachRemoveAria: "Убрать вложение",
       // UI-33: вложение обёрнуто ссылкой без текста — без этих строк у
       // ссылки не было доступного имени вовсе, скринридер читал URL.

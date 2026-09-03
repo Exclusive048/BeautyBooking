@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type PublicUsernamePayload = {
   username: string;
@@ -35,7 +36,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
       const res = await fetchWithAuth(endpoint, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setUsername(json.data.username);
       setUrl(json.data.url);
@@ -77,7 +78,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setUsername(json.data.username);
       setUrl(json.data.url);

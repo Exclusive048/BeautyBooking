@@ -1,3 +1,4 @@
+import { pluralize } from "@/lib/utils/pluralize";
 import type { MasterStats } from "@/lib/advisor/types";
 
 export type AdvisorRule = {
@@ -31,7 +32,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     weight: 9,
     check: (data) => data.totalReviews === 0,
     title: "Попросите первый отзыв",
-    message: () => "Первый отзыв повышает доверие и конверсию в запись.",
+    message: () => "После первого отзыва клиенты записываются охотнее.",
     action: { label: "Перейти к отзывам", href: "/cabinet/master/reviews" },
   },
   {
@@ -40,7 +41,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     check: (data) => data.noShowRate > 0.2,
     title: "Высокий процент неявок",
     message: (data) =>
-      `Неявки за последние 90 дней: ${Math.round(data.noShowRate * 100)}%. Подумайте о напоминаниях или предоплате.`,
+      `За 90 дней ${Math.round(data.noShowRate * 100)}% клиентов не пришли. Помогут напоминания или предоплата.`,
     action: { label: "Посмотреть записи", href: "/cabinet/master/bookings" },
   },
   {
@@ -48,7 +49,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     weight: 7,
     check: (data) => data.hasDeadTimeSlots,
     title: "Есть пустующее время",
-    message: () => "Заполняемость окошек за 60 дней ниже 20%. Проверьте расписание и цены.",
+    message: () => "За 60 дней заняли меньше 20% ваших окошек. Проверьте расписание и цены.",
     action: { label: "Настроить расписание", href: "/cabinet/master/schedule" },
   },
   {
@@ -56,7 +57,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     weight: 7,
     check: (data) => data.newClientsLast30Days === 0 && data.hasActiveSlots,
     title: "Нет новых клиентов",
-    message: () => "За последние 30 дней не было новых клиентов при активном расписании.",
+    message: () => "За 30 дней к вам не записался ни один новый клиент, хотя окошки открыты.",
     action: { label: "Открыть аналитику", href: "/cabinet/master/analytics" },
   },
   {
@@ -65,7 +66,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     check: (data) => data.atRiskClientsCount >= 3,
     title: "Постоянные клиенты пропали",
     message: (data) =>
-      `Есть ${data.atRiskClientsCount} клиента(ов), которые давно не были у вас. Напомните о себе.`,
+      `${data.atRiskClientsCount} ${pluralize(data.atRiskClientsCount, "постоянный клиент давно не приходил", "постоянных клиента давно не приходили", "постоянных клиентов давно не приходили")}. Напомните о себе.`,
     action: { label: "Список клиентов", href: "/cabinet/master/clients" },
   },
   {
@@ -75,7 +76,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     title: "Низкий рейтинг услуги",
     message: (data) =>
       data.lowRatedService
-        ? `Услуга «${data.lowRatedService.name}» имеет среднюю оценку ${data.lowRatedService.rating.toFixed(1)}.`
+        ? `У услуги «${data.lowRatedService.name}» средняя оценка ${data.lowRatedService.rating.toFixed(1)}.`
         : "У одной из услуг низкая оценка.",
     action: { label: "Отзывы", href: "/cabinet/master/reviews" },
   },
@@ -85,7 +86,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     check: (data) => data.workingDaysPerWeek < 3,
     title: "Мало рабочих дней",
     message: (data) =>
-      `Рабочих дней в неделю: ${data.workingDaysPerWeek}. Добавьте окошки, если хотите больше записей.`,
+      `Вы работаете ${data.workingDaysPerWeek} ${pluralize(data.workingDaysPerWeek, "день", "дня", "дней")} в неделю. Добавьте окошки, если хотите больше записей.`,
     action: { label: "Настроить расписание", href: "/cabinet/master/schedule" },
   },
   {

@@ -1,4 +1,5 @@
 import type { ApiResponse } from "@/lib/types/api";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 export type ServiceBookingQuestion = {
   id: string;
@@ -36,7 +37,7 @@ export async function uploadBookingReference(
   if (!res.ok || !json || json.ok !== true) {
     return {
       ok: false,
-      error: json && json.ok === false ? json.error.message : `API error: ${res.status}`,
+      error: json && json.ok === false ? json.error.message : DEFAULT_ERROR_MESSAGE,
     };
   }
 

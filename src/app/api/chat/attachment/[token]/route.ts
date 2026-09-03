@@ -43,7 +43,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const params = await ctx.params;
     const token = params.token?.trim();
     if (!token) {
-      return jsonFail(400, "Не указан токен доступа.", "VALIDATION_ERROR");
+      return jsonFail(400, "Ссылка на файл не открылась. Откройте вложение из чата ещё раз.", "VALIDATION_ERROR");
     }
 
     const verified = verifyChatAttachmentToken(token);

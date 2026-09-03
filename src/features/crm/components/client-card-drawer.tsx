@@ -10,6 +10,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { Drawer } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type CardPhoto = {
   id: string;
@@ -119,7 +120,7 @@ export function ClientCardDrawer({
       const res = await fetch(`${baseUrl}/${encodeURIComponent(clientKey)}/card${query}`, { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as ApiResponse<CardData> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setNotes(json.data.card.notes ?? "");
       setTags(json.data.card.tags ?? []);
@@ -129,7 +130,7 @@ export function ClientCardDrawer({
       setDaysSinceLastVisit(json.data.daysSinceLastVisit ?? null);
       setCardTimeZone(json.data.timeZone ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить карточку клиента");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить карточку клиента. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -150,7 +151,7 @@ export function ClientCardDrawer({
         return current.filter((tag) => tag !== id);
       }
       if (current.length >= TAG_LIMIT) {
-        setError(`Можно выбрать не более ${TAG_LIMIT} тегов.`);
+        setError(`Больше ${TAG_LIMIT} меток выбрать нельзя.`);
         return current;
       }
       return [...current, id];
@@ -169,7 +170,7 @@ export function ClientCardDrawer({
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ card: { id: string; notes: string | null; tags: string[] } }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       onUpdated?.();
     } catch (err) {
@@ -182,7 +183,7 @@ export function ClientCardDrawer({
   const uploadPhoto = async (file: File): Promise<void> => {
     if (!clientKey) return;
     if (photos.length >= PHOTO_LIMIT) {
-      setError(`Можно добавить максимум ${PHOTO_LIMIT} фото.`);
+      setError(`Больше ${PHOTO_LIMIT} фото добавить нельзя.`);
       return;
     }
     setSaving(true);
@@ -196,7 +197,7 @@ export function ClientCardDrawer({
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ photo: CardPhoto }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setPhotos((current) => [json.data.photo, ...current]);
       onUpdated?.();
@@ -217,7 +218,7 @@ export function ClientCardDrawer({
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setPhotos((current) => current.filter((photo) => photo.id !== photoId));
       onUpdated?.();
@@ -274,7 +275,7 @@ export function ClientCardDrawer({
             </section>
 
             <section className="rounded-2xl border border-border-subtle bg-bg-input/60 p-4">
-              <div className="text-sm font-semibold text-text-main">Теги</div>
+              <div className="text-sm font-semibold text-text-main">Метки</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {availableTags.map((tag) => (
                   <Button
@@ -288,7 +289,7 @@ export function ClientCardDrawer({
                   </Button>
                 ))}
               </div>
-              <div className="mt-2 text-xs text-text-sec">Можно выбрать до {TAG_LIMIT} тегов.</div>
+              <div className="mt-2 text-xs text-text-sec">Можно выбрать до {TAG_LIMIT} меток.</div>
             </section>
 
             <section className="rounded-2xl border border-border-subtle bg-bg-input/60 p-4">
@@ -300,7 +301,7 @@ export function ClientCardDrawer({
                   onClick={() => fileRef.current?.click()}
                   disabled={saving || photos.length >= PHOTO_LIMIT}
                 >
-                  {photos.length >= PHOTO_LIMIT ? "Лимит" : "Добавить"}
+                  {photos.length >= PHOTO_LIMIT ? "Больше нельзя" : "Добавить"}
                 </Button>
               </div>
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">

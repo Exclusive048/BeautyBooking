@@ -44,11 +44,11 @@ function parseStatusParam(value?: string | null): ScheduleChangeRequestStatus | 
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const access = await resolveCurrentStudioAccess(user.id);
     if (!hasAdminRole(access.roles)) {
-      return jsonFail(403, "Недостаточно прав.", "FORBIDDEN");
+      return jsonFail(403, "Этот раздел доступен администратору студии.", "FORBIDDEN");
     }
 
     const url = new URL(req.url);
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
         route: "GET /api/studio/schedule/requests",
         status: query.status ?? null,
       });
-      return jsonFail(400, "Некорректный статус.", "VALIDATION_ERROR", { allowed: ALLOWED_STATUS_VALUES });
+      return jsonFail(400, "Выберите, какие заявки показать.", "VALIDATION_ERROR", { allowed: ALLOWED_STATUS_VALUES });
     }
 
     const where: Prisma.ScheduleChangeRequestWhereInput = {

@@ -9,7 +9,7 @@ export const VK_ID_STATE_TTL_SECONDS = 10 * 60;
 function requireSigningSecret(): string {
   const secret = env.AUTH_JWT_SECRET;
   if (!secret) {
-    throw new AppError("Не настроен AUTH_JWT_SECRET.", 500, "INTERNAL_ERROR");
+    throw new AppError("Не удалось завершить вход. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
   }
   return secret;
 }

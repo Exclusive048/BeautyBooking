@@ -11,6 +11,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { scrollBehavior } from "@/lib/ui/scroll";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationEvent } from "@/lib/notifications/types";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type ChatMessageDto = {
   id: string;
@@ -86,7 +87,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
           if (res.status === 403 || res.status === 409) {
             throw new Error(UI_TEXT.chat.errors.unavailable);
           }
-          throw new Error(toErrorMessage(json, `API error: ${res.status}`));
+          throw new Error(toErrorMessage(json, DEFAULT_ERROR_MESSAGE));
         }
         setMessages(json.data.messages ?? []);
         setIsOpen(Boolean(json.data.isOpen));
@@ -177,7 +178,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ message: ChatMessageDto }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(toErrorMessage(json, `API error: ${res.status}`));
+        throw new Error(toErrorMessage(json, DEFAULT_ERROR_MESSAGE));
       }
       setMessages((prev) => prev.map((msg) => (msg.id === tempId ? json.data.message : msg)));
     } catch (sendError) {

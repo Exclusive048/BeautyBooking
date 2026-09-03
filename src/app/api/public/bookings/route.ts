@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     const idempotencyKeyRaw = req.headers.get("x-idempotency-key");
     const idempotencyKey = idempotencyKeyRaw?.trim() || null;
     if (!idempotencyKey) {
-      return jsonFail(400, "Не передан идентификатор запроса.", "VALIDATION_ERROR");
+      return jsonFail(400, "Не удалось оформить запись. Обновите страницу и попробуйте ещё раз.", "VALIDATION_ERROR");
     }
 
     // LOGIC-30: форма телефона, а не только длина. Порог «≥ 8 символов»

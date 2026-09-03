@@ -30,8 +30,8 @@ export const ANNOUNCEMENTS: ReadonlyArray<AnnouncementItem> = [
     id: "announce-reminders",
     type: "announce",
     label: "АНОНС",
-    title: "Авто-напоминания клиентам по почте и в push",
-    description: "Включается в настройках. Бесплатно для Premium-аккаунтов.",
+    title: "Напоминания клиентам на почту и на телефон",
+    description: "Включается в настройках. Бесплатно на тарифе PREMIUM.",
     href: "/cabinet/master/account",
   },
   {
@@ -42,6 +42,6 @@ export const ANNOUNCEMENTS: ReadonlyArray<AnnouncementItem> = [
     type: "tip",
     label: "СОВЕТ",
     title: "Соберите пакет услуг со скидкой",
-    description: "Пакеты повышают средний чек — клиент бронирует несколько услуг сразу.",
+    description: "Пакеты повышают средний чек — клиент записывается на несколько услуг сразу.",
   },
 ];

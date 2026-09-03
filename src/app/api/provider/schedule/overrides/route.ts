@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");

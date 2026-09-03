@@ -80,7 +80,7 @@ export async function serverApiFetch<T>(
   }
 
   if (!json) {
-    return { ok: false, error: { message: "Некорректный ответ сервиса." } };
+    return { ok: false, error: { message: "Не удалось получить ответ. Попробуйте ещё раз." } };
   }
 
   return json;

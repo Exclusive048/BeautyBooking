@@ -16,7 +16,7 @@ import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
  * one place. `computeAvailableTimeSlots` powers the propose-time modal.
  */
 
-const CLOSE_REASON = "Оффер закрыт";
+const CLOSE_REASON = "Предложение закрыто";
 const PROPOSE_SLOT_STEP_MIN = 30;
 const ACTIVE_BOOKING_STATUSES: Array<
   "NEW" | "PENDING" | "CONFIRMED" | "CHANGE_REQUESTED" | "IN_PROGRESS" | "PREPAID" | "STARTED" | "FINISHED"
@@ -30,7 +30,7 @@ export type CloseOfferResult = {
 /**
  * Move offer ACTIVE → CLOSED and cascade-reject every still-pending
  * application (PENDING + APPROVED_WAITING_CLIENT) with a reason
- * "Оффер закрыт". Notifications are fired post-transaction so a flaky
+ * "Предложение закрыто". Notifications are fired post-transaction so a flaky
  * notifier doesn't roll back the state change.
  *
  * Idempotent: a re-run on an already-CLOSED offer is a no-op (returns

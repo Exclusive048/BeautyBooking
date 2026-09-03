@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
     if (!hasAdminRole(user)) return jsonFail(403, "Доступ запрещён.", "FORBIDDEN");
 
     const stats = await runHotSlotsJob();

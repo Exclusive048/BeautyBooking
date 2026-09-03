@@ -3,6 +3,7 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 export type StudioMaster = {
   id: string;
@@ -143,7 +144,7 @@ export async function fetchStudioProfile(studioId: string): Promise<StudioProfil
   const json = await safeJson<ApiResponse<{ provider: ProviderProfileDto | null }>>(res);
 
   if (!res.ok) {
-    return { ok: false, error: `API error: ${res.status}` };
+    return { ok: false, error: DEFAULT_ERROR_MESSAGE };
   }
 
   if (!json) {
@@ -166,7 +167,7 @@ export async function fetchStudioMasters(studioId: string): Promise<MastersResul
   const json = await safeJson<ApiResponse<{ masters: StudioMaster[] }>>(res);
 
   if (!res.ok) {
-    return { ok: false, error: `API error: ${res.status}` };
+    return { ok: false, error: DEFAULT_ERROR_MESSAGE };
   }
 
   if (!json) {
@@ -186,7 +187,7 @@ export async function fetchMasterAvailability(
   dateKey: string
 ): Promise<AvailabilityResult> {
   if (!isValidDateKey(dateKey)) {
-    return { ok: false, error: "Некорректная дата", code: "DATE_INVALID" };
+    return { ok: false, error: "Не удалось открыть этот день. Выберите другой.", code: "DATE_INVALID" };
   }
 
   const url = new URL(`/api/masters/${masterId}/availability`, window.location.origin);
@@ -200,7 +201,7 @@ export async function fetchMasterAvailability(
   if (!res.ok) {
     return {
       ok: false,
-      error: "Не удалось загрузить окошки",
+      error: "Не удалось загрузить окошки. Попробуйте ещё раз.",
     };
   }
 
@@ -241,7 +242,7 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingC
   if (!res.ok) {
     return {
       ok: false,
-      error: "Не удалось создать запись",
+      error: "Не удалось создать запись. Попробуйте ещё раз.",
       code: errorCode,
       status: res.status,
     };

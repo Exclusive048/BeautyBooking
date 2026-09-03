@@ -30,7 +30,7 @@ export class ApiClientError extends Error {
   }
 }
 
-const DEFAULT_ERROR_MESSAGE = "Что-то пошло не так - попробуйте еще раз.";
+export const DEFAULT_ERROR_MESSAGE = "Не получилось. Попробуйте ещё раз.";
 
 /**
  * FIX-C8 — «показать курируемую строку сервера, иначе — свою».

@@ -136,10 +136,10 @@ export async function GET(req: Request) {
       clearVkCookies(cookieStore);
 
       if (!expectedState || parsedCallback.state !== expectedState) {
-        return fail("Некорректное состояние запроса.", 400, "VK_STATE_INVALID");
+        return fail("Вход через VK не завершился. Начните заново.", 400, "VK_STATE_INVALID");
       }
       if (!codeVerifier) {
-        return fail("Сессия входа через VK истекла. Начните заново.", 400, "VALIDATION_ERROR");
+        return fail("Вход через VK не завершился. Начните заново.", 400, "VALIDATION_ERROR");
       }
 
       // RKN-FIX-01: the flags are trusted only after the signature AND the

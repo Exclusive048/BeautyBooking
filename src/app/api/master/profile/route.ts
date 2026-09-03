@@ -69,17 +69,17 @@ export async function PATCH(req: Request) {
     const hasGeoLat = body.geoLat !== undefined;
     const hasGeoLng = body.geoLng !== undefined;
     if (hasGeoLat !== hasGeoLng) {
-      return jsonProfileFail(400, "Укажите адрес через подсказку — нужны координаты.", "ADDRESS_COORDS_REQUIRED");
+      return jsonProfileFail(400, "Выберите адрес из подсказок — так клиенты найдут вас на карте.", "ADDRESS_COORDS_REQUIRED");
     }
     if (addressProvided) {
       const trimmed = body.address?.trim() ?? "";
       if (trimmed) {
         if (!hasGeoLat || body.geoLat === null || body.geoLng === null) {
-          return jsonProfileFail(400, "Укажите адрес через подсказку — нужны координаты.", "ADDRESS_COORDS_REQUIRED");
+          return jsonProfileFail(400, "Выберите адрес из подсказок — так клиенты найдут вас на карте.", "ADDRESS_COORDS_REQUIRED");
         }
       } else {
         if (!hasGeoLat || body.geoLat !== null || body.geoLng !== null) {
-          return jsonProfileFail(400, "Укажите адрес через подсказку — нужны координаты.", "ADDRESS_COORDS_REQUIRED");
+          return jsonProfileFail(400, "Выберите адрес из подсказок — так клиенты найдут вас на карте.", "ADDRESS_COORDS_REQUIRED");
         }
       }
     }

@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       });
     }
     const message =
-      appError.code === "VALIDATION_ERROR" ? "Некорректные параметры запроса" : appError.message;
+      appError.code === "VALIDATION_ERROR" ? "Проверьте дату и время поиска." : appError.message;
     return jsonFail(appError.status, message, appError.code, appError.details);
   }
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.dashboard.attention;
 const TB = UI_TEXT.cabinetMaster.bookings;
@@ -38,7 +39,7 @@ export function ConfirmBookingAction({ bookingId }: Props) {
       });
       const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!response.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API ${response.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       startTransition(() => router.refresh());
     } catch (err) {

@@ -35,15 +35,15 @@ export async function parseBody<T>(
   // или лгать — поэтому граница обязана быть и здесь.
   const read = await readBodyTextCapped(req, maxBytes);
   if (!read.ok) {
-    throw new AppError("Слишком большой запрос.", 413, "REQUEST_BODY_TOO_LARGE");
+    throw new AppError("Вы отправили слишком много за раз. Сократите и попробуйте ещё раз.", 413, "REQUEST_BODY_TOO_LARGE");
   }
 
   let body: unknown;
   try {
     body = JSON.parse(read.text) as unknown;
   } catch {
-    throw validationError("Некорректный формат запроса.", {
-      issues: [{ path: "body", message: "Некорректный формат запроса.", code: "invalid_json" }],
+    throw validationError("Не удалось прочитать отправленное. Обновите страницу и попробуйте ещё раз.", {
+      issues: [{ path: "body", message: "Не удалось прочитать отправленное. Обновите страницу и попробуйте ещё раз.", code: "invalid_json" }],
     });
   }
 

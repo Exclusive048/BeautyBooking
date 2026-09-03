@@ -99,7 +99,7 @@ function statusMeta(
   return {
     badge: "Подтверждено",
     badgeVariant: "success",
-    description: confirmedStartAt ? `Подтверждено! ${UI_FMT.dateTimeLong(confirmedStartAt)}` : "Подтверждено!",
+    description: confirmedStartAt ? `Время подтверждено · ${UI_FMT.dateTimeLong(confirmedStartAt)}` : "Время подтверждено",
   };
 }
 
@@ -169,7 +169,7 @@ export function ClientModelApplicationsPage() {
         });
         const json = (await res.json().catch(() => null)) as ApiResponse<{ bookingId: string | null }> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(extractApiError(json, "Не удалось подтвердить время"));
+          throw new Error(extractApiError(json, "Не удалось подтвердить время. Попробуйте ещё раз."));
         }
         await load();
       } catch (confirmError) {
@@ -290,7 +290,7 @@ export function ClientModelApplicationsPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setActionError("Отклонение времени пока недоступно. Можно дождаться нового предложения мастера.")}
+                  onClick={() => setActionError("Пока нельзя отклонить время. Дождитесь нового предложения мастера.")}
                   disabled={isConfirming}
                 >
                   Отклонить

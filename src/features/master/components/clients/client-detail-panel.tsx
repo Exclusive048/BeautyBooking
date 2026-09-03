@@ -13,6 +13,7 @@ import { ClientDetailStats } from "./client-detail-stats";
 import { ClientNotesEditor } from "./client-notes-editor";
 import { ClientVisitHistory } from "./client-visit-history";
 import { EmptyDetailState } from "./empty-detail-state";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.actions;
 const DETAIL_T = UI_TEXT.cabinetMaster.clients.detail;
@@ -73,7 +74,7 @@ export function ClientDetailPanel({ selectedKey, onBack }: Props) {
           | ApiResponse<ClientDetailView>
           | null;
         if (!response.ok || !json || !json.ok) {
-          const message = json && !json.ok ? json.error.message : `API ${response.status}`;
+          const message = json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE;
           throw new Error(message);
         }
         if (!cancelled) setState({ kind: "loaded", data: json.data });
@@ -83,7 +84,7 @@ export function ClientDetailPanel({ selectedKey, onBack }: Props) {
         const message =
           error instanceof Error && error.message
             ? error.message
-            : "Не удалось загрузить клиента.";
+            : "Не удалось открыть карточку клиента. Попробуйте ещё раз.";
         setState({ kind: "error", message });
       });
 

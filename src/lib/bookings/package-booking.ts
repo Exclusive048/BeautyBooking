@@ -195,14 +195,14 @@ export async function loadPackageForBooking(packageId: string): Promise<LoadedPa
     });
     if (!studio) {
       // A STUDIO provider without a Studio row is a data anomaly — not bookable.
-      throw new AppError("Бронирование пакета недоступно.", 400, "PACKAGE_NOT_BOOKABLE");
+      throw new AppError("На этот пакет сейчас нельзя записаться. Выберите другой.", 400, "PACKAGE_NOT_BOOKABLE");
     }
     studioRowId = studio.id;
   } else {
     // A master that belongs to a studio (master.studioId set) doesn't own
     // public packages in this model — studio packages are owned by the STUDIO
     // provider. Treat as not bookable.
-    throw new AppError("Бронирование пакета недоступно.", 400, "PACKAGE_NOT_BOOKABLE");
+    throw new AppError("На этот пакет сейчас нельзя записаться. Выберите другой.", 400, "PACKAGE_NOT_BOOKABLE");
   }
 
   const components: LoadedPackageComponent[] = pkg.items
@@ -247,7 +247,7 @@ export async function loadPackageForBooking(packageId: string): Promise<LoadedPa
 export async function loadSoloPackage(packageId: string): Promise<LoadedSoloPackage> {
   const pkg = await loadPackageForBooking(packageId);
   if (pkg.kind !== "solo") {
-    throw new AppError("Бронирование пакета доступно только у мастера.", 400, "PACKAGE_NOT_SOLO");
+    throw new AppError("На этот пакет можно записаться только у мастера.", 400, "PACKAGE_NOT_SOLO");
   }
   return {
     id: pkg.id,
@@ -696,7 +696,7 @@ export async function cancelSoloPackageBooking(input: {
   const earliest = liveChildren[0];
   if (earliest) {
     if (!canCancelOrReschedule(earliest.status)) {
-      throw new AppError("Пакет нельзя отменить в текущем состоянии.", 409, "CONFLICT");
+      throw new AppError("Этот пакет уже нельзя отменить.", 409, "CONFLICT");
     }
     if (input.cancelledBy === BookingCancelledBy.CLIENT) {
       ensureBookingActionWindow(earliest.startAtUtc);

@@ -109,7 +109,7 @@ export async function sendConversationMessage(
     if (access.reason === "not-found") {
       throw new AppError("Переписка не найдена.", 404, "NOT_FOUND");
     }
-    throw new AppError("Доступ запрещён.", 403, "FORBIDDEN");
+    throw new AppError("Эта переписка вам недоступна.", 403, "FORBIDDEN");
   }
   if (!access.canSend || !access.openBookingId) {
     throw new AppError(

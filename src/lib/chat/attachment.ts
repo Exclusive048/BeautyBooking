@@ -46,7 +46,7 @@ export async function validateChatAttachmentAsset(input: {
     throw new AppError("Вложение не найдено.", 404, "MEDIA_ASSET_NOT_FOUND");
   }
   if (asset.kind !== MediaKind.CHAT_ATTACHMENT) {
-    throw new AppError("Некорректный тип вложения.", 400, "MEDIA_INVALID_KIND");
+    throw new AppError("Такой файл прикрепить нельзя. Отправьте фото.", 400, "MEDIA_INVALID_KIND");
   }
   if (asset.createdByUserId && asset.createdByUserId !== input.senderUserId) {
     throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");

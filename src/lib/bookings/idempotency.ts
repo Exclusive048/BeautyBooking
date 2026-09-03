@@ -107,7 +107,7 @@ export async function resolveIdempotency<T>(input: {
   try {
     acquired = await setIdempotencyPending(input.key, input.ttlSeconds);
   } catch {
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 503, "INTERNAL_ERROR");
+    throw new AppError("Сейчас не получилось записать. Попробуйте ещё раз через минуту.", 503, "INTERNAL_ERROR");
   }
   if (!acquired) {
     return { result: await waitForIdempotencyResult(input.key, input.load), lockAcquired: false };

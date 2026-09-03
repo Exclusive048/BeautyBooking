@@ -28,7 +28,7 @@ export async function resolveScheduleProvider(input: {
       select: { id: true, type: true, studioId: true, ownerUserId: true },
     });
     if (!provider || provider.ownerUserId !== input.userId) {
-      throw new AppError("Недостаточно прав.", 403, "FORBIDDEN");
+      throw new AppError("У вас нет доступа к графику этого мастера.", 403, "FORBIDDEN");
     }
     return provider;
   }
@@ -47,5 +47,5 @@ export async function resolveScheduleProvider(input: {
   });
   if (studio) return studio;
 
-  throw new AppError("Недостаточно прав.", 403, "FORBIDDEN");
+  throw new AppError("У вас нет доступа к графику этого мастера.", 403, "FORBIDDEN");
 }

@@ -51,13 +51,13 @@ function clampPageSize(value: number | null | undefined): number {
 
 function validateBufferMinutes(value: number): Result<number> {
   if (!Number.isInteger(value)) {
-    return { ok: false, status: 400, message: "Некорректный перерыв между записями.", code: "BUFFER_INVALID" };
+    return { ok: false, status: 400, message: "Проверьте паузу между записями.", code: "BUFFER_INVALID" };
   }
   if (value < 0 || value > 30) {
-    return { ok: false, status: 400, message: "Перерыв между записями вне допустимого диапазона.", code: "BUFFER_INVALID" };
+    return { ok: false, status: 400, message: "Пауза между записями должна быть от 0 до 30 минут.", code: "BUFFER_INVALID" };
   }
   if (value % 5 !== 0) {
-    return { ok: false, status: 400, message: "Некорректный перерыв между записями.", code: "BUFFER_INVALID" };
+    return { ok: false, status: 400, message: "Проверьте паузу между записями.", code: "BUFFER_INVALID" };
   }
   return { ok: true, data: value };
 }

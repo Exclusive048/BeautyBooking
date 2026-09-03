@@ -20,7 +20,7 @@ export async function listProviderCards(input: ListProviderCardsInput = {}) {
   const rawCursor = input.cursor?.trim();
   const cursorId = rawCursor ? decodeCursor(rawCursor) : null;
   if (rawCursor && !cursorId) {
-    throw new AppError("Некорректный курсор пагинации.", 400, "VALIDATION_ERROR");
+    throw new AppError("Не удалось показать следующую страницу. Обновите список.", 400, "VALIDATION_ERROR");
   }
 
   if (cursorId) {
@@ -32,7 +32,7 @@ export async function listProviderCards(input: ListProviderCardsInput = {}) {
       select: { id: true },
     });
     if (!cursorProvider) {
-      throw new AppError("Некорректный курсор пагинации.", 400, "VALIDATION_ERROR");
+      throw new AppError("Не удалось показать следующую страницу. Обновите список.", 400, "VALIDATION_ERROR");
     }
   }
 

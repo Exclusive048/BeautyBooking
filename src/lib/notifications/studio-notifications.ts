@@ -155,7 +155,7 @@ export async function notifyStudioInviteReceived(invite: InviteWithRelations): P
   });
 
   const title = "Приглашение в студию";
-  const body = `Вас пригласили в студию ${studioName}. Пригласил(а): ${inviterLabel}.`;
+  const body = `Вас пригласили в студию ${studioName}. Приглашение отправил(а) ${inviterLabel}.`;
 
   await deliverNotification({
     userId: invitedUserId,
@@ -278,8 +278,8 @@ export async function notifyScheduleRequestSubmitted(
   const studioName = request.studio?.provider.name ?? "Студия";
   const masterName = request.provider.name || "Мастер";
 
-  const title = "Запрос на изменение расписания";
-  const body = `Мастер ${masterName} отправил запрос на изменение расписания студии ${studioName}.`;
+  const title = "Мастер просит изменить график";
+  const body = `Мастер ${masterName} просит изменить свой график в студии ${studioName}.`;
 
   await deliverNotification({
     userId: ownerUserId,
@@ -352,7 +352,7 @@ export async function notifyMasterScheduleUpdatedByStudio(input: {
   if (!masterUserId) return;
 
   const studioName = studio.provider.name ?? "Студия";
-  const title = "График обновлен студией";
+  const title = "Студия изменила ваш график";
   const body = `Студия ${studioName} обновила ваш рабочий график.`;
 
   await deliverNotification({

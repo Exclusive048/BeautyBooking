@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         operation: "refresh-post",
         code: "NO_REFRESH_TOKEN",
       });
-      return fail("Сессия не найдена. Войдите заново.", 401, "UNAUTHORIZED");
+      return fail("Вы вышли из аккаунта. Войдите заново.", 401, "UNAUTHORIZED");
     }
 
     const response = ok({ ok: true });
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     // большинство обновлений сессии.
     const rotated = await rotateSessionWithTelemetry(response, refreshToken);
     if (!rotated) {
-      const unauthorized = fail("Сессия истекла. Войдите заново.", 401, "UNAUTHORIZED");
+      const unauthorized = fail("Вход устарел. Войдите заново.", 401, "UNAUTHORIZED");
       clearSessionCookies(unauthorized);
       unauthorized.headers.set("Cache-Control", "no-store");
       return unauthorized;

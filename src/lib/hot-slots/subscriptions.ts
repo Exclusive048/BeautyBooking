@@ -74,7 +74,7 @@ export async function subscribeHotSlots(userId: string, providerId: string) {
 
   const count = await prisma.hotSlotSubscription.count({ where: { userId } });
   if (count >= MAX_SUBSCRIPTIONS) {
-    throw new AppError("Достигнут лимит подписок.", 409, "LIMIT_REACHED");
+    throw new AppError("Больше подписок на горящие окошки добавить нельзя. Отпишитесь от кого-нибудь.", 409, "LIMIT_REACHED");
   }
 
   return prisma.hotSlotSubscription.create({

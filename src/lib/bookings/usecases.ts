@@ -178,7 +178,7 @@ export async function rescheduleBooking(input: {
   }
 
   if (runtimeStatus !== "PENDING" && runtimeStatus !== "CONFIRMED") {
-    return { ok: false, status: 409, message: "Запись нельзя перенести.", code: "CONFLICT" };
+    return { ok: false, status: 409, message: "Эту запись уже нельзя перенести.", code: "CONFLICT" };
   }
 
   // fix-04a: the previous master-only required-comment guard was
@@ -207,7 +207,7 @@ export async function rescheduleBooking(input: {
   // Присланный конец окна дальше НЕ используется (LOGIC-03) — он проверяется
   // здесь лишь как признак корректно сформированного запроса.
   if (!isValidDate(input.startAtUtc) || !isValidDate(input.endAtUtc)) {
-    return { ok: false, status: 400, message: "Некорректное время записи.", code: "DATE_INVALID" };
+    return { ok: false, status: 400, message: "Проверьте время записи.", code: "DATE_INVALID" };
   }
 
   ensureBookingActionWindow(booking.startAtUtc);
@@ -263,7 +263,7 @@ export async function rescheduleBooking(input: {
       : 0;
   const durationMin = snapshotDurationMin > 0 ? snapshotDurationMin : currentWindowMin;
   if (durationMin <= 0) {
-    return { ok: false, status: 400, message: "Некорректная длительность записи.", code: "DURATION_INVALID" };
+    return { ok: false, status: 400, message: "Проверьте длительность записи.", code: "DURATION_INVALID" };
   }
   const endAtUtc = new Date(input.startAtUtc.getTime() + durationMin * 60_000);
 
@@ -306,7 +306,7 @@ export async function rescheduleBooking(input: {
     return {
       ok: false,
       status: 409,
-      message: "Достигнут лимит переносов записи со стороны клиента.",
+      message: "Эту запись уже переносили несколько раз. Напишите мастеру в чат.",
       code: "CONFLICT",
     };
   }
@@ -315,7 +315,7 @@ export async function rescheduleBooking(input: {
     return {
       ok: false,
       status: 409,
-      message: "Достигнут лимит переносов записи со стороны мастера.",
+      message: "Вы уже переносили эту запись несколько раз. Напишите клиенту в чат.",
       code: "CONFLICT",
     };
   }

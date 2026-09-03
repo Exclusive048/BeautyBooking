@@ -11,9 +11,9 @@ export type AddressStatus = { text: string; tone: AddressStatusTone };
 export type AddressSuggestion = { value: string };
 
 export const COORDS_ERROR_MESSAGE =
-  "Не удалось определить координаты. Выберите адрес из подсказок.";
+  "Не удалось найти адрес на карте. Выберите его из подсказок.";
 export const SUGGEST_UNAVAILABLE_MESSAGE =
-  "Подсказки адреса недоступны. Проверьте ключ Яндекс.Карт.";
+  "Подсказки адреса сейчас недоступны. Введите адрес вручную.";
 export const ADDRESS_PICK_HINT =
   "Выберите адрес из подсказок, чтобы определить координаты";
 export const ADDRESS_RESOLVING_MESSAGE = "Определяем координаты...";

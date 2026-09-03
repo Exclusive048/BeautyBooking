@@ -56,7 +56,7 @@ export function resolveRateLimitRefusal(...results: RateLimitResult[]): RateLimi
   if (unavailable) {
     return {
       status: 503,
-      message: "Сервис временно недоступен. Попробуйте позже.",
+      message: "Сейчас это временно недоступно. Попробуйте ещё раз через минуту.",
       code: "RATE_LIMIT_UNAVAILABLE",
       retryAfterSeconds,
     };
@@ -64,7 +64,7 @@ export function resolveRateLimitRefusal(...results: RateLimitResult[]): RateLimi
 
   return {
     status: 429,
-    message: "Слишком много запросов. Попробуйте позже.",
+    message: "Слишком часто. Подождите минуту и попробуйте ещё раз.",
     code: "RATE_LIMITED",
     retryAfterSeconds,
   };

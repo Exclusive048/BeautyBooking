@@ -31,7 +31,7 @@ export async function GET(
   const requestId = getRequestId(req);
 
   if (!p.id || p.id.length < 8 || p.id.length > 64) {
-    return jsonFail(400, "Некорректный идентификатор записи.", "VALIDATION_ERROR");
+    return jsonFail(400, "Такой записи нет. Проверьте ссылку.", "VALIDATION_ERROR");
   }
 
   try {

@@ -53,7 +53,7 @@ export function ModelsTopBlock({ userState, children }: Props) {
           cta={{
             primary: { label: "Смотреть предложения", href: "#offers" },
             secondary: {
-              label: "Я мастер — опубликовать оффер",
+              label: "Я мастер — разместить предложение",
               href: "/cabinet/master/model-offers",
             },
           }}

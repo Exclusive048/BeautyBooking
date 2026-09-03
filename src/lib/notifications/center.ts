@@ -150,11 +150,11 @@ function toIsoDateLabel(value: unknown): string | null {
 function describeScheduleRequest(payloadJson: unknown): string {
   const payload = parseJsonPayload(payloadJson);
   if (!payload || typeof payload !== "object") {
-    return "Запрос на изменение графика";
+    return "Мастер просит изменить график";
   }
   const range = (payload as { month?: unknown }).month;
   const date = toIsoDateLabel((payload as { date?: unknown }).date ?? range);
-  return date ? `Изменение графика на ${date}` : "Запрос на изменение графика";
+  return date ? `График на ${date}` : "Мастер просит изменить график";
 }
 
 /**
@@ -300,7 +300,7 @@ export async function getNotificationCenterData(input: {
           select: { id: true, name: true },
         });
   const masterNameById = new Map(
-    masters.map((master) => [master.id, master.name || "Master"])
+    masters.map((master) => [master.id, master.name || "Мастер"])
   );
 
   const scheduleRequestNotifications: NotificationCenterNotificationItem[] =
@@ -309,8 +309,8 @@ export async function getNotificationCenterData(input: {
       const details = describeScheduleRequest(item.payloadJson);
       return {
         id: `schedule-request:${item.id}`,
-        title: "Запрос на изменение графика",
-        body: `${masterName} · ${details} · Статус: ${item.status} · Студия: ${item.studio?.provider.name ?? "Студия"}`,
+        title: "Мастер просит изменить график",
+        body: `${masterName} · ${details} · студия ${item.studio?.provider.name ?? "Студия"}`,
         type: "SCHEDULE_REQUEST",
         channel: "STUDIO",
         isRead: false,

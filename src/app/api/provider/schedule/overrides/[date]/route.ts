@@ -58,7 +58,7 @@ export async function PUT(
 ) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");
@@ -72,7 +72,7 @@ export async function PUT(
     return jsonOk({ ok: true });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_BODY") {
-      return jsonFail(400, "Некорректное тело запроса.", "INVALID_BODY");
+      return jsonFail(400, "Не удалось сохранить особые дни. Обновите страницу и попробуйте ещё раз.", "INVALID_BODY");
     }
     const appError = toAppError(error);
     if (appError.status >= 500) {
@@ -92,7 +92,7 @@ export async function DELETE(
 ) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import type { ApiResponse } from "@/lib/types/api";
 import { DeleteAccountModal } from "@/components/deletion/DeleteAccountModal";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type Props = {
   phone: string | null;
@@ -23,13 +24,13 @@ export function DeleteAccountSection({ phone }: Props) {
       const res = await fetch("/api/me/delete", { method: "DELETE" });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `Ошибка: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       setOpen(false);
       router.push("/?deleted=1");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить аккаунт.");
+      setError(err instanceof Error ? err.message : "Не удалось удалить аккаунт. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }

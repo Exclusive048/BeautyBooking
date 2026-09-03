@@ -36,11 +36,11 @@ function supportFail(status: number, message: string, code: ErrorCode) {
   return jsonFail(status, message, code);
 }
 
-const INVALID_FORM_ERROR = "Некорректные данные формы.";
+const INVALID_FORM_ERROR = "Проверьте заполненные поля.";
 const TOO_MANY_REQUESTS_ERROR =
   "Слишком часто. Попробуйте через несколько минут.";
-const TOO_LARGE_ERROR = "Слишком большой запрос.";
-const SEND_ERROR = "Ошибка отправки. Попробуйте позже.";
+const TOO_LARGE_ERROR = "Сообщение слишком длинное. Сократите его.";
+const SEND_ERROR = "Не удалось отправить заявку. Попробуйте ещё раз.";
 
 /**
  * Partnership inquiries from /partners.

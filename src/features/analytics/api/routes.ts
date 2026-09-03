@@ -20,14 +20,14 @@ export function parsePeriodParams(url: URL): {
   const periodRaw = url.searchParams.get("period") ?? "month";
   const allowed: AnalyticsPeriod[] = ["today", "week", "month", "quarter", "custom"];
   if (!allowed.includes(periodRaw as AnalyticsPeriod)) {
-    throw new AppError("Некорректный период.", 400, "VALIDATION_ERROR");
+    throw new AppError("Выберите другой период.", 400, "VALIDATION_ERROR");
   }
   const period = periodRaw as AnalyticsPeriod;
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
   if (period === "custom") {
     if (!from || !to || !isDateKey(from) || !isDateKey(to)) {
-      throw new AppError("Для произвольного периода нужны from/to.", 400, "VALIDATION_ERROR");
+      throw new AppError("Укажите начало и конец периода.", 400, "VALIDATION_ERROR");
     }
   }
   const compare = url.searchParams.get("compare") === "1";
@@ -41,13 +41,13 @@ export function parseGranularityParam(
   const value = url.searchParams.get("granularity");
   if (!value) return fallback;
   if (value === "day" || value === "week" || value === "month") return value;
-  throw new AppError("Некорректная гранулярность.", 400, "VALIDATION_ERROR");
+  throw new AppError("Выберите другой шаг отчёта.", 400, "VALIDATION_ERROR");
 }
 
 export function parseMonthParam(url: URL): string {
   const month = url.searchParams.get("month");
   if (!month || !/^\d{4}-\d{2}$/.test(month)) {
-    throw new AppError("Некорректный месяц.", 400, "VALIDATION_ERROR");
+    throw new AppError("Выберите другой месяц.", 400, "VALIDATION_ERROR");
   }
   return month;
 }
@@ -57,7 +57,7 @@ export function parseMonthsBackParam(url: URL, fallback = 6): number {
   if (!raw) return fallback;
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) {
-    throw new AppError("Некорректное значение monthsBack.", 400, "VALIDATION_ERROR");
+    throw new AppError("Не удалось построить отчёт за этот период.", 400, "VALIDATION_ERROR");
   }
   return Math.min(12, Math.max(1, Math.floor(value)));
 }
@@ -67,7 +67,7 @@ export function parseThresholdDaysParam(url: URL, fallback = 45): number {
   if (!raw) return fallback;
   const value = Number(raw);
   if (!Number.isFinite(value) || value <= 0) {
-    throw new AppError("Некорректный порог.", 400, "VALIDATION_ERROR");
+    throw new AppError("Выберите другое значение.", 400, "VALIDATION_ERROR");
   }
   return Math.min(180, Math.max(1, Math.floor(value)));
 }

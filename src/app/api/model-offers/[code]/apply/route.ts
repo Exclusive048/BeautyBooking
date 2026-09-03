@@ -75,7 +75,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       select: { id: true, entityType: true, entityId: true },
     });
     if (mediaAssets.length !== body.mediaIds.length) {
-      return jsonFail(400, "Некорректные файлы.", "MEDIA_ASSET_NOT_FOUND");
+      return jsonFail(400, "Не удалось загрузить фото. Попробуйте другие.", "MEDIA_ASSET_NOT_FOUND");
     }
     const invalidAsset = mediaAssets.find(
       (asset) => asset.entityType !== "USER" || asset.entityId !== user.id

@@ -36,7 +36,7 @@ type DbClient = BookingDbClient | typeof prisma;
  * разошёлся; наблюдённый статус разойтись не может по построению.
  */
 export const BOOKING_STATUS_CHANGED_MESSAGE =
-  "Статус записи изменился. Обновите страницу.";
+  "Запись уже изменилась. Обновите страницу.";
 
 function isRecordNotFound(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";

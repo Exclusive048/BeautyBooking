@@ -71,7 +71,13 @@ export function MasterPageHeader({ breadcrumb, title, subtitle, actions }: Props
         </div>
 
         {actions ? (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          // PWA-FIX-05 — на телефоне действия занимают СВОЮ строку под
+          // заголовком, а не делят строку с ним: `shrink-0` у действий и
+          // `min-w-0 flex-1` у заголовка отдавали ему остаток ширины, и на
+          // 375 px «Расписание» рендерилось как «Распи…», подзаголовок — в
+          // четыре строки. `w-full` ниже `sm` заставляет `flex-wrap`
+          // перенести блок; с `sm` — прежняя раскладка в одну строку.
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:shrink-0">{actions}</div>
         ) : null}
       </div>
     </header>

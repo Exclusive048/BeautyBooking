@@ -206,7 +206,7 @@ export async function notifyBookingCreated(booking: BookingWithRelations): Promi
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "У тебя новая запись!";
+  const title = "У вас новая запись";
   const body = whenLabel
     ? `${booking.clientName} записался на ${serviceName} ${whenLabel}`
     : `${booking.clientName} записался на ${serviceName}`;
@@ -229,7 +229,7 @@ export async function notifyBookingConfirmed(booking: BookingWithRelations): Pro
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Готово! Запись подтверждена";
+  const title = "Запись подтверждена";
   const body = whenLabel
     ? `${serviceName} — ${whenLabel}`
     : `${serviceName}`;
@@ -254,8 +254,8 @@ export async function notifyBookingRejected(booking: BookingWithRelations): Prom
   const whenLabel = bookingWhenLabel(booking);
   const title = "Запись отклонена";
   const body = whenLabel
-    ? `Запись на ${serviceName} ${whenLabel} была отклонена.`
-    : `Запись на ${serviceName} была отклонена.`;
+    ? `Запись на ${serviceName} ${whenLabel} не подтвердили. Выберите другое окошко.`
+    : `Запись на ${serviceName} не подтвердили. Выберите другое окошко.`;
 
   await deliverNotification({
     userId: clientUserId,

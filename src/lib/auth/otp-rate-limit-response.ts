@@ -33,11 +33,11 @@ import type { OtpRateLimitRefusal } from "@/lib/auth/otp-rate-limit";
  */
 const REFUSAL_COPY: Record<OtpRateLimitRefusal["error"], { message: string; code: string }> = {
   RATE_LIMIT: {
-    message: "Слишком много запросов. Попробуйте позже.",
+    message: "Слишком часто. Подождите минуту и попробуйте ещё раз.",
     code: "RATE_LIMITED",
   },
   RATE_LIMIT_UNAVAILABLE: {
-    message: "Сервис временно недоступен. Попробуйте позже.",
+    message: "Сейчас это временно недоступно. Попробуйте ещё раз через минуту.",
     code: "RATE_LIMIT_UNAVAILABLE",
   },
   OTP_LOCKED: {

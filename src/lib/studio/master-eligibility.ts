@@ -71,7 +71,7 @@ export async function requireActiveStudioMaster(input: {
   }
   if (!isStudioMasterActive(master)) {
     throw new AppError(
-      "Мастер ещё не принял приглашение или приостановлен.",
+      "Мастер ещё не принял приглашение или пока не работает.",
       409,
       "MASTER_NOT_ACTIVE",
     );

@@ -29,7 +29,7 @@ export function buildNotificationEmailHtml(opts: {
     : "";
 
   const unsubBlock = opts.unsubscribeUrl
-    ? `<a href="${opts.unsubscribeUrl}" style="color:${C.textSecondary};text-decoration:underline;">Отключить email-уведомления</a>`
+    ? `<a href="${opts.unsubscribeUrl}" style="color:${C.textSecondary};text-decoration:underline;">Отписаться от писем</a>`
     : "";
 
   return `<!DOCTYPE html>

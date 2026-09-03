@@ -105,10 +105,10 @@ export async function GET(req: Request) {
       clearYandexCookies(cookieStore);
 
       if (!expectedState || parsedCallback.state !== expectedState) {
-        return fail("Некорректное состояние запроса.", 400, "YANDEX_STATE_INVALID");
+        return fail("Вход через Яндекс не завершился. Начните заново.", 400, "YANDEX_STATE_INVALID");
       }
       if (!codeVerifier) {
-        return fail("Сессия входа через Яндекс истекла. Начните заново.", 400, "VALIDATION_ERROR");
+        return fail("Вход через Яндекс не завершился. Начните заново.", 400, "VALIDATION_ERROR");
       }
 
       // RKN-FIX-01 — signature + state binding gate the flags (see the VK

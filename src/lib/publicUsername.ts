@@ -124,11 +124,11 @@ export function slugifyUsername(input: string): string {
 
 export function validateUsername(username: string): UsernameValidationResult {
   if (!username) {
-    return { ok: false, reason: "Введите username." };
+    return { ok: false, reason: "Придумайте адрес профиля." };
   }
 
   if (username.length < USERNAME_MIN_LENGTH || username.length > USERNAME_MAX_LENGTH) {
-    return { ok: false, reason: "Длина username должна быть от 3 до 32 символов." };
+    return { ok: false, reason: "Адрес профиля — от 3 до 32 символов." };
   }
 
   if (!/^[a-z0-9-]+$/.test(username)) {
@@ -140,15 +140,15 @@ export function validateUsername(username: string): UsernameValidationResult {
   }
 
   if (username.includes("--")) {
-    return { ok: false, reason: "Двойные дефисы подряд недопустимы." };
+    return { ok: false, reason: "Два дефиса подряд нельзя. Уберите лишний." };
   }
 
   if (/^\d+$/.test(username)) {
-    return { ok: false, reason: "Username не может состоять только из цифр." };
+    return { ok: false, reason: "Адрес профиля не может быть только из цифр. Добавьте буквы." };
   }
 
   if (RESERVED_SLUGS.has(username)) {
-    return { ok: false, reason: "Этот username нельзя использовать." };
+    return { ok: false, reason: "Этот адрес профиля нельзя использовать. Придумайте другой." };
   }
 
   return { ok: true };
@@ -222,7 +222,7 @@ export async function ensureUniqueUsername(prismaTx: PrismaTx, baseUsername: str
     }
   }
 
-  throw new AppError("Не удалось подобрать свободный username.", 409, "CONFLICT");
+  throw new AppError("Не удалось подобрать свободный адрес профиля. Придумайте свой.", 409, "CONFLICT");
 }
 
 export async function resolvePublicUsername(

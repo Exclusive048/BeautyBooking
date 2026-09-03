@@ -105,7 +105,7 @@ export async function resolveBookingServicePrice(input: {
 
   if (input.hotSlotRequested && !hotPricing.isHot) {
     throw new AppError(
-      "Этот горячий слот уже занят. Выберите другое время.",
+      "Это горящее окошко уже заняли. Выберите другое.",
       409,
       "BOOKING_CONFLICT",
     );
@@ -133,7 +133,7 @@ export async function resolveBookingServicePrice(input: {
   });
   if (recentCancel && isHotSlotRebookBlocked(recentCancel.cancelledAtUtc, input.startAtUtc)) {
     throw new AppError(
-      "Повторная запись на тот же горячий слот после отмены недоступна. Выберите другое время.",
+      "На это горящее окошко записаться повторно нельзя. Выберите другое окошко.",
       409,
       "BOOKING_CONFLICT",
     );

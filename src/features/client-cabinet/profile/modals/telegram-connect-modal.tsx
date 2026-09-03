@@ -74,7 +74,7 @@ export function TelegramConnectModal({ onClose }: Props) {
       >
         <div className="space-y-3">
           <p className="text-sm text-text-sec">
-            Подключение Telegram временно недоступно. Попробуйте позже или
+            Сейчас не получится подключить Telegram. Попробуйте позже или
             обратитесь в поддержку.
           </p>
           <div className="flex justify-end pt-2">
@@ -92,7 +92,7 @@ export function TelegramConnectModal({ onClose }: Props) {
       <div className="space-y-4">
         <p className="text-sm text-text-sec">
           Нажмите кнопку ниже, чтобы войти через Telegram и привязать аккаунт.
-          После подтверждения вы вернётесь в профиль — мы покажем результат и
+          После подтверждения вы вернётесь в профиль — мы сразу покажем, всё ли получилось и
           сможем присылать уведомления в боте.
         </p>
 

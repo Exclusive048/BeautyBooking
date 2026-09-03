@@ -70,7 +70,7 @@ type LoadedStudioPackage = LoadedPackageRecord & { studioId: string };
 export async function loadStudioPackage(packageId: string): Promise<LoadedStudioPackage> {
   const pkg = await loadPackageForBooking(packageId);
   if (pkg.kind !== "studio" || !pkg.studioId) {
-    throw new AppError("Этот пакет бронируется в кабинете студии.", 400, "PACKAGE_NOT_STUDIO");
+    throw new AppError("На этот пакет записывают в кабинете студии.", 400, "PACKAGE_NOT_STUDIO");
   }
   return { ...pkg, studioId: pkg.studioId };
 }

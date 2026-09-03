@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.reviews.reply;
 
@@ -57,7 +58,7 @@ export function ReviewReplyForm({ reviewId, initialText, onCancel, onSaved }: Pr
       });
       const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!response.ok || !json || !json.ok) {
-        const message = json && !json.ok ? json.error.message : `API ${response.status}`;
+        const message = json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE;
         throw new Error(message);
       }
       onSaved();

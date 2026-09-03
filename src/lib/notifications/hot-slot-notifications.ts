@@ -95,10 +95,10 @@ export async function notifyHotSlotBooked(
 
   const serviceName = resolveServiceLabel(hotSlot.service);
   const slotLabel = formatSlotLabel(hotSlot.startAtUtc, hotSlot.provider.timezone);
-  const title = "Горящее окошко забронировано";
+  const title = "Горящее окошко заняли";
   const body = serviceName
-    ? `Клиент ${clientName} забронировал окошко ${slotLabel} (${serviceName}).`
-    : `Клиент ${clientName} забронировал окошко ${slotLabel}.`;
+    ? `Клиент ${clientName} записался на окошко ${slotLabel} (${serviceName}).`
+    : `Клиент ${clientName} записался на окошко ${slotLabel}.`;
 
   await deliverNotification({
     userId: masterUserId,
@@ -123,10 +123,10 @@ export async function notifyHotSlotExpiring(hotSlot: HotSlotWithRelations): Prom
 
   const serviceName = resolveServiceLabel(hotSlot.service);
   const slotLabel = formatSlotLabel(hotSlot.startAtUtc, hotSlot.provider.timezone);
-  const title = "Горящее окошко скоро истекает";
+  const title = "Горящее окошко скоро сгорит";
   const body = serviceName
-    ? `Окошко ${slotLabel} для услуги ${serviceName} истекает через 1 час.`
-    : `Окошко ${slotLabel} истекает через 1 час.`;
+    ? `Окошко ${slotLabel} на ${serviceName} сгорит через час.`
+    : `Окошко ${slotLabel} сгорит через час.`;
 
   await deliverNotification({
     userId: masterUserId,

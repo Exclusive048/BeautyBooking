@@ -50,6 +50,6 @@ describe("notifications/booking-notifications", () => {
 
   it("booking declined body includes declined text", () => {
     const body = buildBookingDeclinedBody(snapshot as never);
-    expect(body.toLowerCase()).toContain("отклонена");
+    expect(body.toLowerCase()).toContain("не подтвердили");
   });
 });

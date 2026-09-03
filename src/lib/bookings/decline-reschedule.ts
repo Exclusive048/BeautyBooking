@@ -44,7 +44,7 @@ export async function declineClientRescheduleRequest(
     throw new AppError("По записи нет запроса на перенос.", 409, "CONFLICT");
   }
   if (!booking.actionRequiredBy || booking.actionRequiredBy !== actor) {
-    throw new AppError("Сейчас ход за другой стороной.", 409, "CONFLICT");
+    throw new AppError("Сейчас ответ за другой стороной. Дождитесь его и обновите страницу.", 409, "CONFLICT");
   }
 
   // LOGIC-02: переход только из наблюдённого статуса.

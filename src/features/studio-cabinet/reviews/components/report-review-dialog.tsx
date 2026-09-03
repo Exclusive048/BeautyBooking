@@ -17,7 +17,7 @@ type Props = {
 
 const REASONS = [
   { value: "SPAM", label: "Спам" },
-  { value: "FAKE", label: "Фейк" },
+  { value: "FAKE", label: "Ненастоящий отзыв" },
   { value: "OFFENSIVE", label: "Оскорбления" },
   { value: "INAPPROPRIATE", label: "Неуместный" },
   { value: "OTHER", label: "Другое" },

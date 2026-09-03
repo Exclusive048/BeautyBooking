@@ -95,6 +95,6 @@ export async function GET(_req: Request, ctx: RouteContext) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
     logError("GET /api/providers/[id]/masters failed", { error: detail });
-    return fail("Не удалось выполнить операцию. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
+    return fail("Не удалось загрузить мастеров. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
   }
 }

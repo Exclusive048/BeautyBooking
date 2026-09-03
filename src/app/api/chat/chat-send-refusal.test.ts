@@ -64,7 +64,7 @@ describe("FIX-C12 · отказ отправки сообщения называ
 
     expect(res.status, "обрыв обязан читаться как 503, а не 429").toBe(503);
     expect(payload.error?.code).toBe("RATE_LIMIT_UNAVAILABLE");
-    expect(payload.error?.message).toContain("недоступен");
+    expect(payload.error?.message).toContain("недоступн");
     expect(
       sendConversationMessage,
       "отказ обязан быть отказом: сообщение не должно уйти",

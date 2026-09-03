@@ -53,7 +53,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const card = await ensureClientCard({ providerId: studio.providerId, clientKey: params.clientKey });
     const existingCount = await prisma.clientCardPhoto.count({ where: { cardId: card.id } });
     if (existingCount >= PHOTO_LIMIT) {
-      return jsonFail(409, "Достигнут лимит фото", "PHOTO_LIMIT_REACHED", { limit: PHOTO_LIMIT });
+      return jsonFail(409, "Больше фото в карточку не поместится. Удалите старое.", "PHOTO_LIMIT_REACHED", { limit: PHOTO_LIMIT });
     }
 
     const formData = await req.formData();

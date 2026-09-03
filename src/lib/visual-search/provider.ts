@@ -47,7 +47,7 @@ let visionClient: OpenAI | null = null;
 function getApiKey(): string {
   const apiKey = env.YANDEX_API_KEY?.trim();
   if (!apiKey) {
-    throw new AppError("Не настроен YANDEX_API_KEY.", 500, "INTERNAL_ERROR");
+    throw new AppError("Поиск по фото сейчас недоступен. Попробуйте позже.", 500, "INTERNAL_ERROR", { missing: "YANDEX_CREDENTIALS" });
   }
   return apiKey;
 }
@@ -55,7 +55,7 @@ function getApiKey(): string {
 function getFolderId(): string {
   const folderId = env.YANDEX_FOLDER_ID?.trim();
   if (!folderId) {
-    throw new AppError("Не настроен YANDEX_FOLDER_ID.", 500, "INTERNAL_ERROR");
+    throw new AppError("Поиск по фото сейчас недоступен. Попробуйте позже.", 500, "INTERNAL_ERROR", { missing: "YANDEX_CREDENTIALS" });
   }
   return folderId;
 }

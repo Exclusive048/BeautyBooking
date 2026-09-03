@@ -229,7 +229,7 @@ export function toAppError(input: unknown): AppError {
 
   if (isPrismaUniqueViolation(input)) {
     return new AppError(
-      "Такая запись уже существует. Проверьте данные и попробуйте ещё раз.",
+      "Такое уже есть. Проверьте — возможно, вы добавили это раньше.",
       409,
       "ALREADY_EXISTS",
     );
@@ -241,7 +241,7 @@ export function toAppError(input: unknown): AppError {
     const maybeStatus = record.status;
     const maybeDetails = record.details;
     if (isErrorCode(maybeCode) && typeof maybeStatus === "number") {
-      return new AppError(input.message || "Не удалось выполнить операцию. Попробуйте ещё раз.", maybeStatus, maybeCode, maybeDetails);
+      return new AppError(input.message || "Не получилось. Попробуйте ещё раз.", maybeStatus, maybeCode, maybeDetails);
     }
   }
 
@@ -256,5 +256,5 @@ export function toAppError(input: unknown): AppError {
     }
   }
 
-  return new AppError("Не удалось выполнить операцию. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
+  return new AppError("Не получилось. Попробуйте ещё раз.", 500, "INTERNAL_ERROR");
 }

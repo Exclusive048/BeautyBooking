@@ -167,10 +167,10 @@ function normalizeWeeklyDays(days: WeeklyScheduleDayInput[]): WeeklyScheduleDayI
       throw new AppError("Некорректный день недели.", 400, "DAY_INVALID");
     }
     if (map.has(day.weekday)) {
-      throw new AppError("Дублирование дня недели.", 400, "VALIDATION_ERROR");
+      throw new AppError("Этот день уже есть в графике.", 400, "VALIDATION_ERROR");
     }
     if (!day.templateId && day.isActive) {
-      throw new AppError("Нельзя включить день без шаблона.", 400, "VALIDATION_ERROR");
+      throw new AppError("Выберите шаблон для этого дня или оставьте его выходным.", 400, "VALIDATION_ERROR");
     }
     map.set(day.weekday, {
       weekday: day.weekday,
@@ -242,7 +242,7 @@ export async function createScheduleTemplate(
 
   const count = await prisma.scheduleTemplate.count({ where: { providerId } });
   if (count >= MAX_TEMPLATES) {
-    throw new AppError("Достигнут лимит шаблонов.", 400, "VALIDATION_ERROR");
+    throw new AppError("Больше шаблонов создать нельзя. Удалите ненужный.", 400, "VALIDATION_ERROR");
   }
 
   const range = validateTimeRange(input.startLocal, input.endLocal);
@@ -548,13 +548,13 @@ function normalizeFixedSlotTimes(values: unknown): string[] {
 
 function validateSchedulePayload(input: SchedulePayload): SchedulePayload {
   if (!input || typeof input !== "object") {
-    throw new AppError("Некорректное тело запроса.", 400, "INVALID_BODY");
+    throw new AppError("Не удалось сохранить график. Обновите страницу и попробуйте ещё раз.", 400, "INVALID_BODY");
   }
   if (!Array.isArray(input.templates) || !input.weekly || !Array.isArray(input.weekly.days)) {
-    throw new AppError("Некорректное тело запроса.", 400, "INVALID_BODY");
+    throw new AppError("Не удалось сохранить график. Обновите страницу и попробуйте ещё раз.", 400, "INVALID_BODY");
   }
   if (!Array.isArray(input.overrides)) {
-    throw new AppError("Некорректное тело запроса.", 400, "INVALID_BODY");
+    throw new AppError("Не удалось сохранить график. Обновите страницу и попробуйте ещё раз.", 400, "INVALID_BODY");
   }
   return input;
 }
@@ -587,7 +587,7 @@ export async function applySchedulePayload(providerId: string, payload: Schedule
   }
 
   if (templatesPayload.length > MAX_TEMPLATES) {
-    throw new AppError("Достигнут лимит шаблонов.", 400, "VALIDATION_ERROR");
+    throw new AppError("Больше шаблонов создать нельзя. Удалите ненужный.", 400, "VALIDATION_ERROR");
   }
 
   const normalizedWeekly = normalizeWeeklyDays(validated.weekly.days);

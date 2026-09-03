@@ -64,7 +64,7 @@ export async function createClientBooking(
     });
     if (idempotency.booking) return idempotency.booking;
     if (!idempotency.lockAcquired) {
-      throw new AppError("Повторный запрос.", 409, "DUPLICATE_REQUEST");
+      throw new AppError("Эта запись уже создана. Откройте «Мои записи».", 409, "DUPLICATE_REQUEST");
     }
     resolvedIdempotencyKey = key;
     idempotencyLockAcquired = true;

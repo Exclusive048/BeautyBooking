@@ -72,7 +72,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     if (body.tags) {
       const validation = validateClientTags(body.tags);
       if (!validation.valid) {
-        return jsonFail(400, "Некорректные теги", "VALIDATION_ERROR", {
+        return jsonFail(400, "Проверьте метки", "VALIDATION_ERROR", {
           invalidTags: validation.invalid,
         });
       }

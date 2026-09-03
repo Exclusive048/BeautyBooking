@@ -32,7 +32,7 @@ function ensureQuestionsAnswered(
     if (!question.required) continue;
     const answer = answersById.get(question.id);
     if (!answer || !normalizeAnswer(answer.answer)) {
-      throw new AppError("Ответ на обязательный вопрос обязателен.", 400, "BOOKING_ANSWER_REQUIRED");
+      throw new AppError("Ответьте на вопрос мастера, чтобы записаться.", 400, "BOOKING_ANSWER_REQUIRED");
     }
   }
 }
@@ -92,7 +92,7 @@ export async function validateReferenceAsset(input: {
     throw new AppError("Референс не найден.", 404, "REFERENCE_PHOTO_NOT_FOUND");
   }
   if (asset.kind !== MediaKind.BOOKING_REFERENCE) {
-    throw new AppError("Некорректный референс.", 400, "REFERENCE_PHOTO_INVALID");
+    throw new AppError("Не удалось прикрепить фото-референс. Загрузите его заново.", 400, "REFERENCE_PHOTO_INVALID");
   }
   if (asset.createdByUserId && asset.createdByUserId !== input.clientUserId) {
     throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
@@ -135,7 +135,7 @@ export async function resolveBookingExtras(input: {
 
   for (const answerId of answersById.keys()) {
     if (!questionIds.has(answerId)) {
-      throw new AppError("Некорректный вопрос.", 400, "BOOKING_ANSWER_INVALID");
+      throw new AppError("Этот вопрос устарел. Обновите страницу и заполните ответы заново.", 400, "BOOKING_ANSWER_INVALID");
     }
   }
 

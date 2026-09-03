@@ -47,21 +47,21 @@ function decideServiceDuration(input: {
     return { ok: false, status: 404, message: "Услуга не найдена.", code: "SERVICE_NOT_FOUND" };
   }
   if (!service.isEnabled || !service.isActive) {
-    return { ok: false, status: 409, message: "Сервис временно недоступен. Попробуйте позже.", code: "SERVICE_DISABLED" };
+    return { ok: false, status: 409, message: "Эта услуга сейчас недоступна. Выберите другую.", code: "SERVICE_DISABLED" };
   }
 
   if (master.studioId) {
     if (service.providerId !== master.studioId) {
-      return { ok: false, status: 400, message: "Услуга не принадлежит студии.", code: "SERVICE_INVALID" };
+      return { ok: false, status: 400, message: "Эта услуга больше не в списке студии. Обновите страницу.", code: "SERVICE_INVALID" };
     }
     if (!override || override.isEnabled === false) {
-      return { ok: false, status: 409, message: "Услуга не назначена мастеру.", code: "SERVICE_INVALID" };
+      return { ok: false, status: 409, message: "Этот мастер не оказывает выбранную услугу. Выберите другую.", code: "SERVICE_INVALID" };
     }
     return { ok: true, data: override.durationOverrideMin ?? service.durationMin };
   }
 
   if (service.providerId !== master.id) {
-    return { ok: false, status: 400, message: "Услуга не принадлежит профилю.", code: "SERVICE_INVALID" };
+    return { ok: false, status: 400, message: "Эта услуга больше не в вашем списке. Обновите страницу.", code: "SERVICE_INVALID" };
   }
 
   return { ok: true, data: service.durationMin };

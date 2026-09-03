@@ -12,7 +12,7 @@ export async function POST(
   if (!auth.ok) return auth.response;
 
   const p = params instanceof Promise ? await params : params;
-  if (!p.id) return fail("Не указан идентификатор приглашения.", 400, "VALIDATION_ERROR");
+  if (!p.id) return fail("Приглашение не открылось. Откройте ссылку из сообщения ещё раз.", 400, "VALIDATION_ERROR");
 
   const result = await acceptStudioInvite(p.id, {
     id: auth.user.id,

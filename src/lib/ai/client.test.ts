@@ -73,12 +73,12 @@ describe("resolveDefaultChatModel — Yandex Lite default", () => {
 
   it("throws INTERNAL_ERROR when YANDEX_FOLDER_ID missing", () => {
     mockEnv.YANDEX_FOLDER_ID = undefined;
-    expect(() => resolveDefaultChatModel()).toThrow(/YANDEX_FOLDER_ID/);
+    expect(() => resolveDefaultChatModel()).toThrow(/Подсказки сейчас недоступны/);
   });
 
   it("trims whitespace-only folder id as missing (catches '   ' misconfigs)", () => {
     mockEnv.YANDEX_FOLDER_ID = "   ";
-    expect(() => resolveDefaultChatModel()).toThrow(/YANDEX_FOLDER_ID/);
+    expect(() => resolveDefaultChatModel()).toThrow(/Подсказки сейчас недоступны/);
   });
 });
 
@@ -203,7 +203,7 @@ describe("aiChat — Yandex client construction", () => {
 
     await expect(
       aiChat({ scope: "review-reply", systemPrompt: "system", userPrompt: "user" }),
-    ).rejects.toThrow(/YANDEX_FOLDER_ID/);
+    ).rejects.toThrow(/Подсказки сейчас недоступны/);
   });
 
   it("override via opts.model bypasses default-model derivation (no folder id needed)", async () => {

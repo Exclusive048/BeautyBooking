@@ -28,7 +28,7 @@ type PlanSeed = {
 const PLANS: ReadonlyArray<PlanSeed> = [
   {
     code: "MASTER_FREE",
-    name: "Free",
+    name: "FREE",
     tier: PlanTier.FREE,
     scope: SubscriptionScope.MASTER,
     features: {
@@ -56,7 +56,7 @@ const PLANS: ReadonlyArray<PlanSeed> = [
   },
   {
     code: "MASTER_PRO",
-    name: "Pro",
+    name: "PRO",
     tier: PlanTier.PRO,
     scope: SubscriptionScope.MASTER,
     features: {
@@ -84,7 +84,7 @@ const PLANS: ReadonlyArray<PlanSeed> = [
   },
   {
     code: "MASTER_PREMIUM",
-    name: "Premium",
+    name: "PREMIUM",
     tier: PlanTier.PREMIUM,
     scope: SubscriptionScope.MASTER,
     features: {
@@ -112,7 +112,7 @@ const PLANS: ReadonlyArray<PlanSeed> = [
   },
   {
     code: "STUDIO_FREE",
-    name: "Free",
+    name: "FREE",
     tier: PlanTier.FREE,
     scope: SubscriptionScope.STUDIO,
     features: {
@@ -136,7 +136,7 @@ const PLANS: ReadonlyArray<PlanSeed> = [
   },
   {
     code: "STUDIO_PRO",
-    name: "Pro",
+    name: "PRO",
     tier: PlanTier.PRO,
     scope: SubscriptionScope.STUDIO,
     features: {
@@ -162,7 +162,7 @@ const PLANS: ReadonlyArray<PlanSeed> = [
   },
   {
     code: "STUDIO_PREMIUM",
-    name: "Premium",
+    name: "PREMIUM",
     tier: PlanTier.PREMIUM,
     scope: SubscriptionScope.STUDIO,
     features: {

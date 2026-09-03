@@ -109,13 +109,13 @@ export async function confirmBooking(
     }
   } else if (runtimeStatus === "CHANGE_REQUESTED") {
     if (!booking.actionRequiredBy || booking.actionRequiredBy !== actor) {
-      throw new AppError("Сейчас ход за другой стороной.", 409, "CONFLICT");
+      throw new AppError("Сейчас ответ за другой стороной. Дождитесь его и обновите страницу.", 409, "CONFLICT");
     }
     startAtUtc = booking.proposedStartAt;
     endAtUtc = booking.proposedEndAt;
     appliesRequestedChange = true;
   } else {
-    throw new AppError("Запись нельзя подтвердить в текущем статусе.", 409, "CONFLICT");
+    throw new AppError("Эту запись уже нельзя подтвердить. Обновите страницу.", 409, "CONFLICT");
   }
 
   if (!isValidDate(startAtUtc) || !isValidDate(endAtUtc)) {

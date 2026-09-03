@@ -42,7 +42,7 @@ export async function POST(
     if (!access.ok) {
       return jsonFail(
         access.reason === "not-found" ? 404 : 403,
-        access.reason === "not-found" ? "Переписка не найдена." : "Доступ запрещён.",
+        access.reason === "not-found" ? "Переписка не найдена." : "Эта переписка вам недоступна.",
         access.reason === "not-found" ? "NOT_FOUND" : "FORBIDDEN",
       );
     }

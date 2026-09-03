@@ -558,7 +558,7 @@ export function isScheduleEditorRequestPayload(value: unknown): value is Schedul
 
 export function normalizeScheduleEditorRequestPayload(value: unknown): NormalizedScheduleState {
   if (!isScheduleEditorRequestPayload(value)) {
-    throw new AppError("Некорректные данные расписания.", 400, "INVALID_BODY");
+    throw new AppError("Не удалось сохранить график. Обновите страницу и попробуйте ещё раз.", 400, "INVALID_BODY");
   }
   return normalizeScheduleState({
     weekSchedule: value.weekSchedule,

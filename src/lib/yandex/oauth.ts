@@ -64,7 +64,7 @@ export type YandexProfile = {
 export function requireYandexRedirectUri(): string {
   const redirectUri = getYandexRedirectUri();
   if (!redirectUri) {
-    throw new AppError("Не настроен YANDEX_OAUTH_REDIRECT_URI.", 500, "YANDEX_REDIRECT_URI_MISSING");
+    throw new AppError("Вход через Яндекс сейчас недоступен. Войдите другим способом.", 500, "YANDEX_REDIRECT_URI_MISSING");
   }
   return redirectUri.trim();
 }
@@ -76,7 +76,7 @@ export function buildYandexAuthorizeUrl(input: {
 }): string {
   const clientId = getYandexClientId();
   if (!clientId) {
-    throw new AppError("Не настроен YANDEX_OAUTH_CLIENT_ID.", 500, "YANDEX_CLIENT_ID_MISSING");
+    throw new AppError("Вход через Яндекс сейчас недоступен. Войдите другим способом.", 500, "YANDEX_CLIENT_ID_MISSING");
   }
 
   const url = new URL(YANDEX_AUTHORIZE_URL);
@@ -93,7 +93,7 @@ export function buildYandexAuthorizeUrl(input: {
 
 function resolveTokenError(error: YandexTokenError): AppError {
   if (error.error === "invalid_grant") {
-    return new AppError("Код авторизации недействителен", 400, "YANDEX_INVALID_GRANT", error);
+    return new AppError("Вход через Яндекс не завершился. Начните заново.", 400, "YANDEX_INVALID_GRANT", error);
   }
   return new AppError(error.error_description ?? "Ошибка авторизации Яндекс", 400, "YANDEX_OAUTH_FAILED", error);
 }
@@ -106,10 +106,10 @@ export async function exchangeYandexCodeForToken(input: {
   const clientId = getYandexClientId();
   const clientSecret = getYandexClientSecret();
   if (!clientId) {
-    throw new AppError("Не настроен YANDEX_OAUTH_CLIENT_ID.", 500, "YANDEX_CLIENT_ID_MISSING");
+    throw new AppError("Вход через Яндекс сейчас недоступен. Войдите другим способом.", 500, "YANDEX_CLIENT_ID_MISSING");
   }
   if (!clientSecret) {
-    throw new AppError("Не настроен YANDEX_OAUTH_CLIENT_SECRET.", 500, "YANDEX_CLIENT_SECRET_MISSING");
+    throw new AppError("Вход через Яндекс сейчас недоступен. Войдите другим способом.", 500, "YANDEX_CLIENT_SECRET_MISSING");
   }
 
   const body = new URLSearchParams();

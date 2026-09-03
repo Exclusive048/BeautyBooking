@@ -29,7 +29,7 @@ async function resolveProviderForScope(userId: string, scope: SubscriptionScope)
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const scope = resolveScope(req);
     const plan = await getCurrentPlan(user.id, scope);
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    const message = appError.code === "VALIDATION_ERROR" ? "Ошибка валидации." : appError.message;
+    const message = appError.code === "VALIDATION_ERROR" ? "Проверьте заполненные поля." : appError.message;
     return jsonFail(appError.status, message, appError.code, appError.details);
   }
 }
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const scope = resolveScope(req);
     const plan = await getCurrentPlan(user.id, scope);
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-    const message = appError.code === "VALIDATION_ERROR" ? "Ошибка валидации." : appError.message;
+    const message = appError.code === "VALIDATION_ERROR" ? "Проверьте заполненные поля." : appError.message;
     return jsonFail(appError.status, message, appError.code, appError.details);
   }
 }

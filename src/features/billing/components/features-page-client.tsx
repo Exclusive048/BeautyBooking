@@ -59,7 +59,7 @@ function findMinPlanLabel(
 type GroupMeta = { icon: React.ElementType; order: number };
 
 const GROUP_META: Record<string, GroupMeta> = {
-  Бронирование:   { icon: Clock,     order: 1 },
+  Записи:         { icon: Clock,     order: 1 },
   Каталог:        { icon: Sparkles,  order: 2 },
   Профиль:        { icon: Image,     order: 3 },
   Уведомления:    { icon: Bell,      order: 4 },
@@ -67,7 +67,7 @@ const GROUP_META: Record<string, GroupMeta> = {
   Аналитика:      { icon: BarChart3, order: 6 },
   Платежи:        { icon: CreditCard,order: 7 },
   Клиенты:        { icon: Users,     order: 8 },
-  Лимиты:         { icon: Wallet,    order: 9 },
+  Объёмы:         { icon: Wallet,    order: 9 },
 };
 
 function groupOrder(group: string): number {

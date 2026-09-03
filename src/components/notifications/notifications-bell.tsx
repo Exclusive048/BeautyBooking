@@ -15,6 +15,7 @@ import {
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 type Props = {
   ariaLabel: string;
@@ -123,7 +124,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
       const res = await fetch(`/api/bookings/${booking.bookingId}/confirm`, { method: "POST" });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       await markRead(notificationId);
     } catch {
@@ -142,7 +143,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API error: ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       await markRead(notificationId);
     } catch {

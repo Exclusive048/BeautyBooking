@@ -19,7 +19,7 @@ export const FEATURE_CATALOG = {
     kind: "boolean",
     title: "Онлайн-запись",
     description: "Запись клиентов через публичную страницу.",
-    group: "Бронирование",
+    group: "Записи",
     appliesTo: "BOTH",
     uiOrder: 10,
     status: "active",
@@ -27,7 +27,7 @@ export const FEATURE_CATALOG = {
   catalogListing: {
     kind: "boolean",
     title: "Размещение в каталоге",
-    description: "Отображается в каталоге.",
+    description: "Ваш профиль виден в каталоге.",
     group: "Каталог",
     appliesTo: "BOTH",
     uiOrder: 20,
@@ -35,8 +35,8 @@ export const FEATURE_CATALOG = {
   },
   pwaPush: {
     kind: "boolean",
-    title: "PWA push-уведомления",
-    description: "Push-уведомления в PWA.",
+    title: "Уведомления на телефон",
+    description: "Уведомления приходят прямо на телефон.",
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 30,
@@ -45,7 +45,7 @@ export const FEATURE_CATALOG = {
   profilePublicPage: {
     kind: "boolean",
     title: "Публичная страница профиля",
-    description: "Публичная страница профиля.",
+    description: "Ваша страница с портфолио, услугами и записью.",
     group: "Профиль",
     appliesTo: "BOTH",
     uiOrder: 40,
@@ -54,7 +54,7 @@ export const FEATURE_CATALOG = {
   onlinePayments: {
     kind: "boolean",
     title: "Онлайн-оплата",
-    description: "Прием онлайн-платежей.",
+    description: "Клиенты могут оплатить услугу онлайн.",
     group: "Платежи",
     appliesTo: "BOTH",
     uiOrder: 50,
@@ -71,8 +71,8 @@ export const FEATURE_CATALOG = {
   },
   analytics_dashboard: {
     kind: "boolean",
-    title: "Аналитика: Дашборд",
-    description: "KPI, выручка по периодам и загрузка по дням недели.",
+    title: "Аналитика: Сводка",
+    description: "Главные цифры, выручка по периодам и загрузка по дням недели.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 72,
@@ -81,7 +81,7 @@ export const FEATURE_CATALOG = {
   analytics_revenue: {
     kind: "boolean",
     title: "Аналитика: Выручка",
-    description: "Детализация выручки по услугам и мастерам.",
+    description: "Выручка по каждой услуге и каждому мастеру.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 74,
@@ -90,7 +90,7 @@ export const FEATURE_CATALOG = {
   analytics_clients: {
     kind: "boolean",
     title: "Аналитика: Клиенты",
-    description: "Сегменты клиентов, выручка и удержание.",
+    description: "Новые и постоянные клиенты, выручка и кто возвращается.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 76,
@@ -98,8 +98,8 @@ export const FEATURE_CATALOG = {
   },
   analytics_booking_insights: {
     kind: "boolean",
-    title: "Аналитика: Бронирования",
-    description: "Воронка, lead-time и тепловая карта.",
+    title: "Аналитика: Записи",
+    description: "Путь клиента до записи, за сколько дней записываются и в какие часы плотнее.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 78,
@@ -107,8 +107,8 @@ export const FEATURE_CATALOG = {
   },
   analytics_cohorts: {
     kind: "boolean",
-    title: "Аналитика: Когорты",
-    description: "Retention и revenue-когорты.",
+    title: "Аналитика: Возвращаемость",
+    description: "Сколько клиентов возвращается и сколько приносит каждая группа.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 79,
@@ -131,8 +131,8 @@ export const FEATURE_CATALOG = {
     // maxNotifications/smsNotifications/clientImport) + dropped from all seed
     // plan grants so no tier advertises an unbuilt feature. Wire it back to a
     // tier only when a real finance report ships.
-    title: "Финансовый отчет",
-    description: "Базовый финансовый отчет.",
+    title: "Финансовый отчёт",
+    description: "Простой отчёт по деньгам.",
     group: "Аналитика",
     appliesTo: "BOTH",
     uiOrder: 81,
@@ -141,7 +141,7 @@ export const FEATURE_CATALOG = {
   notifications: {
     kind: "boolean",
     title: "Уведомления",
-    description: "Доступ к настройкам и каналам уведомлений.",
+    description: "Настройка того, куда приходят уведомления.",
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 85,
@@ -150,7 +150,7 @@ export const FEATURE_CATALOG = {
   tgNotifications: {
     kind: "boolean",
     title: "Уведомления в Telegram",
-    description: "Отправка уведомлений в Telegram.",
+    description: "Уведомления приходят в Telegram.",
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 90,
@@ -158,8 +158,8 @@ export const FEATURE_CATALOG = {
   },
   vkNotifications: {
     kind: "boolean",
-    title: "Уведомления во VK",
-    description: "Отправка уведомлений во VK.",
+    title: "Уведомления в VK",
+    description: "Уведомления приходят в VK.",
     group: "Уведомления",
     appliesTo: "BOTH",
     uiOrder: 100,
@@ -225,9 +225,9 @@ export const FEATURE_CATALOG = {
   },
   maxTeamMasters: {
     kind: "limit",
-    title: "Лимит мастеров в команде",
+    title: "Сколько мастеров в команде",
     description: "Максимум мастеров в студии.",
-    group: "Лимиты",
+    group: "Объёмы",
     appliesTo: "STUDIO",
     uiOrder: 170,
     status: "active",
@@ -235,8 +235,8 @@ export const FEATURE_CATALOG = {
   maxPortfolioPhotosSolo: {
     kind: "limit",
     title: "Портфолио (мастер)",
-    description: "Макс. фото в портфолио мастера.",
-    group: "Лимиты",
+    description: "Сколько фото можно в портфолио мастера.",
+    group: "Объёмы",
     appliesTo: "MASTER",
     uiOrder: 180,
     status: "active",
@@ -244,8 +244,8 @@ export const FEATURE_CATALOG = {
   maxPortfolioPhotosStudioDesign: {
     kind: "limit",
     title: "Портфолио студии",
-    description: "Макс. фото в портфолио студии.",
-    group: "Лимиты",
+    description: "Сколько фото можно в портфолио студии.",
+    group: "Объёмы",
     appliesTo: "STUDIO",
     uiOrder: 190,
     status: "active",
@@ -253,8 +253,8 @@ export const FEATURE_CATALOG = {
   maxPortfolioPhotosPerStudioMaster: {
     kind: "limit",
     title: "Портфолио мастера в студии",
-    description: "Макс. фото на одного мастера.",
-    group: "Лимиты",
+    description: "Сколько фото у каждого мастера студии.",
+    group: "Объёмы",
     appliesTo: "BOTH",
     uiOrder: 200,
     status: "active",

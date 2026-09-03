@@ -232,20 +232,20 @@ export async function ensureNoConflicts(
 function mapAvailabilityError(code?: string): { message: string; status: number } {
   switch (code) {
     case "DURATION_INVALID":
-      return { message: "Некорректная длительность услуги.", status: 400 };
+      return { message: "Проверьте длительность услуги.", status: 400 };
     case "SERVICE_REQUIRED":
       return { message: "Не указана услуга.", status: 400 };
     case "DATE_INVALID":
-      return { message: "Некорректная дата.", status: 400 };
+      return { message: "Проверьте дату.", status: 400 };
     case "RANGE_INVALID":
-      return { message: "Некорректный диапазон.", status: 400 };
+      return { message: "Проверьте выбранный период.", status: 400 };
     case "PROVIDER_NOT_FOUND":
     case "MASTER_NOT_FOUND":
       return { message: "Мастер не найден.", status: 404 };
     case "SERVICE_NOT_FOUND":
       return { message: "Услуга не найдена.", status: 404 };
     case "SERVICE_INVALID":
-      return { message: "Услуга недоступна для мастера.", status: 409 };
+      return { message: "Этот мастер сейчас не оказывает выбранную услугу. Выберите другую.", status: 409 };
     default:
       return { message: "Не удалось проверить доступность окошка.", status: 500 };
   }
@@ -300,7 +300,7 @@ export async function resolveBookingCore(input: {
   ]);
 
   if (!provider) {
-    throw new AppError("Провайдер не найден.", 404, "PROVIDER_NOT_FOUND");
+    throw new AppError("Мастер не найден.", 404, "PROVIDER_NOT_FOUND");
   }
 
   if (!service) {
@@ -324,7 +324,7 @@ export async function resolveBookingCore(input: {
       ? service.providerId !== provider.id && service.providerId !== provider.studioId
       : service.providerId !== provider.id;
   if (providerServiceMismatch) {
-    throw new AppError("Услуга не принадлежит провайдеру.", 400, "SERVICE_NOT_BELONGS_TO_PROVIDER");
+    throw new AppError("Этот мастер не оказывает выбранную услугу. Выберите другую.", 400, "SERVICE_NOT_BELONGS_TO_PROVIDER");
   }
 
   const resolvedMasterProviderId =
@@ -378,24 +378,24 @@ export async function resolveBookingCore(input: {
 
   const durationMin = override?.durationOverrideMin ?? service.baseDurationMin ?? service.durationMin;
   if (!Number.isInteger(durationMin) || durationMin <= 0) {
-    throw new AppError("Некорректная длительность услуги.", 400, "DURATION_INVALID");
+    throw new AppError("Проверьте длительность услуги.", 400, "DURATION_INVALID");
   }
 
   const effectivePrice = override?.priceOverride ?? service.basePrice ?? service.price;
   if (!Number.isInteger(effectivePrice) || effectivePrice < 0) {
-    throw new AppError("Некорректная цена услуги.", 400, "VALIDATION_ERROR");
+    throw new AppError("Проверьте цену услуги.", 400, "VALIDATION_ERROR");
   }
 
   const startAtUtc =
     input.startAtUtc ??
     (input.slotLabel ? parseSlotStartAtUtc(input.slotLabel, provider.timezone) : null);
   if (!isValidDate(startAtUtc)) {
-    throw new AppError("Некорректная дата начала.", 400, "DATE_INVALID");
+    throw new AppError("Проверьте дату и время начала.", 400, "DATE_INVALID");
   }
 
   const endAtUtc = input.endAtUtc ?? new Date(startAtUtc.getTime() + durationMin * 60 * 1000);
   if (!isValidDate(endAtUtc) || endAtUtc <= startAtUtc) {
-    throw new AppError("Некорректная дата окончания.", 400, "DATE_INVALID");
+    throw new AppError("Проверьте дату и время окончания.", 400, "DATE_INVALID");
   }
 
   // BOOKING-WIDGET-A: provider policy enforcement. Three rules surfaced

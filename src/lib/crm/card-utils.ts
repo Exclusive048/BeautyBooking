@@ -21,7 +21,7 @@ export type BookingHistoryRow = {
 export function parseClientKeyOrThrow(clientKey: string): ClientKeyData {
   const parsed = parseClientKey(clientKey);
   if (!parsed) {
-    throw new AppError("Некорректный ключ клиента", 400, "CLIENT_KEY_INVALID");
+    throw new AppError("Карточка клиента не открылась. Вернитесь к списку клиентов.", 400, "CLIENT_KEY_INVALID");
   }
   return parsed;
 }

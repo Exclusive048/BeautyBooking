@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteAccountModal } from "@/components/deletion/DeleteAccountModal";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.account.account;
 
@@ -37,7 +38,7 @@ export function DangerZoneCard({ phone }: Props) {
       }> | null;
       if (!response.ok || !json || !json.ok) {
         throw new Error(
-          json && !json.ok ? json.error.message : `Ошибка: ${response.status}`
+          json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE
         );
       }
       setOpen(false);

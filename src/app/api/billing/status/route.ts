@@ -36,7 +36,7 @@ type SubscriptionSummary = {
 
 export async function GET() {
   const user = await getSessionUser();
-  if (!user) return fail("Необходима авторизация.", 401, "UNAUTHORIZED");
+  if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
   try {
     await ensureFreeSubscriptionsForRoles(user.id, user.roles);

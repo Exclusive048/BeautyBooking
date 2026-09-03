@@ -551,7 +551,7 @@ async function resolvePortfolioMediaUrl(input: {
       asset.entityId !== input.masterId ||
       asset.kind !== MediaKind.PORTFOLIO
     ) {
-      throw new AppError("Некорректный файл.", 400, "FORBIDDEN");
+      throw new AppError("Не удалось загрузить фото. Попробуйте другое.", 400, "FORBIDDEN");
     }
 
     return `${MEDIA_FILE_PATH_PREFIX}${asset.id}`;
@@ -559,7 +559,7 @@ async function resolvePortfolioMediaUrl(input: {
 
   const mediaUrl = input.mediaUrl?.trim();
   if (!mediaUrl) {
-    throw new AppError("Некорректная ссылка на файл.", 400, "VALIDATION_ERROR");
+    throw new AppError("Не удалось прикрепить фото. Загрузите его заново.", 400, "VALIDATION_ERROR");
   }
 
   const allowedS3Endpoint = env.S3_ENDPOINT?.trim();
@@ -567,7 +567,7 @@ async function resolvePortfolioMediaUrl(input: {
     return mediaUrl;
   }
 
-  throw new AppError("Некорректная ссылка на файл.", 400, "VALIDATION_ERROR");
+  throw new AppError("Не удалось прикрепить фото. Загрузите его заново.", 400, "VALIDATION_ERROR");
 }
 
 export async function upsertMasterServices(

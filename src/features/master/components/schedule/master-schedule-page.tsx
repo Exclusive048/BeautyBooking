@@ -72,7 +72,7 @@ export async function MasterSchedulePage({ searchParams }: Props) {
           <>
             <ScheduleSettingsLink />
             <RefreshButton />
-            <NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" />
+            <NewBookingButton label={T.pageHeader.newBookingCta} className="rounded-xl" compactBelowMd />
           </>
         }
       />

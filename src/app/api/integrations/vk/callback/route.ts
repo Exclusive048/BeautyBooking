@@ -100,10 +100,10 @@ export async function GET(req: Request) {
     clearVkCookies(cookieStore);
 
     if (!expectedState || parsedPayload.data.state !== expectedState) {
-      return fail("Некорректное состояние запроса.", 400, "VK_STATE_INVALID");
+      return fail("Подключение VK не завершилось. Начните заново.", 400, "VK_STATE_INVALID");
     }
     if (!codeVerifier) {
-      return fail("Сессия входа через VK истекла. Начните заново.", 400, "VALIDATION_ERROR");
+      return fail("Подключение VK не завершилось. Начните заново.", 400, "VALIDATION_ERROR");
     }
 
     const redirectUri = requireVkRedirectUri("integrations");

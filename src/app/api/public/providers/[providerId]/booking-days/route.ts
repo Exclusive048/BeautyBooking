@@ -33,10 +33,10 @@ export async function GET(
     const limit = Number.parseInt(limitRaw, 10);
 
     if (!isDateKey(fromKey)) {
-      return fail("Некорректная дата начала.", 400, "DATE_INVALID");
+      return fail("Проверьте дату начала.", 400, "DATE_INVALID");
     }
     if (!Number.isInteger(limit) || limit <= 0 || limit > 14) {
-      return fail("Некорректное значение limit.", 400, "LIMIT_INVALID");
+      return fail("Слишком длинный список. Сузьте поиск.", 400, "LIMIT_INVALID");
     }
 
     const provider = await resolveProviderBySlugOrId({

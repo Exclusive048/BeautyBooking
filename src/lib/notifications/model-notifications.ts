@@ -54,7 +54,7 @@ export async function notifyModelApplicationReceived(
   if (!masterUserId) return;
 
   const title = "Новая заявка модели";
-  const body = `Новая заявка на оффер ${application.offer.dateLocal} ${application.offer.timeRangeStartLocal}-${application.offer.timeRangeEndLocal}.`;
+  const body = `Новая заявка на предложение ${application.offer.dateLocal} ${application.offer.timeRangeStartLocal}-${application.offer.timeRangeEndLocal}.`;
 
   await deliverNotification({
     userId: masterUserId,

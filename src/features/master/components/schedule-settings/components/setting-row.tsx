@@ -14,6 +14,12 @@ type Props = {
  * Generic two-column row used across the Rules and Visibility tabs:
  * title + optional helper text on the left, the active control (chip group,
  * switch, etc.) on the right. Wraps onto two lines on narrow viewports.
+ *
+ * PWA-FIX-05 — ниже `sm` строка СТЕКАЕТСЯ: текст занимает всю ширину, контрол
+ * уходит под него. Раньше `flex-1` у текста отдавал ему только остаток после
+ * `shrink-0`-контрола, и на 375 px группа из четырёх чипов оставляла подписи
+ * колонку в одно слово («Минимум / за», подсказка — в семь строк). Из-за этого
+ * подсказки писались телеграфно, а объяснить «шаг окошек» без примера нельзя.
  */
 export function SettingRow({ title, subtitle, control, className }: Props) {
   return (
@@ -23,7 +29,7 @@ export function SettingRow({ title, subtitle, control, className }: Props) {
         className
       )}
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 basis-full sm:flex-1">
         <p className="text-sm font-medium text-text-main">{title}</p>
         {subtitle ? <p className="mt-0.5 text-xs text-text-sec">{subtitle}</p> : null}
       </div>

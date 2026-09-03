@@ -91,7 +91,7 @@ function buildRedirectUri(base: string, mode: "auth" | "integrations"): string {
 export function requireVkRedirectUri(mode: "auth" | "integrations"): string {
   const redirectUri = getVkRedirectUri();
   if (!redirectUri) {
-    throw new AppError("Не настроен VK_REDIRECT_URI.", 500, "VK_ID_REDIRECT_URI_MISSING");
+    throw new AppError("Вход через VK сейчас недоступен. Войдите другим способом.", 500, "VK_ID_REDIRECT_URI_MISSING");
   }
   return buildRedirectUri(redirectUri, mode);
 }
@@ -103,7 +103,7 @@ export function buildVkAuthorizeUrl(input: {
 }): string {
   const clientId = getVkClientId();
   if (!clientId) {
-    throw new AppError("Не настроен VK_CLIENT_ID.", 500, "VK_ID_CLIENT_ID_MISSING");
+    throw new AppError("Вход через VK сейчас недоступен. Войдите другим способом.", 500, "VK_ID_CLIENT_ID_MISSING");
   }
 
   const url = new URL(VK_ID_AUTHORIZE_URL);
@@ -119,10 +119,10 @@ export function buildVkAuthorizeUrl(input: {
 
 function resolveTokenError(error: VkIdTokenError): AppError {
   if (error.error === "invalid_grant") {
-    return new AppError("Код авторизации недействителен", 400, "VK_ID_INVALID_GRANT", error);
+    return new AppError("Вход через VK не завершился. Начните заново.", 400, "VK_ID_INVALID_GRANT", error);
   }
   if (error.error === "expired_code") {
-    return new AppError("Код авторизации истёк", 400, "VK_ID_EXPIRED_CODE", error);
+    return new AppError("Вход через VK не завершился. Начните заново.", 400, "VK_ID_EXPIRED_CODE", error);
   }
   return new AppError(error.error_description ?? "Ошибка авторизации VK ID", 400, "VK_ID_OAUTH_FAILED", error);
 }
@@ -137,10 +137,10 @@ export async function exchangeVkCodeForToken(input: {
   const clientId = getVkClientId();
   const clientSecret = getVkClientSecret();
   if (!clientId) {
-    throw new AppError("Не настроен VK_CLIENT_ID.", 500, "VK_ID_CLIENT_ID_MISSING");
+    throw new AppError("Вход через VK сейчас недоступен. Войдите другим способом.", 500, "VK_ID_CLIENT_ID_MISSING");
   }
   if (!clientSecret) {
-    throw new AppError("Не настроен VK_CLIENT_SECRET.", 500, "VK_ID_CLIENT_SECRET_MISSING");
+    throw new AppError("Вход через VK сейчас недоступен. Войдите другим способом.", 500, "VK_ID_CLIENT_SECRET_MISSING");
   }
 
   const body = new URLSearchParams();

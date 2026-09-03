@@ -19,11 +19,11 @@ export async function POST(
 ) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const access = await resolveCurrentStudioAccess(user.id);
     if (!hasAdminRole(access.roles)) {
-      return jsonFail(403, "Недостаточно прав.", "FORBIDDEN");
+      return jsonFail(403, "Этот раздел доступен администратору студии.", "FORBIDDEN");
     }
 
     const body = (await req.json().catch(() => null)) as { comment?: string } | null;

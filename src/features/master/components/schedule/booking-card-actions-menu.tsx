@@ -28,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.schedule.bookingCard;
 
@@ -141,7 +142,7 @@ export function BookingCardActionsMenu({
         });
         const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
         if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : `API ${res.status}`);
+          throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
         }
         setOpen(false);
         startTransition(() => router.refresh());

@@ -48,7 +48,7 @@ export function useConversations(perspective: ChatPerspective): State & {
       setState({
         conversations: [],
         isLoading: false,
-        error: "Сетевая ошибка. Попробуйте обновить страницу.",
+        error: "Нет связи. Обновите страницу.",
       });
     }
   }, [perspective]);

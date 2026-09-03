@@ -183,7 +183,7 @@ export async function checkOtpRequestRateLimit(input: {
 export async function checkOtpVerifyLock(phone: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -198,7 +198,7 @@ export async function checkOtpVerifyLock(phone: string, ip: string | null): Prom
     logError("OTP verify lock check failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -209,7 +209,7 @@ export async function checkOtpVerifyLock(phone: string, ip: string | null): Prom
 export async function registerOtpVerifyFailure(phone: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -231,7 +231,7 @@ export async function registerOtpVerifyFailure(phone: string, ip: string | null)
     logError("OTP verify failure count failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -322,7 +322,7 @@ export async function checkOtpEmailRequestRateLimit(input: {
 export async function checkOtpEmailVerifyLock(email: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -337,7 +337,7 @@ export async function checkOtpEmailVerifyLock(email: string, ip: string | null):
     logError("OTP email verify lock check failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -348,7 +348,7 @@ export async function checkOtpEmailVerifyLock(email: string, ip: string | null):
 export async function registerOtpEmailVerifyFailure(email: string, ip: string | null): Promise<RateLimitResult> {
   const client = await getRedisConnection();
   if (!client) {
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }
@@ -370,7 +370,7 @@ export async function registerOtpEmailVerifyFailure(email: string, ip: string | 
     logError("OTP email verify failure count failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    throw new AppError("Сервис временно недоступен. Попробуйте позже.", 429, "RATE_LIMITED", {
+    throw new AppError("Слишком часто. Подождите минуту и попробуйте ещё раз.", 429, "RATE_LIMITED", {
       retryAfterSec: OTP_VERIFY_RETRY_AFTER_SECONDS,
     });
   }

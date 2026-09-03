@@ -118,7 +118,7 @@ export async function GET(req: Request) {
         operation: "stream-connect",
         code: "NOTIFIER_UNAVAILABLE",
       });
-      return jsonFail(503, "Сервис временно недоступен. Попробуйте позже.", "INTERNAL_ERROR");
+      return jsonFail(503, "Уведомления сейчас недоступны. Попробуйте позже.", "INTERNAL_ERROR");
     }
     const unsubscribe = notifier.subscribe(user.id, (event) => {
       send(event, event.id);

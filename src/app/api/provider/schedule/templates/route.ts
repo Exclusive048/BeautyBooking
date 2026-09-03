@@ -43,7 +43,7 @@ function parseTemplateBody(body: unknown) {
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
     return jsonOk({ templates });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_BODY") {
-      return jsonFail(400, "Некорректное тело запроса.", "INVALID_BODY");
+      return jsonFail(400, "Не удалось сохранить шаблон. Обновите страницу и попробуйте ещё раз.", "INVALID_BODY");
     }
     const appError = toAppError(error);
     if (appError.status >= 500) {
@@ -70,7 +70,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
-    if (!user) return jsonFail(401, "Необходима авторизация.", "UNAUTHORIZED");
+    if (!user) return jsonFail(401, "Войдите в аккаунт, чтобы продолжить.", "UNAUTHORIZED");
 
     const url = new URL(req.url);
     const providerId = url.searchParams.get("providerId");
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     return jsonOk({ id: created.id }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "INVALID_BODY") {
-      return jsonFail(400, "Некорректное тело запроса.", "INVALID_BODY");
+      return jsonFail(400, "Не удалось сохранить шаблон. Обновите страницу и попробуйте ещё раз.", "INVALID_BODY");
     }
     const appError = toAppError(error);
     if (appError.status >= 500) {

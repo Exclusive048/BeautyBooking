@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
     if (!from || !to || !isDateKey(from) || !isDateKey(to)) {
-      return jsonFail(400, "Некорректный диапазон дат.", "VALIDATION_ERROR");
+      return jsonFail(400, "Проверьте выбранный период.", "VALIDATION_ERROR");
     }
     const thresholdDays = parseThresholdDaysParam(url, 45);
 

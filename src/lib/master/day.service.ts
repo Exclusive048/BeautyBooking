@@ -89,7 +89,7 @@ type BaseDayData = {
 function parseDateKey(date: string): Date {
   const parsed = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
-    throw new AppError("Некорректная дата.", 400, "DATE_INVALID");
+    throw new AppError("Проверьте дату.", 400, "DATE_INVALID");
   }
   return parsed;
 }

@@ -37,7 +37,7 @@ const dateString = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Некорректная дата." });
+  .refine((value) => !Number.isNaN(Date.parse(value)), { message: "Проверьте дату записи." });
 
 const bookingAnswerSchema = z.object({
   questionId: z.string().trim().min(1),
@@ -47,7 +47,7 @@ const bookingAnswerSchema = z.object({
 
 export const bookingCreateSchema = z
   .object({
-    providerId: z.string().trim().min(1, "Не указан провайдер."),
+    providerId: z.string().trim().min(1, "Выберите мастера или студию."),
     serviceId: z.string().trim().min(1, "Не указана услуга."),
     hotSlotId: z.string().trim().min(1).nullable().optional(),
     masterProviderId: z.string().trim().min(1).optional(),
@@ -69,7 +69,7 @@ export const bookingCreateSchema = z
     if (value.endAtUtc && !value.startAtUtc) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "startAtUtc обязателен, если указан endAtUtc.",
+        message: "Проверьте дату и время записи.",
         path: ["startAtUtc"],
       });
     }
@@ -79,7 +79,7 @@ export const bookingCreateSchema = z
       if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "endAtUtc должен быть позже startAtUtc.",
+          message: "Время окончания должно быть позже начала.",
           path: ["endAtUtc"],
         });
       }
@@ -104,7 +104,7 @@ export const bookingRescheduleSchema = z
     if (!Number.isNaN(start) && !Number.isNaN(end) && end <= start) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "endAtUtc должен быть позже startAtUtc.",
+        message: "Время окончания должно быть позже начала.",
         path: ["endAtUtc"],
       });
     }

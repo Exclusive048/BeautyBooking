@@ -30,7 +30,7 @@ test.describe("client funnel blockers (known bugs — guards)", () => {
   test("QA-102: catalog renders results without crashing", async ({ page }) => {
     await page.goto("/catalog");
     // Error boundary copy that appears when the route throws.
-    await expect(page.getByText("Что-то пошло не так")).toBeHidden({ timeout: 8000 });
+    await expect(page.getByText("Не получилось. Попробуйте ещё раз.")).toBeHidden({ timeout: 8000 });
   });
 
   test("QA-103: catalog search response carries no internal id (rule 12)", async ({ request }) => {

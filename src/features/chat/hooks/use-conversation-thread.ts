@@ -68,7 +68,7 @@ export function useConversationThread(input: {
       setState({
         detail: null,
         isLoading: false,
-        error: "Сетевая ошибка. Попробуйте позже.",
+        error: "Нет связи. Попробуйте ещё раз.",
       });
     }
   }, [conversationSlug, perspective]);

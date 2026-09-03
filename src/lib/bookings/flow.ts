@@ -71,7 +71,7 @@ export function ensureBookingActionWindow(startAtUtc: Date | null, now: Date = n
   }
   const minutesLeft = minutesUntilStart(startAtUtc, now);
   if (minutesLeft === null) {
-    throw new AppError("Некорректное время записи.", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Проверьте время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
   if (minutesLeft < BOOKING_ACTION_WINDOW_MINUTES) {
     throw new AppError(
@@ -93,16 +93,16 @@ export function ensureCancellationDeadline(
   }
   const startMs = startAtUtc.getTime();
   if (!Number.isFinite(startMs)) {
-    throw new AppError("Некорректное время записи.", 409, "BOOKING_TIME_REQUIRED");
+    throw new AppError("Проверьте время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
 
   if (deadlineHours <= 0) {
-    throw new AppError("Отмена записи запрещена", 423, "CANCELLATION_DEADLINE_PASSED");
+    throw new AppError("Отменить запись уже нельзя.", 423, "CANCELLATION_DEADLINE_PASSED");
   }
 
   const deadlineMs = startMs - deadlineHours * 60 * 60 * 1000;
   if (now.getTime() > deadlineMs) {
-    throw new AppError("Срок отмены записи истёк", 423, "CANCELLATION_DEADLINE_PASSED");
+    throw new AppError("Отменить запись уже нельзя — срок прошёл.", 423, "CANCELLATION_DEADLINE_PASSED");
   }
 }
 

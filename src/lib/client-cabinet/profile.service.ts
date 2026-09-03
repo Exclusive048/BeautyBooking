@@ -32,14 +32,14 @@ export const updateProfileSchema = z.object({
   city: z.string().trim().max(200).optional().nullable(),
   birthDate: z
     .string()
-    .regex(ISO_DATE_RE, "Дата должна быть в формате YYYY-MM-DD")
+    .regex(ISO_DATE_RE, "Проверьте дату рождения.")
     .optional()
     .nullable(),
   hideAgeYear: z.boolean().optional(),
   email: z
     .string()
     .trim()
-    .email("Некорректный email")
+    .email("Проверьте адрес почты.")
     .max(255)
     .optional()
     .nullable(),

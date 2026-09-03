@@ -21,7 +21,7 @@ export function buildClientKey(input: {
   const rawPhone = input.clientPhone?.trim() ?? "";
   const normalized = rawPhone ? normalizeRussianPhone(rawPhone) : null;
   if (!normalized) {
-    throw new AppError("Недостаточно данных клиента", 400, "CLIENT_KEY_INVALID");
+    throw new AppError("У клиента не хватает контактов, чтобы завести карточку.", 400, "CLIENT_KEY_INVALID");
   }
 
   return { type: "phone", value: normalized, key: `phone:${normalized}` };

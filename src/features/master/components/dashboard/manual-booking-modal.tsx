@@ -13,6 +13,7 @@ import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.dashboard.manualBooking;
 
@@ -134,7 +135,7 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
       if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : `API ${res.status}`);
+        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
       }
       // Reset form, close, then refresh server data.
       setClientName("");
@@ -143,7 +144,7 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
       closeModal();
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось создать запись.");
+      setError(err instanceof Error ? err.message : "Не удалось создать запись. Попробуйте ещё раз.");
     } finally {
       setSaving(false);
     }

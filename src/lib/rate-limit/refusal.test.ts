@@ -89,7 +89,7 @@ describe("FIX-C11 · форма отказа называет причину", (
           "гость здесь делает ПЕРВЫЙ запрос",
       ).toBe(503);
       expect(refusal!.code).toBe("RATE_LIMIT_UNAVAILABLE");
-      expect(refusal!.message).toContain("недоступен");
+      expect(refusal!.message).toContain("недоступн");
     },
     20_000,
   );

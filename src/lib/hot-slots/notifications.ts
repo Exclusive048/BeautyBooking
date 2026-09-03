@@ -29,31 +29,31 @@ function formatSlotLabel(startAtUtc: Date, timezone: string): string {
 }
 
 function buildNotificationBody(input: HotSlotNotificationInput, slotLabel: string): string {
-  const parts: string[] = [`Мастер: ${input.providerName}`];
+  const parts: string[] = [`У мастера ${input.providerName} горящее окошко`];
   if (input.serviceTitle) {
-    parts.push(`Услуга: ${input.serviceTitle}`);
+    parts.push(`${input.serviceTitle}`);
   }
-  parts.push(`Скидка: ${formatDiscount(input.discountType, input.discountValue)}`);
-  parts.push(`Ближайшее окошко: ${slotLabel}`);
+  parts.push(`скидка ${formatDiscount(input.discountType, input.discountValue)}`);
+  parts.push(`ближайшее — ${slotLabel}`);
   if (input.slots.length > 1) {
-    parts.push(`Всего окошек: ${input.slots.length}`);
+    parts.push(`свободных окошек — ${input.slots.length}`);
   }
   return parts.join(" · ");
 }
 
 function buildTelegramText(input: HotSlotNotificationInput, slotLabel: string, linkUrl: string | null): string {
-  const lines: string[] = ["🔥 Горящее окошко доступно"];
-  lines.push(`Мастер: ${input.providerName}`);
+  const lines: string[] = ["🔥 Горящее окошко"];
+  lines.push(`У мастера ${input.providerName}`);
   if (input.serviceTitle) {
-    lines.push(`Услуга: ${input.serviceTitle}`);
+    lines.push(`${input.serviceTitle}`);
   }
-  lines.push(`Скидка: ${formatDiscount(input.discountType, input.discountValue)}`);
-  lines.push(`Ближайшее окошко: ${slotLabel}`);
+  lines.push(`Скидка ${formatDiscount(input.discountType, input.discountValue)}`);
+  lines.push(`Ближайшее окошко — ${slotLabel}`);
   if (input.slots.length > 1) {
-    lines.push(`Всего окошек: ${input.slots.length}`);
+    lines.push(`Свободных окошек — ${input.slots.length}`);
   }
   if (linkUrl) {
-    lines.push(`Ссылка: ${linkUrl}`);
+    lines.push(`Записаться: ${linkUrl}`);
   }
   return lines.join("\n");
 }

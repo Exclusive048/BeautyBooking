@@ -15,7 +15,7 @@ type LimitFeatureKey = {
   [Key in keyof PlanFeatures]: PlanFeatures[Key] extends number | null ? Key : never;
 }[keyof PlanFeatures];
 
-const PLAN_LOAD_ERROR = "Не удалось загрузить тариф";
+const PLAN_LOAD_ERROR = "Не удалось загрузить тариф. Попробуйте ещё раз.";
 
 async function fetchCurrentPlan(url: string): Promise<CurrentPlanInfo> {
   const res = await fetch(url, { cache: "no-store" });

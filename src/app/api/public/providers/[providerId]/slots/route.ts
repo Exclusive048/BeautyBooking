@@ -28,11 +28,11 @@ function mapSlotsError(code?: string): string {
     case "SERVICE_REQUIRED":
       return "Не указана услуга.";
     case "DURATION_INVALID":
-      return "Некорректная длительность услуги.";
+      return "Проверьте длительность услуги.";
     case "DATE_INVALID":
-      return "Некорректная дата.";
+      return "Проверьте дату.";
     case "RANGE_INVALID":
-      return "Некорректный диапазон.";
+      return "Проверьте выбранный период.";
     case "PROVIDER_NOT_FOUND":
     case "MASTER_NOT_FOUND":
       return "Мастер не найден.";
@@ -63,12 +63,12 @@ export async function GET(
     const limitRaw = url.searchParams.get("limit");
 
     if (!serviceId) return fail("Не указана услуга.", 400, "SERVICE_REQUIRED");
-    if (!isDateKey(fromKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
-    if (toKey && !isDateKey(toKey)) return fail("Некорректная дата.", 400, "DATE_INVALID");
+    if (!isDateKey(fromKey)) return fail("Проверьте дату.", 400, "DATE_INVALID");
+    if (toKey && !isDateKey(toKey)) return fail("Проверьте дату.", 400, "DATE_INVALID");
 
     const limit = limitRaw ? Number.parseInt(limitRaw, 10) : undefined;
     if (limitRaw && !Number.isFinite(limit)) {
-      return fail("Некорректный лимит.", 400, "LIMIT_INVALID");
+      return fail("Слишком много дней за раз. Выберите период короче.", 400, "LIMIT_INVALID");
     }
 
     const provider = await resolveProviderBySlugOrId({
