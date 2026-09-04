@@ -183,14 +183,19 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
               </option>
             ))}
           </Select>
-          <Input
-            type="text"
-            value={clientName}
-            onChange={(event) => setClientName(event.target.value)}
-            placeholder={T.clientNamePlaceholder}
-            className="h-11 rounded-xl px-3 text-sm"
-            disabled={!isSolo}
-          />
+          {/* FIX-NAME-HINT: у поля нет отдельной подписи, поэтому формат
+              несёт сам плейсхолдер, а подсказка под ним объясняет зачем. */}
+          <div>
+            <Input
+              type="text"
+              value={clientName}
+              onChange={(event) => setClientName(event.target.value)}
+              placeholder={T.clientNamePlaceholder}
+              className="h-11 rounded-xl px-3 text-sm"
+              disabled={!isSolo}
+            />
+            <p className="mt-1.5 text-xs text-text-sec">{UI_TEXT.common.clientNameHint}</p>
+          </div>
           <Input
             type="text"
             value={clientPhone}

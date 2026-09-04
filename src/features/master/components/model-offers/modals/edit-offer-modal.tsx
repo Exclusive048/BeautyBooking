@@ -9,6 +9,7 @@ import type {
   AvailableServiceForOffer,
 } from "@/lib/master/model-offers-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
+import { resolveRequirementsForSubmit } from "../lib/requirements";
 import { OfferFormFields, type OfferFormState } from "./offer-form-fields";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.edit;
@@ -29,6 +30,7 @@ function deriveInitial(offer: ActiveOfferItem): OfferFormState {
     timeEndLocal: offer.timeRangeEndLocal,
     priceRubles: offer.offerPrice && offer.offerPrice > 0 ? String(Math.round(offer.offerPrice / 100)) : "",
     requirements: offer.requirements,
+    requirementsDraft: "",
   };
 }
 
@@ -80,7 +82,9 @@ export function EditOfferModal({ open, onClose, offer, services }: Props) {
           timeRangeStartLocal: state.timeStartLocal,
           timeRangeEndLocal: state.timeEndLocal,
           price: priceKopeks,
-          requirements: state.requirements,
+          // FIX-OFFER-REQUIREMENTS: см. `create-offer-modal.tsx` — черновик
+          // условия дописывается на отправке.
+          requirements: resolveRequirementsForSubmit(state),
         }),
       });
       if (!response.ok) {

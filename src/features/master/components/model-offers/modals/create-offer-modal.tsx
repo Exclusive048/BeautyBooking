@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import type { AvailableServiceForOffer } from "@/lib/master/model-offers-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
+import { resolveRequirementsForSubmit } from "../lib/requirements";
 import { OfferFormFields, type OfferFormState } from "./offer-form-fields";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.create;
@@ -23,6 +24,7 @@ const EMPTY_STATE: OfferFormState = {
   timeEndLocal: "13:00",
   priceRubles: "",
   requirements: [],
+  requirementsDraft: "",
 };
 
 /**
@@ -69,7 +71,10 @@ export function CreateOfferModal({ open, onClose, services }: Props) {
           timeRangeStartLocal: state.timeStartLocal,
           timeRangeEndLocal: state.timeEndLocal,
           price: priceKopeks,
-          requirements: state.requirements,
+          // FIX-OFFER-REQUIREMENTS: напечатанное, но не подтверждённое Enter'ом
+          // условие раньше терялось молча. Дописываем его тем же правилом,
+          // что и чипы.
+          requirements: resolveRequirementsForSubmit(state),
         }),
       });
       if (!response.ok) {

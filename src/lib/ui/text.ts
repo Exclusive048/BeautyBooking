@@ -16,6 +16,14 @@ export const UI_TEXT = {
     currencyRub: "₽",
     requiredField: "Обязательное поле",
     namePlaceholder: "Имя",
+    // FIX-NAME-HINT: подсказка под полем имени на ВСЕХ поверхностях записи —
+    // и там, где имя вводит мастер/администратор вручную, и там, где клиент
+    // вводит своё. Ключей два, потому что причина разная («найти в списке» —
+    // это про CRM мастера, «узнать вас» — про клиента), но каждый ОДИН на все
+    // свои поверхности: иначе формулировка разъедется по шести экранам
+    // (прецедент общего ключа — `windowNote`, UI-33).
+    clientNameHint: "Лучше фамилия и имя — так клиента проще найти в списке.",
+    ownNameHint: "Лучше фамилия и имя — так мастер быстрее вас узнает.",
     saved: "Сохранено",
     saving: "Сохраняем…",
     save: "Сохранить",
@@ -2809,8 +2817,13 @@ export const UI_TEXT = {
           discountHintTemplate: "Скидка {percent}% от обычной цены",
           requirementsLabel: "Условия (необязательно)",
           requirementsPlaceholder: "Например: натуральные ногти",
+          // FIX-OFFER-REQUIREMENTS: прежняя формулировка читалась как «без
+          // Enter условие не считается» — и ровно так себя и вёл код: текст,
+          // не подтверждённый Enter'ом, пропадал при отправке. Теперь он
+          // дописывается сам, и подсказка про Enter говорит про СЛЕДУЮЩЕЕ
+          // условие, а не про обязательный шаг.
           requirementsHelp:
-            "Нажмите Enter, чтобы добавить условие. Не больше пяти.",
+            "Не больше пяти условий. Enter — чтобы добавить следующее.",
           submit: "Создать предложение",
           submitting: "Создание…",
           cancel: "Отмена",
@@ -3645,8 +3658,14 @@ export const UI_TEXT = {
         unansweredReviewTitle: "Ответить на отзыв",
         unansweredReviewCta: "Ответить",
         freeSlotTitle: "Свободное окошко {from}–{to}",
-        freeSlotDescription:
-          "{minutes} мин сегодня пустуют. Настройте автоматические скидки.",
+        // FIX-FREE-HOURS: раньше здесь стояли минуты («435 мин сегодня
+        // пустуют») — величина, которую мастер всё равно переводит в часы в
+        // уме, причём тем дольше, чем крупнее окошко. Часы округляются ВНИЗ:
+        // окошко всегда >= 60 мин (см. `findFirstFreeSlotToday`), поэтому
+        // значение никогда не ноль, и округление вниз не обещает больше, чем
+        // есть. Точные границы окошка остаются в заголовке карточки.
+        freeSlotDescription: (hours: number) =>
+          `Сегодня пустует ${hours} ${pluralize(hours, "час", "часа", "часов")}. Настройте автоматические скидки.`,
         freeSlotCta: "Настроить горящие окошки",
       },
       quickActions: {
@@ -3670,7 +3689,9 @@ export const UI_TEXT = {
       manualBooking: {
         title: "Новая запись",
         chooseService: "Выберите услугу",
-        clientNamePlaceholder: "Имя клиента",
+        // FIX-NAME-HINT: формат несёт сам плейсхолдер — у поля нет отдельной
+        // подписи, подсказка `common.clientNameHint` стоит под ним.
+        clientNamePlaceholder: "Фамилия и имя клиента",
         phonePlaceholder: "Телефон",
         commentPlaceholder: "Комментарий",
         cancel: "Отмена",
@@ -5809,7 +5830,9 @@ export const UI_TEXT = {
       total: "Итого со скидкой",
       continue: "Продолжить",
       nameLabel: "Имя",
-      namePlaceholder: "Как к вам обращаться",
+      // FIX-NAME-HINT: «Как к вам обращаться» звало назвать одно имя, а
+      // подсказка под полем (`common.ownNameHint`) просит фамилию и имя.
+      namePlaceholder: "Фамилия и имя",
       phoneLabel: "Телефон",
       phonePlaceholder: "+7 999 123-45-67",
       commentLabel: "Комментарий (необязательно)",
@@ -6024,7 +6047,7 @@ export const UI_TEXT = {
       phoneLabel: "Телефон",
       phonePlaceholder: "+7 (___) ___-__-__",
       nameLabel: "Имя",
-      namePlaceholder: "Как к вам обращаться",
+      namePlaceholder: "Фамилия и имя",
       commentLabel: "Комментарий — необязательно",
       commentPlaceholder: "Любые пожелания",
       errorPhoneInvalid: "Проверьте номер телефона.",
@@ -6678,7 +6701,9 @@ export const UI_TEXT = {
         serviceLabel: "Услуга",
         servicePlaceholder: "Выберите услугу",
         clientLabel: "Имя клиента",
-        clientPlaceholder: "Анна Соколова",
+        // FIX-NAME-HINT: пример в порядке «Фамилия Имя» — тот же порядок, о
+        // котором просит подсказка `common.clientNameHint` под полем.
+        clientPlaceholder: "Соколова Анна",
         phoneLabel: "Телефон клиента",
         phonePlaceholder: "+7 999 123-45-67",
         cancel: "Отмена",
@@ -7717,7 +7742,9 @@ export const UI_TEXT = {
       total: "Итого со скидкой",
       continue: "Продолжить",
       nameLabel: "Имя",
-      namePlaceholder: "Как к вам обращаться",
+      // FIX-NAME-HINT: «Как к вам обращаться» звало назвать одно имя, а
+      // подсказка под полем (`common.ownNameHint`) просит фамилию и имя.
+      namePlaceholder: "Фамилия и имя",
       phoneLabel: "Телефон",
       phonePlaceholder: "+7 999 123-45-67",
       commentLabel: "Комментарий (необязательно)",
@@ -7798,7 +7825,8 @@ export const UI_TEXT = {
       subtitleGuest: "Оставьте контакты — мы напомним о записи",
       subtitleAuth: "Проверьте детали и подтвердите",
       nameLabel: "Как к вам обращаться?",
-      namePlaceholder: "Имя",
+      // FIX-NAME-HINT: см. `common.ownNameHint` — подсказка под полем.
+      namePlaceholder: "Фамилия и имя",
       phoneLabel: "Телефон",
       phonePlaceholder: "+7 999 000 00 00",
       silentLabel: "Хочу помолчать",

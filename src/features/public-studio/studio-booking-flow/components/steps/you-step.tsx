@@ -81,6 +81,8 @@ export function YouStep({
               placeholder={UI_TEXT.bookingWidget.youStep.namePlaceholder}
               className="mt-1"
             />
+            {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
+            <p className="mt-1 text-xs text-text-muted">{UI_TEXT.common.ownNameHint}</p>
           </div>
           <div>
             <label htmlFor="guest-phone" className="text-xs font-medium text-text-muted">

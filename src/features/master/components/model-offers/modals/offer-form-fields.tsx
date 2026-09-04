@@ -1,12 +1,13 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import type { AvailableServiceForOffer } from "@/lib/master/model-offers-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatRubles } from "../lib/format";
+import { MAX_REQUIREMENTS, commitRequirementDraft } from "../lib/requirements";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.create;
 
@@ -18,6 +19,13 @@ export type OfferFormState = {
   /** Empty string when "free for the model" — submit handler maps to null. */
   priceRubles: string;
   requirements: string[];
+  /**
+   * FIX-OFFER-REQUIREMENTS: недобранное условие — то, что напечатано в поле,
+   * но ещё не превращено в чип. Раньше оно жило локальным стейтом внутри
+   * `RequirementsField` и при отправке формы просто пропадало. Теперь это
+   * часть состояния формы, поэтому отправка может его дописать.
+   */
+  requirementsDraft: string;
 };
 
 type Props = {
@@ -35,7 +43,9 @@ type Props = {
  * service price; surfaces an "Free for model" hint when price is 0/empty.
  *
  * Requirement chips: type + Enter to add, X to remove. Hard cap of 5
- * (server schema also enforces it).
+ * (server schema also enforces it). FIX-OFFER-REQUIREMENTS — набранное, но
+ * не подтверждённое Enter'ом условие больше не теряется: поле коммитит его
+ * и по потере фокуса, а отправка формы дописывает остаток черновика.
  */
 export function OfferFormFields({ state, onChange, services, serviceReadOnly }: Props) {
   const serviceId = useId();
@@ -162,7 +172,10 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
         <RequirementsField
           inputId={reqId}
           value={state.requirements}
-          onChange={(next) => update("requirements", next)}
+          draft={state.requirementsDraft}
+          onRemove={(next) => update("requirements", next)}
+          onDraftChange={(next) => update("requirementsDraft", next)}
+          onCommitDraft={() => onChange(commitRequirementDraft(state))}
         />
         <p className="mt-1.5 text-xs text-text-sec">{T.requirementsHelp}</p>
       </div>
@@ -181,39 +194,44 @@ function Label({ htmlFor, children }: { htmlFor?: string; children: React.ReactN
 function RequirementsField({
   inputId,
   value,
-  onChange,
+  draft,
+  onRemove,
+  onDraftChange,
+  onCommitDraft,
 }: {
   inputId: string;
   value: string[];
-  onChange: (next: string[]) => void;
+  draft: string;
+  onRemove: (next: string[]) => void;
+  onDraftChange: (next: string) => void;
+  /**
+   * Коммит черновика в чип. Зовётся по Enter И по потере фокуса — клик по
+   * «Создать предложение» сначала снимает фокус с поля, поэтому напечатанное
+   * условие успевает стать чипом ещё до отправки. На blur как на единственный
+   * путь полагаться нельзя (форму можно отправить с клавиатуры), поэтому
+   * отправка дописывает остаток сама — `resolveRequirementsForSubmit`.
+   *
+   * 🔴 Переход делает вызывающий ОДНИМ обновлением состояния: список и
+   * черновик — соседние поля одного объекта, и два раздельных обновления от
+   * общего снимка затёрли бы друг друга.
+   */
+  onCommitDraft: () => void;
 }) {
-  const [input, setInput] = useState("");
-  const atLimit = value.length >= 5;
-
-  const add = () => {
-    const next = input.trim();
-    if (!next) return;
-    if (atLimit) return;
-    if (value.some((item) => item.toLowerCase() === next.toLowerCase())) {
-      setInput("");
-      return;
-    }
-    onChange([...value, next]);
-    setInput("");
-  };
+  const atLimit = value.length >= MAX_REQUIREMENTS;
 
   return (
     <div className="mt-1.5 space-y-2">
       <Input
         id={inputId}
         type="text"
-        value={input}
+        value={draft}
         disabled={atLimit}
-        onChange={(event) => setInput(event.target.value)}
+        onChange={(event) => onDraftChange(event.target.value)}
+        onBlur={onCommitDraft}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
             event.preventDefault();
-            add();
+            onCommitDraft();
           }
         }}
         placeholder={UI_TEXT.cabinetMaster.modelOffers.modals.create.requirementsPlaceholder}
@@ -230,7 +248,7 @@ function RequirementsField({
               <span>{item}</span>
               <button
                 type="button"
-                onClick={() => onChange(value.filter((other) => other !== item))}
+                onClick={() => onRemove(value.filter((other) => other !== item))}
                 aria-label={UI_TEXT.a11y.removeItem(item)}
                 className="text-text-sec hover:text-accent-text"
               >

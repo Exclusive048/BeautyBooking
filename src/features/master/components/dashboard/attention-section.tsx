@@ -78,9 +78,11 @@ function buildTasks(
       title: T.freeSlotTitle
         .replace("{from}", formatLocalHm(data.freeSlot.startAtUtc, timezone))
         .replace("{to}", formatLocalHm(data.freeSlot.endAtUtc, timezone)),
-      description: T.freeSlotDescription.replace(
-        "{minutes}",
-        String(data.freeSlot.durationMin),
+      // FIX-FREE-HOURS: карточка сообщает часы, округлённые ВНИЗ. Окошко
+      // отбирается по порогу >= 60 мин, поэтому `Math.max(1, …)` — страховка
+      // от будущего снижения порога, а не рабочая ветка.
+      description: T.freeSlotDescription(
+        Math.max(1, Math.floor(data.freeSlot.durationMin / 60)),
       ),
       // fix-02: there's no "launch a single hot slot from a free
       // window" flow — hot slots auto-publish via DiscountRule. Link

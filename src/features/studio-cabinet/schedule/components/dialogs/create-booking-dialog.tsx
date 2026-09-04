@@ -253,6 +253,10 @@ export function CreateBookingDialog({
             placeholder={T.clientPlaceholder}
             disabled={submitting}
           />
+          {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
+          <span className="mt-1.5 block text-xs text-text-sec">
+            {UI_TEXT.common.clientNameHint}
+          </span>
         </label>
 
         <label className="block">

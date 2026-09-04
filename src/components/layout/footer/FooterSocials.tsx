@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { VkIcon } from "@/components/ui/vk-icon";
 import { UI_TEXT } from "@/lib/ui/text";
 import { env, isTelegramEnabled } from "@/lib/env";
 
@@ -8,14 +9,11 @@ type SocialLink = {
   icon: ReactNode;
 };
 
-const VK_ICON = (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-    <path
-      fill="currentColor"
-      d="M4.8 6.5h3.2c.2 0 .4.1.5.3.2.6 1 2.6 2.1 3.9.4.4.6.5.8.5.1 0 .3-.1.4-.3.1-.4.2-1.4.1-2.5 0-.3-.2-.6-.5-.7-.2-.1-.5-.1-.3-.4.1-.2.6-.5 1.9-.5 2 0 2.7.4 2.9.7.3.4.2 1.2.2 2.2 0 .7-.1 1.6.2 1.9.2.2.4.3.6.3.3 0 .6-.2 1-.6 1.2-1.4 2.2-3.6 2.2-3.6.1-.2.3-.4.6-.4h3.1c.3 0 .5.2.4.6-.2.8-1.7 3.4-3.4 5.6-.9 1.2-.9 1.7.1 2.6.7.7 1.6 1.3 2.2 2 .4.5.7 1 .6 1.6 0 .3-.3.5-.6.5h-2.7c-.6 0-.9-.2-1.5-.7-.6-.6-1.3-1.4-2-2.3-.3-.4-.5-.6-.8-.6-.2 0-.4.2-.5.7-.2.6-.2 1.6-.2 2.4 0 .3-.2.5-.5.5h-3.2c-.2 0-.4 0-.6-.1-1.3-.4-2.8-1.5-3.8-3.1-1.6-2.5-2.8-5.6-3-7.8 0-.3.2-.5.5-.5Z"
-    />
-  </svg>
-);
+// FIX-VK-GLYPH: знак приходит из единственного источника
+// (`components/ui/vk-icon.tsx`). Прежний рукописный путь жил здесь дословным
+// дублем с `provider-social-links.tsx` и был обведён на глаз — кривой «V» и
+// нарост слева внизу.
+const VK_ICON = <VkIcon className="h-5 w-5" />;
 
 const TELEGRAM_ICON = (
   <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">

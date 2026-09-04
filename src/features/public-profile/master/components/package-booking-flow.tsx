@@ -557,6 +557,10 @@ export function PackageBookingFlow({
                   onChange={(e) => setName(e.target.value)}
                   placeholder={T.namePlaceholder}
                 />
+                {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
+                <span className="mt-1 block text-xs text-text-sec">
+                  {UI_TEXT.common.ownNameHint}
+                </span>
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>

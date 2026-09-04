@@ -170,6 +170,10 @@ export function FormPhase({
             placeholder={T.namePlaceholder}
             maxLength={120}
           />
+          {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
+          <span className="mt-1 block text-xs text-text-sec">
+            {UI_TEXT.common.ownNameHint}
+          </span>
         </label>
       </div>
 
