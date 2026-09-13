@@ -92,6 +92,10 @@ export class S3StorageProvider implements StorageProvider {
     this.client = new S3Client({
       endpoint: cfg.endpoint,
       region: cfg.region,
+      // Path-style (`https://<endpoint>/<bucket>/<key>`) — единственная форма,
+      // которую поддерживают все целевые провайдеры; virtual-hosted-style
+      // требует wildcard-сертификата на домен бакета. Не выносится в env
+      // по той же причине, что и checksum ниже.
       forcePathStyle: true,
       credentials: {
         accessKeyId: cfg.accessKey,
@@ -113,6 +117,27 @@ export class S3StorageProvider implements StorageProvider {
         connectionTimeout: S3_CONNECTION_TIMEOUT_MS,
         requestTimeout: S3_REQUEST_TIMEOUT_MS,
       },
+      // STORAGE-S3-COMPAT — совместимость с не-AWS S3-шлюзами (Cloud.ru
+      // Object Storage, Yandex Object Storage, MinIO).
+      //
+      // 🔴 `@aws-sdk/client-s3` с 3.729 по умолчанию считает `WHEN_SUPPORTED`,
+      // то есть дописывает `x-amz-checksum-crc32` + `x-amz-sdk-checksum-algorithm`
+      // КАЖДОМУ `PutObject`. Часть S3-совместимых шлюзов на незнакомый
+      // checksum-заголовок отвечает `400 Bad Request` либо
+      // `XAmzContentSHA256Mismatch`, и тогда падает не «иногда», а КАЖДАЯ
+      // загрузка медиа — при рабочих, правильно выписанных ключах. Диагностика
+      // при этом уводит в сторону: симптом выглядит как проблема прав.
+      //
+      // `WHEN_REQUIRED` оставляет checksum только там, где его требует сам
+      // протокол (например `DeleteObjects`; проект её не использует — удаление
+      // идёт пообъектно `DeleteObject`). На настоящем AWS S3 и на Yandex Object
+      // Storage поведение не меняется — checksum там опционален. То есть это
+      // строго расширение совместимости, а не размен.
+      //
+      // Отдельной env-ручки намеренно нет: значение верно для всех четырёх
+      // провайдеров, а объявленная-и-никем-не-читаемая переменная — уже
+      // случавшийся в проекте класс (SEC-02, `SMS_LOW_BALANCE_THRESHOLD`).
+      requestChecksumCalculation: "WHEN_REQUIRED",
     });
   }
 

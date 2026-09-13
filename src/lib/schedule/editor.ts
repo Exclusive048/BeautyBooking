@@ -597,6 +597,59 @@ export async function applyScheduleSnapshotTx(
   }
 }
 
+/**
+ * FIX-STUDIO-POLICY-EDITABLE — узкий writer правил записи провайдера.
+ *
+ * Зачем отдельная функция, а не `applyScheduleSnapshot`: снапшот требует ПОЛНОЕ
+ * недельное расписание и список исключений, потому что применяет их через
+ * `deleteMany` + `createMany`. У студии этого расписания нет вовсе — рабочие
+ * часы живут у мастеров, — то есть отправить снапшот означало бы стереть
+ * структуру, которой у провайдера-студии и не должно быть. Отсюда и симптом, с
+ * которого началась правка: правила студии редактировались только через экран
+ * расписания МАСТЕРА, и без единого мастера менять их было негде.
+ *
+ * Почему писать здесь, а не прямым Prisma-вызовом из роута (CLAUDE.md rule 5):
+ * `minBookingHoursAhead` / `maxBookingDaysAhead` / `acceptNewClients` — входы
+ * выдачи слотов, и место их записи обязано совпадать с местом инвалидации.
+ *
+ * ⚠️ Инвалидация здесь — СТРАХОВКА, а не необходимость: эти три поля
+ * применяются ПОСЛЕ чтения кэша (они сужают выдачу, а не то, что закэшировано —
+ * PERF-18), и в `scheduleVersion` намеренно не входят. Дешевле сбросить, чем
+ * держать в голове, какое из полей на какой стороне кэша.
+ */
+export type ProviderBookingPolicyInput = {
+  minHoursAhead: number;
+  maxDaysAhead: number;
+  freeCancelHours: number | null;
+  lateCancelAction: LateCancelAction;
+  acceptNewClients: boolean;
+  remindersEnabled: boolean;
+};
+
+export async function applyProviderBookingPolicy(
+  providerId: string,
+  input: ProviderBookingPolicyInput
+): Promise<void> {
+  const lateCancelAction: LateCancelAction = LATE_CANCEL_ACTIONS.includes(input.lateCancelAction)
+    ? input.lateCancelAction
+    : "none";
+
+  await prisma.provider.update({
+    where: { id: providerId },
+    data: {
+      minBookingHoursAhead: input.minHoursAhead,
+      maxBookingDaysAhead: input.maxDaysAhead,
+      cancellationDeadlineHours: input.freeCancelHours,
+      lateCancelAction,
+      acceptNewClients: input.acceptNewClients,
+      remindersEnabled: input.remindersEnabled,
+    },
+    select: { id: true },
+  });
+
+  await invalidateSlotsForMaster(providerId);
+}
+
 export async function applyScheduleSnapshot(
   providerId: string,
   input: ScheduleSnapshotInput

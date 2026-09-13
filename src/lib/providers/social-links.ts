@@ -5,7 +5,7 @@
 // is an XSS/phishing vector. This module is the single normalization boundary:
 // it extracts a validated handle and RECONSTRUCTS the URL from a hardcoded
 // `https://<allowed-host>/` base. Consequences by construction:
-//   - the stored/rendered href can only ever point at vk.com / instagram.com;
+//   - the stored/rendered href can only ever point at vk.ru / instagram.com;
 //   - a non-http(s) scheme (`javascript:`, `data:`, …) can never survive;
 //   - a foreign host (`evil.com/…`) is rejected outright.
 // The SAME pure function runs on the server (persist-time validation — the
@@ -32,13 +32,32 @@ const HANDLE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 // `javascript:alert(1)` (no `//`) as a plain token (which then fails HANDLE_RE).
 const EXPLICIT_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
-const SOCIAL_CONFIG: Record<SocialKind, { base: string; hosts: readonly string[] }> = {
-  vk: { base: "https://vk.com/", hosts: ["vk.com", "www.vk.com", "m.vk.com"] },
+// FIX-VK-RU-DOMAIN: канонический домен ВКонтакте в РФ — `vk.ru`. Он же —
+// единственная база, из которой реконструируется href (`base`).
+//
+// 🔴 `vk.com` остаётся в `hosts`, но ТОЛЬКО как ПРИНИМАЕМЫЙ ввод, не как выход:
+// пользователи копируют ссылки в обеих формах, а в БД уже лежат строки с
+// `https://vk.com/...` (нормализатор идемпотентен — при следующем сохранении
+// такая строка канонизируется в `vk.ru`). Убрать `vk.com` из `hosts` значило бы
+// отвергать легитимный ввод и ронять `safeSocialHref` на существующих строках,
+// то есть тихо гасить уже сохранённую ссылку на публичном профиле.
+const SOCIAL_CONFIG: Record<SocialKind, { base: string; hosts: readonly string[]; label: string }> = {
+  vk: {
+    base: "https://vk.ru/",
+    hosts: ["vk.ru", "www.vk.ru", "m.vk.ru", "vk.com", "www.vk.com", "m.vk.com"],
+    label: "vk.ru",
+  },
   instagram: {
     base: "https://instagram.com/",
     hosts: ["instagram.com", "www.instagram.com", "m.instagram.com"],
+    label: "instagram.com",
   },
 };
+
+/** Канонический хост вида для сообщений об ошибке («Укажите адрес на vk.ru»). */
+export function socialHostLabel(kind: SocialKind): string {
+  return SOCIAL_CONFIG[kind].label;
+}
 
 function stripLeadingAt(value: string): string {
   return value.startsWith("@") ? value.slice(1) : value;
@@ -88,7 +107,7 @@ export function normalizeSocialLink(
     }
     handle = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
   } else {
-    // Bare token. A lone allowed-host domain ("vk.com") carries no handle.
+    // Bare token. A lone allowed-host domain ("vk.ru") carries no handle.
     if (cfg.hosts.includes(withoutAt.toLowerCase())) {
       return { status: "invalid" };
     }
@@ -129,7 +148,7 @@ export function safeSocialHref(kind: SocialKind, stored: string | null | undefin
   return result.status === "ok" ? result.url : null;
 }
 
-/** Short display handle for the cabinet preview (e.g. `vk.com/durov`). */
+/** Short display handle for the cabinet preview (e.g. `vk.ru/durov`). */
 export function socialDisplayLabel(kind: SocialKind, stored: string | null | undefined): string | null {
   const result = normalizeSocialLink(kind, stored);
   if (result.status !== "ok") return null;

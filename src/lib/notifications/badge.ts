@@ -1,4 +1,5 @@
 import { MembershipStatus } from "@prisma/client";
+import { listAdministeredStudioIds } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import type { NotificationContext } from "@/lib/notifications/groups";
@@ -58,8 +59,17 @@ async function countPendingInvitesForVerifiedOwner(
     where: { id: userId },
     select: { phoneVerifiedAt: true },
   });
-  if (!owner?.phoneVerifiedAt) return 0;
-  return prisma.studioInvite.count({
-    where: { phone: normalizedPhone, status: MembershipStatus.PENDING },
-  });
+  const where = owner?.phoneVerifiedAt
+    ? { phone: normalizedPhone, status: MembershipStatus.PENDING }
+    : // FIX-STUDIO-SELF-INVITE: непроверенный номер считает приглашения ТОЛЬКО
+      // тех студий, которыми пользователь управляет, — то есть ровно свои
+      // самоприглашения. Утечки нет: он же их и выписал. Без этой ветки бейдж
+      // был нулём у всех, потому что подтверждённых номеров в проде нет
+      // (SMS-шлюз не подключён). Разбор грантов — `lib/invites/access.ts`.
+      {
+        phone: normalizedPhone,
+        status: MembershipStatus.PENDING,
+        studioId: { in: await listAdministeredStudioIds(userId) },
+      };
+  return prisma.studioInvite.count({ where });
 }

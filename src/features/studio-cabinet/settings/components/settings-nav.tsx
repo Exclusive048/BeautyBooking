@@ -1,18 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  AlertOctagon,
-  Bell,
-  Building2,
-  Images,
-  ShieldCheck,
-  UserRound,
-  Users,
-} from "lucide-react";
+import { AlertOctagon, Bell, Images, ShieldCheck, UserRound, Users } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
-import type { StudioSettingsSection } from "../lib/types";
+import {
+  DEFAULT_STUDIO_SETTINGS_SECTION,
+  type StudioSettingsSection,
+} from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.settingsV2.nav;
 
@@ -26,8 +21,7 @@ const SECTIONS: Array<{
   labelKey: keyof typeof T;
   icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }> = [
-  { key: "general", labelKey: "general", icon: Building2 },
-  { key: "profile-media", labelKey: "profileMedia", icon: UserRound },
+  { key: "profile", labelKey: "profile", icon: UserRound },
   { key: "portfolio", labelKey: "portfolio", icon: Images },
   { key: "owner-team", labelKey: "ownerTeam", icon: Users },
   { key: "notifications", labelKey: "notifications", icon: Bell },
@@ -41,7 +35,7 @@ export function SettingsNav({ active, canDanger }: Props) {
 
   const select = (key: StudioSettingsSection) => {
     const next = new URLSearchParams(searchParams.toString());
-    if (key === "general") next.delete("section");
+    if (key === DEFAULT_STUDIO_SETTINGS_SECTION) next.delete("section");
     else next.set("section", key);
     router.replace(`?${next.toString()}`, { scroll: false });
   };

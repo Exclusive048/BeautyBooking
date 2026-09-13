@@ -1,5 +1,6 @@
 import { Prisma, NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { listAdministeredStudioIds } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { publishRealtime } from "@/lib/notifications/service";
@@ -87,7 +88,10 @@ function buildPhoneCandidates(phone: string): string[] {
   return Array.from(candidates);
 }
 
-async function resolveInviteRecipientUserId(phone: string): Promise<string | null> {
+async function resolveInviteRecipientUserId(
+  phone: string,
+  studioId: string,
+): Promise<string | null> {
   const phoneCandidates = buildPhoneCandidates(phone);
   if (phoneCandidates.length === 0) return null;
   // PHONE-CLAIM-01: уведомление об инвайте — только ДОКАЗАННОМУ владельцу
@@ -97,7 +101,20 @@ async function resolveInviteRecipientUserId(phone: string): Promise<string | nul
     where: { phone: { in: phoneCandidates }, phoneVerifiedAt: { not: null } },
     select: { id: true },
   });
-  return invitedUser?.id ?? null;
+  if (invitedUser) return invitedUser.id;
+
+  // FIX-STUDIO-SELF-INVITE: второй грант — администратор ТОЙ ЖЕ студии, чей
+  // собственный номер совпал. Утечки нет по построению: он и выписал это
+  // приглашение. Без ветки самоприглашение владельца молчало — подтверждённых
+  // номеров в проде нет ни у кого (SMS-шлюз не подключён), см.
+  // `lib/invites/access.ts`.
+  const claimant = await prisma.userProfile.findFirst({
+    where: { phone: { in: phoneCandidates }, phoneVerifiedAt: null },
+    select: { id: true },
+  });
+  if (!claimant) return null;
+  const administered = await listAdministeredStudioIds(claimant.id);
+  return administered.includes(studioId) ? claimant.id : null;
 }
 
 async function resolveInviteUserLabel(invite: InviteWithRelations): Promise<string> {
@@ -142,7 +159,7 @@ export async function loadScheduleRequestWithRelations(
 }
 
 export async function notifyStudioInviteReceived(invite: InviteWithRelations): Promise<void> {
-  const invitedUserId = await resolveInviteRecipientUserId(invite.phone);
+  const invitedUserId = await resolveInviteRecipientUserId(invite.phone, invite.studio.id);
   if (!invitedUserId) return;
 
   const studioName = invite.studio.provider.name || "Студия";
@@ -223,7 +240,7 @@ export async function notifyStudioInviteRejected(invite: InviteWithRelations): P
 }
 
 export async function notifyStudioInviteRevoked(invite: InviteWithRelations): Promise<void> {
-  const invitedUserId = await resolveInviteRecipientUserId(invite.phone);
+  const invitedUserId = await resolveInviteRecipientUserId(invite.phone, invite.studio.id);
   if (!invitedUserId) return;
 
   const studioName = invite.studio.provider.name || "Студия";

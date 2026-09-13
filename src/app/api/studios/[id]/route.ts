@@ -42,7 +42,15 @@ const updateSchema = z
       .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
       .optional(),
     bannerAssetId: z.string().trim().nullable().optional(),
+    // FIX-STUDIO-POLICY-EDITABLE: правила записи студии. Границы — те же, что у
+    // мастерского редактора расписания (`editor-shared`), чтобы одно и то же
+    // значение не оказывалось валидным на одной поверхности и отвергнутым на
+    // другой. Запись делегируется `applyProviderBookingPolicy` (rule 5).
+    minBookingHoursAhead: z.number().int().min(0).max(168).optional(),
+    maxBookingDaysAhead: z.number().int().min(1).max(365).optional(),
     cancellationDeadlineHours: z.number().int().min(0).max(168).nullable().optional(),
+    lateCancelAction: z.enum(["none", "reminder", "fine"]).optional(),
+    acceptNewClients: z.boolean().optional(),
     remindersEnabled: z.boolean().optional(),
   })
   .refine(
@@ -63,7 +71,11 @@ const updateSchema = z
       data.isPublished !== undefined ||
       data.timezone !== undefined ||
       data.bannerAssetId !== undefined ||
+      data.minBookingHoursAhead !== undefined ||
+      data.maxBookingDaysAhead !== undefined ||
       data.cancellationDeadlineHours !== undefined ||
+      data.lateCancelAction !== undefined ||
+      data.acceptNewClients !== undefined ||
       data.remindersEnabled !== undefined,
     { message: "Заполните хотя бы одно поле." }
   );

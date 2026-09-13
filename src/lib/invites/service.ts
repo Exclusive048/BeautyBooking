@@ -2,6 +2,7 @@ import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma
 import { toAppError } from "@/lib/api/errors";
 import { addRoleToUser } from "@/lib/auth/roles";
 import type { Result, StatusCode } from "@/lib/domain/result";
+import { resolveInviteAccess } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { createMasterProfile } from "@/lib/profiles/professional";
@@ -20,23 +21,27 @@ type InviteRejectResult = {
 };
 
 /**
- * PHONE-CLAIM-01: приглашение адресовано ВЛАДЕЛЬЦУ номера, а не заявителю.
- * `phoneVerifiedAt === null` — кабинетная заявка без OTP-доказательства; матч
- * по ней позволял бы занять чужой номер в своём профиле и принять инвайт,
- * адресованный этому мастеру («invite takeover», SECURITY-EXPOSURE-AUDIT-01
- * #2). В проде до включения SMS подтверждённых номеров нет ни у кого — но там
- * и раньше не было НИКАКИХ номеров (phone писал только OTP-вход, а он off), то
- * есть инвайт-флоу этот гейт не сузил, а сохранил статус-кво.
+ * PHONE-CLAIM-01 + FIX-STUDIO-SELF-INVITE: право на приглашение резолвит
+ * `resolveInviteAccess` (`lib/invites/access.ts`) — там же записано, почему
+ * грантов два и почему второй не ослабляет инв. #46.
+ *
+ * Доказанное владение номером (`PHONE_OWNER`) осталось ровно тем же. Добавлен
+ * `STUDIO_ADMIN`: администратор СВОЕЙ студии со своим же номером в профиле.
+ * Без него до включения SMS-шлюза принять приглашение не мог никто —
+ * подтверждённых номеров в проде нет ни у кого.
  */
-function hasInvitePhoneAccess(
-  user: { phone: string | null; phoneVerifiedAt: Date | null },
-  invitePhone: string,
-): boolean {
-  if (!user.phone || !user.phoneVerifiedAt) return false;
-  const normalizedUserPhone = normalizeRussianPhone(user.phone);
-  const normalizedInvitePhone = normalizeRussianPhone(invitePhone);
-  if (!normalizedUserPhone || !normalizedInvitePhone) return false;
-  return normalizedUserPhone === normalizedInvitePhone;
+async function hasInvitePhoneAccess(
+  user: { id: string; phone: string | null; phoneVerifiedAt: Date | null },
+  invite: { phone: string; studioId: string },
+): Promise<boolean> {
+  const grant = await resolveInviteAccess({
+    userId: user.id,
+    userPhone: user.phone,
+    userPhoneVerifiedAt: user.phoneVerifiedAt,
+    invitePhone: invite.phone,
+    inviteStudioId: invite.studioId,
+  });
+  return grant !== null;
 }
 
 export async function acceptStudioInvite(
@@ -58,7 +63,7 @@ export async function acceptStudioInvite(
     return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
-  if (!hasInvitePhoneAccess(user, invite.phone)) {
+  if (!(await hasInvitePhoneAccess(user, invite))) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
@@ -227,7 +232,7 @@ export async function rejectStudioInvite(
     return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
-  if (!hasInvitePhoneAccess(user, invite.phone)) {
+  if (!(await hasInvitePhoneAccess(user, invite))) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 

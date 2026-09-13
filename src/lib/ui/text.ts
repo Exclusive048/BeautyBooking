@@ -862,12 +862,12 @@ export const UI_TEXT = {
   social: {
     vkLabel: "VK",
     instagramLabel: "Instagram",
-    vkPlaceholder: "vk.com/studio или @studio",
+    vkPlaceholder: "vk.ru/studio или @studio",
     instagramPlaceholder: "instagram.com/studio или @studio",
     vkAria: "Сообщество ВКонтакте",
     instagramAria: "Страница в Instagram",
     previewTemplate: "Ссылка: {label}",
-    invalid: "Не распознали ссылку. Укажите адрес на vk.com или instagram.com.",
+    invalid: "Не распознали ссылку. Укажите адрес на vk.ru или instagram.com.",
     hint: "Полный адрес или @имя — покажем аккуратной иконкой в профиле.",
     masterSectionTitle: "Соцсети",
     masterSectionSubtitle: "Ссылки на ваши сообщества — покажем в публичном профиле",
@@ -1458,18 +1458,29 @@ export const UI_TEXT = {
     profileForm: {
       nameLabel: "Название",
       namePlaceholder: "Название студии",
+      // FIX-STUDIO-SETTINGS-MERGE: слоган переехал сюда из удалённой вкладки
+      // «Общее» — он часть публичной карточки, а не отдельного раздела.
+      taglineLabel: "Краткий слоган",
+      taglinePlaceholder: "Одной строкой — чем вы хороши",
       descriptionLabel: "Описание",
       descriptionPlaceholder:
         "Расскажите о студии — атмосфера, специализация, команда",
       addressLabel: "Адрес",
       addressPlaceholder: "Начните вводить адрес…",
+      // FIX-STUDIO-TZ-FROM-ADDRESS: пояс больше не выбирают руками — он
+      // выводится из города адреса при сохранении. Показываем результат, чтобы
+      // изменение было наблюдаемым, а не молчаливым.
+      timezoneLabel: "Часовой пояс",
+      timezoneHint:
+        "Определяется по адресу. В нём считаются записи, расписание и напоминания.",
+      timezoneUnknown: "Появится после сохранения адреса",
       selectAddressAria: "Выбрать адрес {address}",
       phoneLabel: "Телефон",
       phonePlaceholder: "+7 900 000 00 00",
       emailLabel: "Email",
       emailPlaceholder: "studio@email.com",
       vkLabel: "VK",
-      vkPlaceholder: "vk.com/studio",
+      vkPlaceholder: "vk.ru/studio",
       instagramLabel: "Instagram",
       instagramPlaceholder: "https://instagram.com/username",
     },
@@ -6278,7 +6289,7 @@ export const UI_TEXT = {
       emailPlaceholder: "studio@email.com",
       telegramPlaceholder: "@username",
       instagramPlaceholder: "https://instagram.com/username",
-      vkPlaceholder: "vk.com/studio",
+      vkPlaceholder: "vk.ru/studio",
       categoriesPlaceholder: "Категории (через запятую)",
       descriptionPlaceholder: "Расскажите о студии — атмосфера, специализация, команда",
       published: "Опубликовано",
@@ -7044,8 +7055,10 @@ export const UI_TEXT = {
       },
       nav: {
         sectionsLabel: "Разделы",
-        general: "Общее",
-        profileMedia: "Профиль и медиа",
+        // FIX-STUDIO-SETTINGS-MERGE: вкладка «Общее» удалена — её единственные
+        // собственные поля (слоган + часовой пояс) переехали сюда, а карточка
+        // адреса дублировала редактируемую в профиле.
+        profile: "Профиль",
         portfolio: "Портфолио",
         ownerTeam: "Владелец и команда",
         notifications: "Уведомления и связь",
@@ -7055,26 +7068,6 @@ export const UI_TEXT = {
       portfolio: {
         cardTitle: "Портфолио",
         cardDesc: "Добавляйте работы студии — они появятся на публичной странице.",
-      },
-      general: {
-        cardTitle: "Карточка студии",
-        cardDesc: "Базовые данные. Видны на публичной странице студии.",
-        logoHint: "Логотип, обложку и адрес меняйте в разделе «Профиль и медиа».",
-        nameLabel: "Название",
-        taglineLabel: "Краткий слоган",
-        descriptionLabel: "Описание",
-        timezoneLabel: "Часовой пояс",
-        timezoneHint:
-          "Время записей, напоминаний и расписания студии считается в этом поясе. Обычно определяется по адресу — измените, если нужно.",
-        submitting: "Сохраняем…",
-        addressTitle: "Адрес и местоположение",
-        addressDesc: "Клиенты видят адрес при записи и на странице студии.",
-        cityLabel: "Город",
-        addressLabel: "Адрес",
-        districtLabel: "Район",
-        openMap: "Открыть на Яндекс.Картах",
-        addressEditHint:
-          "Изменить адрес и координаты можно в разделе «Профиль и медиа».",
       },
       ownerTeam: {
         ownerTitle: "Владелец студии",
@@ -7117,14 +7110,22 @@ export const UI_TEXT = {
       },
       policy: {
         title: "Правила записи",
+        // FIX-STUDIO-POLICY-EDITABLE: раздел стал редактируемым. Прежний текст
+        // отправлял «в настройки расписания мастера» — а туда без мастеров не
+        // попасть, и правила студии оказывались недостижимы.
         description:
-          "Клиент видит их при записи. Менять — в настройках расписания мастера.",
+          "Клиент видит их при записи. Действуют для всей студии — отдельные мастера не нужны.",
         minBookingAhead: "Минимум за",
+        minBookingAheadHint: "Раньше этого окна окошко клиенту не покажем.",
         maxBookingAhead: "Максимум вперёд",
+        maxBookingAheadHint: "Насколько далеко вперёд открыта запись.",
         cancellationDeadline: "Бесплатная отмена за",
+        cancellationDeadlineHint: "Позже этого срока отмена считается поздней.",
         lateCancelAction: "При поздней отмене",
         acceptNewClients: "Новые клиенты",
+        acceptNewClientsHint: "Выключите, если записываете только своих.",
         remindersEnabled: "Напоминания",
+        remindersEnabledHint: "Письмо клиенту за сутки и за два часа до визита.",
         hoursTemplate: "{hours} ч",
         daysTemplate: "{days} дней",
         notSet: "Не задано",
@@ -7135,17 +7136,18 @@ export const UI_TEXT = {
           reminder: "Только напоминание",
           fine: "Штраф (скоро)",
         },
-        editHint: "Изменить их можно через",
-        editLink: "настройки расписания",
+        hoursUnit: "часов",
+        daysUnit: "дней",
+        saving: "Сохраняем…",
+        minBookingAheadInvalid: "Укажите минимум записи от 0 до 168 часов.",
+        maxBookingAheadInvalid: "Укажите горизонт записи от 1 до 365 дней.",
+        cancellationDeadlineInvalid:
+          "Укажите срок бесплатной отмены от 0 до 168 часов или оставьте поле пустым.",
       },
       danger: {
-        archiveTitle: "Архивировать студию",
-        archiveDesc:
-          "Скроет студию из публичного каталога. Все данные останутся, страницу можно вернуть позже.",
-        archiveButton: "Архивировать",
-        archiving: "Архивируем…",
-        archiveConfirm: "Студия исчезнет из каталога. Данные сохранятся. Продолжить?",
-        archivedBadge: "Архивирована",
+        // FIX-STUDIO-ARCHIVE-REMOVED: «Архивировать» удалено — действие писало
+        // ровно `isPublished = false`, то есть было вторым, необратимо
+        // выглядящим именем для тумблера «Опубликован» в разделе «Профиль».
         deleteTitle: "Удалить студию навсегда",
         deleteDesc:
           "Мастера покинут студию, а записи и подписки будут удалены. Вернуть их нельзя.",

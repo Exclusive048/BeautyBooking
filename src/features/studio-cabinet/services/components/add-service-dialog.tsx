@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  SERVICE_DURATION_STEP_MIN,
+  SERVICE_PRICE_STEP_RUB,
+  snapServiceDuration,
+  snapServicePrice,
+} from "../lib/service-steps";
 import type { StudioCategoryPickerOption } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.servicesV2.addServiceDialog;
@@ -114,12 +120,20 @@ export function AddServiceDialog({
       setError(E.titleRequired);
       return;
     }
-    const priceNum = Number.parseInt(price, 10);
+    // FIX-SERVICE-STEPS: сетка применяется и на отправке, а не только на blur —
+    // отправка с клавиатуры (Enter в поле) blur не вызывает, и без этого
+    // сохранилось бы несогласованное с подсказкой значение.
+    const snappedPrice = snapServicePrice(price);
+    const snappedDuration = snapServiceDuration(duration);
+    if (snappedPrice !== price) setPrice(snappedPrice);
+    if (snappedDuration !== duration) setDuration(snappedDuration);
+
+    const priceNum = Number.parseInt(snappedPrice, 10);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
       setError(E.priceInvalid);
       return;
     }
-    const durationNum = Number.parseInt(duration, 10);
+    const durationNum = Number.parseInt(snappedDuration, 10);
     if (!Number.isFinite(durationNum) || durationNum < 1) {
       setError(E.durationInvalid);
       return;
@@ -181,10 +195,12 @@ export function AddServiceDialog({
             <Input
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              onBlur={(e) => setPrice(snapServicePrice(e.target.value))}
               disabled={submitting}
               inputMode="numeric"
               type="number"
               min={0}
+              step={SERVICE_PRICE_STEP_RUB}
             />
           </label>
           <label className="block">
@@ -194,10 +210,12 @@ export function AddServiceDialog({
             <Input
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
+              onBlur={(e) => setDuration(snapServiceDuration(e.target.value))}
               disabled={submitting}
               inputMode="numeric"
               type="number"
-              min={1}
+              min={SERVICE_DURATION_STEP_MIN}
+              step={SERVICE_DURATION_STEP_MIN}
             />
           </label>
         </div>

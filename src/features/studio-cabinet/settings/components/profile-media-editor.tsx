@@ -50,6 +50,7 @@ type StudioProfileData = {
     contactName: string | null;
     contactPhone: string | null;
     contactEmail: string | null;
+    timezone: string;
     socialVk: string | null;
     socialInstagram: string | null;
     description: string | null;
@@ -74,6 +75,8 @@ export function ProfileMediaEditor({ providerId }: Props) {
   const [saved, setSaved] = useState(false);
 
   const [name, setName] = useState("");
+  // FIX-STUDIO-SETTINGS-MERGE: слоган переехал сюда из удалённой вкладки «Общее».
+  const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -83,6 +86,8 @@ export function ProfileMediaEditor({ providerId }: Props) {
   // input removed (FZ-199 killswitch).
   const [instagram, setInstagram] = useState("");
   const [vk, setVk] = useState("");
+  // FIX-STUDIO-TZ-FROM-ADDRESS: read-only — сервер выводит зону из города адреса.
+  const [timezone, setTimezone] = useState<string | null>(null);
 
   const {
     inputRef: addressInputRef,
@@ -121,6 +126,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
       }
       const studio = json.data.studio;
       setName(studio.name);
+      setTagline(studio.tagline ?? "");
       setDescription(studio.description ?? "");
       const coords =
         typeof studio.geoLat === "number" &&
@@ -138,6 +144,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
       setIsPublished(studio.isPublished);
       setBannerUrl(studio.bannerUrl);
       setBannerAssetId(studio.bannerAssetId ?? null);
+      setTimezone(studio.timezone || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
@@ -179,6 +186,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         (addressCoords && Number.isFinite(addressCoords.lat) && Number.isFinite(addressCoords.lng));
       const payload: Record<string, unknown> = {
         name: name.trim(),
+        tagline: tagline.trim(),
         description: description.trim() || null,
         contactName: contactName.trim() || null,
         contactPhone: contactPhone.trim() || null,
@@ -219,6 +227,9 @@ export function ProfileMediaEditor({ providerId }: Props) {
         throw new Error(message);
       }
       setIsPublished(json.data.studio.isPublished);
+      // Сервер мог пересчитать зону по новому адресу — показываем результат
+      // сразу, а не до следующей загрузки страницы.
+      setTimezone(json.data.studio.timezone || null);
       markSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : t.saveFailed);
@@ -353,6 +364,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
 
       <StudioProfileForm
         name={name}
+        tagline={tagline}
         description={description}
         address={addressText}
         phone={contactPhone}
@@ -367,7 +379,9 @@ export function ProfileMediaEditor({ providerId }: Props) {
         selectAddressSuggestion={selectAddressSuggestion}
         addressSuggestIndex={addressSuggestIndex}
         setAddressSuggestIndex={setAddressSuggestIndex}
+        timezone={timezone}
         onNameChange={setName}
+        onTaglineChange={setTagline}
         onDescriptionChange={setDescription}
         onAddressChange={handleAddressChange}
         onPhoneChange={setContactPhone}

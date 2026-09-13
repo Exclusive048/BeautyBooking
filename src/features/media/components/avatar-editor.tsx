@@ -185,6 +185,7 @@ export function AvatarEditor({
             onClick={() => inputRef.current?.click()}
             disabled={busy}
             aria-label={filePickerLabel}
+            title={filePickerLabel}
             className="group relative block h-full w-full overflow-hidden text-left focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-70"
           >
             {imageUrl ? (
@@ -200,23 +201,31 @@ export function AvatarEditor({
                 className="object-cover"
               />
             ) : (
-              // FIX-VISUAL-POLISH F2: only the Camera icon here — the bottom
-              // action bar already labels "Загрузить". On the small 80px studio
-              // avatar the extra centered "Нет фото" text collided with that bar
-              // ("Нет фото / Загрузить фото" overlap). One label, no overlap.
               <div className="flex h-full w-full items-center justify-center text-text-sec">
-                <Camera className="h-5 w-5" />
+                <Camera className="h-5 w-5" aria-hidden />
               </div>
             )}
+            {/*
+              FIX-AVATAR-CAPTION: подпись («Загрузить фото» / «Изменить фото»)
+              больше НЕ рендерится внутри плитки — только иконка.
+
+              🔴 Плитка этого варианта — 80×80 и обрезана в круг (вызывающий
+              оборачивает её в `rounded-full overflow-hidden`). Внутри круга на
+              высоте нижней полосы остаётся ~44 px ширины, а «Загрузить фото» на
+              10 px занимает ~72 px: строка переносилась на две и обрезалась
+              окружностью — ровно то «криво написано», что видно в кабинете
+              студии. Укоротить текст нельзя: `UI_TEXT` — общий словарь, и
+              вариант с крупной плиткой использует те же ключи.
+
+              Доступность не теряется: имя кнопки даёт `aria-label`
+              (`filePickerLabel`), подсказку при наведении — `title`.
+            */}
             <div
-              className={`pointer-events-none absolute inset-0 bg-black/35 transition-opacity ${
-                imageUrl ? "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" : "opacity-100"
+              className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity ${
+                imageUrl ? "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" : "opacity-0"
               }`}
-            />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-2 pt-5">
-              <span className="block text-[10px] font-medium leading-none text-white">
-                {imageUrl ? t.replace : t.upload}
-              </span>
+            >
+              <Camera className="h-5 w-5 text-white" aria-hidden />
             </div>
           </Button>
         ) : (

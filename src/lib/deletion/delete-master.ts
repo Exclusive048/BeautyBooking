@@ -1,5 +1,6 @@
-import { BookingStatus, NotificationType } from "@prisma/client";
+import { AccountType, BookingStatus, NotificationType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { removeProfessionalRoles } from "@/lib/auth/roles";
 import { MediaEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { collectProviderMedia } from "@/lib/media/purge";
@@ -118,6 +119,18 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
       providerName: masterProfile.provider?.name || "Мастер",
     };
   });
+
+  // FIX-CABINET-ROLE-LEFTOVER: зеркало студийного пути — без снятия роли пункт
+  // «Кабинет мастера» остаётся в меню и ведёт в удалённый кабинет. `MasterProfile`
+  // к этому моменту удалён, других оснований у роли нет.
+  try {
+    await removeProfessionalRoles(userId, [AccountType.MASTER]);
+  } catch (error) {
+    logError("Failed to drop master role after cabinet deletion", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   const title = "Кабинет мастера удалён";
   const body = "Ваш кабинет мастера удалён. Услуги, расписание и портфолио удалены.";

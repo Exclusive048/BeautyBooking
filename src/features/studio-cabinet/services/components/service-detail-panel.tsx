@@ -11,6 +11,12 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import {
+  SERVICE_DURATION_STEP_MIN,
+  SERVICE_PRICE_STEP_RUB,
+  snapServiceDuration,
+  snapServicePrice,
+} from "../lib/service-steps";
 import type {
   StudioCategoryPickerOption,
   StudioServiceDetail,
@@ -64,12 +70,19 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
       setError(E.titleRequired);
       return;
     }
-    const priceNum = Number.parseInt(price, 10);
+    // FIX-SERVICE-STEPS: сетка применяется и на сохранении — blur не срабатывает
+    // при отправке с клавиатуры, а сохранить надо ровно то, что показано.
+    const snappedPrice = snapServicePrice(price);
+    const snappedDuration = snapServiceDuration(duration);
+    if (snappedPrice !== price) setPrice(snappedPrice);
+    if (snappedDuration !== duration) setDuration(snappedDuration);
+
+    const priceNum = Number.parseInt(snappedPrice, 10);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
       setError(E.priceInvalid);
       return;
     }
-    const durationNum = Number.parseInt(duration, 10);
+    const durationNum = Number.parseInt(snappedDuration, 10);
     if (!Number.isFinite(durationNum) || durationNum < 1) {
       setError(E.durationInvalid);
       return;
@@ -163,10 +176,12 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
               <Input
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
+                onBlur={(e) => setPrice(snapServicePrice(e.target.value))}
                 disabled={saving}
                 inputMode="numeric"
                 type="number"
                 min={0}
+                step={SERVICE_PRICE_STEP_RUB}
               />
             </label>
             <label className="block">
@@ -176,10 +191,12 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
               <Input
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
+                onBlur={(e) => setDuration(snapServiceDuration(e.target.value))}
                 disabled={saving}
                 inputMode="numeric"
                 type="number"
-                min={1}
+                min={SERVICE_DURATION_STEP_MIN}
+                step={SERVICE_DURATION_STEP_MIN}
               />
             </label>
           </div>

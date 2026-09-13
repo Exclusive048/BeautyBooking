@@ -1,4 +1,5 @@
 import { MembershipStatus, NotificationType, ProviderType, StudioRole } from "@prisma/client";
+import { listAdministeredStudioIds } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { resolveNotificationOpenHref } from "@/lib/notifications/presentation";
 import { prisma } from "@/lib/prisma";
@@ -170,11 +171,16 @@ async function listPendingInvitesForVerifiedOwner(userId: string, normalizedPhon
     where: { id: userId },
     select: { phoneVerifiedAt: true },
   });
-  if (!owner?.phoneVerifiedAt) return [];
+  // FIX-STUDIO-SELF-INVITE: зеркало `countPendingInvitesForVerifiedOwner` —
+  // непроверенный номер видит только приглашения СВОИХ студий (самоприглашения).
+  const studioScope = owner?.phoneVerifiedAt
+    ? {}
+    : { studioId: { in: await listAdministeredStudioIds(userId) } };
   return prisma.studioInvite.findMany({
     where: {
       phone: normalizedPhone,
       status: MembershipStatus.PENDING,
+      ...studioScope,
     },
     select: {
       id: true,

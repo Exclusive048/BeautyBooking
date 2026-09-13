@@ -7,10 +7,10 @@ import {
 } from "./social-links";
 
 describe("normalizeSocialLink — VK", () => {
-  it("accepts a bare handle → canonical vk.com URL", () => {
+  it("accepts a bare handle → canonical vk.ru URL", () => {
     expect(normalizeSocialLink("vk", "durov")).toEqual({
       status: "ok",
-      url: "https://vk.com/durov",
+      url: "https://vk.ru/durov",
       handle: "durov",
     });
   });
@@ -18,7 +18,7 @@ describe("normalizeSocialLink — VK", () => {
   it("accepts an @handle", () => {
     expect(normalizeSocialLink("vk", "@durov")).toEqual({
       status: "ok",
-      url: "https://vk.com/durov",
+      url: "https://vk.ru/durov",
       handle: "durov",
     });
   });
@@ -26,7 +26,7 @@ describe("normalizeSocialLink — VK", () => {
   it("accepts a bare host/path (no scheme)", () => {
     expect(normalizeSocialLink("vk", "vk.com/durov")).toEqual({
       status: "ok",
-      url: "https://vk.com/durov",
+      url: "https://vk.ru/durov",
       handle: "durov",
     });
   });
@@ -34,28 +34,62 @@ describe("normalizeSocialLink — VK", () => {
   it("accepts a full https URL and strips query/fragment", () => {
     expect(normalizeSocialLink("vk", "https://vk.com/durov?utm=x#frag")).toEqual({
       status: "ok",
-      url: "https://vk.com/durov",
+      url: "https://vk.ru/durov",
       handle: "durov",
     });
   });
 
   it("canonicalizes www. and m. subdomains to the base host", () => {
     expect(normalizeSocialLink("vk", "https://www.vk.com/club123")).toMatchObject({
-      url: "https://vk.com/club123",
+      url: "https://vk.ru/club123",
     });
     expect(normalizeSocialLink("vk", "m.vk.com/public42")).toMatchObject({
-      url: "https://vk.com/public42",
+      url: "https://vk.ru/public42",
     });
   });
 
   it("upgrades http to https (host reconstructed from safe base)", () => {
     expect(normalizeSocialLink("vk", "http://vk.com/durov")).toMatchObject({
-      url: "https://vk.com/durov",
+      url: "https://vk.ru/durov",
     });
   });
 
   it("accepts id / club / public style handles", () => {
     expect(normalizeSocialLink("vk", "vk.com/id777")).toMatchObject({ handle: "id777" });
+  });
+
+  // FIX-VK-RU-DOMAIN: `vk.ru` — канонический ВЫХОД, `vk.com` — принимаемый ВХОД.
+  it("accepts vk.ru input in every shape", () => {
+    for (const input of [
+      "vk.ru/durov",
+      "https://vk.ru/durov",
+      "https://www.vk.ru/durov?x=1",
+      "m.vk.ru/durov",
+      "http://vk.ru/durov",
+    ]) {
+      expect(normalizeSocialLink("vk", input)).toEqual({
+        status: "ok",
+        url: "https://vk.ru/durov",
+        handle: "durov",
+      });
+    }
+  });
+
+  it("canonicalizes a legacy vk.com value to vk.ru (stored rows re-normalize)", () => {
+    expect(normalizeSocialLink("vk", "https://vk.com/durov")).toMatchObject({
+      url: "https://vk.ru/durov",
+    });
+  });
+
+  it("still rejects a lone allowed-host domain — vk.ru carries no handle", () => {
+    expect(normalizeSocialLink("vk", "vk.ru")).toEqual({ status: "invalid" });
+  });
+
+  it("still rejects a look-alike host that merely contains vk.ru", () => {
+    expect(normalizeSocialLink("vk", "https://vk.ru.evil.com/durov")).toEqual({
+      status: "invalid",
+    });
+    expect(normalizeSocialLink("vk", "https://notvk.ru/durov")).toEqual({ status: "invalid" });
   });
 });
 
@@ -165,7 +199,7 @@ describe("🔴 SECURITY — hostile input is rejected/sanitized, never a live da
       const result = normalizeSocialLink("vk", input);
       expect(result.status).toBe("ok");
       if (result.status === "ok") {
-        expect(result.url.startsWith("https://vk.com/")).toBe(true);
+        expect(result.url.startsWith("https://vk.ru/")).toBe(true);
       }
     }
   });
@@ -178,7 +212,7 @@ describe("resolveStoredSocialLink (server persist helper)", () => {
   });
 
   it("returns the normalized URL for valid input", () => {
-    expect(resolveStoredSocialLink("vk", "@durov")).toEqual({ value: "https://vk.com/durov" });
+    expect(resolveStoredSocialLink("vk", "@durov")).toEqual({ value: "https://vk.ru/durov" });
   });
 
   it("returns { invalid: true } for hostile input", () => {
@@ -188,16 +222,16 @@ describe("resolveStoredSocialLink (server persist helper)", () => {
 
   it("is idempotent on an already-normalized URL", () => {
     const once = resolveStoredSocialLink("vk", "vk.com/durov");
-    expect(once).toEqual({ value: "https://vk.com/durov" });
+    expect(once).toEqual({ value: "https://vk.ru/durov" });
     if ("value" in once && once.value) {
-      expect(resolveStoredSocialLink("vk", once.value)).toEqual({ value: "https://vk.com/durov" });
+      expect(resolveStoredSocialLink("vk", once.value)).toEqual({ value: "https://vk.ru/durov" });
     }
   });
 });
 
 describe("safeSocialHref (render defense-in-depth)", () => {
   it("returns a safe href for a valid stored URL", () => {
-    expect(safeSocialHref("vk", "https://vk.com/durov")).toBe("https://vk.com/durov");
+    expect(safeSocialHref("vk", "https://vk.com/durov")).toBe("https://vk.ru/durov");
   });
 
   it("returns null for a corrupted / dangerous stored value", () => {
@@ -210,7 +244,7 @@ describe("safeSocialHref (render defense-in-depth)", () => {
 
 describe("socialDisplayLabel (cabinet preview)", () => {
   it("shows a clean host/handle label", () => {
-    expect(socialDisplayLabel("vk", "https://vk.com/durov")).toBe("vk.com/durov");
+    expect(socialDisplayLabel("vk", "https://vk.com/durov")).toBe("vk.ru/durov");
     expect(socialDisplayLabel("instagram", "@anna")).toBe("instagram.com/anna");
   });
 

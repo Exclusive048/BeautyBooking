@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
-import { resolveStoredSocialLink, type SocialKind } from "@/lib/providers/social-links";
+import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { deleteAssetById } from "@/lib/media/service";
 import { logError } from "@/lib/logging/logger";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
@@ -19,7 +19,7 @@ function resolveSocialOrThrow(kind: SocialKind, raw: string | null | undefined):
   if ("invalid" in result) {
     const label = kind === "vk" ? "VK" : "Instagram";
     throw new AppError(
-      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${kind}.com.`,
+      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${socialHostLabel(kind)}.`,
       400,
       "INVALID_SOCIAL_LINK",
     );

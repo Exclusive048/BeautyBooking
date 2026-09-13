@@ -56,6 +56,66 @@ export async function addRoleToUser(
   return nextRoles;
 }
 
+/**
+ * FIX-CABINET-ROLE-LEFTOVER — снятие профессиональной роли при удалении кабинета.
+ *
+ * 🔴 Меню «Сменить кабинет» строится ИСКЛЮЧИТЕЛЬНО из `UserProfile.roles`
+ * (`getAvailableCabinets`), а удаление кабинета роль не трогало — поэтому после
+ * «Удалить студию навсегда» пункт «Кабинет студии» оставался в бургер-меню и
+ * вёл на `/cabinet/studio`, где студии уже нет. Симметрично у мастера.
+ *
+ * `CLIENT` не снимается никогда (`ensureClientRole`): это базовая роль любого
+ * аккаунта, и без неё пользователь остался бы вообще без кабинета.
+ * Административные роли (`ADMIN`/`SUPERADMIN`) сюда не попадают по сигнатуре —
+ * снимать их вправе только админка.
+ *
+ * Роли читаются из БД, а не принимаются аргументом: вызывающий — путь удаления,
+ * он уже провёл несколько транзакций, и его снимок ролей к этому моменту может
+ * быть устаревшим (роль могла добавиться параллельно принятым приглашением).
+ */
+export type ProfessionalRole = Extract<AccountType, "MASTER" | "STUDIO" | "STUDIO_ADMIN">;
+
+export async function removeProfessionalRoles(
+  userId: string,
+  roles: ReadonlyArray<ProfessionalRole>
+): Promise<AccountType[]> {
+  if (roles.length === 0) return [];
+  const profile = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: { roles: true },
+  });
+  if (!profile) return [];
+
+  const toRemove = new Set<AccountType>(roles);
+  const nextRoles = ensureClientRole(profile.roles.filter((role) => !toRemove.has(role)));
+  if (nextRoles.length === profile.roles.length) return profile.roles;
+
+  await prisma.userProfile.update({
+    where: { id: userId },
+    data: { roles: { set: nextRoles } },
+  });
+  return nextRoles;
+}
+
+/**
+ * Остались ли у пользователя основания для роли STUDIO: собственная студия или
+ * активное членство в чужой. Проверяется ПОСЛЕ удаления — мастер, состоявший в
+ * двух студиях, роль сохраняет.
+ */
+export async function hasAnyStudioAffiliation(userId: string): Promise<boolean> {
+  const [ownedStudio, membership] = await Promise.all([
+    prisma.studio.findFirst({
+      where: { OR: [{ ownerUserId: userId }, { provider: { ownerUserId: userId } }] },
+      select: { id: true },
+    }),
+    prisma.studioMembership.findFirst({
+      where: { userId, status: MembershipStatus.ACTIVE },
+      select: { id: true },
+    }),
+  ]);
+  return Boolean(ownedStudio || membership);
+}
+
 export async function setAccountTypeRoles(
   userId: string,
   roles: AccountType[],

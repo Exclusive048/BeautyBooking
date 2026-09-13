@@ -1,4 +1,5 @@
 import {
+  AccountType,
   BookingStatus,
   MembershipStatus,
   NotificationType,
@@ -8,6 +9,7 @@ import {
   StudioRole,
 } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { hasAnyStudioAffiliation, removeProfessionalRoles } from "@/lib/auth/roles";
 import { MediaEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { collectProviderMedia } from "@/lib/media/purge";
@@ -172,6 +174,31 @@ export async function deleteStudioCabinet(userId: string): Promise<void> {
       memberUserIds: Array.from(memberUserIds),
     };
   });
+
+  // FIX-CABINET-ROLE-LEFTOVER: снимаем роль STUDIO у всех, кто потерял с этой
+  // студией последнюю связь. Иначе «Кабинет студии» остаётся висеть в бургер-
+  // меню и ведёт на несуществующий кабинет — меню строится из `roles`, а не из
+  // наличия студии (`getAvailableCabinets`). Проверка ПОСЛЕ удаления и
+  // по-человечно: мастер, состоящий ещё в одной студии, роль сохраняет.
+  //
+  // Роль снимается ПОСЛЕ коммита и не в транзакции: это не часть целостности
+  // данных, а состояние навигации, и провал здесь не должен откатывать
+  // удаление. При провале пользователь увидит лишний пункт меню — тот же
+  // симптом, что и раньше, а не потерянную студию.
+  for (const memberId of result.memberUserIds) {
+    try {
+      if (await hasAnyStudioAffiliation(memberId)) continue;
+      await removeProfessionalRoles(memberId, [
+        AccountType.STUDIO,
+        AccountType.STUDIO_ADMIN,
+      ]);
+    } catch (error) {
+      logError("Failed to drop studio role after studio deletion", {
+        userId: memberId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   const title = "Студия расформирована";
   const body = `Студия «${result.studioName}» расформирована. Кабинет студии больше недоступен.`;

@@ -2,8 +2,12 @@ import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
-import { resolveStoredSocialLink, type SocialKind } from "@/lib/providers/social-links";
+import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
+import {
+  applyProviderBookingPolicy,
+  type LateCancelAction,
+} from "@/lib/schedule/editor";
 
 // FEAT-PROVIDER-SOCIALS: normalize a raw social input into the value to store
 // (safe URL or null), throwing a clean 400 on hostile/foreign input. The
@@ -13,7 +17,7 @@ function resolveSocialOrThrow(kind: SocialKind, raw: string | null | undefined):
   if ("invalid" in result) {
     const label = kind === "vk" ? "VK" : "Instagram";
     throw new AppError(
-      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${kind}.com.`,
+      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${socialHostLabel(kind)}.`,
       400,
       "INVALID_SOCIAL_LINK",
     );
@@ -42,7 +46,13 @@ export type StudioProviderPrivateDto = {
   bufferBetweenBookingsMin: number;
   bannerAssetId: string | null;
   bannerUrl: string | null;
+  // FIX-STUDIO-POLICY-EDITABLE: правила записи студии — читаются и правятся
+  // прямо в настройках студии, без экрана расписания мастера.
+  minBookingHoursAhead: number;
+  maxBookingDaysAhead: number;
   cancellationDeadlineHours: number | null;
+  lateCancelAction: string;
+  acceptNewClients: boolean;
   remindersEnabled: boolean;
 };
 
@@ -71,7 +81,11 @@ export async function getStudioProviderById(
       isPublished: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
+      minBookingHoursAhead: true,
+      maxBookingDaysAhead: true,
       cancellationDeadlineHours: true,
+      lateCancelAction: true,
+      acceptNewClients: true,
       remindersEnabled: true,
     },
   });
@@ -104,7 +118,11 @@ export async function getStudioProviderById(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    minBookingHoursAhead: provider.minBookingHoursAhead,
+    maxBookingDaysAhead: provider.maxBookingDaysAhead,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
+    lateCancelAction: provider.lateCancelAction,
+    acceptNewClients: provider.acceptNewClients,
     remindersEnabled: provider.remindersEnabled,
   };
 }
@@ -126,7 +144,11 @@ export type StudioProfileUpdate = {
   isPublished?: boolean;
   timezone?: string;
   bannerAssetId?: string | null;
+  minBookingHoursAhead?: number;
+  maxBookingDaysAhead?: number;
   cancellationDeadlineHours?: number | null;
+  lateCancelAction?: LateCancelAction;
+  acceptNewClients?: boolean;
   remindersEnabled?: boolean;
 };
 
@@ -213,10 +235,6 @@ export async function updateStudioProviderProfile(
       ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
       ...(derivedCityId !== undefined ? { cityId: derivedCityId } : {}),
       ...(resolvedTimezone !== undefined ? { timezone: resolvedTimezone } : {}),
-      ...(input.cancellationDeadlineHours !== undefined
-        ? { cancellationDeadlineHours: input.cancellationDeadlineHours }
-        : {}),
-      ...(input.remindersEnabled !== undefined ? { remindersEnabled: input.remindersEnabled } : {}),
     },
     select: {
       id: true,
@@ -238,7 +256,11 @@ export async function updateStudioProviderProfile(
       isPublished: true,
       timezone: true,
       bufferBetweenBookingsMin: true,
+      minBookingHoursAhead: true,
+      maxBookingDaysAhead: true,
       cancellationDeadlineHours: true,
+      lateCancelAction: true,
+      acceptNewClients: true,
       remindersEnabled: true,
     },
   });
@@ -247,6 +269,37 @@ export async function updateStudioProviderProfile(
 
   if (input.bannerAssetId !== undefined) {
     await setStudioBannerAssetId(provider.id, input.bannerAssetId);
+  }
+
+  // FIX-STUDIO-POLICY-EDITABLE: правила записи пишет `editor.ts` (CLAUDE.md
+  // rule 5) — там же живёт инвалидация кэша слотов. Здесь остаётся ПРОФИЛЬ.
+  // Пишем целиком, а не по полю: `applyProviderBookingPolicy` — снимок правил,
+  // и частичная запись означала бы второе место, где решается, что считать
+  // «не задано». Значения, которых нет во входе, берём из только что
+  // прочитанной строки.
+  const policyTouched =
+    input.minBookingHoursAhead !== undefined ||
+    input.maxBookingDaysAhead !== undefined ||
+    input.cancellationDeadlineHours !== undefined ||
+    input.lateCancelAction !== undefined ||
+    input.acceptNewClients !== undefined ||
+    input.remindersEnabled !== undefined;
+
+  const policy = {
+    minHoursAhead: input.minBookingHoursAhead ?? provider.minBookingHoursAhead,
+    maxDaysAhead: input.maxBookingDaysAhead ?? provider.maxBookingDaysAhead,
+    freeCancelHours:
+      input.cancellationDeadlineHours !== undefined
+        ? input.cancellationDeadlineHours
+        : (provider.cancellationDeadlineHours ?? null),
+    lateCancelAction:
+      input.lateCancelAction ?? (provider.lateCancelAction as LateCancelAction),
+    acceptNewClients: input.acceptNewClients ?? provider.acceptNewClients,
+    remindersEnabled: input.remindersEnabled ?? provider.remindersEnabled,
+  };
+
+  if (policyTouched) {
+    await applyProviderBookingPolicy(provider.id, policy);
   }
 
   const [bannerAssetId, bannerUrl] = await Promise.all([
@@ -275,7 +328,11 @@ export async function updateStudioProviderProfile(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
-    cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
-    remindersEnabled: provider.remindersEnabled,
+    minBookingHoursAhead: policy.minHoursAhead,
+    maxBookingDaysAhead: policy.maxDaysAhead,
+    cancellationDeadlineHours: policy.freeCancelHours,
+    lateCancelAction: policy.lateCancelAction,
+    acceptNewClients: policy.acceptNewClients,
+    remindersEnabled: policy.remindersEnabled,
   };
 }

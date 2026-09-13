@@ -2,15 +2,17 @@
 
 import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useId, useRef, type Ref, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SocialLinkPreview } from "@/components/ui/social-link-preview";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
 import { UI_TEXT } from "@/lib/ui/text";
+import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 type Props = {
   name: string;
+  tagline: string;
   description: string;
   address: string;
   phone: string;
@@ -25,7 +27,10 @@ type Props = {
   selectAddressSuggestion: (item: AddressSuggestion) => void;
   addressSuggestIndex: number;
   setAddressSuggestIndex: (value: number) => void;
+  /** IANA-зона, выведенная из адреса. `null` — адрес ещё не сохранён. */
+  timezone: string | null;
   onNameChange: (value: string) => void;
+  onTaglineChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onAddressChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
@@ -34,15 +39,24 @@ type Props = {
   onVkChange: (value: string) => void;
 };
 
-// UI-32: своих focus-состояний класс не задаёт намеренно. `focus-visible:ring-0`
-// гасил кольцо `.lux-input:focus-visible` (утилита бьёт слой компонентов), а
-// заменой служил переход бордера `white/10 → white/20` — дельта в 10% альфы,
-// кратно ниже 3:1. Оба переопределения сняты: фокус выглядит так же, как во
-// всех остальных полях продукта.
-const inputClass = "border border-white/10 bg-white/[0.06]";
+// FIX-STUDIO-FORM-BORDERS: переопределений больше нет — поля выглядят как во
+// всём продукте (`.lux-input`: рамка `--border-control` + заливка `--bg-input`).
+//
+// 🔴 Здесь жило `border border-white/10 bg-white/[0.06]`, и это была не
+// стилистика, а **невидимое поле в светлой теме**: утилита бьёт authored-слой
+// `@layer components`, поэтому рамка `.lux-input` заменялась на белую с альфой
+// 10% — по белой карточке это контраст ~1.0:1, то есть границы нет вообще
+// (WCAG 1.4.11 провален; UI-32 чинил ФОКУС и по этой же причине не видел, что
+// в покое рамки нет). Тот же класс дефекта, что UI-01: «класс есть, а видимого
+// результата нет». Заливка съедалась ровно так же.
+//
+// Токены вместо литералов — правило дизайн-скилла: цвет берётся из
+// `globals.css`, а не из `white/…`, иначе тема переключается только у части
+// поверхности.
 
 export function StudioProfileForm({
   name,
+  tagline,
   description,
   address,
   phone,
@@ -57,7 +71,9 @@ export function StudioProfileForm({
   selectAddressSuggestion,
   addressSuggestIndex,
   setAddressSuggestIndex,
+  timezone,
   onNameChange,
+  onTaglineChange,
   onDescriptionChange,
   onAddressChange,
   onPhoneChange,
@@ -75,6 +91,16 @@ export function StudioProfileForm({
         : "text-text-sec";
 
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
+
+  // «Екатеринбург, GMT+5» — скобки у `formatZoneLabel` нужны только когда метка
+  // стоит ПОСЛЕ времени; здесь она сама по себе, поэтому снимаем. Фолбэк —
+  // сырой IANA-идентификатор: пустую строку показывать нельзя, пользователь
+  // прочтёт её как «пояс не определился».
+  const zoneLabel = useMemo(() => {
+    if (!timezone) return null;
+    const label = formatZoneLabel({ iso: new Date().toISOString(), timeZone: timezone });
+    return label ? label.replace(/^\(|\)$/g, "") : timezone;
+  }, [timezone]);
 
   useEffect(() => {
     if (!isAddressSuggestOpen) return;
@@ -165,7 +191,16 @@ export function StudioProfileForm({
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
               placeholder={studioFormText.namePlaceholder}
-              className={inputClass}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-text-label">{studioFormText.taglineLabel}</div>
+            <Input
+              value={tagline}
+              onChange={(event) => onTaglineChange(event.target.value)}
+              placeholder={studioFormText.taglinePlaceholder}
+              maxLength={140}
             />
           </div>
 
@@ -178,7 +213,7 @@ export function StudioProfileForm({
                 placeholder={studioFormText.descriptionPlaceholder}
                 maxLength={500}
                 rows={4}
-                className={`${inputClass} resize-none pb-7`}
+                className="resize-none pb-7"
               />
               <span className="absolute bottom-2 right-3 text-xs text-text-sec">{description.length}/500</span>
             </div>
@@ -209,7 +244,7 @@ export function StudioProfileForm({
                     setIsAddressSuggestOpen(false);
                   }}
                   placeholder={studioFormText.addressPlaceholder}
-                  className={`lux-input h-11 w-full rounded-2xl px-4 text-sm text-text-main placeholder:text-text-placeholder outline-none ${inputClass} pl-11`}
+                  className="lux-input h-11 w-full rounded-2xl pl-11 pr-4 text-sm text-text-main placeholder:text-text-placeholder outline-none"
                 />
                 {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
                   <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">
@@ -237,6 +272,24 @@ export function StudioProfileForm({
               ) : null}
             </div>
           </div>
+
+          {/*
+            FIX-STUDIO-TZ-FROM-ADDRESS: пояс только ПОКАЗЫВАЕТСЯ. Выводит его
+            сервер из города адреса (`detectCityFromAddress` →
+            `updateStudioProviderProfile`), поэтому ручной селектор был третьим
+            местом, где одно и то же значение могло разойтись с адресом.
+            Показываем, потому что молчаливая правка часового пояса — это
+            сдвиг всех записей студии, и увидеть её пользователь обязан.
+          */}
+          <div className="space-y-1 rounded-2xl border border-border-subtle bg-bg-input/40 px-4 py-3">
+            <div className="text-xs font-medium text-text-label">
+              {studioFormText.timezoneLabel}
+            </div>
+            <div className="text-sm text-text-main">
+              {zoneLabel ?? studioFormText.timezoneUnknown}
+            </div>
+            <p className="text-[11px] text-text-sec">{studioFormText.timezoneHint}</p>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -247,7 +300,6 @@ export function StudioProfileForm({
                 value={phone}
                 onChange={(event) => onPhoneChange(event.target.value)}
                 placeholder={studioFormText.phonePlaceholder}
-                className={inputClass}
               />
             </div>
             <div className="space-y-2">
@@ -256,20 +308,19 @@ export function StudioProfileForm({
                 value={email}
                 onChange={(event) => onEmailChange(event.target.value)}
                 placeholder={studioFormText.emailPlaceholder}
-                className={inputClass}
               />
             </div>
             {/* FIX-STUDIO-SOCIAL-PERSIST: Telegram contact input removed
                 (FZ-199 killswitch — don't collect data the platform won't
-                surface). VK + Instagram kept but still not persisted — a
-                schema column is required; flagged for a follow-up migration. */}
+                surface). VK + Instagram ARE persisted (FEAT-PROVIDER-SOCIALS,
+                `Provider.social{Vk,Instagram}`) — прежняя редакция этого
+                комментария утверждала обратное и успела устареть. */}
             <div className="space-y-2">
               <div className="text-xs font-medium text-text-label">{studioFormText.vkLabel}</div>
               <Input
                 value={vk}
                 onChange={(event) => onVkChange(event.target.value)}
                 placeholder={studioFormText.vkPlaceholder}
-                className={inputClass}
               />
               <SocialLinkPreview kind="vk" value={vk} />
             </div>
@@ -279,7 +330,6 @@ export function StudioProfileForm({
                 value={instagram}
                 onChange={(event) => onInstagramChange(event.target.value)}
                 placeholder={studioFormText.instagramPlaceholder}
-                className={inputClass}
               />
               <SocialLinkPreview kind="instagram" value={instagram} />
             </div>
