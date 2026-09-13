@@ -194,12 +194,15 @@ export function StudioBottomNav({ counts }: Props) {
         ) : null}
       </AnimatePresence>
 
+      {/* PWA-FIX-06 — см. `MasterBottomNav`: safe-area отдаётся строке вкладок,
+          подложка покрывает весь `<nav>` до нижней кромки экрана. С отступом на
+          прозрачном `<nav>` под панелью просвечивала страница. */}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label={T.nav.ariaLabel}
       >
-        <div className="border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl">
+        <div className="absolute inset-0 border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl" />
+        <div className="relative pb-[env(safe-area-inset-bottom,0px)]">
           <ul className="flex items-stretch">
             {primary.map((item) => {
               const active = isStudioNavItemActive(pathname, item);

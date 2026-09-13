@@ -102,7 +102,20 @@ export async function MasterCabinetShell({
           </div>
         </div>
 
-        <main data-testid="page-main" className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
+        {/* PWA-FIX-06 — зазор под фиксированной нижней навигацией считается от её
+            реальной высоты (~56px) плюс safe-area, а не круглым `pb-24` (96px):
+            спейсер `h-16` внутри самой навигации здесь инертен, потому что этот
+            шелл — `display:flex` в РЯД, и спейсер становится нулевым по ширине
+            флекс-элементом рядом с `<main>`, ничего не добавляя снизу. То есть
+            единственный работающий зазор — этот, и прежние 96px давали 40px
+            мёртвого низа на каждой странице кабинета, ничего не страхуя от
+            home-indicator (инсет в `pb-24` не входит). */}
+        <main
+          data-testid="page-main"
+          className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+        >
+          {children}
+        </main>
 
         <MasterBottomNav pendingBookingsCount={pendingBookings} />
       </div>

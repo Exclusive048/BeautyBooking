@@ -5,6 +5,7 @@ import {
   UserMinus,
   type LucideIcon,
 } from "lucide-react";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioServicesKpis } from "../lib/types";
@@ -19,25 +20,17 @@ type Tile = {
   warn?: boolean;
 };
 
-function Card({ icon: Icon, label, value, sublabel, warn }: Tile) {
+// PWA-FIX-10 — общий `<StatTile>`; предупреждение «услуга без мастера» переехало
+// с сырой пары `amber-*`/`dark:amber-*` на токен `warning` (UI-26/27).
+function Card({ icon, label, value, sublabel, warn }: Tile) {
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
-      <span
-        aria-hidden
-        className={`mb-2 inline-grid h-8 w-8 place-items-center rounded-lg ${
-          warn
-            ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-            : "bg-primary/10 text-accent-text"
-        }`}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-      <p className="text-xs text-text-sec">{label}</p>
-      <p className="mt-0.5 font-display text-xl tabular-nums text-text-main">
-        {value}
-      </p>
-      <p className="mt-0.5 text-[11px] text-text-sec">{sublabel}</p>
-    </div>
+    <StatTile
+      icon={icon}
+      label={label}
+      value={value}
+      sublabel={sublabel}
+      accent={warn ? "warning" : "neutral"}
+    />
   );
 }
 
@@ -77,10 +70,10 @@ export function ServicesKpiRow({ kpis }: { kpis: StudioServicesKpis }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <StatTileGrid columns={4}>
       {tiles.map((tile) => (
         <Card key={tile.label} {...tile} />
       ))}
-    </div>
+    </StatTileGrid>
   );
 }

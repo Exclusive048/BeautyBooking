@@ -14,6 +14,7 @@ import { ChipGroup } from "./components/chip-group";
 import { ModeCard } from "./components/mode-card";
 import { SettingRow } from "./components/setting-row";
 import { WeeklyDaysList } from "./hours/weekly-days-list";
+import { WeekdayStrip } from "./hours/weekday-strip";
 import {
   clearDay as clearDayPure,
   copyDayToAll,
@@ -53,6 +54,10 @@ type Props = {
  * adding a break in the middle.
  */
 export function HoursTab({ initialSnapshot }: Props) {
+  // PWA-FIX-12 — какой день правим на мобильном. Только представление: в
+  // черновике и в запросе по-прежнему вся неделя, поэтому «копировать на будни»
+  // и автосохранение работают как раньше. 0 = понедельник.
+  const [activeDayOfWeek, setActiveDayOfWeek] = useState(0);
   const [draft, setDraft] = useState<Draft>(() => ({
     weekSchedule: initialSnapshot.weekSchedule,
     slotStepMin: clampSlotStep(initialSnapshot.slotStepMin),
@@ -172,18 +177,53 @@ export function HoursTab({ initialSnapshot }: Props) {
           />
         </div>
 
-        <WeeklyDaysList>
-          {draft.weekSchedule.map((day) => (
-            <WeekdayRow
-              key={day.dayOfWeek}
-              day={day}
-              onChange={updateDay}
-              onCopyToWorkdays={() => handleCopyToWorkdays(day.dayOfWeek)}
-              onCopyToAll={() => handleCopyToAll(day.dayOfWeek)}
-              onClear={() => handleClearDay(day.dayOfWeek)}
-            />
-          ))}
-        </WeeklyDaysList>
+        {/* PWA-FIX-12 — на телефоне неделя горизонтальная: полоса дней выбирает,
+            какой день правим, и под ней ОДНА строка редактора. Семь строк
+            `<WeekdayRow>` (каждая — `flex flex-wrap`, то есть на 375px две-три
+            линии) давали ~600px вертикали, хотя правится всегда один день. С
+            `lg` — прежний список всех семи: там они видны сразу, и сравнение
+            дней полезнее экономии высоты. Обе ветви рендерят один и тот же
+            `<WeekdayRow>` с одними обработчиками — скрытая ветвь выключена
+            `display:none`, поэтому в дерево доступности её поля не попадают. */}
+        <div className="lg:hidden">
+          <WeeklyDaysList
+            strip={
+              <WeekdayStrip
+                days={draft.weekSchedule}
+                activeDayOfWeek={activeDayOfWeek}
+                onSelect={setActiveDayOfWeek}
+              />
+            }
+          >
+            {draft.weekSchedule
+              .filter((day) => day.dayOfWeek === activeDayOfWeek)
+              .map((day) => (
+                <WeekdayRow
+                  key={day.dayOfWeek}
+                  day={day}
+                  onChange={updateDay}
+                  onCopyToWorkdays={() => handleCopyToWorkdays(day.dayOfWeek)}
+                  onCopyToAll={() => handleCopyToAll(day.dayOfWeek)}
+                  onClear={() => handleClearDay(day.dayOfWeek)}
+                />
+              ))}
+          </WeeklyDaysList>
+        </div>
+
+        <div className="hidden lg:block">
+          <WeeklyDaysList>
+            {draft.weekSchedule.map((day) => (
+              <WeekdayRow
+                key={day.dayOfWeek}
+                day={day}
+                onChange={updateDay}
+                onCopyToWorkdays={() => handleCopyToWorkdays(day.dayOfWeek)}
+                onCopyToAll={() => handleCopyToAll(day.dayOfWeek)}
+                onClear={() => handleClearDay(day.dayOfWeek)}
+              />
+            ))}
+          </WeeklyDaysList>
+        </div>
 
         <div className="flex items-start gap-2 rounded-2xl border border-border-subtle bg-bg-input/30 px-4 py-3 text-xs text-text-sec">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

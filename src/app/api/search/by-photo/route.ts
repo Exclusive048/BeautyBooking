@@ -4,14 +4,17 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { tooManyRequests } from "@/lib/api/response";
 import { getClientIp } from "@/lib/http/ip";
-import { getRequestId, logError } from "@/lib/logging/logger";
+import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type {
   VisualSearchFailureReason,
   VisualSearchHttpResponse,
 } from "@/lib/visual-search/contracts";
 import { searchByImage } from "@/lib/visual-search/searcher";
-import { getVisualSearchEnabled } from "@/lib/visual-search/config";
+import {
+  getVisualSearchEnabled,
+  getVisualSearchEnabledByEnv,
+} from "@/lib/visual-search/config";
 import {
   byPhotoImageHash,
   getCachedByPhotoResult,
@@ -62,6 +65,19 @@ export async function POST(req: Request) {
 
     const enabled = await getVisualSearchEnabled();
     if (!enabled) {
+      // VISUAL-SEARCH-DIAG-01 — «выключено» имеет ДВЕ разные причины, и по 403
+      // они неотличимы: либо не заданы `YANDEX_API_KEY`/`YANDEX_FOLDER_ID` (тогда
+      // `envEnabled: false` — фича не сконфигурирована, ENV-SPLIT-01), либо
+      // креды есть, а админ снял тумблер `visualSearchEnabled` в SystemConfig
+      // (`envEnabled: true`). Это первое, что надо знать, разбираясь «почему
+      // визуальный поиск не работает», и без записи это требовало доступа к
+      // прод-окружению. Значение кэшируется на 30 с, поэтому лог не заливается.
+      logInfo("Visual search unavailable", {
+        scope: "visual-search:search",
+        stage: "feature_disabled",
+        envEnabled: getVisualSearchEnabledByEnv(),
+        requestId: getRequestId(req),
+      });
       return jsonFail(
         403,
         UI_TEXT.home.visualSearch.messages.disabled,

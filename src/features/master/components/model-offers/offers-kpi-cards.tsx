@@ -1,5 +1,5 @@
 import { Archive, Inbox, Sparkles, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { OffersKpi } from "@/lib/master/model-offers-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -10,77 +10,42 @@ type Props = {
 };
 
 /**
- * Four KPI tiles at the top of the page — same shape as the
- * notifications/clients/reviews KPI strips so cabinets feel consistent.
- * Empty values render as bg-muted hints so the surface doesn't read as
- * "broken" before the master publishes anything.
+ * Четыре плитки показателей вверху страницы модель-офферов.
+ *
+ * PWA-FIX-10 — общий `<StatTile>`; акцент «есть необработанные» переехал с сырой
+ * пары `amber-*`/`dark:amber-*` на токен `warning` (UI-26/27). Пустые значения
+ * по-прежнему рендерятся курируемой строкой, а не нулём, чтобы свежая страница
+ * не читалась как сломанная.
  */
 export function OffersKpiCards({ kpi }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Tile
+    <StatTileGrid columns={4}>
+      <StatTile
         icon={Sparkles}
         label={T.activeOffersLabel}
         value={kpi.activeOffersCount > 0 ? String(kpi.activeOffersCount) : T.activeOffersEmpty}
         accent={kpi.activeOffersCount > 0 ? "primary" : "neutral"}
       />
-      <Tile
+      <StatTile
         icon={Inbox}
         label={T.pendingLabel}
-        value={kpi.pendingApplicationsCount > 0 ? String(kpi.pendingApplicationsCount) : T.pendingEmpty}
-        accent={kpi.pendingApplicationsCount > 0 ? "amber" : "neutral"}
+        value={
+          kpi.pendingApplicationsCount > 0
+            ? String(kpi.pendingApplicationsCount)
+            : T.pendingEmpty
+        }
+        accent={kpi.pendingApplicationsCount > 0 ? "warning" : "neutral"}
       />
-      <Tile
+      <StatTile
         icon={TrendingUp}
         label={T.conversionLabel}
         value={kpi.conversionRate !== null ? `${kpi.conversionRate}%` : T.conversionEmpty}
-        accent="neutral"
       />
-      <Tile
+      <StatTile
         icon={Archive}
         label={T.archivedLabel}
         value={kpi.archivedCount > 0 ? String(kpi.archivedCount) : T.archivedEmpty}
-        accent="neutral"
       />
-    </div>
-  );
-}
-
-function Tile({
-  icon: Icon,
-  label,
-  value,
-  accent,
-}: {
-  icon: typeof Inbox;
-  label: string;
-  value: string;
-  accent: "primary" | "amber" | "neutral";
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border border-border-subtle bg-bg-card p-4",
-        accent === "amber" && "border-amber-200 dark:border-amber-900/40",
-        accent === "primary" && "border-primary/30"
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-          {label}
-        </p>
-        <Icon className="h-3.5 w-3.5 shrink-0 text-text-sec/60" aria-hidden />
-      </div>
-      <p
-        className={cn(
-          "mt-1.5 font-display text-lg",
-          accent === "amber" && "text-amber-700 dark:text-amber-300",
-          accent === "primary" && "text-accent-text",
-          accent === "neutral" && "text-text-main"
-        )}
-      >
-        {value}
-      </p>
-    </div>
+    </StatTileGrid>
   );
 }

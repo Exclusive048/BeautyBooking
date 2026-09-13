@@ -1,4 +1,5 @@
 import { Calendar, LineChart, Sparkles, Wallet } from "lucide-react";
+import { StatTileGrid } from "@/components/ui/stat-tile";
 import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
 import type { ScheduleKpi } from "@/lib/master/schedule.service";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -34,7 +35,7 @@ export function ScheduleKpiCards({ stats }: Props) {
     : undefined;
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+    <StatTileGrid columns={4}>
       <KpiCard
         icon={Calendar}
         label={T.weekBookings}
@@ -57,6 +58,6 @@ export function ScheduleKpiCards({ stats }: Props) {
         value={freeLabel}
         sublabel={freeSub}
       />
-    </div>
+    </StatTileGrid>
   );
 }

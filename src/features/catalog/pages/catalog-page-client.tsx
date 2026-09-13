@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { SlidersHorizontal } from "lucide-react";
+import { List, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -893,8 +893,32 @@ export default function CatalogPageClient({
             </motion.div>
           ) : null}
 
+          {/* PWA-FIX-11 — на телефоне режим карты занимает ВЕСЬ экран между шапкой
+              и нижней навигацией, а не коробку `min-h-[60vh]` внутри прокручиваемой
+              страницы. Прежняя раскладка делала карту неработоспособной именно на
+              телефоне: высота ~60% экрана, и при любом промежуточном положении
+              прокрутки половина карты уезжала за кромку, то есть тащить и
+              масштабировать приходилось в остатке видимой части, а страница под
+              пальцем норовила прокрутиться. Границы взяты у чужой фиксированной
+              хромы, а не «на весь vh»: сверху `--topbar-h` (город и поиск обязаны
+              остаться доступны), снизу высота нижней навигации плюс safe-area —
+              иначе карта уходила бы под панель вкладок. С `lg` — прежняя карточка
+              в потоке, там ширины и высоты хватает. */}
           {!currentError && view === "map" ? (
-            <div className="relative min-h-[60vh] overflow-hidden rounded-2xl border border-border bg-card/60 lg:min-h-[620px]">
+            <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] top-[var(--topbar-h)] z-30 overflow-hidden border-y border-border bg-card/60 lg:static lg:bottom-auto lg:top-auto lg:z-auto lg:min-h-[620px] lg:rounded-2xl lg:border">
+              {/* Возврат к списку: переключатель вида живёт в строке фильтров над
+                  картой, а она на телефоне оказывается ПОД оверлеем — без этой
+                  кнопки из режима карты не выйти. На `lg` не рендерится: там
+                  переключатель на месте и виден. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => updateParams({ view: "list" })}
+                className="absolute left-3 top-3 z-10 gap-1.5 rounded-full shadow-card lg:hidden"
+              >
+                <List className="h-4 w-4" aria-hidden />
+                {UI_TEXT.catalog.viewList}
+              </Button>
               <CatalogMap
                 points={mapPoints}
                 itemsCount={currentItems.length}

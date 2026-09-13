@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { UI_TEXT } from "@/lib/ui/text";
 import { Badge } from "@/components/ui/badge";
 import type {
@@ -148,19 +149,17 @@ function KpiBar({
     { label: T.kpiResponded, value: kpi?.respondedCount ?? 0 },
     { label: T.kpiPending, value: kpi?.pendingCount ?? 0 },
   ];
+  // PWA-FIX-10 — общий `<StatTile>` вместо локальной плитки.
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <StatTileGrid columns={4}>
       {items.map((it) => (
-        <Card key={it.label} className="p-4">
-          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-            {it.label}
-          </div>
-          <div className="mt-1 font-display text-2xl text-text-main">
-            {isLoading ? "—" : it.value}
-          </div>
-        </Card>
+        <StatTile
+          key={it.label}
+          label={it.label}
+          value={isLoading ? "—" : String(it.value)}
+        />
       ))}
-    </div>
+    </StatTileGrid>
   );
 }
 

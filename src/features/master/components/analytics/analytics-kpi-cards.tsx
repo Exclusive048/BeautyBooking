@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import type { AnalyticsKpi } from "@/lib/master/analytics-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -26,7 +27,7 @@ type Props = {
  */
 export function AnalyticsKpiCards({ kpi, comparison }: Props) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <StatTileGrid columns={4}>
       <KpiTile
         label={T.revenueLabel}
         value={formatRubles(kpi.revenue.current)}
@@ -81,7 +82,7 @@ export function AnalyticsKpiCards({ kpi, comparison }: Props) {
         }
         previousIsNull={kpi.utilization.previous === null}
       />
-    </div>
+    </StatTileGrid>
   );
 }
 
@@ -97,6 +98,12 @@ type TileProps = {
   previousIsNull: boolean;
 };
 
+/**
+ * PWA-FIX-10 — оболочка плитки общая (`<StatTile>`), а тренд-строка остаётся
+ * своей и приезжает слотом `footer`: у неё собственная логика (проценты против
+ * процентных пунктов, «нет данных за прошлый период»), и загонять её в пропс
+ * примитива значило бы описывать типом три разные семантики дельты.
+ */
 function KpiTile({
   label,
   value,
@@ -107,18 +114,18 @@ function KpiTile({
   previousIsNull,
 }: TileProps) {
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-        {label}
-      </p>
-      <p className="mt-2 font-display text-2xl text-text-main">{value}</p>
-      {comparison ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <TrendBadge deltaPct={deltaPct} deltaPp={deltaPp} previousIsNull={previousIsNull} />
-          <span className="text-[11px] text-text-sec">{previousLabel}</span>
-        </div>
-      ) : null}
-    </div>
+    <StatTile
+      label={label}
+      value={value}
+      footer={
+        comparison ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <TrendBadge deltaPct={deltaPct} deltaPp={deltaPp} previousIsNull={previousIsNull} />
+            <span className="text-[11px] text-text-sec">{previousLabel}</span>
+          </div>
+        ) : null
+      }
+    />
   );
 }
 
@@ -160,8 +167,8 @@ function TrendBadge({
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px]",
         isFlat && "bg-bg-input text-text-sec",
-        isPositive && !isFlat && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-        !isPositive && !isFlat && "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+        isPositive && !isFlat && "bg-success-surface text-success-text",
+        !isPositive && !isFlat && "bg-danger-surface text-danger-text"
       )}
     >
       <Icon className="h-3 w-3" aria-hidden />

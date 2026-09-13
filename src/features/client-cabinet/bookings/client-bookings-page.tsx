@@ -15,6 +15,7 @@ import {
   Star,
   X,
   Search,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { ICS_FAILURE_PARAM, type IcsExportFailure } from "@/lib/bookings/ics-export-outcome";
@@ -230,7 +232,7 @@ function KpiCards({
 }) {
   const next = kpi?.upcomingNext;
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <StatTileGrid columns={4}>
       <KpiCard
         icon={CalendarDays}
         label={T.kpiAll}
@@ -242,29 +244,34 @@ function KpiCards({
           theme-stable, no dark-flip trap). Empty state stays a quiet plain
           card. `bg-brand-gradient` is a background-IMAGE, so it paints over
           Card's `bg-bg-card` regardless of cn order. */}
+      {/* PWA-FIX-10: плитка «ближайшая запись» остаётся своей — у неё
+          бренд-градиент и белый текст, которых у примитива нет, — но её ритм
+          выровнен по `<StatTile>`: те же отступы `p-3 sm:p-4`, та же подпись
+          `text-[11px]` вместо mono-uppercase с трекингом (на 375px он был
+          заметно шире и ломал ряд). */}
       <Card
         className={
           next
-            ? "relative overflow-hidden bg-brand-gradient p-4 shadow-lg"
-            : "relative p-4"
+            ? "relative overflow-hidden bg-brand-gradient p-3 shadow-lg sm:p-4"
+            : "relative p-3 sm:p-4"
         }
       >
         <div
-          className={`font-mono text-[10px] uppercase tracking-[0.18em] ${
+          className={`text-[11px] leading-tight sm:text-xs ${
             next ? "text-white/85" : "text-text-sec"
           }`}
         >
           {T.kpiUpcoming}
         </div>
         <div
-          className={`mt-1 font-display text-base ${
+          className={`mt-1.5 font-display text-base leading-tight ${
             next ? "font-semibold text-white" : "text-text-main"
           }`}
         >
           {isLoading ? "—" : next ? formatRelativeDateTime(next.whenIso, next.timeZone) : "—"}
         </div>
         {next ? (
-          <div className="mt-0.5 truncate text-xs text-white/75">
+          <div className="mt-0.5 truncate text-[11px] leading-tight text-white/75">
             {next.providerName}
           </div>
         ) : null}
@@ -279,30 +286,21 @@ function KpiCards({
         label={T.kpiSpent3m}
         value={isLoading ? "—" : moneyRUBFromKopeks(kpi?.spentLast90dKopeks ?? 0)}
       />
-    </div>
+    </StatTileGrid>
   );
 }
 
+// PWA-FIX-10 - общий StatTile вместо локальной плитки кабинета клиента.
 function KpiCard({
-  icon: Icon,
+  icon,
   label,
   value,
 }: {
-  icon: typeof CalendarDays;
+  icon: LucideIcon;
   label: string;
   value: string;
 }) {
-  return (
-    <Card className="p-4">
-      <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 text-text-sec" aria-hidden />
-        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-          {label}
-        </div>
-      </div>
-      <div className="mt-1 font-display text-2xl text-text-main">{value}</div>
-    </Card>
-  );
+  return <StatTile icon={icon} label={label} value={value} />;
 }
 
 /* -------------------------------------------------------------------------- */

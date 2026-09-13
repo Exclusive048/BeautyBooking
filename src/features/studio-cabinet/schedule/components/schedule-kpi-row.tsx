@@ -1,4 +1,5 @@
 import { BarChart3, Calendar, Clock, Wallet, type LucideIcon } from "lucide-react";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleKpis } from "../server/types";
@@ -13,25 +14,10 @@ type Tile = {
   sublabel: string;
 };
 
-function Card({ icon: Icon, label, value, unit, sublabel }: Tile) {
-  return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-card p-4 lg:p-5">
-      <span
-        aria-hidden
-        className="mb-2 inline-grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-accent-text"
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-      <p className="text-xs text-text-sec">{label}</p>
-      <p className="mt-1 flex items-baseline gap-1">
-        <span className="font-display text-xl tabular-nums text-text-main lg:text-2xl">
-          {value}
-        </span>
-        {unit ? <span className="text-sm text-text-sec">{unit}</span> : null}
-      </p>
-      <p className="mt-0.5 text-[11px] text-text-sec">{sublabel}</p>
-    </div>
-  );
+// PWA-FIX-10 — локальная копия плитки заменена общим `<StatTile>`: иконка ушла
+// в строку подписи вместо собственной строки с `mb-2`.
+function Card({ icon, label, value, unit, sublabel }: Tile) {
+  return <StatTile icon={icon} label={label} value={value} unit={unit} sublabel={sublabel} />;
 }
 
 export function ScheduleKpiRow({ kpis }: { kpis: ScheduleKpis }) {
@@ -70,10 +56,10 @@ export function ScheduleKpiRow({ kpis }: { kpis: ScheduleKpis }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+    <StatTileGrid columns={4}>
       {tiles.map((tile) => (
         <Card key={tile.label} {...tile} />
       ))}
-    </div>
+    </StatTileGrid>
   );
 }

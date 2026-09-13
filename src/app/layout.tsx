@@ -13,6 +13,7 @@ const playfair = Playfair_Display({
 });
 import { AppShell } from "@/components/layout/app-shell";
 import { ViewerTimeZoneProvider } from "@/components/providers/viewer-timezone-provider";
+import { ThemeColorMeta } from "@/components/theme-color-meta";
 import { ThemeProvider } from "@/components/theme-provider";
 import { NetworkBanner } from "@/components/ui/network-banner";
 import { PWAUpdatePrompt } from "@/components/pwa/update-prompt";
@@ -71,11 +72,15 @@ export const viewport: Viewport = {
   // FIX-EXP-A11Y-PWA (EXP-033): no `maximumScale`/`userScalable: false` — those
   // block pinch-to-zoom, breaking WCAG 1.4.4 (Resize Text) for low-vision users.
   viewportFit: "cover",
-  // brand-kit: mobile browser chrome tint matches the brand palette
-  // — `#720808` (brand-deep) in light, `#a10728` (brand-core) in dark.
+  // PWA-FIX-07: тинт хрома = фон страницы (`--bg-page`), чтобы полоса статуса
+  // читалась продолжением шапки, а не отдельной бордовой плашкой. Эти две
+  // записи — SSR-база первого кадра (верна для системной настройки); дальше
+  // мету перебивает `<ThemeColorMeta>`, потому что тему в продукте переключает
+  // `next-themes`, а он `prefers-color-scheme` не меняет. Значения зеркалят
+  // `BRAND_COLORS.surfacePage` / `.darkSurfacePage` (инв. #40).
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#720808" },
-    { media: "(prefers-color-scheme: dark)", color: "#a10728" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F0EA" },
+    { media: "(prefers-color-scheme: dark)", color: "#1F1417" },
   ],
 };
 
@@ -202,6 +207,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <SWRProvider>
         <ThemeProvider nonce={nonce}>
           <ViewerTimeZoneProvider>
+            <ThemeColorMeta />
             <DevServiceWorkerReset />
             <NetworkBanner />
             <PWAUpdatePrompt />

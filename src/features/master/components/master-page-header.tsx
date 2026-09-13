@@ -28,12 +28,21 @@ type Props = {
  * navbar's z-30 so the two stacks form a clean two-tier sticky chrome on
  * scroll instead of overlapping.
  *
+ * 🔴 PWA-FIX-09 — липкость только с `lg`. На телефоне два липких слоя подряд
+ * (глобальная шапка 57px + этот блок: крошки + заголовок + подзаголовок, а с
+ * `actions` ещё и своя строка кнопок) держали 160–200px из ~670px высоты экрана
+ * ПОСТОЯННО: часть экрана была перекрыта всегда, и прокрутка её не освобождала.
+ * На десктопе размен обратный — высоты много, а липкий заголовок с крошками
+ * помогает не терять место в длинных настройках, поэтому там поведение
+ * сохранено. Ниже `lg` заголовок уезжает со прокруткой; ориентир «где я» на
+ * мобильном несёт нижняя навигация, которая никуда не уезжает.
+ *
  * Server component — no client hooks. Pages pass plain props; the header
  * doesn't reach into URL state.
  */
 export function MasterPageHeader({ breadcrumb, title, subtitle, actions }: Props) {
   return (
-    <header className="sticky top-[var(--topbar-h)] z-20 border-b border-border-subtle bg-bg-page/85 px-4 py-4 backdrop-blur-md md:px-6 lg:px-8">
+    <header className="z-20 border-b border-border-subtle bg-bg-page/85 px-4 py-3 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 flex-1">
           <nav

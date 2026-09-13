@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { StatTile } from "@/components/ui/stat-tile";
 
 type Props = {
   icon: LucideIcon;
@@ -8,28 +9,14 @@ type Props = {
 };
 
 /**
- * Single KPI tile — surface inside `<KpiCardsGrid>`. Numeric value uses
- * Playfair display + tabular-nums so multi-digit numbers don't shift the
- * row baseline. No trend % yet — sublabel carries plain-text context.
+ * Плитка показателя дашборда — тонкая обёртка над общим `<StatTile>`.
+ *
+ * PWA-FIX-10: собственная разметка (иконка отдельной строкой + `mb-3`,
+ * `p-4 lg:p-5`, значение `text-2xl lg:text-[28px]`) заменена на общий примитив.
+ * Обёртка оставлена, а не удалена: у неё два потребителя — дашборд и расписание
+ * мастера, — и они передают `icon`/`label`/`value`/`sublabel` позиционно
+ * одинаково, так что точка замены одна.
  */
-export function KpiCard({ icon: Icon, label, value, sublabel }: Props) {
-  return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-card p-4 lg:p-5">
-      <div className="mb-3 flex items-start">
-        <span
-          aria-hidden
-          className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-accent-text"
-        >
-          <Icon className="h-4 w-4" aria-hidden />
-        </span>
-      </div>
-      <p className="mb-1 text-xs text-text-sec">{label}</p>
-      <p className="font-display text-2xl tabular-nums text-text-main lg:text-[28px]">
-        {value}
-      </p>
-      {sublabel ? (
-        <p className="mt-1 text-[11px] text-text-sec">{sublabel}</p>
-      ) : null}
-    </div>
-  );
+export function KpiCard({ icon, label, value, sublabel }: Props) {
+  return <StatTile icon={icon} label={label} value={value} sublabel={sublabel} />;
 }

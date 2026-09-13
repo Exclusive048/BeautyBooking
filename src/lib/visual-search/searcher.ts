@@ -1,4 +1,5 @@
 import { MediaKind, Prisma } from "@prisma/client";
+import { logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import type {
   VisualSearchProviderResult,
@@ -200,6 +201,30 @@ function buildProviderResults(input: {
   return results.sort((a, b) => b.score - a.score).slice(0, MAX_PROVIDER_RESULTS);
 }
 
+/**
+ * VISUAL-SEARCH-DIAG-01 — почему поиск «не работает», по логам.
+ *
+ * 🔴 Дефект наблюдаемости, а не логики. Из девяти точек выхода `searchByImage`
+ * не логировала НИ ОДНУ, а три структурно разные причины отдавали пользователю
+ * один и тот же `not_enough_indexed`:
+ *   · в базе нет проиндексированных фото нужной категории (доминирующий случай —
+ *     визуальный поиск dormant, векторов ноль);
+ *   · эмбеддинг запроса не построился — отказ провайдера на платном вызове;
+ *   · векторное сравнение вернуло ноль строк либо все совпадения принадлежат
+ *     НЕопубликованным кабинетам, то есть данные есть, но отфильтрованы.
+ * По ответу и по логам они были неотличимы, поэтому «поиск не находит» нельзя
+ * было свести ни к настройке, ни к пустому индексу, ни к отказу провайдера.
+ *
+ * `stage` — машинный признак точки выхода, он же ключ группировки. Числа рядом
+ * (`filteredCount`, `similarityCount`, `publishedProviderCount`) — то, чего из
+ * `reason` не видно: они прямо отвечают, чего именно не хватило. Снимка
+ * изображения и текста описания в логе НЕТ намеренно: описание построено по
+ * пользовательскому фото, это чужой контент, и для диагностики довольно длины.
+ */
+function logSearchOutcome(meta: Record<string, unknown>): void {
+  logInfo("Visual search outcome", { scope: "visual-search:search", ...meta });
+}
+
 export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearchResponse> {
   await assertVisualSearchEnabled();
 
@@ -207,20 +232,39 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
   const classification = await classifyImage(resizedBytes, "visual-search:search");
 
   if (classification.category === "none") {
+    logSearchOutcome({ stage: "classification_none", reason: "unrecognized" });
     return { ok: false, reason: "unrecognized" };
   }
 
   if (classification.confidence === "low") {
+    logSearchOutcome({
+      stage: "classification_low_confidence",
+      reason: "low_confidence",
+      category: classification.category,
+    });
     return { ok: false, reason: "low_confidence" };
   }
 
   const strategy = getStrategy(classification.category);
   if (!strategy) {
+    // Классификатор назвал категорию, которой нет в реестре стратегий: реестр и
+    // промпт разъехались. Для пользователя это «не распознали», для нас —
+    // рассинхрон конфигурации, и различить их можно только здесь.
+    logSearchOutcome({
+      stage: "strategy_missing",
+      reason: "unrecognized",
+      category: classification.category,
+    });
     return { ok: false, reason: "unrecognized" };
   }
 
   const described = await describeImageWithStrategy(resizedBytes, strategy, "visual-search:search");
   if (described.error === "not_applicable") {
+    logSearchOutcome({
+      stage: "description_not_applicable",
+      reason: "unrecognized",
+      category: classification.category,
+    });
     return { ok: false, reason: "unrecognized" };
   }
 
@@ -231,6 +275,9 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
     filterPairs,
     useStrictFilters: filterPairs.length > 0,
   });
+  // Сколько дал СТРОГИЙ отбор до ослабления фильтров — иначе по одному итоговому
+  // числу не видно, отсеяли кандидатов фильтры или их не было вовсе.
+  const strictFilteredCount = filterPairs.length > 0 ? filtered.length : null;
 
   if (filtered.length < MIN_FILTERED_ASSETS && filterPairs.length > 0) {
     filtered = await findFilteredAssets({
@@ -241,11 +288,29 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
   }
 
   if (filtered.length < MIN_FILTERED_ASSETS) {
+    logSearchOutcome({
+      stage: "no_indexed_assets",
+      reason: "not_enough_indexed",
+      category: classification.category,
+      filterCount: filterPairs.length,
+      strictFilteredCount,
+      filteredCount: filtered.length,
+      minRequired: MIN_FILTERED_ASSETS,
+    });
     return { ok: false, reason: "not_enough_indexed" };
   }
 
   const queryEmbedding = await createQueryEmbedding(described.text_description);
   if (!queryEmbedding) {
+    // Отказ ПРОВАЙДЕРА, а не пустой индекс: наружу уходит тот же `reason`, что и
+    // у «нет данных», поэтому без этой записи причина неустановима.
+    logSearchOutcome({
+      stage: "query_embedding_failed",
+      reason: "not_enough_indexed",
+      category: classification.category,
+      filteredCount: filtered.length,
+      descriptionLength: described.text_description.length,
+    });
     return { ok: false, reason: "not_enough_indexed" };
   }
   const similarities = await searchSimilarities(
@@ -253,6 +318,14 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
     queryEmbedding
   );
   if (similarities.length === 0) {
+    // Кандидаты есть, а векторов для них нет: `MediaAsset.visualIndexed = TRUE`
+    // без строки в `media_asset_embeddings` — рассинхрон индексации.
+    logSearchOutcome({
+      stage: "no_embedding_rows",
+      reason: "not_enough_indexed",
+      category: classification.category,
+      filteredCount: filtered.length,
+    });
     return { ok: false, reason: "not_enough_indexed" };
   }
 
@@ -279,8 +352,28 @@ export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearc
   });
 
   if (results.length === 0) {
+    // Данные и векторы есть, а выдача пуста — почти всегда потому, что все
+    // совпавшие фото принадлежат НЕопубликованным кабинетам. Поэтому рядом с
+    // числом кандидатов стоит число опубликованных из них.
+    logSearchOutcome({
+      stage: "no_published_matches",
+      reason: "not_enough_indexed",
+      category: classification.category,
+      filteredCount: filtered.length,
+      similarityCount: similarities.length,
+      candidateProviderCount: providerIds.length,
+      publishedProviderCount: providers.length,
+    });
     return { ok: false, reason: "not_enough_indexed" };
   }
+
+  logSearchOutcome({
+    stage: "ok",
+    category: classification.category,
+    filteredCount: filtered.length,
+    similarityCount: similarities.length,
+    resultCount: results.length,
+  });
 
   return {
     ok: true,

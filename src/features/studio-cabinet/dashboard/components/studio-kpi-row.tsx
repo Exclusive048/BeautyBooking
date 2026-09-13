@@ -1,4 +1,5 @@
 import { BarChart3, Calendar, Star, Wallet, type LucideIcon } from "lucide-react";
+import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -18,10 +19,10 @@ type Tile = {
   delta: { text: string; tone: DeltaTone };
 };
 
+// UI-26/27: статусная пилюля — токенами, тёмная тема внутри переменной.
 const DELTA_TONE: Record<DeltaTone, string> = {
-  positive:
-    "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-  negative: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  positive: "bg-success-surface text-success-text",
+  negative: "bg-danger-surface text-danger-text",
   neutral: "bg-bg-input text-text-sec",
 };
 
@@ -31,19 +32,24 @@ const DELTA_ARROW: Record<DeltaTone, string> = {
   neutral: "·",
 };
 
+/**
+ * PWA-FIX-10 — оболочка общая (`<StatTile>`), дельта-пилюля приезжает слотом
+ * `badge` в строку подписи. Раньше пилюля и иконка занимали ОТДЕЛЬНУЮ строку
+ * сверху (`flex justify-between` + `gap-3`), то есть на плитку уходило ~36px
+ * вертикали под два элемента, каждый из которых помещается в строку подписи.
+ */
 function TileCard({ icon: Icon, label, value, unit, sublabel, delta }: Tile) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border-subtle bg-bg-card p-4 lg:p-5">
-      <div className="flex items-center justify-between">
-        <span
-          aria-hidden
-          className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-accent-text"
-        >
-          <Icon className="h-4 w-4" />
-        </span>
+    <StatTile
+      icon={Icon}
+      label={label}
+      value={value}
+      unit={unit}
+      sublabel={sublabel}
+      badge={
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold",
+            "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold",
             DELTA_TONE[delta.tone],
           )}
         >
@@ -54,18 +60,8 @@ function TileCard({ icon: Icon, label, value, unit, sublabel, delta }: Tile) {
             ? delta.text
             : `${DELTA_ARROW[delta.tone]} ${delta.text}`}
         </span>
-      </div>
-      <div>
-        <p className="text-xs text-text-sec">{label}</p>
-        <p className="mt-1 flex items-baseline gap-1.5">
-          <span className="font-display text-2xl tabular-nums text-text-main lg:text-[26px]">
-            {value}
-          </span>
-          {unit ? <span className="text-sm text-text-sec">{unit}</span> : null}
-        </p>
-        <p className="mt-1 text-[11px] text-text-sec">{sublabel}</p>
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -110,10 +106,10 @@ export function StudioKpiRow({ kpis }: { kpis: StudioKpis }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+    <StatTileGrid columns={4}>
       {tiles.map((tile) => (
         <TileCard key={tile.label} {...tile} />
       ))}
-    </div>
+    </StatTileGrid>
   );
 }

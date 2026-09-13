@@ -36,6 +36,21 @@ describe("overridesGroup — семейство, а не список имён",
     expect(overridesGroup("px-4", "padding-all")).toBe(false);
   });
 
+  it("ширина ловится, но не путается с min-w / max-w", () => {
+    // PWA-FIX-12: собственная ширина вызывающего обязана гасить дефолт `w-full`
+    // примитива — на этом сгорели поля времени в редакторе часов (`w-[6.5rem]`
+    // печатается в бандле РАНЬШЕ `w-full`, поэтому дефолт побеждал).
+    expect(overridesGroup("w-full", "width")).toBe(true);
+    expect(overridesGroup("h-9 w-[6.5rem] px-2", "width")).toBe(true);
+    expect(overridesGroup("w-64", "width")).toBe(true);
+    expect(overridesGroup("w-1/2", "width")).toBe(true);
+
+    // `min-w-*` / `max-w-*` — ДРУГОЕ свойство: «не уже» и «не шире» сочетаются
+    // с `width`, а не конфликтуют с ней, и гасить из-за них дефолт неверно.
+    expect(overridesGroup("min-w-0 flex-1", "width")).toBe(false);
+    expect(overridesGroup("max-w-xs", "width")).toBe(false);
+  });
+
   it("пустой className ничего не переопределяет", () => {
     expect(overridesGroup(undefined, "radius")).toBe(false);
     expect(overridesGroup("", "radius")).toBe(false);
@@ -76,6 +91,10 @@ describe("реестр жёстких дефолтов", () => {
       ["card.tsx", "padding-all"],
       ["badge.tsx", "padding-x"],
       ["badge.tsx", "padding-y"],
+      // PWA-FIX-12: `w-full` у `Input` побеждал заданную вызывающим ширину
+      // (замер бандла: `.w-[6.5rem]` 2571 < `.w-full` 2608), из-за чего поля
+      // времени в редакторе часов растягивались во всю строку.
+      ["input.tsx", "width"],
     ] as const;
 
     for (const [file, group] of fixed) {

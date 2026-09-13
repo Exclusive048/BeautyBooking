@@ -7,6 +7,12 @@ const T = UI_TEXT.cabinetMaster.scheduleSettings.week;
 
 type Props = {
   children: ReactNode;
+  /**
+   * PWA-FIX-12 — слот под шапкой: горизонтальный выбор дня на мобильном. Живёт
+   * здесь, а не снаружи, чтобы полоса и редактируемая строка читались одной
+   * карточкой, а не двумя независимыми блоками.
+   */
+  strip?: ReactNode;
 };
 
 /**
@@ -19,13 +25,14 @@ type Props = {
  * `divide-y` between siblings, so any extra wrapper here would break
  * the dividers — keep the body a single flat list.
  */
-export function WeeklyDaysList({ children }: Props) {
+export function WeeklyDaysList({ children, strip }: Props) {
   return (
     <section className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
       <header className="border-b border-border-subtle px-4 py-3">
         <h2 className="font-display text-base text-text-main">{T.sectionTitle}</h2>
         <p className="mt-0.5 text-xs text-text-sec">{T.hint}</p>
       </header>
+      {strip ? <div className="border-b border-border-subtle">{strip}</div> : null}
       <ul className="divide-y divide-border-subtle">{children}</ul>
     </section>
   );

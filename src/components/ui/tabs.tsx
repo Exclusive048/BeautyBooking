@@ -13,6 +13,23 @@ export type TabItem = {
   title?: string;
 };
 
+/**
+ * PWA-FIX-12 — полоса вкладок НЕ переносится, а прокручивается по горизонтали.
+ *
+ * 🔴 `flex-wrap` на телефоне превращал набор из четырёх-пяти вкладок в два-три
+ * ряда: на 375px «Часы · Исключения · Перерывы · Правила · Видимость» занимали
+ * три ряда пилюль, то есть ~120px вертикали под один переключатель, а ряды
+ * получались разной длины и читались как несколько групп, а не как одна шкала.
+ *
+ * ⚠️ `overflow-x-auto` и `min-w-max` на ОДНОМ элементе — запрещённая форма
+ * (FIX-D2, сторож `lib/ui/horizontal-strip.test.ts`): `min-width` сильнее
+ * `max-width`, содержимое из элемента не выпадает, прокрутка мертва, а лишняя
+ * ширина уезжает в документ. Здесь её нет: контейнер прокручивает вкладки за
+ * счёт того, что сами вкладки `shrink-0`, а контейнер при `inline-flex`
+ * сжимается до доступной ширины. Проверять надо поведением — `innerWidth ===
+ * documentElement.clientWidth` (`.qa/no-horizontal-overflow.spec.ts`), а не
+ * чтением классов.
+ */
 export function Tabs({
   items,
   value,
@@ -27,7 +44,7 @@ export function Tabs({
   return (
     <div
       className={cn(
-        "inline-flex flex-wrap gap-1 rounded-2xl border border-border-subtle bg-bg-input p-1.5 shadow-card",
+        "inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-border-subtle bg-bg-input p-1.5 shadow-card scrollbar-hide",
         className
       )}
     >
@@ -45,7 +62,7 @@ export function Tabs({
             aria-disabled={disabled}
             title={t.title}
             className={cn(
-              "inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition-all duration-300",
+              "inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-300",
               disabled
                 ? "cursor-not-allowed text-text-sec/40"
                 : active

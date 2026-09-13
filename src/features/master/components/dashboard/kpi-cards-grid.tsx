@@ -1,4 +1,5 @@
 import { Calendar, LineChart, Users, Wallet } from "lucide-react";
+import { StatTileGrid } from "@/components/ui/stat-tile";
 import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -42,7 +43,7 @@ export function KpiCardsGrid({
   );
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+    <StatTileGrid columns={4}>
       <KpiCard
         icon={Wallet}
         label={T.todayRevenue}
@@ -67,6 +68,6 @@ export function KpiCardsGrid({
         value={newClientsValue}
         sublabel={returningSub}
       />
-    </div>
+    </StatTileGrid>
   );
 }

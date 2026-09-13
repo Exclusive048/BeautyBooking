@@ -6,6 +6,8 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, X, Scissors, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
+import type { CabinetKind } from "@/lib/auth/available-cabinets";
+import { hasProfessionalCabinet } from "@/lib/auth/available-cabinets";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
@@ -23,6 +25,15 @@ type Props = {
   masterWorkspace: WorkspaceMenuLink | null;
   studioWorkspace: WorkspaceMenuLink | null;
   isGuest?: boolean;
+  /**
+   * PWA-FIX-08 — кабинеты, доступные по РОЛЯМ. Нужны ровно для подписи пункта
+   * `/cabinet/roles`: без профессионального кабинета он называется «Стать
+   * мастером», с кабинетом — «Мои кабинеты». Предикат общий с десктопным меню
+   * (`hasProfessionalCabinet`), иначе две поверхности разъехались бы в подписи
+   * одного пункта. Пустой массив (гость, забывший вызов) → «Стать мастером»:
+   * это же и верно для того, у кого роли нет.
+   */
+  availableCabinets?: CabinetKind[];
   /**
    * AUTH-GATE-01 — server-resolved `resolveAuthMethods().any`. Only affects the
    * guest branch: with no login method available the «Вход» CTA is dropped.
@@ -83,11 +94,15 @@ export function AuthMobileMenu({
   masterWorkspace,
   studioWorkspace,
   isGuest = false,
+  availableCabinets = [],
   authEnabled = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const reduce = useReducedMotion();
+  const professionalLabel = hasProfessionalCabinet(availableCabinets)
+    ? UI_TEXT.nav.professionalRoles
+    : UI_TEXT.nav.becomeMaster;
 
   useEffect(() => {
     if (!open) return;
@@ -228,7 +243,7 @@ export function AuthMobileMenu({
                     className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
                     onClick={closeMenu}
                   >
-                    {UI_TEXT.nav.professionalRoles}
+                    {professionalLabel}
                   </Link>
                   <Link
                     href="/cabinet/settings"

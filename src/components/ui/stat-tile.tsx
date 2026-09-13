@@ -1,0 +1,172 @@
+import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/cn";
+import { defaultUnlessOverridden } from "@/lib/ui/class-groups";
+
+/**
+ * PWA-FIX-10 — общая плитка показателя для всех кабинетов.
+ *
+ * 🔴 Зачем один примитив вместо двадцати локальных. Плитки показателей жили
+ * отдельными реализациями в каждом разделе (мастер — 9, студия — 8, клиент — 2),
+ * и они разошлись по трём осям разом: подпись то `text-xs`, то
+ * `font-mono uppercase tracking-[0.18em]`; значение то `text-2xl`, то `text-xl`,
+ * то `text-lg`; иконка то есть, то нет. Но дороже расхождения оказалась ОБЩАЯ у
+ * всех черта: иконка занимала СВОЮ строку с отступом (`mb-2`/`mb-3`), то есть
+ * ~36px вертикали на плитку не несли информации вовсе. На телефоне четыре плитки
+ * в две колонки давали ~264px — больше трети экрана под четыре числа, и это
+ * повторялось на дашборде, в расписании, в записях, у клиентов.
+ *
+ * Форма компактности здесь — не «уменьшить шрифт», а **убрать строку иконки**:
+ * иконка уезжает в одну строку с подписью, где место всё равно пустовало.
+ * Экономия ~40px на плитку (≈90px против ≈132px) без потери ни одного знака.
+ *
+ * ⚠️ Полностью унифицировать НЕ пытаемся: у аналитики свой тренд-бейдж, у
+ * дашборда студии — дельта-пилюля, и загонять их в общий пропс значило бы
+ * описывать типом три разные логики. Примитив владеет ровно тем, что у всех
+ * одинаково, — оболочкой, строкой «иконка + подпись», строкой значения и
+ * подписью под ним; остальное приходит слотами `badge` / `footer`.
+ *
+ * Радиус и отступы объявлены через `defaultUnlessOverridden` (CN-CONFLICT-CLASS):
+ * `cn` — плоский join, и жёсткий дефолт примитива побеждал бы `className`
+ * вызывающего не по порядку в атрибуте, а по порядку правил в бандле.
+ */
+
+/**
+ * UI-26/27: статусные акценты идут ТОЛЬКО токенами — сырые `amber-*` / `rose-*`
+ * в новых статусных поверхностях запрещены, а тёмная тема встроена в переменные,
+ * поэтому `dark:`-вилок здесь нет. Миграция как раз и убрала такие пары из
+ * плиток уведомлений, офферов и клиентов.
+ */
+export type StatTileAccent = "neutral" | "primary" | "success" | "warning" | "danger";
+
+const ACCENT_BORDER: Record<StatTileAccent, string> = {
+  neutral: "",
+  primary: "border-primary/30",
+  success: "border-success-border",
+  warning: "border-warning-border",
+  danger: "border-danger-border",
+};
+
+const ACCENT_VALUE: Record<StatTileAccent, string> = {
+  neutral: "text-text-main",
+  primary: "text-accent-text",
+  success: "text-success-text",
+  warning: "text-warning-text",
+  danger: "text-danger-text",
+};
+
+export type StatTileProps = {
+  /** Необязательна: часть поверхностей (аналитика) плитки без иконок. */
+  icon?: LucideIcon;
+  label: string;
+  /**
+   * Пояснение к подписи — `title`, то есть тултип на десктопе и long-press на
+   * телефоне. Заведён под «Общая выручка», где подпись короче, чем смысл.
+   */
+  labelTooltip?: string;
+  value: string;
+  /** Единица отдельно от значения, чтобы не тянуть её в display-кегль: «%», «★». */
+  unit?: string;
+  sublabel?: ReactNode;
+  /** Правый верхний слот строки подписи — дельта-пилюля. */
+  badge?: ReactNode;
+  /** Слот под значением — тренд-строка аналитики. */
+  footer?: ReactNode;
+  accent?: StatTileAccent;
+  className?: string;
+};
+
+export function StatTile({
+  icon: Icon,
+  label,
+  labelTooltip,
+  value,
+  unit,
+  sublabel,
+  badge,
+  footer,
+  accent = "neutral",
+  className,
+}: StatTileProps) {
+  return (
+    <div
+      className={cn(
+        "border border-border-subtle bg-bg-card",
+        ACCENT_BORDER[accent],
+        defaultUnlessOverridden(className, "radius", "rounded-2xl"),
+        defaultUnlessOverridden(className, "padding-all", "p-3 sm:p-4"),
+        className,
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        {Icon ? (
+          <span
+            aria-hidden
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary/10 text-accent-text sm:h-7 sm:w-7"
+          >
+            <Icon className="h-3.5 w-3.5" aria-hidden />
+          </span>
+        ) : null}
+        <p
+          title={labelTooltip}
+          className={cn(
+            "min-w-0 flex-1 truncate text-[11px] leading-tight text-text-sec sm:text-xs",
+            labelTooltip &&
+              "cursor-help decoration-text-sec/30 decoration-dotted underline-offset-2 hover:underline",
+          )}
+        >
+          {label}
+        </p>
+        {badge ? <span className="shrink-0">{badge}</span> : null}
+      </div>
+
+      <p className="mt-1.5 flex items-baseline gap-1">
+        <span
+          className={cn(
+            "font-display text-xl leading-tight tabular-nums sm:text-2xl",
+            ACCENT_VALUE[accent],
+          )}
+        >
+          {value}
+        </span>
+        {unit ? <span className="text-xs text-text-sec sm:text-sm">{unit}</span> : null}
+      </p>
+
+      {sublabel ? (
+        <p className="mt-0.5 truncate text-[11px] leading-tight text-text-sec">{sublabel}</p>
+      ) : null}
+
+      {footer ? <div className="mt-1">{footer}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Сетка плиток. Заведена рядом с примитивом, потому что «сколько колонок на
+ * каком брейкпоинте» — тоже расходившееся решение: встречались
+ * `gap-3 lg:grid-cols-4`, `md:grid-cols-4`, `md:grid-cols-3 lg:grid-cols-5`.
+ * На мобильном всегда две колонки: одна растягивает число на всю ширину и
+ * съедает вертикаль, три — обрезают подписи.
+ */
+const GRID_COLUMNS: Record<3 | 4 | 5, string> = {
+  3: "sm:grid-cols-3",
+  4: "sm:grid-cols-4",
+  5: "sm:grid-cols-3 lg:grid-cols-5",
+};
+
+export function StatTileGrid({
+  columns = 4,
+  children,
+  className,
+}: {
+  /** Колонки на широком экране. На мобильном всегда 2. */
+  columns?: 3 | 4 | 5;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid grid-cols-2 gap-2 sm:gap-3", GRID_COLUMNS[columns], className)}>
+      {children}
+    </div>
+  );
+}

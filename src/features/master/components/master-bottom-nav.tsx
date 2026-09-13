@@ -178,12 +178,20 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
       </AnimatePresence>
 
       {/* Tab bar */}
+      {/* PWA-FIX-06 — фон панели доходит ДО нижней кромки экрана, а safe-area
+          отдаётся строке вкладок, а не прозрачному `<nav>`. Раньше отступ
+          `env(safe-area-inset-bottom)` стоял на самом `<nav>` (прозрачном), а
+          фон — на внутреннем блоке: в PWA на устройстве с home-indicator под
+          панелью оставалась полоса высотой инсета, через которую просвечивала
+          страница, и панель читалась как «не прижатая к низу». Форма взята у
+          клиентского кабинета (`CabinetBottomNav`), где она изначально верна:
+          подложка `absolute inset-0` покрывает весь `<nav>` целиком. */}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-label={UI_TEXT.a11y.mainNav}
       >
-        <div className="border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl">
+        <div className="absolute inset-0 border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl" />
+        <div className="relative pb-[env(safe-area-inset-bottom,0px)]">
           <ul className="flex items-stretch">
             {TABS.map((tab) => {
               const active = isActive(pathname, tab.href, tab.exact);

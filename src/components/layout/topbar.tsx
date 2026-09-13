@@ -229,6 +229,7 @@ export async function Topbar() {
                 showAdminLink={showAdminLink}
                 masterWorkspace={workspaceLinks.master}
                 studioWorkspace={workspaceLinks.studio}
+                availableCabinets={availableCabinets}
               />
             </>
           ) : (

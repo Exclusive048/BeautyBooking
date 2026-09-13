@@ -8,7 +8,11 @@ import { ChevronDown, User, Settings, Shield, LogIn, Briefcase, Building2, UserC
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import type { CabinetKind } from "@/lib/auth/available-cabinets";
-import { CABINET_URLS, detectCurrentCabinet } from "@/lib/auth/available-cabinets";
+import {
+  CABINET_URLS,
+  detectCurrentCabinet,
+  hasProfessionalCabinet,
+} from "@/lib/auth/available-cabinets";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -40,6 +44,14 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
   const pathname = usePathname() ?? "/";
   const currentCabinet = detectCurrentCabinet(pathname);
   const showSwitcher = availableCabinets.length > 1;
+  // PWA-FIX-08 — один и тот же пункт ведёт в `/cabinet/roles`, но называется по
+  // назначению: без профессионального кабинета это вход в СОЗДАНИЕ («Стать
+  // мастером»), с кабинетом — список уже имеющихся («Мои кабинеты»). Прежняя
+  // единственная подпись «Мои кабинеты» у клиента без роли обещала то, чего за
+  // ней нет.
+  const professionalLabel = hasProfessionalCabinet(availableCabinets)
+    ? UI_TEXT.nav.professionalRoles
+    : UI_TEXT.nav.becomeMaster;
 
   useEffect(() => {
     if (!open) return;
@@ -149,7 +161,7 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
                 onClick={closeMenu}
               >
                 <LogIn className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
-                {UI_TEXT.nav.professionalRoles}
+                {professionalLabel}
               </Link>
               <Link
                 href="/cabinet/settings"
