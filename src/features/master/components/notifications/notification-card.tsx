@@ -1,5 +1,7 @@
 import { cn } from "@/lib/cn";
 import type { NotificationCenterNotificationItem } from "@/lib/notifications/center";
+import { resolveCurrentWhenLabel } from "@/lib/notifications/current-when";
+import { UI_TEXT } from "@/lib/ui/text";
 import { getCardConfig } from "./lib/card-config";
 import { formatTimeAgo } from "./lib/format-time-ago";
 import { readNotificationPayload } from "./lib/payload";
@@ -23,6 +25,9 @@ export function NotificationCard({ notification, now }: Props) {
   const isUnread = !notification.isRead;
   const config = getCardConfig(notification.type);
   const payload = readNotificationPayload(notification.payloadJson);
+  // RESCHEDULE-CURRENT-TIME: текст заморожен на момент события, бронь могла
+  // быть перенесена — строка показывает живое время (salon-tz с меткой).
+  const currentWhen = resolveCurrentWhenLabel(payload);
   const Icon = config.icon;
 
   return (
@@ -68,6 +73,14 @@ export function NotificationCard({ notification, now }: Props) {
           <p className="mt-1 text-sm font-medium text-text-main">{notification.title}</p>
           {notification.body ? (
             <p className="mt-1 line-clamp-3 text-sm text-text-sec">{notification.body}</p>
+          ) : null}
+          {currentWhen ? (
+            <p
+              className="mt-1 text-xs font-medium text-accent-text"
+              data-testid="notification-current-time"
+            >
+              {UI_TEXT.notificationsCenter.currentTimeLabel}: {currentWhen}
+            </p>
           ) : null}
 
           <NotificationActions

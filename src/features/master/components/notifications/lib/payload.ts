@@ -55,6 +55,9 @@ export type NotificationPayload = {
   serviceName: string | null;
   clientName: string | null;
   startAtUtc: string | null;
+  /** RESCHEDULE-CURRENT-TIME: живое время брони, подмешанное `center.ts` (см. `lib/notifications/current-when.ts`). */
+  currentStartAtUtc: string | null;
+  providerTimezone: string | null;
 };
 
 export function readNotificationPayload(raw: unknown): NotificationPayload {
@@ -71,5 +74,7 @@ export function readNotificationPayload(raw: unknown): NotificationPayload {
     serviceName: readString(record, "serviceName"),
     clientName: readString(record, "clientName"),
     startAtUtc: readString(record, "startAtUtc"),
+    currentStartAtUtc: readString(record, "currentStartAtUtc"),
+    providerTimezone: readString(record, "providerTimezone"),
   };
 }

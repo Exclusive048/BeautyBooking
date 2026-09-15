@@ -74,6 +74,21 @@ export type StatTileProps = {
   footer?: ReactNode;
   accent?: StatTileAccent;
   className?: string;
+  /**
+   * PWA-UX-BATCH-01: плотная форма для сетки в ЧЕТЫРЕ колонки на телефоне
+   * (`StatTileGrid mobileColumns={4}`): ниже `sm` иконка скрыта, отступ и
+   * кегль значения меньше — иначе четыре плитки по ~80px не вмещают ни
+   * подпись, ни число. С `sm` — обычная плитка.
+   */
+  compact?: boolean;
+  /**
+   * Короткая подпись ниже `sm` в compact-форме: четыре плитки по ~85px не
+   * вмещают «Записей на неделе» — в живом прогоне PWA-UX-BATCH-01 подпись
+   * обрезалась до «Записей на не…». С `sm` — полная `label`.
+   */
+  labelCompact?: string;
+  /** Короткое значение ниже `sm` в compact-форме: «20» вместо «20 око…». */
+  valueCompact?: string;
 };
 
 export function StatTile({
@@ -87,6 +102,9 @@ export function StatTile({
   footer,
   accent = "neutral",
   className,
+  compact = false,
+  labelCompact,
+  valueCompact,
 }: StatTileProps) {
   return (
     <div
@@ -94,7 +112,7 @@ export function StatTile({
         "border border-border-subtle bg-bg-card",
         ACCENT_BORDER[accent],
         defaultUnlessOverridden(className, "radius", "rounded-2xl"),
-        defaultUnlessOverridden(className, "padding-all", "p-3 sm:p-4"),
+        defaultUnlessOverridden(className, "padding-all", compact ? "p-2 sm:p-4" : "p-3 sm:p-4"),
         className,
       )}
     >
@@ -102,7 +120,10 @@ export function StatTile({
         {Icon ? (
           <span
             aria-hidden
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary/10 text-accent-text sm:h-7 sm:w-7"
+            className={cn(
+              "h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary/10 text-accent-text sm:h-7 sm:w-7",
+              compact ? "hidden sm:grid" : "grid",
+            )}
           >
             <Icon className="h-3.5 w-3.5" aria-hidden />
           </span>
@@ -110,24 +131,40 @@ export function StatTile({
         <p
           title={labelTooltip}
           className={cn(
-            "min-w-0 flex-1 truncate text-[11px] leading-tight text-text-sec sm:text-xs",
+            "min-w-0 flex-1 truncate leading-tight text-text-sec sm:text-xs",
+            compact ? "text-[10px]" : "text-[11px]",
             labelTooltip &&
               "cursor-help decoration-text-sec/30 decoration-dotted underline-offset-2 hover:underline",
           )}
         >
-          {label}
+          {compact && labelCompact ? (
+            <>
+              <span className="sm:hidden">{labelCompact}</span>
+              <span className="hidden sm:inline">{label}</span>
+            </>
+          ) : (
+            label
+          )}
         </p>
         {badge ? <span className="shrink-0">{badge}</span> : null}
       </div>
 
-      <p className="mt-1.5 flex items-baseline gap-1">
+      <p className={cn("flex items-baseline gap-1", compact ? "mt-1" : "mt-1.5")}>
         <span
           className={cn(
-            "font-display text-xl leading-tight tabular-nums sm:text-2xl",
+            "truncate font-display leading-tight tabular-nums sm:text-2xl",
+            compact ? "text-base" : "text-xl",
             ACCENT_VALUE[accent],
           )}
         >
-          {value}
+          {compact && valueCompact ? (
+            <>
+              <span className="sm:hidden">{valueCompact}</span>
+              <span className="hidden sm:inline">{value}</span>
+            </>
+          ) : (
+            value
+          )}
         </span>
         {unit ? <span className="text-xs text-text-sec sm:text-sm">{unit}</span> : null}
       </p>
@@ -154,18 +191,30 @@ const GRID_COLUMNS: Record<3 | 4 | 5, string> = {
   5: "sm:grid-cols-3 lg:grid-cols-5",
 };
 
+const MOBILE_GRID_COLUMNS: Record<2 | 4, string> = {
+  2: "grid-cols-2 gap-2",
+  // PWA-UX-BATCH-01: четыре плитки в одну строку на телефоне — только вместе
+  // с `compact` у плиток; зазор у́же, иначе плитки по 76px.
+  4: "grid-cols-4 gap-1.5",
+};
+
 export function StatTileGrid({
   columns = 4,
+  mobileColumns = 2,
   children,
   className,
 }: {
-  /** Колонки на широком экране. На мобильном всегда 2. */
+  /** Колонки на широком экране. */
   columns?: 3 | 4 | 5;
+  /** Колонки ниже `sm`: по умолчанию 2; 4 — одна строка (плитки — `compact`). */
+  mobileColumns?: 2 | 4;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cn("grid grid-cols-2 gap-2 sm:gap-3", GRID_COLUMNS[columns], className)}>
+    <div
+      className={cn("grid sm:gap-3", MOBILE_GRID_COLUMNS[mobileColumns], GRID_COLUMNS[columns], className)}
+    >
       {children}
     </div>
   );

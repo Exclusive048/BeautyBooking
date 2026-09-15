@@ -4,7 +4,12 @@ import { getSessionUser } from "@/lib/auth/access";
 import { requireBookingConfirmAccess } from "@/lib/auth/ownership";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { loadBookingWithRelations, notifyBookingConfirmed } from "@/lib/notifications/booking-notifications";
+import {
+  loadBookingWithRelations,
+  notifyBookingConfirmed,
+  notifyRescheduleAnswered,
+} from "@/lib/notifications/booking-notifications";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(
   _req: Request,
@@ -17,12 +22,25 @@ export async function POST(
     const p = params instanceof Promise ? await params : params;
     const access = await requireBookingConfirmAccess(user, p.id);
 
+    // RESCHEDULE-CLIENT-APPROVAL: клиенту доступен единственный confirm —
+    // принять предложенный мастером перенос (`confirmBooking` отказывает ему
+    // на PENDING). Статус читается ДО применения: повторный сабмит на уже
+    // подтверждённой брони идемпотентен и мастера не уведомляет.
+    const answersProposal =
+      access.actor === "CLIENT" &&
+      (await prisma.booking.findUnique({ where: { id: p.id }, select: { status: true } }))
+        ?.status === "CHANGE_REQUESTED";
+
     const booking = await confirmBooking(p.id, access.actor);
-    if (access.actor === "MASTER") {
+    if (access.actor === "MASTER" || answersProposal) {
       try {
         const fullBooking = await loadBookingWithRelations(booking.id);
         if (fullBooking) {
-          await notifyBookingConfirmed(fullBooking);
+          if (access.actor === "MASTER") {
+            await notifyBookingConfirmed(fullBooking);
+          } else {
+            await notifyRescheduleAnswered(fullBooking, "accepted");
+          }
         }
       } catch (error) {
         logError("POST /api/bookings/[id]/confirm notification failed", {

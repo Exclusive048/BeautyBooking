@@ -77,7 +77,7 @@ function toPriceNumber(value: Prisma.Decimal | null): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-function todayDateString(): string {
+export function todayDateString(): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today.toISOString().slice(0, 10);

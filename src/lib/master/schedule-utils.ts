@@ -114,6 +114,31 @@ export function getWeekDays(
   return days;
 }
 
+/**
+ * PWA-UX-BATCH-01 — helpers for the day view. `parseIsoDateKey` mirrors the
+ * client-side parse in `ScheduleControls` (local-tz calendar date from an
+ * `YYYY-MM-DD` key); `addDays` is the day-step counterpart of `addWeeks`;
+ * `formatDayLabel` is the day-view period label («ср, 16 апреля»).
+ */
+export function parseIsoDateKey(iso: string): Date | null {
+  const [y, m, d] = iso.split("-").map((part) => Number.parseInt(part, 10));
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return Number.isNaN(date.getTime()) ? null : startOfDay(date);
+}
+
+export function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+export function formatDayLabel(date: Date): string {
+  const weekday = WEEKDAYS_SHORT[date.getDay()] ?? "";
+  const month = MONTHS_GENITIVE[date.getMonth()] ?? "";
+  return `${weekday}, ${date.getDate()} ${month}`;
+}
+
 /** "14 — 20 апреля 2026" — week-range label for the page subtitle. */
 export function formatWeekRange(weekStart: Date): string {
   const end = new Date(weekStart);

@@ -4,15 +4,21 @@ import { getSessionUser } from "@/lib/auth/access";
 import { requireBookingConfirmAccess } from "@/lib/auth/ownership";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { loadBookingWithRelations, notifyBookingRejected } from "@/lib/notifications/booking-notifications";
+import {
+  loadBookingWithRelations,
+  notifyRescheduleAnswered,
+  notifyRescheduleDeclinedByMaster,
+} from "@/lib/notifications/booking-notifications";
 
 /**
  * FIX-R2-06-A — decline a client-proposed reschedule (two-sided approval).
  * Counterpart of `POST /api/bookings/[id]/confirm` (accept). Auth via the same
  * `requireBookingConfirmAccess`, which admits the solo master AND a studio admin
  * (→ `actor: "MASTER"`) — giving the studio path parity with the solo master.
- * The booking reverts to its original time; the client is notified (same
- * `notifyBookingRejected` the master decline path sends).
+ * The booking reverts to its original time. RESCHEDULE-CLIENT-APPROVAL: the
+ * other side is told the OLD time stands — «Запись отклонена» was wrong here,
+ * the booking is still on. The client declining a master-proposed move notifies
+ * the provider side the same way.
  */
 export async function POST(
   _req: Request,
@@ -29,7 +35,11 @@ export async function POST(
     try {
       const fullBooking = await loadBookingWithRelations(booking.id);
       if (fullBooking) {
-        await notifyBookingRejected(fullBooking);
+        if (access.actor === "CLIENT") {
+          await notifyRescheduleAnswered(fullBooking, "declined");
+        } else {
+          await notifyRescheduleDeclinedByMaster(fullBooking);
+        }
       }
     } catch (error) {
       logError("POST /api/bookings/[id]/decline-reschedule notification failed", {

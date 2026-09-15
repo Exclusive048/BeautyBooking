@@ -47,9 +47,10 @@ import {
   loadMasterServiceOverridesMap,
 } from "./portfolio.service";
 
-function makeMaster(id: string, overrides: Partial<{ name: string; publicUsername: string | null; avatarUrl: string | null; ratingAvg: number; studio: { name: string } | null }> = {}) {
+function makeMaster(id: string, overrides: Partial<{ name: string; publicUsername: string | null; avatarUrl: string | null; ratingAvg: number; studio: { name: string } | null; isPublished: boolean }> = {}) {
   return {
     id,
+    isPublished: overrides.isPublished ?? true,
     name: overrides.name ?? `Master ${id}`,
     publicUsername: overrides.publicUsername ?? null,
     avatarUrl: overrides.avatarUrl ?? null,
@@ -225,6 +226,55 @@ describe("listHomePortfolioFeed (FEED-PORTFOLIO-N1-FIX-A — site 2 of 4)", () =
     });
     expect(result.items[0]).not.toHaveProperty("masterId");
     expect(masterServiceFindMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * FEED-UNPUBLISHED-MASTER (2026-09-15). Лента показывала работы мастеров,
+ * снятых с публикации (фильтр был только по `isPublic` самой работы).
+ *
+ * @probe убран `...PUBLISHED_MASTER_WHERE` из `listPortfolioFeed` → первый
+ * кейс красный (`where` без `master.isPublished`); убран `!item.master.isPublished`
+ * из `getPortfolioDetail` → второй кейс красный (резолвится вместо 404).
+ */
+describe("FEED-UNPUBLISHED-MASTER · работы неопубликованных мастеров не отдаются", () => {
+  it("лента требует опубликованного мастера в самом запросе", async () => {
+    portfolioItemFindMany.mockResolvedValue([]);
+    await listPortfolioFeed({ limit: 10 });
+    await listHomePortfolioFeed({ limit: 10 });
+
+    for (const call of portfolioItemFindMany.mock.calls) {
+      expect(call[0].where).toMatchObject({ isPublic: true, master: { isPublished: true } });
+    }
+    expect(portfolioItemFindMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("карточка работы неопубликованного мастера — тот же 404, что у несуществующей", async () => {
+    portfolioItemFindUnique.mockResolvedValue({
+      ...makePortfolioRow({ id: "hidden-1", masterId: "m-hidden", serviceIds: ["s-h"] }),
+      master: makeMaster("m-hidden", { isPublished: false }),
+      isPublic: true,
+    });
+
+    await expect(getPortfolioDetail("hidden-1")).rejects.toMatchObject({ status: 404 });
+    expect(masterServiceFindMany).not.toHaveBeenCalled();
+  });
+
+  it("«похожие» на карточке тоже требуют опубликованного мастера", async () => {
+    portfolioItemFindUnique.mockResolvedValue({
+      ...makePortfolioRow({ id: "detail-pub", masterId: "m-pub", serviceIds: ["s-p"] }),
+      isPublic: true,
+    });
+    portfolioItemFindMany.mockResolvedValue([]);
+    masterServiceFindMany.mockResolvedValue([]);
+
+    await getPortfolioDetail("detail-pub");
+
+    expect(portfolioItemFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isPublic: true, master: { isPublished: true } }),
+      }),
+    );
   });
 });
 

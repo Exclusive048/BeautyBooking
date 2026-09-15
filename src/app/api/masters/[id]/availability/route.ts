@@ -5,6 +5,7 @@ import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
+import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
@@ -85,6 +86,14 @@ export async function GET(
     // disagreeing on the off-by-one). Convert inclusive `to` → exclusive.
     const toKeyExclusive = toKey ? addDaysToDateKey(toKey, 1) : undefined;
 
+    // RESCHEDULE-SELF-SLOT: окно переносимой брони не занято — только для
+    // сторон этой брони (см. reschedule-exclusion.ts).
+    const excludeBookingId = await resolveRescheduleExclusion(
+      req,
+      provider.id,
+      url.searchParams.get("excludeBookingId"),
+    );
+
     // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
     // applied identically. A slot returned here is one `assertBookingWindow`
     // will accept at submit.
@@ -96,6 +105,7 @@ export async function GET(
       toKeyExclusive,
       limit,
       now: new Date(),
+      excludeBookingId,
     });
     if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
 

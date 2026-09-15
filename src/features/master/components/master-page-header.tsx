@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export type Crumb = {
@@ -16,6 +17,12 @@ type Props = {
   subtitle?: string;
   /** Optional right-side action slot — buttons, badges, anything. */
   actions?: ReactNode;
+  /**
+   * PWA-UX-BATCH-01: держать действия на строке заголовка и на телефоне.
+   * Только для страниц с коротким заголовком и одним действием (дашборд);
+   * у остальных действия ниже `sm` уезжают на свою строку (PWA-FIX-05).
+   */
+  actionsInline?: boolean;
 };
 
 /**
@@ -40,10 +47,21 @@ type Props = {
  * Server component — no client hooks. Pages pass plain props; the header
  * doesn't reach into URL state.
  */
-export function MasterPageHeader({ breadcrumb, title, subtitle, actions }: Props) {
+export function MasterPageHeader({
+  breadcrumb,
+  title,
+  subtitle,
+  actions,
+  actionsInline = false,
+}: Props) {
   return (
     <header className="z-20 border-b border-border-subtle bg-bg-page/85 px-4 py-3 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div
+        className={cn(
+          "flex flex-wrap justify-between gap-4",
+          actionsInline ? "items-center" : "items-end",
+        )}
+      >
         <div className="min-w-0 flex-1">
           <nav
             aria-label={UI_TEXT.a11y.breadcrumbs}
@@ -86,7 +104,17 @@ export function MasterPageHeader({ breadcrumb, title, subtitle, actions }: Props
           // 375 px «Расписание» рендерилось как «Распи…», подзаголовок — в
           // четыре строки. `w-full` ниже `sm` заставляет `flex-wrap`
           // перенести блок; с `sm` — прежняя раскладка в одну строку.
-          <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:shrink-0">{actions}</div>
+          // PWA-UX-BATCH-01: `actionsInline` — страница с коротким заголовком и
+          // одним действием (дашборд) держит его на строке заголовка и на
+          // телефоне; переносить нечего.
+          <div
+            className={cn(
+              "flex items-center justify-end gap-2",
+              actionsInline ? "shrink-0" : "w-full sm:w-auto sm:shrink-0",
+            )}
+          >
+            {actions}
+          </div>
         ) : null}
       </div>
     </header>

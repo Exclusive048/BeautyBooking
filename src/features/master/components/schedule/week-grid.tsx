@@ -4,7 +4,8 @@ import { WeekGridColumn } from "@/features/master/components/schedule/week-grid-
 import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
 import type { ScheduleDay } from "@/lib/master/schedule.service";
 
-const HOUR_PX = 60;
+/** Shared with the day view (PWA-UX-BATCH-01) so both grids keep one vertical scale. */
+export const HOUR_PX = 60;
 /**
  * Minimum column width on overflow-scroll surfaces. FIX-BATCH-E: tightened
  * 168→120 so all 7 weekday columns fit at desktop (≥1280) instead of the

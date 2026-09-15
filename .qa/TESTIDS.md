@@ -80,6 +80,13 @@
 | `booking-confirm` | `master/components/bookings/booking-card-actions.tsx` | master accepts a pending / change-requested booking (the reschedule-accept side) |
 | `booking-decline` | `master/components/bookings/booking-card-actions.tsx` | master declines a pending / change-requested booking |
 | `reschedule-submit` | `client-cabinet/bookings/client-reschedule-modal.tsx` | client proposes a new time |
+| `reschedule-proposal` | `client-cabinet/bookings/client-bookings-page.tsx` | PWA-UX-BATCH-01: block «Мастер предлагает перенести…» / «ждём ответа мастера» on the client booking row |
+| `reschedule-accept` / `reschedule-keep` | same file | client answers a master-proposed reschedule (accept / keep old time) |
+| `notification-current-time` | `notifications-center-page.tsx`, master & studio `notification-card.tsx` | RESCHEDULE-CURRENT-TIME: «Актуальное время: …» line under a booking notification |
+| `schedule-day-view` / `schedule-day-chip-<iso>` | `master/components/schedule/day-view.tsx` | day view container / day chips (mobile default view) |
+| `schedule-period-label` | `master/components/schedule/schedule-controls.tsx` | period label between prev/next arrows |
+| `bookings-column-<id>` (+ `data-collapsed`) | `master/components/bookings/kanban-column.tsx` | kanban column; `data-collapsed="true"` when empty (136px on phone) |
+| `footer-cta-metrics` | `layout/footer/FooterCTA.tsx` | live metrics row of the «Для моделей» card (absent when no open offers) |
 
 > Login still exposes the 6 OTP boxes via `getByLabel("Цифра N из 6")` (unchanged
 > by LOGIN-REDESIGN-01 — the OTP grid moved to the shared `ui/otp-input.tsx`

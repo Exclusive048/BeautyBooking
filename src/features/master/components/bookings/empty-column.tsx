@@ -10,5 +10,12 @@ import { UI_TEXT } from "@/lib/ui/text";
  * поверх и без того приглушённого токена.
  */
 export function EmptyColumn() {
-  return <EmptyState title={UI_TEXT.cabinetMaster.bookings.empty} className="py-8" />;
+  // PWA-UX-BATCH-01: в схлопнутой колонке (136px на телефоне) плейсхолдер
+  // компактный — `px-2 py-4`; на десктопе прежние отступы.
+  return (
+    <EmptyState
+      title={UI_TEXT.cabinetMaster.bookings.empty}
+      className="px-2 py-4 lg:px-4 lg:py-8"
+    />
+  );
 }

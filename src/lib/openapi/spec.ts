@@ -146,6 +146,18 @@ const limitQuery: ParameterObject = {
   description: "Page size (days).",
 };
 
+// RESCHEDULE-SELF-SLOT: окно этой брони не считается занятым (перенос).
+// Только для сторон брони — её клиента либо владельца кабинета/админа
+// студии; посторонний — 403, чужой исполнитель — 404, без сессии — 401.
+const excludeBookingIdQuery: ParameterObject = {
+  name: "excludeBookingId",
+  in: "query",
+  required: false,
+  schema: { type: "string" },
+  description:
+    "Booking being rescheduled: its own window (and buffer) is not treated as occupied. Requires a session of a party to that booking.",
+};
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
@@ -2338,7 +2350,7 @@ export const openApiSpec = {
       get: {
         summary: "List available slots for master",
         tags: ["schedule", "masters"],
-        parameters: [masterIdParam, serviceIdQuery, fromQuery, toQuery, limitQuery],
+        parameters: [masterIdParam, serviceIdQuery, fromQuery, toQuery, limitQuery, excludeBookingIdQuery],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/AvailabilitySlotsData" }),
           "400": errorResponse("Validation error"),

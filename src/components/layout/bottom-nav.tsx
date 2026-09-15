@@ -351,9 +351,11 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
       <nav
         aria-label={UI_TEXT.a11y.mainNav}
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-bg-card/95 shadow-card backdrop-blur lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        // PWA-UX-BATCH-01: инсет минус 10px — кнопки ближе к нижней кромке,
+        // без пустой полосы высотой инсета под ними (см. MasterBottomNav).
+        style={{ paddingBottom: "max(0px, calc(env(safe-area-inset-bottom, 0px) - 10px))" }}
       >
-        <div className="mx-auto flex max-w-4xl items-center justify-around px-3 pt-2 pb-1">
+        <div className="mx-auto flex max-w-4xl items-center justify-around px-3 pb-0.5 pt-1.5">
           {items.map((item) => {
             const itemPath = item.href.split("?")[0] ?? item.href;
             const isActive =
@@ -364,7 +366,7 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] transition",
+                  "flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 pb-1 pt-1.5 text-[11px] transition",
                   isActive ? "text-accent-text" : "text-text-sec"
                 )}
                 aria-current={isActive ? "page" : undefined}

@@ -99,6 +99,8 @@ export async function listBookableSlots(input: {
   toKeyExclusive?: string;
   limit?: number;
   now: Date;
+  /** RESCHEDULE-SELF-SLOT: бронь, которую переносят — её окно не занято (см. usecases.ts). */
+  excludeBookingId?: string;
 }): Promise<BookableSlotsResult> {
   const { provider, serviceId, durationMinutes, fromKey, toKeyExclusive, limit, now } = input;
 
@@ -106,6 +108,7 @@ export async function listBookableSlots(input: {
     fromKey,
     toKeyExclusive,
     limit,
+    excludeBookingId: input.excludeBookingId,
   });
   if (!result.ok) {
     return { ok: false, status: result.status, code: result.code, message: result.message };

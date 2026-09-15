@@ -523,6 +523,14 @@ export async function proxy(request: NextRequest) {
     // относится — он идёт под `script-src`, где `https:` уже разрешён.
     "frame-src 'self' https://oauth.telegram.org https://yandex.ru https://*.yandex.ru",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https:`,
+    // PWA-UX-BATCH-01: без явного `worker-src` создание воркеров падает в
+    // `script-src`, где `'strict-dynamic'` ОТКЛЮЧАЕТ host-based allowlisting
+    // (включая `'self'`), а nonce к URL воркера неприменим — Chromium отказывал
+    // бы в регистрации сервис-воркера (`/sw.js`) в проде: «Refused to create a
+    // worker … Note that 'strict-dynamic' is present». CSP стоит только в
+    // production, поэтому локально это не воспроизводилось; без SW нет ни
+    // push-подписки, ни offline-fallback.
+    "worker-src 'self'",
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",

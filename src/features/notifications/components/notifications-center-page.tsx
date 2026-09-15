@@ -27,6 +27,7 @@ import {
 } from "@/lib/notifications/center-groups";
 import { emitNotificationEvent, subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationCenterData, NotificationChannel, NotificationCenterNotificationItem } from "@/lib/notifications/center";
+import { resolveCurrentWhenLabel } from "@/lib/notifications/current-when";
 import {
   isBookingActionNotification,
   resolveNotificationOpenHref,
@@ -105,6 +106,9 @@ type ChatPayload = {
 type BookingPayload = {
   bookingId?: unknown;
   bookingStatus?: unknown;
+  startAtUtc?: unknown;
+  currentStartAtUtc?: unknown;
+  providerTimezone?: unknown;
 };
 
 function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {
@@ -121,13 +125,31 @@ function parsePayloadRecord(payload: unknown): Record<string, unknown> | null {
   return null;
 }
 
-function parseBookingPayload(payload: unknown): { bookingId: string; bookingStatus?: string } | null {
+function parseBookingPayload(payload: unknown): {
+  bookingId: string;
+  bookingStatus?: string;
+  /** RESCHEDULE-CURRENT-TIME: сохранённое в момент события время. */
+  startAtUtc?: string;
+  /** RESCHEDULE-CURRENT-TIME: живое время брони (предложение переноса либо текущее начало). */
+  currentStartAtUtc?: string;
+  providerTimezone?: string;
+} | null {
   const record = parsePayloadRecord(payload) as BookingPayload | null;
   if (!record) return null;
   if (typeof record.bookingId !== "string" || record.bookingId.trim().length === 0) return null;
   const bookingStatus = typeof record.bookingStatus === "string" ? record.bookingStatus : undefined;
-  return { bookingId: record.bookingId, bookingStatus };
+  const asIso = (value: unknown) => (typeof value === "string" && value.length > 0 ? value : undefined);
+  return {
+    bookingId: record.bookingId,
+    bookingStatus,
+    startAtUtc: asIso(record.startAtUtc),
+    currentStartAtUtc: asIso(record.currentStartAtUtc),
+    providerTimezone: asIso(record.providerTimezone),
+  };
 }
+
+// RESCHEDULE-CURRENT-TIME: строка «Актуальное время» — общий резолвер
+// `lib/notifications/current-when.ts` (тот же у карточек мастера и студии).
 
 function resolveBookingStatusMeta(status: string | undefined): { label: string; className: string } | null {
   const t = UI_TEXT.notificationsCenter.bookingStatus;
@@ -714,6 +736,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
                   isBookingActionNotification(note.type) && bookingPayload?.bookingId
                     ? resolveBookingStatusMeta(bookingStatus)
                     : null;
+                const currentWhen = resolveCurrentWhenLabel(bookingPayload);
                 const isUnread = !note.isRead;
                 const Icon = getNotificationIcon(note.type);
 
@@ -774,6 +797,15 @@ export function NotificationsCenterPage({ initialData }: Props) {
 
                       {note.body ? (
                         <p className="mt-1 line-clamp-2 text-sm text-text-sec">{note.body}</p>
+                      ) : null}
+
+                      {currentWhen ? (
+                        <p
+                          className="mt-1 text-xs font-medium text-accent-text"
+                          data-testid="notification-current-time"
+                        >
+                          {UI_TEXT.notificationsCenter.currentTimeLabel}: {currentWhen}
+                        </p>
                       ) : null}
 
                       <span className="mt-1.5 inline-block rounded-md bg-bg-card px-2 py-0.5 text-[10px] text-text-sec">

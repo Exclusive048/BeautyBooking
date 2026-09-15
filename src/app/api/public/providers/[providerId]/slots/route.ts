@@ -8,6 +8,7 @@ import { resolveDynamicHotSlotPricing } from "@/lib/hot-slots/runtime";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { clampVisibleSlotsHorizon } from "@/lib/bookings/policy-enforcement";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
+import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -111,6 +112,14 @@ export async function GET(
       ? addDaysToDateKey(clampedToKey, 1)
       : toKey || undefined;
 
+    // RESCHEDULE-SELF-SLOT: окно переносимой брони не занято — только для
+    // сторон этой брони (см. reschedule-exclusion.ts); аноним без сессии — 401.
+    const excludeBookingId = await resolveRescheduleExclusion(
+      req,
+      provider.id,
+      url.searchParams.get("excludeBookingId"),
+    );
+
     // EXP-025/026: the shared bookable-window primitive applies the
     // `minBookingHoursAhead` cutoff + effective weekly/override schedule
     // filter. `/availability` calls the SAME helper so the two endpoints
@@ -125,6 +134,7 @@ export async function GET(
         toKeyExclusive: effectiveToKeyExclusive,
         limit,
         now: nowForPolicy,
+        excludeBookingId,
       }),
       prisma.discountRule.findUnique({
         where: { providerId: provider.id },

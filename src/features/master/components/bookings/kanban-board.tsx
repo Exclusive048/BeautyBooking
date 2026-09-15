@@ -29,7 +29,9 @@ export function KanbanBoard({ columns }: Props) {
           content. The default `align-items: stretch` made every column as tall
           as the fullest one — short columns rendered as tall empty "bands"
           (the reported over-stretch). Columns now read as cards. */}
-      <div className="flex snap-x snap-mandatory items-start gap-4">
+      {/* PWA-UX-BATCH-01: на телефоне соседняя колонка видна краем (ширина
+          272px при 343px контента), пустые колонки схлопнуты — см. KanbanColumn. */}
+      <div className="flex snap-x snap-mandatory items-start gap-3 lg:gap-4">
         {COLUMN_ORDER.map((col) => (
           <KanbanColumn
             key={col.id}

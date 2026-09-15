@@ -7,6 +7,9 @@ export type PendingBookingRow = {
   id: string;
   clientName: string;
   startAtUtc: Date | null;
+  /** RESCHEDULE-CURRENT-TIME: время, которое клиент просит (только CHANGE_REQUESTED). */
+  proposedStartAt: Date | null;
+  isRescheduleRequest: boolean;
   serviceTitle: string;
   changeComment: string | null;
 };
@@ -49,8 +52,10 @@ export const getPendingBookingsForMaster = cache(
       take: limit,
       select: {
         id: true,
+        status: true,
         clientName: true,
         startAtUtc: true,
+        proposedStartAt: true,
         changeComment: true,
         service: { select: { name: true, title: true } },
       },
@@ -59,6 +64,8 @@ export const getPendingBookingsForMaster = cache(
       id: row.id,
       clientName: row.clientName,
       startAtUtc: row.startAtUtc,
+      proposedStartAt: row.status === BookingStatus.CHANGE_REQUESTED ? row.proposedStartAt : null,
+      isRescheduleRequest: row.status === BookingStatus.CHANGE_REQUESTED,
       serviceTitle: row.service.title?.trim() || row.service.name,
       changeComment: row.changeComment,
     }));

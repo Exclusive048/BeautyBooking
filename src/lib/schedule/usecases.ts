@@ -252,9 +252,25 @@ export async function listAvailabilitySlotsPaginated(
   providerId: string,
   serviceId: string,
   durationMin: number,
-  input: { fromKey: string; toKeyExclusive?: string; limit?: number }
+  input: {
+    fromKey: string;
+    toKeyExclusive?: string;
+    limit?: number;
+    /**
+     * RESCHEDULE-SELF-SLOT (2026-09-15): бронь, которую переносят. Её окно
+     * (и буфер вокруг) не считается занятым — иначе клиент, записанный на
+     * 10:00 с 90-минутной услугой, не мог перенестись на 10:30 при пустом
+     * дне: пикер не предлагал слот, хотя запись переноса (`ensureNoConflictsExcluding`)
+     * приняла бы его. Ключ слот-кэша брони не знает, поэтому при исключении
+     * кэш обходится целиком — ни чтения, ни записи, ни single-flight: это
+     * один запрос на одно окно переноса, а не публичная выдача.
+     */
+    excludeBookingId?: string;
+  }
 ): Promise<Result<AvailabilitySlotsPageResult>> {
   const startedAt = Date.now();
+  const excludeBookingId = input.excludeBookingId ?? null;
+  const bypassCache = excludeBookingId !== null;
 
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
     return { ok: false, status: 400, message: "Некорректная длительность.", code: "DURATION_INVALID" };
@@ -332,7 +348,9 @@ export async function listAvailabilitySlotsPaginated(
   }
 
   const slotsByDateKey = new Map<string, AvailabilitySlot[]>();
-  const cachedDays = await Promise.all(days.map((day) => getCachedSlots(day.cacheKey)));
+  const cachedDays = bypassCache
+    ? days.map(() => null)
+    : await Promise.all(days.map((day) => getCachedSlots(day.cacheKey)));
   days.forEach((day, index) => {
     const cached = cachedDays[index];
     if (cached) slotsByDateKey.set(day.dateKey, cached);
@@ -378,6 +396,7 @@ export async function listAvailabilitySlotsPaginated(
             { masterProviderId: null, providerId },
           ],
           status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+          ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
           ...buildBookingOverlapWhere(rangeFromUtc, rangeToExclusiveUtc),
         },
         select: { startAtUtc: true, endAtUtc: true },
@@ -441,7 +460,11 @@ export async function listAvailabilitySlotsPaginated(
           now,
           slotStepMin,
         });
-          computed.set(day.dateKey, daySlots);
+        computed.set(day.dateKey, daySlots);
+        // RESCHEDULE-SELF-SLOT: выдача без одной брони — не то, что лежит в
+        // общем кэше; писать её туда значило бы отдать следующему клиенту
+        // занятое окно как свободное.
+        if (bypassCache) continue;
         await setCachedSlotsForDate({
           key: day.cacheKey,
           masterId: providerId,
@@ -453,22 +476,24 @@ export async function listAvailabilitySlotsPaginated(
       return computed;
     };
 
-    const computedDays = await withSingleFlight<Map<string, AvailabilitySlot[]>>({
-      // Замок именует ровно ту работу, которую защищает: провайдер, услуга,
-      // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
-      // разными отрезками друг друга не блокируют.
-      lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}`,
-      read: async () => {
-        const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
-        // Частично заполненный набор — ещё не результат: победитель пишет дни по
-        // одному, и взять половину значило бы отдать неполный ответ.
-        if (values.some((value) => !value)) return null;
-        const filled = new Map<string, AvailabilitySlot[]>();
-        missingDays.forEach((day, index) => filled.set(day.dateKey, values[index] as AvailabilitySlot[]));
-        return filled;
-      },
-      compute: computeMissingDays,
-    });
+    const computedDays = bypassCache
+      ? await computeMissingDays()
+      : await withSingleFlight<Map<string, AvailabilitySlot[]>>({
+          // Замок именует ровно ту работу, которую защищает: провайдер, услуга,
+          // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
+          // разными отрезками друг друга не блокируют.
+          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}`,
+          read: async () => {
+            const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
+            // Частично заполненный набор — ещё не результат: победитель пишет дни по
+            // одному, и взять половину значило бы отдать неполный ответ.
+            if (values.some((value) => !value)) return null;
+            const filled = new Map<string, AvailabilitySlot[]>();
+            missingDays.forEach((day, index) => filled.set(day.dateKey, values[index] as AvailabilitySlot[]));
+            return filled;
+          },
+          compute: computeMissingDays,
+        });
 
     for (const [dateKey, daySlots] of computedDays) {
       slotsByDateKey.set(dateKey, daySlots);

@@ -27,6 +27,11 @@ export type KanbanBookingItem = {
   endAtUtc: Date | null;
   /** Pre-formatted display label for date+time, computed against the master timezone. */
   whenLabel: string;
+  /**
+   * RESCHEDULE-CURRENT-TIME: запрошенное клиентом время (CHANGE_REQUESTED),
+   * в той же форме, что `whenLabel`; `null`, когда переноса нет.
+   */
+  proposedWhenLabel: string | null;
   price: number;
   /** Cancellation comment / change request reason — surfaced under cancelled cards. */
   changeComment: string | null;
@@ -203,6 +208,7 @@ export const getMasterBookingsForKanban = cache(
           status: true,
           startAtUtc: true,
           endAtUtc: true,
+          proposedStartAt: true,
           clientName: true,
           clientUserId: true,
           changeComment: true,
@@ -232,6 +238,7 @@ export const getMasterBookingsForKanban = cache(
           status: true,
           startAtUtc: true,
           endAtUtc: true,
+          proposedStartAt: true,
           clientName: true,
           clientUserId: true,
           changeComment: true,
@@ -333,6 +340,10 @@ export const getMasterBookingsForKanban = cache(
         startAtUtc: row.startAtUtc,
         endAtUtc: row.endAtUtc,
         whenLabel: formatWhenLabel(row.startAtUtc, now, timeZone),
+        proposedWhenLabel:
+          row.status === "CHANGE_REQUESTED" && row.proposedStartAt
+            ? formatWhenLabel(row.proposedStartAt, now, timeZone)
+            : null,
         price: bookingPrice(row),
         changeComment: row.changeComment,
         reviewRating,

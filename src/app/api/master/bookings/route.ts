@@ -32,6 +32,8 @@ type BookingListItem = {
   servicePrice: number;
   serviceDurationMin: number;
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /** RESCHEDULE-CURRENT-TIME: запрошенное время переноса (только CHANGE_REQUESTED). */
+  proposedStartAt: string | null;
 };
 
 export async function GET(req: Request) {
@@ -84,6 +86,7 @@ export async function GET(req: Request) {
         clientName: true,
         clientPhone: true,
         actionRequiredBy: true,
+        proposedStartAt: true,
         service: { select: { name: true, title: true, price: true, durationMin: true } },
         serviceItems: { select: { priceSnapshot: true } },
       },
@@ -138,6 +141,8 @@ export async function GET(req: Request) {
         servicePrice: price,
         serviceDurationMin: b.service?.durationMin ?? 0,
         actionRequiredBy: (b.actionRequiredBy as "CLIENT" | "MASTER" | null) ?? null,
+        proposedStartAt:
+          b.status === "CHANGE_REQUESTED" && b.proposedStartAt ? b.proposedStartAt.toISOString() : null,
       });
     }
 

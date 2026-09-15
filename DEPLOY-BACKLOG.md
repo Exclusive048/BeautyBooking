@@ -441,7 +441,7 @@ WHERE u.email IS NOT NULL AND u."emailVerifiedAt" IS NULL AND u."emailNotificati
   ```
   - **`Review_active_target_createdAt_idx` — ЧАСТИЧНЫЙ и живёт сырым SQL** (реестр `scripts/raw-sql-objects.mjs`). Его предикат обязан дословно совпадать с `ACTIVE_REVIEW_FILTER`; при расхождении планировщик просто перестанет его подхватывать — молча.
 - **Seed `BillingPlanPrice`** — явные active-строки на каждый предлагаемый период (1/3/6/12 мес). Fallback есть, но явная строка предпочтительнее.
-- **VAPID prod-ключи** для web-push (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL`). ⚠️ Web Push — единственный трансграничный поток ПДн; **до юридического вердикта push не включать** (гейт этапа 2).
+- **VAPID prod-ключи** для web-push (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_EMAIL`). ⚠️ Web Push — единственный трансграничный поток ПДн; **до юридического вердикта push не включать** (гейт этапа 2). **Что ещё нужно, когда вердикт получен (PWA-UX-BATCH-01, 2026-09-15):** (а) публичный ключ живёт в ДВУХ местах — build-arg (инлайнится в браузерный бандл → **пересборка образа**) и runtime-env того же имени (его читает сервер/воркер в `notifications/push/vapid.ts`); заданный только с одной стороны — «полумёртвая» фича без ошибки; (б) CSP получил `worker-src 'self'` (`src/proxy.ts`) — до этого регистрация `/sw.js` в проде отказывалась бы под `script-src 'strict-dynamic'`; проверка — консоль прод-страницы без «Refused to create a worker»; (в) сама подписка — тумблер в настройках (opt-in, `pushNotificationsEnabled`), runbook `docs/runbooks/vapid-push-verify.md` (вне VCS).
 
 ---
 

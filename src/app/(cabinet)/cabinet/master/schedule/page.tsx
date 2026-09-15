@@ -19,6 +19,8 @@ export default async function MasterScheduleRoute({ searchParams }: RouteProps) 
     <MasterSchedulePage
       searchParams={{
         weekStart: pickString(params.weekStart),
+        view: pickString(params.view),
+        day: pickString(params.day),
       }}
     />
   );

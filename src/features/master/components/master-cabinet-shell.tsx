@@ -112,7 +112,7 @@ export async function MasterCabinetShell({
             home-indicator (инсет в `pb-24` не входит). */}
         <main
           data-testid="page-main"
-          className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+          className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
         >
           {children}
         </main>

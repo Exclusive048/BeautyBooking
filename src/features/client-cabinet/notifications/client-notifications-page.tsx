@@ -364,7 +364,9 @@ function deriveAction(n: NotificationItem): { href: string; label: string } | nu
       };
     }
     return {
-      href: `/cabinet/bookings#${bookingId}`,
+      // RESCHEDULE-CLIENT-APPROVAL: единый deep-link `?focus=` — его читает
+      // `useFocusHighlight` на «Моих записях»; якорь `#id` там никто не слушал.
+      href: `/cabinet/bookings?focus=${bookingId}`,
       label: T.actionOpen,
     };
   }

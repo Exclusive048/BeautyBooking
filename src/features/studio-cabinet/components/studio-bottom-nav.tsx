@@ -62,7 +62,7 @@ function NavTab({
   return (
     <Link
       href={item.href}
-      className="relative flex flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
+      className="relative flex flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
       aria-current={active ? "page" : undefined}
     >
       <span className="relative">
@@ -202,7 +202,8 @@ export function StudioBottomNav({ counts }: Props) {
         aria-label={T.nav.ariaLabel}
       >
         <div className="absolute inset-0 border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl" />
-        <div className="relative pb-[env(safe-area-inset-bottom,0px)]">
+        {/* PWA-UX-BATCH-01: см. MasterBottomNav — инсет минус 10px, строка ниже. */}
+        <div className="relative pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-10px))]">
           <ul className="flex items-stretch">
             {primary.map((item) => {
               const active = isStudioNavItemActive(pathname, item);
@@ -217,7 +218,7 @@ export function StudioBottomNav({ counts }: Props) {
               <button
                 type="button"
                 onClick={() => setMoreOpen(true)}
-                className="flex w-full flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
+                className="flex w-full flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
                 aria-expanded={moreOpen}
               >
                 <MoreHorizontal

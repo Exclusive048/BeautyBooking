@@ -28,6 +28,8 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { ICS_FAILURE_PARAM, type IcsExportFailure } from "@/lib/bookings/ics-export-outcome";
 import { moneyRUBFromKopeks } from "@/lib/format";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -59,6 +61,13 @@ export function ClientBookingsPage() {
   const [filter, setFilter] = useState<Filter>({ status: "all", search: "" });
   const [rescheduleTarget, setRescheduleTarget] = useState<ClientBookingDTO | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ClientBookingDTO | null>(null);
+  // RESCHEDULE-CLIENT-APPROVAL: ответ на предложенный мастером перенос —
+  // состояние одной карточки (какая занята / какая с ошибкой).
+  const [answerState, setAnswerState] = useState<{
+    id: string;
+    busy: boolean;
+    error: string | null;
+  } | null>(null);
   const { confirm, modal: confirmModal } = useConfirm();
 
   const queryString = new URLSearchParams({
@@ -117,6 +126,34 @@ export function ClientBookingsPage() {
     const cancelled = bookings.filter((b) => b.isCancelled).length;
     return { all, upcoming, finished, cancelled };
   }, [bookings]);
+
+  // RESCHEDULE-CLIENT-APPROVAL: `/confirm` применяет предложенное мастером
+  // время, `/decline-reschedule` возвращает прежнее (инв. #32 — тот же
+  // backend, что у мастера). Серверная строка показывается дословно: отказы
+  // здесь действенные («статус изменился — обновите страницу», «время уже
+  // занято»), канон «попробуйте ещё раз» на них был бы неверным советом.
+  async function handleRescheduleAnswer(booking: ClientBookingDTO, answer: "accept" | "decline") {
+    setAnswerState({ id: booking.id, busy: true, error: null });
+    try {
+      await fetchJson(
+        `/api/bookings/${booking.id}/${answer === "accept" ? "confirm" : "decline-reschedule"}`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      setAnswerState(null);
+      await mutate();
+    } catch (error) {
+      setAnswerState({
+        id: booking.id,
+        busy: false,
+        error: serverMessageOr(error, T.rescheduleAnswerFailed),
+      });
+    }
+  }
 
   async function handleCancel(booking: ClientBookingDTO) {
     const ok = await confirm({
@@ -183,6 +220,9 @@ export function ClientBookingsPage() {
                       onCancel={() => handleCancel(b)}
                       onReschedule={() => setRescheduleTarget(b)}
                       onReview={() => setReviewTarget(b)}
+                      onAnswerReschedule={(answer) => handleRescheduleAnswer(b, answer)}
+                      answerBusy={answerState?.id === b.id && answerState.busy}
+                      answerError={answerState?.id === b.id ? answerState.error : null}
                     />
                   </li>
                 ))}
@@ -371,11 +411,17 @@ function BookingRow({
   onCancel,
   onReschedule,
   onReview,
+  onAnswerReschedule,
+  answerBusy,
+  answerError,
 }: {
   booking: ClientBookingDTO;
   onCancel: () => void;
   onReschedule: () => void;
   onReview: () => void;
+  onAnswerReschedule: (answer: "accept" | "decline") => void;
+  answerBusy: boolean;
+  answerError: string | null;
 }) {
   // QA-107/FIX-22: the time is shown in the SALON's timezone everywhere; show
   // the explicit «(город, GMT+N)» label only when the viewer's zone differs
@@ -403,7 +449,11 @@ function BookingRow({
 
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={booking.status} isToday={booking.isToday} />
+          <StatusBadge
+            status={booking.status}
+            actionRequiredBy={booking.actionRequiredBy}
+            isToday={booking.isToday}
+          />
           <span className="font-mono text-xs text-text-sec">
             {formatDuration(booking.durationMin)}
           </span>
@@ -438,6 +488,16 @@ function BookingRow({
             <MapPin className="h-3 w-3 shrink-0" aria-hidden />
             <span className="truncate">{booking.address}</span>
           </div>
+        ) : null}
+
+        {booking.status === "CHANGE_REQUESTED" && booking.proposedStartAt ? (
+          <RescheduleProposal
+            booking={booking}
+            salonTz={salonTz}
+            onAnswer={onAnswerReschedule}
+            busy={answerBusy}
+            error={answerError}
+          />
         ) : null}
 
         <BookingActions
@@ -513,11 +573,76 @@ function DateBadge({
   );
 }
 
+/**
+ * RESCHEDULE-CLIENT-APPROVAL — блок предложения переноса (инв. #32, сторона
+ * клиента). Мастер предложил (`actionRequiredBy === "CLIENT"`) → текст +
+ * «Подтвердить перенос» / «Оставить прежнее время»; клиент сам попросил →
+ * только текст «ждём ответа мастера». Время предложения — в salon-tz, как и
+ * всё на карточке (rule 17).
+ */
+function RescheduleProposal({
+  booking,
+  salonTz,
+  onAnswer,
+  busy,
+  error,
+}: {
+  booking: ClientBookingDTO;
+  salonTz: string;
+  onAnswer: (answer: "accept" | "decline") => void;
+  busy: boolean;
+  error: string | null;
+}) {
+  if (!booking.proposedStartAt) return null;
+  const when = UI_FMT.dateTimeLong(booking.proposedStartAt, { timeZone: salonTz });
+  const awaitsClient = booking.actionRequiredBy === "CLIENT";
+  const text = (awaitsClient ? T.rescheduleProposedByMaster : T.rescheduleProposedByYou).replace(
+    "{when}",
+    when,
+  );
+
+  return (
+    <div
+      data-testid="reschedule-proposal"
+      className="rounded-xl border border-warning-border bg-warning-surface px-3 py-2.5"
+    >
+      <p className="text-sm font-medium text-warning-text">{text}</p>
+      {awaitsClient ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="primary"
+            disabled={busy}
+            onClick={() => onAnswer("accept")}
+            data-testid="reschedule-accept"
+          >
+            {T.actionAcceptReschedule}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => onAnswer("decline")}
+            data-testid="reschedule-keep"
+          >
+            {T.actionKeepTime}
+          </Button>
+        </div>
+      ) : null}
+      {error ? <p className="mt-2 text-xs text-danger-text">{error}</p> : null}
+    </div>
+  );
+}
+
 function StatusBadge({
   status,
+  actionRequiredBy,
   isToday,
 }: {
   status: ClientBookingDTO["status"];
+  actionRequiredBy: ClientBookingDTO["actionRequiredBy"];
   isToday: boolean;
 }) {
   if (isToday && (status === "CONFIRMED" || status === "PREPAID")) {
@@ -528,7 +653,12 @@ function StatusBadge({
     case "PENDING":
       return <Badge variant="warning">{STATUS_T.waitsMaster}</Badge>;
     case "CHANGE_REQUESTED":
-      return <Badge variant="warning">{STATUS_T.changeRequested}</Badge>;
+      // RESCHEDULE-CLIENT-APPROVAL: чей ход — видно по бейджу.
+      return (
+        <Badge variant="warning">
+          {actionRequiredBy === "CLIENT" ? STATUS_T.needsYourAnswer : STATUS_T.changeRequested}
+        </Badge>
+      );
     case "CONFIRMED":
     case "PREPAID":
       return <Badge variant="info">{STATUS_T.confirmed}</Badge>;
@@ -578,7 +708,12 @@ function BookingActions({
           {chatHref ? (
             <ActionLink href={chatHref} icon={MessageSquare} label={T.actionChat} variant="primary" />
           ) : null}
-          <ActionButton icon={Calendar} label={T.actionReschedule} onClick={onReschedule} />
+          {/* RESCHEDULE-CLIENT-APPROVAL: пока перенос согласуется, второй запрос
+              сервер отклоняет (409) — кнопку не показываем, ответ даётся в
+              блоке предложения выше. */}
+          {booking.status === "CHANGE_REQUESTED" ? null : (
+            <ActionButton icon={Calendar} label={T.actionReschedule} onClick={onReschedule} />
+          )}
           {/* FIX-B18: без `download` — атрибут заставил бы браузер СКАЧАТЬ цель
               редиректа при отказе (страницу вместо файла). На успехе он не
               нужен: ответ несёт `Content-Disposition: attachment`, который сам

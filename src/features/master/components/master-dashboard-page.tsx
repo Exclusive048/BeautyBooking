@@ -91,7 +91,10 @@ export async function MasterDashboardPage() {
           { label: HOME_TITLE.title },
         ]}
         title={HOME_TITLE.title}
-        subtitle={HOME_TITLE.subtitle}
+        // PWA-UX-BATCH-01: «Новая запись» стоит на строке заголовка и на
+        // телефоне (`actionsInline`) — заголовок короткий, действие одно, а
+        // отдельная строка под ним отнимала ~60px первого экрана кабинета.
+        actionsInline
         actions={
           <NewBookingButton label={HEADER.newBookingCta} className="rounded-xl" />
         }

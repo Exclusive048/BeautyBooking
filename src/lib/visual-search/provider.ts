@@ -139,7 +139,10 @@ function logProviderFailure(scope: string, error: unknown): void {
 }
 
 export async function resizeForVision(imageBytes: Uint8Array): Promise<Uint8Array> {
-  const image = sharp(Buffer.from(imageBytes), { failOn: "none" });
+  // MEDIA-EXIF-ORIENTATION: ориентация из EXIF применяется к пикселям до
+  // ресайза — иначе модель видит кадр на боку. `.rotate()` обязан стоять
+  // раньше `.resize()` (ограничение sharp).
+  const image = sharp(Buffer.from(imageBytes), { failOn: "none" }).rotate();
   const meta = await image.metadata();
   const width = meta.width ?? null;
   const height = meta.height ?? null;

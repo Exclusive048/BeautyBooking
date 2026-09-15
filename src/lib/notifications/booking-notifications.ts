@@ -326,14 +326,96 @@ export async function notifyBookingRescheduled(booking: BookingWithRelations): P
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingRequestedLabel(booking) ?? bookingWhenLabel(booking);
-  const title = "Запись перенесена";
-  const body = whenLabel
-    ? `Ваша запись перенесена: ${serviceName} ${whenLabel}`
-    : `Ваша запись перенесена: ${serviceName}`;
+  // RESCHEDULE-CLIENT-APPROVAL: перенос, начатый мастером, — ПРЕДЛОЖЕНИЕ
+  // (инв. #32: вступает по согласию обеих сторон). Прежний текст «Запись
+  // перенесена» сообщал о свершившемся факте, и клиент не знал, что от него
+  // ждут ответа. Уже применённый перенос (студийный move и т.п.) сохраняет
+  // прежнюю формулировку.
+  const isProposal =
+    booking.status === "CHANGE_REQUESTED" && booking.actionRequiredBy === "CLIENT";
+  const title = isProposal ? "Мастер предлагает перенести запись" : "Запись перенесена";
+  const body = isProposal
+    ? whenLabel
+      ? `Мастер предлагает перенести ${serviceName} на ${whenLabel}. Подтвердите перенос или оставьте прежнее время в разделе «Мои записи».`
+      : `Мастер предлагает перенести ${serviceName}. Подтвердите перенос или оставьте прежнее время в разделе «Мои записи».`
+    : whenLabel
+      ? `Ваша запись перенесена: ${serviceName} ${whenLabel}`
+      : `Ваша запись перенесена: ${serviceName}`;
 
   await deliverNotification({
     userId: clientUserId,
     type: NotificationType.BOOKING_RESCHEDULED,
+    title,
+    body,
+    payloadJson: buildBookingPayload(booking),
+    bookingId: booking.id,
+    pushUrl: bookingPushUrl(booking.id, "CLIENT"),
+    telegramText: buildTelegramText(title, body),
+  });
+}
+
+/**
+ * RESCHEDULE-CLIENT-APPROVAL: клиент ответил на предложенный мастером перенос.
+ * `accepted` — время применено (`confirmBooking`), `declined` — прежнее время
+ * сохранено (`declineClientRescheduleRequest`). Получатели — сторона
+ * провайдера; типы `BOOKING_CONFIRMED` / `BOOKING_DECLINED` — центр отдаёт им
+ * кабинетную ссылку по каналу получателя (`resolveNotificationOpenHref`).
+ */
+export async function notifyRescheduleAnswered(
+  booking: BookingWithRelations,
+  answer: "accepted" | "declined",
+): Promise<void> {
+  const recipientIds = await resolveProviderRecipientUserIds(booking);
+  if (recipientIds.length === 0) return;
+
+  const serviceName = resolveServiceLabel(booking.service);
+  const whenLabel = bookingWhenLabel(booking);
+  const title = answer === "accepted" ? "Клиент подтвердил перенос" : "Клиент оставил прежнее время";
+  const body =
+    answer === "accepted"
+      ? whenLabel
+        ? `${booking.clientName} подтвердил перенос: ${serviceName} ${whenLabel}.`
+        : `${booking.clientName} подтвердил перенос: ${serviceName}.`
+      : whenLabel
+        ? `${booking.clientName} не принял перенос — ${serviceName} остаётся ${whenLabel}.`
+        : `${booking.clientName} не принял перенос — ${serviceName} остаётся на прежнее время.`;
+
+  const payload = buildBookingPayload(booking);
+  await Promise.all(
+    recipientIds.map((userId) =>
+      deliverNotification({
+        userId,
+        type: answer === "accepted" ? NotificationType.BOOKING_CONFIRMED : NotificationType.BOOKING_DECLINED,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: providerNotificationPushUrl(booking, userId),
+        telegramText: buildTelegramText(title, body),
+      })
+    )
+  );
+}
+
+/**
+ * RESCHEDULE-CLIENT-APPROVAL: мастер не принял перенос, который просил клиент —
+ * бронь осталась на прежнем времени. Раньше сюда шёл `notifyBookingRejected`
+ * («Запись отклонена»), хотя запись никуда не делась.
+ */
+export async function notifyRescheduleDeclinedByMaster(booking: BookingWithRelations): Promise<void> {
+  const clientUserId = resolveClientUserId(booking);
+  if (!clientUserId) return;
+
+  const serviceName = resolveServiceLabel(booking.service);
+  const whenLabel = bookingWhenLabel(booking);
+  const title = "Мастер оставил прежнее время";
+  const body = whenLabel
+    ? `Перенос не согласован — ${serviceName} остаётся ${whenLabel}.`
+    : `Перенос не согласован — ${serviceName} остаётся на прежнее время.`;
+
+  await deliverNotification({
+    userId: clientUserId,
+    type: NotificationType.BOOKING_DECLINED,
     title,
     body,
     payloadJson: buildBookingPayload(booking),

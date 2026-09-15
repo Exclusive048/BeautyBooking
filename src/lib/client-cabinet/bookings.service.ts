@@ -28,6 +28,15 @@ export type ClientBookingDTO = {
   canReview: boolean;
   hasReview: boolean;
   chatSlug: string | null;
+  /**
+   * RESCHEDULE-CLIENT-APPROVAL: двустороннее согласование переноса (инв. #32).
+   * `proposedStartAt`/`proposedEndAt` — предложенное окно (только при
+   * CHANGE_REQUESTED), `actionRequiredBy` — чей сейчас ход: `CLIENT` — мастер
+   * предложил и ждёт ответа клиента, `MASTER` — клиент попросил и ждёт мастера.
+   */
+  proposedStartAt: string | null;
+  proposedEndAt: string | null;
+  actionRequiredBy: "CLIENT" | "MASTER" | null;
   /** Maps action shows when address exists and viewing is master-on-site */
   isOnSite: boolean;
   address: string | null;
@@ -84,6 +93,9 @@ export async function listClientBookings(
       status: true,
       startAtUtc: true,
       endAtUtc: true,
+      proposedStartAt: true,
+      proposedEndAt: true,
+      actionRequiredBy: true,
       slotLabel: true,
       providerId: true,
       service: {
@@ -196,6 +208,11 @@ export async function listClientBookings(
       canReview,
       hasReview,
       chatSlug: slugByProvider.get(displayProvider.id) ?? null,
+      proposedStartAt:
+        r.status === "CHANGE_REQUESTED" && r.proposedStartAt ? r.proposedStartAt.toISOString() : null,
+      proposedEndAt:
+        r.status === "CHANGE_REQUESTED" && r.proposedEndAt ? r.proposedEndAt.toISOString() : null,
+      actionRequiredBy: r.status === "CHANGE_REQUESTED" ? (r.actionRequiredBy ?? null) : null,
       isOnSite: !!address,
       address,
       provider: {

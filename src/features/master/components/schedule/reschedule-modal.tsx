@@ -222,6 +222,9 @@ export function RescheduleModal({
     url.searchParams.set("serviceId", context.serviceId);
     url.searchParams.set("from", selectedDate);
     url.searchParams.set("limit", "1");
+    // RESCHEDULE-SELF-SLOT: окно самой брони не занято — иначе сдвиг на
+    // полчаса внутри своего же окна был невозможен.
+    url.searchParams.set("excludeBookingId", bookingId);
     void fetch(url.toString(), { cache: "no-store" })
       .then(async (res) => {
         const json = (await res.json().catch(() => null)) as
@@ -247,7 +250,7 @@ export function RescheduleModal({
     return () => {
       cancelled = true;
     };
-  }, [open, context, selectedDate]);
+  }, [open, context, selectedDate, bookingId]);
 
   // Filter and group slots for the picker; exclude the booking's
   // current slot (master shouldn't "move to where it already is").

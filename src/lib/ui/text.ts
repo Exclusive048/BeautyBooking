@@ -885,26 +885,24 @@ export const UI_TEXT = {
       button: "Создать профиль бесплатно",
       hint: "Настройте кабинет так, как удобно вам",
     },
+    // FOOTER-HONEST-METRICS (2026-09-15): выдуманные числа («+34% записей»,
+    // «1 240 предложений», «−54%», «−40…−70%», «3 месяца без комиссии») сняты
+    // по решению владельца. У мастеров метрик нет; у моделей — живые
+    // (`getPublicModelOfferStats`), здесь только подписи к ним.
     ctaMasters: {
       badge: "Для мастеров",
       title: "Принимаете клиентов? Платформа уже всё умеет",
       subtitle:
-        "Расписание, онлайн-запись, отзывы и аналитика — в одном кабинете. Первые 3 месяца — без комиссии.",
-      metric1Value: "+34%",
-      metric1Label: "записей в месяц",
-      metric2Value: "12 мин",
-      metric2Label: "до первого клиента",
+        "Расписание, онлайн-запись, отзывы и аналитика — в одном кабинете. Начать можно бесплатно.",
       cta: "Стать мастером",
     },
     ctaModels: {
       badge: "Для моделей",
       title: "Хотите модный образ со скидкой?",
       subtitle:
-        "Мастера ищут моделей для отработки техник и портфолио. Услуги −40…−70%, всё официально и безопасно.",
-      metric1Value: "1 240",
-      metric1Label: "предложений сейчас",
-      metric2Value: "−54%",
-      metric2Label: "средняя скидка",
+        "Мастера ищут моделей для отработки техник и портфолио — услуги со скидкой, всё официально и безопасно.",
+      metricOffersLabel: "открыто сейчас",
+      metricDiscountLabel: "средняя скидка",
       cta: "Найти предложение",
     },
     columns: {
@@ -1642,6 +1640,9 @@ export const UI_TEXT = {
       cancelled: "Отменено",
       noShow: "Неявка",
     },
+    // RESCHEDULE-CURRENT-TIME: текст уведомления заморожен на момент события,
+    // а бронь могла быть перенесена — строка показывает живое время.
+    currentTimeLabel: "Актуальное время",
     bookingActions: {
       resolveForConfirmFailed: "Не удалось подтвердить запись. Попробуйте ещё раз.",
       resolveForDeclineFailed: "Не удалось отклонить запись. Попробуйте ещё раз.",
@@ -2405,10 +2406,6 @@ export const UI_TEXT = {
           endLabel: "Конец",
           submit: "Добавить",
           cancel: "Отмена",
-        },
-        footerHint: {
-          title: "Нажмите в календаре, чтобы закрыть одно окошко",
-          body: "Разовые паузы между клиентами проще ставить прямо в расписании — не нужно создавать правило.",
         },
       },
       errors: {
@@ -3467,12 +3464,15 @@ export const UI_TEXT = {
       bookingsLabelFew: "записи",
       bookingsLabelMany: "записей",
       controls: {
+        // PWA-UX-BATCH-01: «Месяц» снят (был заглушкой, выглядел нажимаемым);
+        // день — рабочий вид, для телефона — по умолчанию.
         viewDay: "День",
         viewWeek: "Неделя",
-        viewMonth: "Месяц",
-        viewSoon: "Скоро",
         prevWeek: "Предыдущая неделя",
         nextWeek: "Следующая неделя",
+        prevDay: "Предыдущий день",
+        nextDay: "Следующий день",
+        dayStripAria: "Дни недели",
         today: "Сегодня",
         refresh: "Обновить",
         // PWA-FIX-05 — подписанная кнопка входа в настройки со страницы
@@ -3481,6 +3481,9 @@ export const UI_TEXT = {
       },
       kpi: {
         weekBookings: "Записей на неделе",
+        // PWA-UX-BATCH-01: короткие подписи для плиток 4-в-ряд на телефоне.
+        weekBookingsShort: "Записей",
+        freeTodayShort: "Свободно",
         weekRevenue: "Доход",
         load: "Загрузка",
         loadHoursTemplate: "из {hours} ч",
@@ -3591,6 +3594,8 @@ export const UI_TEXT = {
         cancelError: "Не удалось отменить запись. Попробуйте ещё раз.",
         reviewLabelTemplate: "★ {rating} · отзыв оставлен",
         guestClient: "Без аккаунта",
+        // RESCHEDULE-CURRENT-TIME: запрошенное клиентом время под текущим.
+        proposedWhenPrefix: "Перенос на",
       },
       empty: "Пока пусто",
       declineReasonPrompt: "Укажите причину отказа — она будет отправлена клиенту:",
@@ -3664,6 +3669,9 @@ export const UI_TEXT = {
         emptyDescription:
           "Нет срочных задач. Можно сосредоточиться на работе с клиентами.",
         confirmBookingTitle: "Подтвердить запись",
+        // RESCHEDULE-CURRENT-TIME: запрос переноса — отдельная задача, время
+        // в описании «прежнее → запрошенное».
+        rescheduleRequestTitle: "Подтвердить перенос",
         confirmBookingCta: "Подтвердить",
         confirmBookingBusy: "Подтверждаем…",
         unansweredReviewTitle: "Ответить на отзыв",
@@ -3731,7 +3739,9 @@ export const UI_TEXT = {
      * delete as "unused" — they're future surfaces.
      */
     pageTitles: {
-      home: { title: "Главная", subtitle: "Сводка дня и быстрые действия" },
+      // PWA-UX-BATCH-01: подзаголовка у «Главной» больше нет — на телефоне
+      // шапка отнимала экран, а строка ничего не сообщала.
+      home: { title: "Главная" },
       bookings: { title: "Записи", subtitle: "Ждут подтверждения и уже подтверждённые" },
       notifications: { title: "Уведомления", subtitle: "Всё по работе с клиентами" },
       schedule: { title: "Расписание", subtitle: "Свободные окошки и план дня" },
@@ -5327,6 +5337,8 @@ export const UI_TEXT = {
       inProgress: "В процессе",
       finished: "Завершено",
       changeRequested: "Ожидает подтверждения",
+      // RESCHEDULE-CLIENT-APPROVAL: мастер предложил перенос — ход за клиентом.
+      needsYourAnswer: "Нужен ваш ответ",
       waitsMaster: "Ожидает подтверждения мастера",
       goToMaster: "К мастеру",
       goToStudio: "К студии",
@@ -5523,6 +5535,14 @@ export const UI_TEXT = {
       cancelConfirmTitle: "Отменить запись?",
       cancelConfirmBody: "Мастер получит уведомление. Действие необратимо.",
       cancelConfirmAction: "Отменить запись",
+      // RESCHEDULE-CLIENT-APPROVAL: двустороннее согласование переноса
+      // (инв. #32) на стороне клиента — раньше у клиента не было ни текста
+      // предложения, ни кнопок, и запись висела «в ожидании» без выхода.
+      rescheduleProposedByMaster: "Мастер предлагает перенести на {when}",
+      rescheduleProposedByYou: "Вы предложили {when} — ждём ответа мастера",
+      actionAcceptReschedule: "Подтвердить перенос",
+      actionKeepTime: "Оставить прежнее время",
+      rescheduleAnswerFailed: "Не удалось ответить на перенос. Попробуйте ещё раз.",
       icsFilename: (id: string) => `booking-${id}.ics`,
       // FIX-B18: исходы `GET /api/bookings/[id]/ics`. Роут возвращает браузер
       // сюда с `?ics=<исход>` вместо JSON-конверта в окне; ключи — союз

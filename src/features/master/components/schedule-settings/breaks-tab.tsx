@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
-import { BreaksFooterHint } from "./breaks/breaks-footer-hint";
 import { BufferSection } from "./breaks/buffer-section";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
@@ -16,8 +15,12 @@ type Props = {
 };
 
 /**
- * Breaks tab — buffer between bookings + footer hint about click-to-block
- * in the week view.
+ * Breaks tab — buffer between bookings.
+ *
+ * PWA-UX-BATCH-01 (2026-09-15): подсказка «Нажмите в календаре, чтобы закрыть
+ * одно окошко» снята по решению владельца — она отправляла на другой экран и
+ * описывала жест, который на телефоне не очевиден; вкладка держит только
+ * настройку паузы между записями.
  *
  * The recurring-breaks UI was rolled back in 25-FIX-A: per-day breaks are
  * already managed from the Hours tab (single source of truth on
@@ -59,7 +62,6 @@ export function BreaksTab({ initialSnapshot }: Props) {
   return (
     <div className="space-y-6">
       <BufferSection value={draft} onChange={setDraft} />
-      <BreaksFooterHint />
     </div>
   );
 }

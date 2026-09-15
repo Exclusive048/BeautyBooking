@@ -1,6 +1,7 @@
 import { BookingCard } from "@/features/master/components/bookings/booking-card";
 import { EmptyColumn } from "@/features/master/components/bookings/empty-column";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
+import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 
 const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
@@ -30,13 +31,28 @@ type Props = {
  * long column (e.g. «Завершены» with dozens of cards) scrolls INSIDE its
  * body instead of ballooning the whole page to several viewports. Combined
  * with the board's `items-start`, columns read as cards, not stretched
- * bands. Mobile keeps natural page-scroll (one column per viewport).
+ * bands. Mobile keeps natural page-scroll.
+ *
+ * PWA-UX-BATCH-01 (2026-09-15): на телефоне колонка была `w-[320px]` при
+ * 343px контента — то есть ровно один столбец на экран, и о соседних
+ * колонках ничто не сообщало. Теперь колонка с записями — 272px (край
+ * следующей виден, свайп читается), а ПУСТАЯ колонка схлопывается до
+ * 136px: заголовок + счётчик «0», подсказка и сумма скрыты ниже `lg`.
+ * Десктоп не менялся.
  */
 export function KanbanColumn({ id, title, hint, bookings }: Props) {
   const sum = bookings.reduce((s, b) => s + b.price, 0);
+  const collapsed = bookings.length === 0;
   return (
-    <section data-testid={`bookings-column-${id}`} className="flex w-[320px] shrink-0 snap-start flex-col lg:max-h-[calc(100dvh-var(--topbar-h)-12rem)] lg:w-[280px] xl:w-[300px]">
-      <header className="rounded-t-2xl border border-border-subtle bg-bg-card px-4 py-3">
+    <section
+      data-testid={`bookings-column-${id}`}
+      data-collapsed={collapsed ? "true" : "false"}
+      className={cn(
+        "flex shrink-0 snap-start flex-col lg:max-h-[calc(100dvh-var(--topbar-h)-12rem)] lg:w-[280px] xl:w-[300px]",
+        collapsed ? "w-[136px]" : "w-[272px]",
+      )}
+    >
+      <header className="rounded-t-2xl border border-border-subtle bg-bg-card px-3 py-3 lg:px-4">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${ACCENT_DOT[id]}`} />
@@ -46,7 +62,12 @@ export function KanbanColumn({ id, title, hint, bookings }: Props) {
             {bookings.length}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs">
+        <div
+          className={cn(
+            "items-center justify-between gap-2 text-xs",
+            collapsed ? "hidden lg:flex" : "flex",
+          )}
+        >
           <p className="truncate text-text-sec">{hint}</p>
           <p className="font-medium tabular-nums text-text-main">{formatRub(sum)}</p>
         </div>

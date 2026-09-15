@@ -6,6 +6,7 @@ import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/Fo
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
 import { FooterSocials } from "@/components/layout/footer/FooterSocials";
 import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
+import { getPublicModelOfferStats } from "@/lib/model-offers/public-stats";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const APP_ROOT = path.join(process.cwd(), "src", "app");
@@ -59,8 +60,10 @@ function buildFooterLinks() {
   return { about, clients, masters, support };
 }
 
-export function Footer() {
+export async function Footer() {
   const { about, clients, masters, support } = buildFooterLinks();
+  // FOOTER-HONEST-METRICS: живые числа карточки «Для моделей» (кэш 15 мин).
+  const modelOfferStats = await getPublicModelOfferStats();
 
   return (
     <footer
@@ -71,7 +74,7 @@ export function Footer() {
     >
       <div className="mx-auto max-w-[1280px] px-4 py-12 md:py-16">
         {/* CTA Banner */}
-        <FooterCTA />
+        <FooterCTA modelOfferStats={modelOfferStats} />
 
         {/* Main grid */}
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,3fr)]">

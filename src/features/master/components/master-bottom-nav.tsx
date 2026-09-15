@@ -191,7 +191,9 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
         aria-label={UI_TEXT.a11y.mainNav}
       >
         <div className="absolute inset-0 border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl" />
-        <div className="relative pb-[env(safe-area-inset-bottom,0px)]">
+        {/* PWA-UX-BATCH-01: инсет вычитается на 10px, строка вкладок ниже —
+            иначе кнопки висели над пустой полосой высотой инсета. */}
+        <div className="relative pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-10px))]">
           <ul className="flex items-stretch">
             {TABS.map((tab) => {
               const active = isActive(pathname, tab.href, tab.exact);
@@ -202,7 +204,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                 <li key={tab.href} className="flex-1">
                   <Link
                     href={tab.href}
-                    className="relative flex flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
+                    className="relative flex flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
                     aria-current={active ? "page" : undefined}
                   >
                     <span className="relative">
@@ -227,7 +229,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
               <button
                 type="button"
                 onClick={() => setMoreOpen(true)}
-                className="flex w-full flex-col items-center gap-0.5 px-1 py-2.5 transition-colors"
+                className="flex w-full flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
                 aria-expanded={moreOpen}
               >
                 <MoreHorizontal
@@ -242,7 +244,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
           </ul>
         </div>
       </nav>
-      <div className="h-16 lg:hidden" aria-hidden="true" />
+      <div className="h-14 lg:hidden" aria-hidden="true" />
     </>
   );
 }

@@ -97,6 +97,33 @@ describe("PERF-07 · загруженное изображение ограни�
     expect(MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX).toBeLessThan(MEDIA_MAX_IMAGE_SIDE_PX);
   });
 
+  /**
+   * MEDIA-EXIF-ORIENTATION. Снимок с телефона несёт `Orientation: 6` (кадр
+   * лежит на боку, тег велит повернуть на 90°). sharp при переупаковке тег
+   * снимает и без `.rotate()` пиксели не трогает — файл хранился «на боку».
+   * Проверяется свойство результата: пиксели повёрнуты (ширина и высота
+   * поменялись местами), тега ориентации больше нет, и порог длинной стороны
+   * применён ПОСЛЕ поворота.
+   *
+   * @probe убран `.rotate()` из `capLongestSide` → `{ width: 400, height: 200 }`
+   * вместо ожидаемых `{ width: 200, height: 400 }` — тест красный.
+   */
+  it("EXIF-ориентация применяется к пикселям до ресайза, тег обнуляется", async () => {
+    const sideways = await sharp({
+      create: { width: 400, height: 200, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    })
+      .jpeg()
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    expect((await sharp(sideways).metadata()).orientation).toBe(6);
+
+    const out = await capLongestSide(sharp(sideways), 300).jpeg().toBuffer();
+    const meta = await sharp(out).metadata();
+
+    expect({ width: meta.width, height: meta.height }).toEqual({ width: 150, height: 300 });
+    expect(meta.orientation).toBeUndefined();
+  });
+
   it("capLongestSide не увеличивает изображение (withoutEnlargement)", async () => {
     const small = await sharp({
       create: { width: 40, height: 20, channels: 3, background: { r: 0, g: 0, b: 0 } },

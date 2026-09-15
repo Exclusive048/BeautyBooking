@@ -6,6 +6,10 @@ type Props = {
   label: string;
   value: string;
   sublabel?: string;
+  /** PWA-UX-BATCH-01: плотная плитка для сетки 4-в-ряд на телефоне (см. StatTile). */
+  compact?: boolean;
+  labelCompact?: string;
+  valueCompact?: string;
 };
 
 /**
@@ -17,6 +21,16 @@ type Props = {
  * мастера, — и они передают `icon`/`label`/`value`/`sublabel` позиционно
  * одинаково, так что точка замены одна.
  */
-export function KpiCard({ icon, label, value, sublabel }: Props) {
-  return <StatTile icon={icon} label={label} value={value} sublabel={sublabel} />;
+export function KpiCard({ icon, label, value, sublabel, compact, labelCompact, valueCompact }: Props) {
+  return (
+    <StatTile
+      icon={icon}
+      label={label}
+      value={value}
+      sublabel={sublabel}
+      compact={compact}
+      labelCompact={labelCompact}
+      valueCompact={valueCompact}
+    />
+  );
 }

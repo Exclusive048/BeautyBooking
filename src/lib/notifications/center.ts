@@ -74,9 +74,29 @@ function parseJsonPayload(payloadJson: unknown): unknown {
   return payloadJson ?? null;
 }
 
+/**
+ * RESCHEDULE-CURRENT-TIME (2026-09-15). Текст уведомления («… записался на
+ * 10:00») заморожен в момент создания, а бронь живёт дальше: клиент оформил
+ * запись и тут же перенёс её — мастер в центре уведомлений читал первую дату
+ * как актуальную. Раньше из живой брони подтягивался только статус; теперь
+ * ещё и АКТУАЛЬНОЕ время (`currentStartAtUtc` = предложение переноса, если
+ * оно есть, иначе текущее начало) плюс зона салона для его отображения.
+ * Сохранённый `startAtUtc` не трогается — по расхождению с ним страница и
+ * понимает, что время сменилось.
+ */
 function mergeBookingPayload(
   payloadJson: unknown,
-  booking: { id: string; status: string } | null | undefined
+  booking:
+    | {
+        id: string;
+        status: string;
+        startAtUtc: Date | null;
+        proposedStartAt: Date | null;
+        actionRequiredBy: string | null;
+        provider: { timezone: string };
+      }
+    | null
+    | undefined
 ): unknown {
   const parsed = parseJsonPayload(payloadJson);
   if (!booking) return parsed;
@@ -86,6 +106,12 @@ function mergeBookingPayload(
     record.bookingId = booking.id;
   }
   record.bookingStatus = booking.status;
+  record.actionRequiredBy = booking.actionRequiredBy ?? null;
+  const current = booking.proposedStartAt ?? booking.startAtUtc;
+  record.currentStartAtUtc = current ? current.toISOString() : null;
+  if (typeof record.providerTimezone !== "string" || record.providerTimezone.length === 0) {
+    record.providerTimezone = booking.provider.timezone;
+  }
   return record;
 }
 
@@ -240,10 +266,15 @@ export async function getNotificationCenterData(input: {
             id: true,
             status: true,
             studioId: true,
+            // RESCHEDULE-CURRENT-TIME: живое время брони для центра.
+            startAtUtc: true,
+            proposedStartAt: true,
+            actionRequiredBy: true,
             provider: {
               select: {
                 type: true,
                 ownerUserId: true,
+                timezone: true,
               },
             },
             masterProvider: {
@@ -332,19 +363,20 @@ export async function getNotificationCenterData(input: {
   const timelineNotifications: NotificationCenterNotificationItem[] = [
     ...notifications.map((item) => {
       const payloadJson = mergeBookingPayload(item.payloadJson, item.booking);
+      const channel: NotificationChannel =
+        resolveModelChannel(item.type) ??
+        (item.type.startsWith("STUDIO_") ? "STUDIO" : null) ??
+        classifyNotificationChannel({
+          userId: input.userId,
+          studioIds,
+          booking: item.booking,
+        });
       return {
         id: item.id,
         title: item.title,
         body: item.body,
         type: item.type,
-        channel:
-          resolveModelChannel(item.type) ??
-          (item.type.startsWith("STUDIO_") ? "STUDIO" : null) ??
-          classifyNotificationChannel({
-            userId: input.userId,
-            studioIds,
-            booking: item.booking,
-          }),
+        channel,
         isRead: item.isRead,
         readAt: item.readAt ? item.readAt.toISOString() : null,
         createdAt: item.createdAt.toISOString(),
@@ -352,7 +384,9 @@ export async function getNotificationCenterData(input: {
         openHref:
           resolveModelOpenHref(item.type, payloadJson) ??
           resolveChatOpenHref(item.type, payloadJson) ??
-          resolveNotificationOpenHref(item.type, payloadJson),
+          // RESCHEDULE-CURRENT-TIME: канал нужен, потому что ответ клиента на
+          // перенос уходит мастеру типами «клиентской» семантики.
+          resolveNotificationOpenHref(item.type, payloadJson, channel),
       };
     }),
     ...scheduleRequestNotifications,

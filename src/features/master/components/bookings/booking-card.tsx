@@ -83,6 +83,13 @@ export function BookingCard({ booking, column }: Props) {
         </span>
       </div>
 
+      {booking.proposedWhenLabel ? (
+        // RESCHEDULE-CURRENT-TIME: запрошенное время — актуальное для мастера.
+        <p className="mb-2 text-xs font-medium text-accent-text">
+          {T.proposedWhenPrefix} {booking.proposedWhenLabel}
+        </p>
+      ) : null}
+
       {column === "cancelled" && booking.changeComment ? (
         <p className="mb-2 line-clamp-2 text-[11px] text-text-sec">
           {booking.changeComment}

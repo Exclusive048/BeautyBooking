@@ -3,6 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { decodePublicId, encodePublicId } from "@/lib/public-id";
 import { Prisma } from "@prisma/client";
 
+/**
+ * FEED-UNPUBLISHED-MASTER (2026-09-15). Лента портфолио на главной для
+ * авторизованных фильтровала только `isPublic` самой работы и показывала
+ * работы мастеров, СНЯТЫХ с публикации (черновой кабинет, удалённый кабинет —
+ * удаление мастера выражается как `isPublished: false`). Соседние ленты
+ * (stories, «недавние мастера», каталог) публикацию требуют; отдача медиа тоже
+ * (`isProviderMediaPubliclyVisible`), поэтому карточка рендерилась с именем и
+ * ценой, но с плейсхолдером вместо фото. Предикат один на все четыре чтения
+ * ленты — лента, домашняя лента, «похожие», карточка работы.
+ */
+const PUBLISHED_MASTER_WHERE = { master: { isPublished: true } } as const;
+
 type PortfolioServiceOption = {
   serviceId: string;
   title: string;
@@ -274,6 +286,7 @@ export async function listPortfolioFeed(input: {
     prisma.portfolioItem.findMany({
       where: {
         isPublic: true,
+        ...PUBLISHED_MASTER_WHERE,
         ...(input.masterId ? { masterId: input.masterId } : {}),
         ...(input.q
           ? {
@@ -409,6 +422,7 @@ export async function listHomePortfolioFeed(input: {
     prisma.portfolioItem.findMany({
       where: {
         isPublic: true,
+        ...PUBLISHED_MASTER_WHERE,
         ...(globalCategoryId
           ? {
               services: {
@@ -529,6 +543,7 @@ export async function getPortfolioDetail(
           publicUsername: true,
           avatarUrl: true,
           ratingAvg: true,
+          isPublished: true,
           // TZ-DISPLAY-SALON-PARITY-01: salon tz for the nearest-slot times.
           timezone: true,
           studio: { select: { name: true } },
@@ -557,7 +572,9 @@ export async function getPortfolioDetail(
     },
   });
 
-  if (!item || !item.isPublic) {
+  // FEED-UNPUBLISHED-MASTER: тот же 404, что и у несуществующей работы —
+  // отдельный код разгласил бы факт существования скрытого кабинета.
+  if (!item || !item.isPublic || !item.master.isPublished) {
     throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
 
@@ -573,6 +590,7 @@ export async function getPortfolioDetail(
   const similarRows = await prisma.portfolioItem.findMany({
     where: {
       isPublic: true,
+      ...PUBLISHED_MASTER_WHERE,
       id: { not: item.id },
       OR: [
         { masterId: item.master.id },
@@ -656,10 +674,10 @@ export async function togglePortfolioFavorite(input: {
 }): Promise<{ isFavorited: boolean; favoritesCount: number }> {
   const item = await prisma.portfolioItem.findUnique({
     where: { id: input.portfolioId },
-    select: { id: true, isPublic: true },
+    select: { id: true, isPublic: true, master: { select: { isPublished: true } } },
   });
 
-  if (!item || !item.isPublic) {
+  if (!item || !item.isPublic || !item.master.isPublished) {
     throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
   }
 

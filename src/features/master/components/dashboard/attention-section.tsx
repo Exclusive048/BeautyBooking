@@ -37,12 +37,17 @@ function buildTasks(
 
   for (const pb of data.pendingBookings) {
     const when = pb.startAtUtc ? formatLocalHm(pb.startAtUtc, timezone) : "";
+    // RESCHEDULE-CURRENT-TIME: у запроса переноса АКТУАЛЬНОЕ время — то, что
+    // просит клиент; прежнее показывается рядом, иначе мастер читал первую
+    // дату как текущую (клиент записался и тут же перенёс).
+    const proposed = pb.proposedStartAt ? formatLocalHm(pb.proposedStartAt, timezone) : "";
+    const whenText = proposed && when ? `${when} → ${proposed}` : proposed || when;
     tasks.push({
       key: `pending-${pb.id}`,
       icon: AlertCircle,
-      title: T.confirmBookingTitle,
-      description: when
-        ? `${pb.clientName}, ${when} — ${pb.serviceTitle}`
+      title: pb.isRescheduleRequest ? T.rescheduleRequestTitle : T.confirmBookingTitle,
+      description: whenText
+        ? `${pb.clientName}, ${whenText} — ${pb.serviceTitle}`
         : `${pb.clientName} — ${pb.serviceTitle}`,
       // fix-02: replace the broken `/bookings/[id]` link with an inline
       // confirm action — same PATCH endpoint the kanban uses, no

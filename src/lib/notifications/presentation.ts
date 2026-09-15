@@ -161,7 +161,19 @@ const BILLING_HREF_TYPES = new Set<string>([
   "BILLING_PLAN_EDITED",
 ]);
 
-export function resolveNotificationOpenHref(type: string, payload: unknown): string | undefined {
+/**
+ * RESCHEDULE-CURRENT-TIME: `channel` — сторона получателя, известная центру
+ * уведомлений (`center.ts`). Ответ клиента на предложенный мастером перенос
+ * (принял / оставил прежнее время) уходит мастеру типами `BOOKING_CONFIRMED` /
+ * `BOOKING_DECLINED`, у которых href по умолчанию клиентский; для получателя
+ * со стороны провайдера ссылка ведёт в его кабинет. Без канала (toast из SSE)
+ * поведение прежнее.
+ */
+export function resolveNotificationOpenHref(
+  type: string,
+  payload: unknown,
+  channel?: "MASTER" | "STUDIO" | "SYSTEM",
+): string | undefined {
   if (BILLING_HREF_TYPES.has(type)) {
     const record = parsePayloadRecord(payload);
     const scope = record?.billingScope;
@@ -172,7 +184,8 @@ export function resolveNotificationOpenHref(type: string, payload: unknown): str
   const booking = parseBookingPayload(payload);
   if (!booking) return undefined;
 
-  if (BOOKING_MASTER_HREF_TYPES.has(type)) {
+  const providerSide = channel === "MASTER" || channel === "STUDIO";
+  if (BOOKING_MASTER_HREF_TYPES.has(type) || (providerSide && BOOKING_CLIENT_HREF_TYPES.has(type))) {
     if (booking.providerType === "STUDIO") {
       return buildStudioCalendarHref(
         booking.bookingId,

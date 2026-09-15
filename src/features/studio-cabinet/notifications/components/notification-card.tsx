@@ -1,6 +1,7 @@
 import { cn } from "@/lib/cn";
 import { getCardConfig } from "@/features/master/components/notifications/lib/card-config";
 import { readNotificationPayload } from "@/features/master/components/notifications/lib/payload";
+import { resolveCurrentWhenLabel } from "@/lib/notifications/current-when";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { NotificationCenterNotificationItem } from "../lib/types";
 import { NotificationActions } from "./notification-actions";
@@ -27,6 +28,8 @@ export function NotificationCard({ item }: Props) {
   const config = getCardConfig(item.type);
   const Icon = config.icon;
   const payload = readNotificationPayload(item.payloadJson);
+  // RESCHEDULE-CURRENT-TIME: живое время брони, если оно разошлось с текстом.
+  const currentWhen = resolveCurrentWhenLabel(payload);
   const timeLabel = RU_FMT.format(new Date(item.createdAt));
 
   const relatesParts: string[] = [];
@@ -71,6 +74,14 @@ export function NotificationCard({ item }: Props) {
           <h3 className="mt-0.5 text-sm font-semibold text-text-main">{item.title}</h3>
           {item.body ? (
             <p className="mt-0.5 text-sm text-text-sec">{item.body}</p>
+          ) : null}
+          {currentWhen ? (
+            <p
+              className="mt-1 text-xs font-medium text-accent-text"
+              data-testid="notification-current-time"
+            >
+              {UI_TEXT.notificationsCenter.currentTimeLabel}: {currentWhen}
+            </p>
           ) : null}
           {relatesParts.length > 0 ? (
             <p className="mt-1 text-[11px] text-text-sec/80">

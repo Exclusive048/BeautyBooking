@@ -55,10 +55,12 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
   // day — and since the chips render only «HH:MM» (no date), every time showed
   // up twice (the «34 кнопки / 17 уникальных» duplication). `to=date` pins the
   // list to the day the user actually picked.
+  // RESCHEDULE-SELF-SLOT: `excludeBookingId` — окно этой же брони не считается
+  // занятым, иначе перенос на полчаса внутри своего окна невозможен.
   const slotsUrl = date
     ? `/api/public/providers/${booking.provider.id}/slots?serviceId=${
         booking.service.id
-      }&from=${date}&to=${date}`
+      }&from=${date}&to=${date}&excludeBookingId=${encodeURIComponent(booking.id)}`
     : null;
 
   const { data: slotsData, isLoading: slotsLoading } = useSWR<SlotsApiResponse>(
