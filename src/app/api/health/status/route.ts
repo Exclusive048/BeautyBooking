@@ -10,11 +10,10 @@ import { prisma } from "@/lib/prisma";
 import { getQueueStats } from "@/lib/queue/queue";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { env, isProduction } from "@/lib/env";
+import { WORKER_ALIVE_THRESHOLD_MS, WORKER_LAST_PING_KEY } from "@/lib/queue/worker-liveness";
 
 export const runtime = "nodejs";
 
-const WORKER_LAST_PING_KEY = "worker:last-ping";
-const WORKER_ALIVE_THRESHOLD_MS = 120_000;
 const QUEUE_PENDING_OVERLOAD_THRESHOLD = 1000;
 const QUEUE_DEAD_THRESHOLD = 10;
 const QUEUE_PROCESSING_THRESHOLD = 50;

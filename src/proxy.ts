@@ -9,6 +9,27 @@ import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { toApiRouteTemplate } from "@/lib/rate-limit/route-template";
 import { verifyToken } from "@/lib/auth/jwt";
+import { startApiMetricsFlusher } from "@/lib/monitoring/api-metrics";
+import { installHttpApiMetricsHook } from "@/lib/monitoring/http-metrics-hook";
+
+/**
+ * ADMIN-HEALTH-01 — замер длительности `/api/*` и heartbeat процесса для
+ * панели «Состояние системы» ставятся ОТСЮДА, а не из `instrumentation.ts`:
+ * Next компилирует instrumentation отдельным entry, в котором не резолвятся
+ * ни Node-builtins (`crypto` из логгера), ни `redis` (список
+ * `serverExternalPackages` тот entry игнорирует — см. next.config.ts), и
+ * импорт оттуда ронял КАЖДЫЙ роут 500-й (проверено живым dev: «Module not
+ * found: Can't resolve 'crypto'»). Прокси же живёт в обычном Node-бандле,
+ * грузится при первом запросе в ОБОИХ контейнерах (`web` и `api`) и уже
+ * импортирует Redis-лимитер. Оба вызова идемпотентны; в тестах не ставятся,
+ * чтобы таймер флашера не ходил в Redis из-под vitest (`process.env` здесь
+ * намеренно: тесты прокси мокают `@/lib/env` частично, а этот файл — в
+ * списке исключений rule 11).
+ */
+if (process.env.NODE_ENV !== "test") {
+  installHttpApiMetricsHook();
+  startApiMetricsFlusher();
+}
 
 /**
  * Прод-ориджины для CORS и CSRF-слоя (SEC-08).

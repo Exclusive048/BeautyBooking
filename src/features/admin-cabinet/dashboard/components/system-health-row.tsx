@@ -12,6 +12,7 @@ const STAT_LABEL: Record<AdminHealthStat["key"], string> = {
   queueDead: UI_TEXT.adminPanel.dashboard.health.stats.queueDead,
   complaintsOpen: UI_TEXT.adminPanel.dashboard.health.stats.complaintsOpen,
   smsBalance: UI_TEXT.adminPanel.dashboard.health.stats.smsBalance,
+  worker: UI_TEXT.adminPanel.dashboard.health.stats.worker,
 };
 
 const DOT: Record<AdminHealthTone, string> = {

@@ -3,12 +3,11 @@ import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connect
 import { logError } from "@/lib/logging/logger";
 import { timingSafeStringEqual } from "@/lib/auth/constant-time";
 import { env, isProduction } from "@/lib/env";
+import { WORKER_ALIVE_THRESHOLD_MS, WORKER_LAST_PING_KEY } from "@/lib/queue/worker-liveness";
 
 export const runtime = "nodejs";
 
-const WORKER_LAST_PING_KEY = "worker:last-ping";
 const WORKER_PING_TTL_SECONDS = 300;
-const WORKER_ALIVE_THRESHOLD_MS = 120_000;
 
 function resolveWorkerSecret(): string | null {
   const secret = env.WORKER_SECRET?.trim();

@@ -97,7 +97,8 @@ export type AdminHealthStat = {
     | "queuePending"
     | "queueDead"
     | "complaintsOpen"
-    | "smsBalance";
+    | "smsBalance"
+    | "worker";
   valueText: string;
   tone: AdminHealthTone;
   /** Optional hint shown on hover — e.g. why a metric is "—". */

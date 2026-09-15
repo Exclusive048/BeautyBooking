@@ -1,7 +1,11 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { readApiMetrics } from "@/lib/monitoring/api-metrics";
+import type { ApiMetricsSnapshot } from "@/lib/monitoring/api-metrics";
 import { getQueueStats } from "@/lib/queue/queue";
+import { readWorkerLiveness } from "@/lib/queue/worker-liveness";
+import type { WorkerLiveness } from "@/lib/queue/worker-liveness";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatCount } from "@/features/admin-cabinet/dashboard/server/shared";
@@ -13,14 +17,28 @@ import type {
 
 const T = UI_TEXT.adminPanel.dashboard.health;
 
-/** Thresholds picked to match the reference's "ok / not ok" pacing —
- * tuned to be lenient enough that a healthy environment shows green
- * across the board. */
-const THRESHOLDS = {
+/**
+ * ADMIN-HEALTH-01 — пороги панели. Подобраны так, чтобы здоровая система
+ * была зелёной по всем строкам, а известные классы отказов — красными:
+ *   · воркер без свежей отметки — красный сразу (порог 2 мин совпадает с
+ *     `/api/health/status`);
+ *   · любая мёртвая задача — красный;
+ *   · p95 ≥ 1.5 с — красный (SSR-загрузчики витрины при молчащем Redis
+ *     давали 9–20 с, FIX-C4);
+ *   · uptime < 98 % за сутки — красный (≈ 29 минут простоя).
+ */
+export const HEALTH_THRESHOLDS = {
   queuePending: { warn: 100, error: 500 },
-  queueDead: { error: 1 }, // any dead job is a problem
+  queueDead: { error: 1 },
   complaints: { warn: 1, error: 6 },
+  p95Ms: { warn: 500, error: 1500 },
+  uptimeRatio: { warn: 0.995, error: 0.98 },
 } as const;
+
+const PERCENT_FMT = new Intl.NumberFormat("ru-RU", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 function toneForRange(
   value: number,
@@ -32,32 +50,103 @@ function toneForRange(
   return "ok";
 }
 
+/** Для метрик, где ХУЖЕ — это МЕНЬШЕ (uptime). */
+function toneForFloor(value: number, warnBelow: number, errorBelow: number): AdminHealthTone {
+  if (value < errorBelow) return "error";
+  if (value < warnBelow) return "warn";
+  return "ok";
+}
+
+export function formatAgo(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return T.agoSeconds(seconds);
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return T.agoMinutes(minutes);
+  return T.agoHours(Math.floor(minutes / 60));
+}
+
+function unavailableStat(key: AdminHealthStat["key"], hint: string = T.metricUnavailableHint): AdminHealthStat {
+  return { key, valueText: T.metricUnavailable, tone: "neutral", hint };
+}
+
+export function buildApiUptimeStat(metrics: ApiMetricsSnapshot): AdminHealthStat {
+  const { uptime } = metrics;
+  if (!uptime.available || uptime.ratio === null) {
+    return unavailableStat("apiUptime", T.noDataYetHint);
+  }
+  const percent = uptime.ratio * 100;
+  return {
+    key: "apiUptime",
+    valueText: T.uptimeValue(PERCENT_FMT.format(percent)),
+    tone: toneForFloor(
+      uptime.ratio,
+      HEALTH_THRESHOLDS.uptimeRatio.warn,
+      HEALTH_THRESHOLDS.uptimeRatio.error,
+    ),
+    hint: T.uptimeHint(formatCount(uptime.upMinutes), formatCount(uptime.observedMinutes)),
+  };
+}
+
+export function buildP95Stat(metrics: ApiMetricsSnapshot): AdminHealthStat {
+  const { latency } = metrics;
+  if (!latency.available) return unavailableStat("p95", T.noDataYetHint);
+  const hint = T.p95Hint(latency.windowMinutes, formatCount(latency.requests), formatCount(latency.errors5xx));
+  if (latency.p95Ms === null) {
+    return { key: "p95", valueText: T.p95NoTraffic, tone: "neutral", hint };
+  }
+  return {
+    key: "p95",
+    valueText: latency.saturated
+      ? T.p95ValueAbove(formatCount(latency.p95Ms))
+      : T.p95Value(formatCount(latency.p95Ms)),
+    tone: toneForRange(
+      latency.saturated ? Number.POSITIVE_INFINITY : latency.p95Ms,
+      HEALTH_THRESHOLDS.p95Ms.warn,
+      HEALTH_THRESHOLDS.p95Ms.error,
+    ),
+    hint,
+  };
+}
+
+export function buildWorkerStat(liveness: WorkerLiveness | null): AdminHealthStat {
+  if (liveness === null) return unavailableStat("worker", T.workerRedisUnavailableHint);
+  if (liveness.state === "alive" && liveness.lastPingAgoMs !== null) {
+    return {
+      key: "worker",
+      valueText: T.workerAlive(formatAgo(liveness.lastPingAgoMs)),
+      tone: "ok",
+      hint: T.workerHint,
+    };
+  }
+  if (liveness.state === "stale" && liveness.lastPingAgoMs !== null) {
+    return {
+      key: "worker",
+      valueText: T.workerStale(formatAgo(liveness.lastPingAgoMs)),
+      tone: "error",
+      hint: T.workerHint,
+    };
+  }
+  return { key: "worker", valueText: T.workerUnknown, tone: "error", hint: T.workerHint };
+}
+
 export async function getAdminHealth(): Promise<AdminHealth> {
-  // Reported reviews — count of `Review.reportedAt IS NOT NULL`. There's
-  // no schema field tracking "moderation resolved", so this is a strict
-  // upper bound on the actual queue. Documented as a known limitation.
-  const [queue, complaints] = await Promise.all([
+  // Reported reviews — count of `Review.reportedAt IS NOT NULL` among active
+  // rows. Both moderation outcomes leave the count: «одобрить» clears
+  // `reportedAt` (approve-review.service), «удалить» soft-deletes the row and
+  // `ACTIVE_REVIEW_FILTER` drops it. So this IS the open moderation queue.
+  const [queue, complaints, metrics, worker] = await Promise.all([
     getQueueStats(),
     prisma.review.count({
       where: { reportedAt: { not: null }, ...ACTIVE_REVIEW_FILTER },
     }),
+    readApiMetrics(),
+    readWorkerLiveness(),
   ]);
 
   const stats: AdminHealthStat[] = [
-    // API uptime: no APM integration yet. Render "—" with a neutral dot
-    // and a tooltip explaining why — never lie about uptime to admins.
-    {
-      key: "apiUptime",
-      valueText: T.metricUnavailable,
-      tone: "neutral",
-      hint: T.metricUnavailableHint,
-    },
-    {
-      key: "p95",
-      valueText: T.metricUnavailable,
-      tone: "neutral",
-      hint: T.metricUnavailableHint,
-    },
+    buildApiUptimeStat(metrics),
+    buildP95Stat(metrics),
+    buildWorkerStat(worker),
     {
       key: "queuePending",
       valueText:
@@ -69,9 +158,10 @@ export async function getAdminHealth(): Promise<AdminHealth> {
           ? "neutral"
           : toneForRange(
               queue.pending,
-              THRESHOLDS.queuePending.warn,
-              THRESHOLDS.queuePending.error,
+              HEALTH_THRESHOLDS.queuePending.warn,
+              HEALTH_THRESHOLDS.queuePending.error,
             ),
+      hint: queue.pending < 0 ? T.queueRedisUnavailableHint : T.queuePendingHint,
     },
     {
       key: "queueDead",
@@ -80,15 +170,16 @@ export async function getAdminHealth(): Promise<AdminHealth> {
       tone:
         queue.dead < 0
           ? "neutral"
-          : toneForRange(queue.dead, undefined, THRESHOLDS.queueDead.error),
+          : toneForRange(queue.dead, undefined, HEALTH_THRESHOLDS.queueDead.error),
+      hint: queue.dead < 0 ? T.queueRedisUnavailableHint : undefined,
     },
     {
       key: "complaintsOpen",
       valueText: formatCount(complaints),
       tone: toneForRange(
         complaints,
-        THRESHOLDS.complaints.warn,
-        THRESHOLDS.complaints.error,
+        HEALTH_THRESHOLDS.complaints.warn,
+        HEALTH_THRESHOLDS.complaints.error,
       ),
     },
     // SMS gateway isn't wired in yet (P1 from the project audit). Show
