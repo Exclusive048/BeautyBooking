@@ -10,6 +10,7 @@ import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { prisma } from "@/lib/prisma";
 import { sendEmail, isEmailConfigured } from "@/lib/email/sender";
 import {
+  buildNotificationEmailHeaders,
   buildNotificationEmailHtml,
   buildNotificationEmailText,
 } from "@/lib/email/templates/notification";
@@ -118,6 +119,7 @@ async function deliverEmailNotification(
       unsubscribeUrl,
     }),
     text: buildNotificationEmailText({ title, body, ctaUrl: resolvedCtaUrl }),
+    headers: buildNotificationEmailHeaders({ unsubscribeUrl }),
   });
 }
 

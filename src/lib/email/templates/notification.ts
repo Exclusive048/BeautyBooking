@@ -11,6 +11,39 @@ const C = BRAND_COLORS;
  */
 const BRAND_URL = env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru";
 
+/**
+ * Заголовок и текст уведомления собираются из пользовательского ввода — имя
+ * гостя в брони, название услуги, имя мастера. Без экранирования гость,
+ * назвавшийся `<a href="https://…">…</a>`, вставлял бы свою ссылку в письмо,
+ * которое мастер получает от домена платформы: фишинг нашими же DKIM/SPF,
+ * а чужие ссылки в теле ещё и тянут письмо в спам. Атрибутный контекст
+ * (`href`) требует и кавычек, поэтому экранируются все пять символов.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Заголовки письма-уведомления. `List-Unsubscribe` почтовики (Яндекс, Mail.ru,
+ * Gmail) учитывают при фильтрации и показывают по нему свою кнопку «Отписаться»
+ * — без него единственный выход для получателя это «Это спам», который и
+ * портит репутацию домена. Только абсолютный http(s)-адрес: относительный путь
+ * в заголовке почтовик разрешить не может.
+ *
+ * ⚠️ Адрес ведёт на настройки кабинета (нужен вход), то есть это НЕ отписка
+ * в один клик по RFC 8058 — `List-Unsubscribe-Post` поэтому не ставится.
+ */
+export function buildNotificationEmailHeaders(opts: { unsubscribeUrl?: string }): Record<string, string> {
+  const url = opts.unsubscribeUrl;
+  if (!url || !/^https?:\/\//i.test(url)) return {};
+  return { "List-Unsubscribe": `<${url}>` };
+}
+
 export function buildNotificationEmailHtml(opts: {
   title: string;
   body: string;
@@ -19,17 +52,19 @@ export function buildNotificationEmailHtml(opts: {
   unsubscribeUrl?: string;
 }): string {
   const year = new Date().getFullYear();
+  const title = escapeHtml(opts.title);
+  const body = escapeHtml(opts.body).replace(/\n/g, "<br/>");
   const ctaBlock = opts.ctaUrl
     ? `<div style="text-align:center;margin:24px 0;">
-        <a href="${opts.ctaUrl}"
+        <a href="${escapeHtml(opts.ctaUrl)}"
            style="display:inline-block;padding:12px 28px;background:${C.brandFrom};background:${brandGradientCss()};color:${C.textOnBrand};border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;">
-          ${opts.ctaLabel ?? "Посмотреть"}
+          ${escapeHtml(opts.ctaLabel ?? "Посмотреть")}
         </a>
        </div>`
     : "";
 
   const unsubBlock = opts.unsubscribeUrl
-    ? `<a href="${opts.unsubscribeUrl}" style="color:${C.textSecondary};text-decoration:underline;">Отписаться от писем</a>`
+    ? `<a href="${escapeHtml(opts.unsubscribeUrl)}" style="color:${C.textSecondary};text-decoration:underline;">Отписаться от писем</a>`
     : "";
 
   return `<!DOCTYPE html>
@@ -37,7 +72,7 @@ export function buildNotificationEmailHtml(opts: {
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>${opts.title}</title>
+<title>${title}</title>
 </head>
 <body style="margin:0;padding:0;background:${C.surfacePage};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${C.surfacePage};padding:40px 16px;">
@@ -51,8 +86,8 @@ export function buildNotificationEmailHtml(opts: {
       </tr>
       <tr>
         <td style="padding:28px 32px 24px;">
-          <p style="margin:0 0 12px;font-size:20px;font-weight:700;color:${C.textMain};">${opts.title}</p>
-          <p style="margin:0;font-size:15px;color:${C.textLabel};line-height:1.65;">${opts.body.replace(/\n/g, "<br/>")}</p>
+          <p style="margin:0 0 12px;font-size:20px;font-weight:700;color:${C.textMain};">${title}</p>
+          <p style="margin:0;font-size:15px;color:${C.textLabel};line-height:1.65;">${body}</p>
           ${ctaBlock}
         </td>
       </tr>

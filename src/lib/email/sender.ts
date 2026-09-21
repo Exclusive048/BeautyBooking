@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { resolvePublicAppUrl } from "@/lib/app-url";
 import { env } from "@/lib/env";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { maskEmail } from "@/lib/logging/masking";
@@ -8,7 +9,26 @@ type MailOptions = {
   subject: string;
   html: string;
   text?: string;
+  /** Дополнительные заголовки письма (например, `List-Unsubscribe` у уведомлений). */
+  headers?: Record<string, string>;
 };
+
+/**
+ * Имя, которым транспорт представляется SMTP-серверу (EHLO). Без него
+ * nodemailer берёт `os.hostname()`, а в контейнере это случайный id вида
+ * `3f9c2a7b1e04` — он попадает в заголовок `Received` каждого письма, и часть
+ * спам-фильтров читает безымянный узел как признак сомнительного источника.
+ * Берём хост публичного адреса приложения; без него — дефолт nodemailer.
+ */
+export function resolveSmtpClientName(): string | undefined {
+  const appUrl = resolvePublicAppUrl();
+  if (!appUrl) return undefined;
+  try {
+    return new URL(appUrl).hostname || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * RES-05 — верхние границы SMTP-сессии. ЕДИНСТВЕННЫЙ источник для всех
@@ -38,11 +58,13 @@ function buildTransporter() {
   const pass = env.SMTP_PASS;
   if (!host || !user || !pass) return null;
   const port = env.SMTP_PORT ?? 587;
+  const name = resolveSmtpClientName();
   return nodemailer.createTransport({
     host,
     port,
     secure: port === 465,
     auth: { user, pass },
+    ...(name ? { name } : {}),
     ...SMTP_TIMEOUTS,
   });
 }
@@ -67,7 +89,14 @@ export async function sendEmail(opts: MailOptions): Promise<boolean> {
   }
   const from = env.SMTP_FROM ?? env.SMTP_USER;
   try {
-    await transport.sendMail({ from, to: opts.to, subject: opts.subject, html: opts.html, text: opts.text });
+    await transport.sendMail({
+      from,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text,
+      headers: opts.headers,
+    });
     logInfo("Email sent", { to: maskEmail(opts.to), subject: opts.subject });
     return true;
   } catch (error) {
