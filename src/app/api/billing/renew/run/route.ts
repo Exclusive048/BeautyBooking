@@ -254,6 +254,9 @@ async function runBillingCron() {
       autoRenew: true,
       cancelAtPeriodEnd: false,
       nextBillingAt: { lte: now },
+      // DELETION-03: удалённый аккаунт не продлевается никогда (вторая
+      // страховка к снятию автопродления в delete-account).
+      user: { isDeleted: false },
     },
     select: {
       id: true,

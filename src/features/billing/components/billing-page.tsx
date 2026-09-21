@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
 import { BILLING_YEARLY_DISCOUNT } from "@/lib/billing/constants";
 import { resolvePlanPrice } from "@/lib/billing/pricing";
+import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
 import { cn } from "@/lib/cn";
 import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
 import type { ApiResponse } from "@/lib/types/api";
@@ -435,6 +436,8 @@ export function BillingPage({ scope }: BillingPageProps) {
   const isFreePlan = !subscription || subscription.plan.tier === "FREE";
   const isActiveSub = subscription?.status === "ACTIVE" || subscription?.status === "PAST_DUE";
   const availablePeriods = getAvailablePeriods(scopePlans);
+  // LAUNCH-PROMO-01: до 1 ноября тарифы не продаются — у кабинета PREMIUM по акции.
+  const launchPromo = isLaunchPromoActive();
 
   return (
     <section className="space-y-8">
@@ -445,6 +448,16 @@ export function BillingPage({ scope }: BillingPageProps) {
 
       {error ? (
         <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
+      ) : null}
+
+      {launchPromo ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-primary/30 bg-primary/[0.06] p-4 text-sm">
+          <Sparkles aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-accent-text" strokeWidth={1.5} />
+          <div>
+            <div className="font-semibold text-text-main">{UI_TEXT.billing.launchPromo.title}</div>
+            <p className="mt-0.5 text-text-sec">{UI_TEXT.billing.launchPromo.body}</p>
+          </div>
+        </div>
       ) : null}
 
       {subscription?.pendingPriceOptIn && subscription.pendingPriceKopeks !== null ? (
@@ -610,10 +623,19 @@ export function BillingPage({ scope }: BillingPageProps) {
                 <CardContent className="flex flex-1 flex-col justify-between gap-4">
                   <div className="text-xs text-text-sec">Период: {formatPeriodLabel(curPeriod)}</div>
                   <Button
-                    disabled={isBusy || isCurrent || checkoutAmountKopeks === null}
+                    disabled={
+                      isBusy ||
+                      isCurrent ||
+                      launchPromo ||
+                      checkoutAmountKopeks === null
+                    }
                     onClick={() => void handleCheckout(scope, plan)}
                   >
-                    {isCurrent ? "Текущий тариф" : "Оформить"}
+                    {isCurrent
+                      ? "Текущий тариф"
+                      : launchPromo
+                        ? UI_TEXT.billing.launchPromo.planCta
+                        : "Оформить"}
                   </Button>
                 </CardContent>
               </Card>

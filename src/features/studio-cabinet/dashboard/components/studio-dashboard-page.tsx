@@ -1,3 +1,4 @@
+import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { StudioAttentionPanel } from "./studio-attention-panel";
 import { StudioKpiRow } from "./studio-kpi-row";
 import { StudioPopularServices } from "./studio-popular-services";
@@ -23,6 +24,9 @@ export function StudioDashboardPage({ data, studioName }: Props) {
   return (
     <div className="space-y-5 lg:space-y-6">
       <StudioTodayBanner data={data.todayBanner} studioName={studioName} />
+
+      {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
+      <AppSetupCard />
 
       <StudioKpiRow kpis={data.kpis} />
 

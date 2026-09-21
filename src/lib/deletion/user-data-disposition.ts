@@ -175,9 +175,10 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
   reviewsAuthored: {
     kind: "POLICY_PENDING",
     reason:
-      "RKN-FIX-03-B: public UGC. Hard-deleted today ONLY when the account had a master " +
-      "cabinet (delete-master) — an asymmetry counsel should resolve. The author renders as " +
-      "«Удалённый пользователь» either way; review TEXT may still contain PD",
+      "RKN-FIX-03-B: public UGC. Retained on every path — DELETION-03 removed the old " +
+      "asymmetry where delete-master hard-deleted the reviews its owner wrote AS A CLIENT " +
+      "(without recalculating those providers' ratings). The author renders as " +
+      "«Удалённый пользователь»; review TEXT may still contain PD — counsel decides",
   },
   clientCards: {
     kind: "POLICY_PENDING",

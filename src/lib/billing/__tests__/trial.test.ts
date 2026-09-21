@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // Hoisted mocks so vi.mock factories can reference them.
 const subFindUnique = vi.hoisted(() => vi.fn());
@@ -7,6 +7,7 @@ const subFindMany = vi.hoisted(() => vi.fn());
 const subCreate = vi.hoisted(() => vi.fn());
 const subUpdate = vi.hoisted(() => vi.fn());
 const planFindFirst = vi.hoisted(() => vi.fn());
+const planFindUnique = vi.hoisted(() => vi.fn());
 const auditCreate = vi.hoisted(() => vi.fn());
 const transaction = vi.hoisted(() => vi.fn());
 const ensureFreeSubscription = vi.hoisted(() => vi.fn());
@@ -26,6 +27,7 @@ const txClient = {
   },
   billingPlan: {
     findFirst: planFindFirst,
+    findUnique: planFindUnique,
   },
   billingAuditLog: {
     create: auditCreate,
@@ -42,7 +44,7 @@ vi.mock("@/lib/prisma", () => ({
       create: subCreate,
       update: subUpdate,
     },
-    billingPlan: { findFirst: planFindFirst },
+    billingPlan: { findFirst: planFindFirst, findUnique: planFindUnique },
     billingAuditLog: { create: auditCreate },
   },
 }));
@@ -71,6 +73,26 @@ import {
   ensureFreeOrTrialSubscription,
 } from "@/lib/billing/trial";
 import { processTrialExpirations } from "@/lib/billing/trial-cron";
+import { LAUNCH_PROMO_ENDS_AT } from "@/lib/billing/launch-promo";
+
+// LAUNCH-PROMO-01: сценарии обычного 30-дневного trial живут ПОСЛЕ акции.
+// «Сейчас» фиксируется за её пределами; ветка акции проверяется явным `now`.
+const AFTER_PROMO = new Date("2026-11-15T12:00:00Z");
+
+/**
+ * Крон листает кандидатов пачками (`notIn` уже обработанных) — двойник
+ * отвечает по стадии: предупреждение фильтрует `trialEndingNotificationSentAt`,
+ * понижение — нет. Пачка возвращает ещё не виденные строки, затем пустоту.
+ */
+function mockStages(warn: Array<{ id: string }>, expired: Array<{ id: string }>) {
+  subFindMany.mockImplementation(
+    async (args: { where: { trialEndingNotificationSentAt?: null; id?: { notIn: string[] } } }) => {
+      const pool = "trialEndingNotificationSentAt" in args.where ? warn : expired;
+      const seen = args.where.id?.notIn ?? [];
+      return pool.filter((row) => !seen.includes(row.id));
+    },
+  );
+}
 
 beforeEach(() => {
   subFindUnique.mockReset();
@@ -79,6 +101,7 @@ beforeEach(() => {
   subCreate.mockReset();
   subUpdate.mockReset();
   planFindFirst.mockReset();
+  planFindUnique.mockReset();
   auditCreate.mockReset();
   transaction.mockReset();
   ensureFreeSubscription.mockReset();
@@ -88,8 +111,53 @@ beforeEach(() => {
   logInfo.mockReset();
   logError.mockReset();
 
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(AFTER_PROMO);
+
   // Default: $transaction(callback) → callback(txClient)
   transaction.mockImplementation(async (callback: (tx: typeof txClient) => unknown) => callback(txClient));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("activateTrialForNewProvider — стартовая акция (до 1 ноября)", () => {
+  const DURING_PROMO = new Date("2026-09-22T12:00:00Z");
+
+  it("выдаёт PREMIUM до конца акции, а не на 30 дней", async () => {
+    subFindUnique.mockResolvedValueOnce(null);
+    planFindUnique.mockResolvedValueOnce({ id: "plan-premium", code: "MASTER_PREMIUM", isActive: true });
+    subCreate.mockResolvedValueOnce({ id: "sub-1" });
+
+    const result = await activateTrialForNewProvider("user-1", "MASTER", DURING_PROMO);
+
+    expect(result).toEqual({ ok: true, subscriptionId: "sub-1", trialEndsAt: expect.any(Date) });
+    if (result.ok) expect(result.trialEndsAt.toISOString()).toBe(LAUNCH_PROMO_ENDS_AT.toISOString());
+    expect(auditCreate.mock.calls[0][0].data.action).toBe("LAUNCH_PROMO_GRANTED");
+  });
+
+  it("повторная регистрация кабинета (PREMIUM был раньше) во время акции тоже получает PREMIUM", async () => {
+    subFindUnique.mockResolvedValueOnce({
+      id: "sub-old",
+      planId: "plan-free",
+      status: "ACTIVE",
+      isTrial: false,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      graceUntil: null,
+      plan: { tier: "FREE" },
+    });
+    planFindUnique.mockResolvedValueOnce({ id: "plan-premium", code: "MASTER_PREMIUM", isActive: true });
+
+    const result = await activateTrialForNewProvider("user-1", "MASTER", DURING_PROMO);
+
+    expect(result.ok).toBe(true);
+    expect(subFindFirst).not.toHaveBeenCalled(); // без проверки «уже был PREMIUM»
+    expect(subUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "sub-old" }, data: expect.objectContaining({ planId: "plan-premium" }) }),
+    );
+  });
 });
 
 describe("activateTrialForNewProvider", () => {
@@ -257,9 +325,7 @@ describe("processTrialExpirations", () => {
       scope: "MASTER" as const,
       trialEndsAt: new Date("2026-05-17T12:00:00Z"), // 2 days ahead
     };
-    subFindMany
-      .mockResolvedValueOnce([expiringSoon]) // warning batch
-      .mockResolvedValueOnce([]); // no expired
+    mockStages([expiringSoon], []);
     sendTrialEndingSoon.mockResolvedValueOnce({});
     subUpdate.mockResolvedValueOnce({});
 
@@ -284,7 +350,7 @@ describe("processTrialExpirations", () => {
   });
 
   it("does not re-warn (query filters by trialEndingNotificationSentAt: null)", async () => {
-    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    mockStages([], []);
     await processTrialExpirations(NOW);
     expect(subFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -302,7 +368,7 @@ describe("processTrialExpirations", () => {
       scope: "MASTER" as const,
       planId: "plan-premium",
     };
-    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
+    mockStages([], [expired]);
 
     // Inside downgradeTrialToFree's transaction (genuine unconverted trial:
     // no payment evidence, period ended with the trial):
@@ -355,7 +421,7 @@ describe("processTrialExpirations", () => {
       scope: "MASTER" as const,
       planId: "plan-premium",
     };
-    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
+    mockStages([], [expired]);
     subFindUnique.mockResolvedValueOnce({
       id: "sub-1",
       isTrial: true,
@@ -391,7 +457,7 @@ describe("processTrialExpirations", () => {
       scope: "STUDIO" as const,
       planId: "plan-studio-premium",
     };
-    subFindMany.mockResolvedValueOnce([expiringSoon]).mockResolvedValueOnce([expired]);
+    mockStages([expiringSoon], [expired]);
     sendTrialEndingSoon.mockResolvedValueOnce({});
     subUpdate.mockResolvedValueOnce({});
     subFindUnique.mockResolvedValueOnce({
@@ -426,7 +492,7 @@ describe("processTrialExpirations", () => {
       scope: "MASTER" as const,
       planId: "plan-premium",
     };
-    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
+    mockStages([], [expired]);
     subFindUnique.mockResolvedValueOnce({
       id: "sub-1",
       isTrial: true, // flags inconsistent — user paid mid-trial pre-fix
@@ -458,7 +524,7 @@ describe("processTrialExpirations", () => {
       scope: "STUDIO" as const,
       planId: "plan-studio-premium",
     };
-    subFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([expired]);
+    mockStages([], [expired]);
     subFindUnique.mockResolvedValueOnce({
       id: "sub-2",
       isTrial: true,

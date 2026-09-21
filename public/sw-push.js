@@ -4,7 +4,11 @@
     self.registration.showNotification(data.title ?? "МастерРядом", {
       body: data.body,
       icon: "/icons/icon-192.png",
-      badge: "/icons/badge-72.png",
+      // PUSH-COVERAGE-01: прежний `/icons/badge-72.png` в public/ не существовал.
+      badge: "/icons/icon-72.png",
+      // Сообщения одной переписки схлопываются в одну плашку (tag), но каждое
+      // новое всё равно звенит (renotify). Без тега — как раньше, стопкой.
+      ...(data.tag ? { tag: data.tag, renotify: true } : {}),
       data: { url: data.url ?? "/" },
     })
   );

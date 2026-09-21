@@ -13,6 +13,8 @@ import {
   publishNotifications,
 } from "@/lib/notifications/service";
 import { sendBookingReminderTelegramNotifications } from "@/lib/notifications/bookingTelegramService";
+import { deliverExternalChannels } from "@/lib/notifications/delivery";
+import { resolveNotificationOpenHref } from "@/lib/notifications/presentation";
 
 const MINUTES = 60 * 1000;
 const HOURS = 60 * MINUTES;
@@ -219,6 +221,7 @@ export async function processBookingReminder(payload: BookingReminderPayload): P
         id: true,
         status: true,
         startAtUtc: true,
+        clientUserId: true,
         silentMode: true,
         reminder24hSentAt: true,
         reminder2hSentAt: true,
@@ -245,7 +248,7 @@ export async function processBookingReminder(payload: BookingReminderPayload): P
       db: tx,
     });
 
-    return { sent: true, notifications };
+    return { sent: true, notifications, clientUserId: booking.clientUserId };
   });
 
   if (!result.sent) return;
@@ -253,6 +256,16 @@ export async function processBookingReminder(payload: BookingReminderPayload): P
   const notifications = result.notifications ?? [];
   if (notifications.length > 0) {
     publishNotifications(notifications);
+    // PUSH-COVERAGE-01: пуш и письмо — строго после коммита (запись и отметка
+    // «отправлено» атомарны; до коммита отправлять нельзя, ретрай джоба
+    // прислал бы напоминание дважды). Ссылка — своя у каждой стороны: клиенту
+    // «Мои записи», мастеру/студии — их кабинет.
+    for (const record of notifications) {
+      const channel = record.userId === result.clientUserId ? undefined : "MASTER";
+      deliverExternalChannels(record, {
+        pushUrl: resolveNotificationOpenHref(record.type, record.payloadJson, channel),
+      });
+    }
   }
 
   await sendBookingReminderTelegramNotifications(payload.bookingId, payload.kind);

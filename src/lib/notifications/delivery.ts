@@ -24,6 +24,8 @@ type DeliveryInput = {
   payloadJson: Prisma.InputJsonValue;
   bookingId?: string | null;
   pushUrl?: string;
+  /** Ключ схлопывания push в шторке (см. `sendPushToUser`). */
+  pushTag?: string;
   telegramText?: string;
   /** Override the CTA URL in email. Defaults to pushUrl if not set. */
   emailCtaUrl?: string;
@@ -123,6 +125,58 @@ async function deliverEmailNotification(
   });
 }
 
+/**
+ * PUSH-COVERAGE-01 — внешние каналы (push + почта) для УЖЕ созданной и
+ * закоммиченной in-app записи. Единственное место, где решается, куда ещё
+ * уходит уведомление, кроме центра: `deliverNotification` зовёт его сам, а
+ * пути, которые создают запись ВНУТРИ транзакции (напоминания о записи:
+ * запись + отметка «отправлено» атомарны), зовут его после коммита.
+ *
+ * До этого такие пути ограничивались `publishNotifications` (только SSE) —
+ * и напоминания за 24 ч / 2 ч, самое полезное уведомление продукта, не
+ * приходили ни пушем, ни письмом, хотя оба типа стоят в почтовом списке.
+ *
+ * Звать ТОЛЬКО после коммита: push, отправленный до него, может сообщить о
+ * том, чего не случилось (откат), а ретрай джоба пришлёт его второй раз.
+ */
+export function deliverExternalChannels(
+  record: { userId: string; type: NotificationType; title: string; body: string },
+  urls: { pushUrl?: string; emailCtaUrl?: string; pushTag?: string } = {},
+): void {
+  // HARDENING-01 FIX-4: fire-and-forget MUST carry a .catch — a rejected
+  // detached promise inside the worker (booking reminders run here) hits the
+  // global unhandledRejection handler, which exits the whole worker process.
+  // Mirrors the existing pattern in `admin-initiated.ts`.
+  void sendPushToUser(record.userId, {
+    title: record.title,
+    body: record.body,
+    url: urls.pushUrl,
+    tag: urls.pushTag,
+  }).catch((error) => {
+    logError("Push notification delivery failed", {
+      userId: record.userId,
+      type: record.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  // Email channel — silent fail, only for important notification types
+  if (EMAIL_NOTIFICATION_TYPES.has(record.type)) {
+    void deliverEmailNotification(
+      record.userId,
+      record.title,
+      record.body,
+      urls.emailCtaUrl ?? urls.pushUrl
+    ).catch((error) => {
+      logError("Email notification delivery failed", {
+        userId: record.userId,
+        type: record.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+}
+
 export async function deliverNotification(input: DeliveryInput): Promise<void> {
   const record = await createNotification({
     userId: input.userId,
@@ -135,20 +189,10 @@ export async function deliverNotification(input: DeliveryInput): Promise<void> {
 
   publishNotifications([record]);
 
-  // HARDENING-01 FIX-4: fire-and-forget MUST carry a .catch — a rejected
-  // detached promise inside the worker (booking reminders run here) hits the
-  // global unhandledRejection handler, which exits the whole worker process.
-  // Mirrors the existing pattern in `admin-initiated.ts`.
-  void sendPushToUser(input.userId, {
-    title: record.title,
-    body: record.body,
-    url: input.pushUrl,
-  }).catch((error) => {
-    logError("Push notification delivery failed", {
-      userId: input.userId,
-      type: input.type,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  deliverExternalChannels(record, {
+    pushUrl: input.pushUrl,
+    emailCtaUrl: input.emailCtaUrl,
+    pushTag: input.pushTag,
   });
 
   // FIX-TELEGRAM-KILLSWITCH: fast env-ceiling skip (sync, no DB) before the
@@ -167,21 +211,5 @@ export async function deliverNotification(input: DeliveryInput): Promise<void> {
         });
       }
     })();
-  }
-
-  // Email channel — silent fail, only for important notification types
-  if (EMAIL_NOTIFICATION_TYPES.has(input.type)) {
-    void deliverEmailNotification(
-      input.userId,
-      input.title,
-      input.body,
-      input.emailCtaUrl ?? input.pushUrl
-    ).catch((error) => {
-      logError("Email notification delivery failed", {
-        userId: input.userId,
-        type: input.type,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    });
   }
 }

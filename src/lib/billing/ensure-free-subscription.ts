@@ -1,24 +1,16 @@
-import { AccountType, SubscriptionScope } from "@prisma/client";
+import type { AccountType, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
 import { AppError } from "@/lib/api/errors";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
+import { resolveBillingScopesFromRoles } from "@/lib/billing/launch-promo-grant";
+
+export { resolveBillingScopesFromRoles };
 
 const FREE_PLAN_CODES: Record<SubscriptionScope, string> = {
   MASTER: "MASTER_FREE",
   STUDIO: "STUDIO_FREE",
 };
-
-export function resolveBillingScopesFromRoles(roles: AccountType[]): SubscriptionScope[] {
-  const scopes: SubscriptionScope[] = [];
-  if (roles.includes(AccountType.MASTER)) {
-    scopes.push(SubscriptionScope.MASTER);
-  }
-  if (roles.includes(AccountType.STUDIO) || roles.includes(AccountType.STUDIO_ADMIN)) {
-    scopes.push(SubscriptionScope.STUDIO);
-  }
-  return scopes;
-}
 
 export async function ensureFreeSubscriptionsForRoles(userId: string, roles: AccountType[]): Promise<void> {
   const scopes = resolveBillingScopesFromRoles(roles);

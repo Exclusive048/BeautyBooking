@@ -5,7 +5,8 @@ import { collectAccountMedia } from "@/lib/media/purge";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { alertWarning } from "@/lib/monitoring";
 import { deleteMasterCabinet } from "@/lib/deletion/delete-master";
-import { deleteStudioCabinet } from "@/lib/deletion/delete-studio";
+import { deleteStudioCabinet, ownedStudioWhere } from "@/lib/deletion/delete-studio";
+import { countBlockingMasterBookings, countBlockingStudioBookings } from "@/lib/deletion/active-bookings";
 
 const NOTIFICATION_RETENTION_DAYS = 30;
 
@@ -28,41 +29,33 @@ export async function deleteUserAccount(userId: string): Promise<void> {
 
   const masterProfile = await prisma.masterProfile.findUnique({
     where: { userId },
-    select: { id: true },
+    select: { id: true, providerId: true },
   });
-  if (masterProfile) {
-    await deleteMasterCabinet(userId);
+  const ownedStudios = await prisma.studio.findMany({
+    where: ownedStudioWhere(userId),
+    select: { id: true, providerId: true },
+  });
+
+  // DELETION-03: живые записи проверяются во ВСЕХ кабинетах ДО первого
+  // удаления. Раньше кабинет мастера удалялся своей транзакцией, а 409 от
+  // студии прилетал уже после — аккаунт оставался с удалённым кабинетом
+  // мастера и не удалённым сам.
+  let blocking = masterProfile ? await countBlockingMasterBookings(prisma, masterProfile.providerId) : 0;
+  for (const studio of ownedStudios) {
+    blocking += await countBlockingStudioBookings(prisma, studio);
+  }
+  if (blocking > 0) {
+    throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", { count: blocking });
   }
 
-  while (true) {
-    const studio = await prisma.studio.findFirst({
-      where: {
-        OR: [
-          { ownerUserId: userId },
-          {
-            memberships: {
-              some: {
-                userId,
-                status: "ACTIVE",
-                roles: { has: "OWNER" },
-              },
-            },
-          },
-          {
-            studioMembers: {
-              some: {
-                userId,
-                status: "ACTIVE",
-                role: "OWNER",
-              },
-            },
-          },
-        ],
-      },
-      select: { id: true },
-    });
+  if (masterProfile) {
+    await deleteMasterCabinet(userId, { silent: true });
+  }
+
+  for (let guard = 0; guard < ownedStudios.length + 1; guard += 1) {
+    const studio = await prisma.studio.findFirst({ where: ownedStudioWhere(userId), select: { id: true } });
     if (!studio) break;
-    await deleteStudioCabinet(userId);
+    await deleteStudioCabinet(userId, { silent: true });
   }
 
   const cutoffDate = daysAgo(NOTIFICATION_RETENTION_DAYS);
@@ -129,6 +122,18 @@ export async function deleteUserAccount(userId: string): Promise<void> {
       .map((item) => item.id);
     if (deletableIds.length > 0) {
       await tx.userSubscription.deleteMany({ where: { id: { in: deletableIds } } });
+    }
+    // DELETION-03: подписки с платежами остаются (история платежей), но
+    // продлеваться больше не могут: без этого крон продлений списывал бы
+    // деньги с сохранённой карты удалённого аккаунта.
+    const retainedIds = subscriptions
+      .filter((item) => item._count.payments > 0)
+      .map((item) => item.id);
+    if (retainedIds.length > 0) {
+      await tx.userSubscription.updateMany({
+        where: { id: { in: retainedIds } },
+        data: { autoRenew: false, cancelAtPeriodEnd: true, nextBillingAt: null, paymentMethodId: null },
+      });
     }
 
     await tx.userProfile.update({

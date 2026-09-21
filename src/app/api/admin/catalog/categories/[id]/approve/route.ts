@@ -5,7 +5,7 @@ import { createAdminAuditLog } from "@/lib/audit/admin-audit";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
+import { deliverNotification } from "@/lib/notifications/delivery";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -56,14 +56,16 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     if (category.proposedBy) {
-      const notification = await createNotification({
+      // PUSH-COVERAGE-01: через общую доставку — раньше запись уходила только
+      // в центр уведомлений (без пуша), в отличие от всех остальных типов.
+      await deliverNotification({
         userId: category.proposedBy,
         type: NotificationType.CATEGORY_APPROVED,
         title: "Категория одобрена",
         body: `Ваша категория «${category.name}» одобрена. Теперь вы можете создавать услуги в этой категории.`,
         payloadJson: { categoryId: category.id, status: "APPROVED" },
+        pushUrl: "/notifications",
       });
-      publishNotifications([notification]);
     }
 
     return ok({ category: updated });

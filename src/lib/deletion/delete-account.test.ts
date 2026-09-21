@@ -23,7 +23,7 @@ const tx = vi.hoisted(() => ({
   studioMembership: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   studioMember: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   refreshSession: { updateMany: vi.fn(async () => ({ count: 0 })), deleteMany: vi.fn() },
-  userSubscription: { findMany: vi.fn(async () => []), deleteMany: vi.fn() },
+  userSubscription: { findMany: vi.fn(async () => []), deleteMany: vi.fn(), updateMany: vi.fn() },
   userProfile: { update: vi.fn(async () => ({})) },
   booking: { updateMany: vi.fn(), deleteMany: vi.fn() },
   review: { deleteMany: vi.fn() },
@@ -37,7 +37,8 @@ const tx = vi.hoisted(() => ({
 const prismaMock = vi.hoisted(() => ({
   userProfile: { findUnique: vi.fn() },
   masterProfile: { findUnique: vi.fn(async () => null) },
-  studio: { findFirst: vi.fn(async () => null) },
+  studio: { findFirst: vi.fn(async () => null), findMany: vi.fn(async () => []) },
+  booking: { count: vi.fn(async () => 0) },
   // DELETION-02: снимок медиа берётся ВНЕ транзакции, до неё.
   mediaAsset: { findMany: vi.fn(async () => []) },
   $transaction: vi.fn(async (cb: (t: typeof tx) => Promise<void>) => cb(tx)),
@@ -48,8 +49,12 @@ vi.mock("@/lib/logging/logger", () => ({ logInfo: vi.fn(), logError: vi.fn() }))
 // DELETION-02: постановка задачи на удаление медиа — отдельный модуль, здесь не проверяется.
 vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: vi.fn() }));
 vi.mock("@/lib/monitoring", () => ({ alertWarning: vi.fn() }));
-vi.mock("@/lib/deletion/delete-master", () => ({ deleteMasterCabinet: vi.fn() }));
-vi.mock("@/lib/deletion/delete-studio", () => ({ deleteStudioCabinet: vi.fn() }));
+const cabinets = vi.hoisted(() => ({ deleteMasterCabinet: vi.fn(), deleteStudioCabinet: vi.fn() }));
+vi.mock("@/lib/deletion/delete-master", () => ({ deleteMasterCabinet: cabinets.deleteMasterCabinet }));
+vi.mock("@/lib/deletion/delete-studio", () => ({
+  deleteStudioCabinet: cabinets.deleteStudioCabinet,
+  ownedStudioWhere: (userId: string) => ({ ownerUserId: userId }),
+}));
 
 import { deleteUserAccount } from "@/lib/deletion/delete-account";
 
@@ -71,6 +76,8 @@ beforeEach(() => {
   prismaMock.userProfile.findUnique.mockResolvedValue({ id: USER_ID, phone: "+79990001122" });
   prismaMock.masterProfile.findUnique.mockResolvedValue(null);
   prismaMock.studio.findFirst.mockResolvedValue(null);
+  prismaMock.studio.findMany.mockResolvedValue([]);
+  prismaMock.booking.count.mockResolvedValue(0);
   prismaMock.$transaction.mockImplementation(async (cb: (t: typeof tx) => Promise<void>) => cb(tx));
   tx.userSubscription.findMany.mockResolvedValue([]);
 });
@@ -157,5 +164,38 @@ describe("deleteUserAccount — preserved behaviour", () => {
   it("404s for a missing user", async () => {
     prismaMock.userProfile.findUnique.mockResolvedValue(null);
     await expect(deleteUserAccount("nope")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("deleteUserAccount — DELETION-03", () => {
+  it("живые записи в ЛЮБОМ кабинете останавливают удаление ДО удаления первого кабинета", async () => {
+    prismaMock.masterProfile.findUnique.mockResolvedValue({ id: "mp", providerId: "prov-master" } as never);
+    prismaMock.studio.findMany.mockResolvedValue([{ id: "st", providerId: "prov-studio" }] as never);
+    // мастер чист, студия — нет
+    prismaMock.booking.count.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
+
+    await expect(deleteUserAccount(USER_ID)).rejects.toMatchObject({ code: "ACTIVE_BOOKINGS" });
+    expect(cabinets.deleteMasterCabinet).not.toHaveBeenCalled();
+    expect(cabinets.deleteStudioCabinet).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("кабинеты удаляются без уведомления самому удаляемому", async () => {
+    prismaMock.masterProfile.findUnique.mockResolvedValue({ id: "mp", providerId: "prov-master" } as never);
+    await deleteUserAccount(USER_ID);
+    expect(cabinets.deleteMasterCabinet).toHaveBeenCalledWith(USER_ID, { silent: true });
+  });
+
+  it("подписка с платежами остаётся, но автопродление и карта снимаются", async () => {
+    tx.userSubscription.findMany.mockResolvedValue([
+      { id: "free", _count: { payments: 0 } },
+      { id: "paid", _count: { payments: 3 } },
+    ] as never);
+    await deleteUserAccount(USER_ID);
+    expect(tx.userSubscription.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["free"] } } });
+    expect(tx.userSubscription.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["paid"] } },
+      data: { autoRenew: false, cancelAtPeriodEnd: true, nextBillingAt: null, paymentMethodId: null },
+    });
   });
 });

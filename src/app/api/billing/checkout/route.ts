@@ -10,6 +10,7 @@ import { createBillingAuditLog } from "@/lib/billing/audit";
 import { formatTimeBucketUtc, sha256 } from "@/lib/billing/utils";
 import { isCurrentMasterManagedByStudio } from "@/lib/master/access";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
+import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
 
 export const runtime = "nodejs";
 
@@ -93,6 +94,17 @@ export async function POST(req: Request) {
   }
 
   const now = new Date();
+
+  // LAUNCH-PROMO-01: до 1 ноября все тарифы бесплатны — у каждого кабинета
+  // PREMIUM по акции, поэтому платный checkout не нужен и не проводится:
+  // иначе человек заплатил бы за то, что у него и так есть.
+  if (plan.tier !== "FREE" && isLaunchPromoActive(now)) {
+    return fail(
+      "До 1 ноября все тарифы бесплатны — у вас уже максимальный тариф. Оплата понадобится после 1 ноября.",
+      409,
+      "LAUNCH_PROMO_ACTIVE",
+    );
+  }
   const existing = await prisma.userSubscription.findUnique({
     where: { userId_scope: { userId: user.id, scope } },
     select: { id: true, status: true, planId: true },

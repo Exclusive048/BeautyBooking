@@ -10,6 +10,7 @@ import { UpcomingBookingsSection } from "@/features/master/components/dashboard/
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
+import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
@@ -122,6 +123,9 @@ export async function MasterDashboardPage() {
           nextBooking={nextBooking}
           timezone={data.master.timezone}
         />
+
+        {/* PWA-ONBOARDING-01: установка приложения + уведомления (скрывается сама). */}
+        <AppSetupCard />
 
         <KpiCardsGrid
           todayRevenue={data.kpis.todayRevenue}

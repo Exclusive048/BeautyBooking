@@ -7,27 +7,10 @@ import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
 import { UI_TEXT } from "@/lib/ui/text";
 import { isProduction } from "@/lib/env.client";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-};
+import { promptPwaInstall } from "@/lib/pwa/install-state";
+import { usePwaInstall } from "@/lib/pwa/use-pwa-install";
 
 const DISMISS_KEY = "pwa-install-dismissed";
-
-function isStandaloneMode(): boolean {
-  if (typeof window === "undefined") return false;
-  const media = window.matchMedia?.("(display-mode: standalone)").matches ?? false;
-  const iosStandalone = Boolean(
-    (window.navigator as Navigator & { standalone?: boolean }).standalone
-  );
-  return media || iosStandalone;
-}
-
-function isIOSDevice(): boolean {
-  if (typeof window === "undefined") return false;
-  return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-}
 
 function readDismissed(): boolean {
   try {
@@ -66,32 +49,24 @@ function ShareIcon() {
 
 export function PWAInstallPrompt() {
   const { user } = useMe();
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  // PWA-ONBOARDING-01: событие установки ловит общий стор (`install-state.ts`) —
+  // его же читает карточка «Приложение и уведомления»; второй слушатель здесь
+  // получил бы то же событие, и второй `prompt()` на нём бросил бы.
+  const install = usePwaInstall();
   const [visible, setVisible] = useState(false);
-  const [standalone] = useState(() => isStandaloneMode());
-  const [ios] = useState(() => isIOSDevice());
+  const ios = install.platform === "ios";
   const reduce = useReducedMotion();
-
-  // Capture beforeinstallprompt before the user interacts
-  useEffect(() => {
-    const handler = (event: Event) => {
-      event.preventDefault();
-      setDeferredPrompt(event as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
 
   // Show banner once user is authenticated and conditions are met
   useEffect(() => {
     if (!user) return;
-    if (standalone || readDismissed()) return;
+    if (install.installed || readDismissed()) return;
     // On non-iOS we need the browser's native prompt; iOS uses Share sheet
-    if (!ios && !deferredPrompt) return;
+    if (!ios && !install.canPrompt) return;
 
     const timer = window.setTimeout(() => setVisible(true), 2000);
     return () => window.clearTimeout(timer);
-  }, [user, standalone, ios, deferredPrompt]);
+  }, [user, install.installed, ios, install.canPrompt]);
 
   const dismiss = () => {
     writeDismissed();
@@ -99,11 +74,8 @@ export function PWAInstallPrompt() {
   };
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    await deferredPrompt.userChoice.catch(() => null);
+    await promptPwaInstall();
     dismiss();
-    setDeferredPrompt(null);
   };
 
   if (!isProduction) return null;

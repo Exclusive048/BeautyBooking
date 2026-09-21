@@ -15,6 +15,7 @@ const createBookingReminderNotifications = vi.hoisted(() => vi.fn());
 const publishNotifications = vi.hoisted(() => vi.fn());
 const sendBookingReminderTelegramNotifications = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
+const deliverExternalChannels = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -36,6 +37,7 @@ vi.mock("@/lib/notifications/bookingTelegramService", () => ({
   sendBookingReminderTelegramNotifications,
 }));
 vi.mock("@/lib/logging/logger", () => ({ logError }));
+vi.mock("@/lib/notifications/delivery", () => ({ deliverExternalChannels }));
 
 import {
   isBookingReminderJob,
@@ -56,6 +58,7 @@ describe("bookings/reminders", () => {
     publishNotifications.mockReset();
     sendBookingReminderTelegramNotifications.mockReset();
     logError.mockReset();
+    deliverExternalChannels.mockReset();
   });
 
   it("resolves both reminders when far from start", () => {
@@ -100,6 +103,49 @@ describe("bookings/reminders", () => {
 
     expect(publishNotifications).toHaveBeenCalledTimes(1);
     expect(sendBookingReminderTelegramNotifications).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * PUSH-COVERAGE-01 — напоминание приходит ПУШЕМ (и письмом), а не только в
+   * центр уведомлений; и уходит после коммита — транзакция уже вернулась.
+   * Ссылка своя у каждой стороны.
+   */
+  it("шлёт пуш каждой стороне после коммита, со ссылкой её кабинета", async () => {
+    const payloadJson = {
+      bookingId: "b1",
+      providerType: "MASTER",
+      startAtUtc: "2026-03-02T10:00:00.000Z",
+      providerTimezone: "Europe/Moscow",
+    };
+    prismaTransaction.mockResolvedValueOnce({
+      sent: true,
+      clientUserId: "client-1",
+      notifications: [
+        { id: "n1", userId: "client-1", type: "BOOKING_REMINDER_2H", title: "t", body: "b", payloadJson },
+        { id: "n2", userId: "master-1", type: "BOOKING_REMINDER_2H", title: "t", body: "b", payloadJson },
+      ],
+    });
+
+    await processBookingReminder({
+      bookingId: "b1",
+      kind: "REMINDER_2H",
+      startAtUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+
+    expect(deliverExternalChannels).toHaveBeenCalledTimes(2);
+    const urls = deliverExternalChannels.mock.calls.map((call) => (call[1] as { pushUrl?: string }).pushUrl);
+    expect(urls[0]).toBe("/cabinet/bookings?focus=b1");
+    expect(urls[1]).toBe("/cabinet/master/dashboard?focus=b1");
+  });
+
+  it("не отправленное напоминание (дубль/отмена) — без пуша", async () => {
+    prismaTransaction.mockResolvedValueOnce({ sent: false });
+    await processBookingReminder({
+      bookingId: "b1",
+      kind: "REMINDER_2H",
+      startAtUtc: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    });
+    expect(deliverExternalChannels).not.toHaveBeenCalled();
   });
 
   it("recognizes reminder jobs", () => {

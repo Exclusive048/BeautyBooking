@@ -56,7 +56,7 @@ async function getActiveRegistration(): Promise<ServiceWorkerRegistration | null
 async function syncSubscriptionToServer(subscription: PushSubscription): Promise<void> {
   const json = subscription.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return;
-  await fetch("/api/notifications/push/subscribe", {
+  const res = await fetch("/api/notifications/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -64,6 +64,10 @@ async function syncSubscriptionToServer(subscription: PushSubscription): Promise
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
     }),
   });
+  // PUSH-COVERAGE-01: ответ раньше игнорировался — несохранённая подписка
+  // давала тумблер «включено» без единого доставленного пуша. Теперь отказ
+  // сервера всплывает в `requestAndSubscribe` как "error".
+  if (!res.ok) throw new Error(`push subscribe failed: ${res.status}`);
 }
 
 export type PushSubscribeResult =

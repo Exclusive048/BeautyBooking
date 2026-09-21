@@ -3,7 +3,7 @@ import { HeaderBlock } from "@/components/ui/header-block";
 import { isTelegramEnabled } from "@/lib/env";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { EmailNotificationsSection } from "@/features/cabinet/components/email-notifications";
-import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
+import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
 import { MarketingConsentSection } from "@/features/cabinet/components/marketing-consent";
 import { getSessionUser } from "@/lib/auth/session";
@@ -30,7 +30,9 @@ export default async function SettingsPage() {
             delivery ships). VK stays available as a login/identity provider in
             the profile «Связанные аккаунты» card. */}
         <EmailNotificationsSection />
-        <PushNotificationsSection />
+        {/* PWA-ONBOARDING-01: push-тумблер живёт рядом с инструкцией по установке —
+            на iPhone уведомления работают только в установленном приложении. */}
+        <AppSetupCard variant="settings" />
         {/* RKN-FIX-18: согласие на маркетинг — ОДИН компонент на все роли
             (/cabinet/settings в глобальном topbar-меню, как и /cabinet/profile).
             Стоит рядом с удалением аккаунта намеренно: именно туда

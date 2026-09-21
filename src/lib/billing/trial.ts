@@ -4,9 +4,16 @@ import { logError, logInfo } from "@/lib/logging/logger";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { ensureFreeSubscription } from "@/lib/billing/ensure-free-subscription";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
+import { TRIAL_DURATION_DAYS, isLaunchPromoActive, resolveTrialEndsAt } from "@/lib/billing/launch-promo";
+import { grantLaunchPromoInTx } from "@/lib/billing/launch-promo-grant";
 
 /**
- * 30-day PREMIUM trial granted on first creation of a master/studio profile.
+ * PREMIUM trial granted on first creation of a master/studio profile.
+ *
+ * LAUNCH-PROMO-01: until the launch promo ends (1 Nov, `launch-promo.ts`) the
+ * grant runs through `grantLaunchPromoInTx` — PREMIUM until the promo end for
+ * everyone, including a user who re-creates a cabinet (no re-trial guard: the
+ * promo is for all). After the promo it is the regular 30-day trial below.
  *
  * Architectural invariant: `UserSubscription.@@unique([userId, scope])` allows
  * exactly one row per (user, scope). So:
@@ -18,7 +25,7 @@ import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
  *     (current or historical) is not eligible for trial again.
  */
 
-export const TRIAL_DURATION_DAYS = 30;
+export { TRIAL_DURATION_DAYS };
 
 export type TrialActivationReason =
   | "already-active"
@@ -41,7 +48,21 @@ export type TrialActivationResult =
 export async function activateTrialForNewProvider(
   userId: string,
   scope: SubscriptionScope,
+  now: Date = new Date(),
 ): Promise<TrialActivationResult> {
+  if (isLaunchPromoActive(now)) {
+    return prisma.$transaction(async (tx): Promise<TrialActivationResult> => {
+      const result = await grantLaunchPromoInTx(tx, { userId, scope, now, source: "registration" });
+      if ((result.outcome === "created" || result.outcome === "upgraded") && result.subscriptionId && result.trialEndsAt) {
+        return { ok: true, subscriptionId: result.subscriptionId, trialEndsAt: result.trialEndsAt };
+      }
+      if (result.outcome === "skipped-no-plan") {
+        return { ok: false, reason: "premium-plan-not-found" };
+      }
+      return { ok: false, reason: "already-active" };
+    });
+  }
+
   return prisma.$transaction(async (tx) => {
     // 1. Already has any subscription for this scope?
     const existingActive = await tx.userSubscription.findUnique({
@@ -73,8 +94,7 @@ export async function activateTrialForNewProvider(
     }
 
     // 4. Create the trial row.
-    const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
+    const trialEndsAt = resolveTrialEndsAt(now);
 
     const subscription = await tx.userSubscription.create({
       data: {

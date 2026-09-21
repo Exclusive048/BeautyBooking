@@ -152,6 +152,7 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
           access.senderType === "CLIENT"
             ? `/cabinet/master/dashboard?focus=${bookingId}&chat=open`
             : `/cabinet/bookings?focus=${bookingId}&chat=open`,
+        pushTag: `chat:${chat.id}`,
       });
     }
 

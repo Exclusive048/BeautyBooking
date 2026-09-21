@@ -20,12 +20,19 @@ import {
  *      row alongside, and the in-place mutation keeps history coherent
  *      (BillingAuditLog records the transition).
  *
- * Both stages process up to BATCH_SIZE rows per invocation. If real volume
- * outgrows that, the cron can be invoked more frequently or the limit raised.
+ * Both stages page through candidates in BATCH_SIZE chunks, up to MAX_BATCHES
+ * per invocation. LAUNCH-PROMO-01: every cabinet registered during the launch
+ * promo shares ONE trial end (1 Nov), so a single run must be able to drain far
+ * more than one batch — otherwise the tail would get its «trial ending» notice
+ * after the trial had already ended. (Access itself never depends on this cron:
+ * `isSubscriptionActive` compares `currentPeriodEnd` with now.) Rows attempted
+ * in this run are excluded from the next page, so a failing row is retried by
+ * the next daily run, not hammered in a loop.
  */
 
 const WARNING_DAYS = 3;
 const BATCH_SIZE = 100;
+const MAX_BATCHES = 50;
 
 export type TrialExpirationsResult = {
   warned: number;
@@ -43,72 +50,84 @@ export async function processTrialExpirations(now: Date = new Date()): Promise<T
   // Stage 1 — warn upcoming expiries (dedup via trialEndingNotificationSentAt).
   const warningHorizon = new Date(now.getTime() + WARNING_DAYS * 24 * 60 * 60 * 1000);
 
-  const expiringSoon = await prisma.userSubscription.findMany({
-    where: {
-      isTrial: true,
-      status: SubscriptionStatus.ACTIVE,
-      trialEndsAt: { gt: now, lte: warningHorizon },
-      trialEndingNotificationSentAt: null,
-    },
-    select: { id: true, userId: true, scope: true, trialEndsAt: true },
-    take: BATCH_SIZE,
-  });
+  const warnAttempted: string[] = [];
+  for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+    const expiringSoon = await prisma.userSubscription.findMany({
+      where: {
+        isTrial: true,
+        status: SubscriptionStatus.ACTIVE,
+        trialEndsAt: { gt: now, lte: warningHorizon },
+        trialEndingNotificationSentAt: null,
+        ...(warnAttempted.length > 0 ? { id: { notIn: warnAttempted } } : {}),
+      },
+      select: { id: true, userId: true, scope: true, trialEndsAt: true },
+      take: BATCH_SIZE,
+    });
+    if (expiringSoon.length === 0) break;
 
-  for (const sub of expiringSoon) {
-    try {
-      const daysLeft = Math.max(
-        1,
-        Math.ceil(((sub.trialEndsAt?.getTime() ?? now.getTime()) - now.getTime()) / (24 * 60 * 60 * 1000)),
-      );
-      await sendTrialEndingSoonNotification({
-        userId: sub.userId,
-        scope: sub.scope,
-        subscriptionId: sub.id,
-        daysLeft,
-        trialEndsAt: sub.trialEndsAt ?? now,
-      });
-      await prisma.userSubscription.update({
-        where: { id: sub.id },
-        data: { trialEndingNotificationSentAt: now },
-      });
-      warned += 1;
-    } catch (error) {
-      warnErrors += 1;
-      logError("Trial warning failed", {
-        subscriptionId: sub.id,
-        userId: sub.userId,
-        scope: sub.scope,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    for (const sub of expiringSoon) {
+      warnAttempted.push(sub.id);
+      try {
+        const daysLeft = Math.max(
+          1,
+          Math.ceil(((sub.trialEndsAt?.getTime() ?? now.getTime()) - now.getTime()) / (24 * 60 * 60 * 1000)),
+        );
+        await sendTrialEndingSoonNotification({
+          userId: sub.userId,
+          scope: sub.scope,
+          subscriptionId: sub.id,
+          daysLeft,
+          trialEndsAt: sub.trialEndsAt ?? now,
+        });
+        await prisma.userSubscription.update({
+          where: { id: sub.id },
+          data: { trialEndingNotificationSentAt: now },
+        });
+        warned += 1;
+      } catch (error) {
+        warnErrors += 1;
+        logError("Trial warning failed", {
+          subscriptionId: sub.id,
+          userId: sub.userId,
+          scope: sub.scope,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
   // Stage 2 — downgrade expired trials in-place to FREE.
-  const expired = await prisma.userSubscription.findMany({
-    where: {
-      isTrial: true,
-      status: SubscriptionStatus.ACTIVE,
-      trialEndsAt: { lte: now },
-    },
-    select: { id: true, userId: true, scope: true, planId: true },
-    take: BATCH_SIZE,
-  });
+  const downgradeAttempted: string[] = [];
+  for (let batch = 0; batch < MAX_BATCHES; batch += 1) {
+    const expired = await prisma.userSubscription.findMany({
+      where: {
+        isTrial: true,
+        status: SubscriptionStatus.ACTIVE,
+        trialEndsAt: { lte: now },
+        ...(downgradeAttempted.length > 0 ? { id: { notIn: downgradeAttempted } } : {}),
+      },
+      select: { id: true, userId: true, scope: true, planId: true },
+      take: BATCH_SIZE,
+    });
+    if (expired.length === 0) break;
 
-  for (const sub of expired) {
-    try {
-      const outcome = await downgradeTrialToFree(
-        { subscriptionId: sub.id, userId: sub.userId, scope: sub.scope },
-        now,
-      );
-      if (outcome === "downgraded") downgraded += 1;
-    } catch (error) {
-      downgradeErrors += 1;
-      logError("Trial downgrade failed", {
-        subscriptionId: sub.id,
-        userId: sub.userId,
-        scope: sub.scope,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    for (const sub of expired) {
+      downgradeAttempted.push(sub.id);
+      try {
+        const outcome = await downgradeTrialToFree(
+          { subscriptionId: sub.id, userId: sub.userId, scope: sub.scope },
+          now,
+        );
+        if (outcome === "downgraded") downgraded += 1;
+      } catch (error) {
+        downgradeErrors += 1;
+        logError("Trial downgrade failed", {
+          subscriptionId: sub.id,
+          userId: sub.userId,
+          scope: sub.scope,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 

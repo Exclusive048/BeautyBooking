@@ -13,6 +13,7 @@ import { TrialPromoBlock } from "@/features/pricing/components/trial-promo-block
 import { getMarketingPricing } from "@/lib/billing/marketing-pricing";
 import { getCurrentSubscriptionRow } from "@/lib/billing/get-current-subscription-row";
 import { getSessionUserId } from "@/lib/auth/session";
+import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
 import { UI_TEXT } from "@/lib/ui/text";
 
 export const metadata: Metadata = {
@@ -46,6 +47,7 @@ export default async function PricingPage({ searchParams }: PageProps) {
   const userId = await getSessionUserId();
   const currentSub = userId ? await getCurrentSubscriptionRow(userId, scopeUpper) : null;
   const showTrialPromo = !currentSub;
+  const launchPromo = isLaunchPromoActive();
 
   return (
     <MarketingLayout>
@@ -91,6 +93,24 @@ export default async function PricingPage({ searchParams }: PageProps) {
           FIX-EXP-PRICING-COPY (EXP-015): `id` anchor — the final-CTA "Сравнить
           тарифы" scrolls here (the real tariff comparison) instead of the
           unrelated /become-master redirect. */}
+      {/* LAUNCH-PROMO-01: до 1 ноября цены на карточках — будущие, сейчас всё бесплатно. */}
+      {launchPromo ? (
+        <section className="mx-auto max-w-3xl px-4">
+          <div className="rounded-2xl border border-primary/30 bg-primary/[0.06] px-5 py-4 text-center">
+            <p className="mb-1 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
+              {T.launchPromo.eyebrow}
+            </p>
+            <p className="font-display text-xl text-text-main">
+              {T.launchPromo.title}{" "}
+              <em className="font-display font-normal italic text-accent-text">{T.launchPromo.titleItalic}</em>
+            </p>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-text-sec">
+              {T.launchPromo.description}
+            </p>
+          </div>
+        </section>
+      ) : null}
+
       <section id="pricing-plans" key={activeTab} className="mx-auto max-w-[1280px] px-4 py-8">
         <div className="grid gap-6 md:grid-cols-3">
           <PlanCard plan={deck.free} fallbackCode={`${scopeUpper}_FREE`} />
@@ -103,7 +123,7 @@ export default async function PricingPage({ searchParams }: PageProps) {
           have no subscription yet for this scope (i.e. haven't onboarded as
           master/studio yet). Hidden for users with any existing subscription
           to avoid over-promising what they can't claim a second time. */}
-      {showTrialPromo ? <TrialPromoBlock scope={activeTab} /> : null}
+      {showTrialPromo ? <TrialPromoBlock scope={activeTab} launchPromo={launchPromo} /> : null}
 
       {/* FAQ — reuses <FAQItem> from /faq for visual continuity. */}
       <section className="mx-auto max-w-3xl px-4 py-12">

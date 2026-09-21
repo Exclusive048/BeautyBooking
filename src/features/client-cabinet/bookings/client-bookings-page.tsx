@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
@@ -195,6 +196,9 @@ export function ClientBookingsPage() {
         </h1>
         <p className="mt-1 text-sm text-text-sec">{T.subtitle}</p>
       </header>
+
+      {/* PWA-ONBOARDING-01: напоминания о визитах приходят пушем — поэтому и клиенту. */}
+      <AppSetupCard />
 
       <KpiCards kpi={kpi} isLoading={isLoading} />
 

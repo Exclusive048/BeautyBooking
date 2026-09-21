@@ -20,7 +20,7 @@ export async function sendTrialEndingSoonNotification(input: {
     userId: input.userId,
     type: NotificationType.BILLING_TRIAL_ENDING_SOON,
     scope: input.scope,
-    title: "Пробный период скоро закончится",
+    title: "Бесплатный PREMIUM скоро закончится",
     body:
       `Через ${input.daysLeft} ${dayWord} тариф PREMIUM для кабинета ${scopeLabel} закончится. ` +
       `Оформите подписку, чтобы сохранить расширенные возможности — или продолжите на бесплатном тарифе.`,
@@ -44,9 +44,9 @@ export async function sendTrialExpiredNotification(input: {
     userId: input.userId,
     type: NotificationType.BILLING_TRIAL_EXPIRED,
     scope: input.scope,
-    title: "Пробный период закончился",
+    title: "Бесплатный PREMIUM закончился",
     body:
-      `Пробный месяц PREMIUM для кабинета ${scopeLabel} закончился — аккаунт переведён на бесплатный тариф. ` +
+      `Бесплатный период тарифа PREMIUM для кабинета ${scopeLabel} закончился — кабинет переведён на тариф FREE. ` +
       `Все ваши данные (записи, портфолио, клиенты) сохранены. Чтобы вернуть расширенные возможности, оформите подписку в любой момент.`,
     payloadJson: {
       kind: "trial_expired",

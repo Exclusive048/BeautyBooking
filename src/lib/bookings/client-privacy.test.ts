@@ -89,6 +89,7 @@ const MASTER_CRM_READERS: Record<string, string> = {
   "src/lib/deletion/user-data-disposition.ts": "карта диспозиций при удалении аккаунта (инв. #35)",
   "src/lib/deletion/provider-data-disposition.ts": "карта диспозиций при удалении кабинета (инв. #38)",
   "src/lib/billing/feature-catalog.ts": "описание фичи тарифа, не чтение данных",
+  "src/lib/billing/plan-catalog.ts": "флаги фич в каталоге тарифов (BILLING-CATALOG-01), не чтение данных",
 };
 
 /**

@@ -1,4 +1,4 @@
-import { AccountType, BookingStatus, NotificationType } from "@prisma/client";
+import { AccountType, NotificationType, StudioMemberRole, StudioRole } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { removeProfessionalRoles } from "@/lib/auth/roles";
 import { MediaEntityType } from "@prisma/client";
@@ -7,20 +7,25 @@ import { collectProviderMedia } from "@/lib/media/purge";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { logError, logInfo } from "@/lib/logging/logger";
-
-const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
-  "NEW",
-  "PENDING",
-  "CONFIRMED",
-  "IN_PROGRESS",
-];
+import { countBlockingMasterBookings } from "@/lib/deletion/active-bookings";
 
 type MasterDeletionResult = {
   providerId: string;
   providerName: string;
 };
 
-export async function deleteMasterCabinet(userId: string): Promise<void> {
+export type CabinetDeletionOptions = {
+  /**
+   * Удаление аккаунта целиком: уведомление «кабинет удалён» адресату, который
+   * через мгновение перестанет существовать, не шлётся.
+   */
+  silent?: boolean;
+};
+
+/** Интерактивная транзакция удаления — два десятка операций; дефолтных 5 с мало. */
+export const CABINET_DELETION_TX_TIMEOUT_MS = 30_000;
+
+export async function deleteMasterCabinet(userId: string, options: CabinetDeletionOptions = {}): Promise<void> {
   // DELETION-02: снимок ДО транзакции — после неё указателей на объекты уже не найти.
   const provider = await prisma.masterProfile.findUnique({
     where: { userId },
@@ -45,12 +50,8 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
     }
 
     const providerId = masterProfile.providerId;
-    const activeCount = await tx.booking.count({
-      where: {
-        status: { in: ACTIVE_BOOKING_STATUSES },
-        OR: [{ providerId }, { masterProviderId: providerId }],
-      },
-    });
+    // DELETION-03: общий предикат живой записи (включая CHANGE_REQUESTED/PREPAID/STARTED).
+    const activeCount = await countBlockingMasterBookings(tx, providerId);
 
     if (activeCount > 0) {
       throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", {
@@ -81,9 +82,13 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
       tx.masterService.deleteMany({ where: { masterProviderId: providerId } }),
       tx.clientNote.deleteMany({ where: { masterId: providerId } }),
       tx.clientCard.deleteMany({ where: { providerId } }),
-      tx.review.deleteMany({ where: { authorId: userId } }),
-      tx.studioMembership.deleteMany({ where: { userId } }),
-      tx.studioMember.deleteMany({ where: { userId } }),
+      // DELETION-03: пакеты услуг значились в карте диспозиций как DELETED, но
+      // не удалялись; брони пакета остаются (BookingPackage.servicePackage → SetNull).
+      tx.servicePackage.deleteMany({ where: { masterId: providerId } }),
+      // DELETION-03: из студий уходит только роль МАСТЕРА. Раньше удалялись ВСЕ
+      // членства пользователя — владелец студии, удаливший свой кабинет мастера,
+      // терял OWNER-членство и доступ к собственной студии (/403).
+      tx.studioMember.deleteMany({ where: { userId, role: StudioMemberRole.MASTER } }),
       tx.publicUsernameAlias.deleteMany({ where: { providerId } }),
       tx.service.deleteMany({
         where: {
@@ -93,9 +98,40 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
       }),
     ]);
 
+    // Отзывы, НАПИСАННЫЕ пользователем как клиентом, кабинету не принадлежат и
+    // здесь не трогаются (DELETION-03): раньше они удалялись без пересчёта
+    // рейтинга чужих мастеров — рейтинги оставались протухшими.
+
+    const memberships = await tx.studioMembership.findMany({
+      where: { userId, roles: { has: StudioRole.MASTER } },
+      select: { id: true, roles: true },
+    });
+    for (const membership of memberships) {
+      const rest = membership.roles.filter((role) => role !== StudioRole.MASTER);
+      if (rest.length === 0) {
+        await tx.studioMembership.delete({ where: { id: membership.id } });
+      } else {
+        await tx.studioMembership.update({ where: { id: membership.id }, data: { roles: rest } });
+      }
+    }
+
+    // Услуги с историей броней остаются (FK), но продаваться не должны.
+    await tx.service.updateMany({ where: { providerId }, data: { isActive: false } });
+
+    // DELETION-03: платная подписка кабинета больше не продлевается сама —
+    // иначе удалённый кабинет продолжал бы списывать деньги с сохранённой карты.
+    await tx.userSubscription.updateMany({
+      where: { userId, scope: "MASTER", autoRenew: true },
+      data: { autoRenew: false, cancelAtPeriodEnd: true, nextBillingAt: null },
+    });
+
     await tx.provider.update({
       where: { id: providerId },
       data: {
+        // DELETION-03: связь с владельцем рвётся (так и записано в карте
+        // диспозиций). Без этого повторное создание кабинета подхватывало
+        // анонимизированную строку вместе со старыми услугами и историей.
+        ownerUserId: null,
         isPublished: false,
         publicUsername: null,
         publicUsernameUpdatedAt: null,
@@ -118,7 +154,7 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
       providerId,
       providerName: masterProfile.provider?.name || "Мастер",
     };
-  });
+  }, { timeout: CABINET_DELETION_TX_TIMEOUT_MS });
 
   // FIX-CABINET-ROLE-LEFTOVER: зеркало студийного пути — без снятия роли пункт
   // «Кабинет мастера» остаётся в меню и ведёт в удалённый кабинет. `MasterProfile`
@@ -135,20 +171,22 @@ export async function deleteMasterCabinet(userId: string): Promise<void> {
   const title = "Кабинет мастера удалён";
   const body = "Ваш кабинет мастера удалён. Услуги, расписание и портфолио удалены.";
 
-  try {
-    await deliverNotification({
-      userId,
-      type: NotificationType.MASTER_CABINET_DELETED,
-      title,
-      body,
-      payloadJson: { providerId: result.providerId, providerName: result.providerName },
-      pushUrl: "/cabinet/roles",
-    });
-  } catch (error) {
-    logError("Failed to send master deletion notification", {
-      userId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  if (!options.silent) {
+    try {
+      await deliverNotification({
+        userId,
+        type: NotificationType.MASTER_CABINET_DELETED,
+        title,
+        body,
+        payloadJson: { providerId: result.providerId, providerName: result.providerName },
+        pushUrl: "/cabinet/roles",
+      });
+    } catch (error) {
+      logError("Failed to send master deletion notification", {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   await enqueueMediaPurge(mediaToPurge, "master-cabinet-deletion", userId);

@@ -28,13 +28,20 @@ export function DeleteAccountModal({
   const [checked, setChecked] = useState(false);
   const [value, setValue] = useState("");
 
+  // DELETION-03: без телефона подтверждаем словом — иначе аккаунты, созданные
+  // через почту/VK/Яндекс (а в проде почта — основной вход), удалить нельзя.
+  const confirmByPhone = Boolean(phone);
   const normalizedTarget = useMemo(() => (phone ? normalizeRussianPhone(phone) ?? phone : null), [phone]);
   const normalizedInput = useMemo(
     () => (value.trim() ? normalizeRussianPhone(value.trim()) ?? value.trim() : null),
     [value]
   );
+  const wordMatches =
+    value.trim().toLocaleUpperCase("ru-RU") === UI_TEXT.deletion.accountConfirmWord;
 
-  const canConfirm = Boolean(checked && normalizedTarget && normalizedInput === normalizedTarget);
+  const canConfirm = Boolean(
+    checked && (confirmByPhone ? normalizedTarget && normalizedInput === normalizedTarget : wordMatches)
+  );
 
   return (
     <ModalSurface key={open ? "open" : "closed"} open={open} onClose={onCancel} title={UI_TEXT.deletion.accountTitle}>
@@ -51,13 +58,14 @@ export function DeleteAccountModal({
         </label>
 
         <label className="block text-xs text-text-sec">
-          {UI_TEXT.deletion.accountPhonePrompt}
+          {confirmByPhone ? UI_TEXT.deletion.accountPhonePrompt : UI_TEXT.deletion.accountWordPrompt}
           <Input
-            type="tel"
+            type={confirmByPhone ? "tel" : "text"}
             value={value}
             onChange={(event) => setValue(event.target.value)}
             className="mt-2 focus:ring-2 focus:ring-red-500/30"
-            placeholder={phone ?? "+7"}
+            placeholder={confirmByPhone ? (phone ?? "+7") : UI_TEXT.deletion.accountConfirmWord}
+            autoComplete="off"
           />
         </label>
 

@@ -7,7 +7,7 @@ import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { logInfo } from "@/lib/logging/logger";
-import { createNotification, publishNotifications } from "@/lib/notifications/service";
+import { deliverNotification } from "@/lib/notifications/delivery";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -89,7 +89,9 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     if (category.proposedBy) {
-      const notification = await createNotification({
+      // PUSH-COVERAGE-01: через общую доставку — раньше запись уходила только
+      // в центр уведомлений (без пуша), в отличие от всех остальных типов.
+      await deliverNotification({
         userId: category.proposedBy,
         type: NotificationType.CATEGORY_REJECTED,
         title: "Категория отклонена",
@@ -101,8 +103,8 @@ export async function POST(req: Request, ctx: RouteContext) {
           status: "REJECTED",
           reason: reason ?? null,
         },
+        pushUrl: "/notifications",
       });
-      publishNotifications([notification]);
     }
 
     return ok({ category: updated });

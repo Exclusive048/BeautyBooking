@@ -82,7 +82,7 @@ export const PROVIDER_RELATION_DISPOSITION: Record<string, RelationDisposition> 
       "теперь ещё и вычищаются из хранилища задачей `media.purge`",
   },
   hotSlots: { kind: "DELETED", reason: "delete-master/delete-studio: горячие слоты кабинета" },
-  modelOffers: { kind: "DELETED", reason: "delete-master: офферы моделям" },
+  modelOffers: { kind: "DELETED", reason: "delete-master/delete-studio: офферы моделям" },
   publicUsernameAliases: { kind: "DELETED", reason: "delete-master/delete-studio: освобождение публичных хэндлов" },
 
   // ── Клиентские «указатели» на провайдера — источник dangling-строк ────────
@@ -112,7 +112,9 @@ export const PROVIDER_RELATION_DISPOSITION: Record<string, RelationDisposition> 
   // ── CRM: удаляется вместе с кабинетом ────────────────────────────────────
   clientCards: {
     kind: "DELETED",
-    reason: "delete-master: CRM-карточки этого мастера (инв. #25 — данные обработки мастером)",
+    reason:
+      "delete-master/delete-studio: CRM-карточки кабинета (инв. #25 — данные обработки " +
+      "мастером). У студии удалялись только с DELETION-03 — до этого карточки переживали её",
   },
   clientNotes: { kind: "DELETED", reason: "delete-master: заметки мастера о клиентах" },
 
@@ -128,8 +130,8 @@ export const PROVIDER_RELATION_DISPOSITION: Record<string, RelationDisposition> 
   reviewsAbout: {
     kind: "RETAINED",
     reason:
-      "Публичные отзывы О провайдере — UGC других людей. Отзывы, НАПИСАННЫЕ владельцем, " +
-      "удаляются в delete-master (это его ПДн, а не этого провайдера)",
+      "Публичные отзывы О провайдере — UGC других людей. Отзывы, НАПИСАННЫЕ владельцем как " +
+      "клиентом, кабинету не принадлежат и при его удалении не трогаются (DELETION-03)",
   },
   createdGlobalCategories: {
     kind: "RETAINED",

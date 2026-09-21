@@ -227,6 +227,7 @@ export async function sendConversationMessage(
         bodyPreview: preview,
       } satisfies Prisma.InputJsonValue,
       pushUrl: recipientPath,
+      pushTag: `chat:${chat.id}`,
     });
   }
 

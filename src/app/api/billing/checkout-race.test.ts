@@ -23,6 +23,8 @@ const state = vi.hoisted(() => ({
   // Что вернёт повторное чтение по ключу после конфликта.
   winner: null as { status: string; confirmationUrl: string | null } | null,
   existingByKey: null as { status: string; confirmationUrl: string | null } | null,
+  // LAUNCH-PROMO-01: сценарии оплаты — после акции; сама акция — отдельный тест.
+  promoActive: false,
 }));
 
 const spies = vi.hoisted(() => ({
@@ -91,6 +93,7 @@ vi.mock("@/lib/payments/yookassa/client", () => ({
   },
 }));
 
+vi.mock("@/lib/billing/launch-promo", () => ({ isLaunchPromoActive: () => state.promoActive }));
 vi.mock("@/lib/billing/audit", () => ({ createBillingAuditLog: vi.fn(async () => {}) }));
 vi.mock("@/lib/billing/get-current-plan", () => ({ invalidatePlanCache: vi.fn(async () => {}) }));
 vi.mock("@/lib/logging/logger", async (importOriginal) => ({
@@ -120,6 +123,7 @@ beforeEach(() => {
   state.createThrows = null;
   state.winner = null;
   state.existingByKey = null;
+  state.promoActive = false;
   for (const spy of Object.values(spies)) spy.mockClear();
 });
 
@@ -196,5 +200,19 @@ describe("LOGIC-08 · молчать о чужих ошибках нельзя",
     state.createThrows = "P2002";
     state.winner = null;
     await expect(call()).rejects.toThrow();
+  });
+});
+
+describe("LAUNCH-PROMO-01 · до 1 ноября платный тариф не продаётся", () => {
+  it("платный checkout во время акции → 409 LAUNCH_PROMO_ACTIVE, ни платежа, ни ЮКассы", async () => {
+    state.promoActive = true;
+
+    const res = await call();
+    const body = (await res.json()) as { ok: boolean; error: { code: string; message: string } };
+
+    expect(res.status).toBe(409);
+    expect(body.error.code).toBe("LAUNCH_PROMO_ACTIVE");
+    expect(spies.paymentCreate).not.toHaveBeenCalled();
+    expect(spies.createInitialPayment).not.toHaveBeenCalled();
   });
 });

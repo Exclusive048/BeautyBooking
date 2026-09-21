@@ -5,8 +5,8 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { deleteUserAccount } from "@/lib/deletion/delete-account";
-import { env, isProduction } from "@/lib/env";
 import { extractClientIp } from "@/lib/http/ip";
+import { clearSessionCookies } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
@@ -35,14 +35,8 @@ export async function DELETE(req: Request) {
     await deleteUserAccount(auth.user.id);
 
     const res = ok({ deleted: true });
-    const name = env.AUTH_COOKIE_NAME;
-    res.cookies.set(name, "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: isProduction,
-      path: "/",
-      maxAge: 0,
-    });
+    // DELETION-03: снимаются ОБЕ куки сессии — раньше `bh_refresh` оставалась.
+    clearSessionCookies(res);
     return res;
   } catch (error) {
     const appError = error instanceof AppError ? error : toAppError(error);
