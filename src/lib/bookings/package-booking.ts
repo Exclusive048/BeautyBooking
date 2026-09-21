@@ -23,7 +23,7 @@ import {
 } from "@/lib/bookings/package-math";
 import { toKopeks } from "@/lib/money/kopeks";
 import {
-  canCancelOrReschedule,
+  canCancelBookingStatus,
   ensureBookingActionWindow,
   ensureCancellationDeadline,
   resolveBookingRuntimeStatus,
@@ -695,7 +695,7 @@ export async function cancelSoloPackageBooking(input: {
 
   const earliest = liveChildren[0];
   if (earliest) {
-    if (!canCancelOrReschedule(earliest.status)) {
+    if (!canCancelBookingStatus(earliest.status)) {
       throw new AppError("Этот пакет уже нельзя отменить.", 409, "CONFLICT");
     }
     if (input.cancelledBy === BookingCancelledBy.CLIENT) {

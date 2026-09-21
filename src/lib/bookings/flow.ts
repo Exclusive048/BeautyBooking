@@ -106,9 +106,22 @@ export function ensureCancellationDeadline(
   }
 }
 
-export function canCancelOrReschedule(status: BookingStatus): boolean {
-  const normalized = normalizeBookingStatus(status);
-  return normalized === "PENDING" || normalized === "CONFIRMED";
+/**
+ * Статусы, из которых бронь можно отменить. Единственный источник для отмены
+ * одиночной брони, пакета и поверхностей, показывающих отменяемое.
+ *
+ * `CHANGE_REQUESTED` сюда входит: пока перенос согласуется, запись остаётся
+ * живой, и отказ от неё не должен ждать ответа второй стороны. Раньше отмена
+ * судила по отдельному предикату без этого статуса — клиент, попросивший
+ * перенос, не мог отменить запись, пока мастер молчал, а сторона, которой
+ * перенос предложили, «отменой» его только отклоняла.
+ */
+function isCancellableStatus(status: BookingRuntimeStatus): boolean {
+  return status === "PENDING" || status === "CONFIRMED" || status === "CHANGE_REQUESTED";
+}
+
+export function canCancelBookingStatus(status: BookingStatus): boolean {
+  return isCancellableStatus(normalizeBookingStatus(status));
 }
 
 /**
@@ -126,7 +139,5 @@ export function canCancelIndividually(input: {
   bookingPackageId: string | null;
 }): boolean {
   if (input.bookingPackageId !== null) return false;
-  return (
-    input.status === "PENDING" || input.status === "CONFIRMED" || input.status === "CHANGE_REQUESTED"
-  );
+  return isCancellableStatus(input.status);
 }

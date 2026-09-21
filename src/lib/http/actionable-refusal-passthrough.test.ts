@@ -259,6 +259,9 @@ const ACTIONABLE_REFUSAL_SURFACES = [
   "src/features/studio-cabinet/schedule-requests/components/approve-dialog.tsx",
   "src/features/studio-cabinet/schedule-requests/components/reject-dialog.tsx",
   "src/features/public-profile/master/reviews-preview.tsx",
+  // CANCEL-DURING-RESCHEDULE: отмена записи клиентом — окно 60 минут и срок
+  // отмены называют причину; раньше отказ здесь глотался целиком.
+  "src/features/client-cabinet/bookings/client-bookings-page.tsx",
 ] as const;
 
 describe("FIX-C8 · поверхности решают через общий чокпоинт", () => {

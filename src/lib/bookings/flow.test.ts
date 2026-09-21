@@ -3,7 +3,8 @@ import type { BookingStatus } from "@prisma/client";
 import {
   BOOKING_ACTION_WINDOW_MINUTES,
   BOOKING_FINISH_GRACE_MINUTES,
-  canCancelOrReschedule,
+  canCancelBookingStatus,
+  canCancelIndividually,
   ensureBookingActionWindow,
   ensureCancellationDeadline,
   minutesUntilStart,
@@ -242,27 +243,53 @@ describe("bookings/flow — ensureCancellationDeadline", () => {
   });
 });
 
-describe("bookings/flow — canCancelOrReschedule", () => {
+describe("bookings/flow — canCancelBookingStatus", () => {
   it("allows PENDING (raw + NEW)", () => {
-    expect(canCancelOrReschedule("PENDING")).toBe(true);
-    expect(canCancelOrReschedule("NEW")).toBe(true);
+    expect(canCancelBookingStatus("PENDING")).toBe(true);
+    expect(canCancelBookingStatus("NEW")).toBe(true);
   });
 
   it("allows CONFIRMED (raw + PREPAID)", () => {
-    expect(canCancelOrReschedule("CONFIRMED")).toBe(true);
-    expect(canCancelOrReschedule("PREPAID")).toBe(true);
+    expect(canCancelBookingStatus("CONFIRMED")).toBe(true);
+    expect(canCancelBookingStatus("PREPAID")).toBe(true);
   });
 
   it("blocks terminal/in-progress states", () => {
-    expect(canCancelOrReschedule("FINISHED")).toBe(false);
-    expect(canCancelOrReschedule("CANCELLED")).toBe(false);
-    expect(canCancelOrReschedule("REJECTED")).toBe(false);
-    expect(canCancelOrReschedule("NO_SHOW")).toBe(false);
-    expect(canCancelOrReschedule("IN_PROGRESS")).toBe(false);
-    expect(canCancelOrReschedule("STARTED")).toBe(false);
+    expect(canCancelBookingStatus("FINISHED")).toBe(false);
+    expect(canCancelBookingStatus("CANCELLED")).toBe(false);
+    expect(canCancelBookingStatus("REJECTED")).toBe(false);
+    expect(canCancelBookingStatus("NO_SHOW")).toBe(false);
+    expect(canCancelBookingStatus("IN_PROGRESS")).toBe(false);
+    expect(canCancelBookingStatus("STARTED")).toBe(false);
   });
 
-  it("blocks CHANGE_REQUESTED (action required from counter-party)", () => {
-    expect(canCancelOrReschedule("CHANGE_REQUESTED")).toBe(false);
+  // CANCEL-DURING-RESCHEDULE: согласуемый перенос не запирает запись — отменить
+  // её можно, не дожидаясь ответа второй стороны.
+  it("allows CHANGE_REQUESTED (pending reschedule does not lock the booking)", () => {
+    expect(canCancelBookingStatus("CHANGE_REQUESTED")).toBe(true);
+  });
+
+  it("agrees with canCancelIndividually on every status (one criterion, LOGIC-13)", () => {
+    const statuses: BookingStatus[] = [
+      "NEW",
+      "PENDING",
+      "CONFIRMED",
+      "PREPAID",
+      "CHANGE_REQUESTED",
+      "STARTED",
+      "IN_PROGRESS",
+      "FINISHED",
+      "CANCELLED",
+      "REJECTED",
+      "NO_SHOW",
+    ];
+    for (const status of statuses) {
+      expect(canCancelBookingStatus(status)).toBe(
+        canCancelIndividually({
+          status: normalizeBookingStatus(status),
+          bookingPackageId: null,
+        }),
+      );
+    }
   });
 });

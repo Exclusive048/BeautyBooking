@@ -4,7 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import type { BookingCancelInput } from "@/lib/domain/bookings";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import {
-  canCancelOrReschedule,
+  canCancelIndividually,
   ensureCancellationDeadline,
   ensureBookingActionWindow,
   resolveBookingRuntimeStatus,
@@ -27,8 +27,6 @@ export type CancelBookingSideEffects = {
   startAtUtc: Date | null;
   endAtUtc: Date | null;
   cancelledBy: BookingCancelInput["cancelledBy"];
-  /** Клиент отклонил мастерский перенос — бронь осталась CONFIRMED, отмены не было. */
-  declinesMasterChange: boolean;
 };
 
 /**
@@ -47,8 +45,9 @@ export async function cancelBookingInTx(
   // AUDIT (отмена/отклонение):
   // - реализовано: отмена/отклонение меняет статус, удаления записи нет.
   // - реализовано: CLIENT/PROVIDER отмена -> REJECTED, requestedBy проставляется.
-  // - реализовано: клиентский отказ от мастерского переноса оставляет CONFIRMED и очищает proposed*.
-  // - реализовано: правило 60 минут проверяется на сервере для отмены (кроме reject ветки переноса).
+  // - реализовано: отмена брони с согласуемым переносом (CHANGE_REQUESTED) — тоже отмена;
+  //   отказ от переноса без отмены — отдельный роут `/decline-reschedule`.
+  // - реализовано: правило 60 минут проверяется на сервере для клиентской отмены.
   const booking = await tx.booking.findUnique({
     where: { id: input.bookingId },
     select: {
@@ -58,10 +57,6 @@ export async function cancelBookingInTx(
       masterProviderId: true,
       startAtUtc: true,
       endAtUtc: true,
-      proposedStartAt: true,
-      proposedEndAt: true,
-      requestedBy: true,
-      actionRequiredBy: true,
       bookingPackageId: true,
       provider: { select: { cancellationDeadlineHours: true } },
     },
@@ -95,55 +90,47 @@ export async function cancelBookingInTx(
     throw new AppError("Запись уже началась.", 409, "CONFLICT");
   }
 
-  const declinesMasterChange =
-    input.cancelledBy === "CLIENT" &&
-    runtimeStatus === "CHANGE_REQUESTED" &&
-    booking.requestedBy === "MASTER" &&
-    booking.actionRequiredBy === "CLIENT";
-
-  if (!declinesMasterChange) {
-    if (!canCancelOrReschedule(booking.status)) {
-      throw new AppError("Эту запись уже нельзя отменить.", 409, "CONFLICT");
-    }
-    if (input.cancelledBy === "CLIENT") {
-      ensureBookingActionWindow(booking.startAtUtc);
-      ensureCancellationDeadline(booking.startAtUtc, booking.provider.cancellationDeadlineHours);
-    }
-    // FIX-STUDIO-02 (F3): provider-side cancellation reason is OPTIONAL. The
-    // studio cancel dialog labels it «необязательно» and `bookingCancelSchema`
-    // already marks `reason` optional — the old required-comment guard threw a
-    // raw English «Comment is required» that leaked straight into the dialog
-    // (an API/UI contract violation). Mirrors the reschedule precedent
-    // (fix-04a), which dropped the identical guard for the same reason; the
-    // client-cancel path never required one either. When a reason IS provided
-    // it still flows into `cancelReason` + the "cancelled by master"
-    // notification below.
+  // CANCEL-DURING-RESCHEDULE: согласуемый перенос (CHANGE_REQUESTED) отмену не
+  // блокирует и не подменяет. Раньше клиентская «отмена» на предложенном
+  // мастером переносе тихо возвращала бронь в CONFIRMED на прежнее время, а на
+  // собственном запросе переноса отвечала 409 — то есть отменить запись, пока
+  // вторая сторона молчит, было нельзя никому. Отказ от переноса без отмены —
+  // отдельный роут `/decline-reschedule`. Критерий общий с поверхностями
+  // (LOGIC-13): пакет уже отсечён выше, поэтому здесь решает только статус.
+  if (
+    !canCancelIndividually({ status: runtimeStatus, bookingPackageId: booking.bookingPackageId })
+  ) {
+    throw new AppError("Эту запись уже нельзя отменить.", 409, "CONFLICT");
   }
+  if (input.cancelledBy === "CLIENT") {
+    ensureBookingActionWindow(booking.startAtUtc);
+    ensureCancellationDeadline(booking.startAtUtc, booking.provider.cancellationDeadlineHours);
+  }
+  // FIX-STUDIO-02 (F3): provider-side cancellation reason is OPTIONAL. The
+  // studio cancel dialog labels it «необязательно» and `bookingCancelSchema`
+  // already marks `reason` optional — the old required-comment guard threw a
+  // raw English «Comment is required» that leaked straight into the dialog
+  // (an API/UI contract violation). Mirrors the reschedule precedent
+  // (fix-04a), which dropped the identical guard for the same reason; the
+  // client-cancel path never required one either. When a reason IS provided
+  // it still flows into `cancelReason` + the "cancelled by master"
+  // notification below.
 
   // LOGIC-02: переход только из наблюдённого статуса — иначе отмена ложится
   // поверх уже подтверждённого мастером переноса (и наоборот).
   const updated = await applyBookingTransition(tx, {
     id: input.bookingId,
     expectedStatus: booking.status,
-    data: declinesMasterChange
-      ? {
-          status: "CONFIRMED",
-          actionRequiredBy: null,
-          requestedBy: null,
-          changeComment: null,
-          proposedStartAt: null,
-          proposedEndAt: null,
-        }
-      : {
-          status: "REJECTED",
-          cancelledBy: input.cancelledBy,
-          cancelReason: input.reason?.trim() || null,
-          cancelledAtUtc: new Date(),
-          requestedBy: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
-          actionRequiredBy: null,
-          proposedStartAt: null,
-          proposedEndAt: null,
-        },
+    data: {
+      status: "REJECTED",
+      cancelledBy: input.cancelledBy,
+      cancelReason: input.reason?.trim() || null,
+      cancelledAtUtc: new Date(),
+      requestedBy: input.cancelledBy === "CLIENT" ? "CLIENT" : "MASTER",
+      actionRequiredBy: null,
+      proposedStartAt: null,
+      proposedEndAt: null,
+    },
     select: { id: true, status: true },
   });
 
@@ -156,7 +143,6 @@ export async function cancelBookingInTx(
       startAtUtc: booking.startAtUtc,
       endAtUtc: booking.endAtUtc,
       cancelledBy: input.cancelledBy,
-      declinesMasterChange,
     },
   };
 }
@@ -165,11 +151,6 @@ export async function cancelBookingInTx(
 export async function runCancelBookingSideEffects(
   effects: CancelBookingSideEffects
 ): Promise<void> {
-  // Ветка «клиент отклонил мастерский перенос» ничего не отменяет — бронь
-  // остаётся CONFIRMED, только сбрасываются proposed*. Ни слоты, ни чат
-  // трогать не нужно.
-  if (effects.declinesMasterChange) return;
-
   await invalidateSlotsForBookingRange({
     providerId: effects.providerId,
     masterProviderId: effects.masterProviderId,

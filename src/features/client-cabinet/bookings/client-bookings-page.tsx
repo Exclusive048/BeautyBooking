@@ -51,11 +51,7 @@ type Filter = {
 };
 
 const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then(async (res) => {
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? "load_failed");
-    return json.data as ClientBookingsPayload;
-  });
+  fetchJson<ClientBookingsPayload>(url, { credentials: "include" });
 
 export function ClientBookingsPage() {
   const [filter, setFilter] = useState<Filter>({ status: "all", search: "" });
@@ -64,6 +60,13 @@ export function ClientBookingsPage() {
   // RESCHEDULE-CLIENT-APPROVAL: ответ на предложенный мастером перенос —
   // состояние одной карточки (какая занята / какая с ошибкой).
   const [answerState, setAnswerState] = useState<{
+    id: string;
+    busy: boolean;
+    error: string | null;
+  } | null>(null);
+  // CANCEL-DURING-RESCHEDULE: отказ отмены раньше глотался — кнопка просто
+  // ничего не делала. Теперь то же состояние карточки, что и у ответа на перенос.
+  const [cancelState, setCancelState] = useState<{
     id: string;
     busy: boolean;
     error: string | null;
@@ -163,14 +166,24 @@ export function ClientBookingsPage() {
       variant: "danger",
     });
     if (!ok) return;
-    const res = await fetch(`/api/bookings/${booking.id}/cancel`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    if (res.ok) {
+    setCancelState({ id: booking.id, busy: true, error: null });
+    try {
+      await fetchJson(`/api/bookings/${booking.id}/cancel`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      setCancelState(null);
       await mutate();
+    } catch (error) {
+      // Отказы отмены действенные (окно 60 минут, срок отмены, «запись уже
+      // изменилась — обновите страницу») — серверная строка дословно (FIX-C8).
+      setCancelState({
+        id: booking.id,
+        busy: false,
+        error: serverMessageOr(error, T.cancelFailed),
+      });
     }
   }
 
@@ -223,6 +236,8 @@ export function ClientBookingsPage() {
                       onAnswerReschedule={(answer) => handleRescheduleAnswer(b, answer)}
                       answerBusy={answerState?.id === b.id && answerState.busy}
                       answerError={answerState?.id === b.id ? answerState.error : null}
+                      cancelBusy={cancelState?.id === b.id && cancelState.busy}
+                      cancelError={cancelState?.id === b.id ? cancelState.error : null}
                     />
                   </li>
                 ))}
@@ -414,6 +429,8 @@ function BookingRow({
   onAnswerReschedule,
   answerBusy,
   answerError,
+  cancelBusy,
+  cancelError,
 }: {
   booking: ClientBookingDTO;
   onCancel: () => void;
@@ -422,6 +439,8 @@ function BookingRow({
   onAnswerReschedule: (answer: "accept" | "decline") => void;
   answerBusy: boolean;
   answerError: string | null;
+  cancelBusy: boolean;
+  cancelError: string | null;
 }) {
   // QA-107/FIX-22: the time is shown in the SALON's timezone everywhere; show
   // the explicit «(город, GMT+N)» label only when the viewer's zone differs
@@ -505,7 +524,13 @@ function BookingRow({
           onCancel={onCancel}
           onReschedule={onReschedule}
           onReview={onReview}
+          cancelBusy={cancelBusy}
         />
+        {cancelError ? (
+          <p className="text-xs text-danger-text" role="alert" data-testid="cancel-error">
+            {cancelError}
+          </p>
+        ) : null}
       </div>
 
       <div className="text-right sm:min-w-[6rem]">
@@ -683,11 +708,13 @@ function BookingActions({
   onCancel,
   onReschedule,
   onReview,
+  cancelBusy,
 }: {
   booking: ClientBookingDTO;
   onCancel: () => void;
   onReschedule: () => void;
   onReview: () => void;
+  cancelBusy: boolean;
 }) {
   const chatHref = booking.chatSlug ? `/cabinet/messages?c=${booking.chatSlug}` : null;
   const mapsHref =
@@ -726,11 +753,15 @@ function BookingActions({
           {mapsHref ? (
             <ActionLink href={mapsHref} icon={MapPin} label={T.actionRoute} target="_blank" />
           ) : null}
+          {/* CANCEL-DURING-RESCHEDULE: доступна и пока перенос согласуется —
+              сервер отменяет запись в любом живом статусе, включая
+              CHANGE_REQUESTED. */}
           <ActionButton
             icon={X}
             label={T.actionCancel}
             onClick={onCancel}
             variant="danger"
+            disabled={cancelBusy}
           />
         </>
       ) : null}
@@ -779,17 +810,20 @@ function ActionButton({
   label,
   onClick,
   variant = "default",
+  disabled = false,
 }: {
   icon: typeof Calendar;
   label: string;
   onClick: () => void;
   variant?: ActionVariant;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition ${actionClass(
+      disabled={disabled}
+      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition disabled:pointer-events-none disabled:opacity-50 ${actionClass(
         variant,
       )}`}
     >
