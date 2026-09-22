@@ -18,9 +18,11 @@ import { stripComments } from "@/lib/testing/source-scan";
  *
  * Свойство: у каждой inline-edit строки есть собственное сохранённое значение
  * (`savedValue`), и JSX режима просмотра ссылается на него, а не на проп.
- * Строки со СВОИМ механизмом обновления сюда не входят: `address-editor.tsx`
- * делает `window.location.reload()` после сохранения, `username-editable-row.tsx`
- * — `router.refresh()` с явной кнопкой; у них проп свежий по построению.
+ * `address-editor.tsx` входит сюда с PWA-RELOAD-01: раньше он делал
+ * `window.location.reload()` после сохранения и проп был свежим по построению,
+ * теперь — `router.refresh()`, и до прихода дерева просмотр обязан печатать
+ * `savedValue`. `username-editable-row.tsx` не входит — `router.refresh()` с
+ * явной кнопкой, проп свежий по построению.
  *
  * ⚠️ Это проверка формы, не поведения: в проекте нет DOM-среды для тестов
  * (ни jsdom, ни testing-library), и «кликнул → напечатал → blur → текст»
@@ -37,7 +39,12 @@ import { stripComments } from "@/lib/testing/source-scan";
 
 const EDITABLE_DIR = "src/features/master/components/profile/editable";
 
-const ROWS = ["editable-field-row.tsx", "editable-textarea-row.tsx", "social-editable-row.tsx"];
+const ROWS = [
+  "editable-field-row.tsx",
+  "editable-textarea-row.tsx",
+  "social-editable-row.tsx",
+  "address-editor.tsx",
+];
 
 function read(file: string): string {
   return stripComments(readFileSync(path.join(process.cwd(), EDITABLE_DIR, file), "utf8"));
@@ -52,7 +59,9 @@ describe("PWA-FIX-04 · inline-edit строка печатает сохранё
         /const \[savedValue, setSavedValue\] = useState\(/,
       );
 
-      const jsxStart = source.indexOf("return (");
+      // `return (` сразу перед разметкой — не `return () =>` из cleanup'а
+      // эффекта (он есть в address-editor и стоит раньше JSX).
+      const jsxStart = source.search(/return \(\s*</);
       expect(jsxStart, `${file}: JSX не найден — сканер устарел`).toBeGreaterThan(0);
       const jsx = source.slice(jsxStart);
 

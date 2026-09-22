@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import { isProduction } from "@/lib/env.client";
 
+/**
+ * PWA-RELOAD-01 — страница перезагружается при смене сервис-воркера ТОЛЬКО по
+ * нажатию «Обновить».
+ *
+ * `src/app/sw.ts` стоит на `skipWaiting` + `clientsClaim`, поэтому
+ * `controllerchange` приходит без участия пользователя дважды: при ПЕРВОМ
+ * открытии приложения (контроллер null → свежий SW, это не обновление вовсе)
+ * и на каждом деплое (новый SW захватывает уже открытые вкладки). Безусловный
+ * reload в обработчике перезагружал страницу через секунду после первого
+ * открытия и посреди заполнения формы после выкатки. Старая вкладка под новым
+ * SW работоспособна: навигации идут в сеть (`NetworkOnly`), а рассинхрон
+ * версии Next сам разрешает жёсткой навигацией на следующем переходе.
+ */
 export function PWAUpdatePrompt() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [visible, setVisible] = useState(false);
+  const reloadRequestedRef = useRef(false);
 
   useEffect(() => {
     if (!isProduction) return;
@@ -40,7 +54,7 @@ export function PWAUpdatePrompt() {
     navigator.serviceWorker.getRegistration().then(handleRegistration).catch(() => null);
 
     const handleControllerChange = () => {
-      if (!mounted) return;
+      if (!mounted || !reloadRequestedRef.current) return;
       window.location.reload();
     };
 
@@ -72,7 +86,11 @@ export function PWAUpdatePrompt() {
             size="sm"
             onClick={() => {
               if (waitingWorker) {
+                // Перезагрузка — в `controllerchange`, когда новый SW
+                // действительно взял страницу, иначе она ушла бы под старым.
+                reloadRequestedRef.current = true;
                 waitingWorker.postMessage({ type: "SKIP_WAITING" });
+                return;
               }
               window.location.reload();
             }}

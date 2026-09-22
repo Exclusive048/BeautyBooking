@@ -13,6 +13,13 @@ const withSerwist = require("@serwist/next").default({
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
   register: true,
+  // PWA-RELOAD-01: дефолт serwist `reloadOnOnline: true` вешает на КАЖДУЮ
+  // страницу `online → location.reload()`. Мобильная сеть и возврат PWA из фона
+  // дёргают это событие постоянно — страница перезагружалась посреди ввода,
+  // сбрасывая скролл и недописанные поля. Перезагрузка по возврату сети нужна
+  // ровно одной странице — офлайн-заглушке, и она делает это сама
+  // (`src/app/offline/page.tsx`).
+  reloadOnOnline: false,
   // /offline — server-rendered маршрут, в манифест build-ассетов сам не попадает;
   // прекэшируем явно, иначе fallback в sw.ts нечем отдавать. revision меняется
   // каждым билдом — снапшот страницы обновляется на каждый деплой.

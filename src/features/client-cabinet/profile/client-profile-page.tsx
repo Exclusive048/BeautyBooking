@@ -37,6 +37,7 @@ import {
   formatMemberSince,
   formatVisitsLabel,
 } from "./lib/format-helpers";
+import { mergeSavedProfile } from "./lib/merge-saved-profile";
 import {
   useProfileAutosave,
   type SaveStatus,
@@ -149,8 +150,10 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
 
 
   const { status, errorMessage, scheduleSave } = useProfileAutosave({
+    // PWA-RELOAD-01: поля ввода остаются локальными, от сервера — вычисляемое
+    // (см. `mergeSavedProfile`), иначе ответ сейва перетирал набираемый текст.
     onSaved: (next) => {
-      void mutate(next, { revalidate: false });
+      void mutate((current) => mergeSavedProfile(next, current), { revalidate: false });
     },
   });
 

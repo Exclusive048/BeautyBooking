@@ -1,7 +1,8 @@
 "use client";
 
 import { Pencil } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
@@ -29,12 +30,24 @@ const SUGGEST_DEBOUNCE_MS = 220;
  *
  * Free-form Enter (without a suggestion) won't save — we require the
  * user to pick from the suggest list so geocoding is always reliable.
+ *
+ * PWA-RELOAD-01 — после сохранения обновляется серверное дерево
+ * (`router.refresh()`), а не вся страница: прежний `window.location.reload()`
+ * сбрасывал скролл и перерисовывал кабинет целиком. Режим просмотра печатает
+ * `savedValue` (optimistic, образец — `EditableFieldRow`), иначе до прихода
+ * обновлённого дерева строка мигала бы старым адресом.
  */
 export function AddressEditor({ value }: Props) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  /** Что показывает режим просмотра (optimistic, см. док-блок выше). */
+  const [savedValue, setSavedValue] = useState(value);
+  /** Последний подтверждённый сервером адрес — точка отката при отказе. */
+  const confirmedRef = useRef(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const fetchSeqRef = useRef(0);
@@ -43,8 +56,13 @@ export function AddressEditor({ value }: Props) {
   const [prevValue, setPrevValue] = useState(value);
   if (prevValue !== value) {
     setPrevValue(value);
+    setSavedValue(value);
     if (!isEditing) setDraft(value);
   }
+
+  useEffect(() => {
+    confirmedRef.current = value;
+  }, [value]);
 
   const autosave = useAutosave<{ address: string; lat: number; lng: number }>(
     async (next) => {
@@ -57,7 +75,11 @@ export function AddressEditor({ value }: Props) {
           geoLng: next.lng,
         }),
       });
-      if (!response.ok) return { ok: false };
+      if (!response.ok) {
+        setSavedValue(confirmedRef.current);
+        return { ok: false };
+      }
+      confirmedRef.current = next.address;
       return { ok: true };
     },
     { isEqual: (a, b) => a.address === b.address && a.lat === b.lat && a.lng === b.lng }
@@ -73,7 +95,7 @@ export function AddressEditor({ value }: Props) {
 
   const enterEdit = () => {
     if (isEditing) return;
-    setDraft(value);
+    setDraft(savedValue);
     setIsEditing(true);
     setOpen(true);
     queueMicrotask(() => inputRef.current?.focus());
@@ -114,6 +136,7 @@ export function AddressEditor({ value }: Props) {
 
   const pickSuggestion = async (suggestion: Suggestion) => {
     setDraft(suggestion.value);
+    setSavedValue(suggestion.value);
     setOpen(false);
     setSuggestions([]);
     // Geocode the picked address; server PATCH then re-geocodes
@@ -135,20 +158,18 @@ export function AddressEditor({ value }: Props) {
     setIsEditing(false);
     // Refresh server state — `getMasterProfileView` will pick up the
     // new cityId/coords for the map render.
-    if (typeof window !== "undefined") {
-      window.location.reload();
-    }
+    startTransition(() => router.refresh());
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      setDraft(value);
+      setDraft(savedValue);
       exitEdit();
     }
   };
 
-  const isEmpty = !value || value.trim().length === 0;
+  const isEmpty = !savedValue || savedValue.trim().length === 0;
 
   return (
     <div className="group flex items-start gap-3 border-b border-border-subtle py-3 last:border-0">
@@ -216,7 +237,7 @@ export function AddressEditor({ value }: Props) {
               isEmpty ? "italic text-text-sec" : "text-text-main"
             )}
           >
-            {isEmpty ? T_EDIT.emptyValue : value}
+            {isEmpty ? T_EDIT.emptyValue : savedValue}
           </button>
         )}
       </div>
