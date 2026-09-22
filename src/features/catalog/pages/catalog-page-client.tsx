@@ -4,13 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { List, SlidersHorizontal } from "lucide-react";
+import { Camera, List, Map as MapIcon, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useBodyScrollLock } from "@/components/ui/use-modal-a11y";
 import { CatalogCard } from "@/features/catalog/components/catalog-card";
+import { CatalogQuickFilters } from "@/features/catalog/components/catalog-quick-filters";
 import { CatalogSearchBar } from "@/features/catalog/components/catalog-search-bar";
-import type { AutocompleteCategory } from "@/features/catalog/components/service-search-input";
+import {
+  ServiceSearchInput,
+  type AutocompleteCategory,
+} from "@/features/catalog/components/service-search-input";
 import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
 import { CatalogPagination } from "@/features/catalog/components/catalog-pagination";
 import { SortMenu } from "@/features/catalog/components/sort-menu";
@@ -18,12 +22,10 @@ import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-
 import { LoginRequiredModal } from "@/features/auth/components/login-required-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { ProviderResultCard } from "@/features/search-by-time/components/provider-result-card";
-import type { TimePreset } from "@/features/search-by-time/components/time-preset-chips";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import type { CatalogSort } from "@/lib/catalog/schemas";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
 import { getCurrentCitySlug } from "@/lib/cities/client-city";
-import { providerPublicUrl } from "@/lib/public-urls";
 import { scrollBehavior } from "@/lib/ui/scroll";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ApiResponse } from "@/lib/types/api";
@@ -39,16 +41,16 @@ import type { ApiResponse } from "@/lib/types/api";
  * и грузит Яндекс-скрипт из эффекта, модалка рендерится только по клику;
  * серверной разметки у обеих не было.
  *
- * Скелет карты накрывает контейнер целиком (он `relative` и держит
- * `min-h-[60vh]`), поэтому переключение в режим карты не прыгает.
+ * Скелет карты накрывает контейнер целиком (он `relative`), поэтому
+ * переключение в режим карты не прыгает.
  */
 const CatalogMap = dynamic(
   () => import("@/features/catalog/components/catalog-map").then((m) => m.CatalogMap),
-  { ssr: false, loading: () => <Skeleton className="absolute inset-0 h-full w-full rounded-2xl" /> },
+  { ssr: false, loading: () => <Skeleton className="absolute inset-0 h-full w-full rounded-none" /> },
 );
 
-const CatalogMapSidebar = dynamic(
-  () => import("@/features/catalog/components/catalog-map-sidebar").then((m) => m.CatalogMapSidebar),
+const CatalogMapCarousel = dynamic(
+  () => import("@/features/catalog/components/catalog-map-carousel").then((m) => m.CatalogMapCarousel),
   { ssr: false, loading: () => null },
 );
 
@@ -100,26 +102,21 @@ type MapSearchState = {
   center: { lat: number; lng: number };
 } | null;
 
-type MapSearchSource = "auto" | "manual";
-
-type MapSidebarItem = {
-  id: string;
-  title: string;
-  type: "master" | "studio";
-  avatarUrl: string | null;
-  ratingAvg: number;
-  priceFrom: number | null;
-  href: string | null;
-};
+/** Кто выбрал мастера на карте: от этого зависит, кто за кем «едет». */
+type MapSelection = { id: string; source: "map" | "carousel" };
 
 const DEBOUNCE_MS = 400;
 const TIME_SEARCH_DEBOUNCE_MS = 200;
+/** Раскладка без сайдбара (< `lg`): карта здесь — полноэкранный слой. */
+const MOBILE_LAYOUT_QUERY = "(max-width: 1023px)";
 
 const TIME_PRESET_RANGES: Record<TimePresetValue, { from: string; to: string }> = {
   morning: { from: "09:00", to: "12:00" },
   day: { from: "12:00", to: "18:00" },
   evening: { from: "18:00", to: "22:00" },
 };
+
+const TH = UI_TEXT.catalog2.resultsHeader;
 
 function parseEntityType(value: string | null): EntityType {
   if (value === "master" || value === "studio") return value;
@@ -157,10 +154,15 @@ function parsePage(value: string | null): number {
 function pluralizeMasters(count: number): string {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return UI_TEXT.catalog2.resultsHeader.pluralOne;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
-    return UI_TEXT.catalog2.resultsHeader.pluralFew;
-  return UI_TEXT.catalog2.resultsHeader.pluralMany;
+  if (mod10 === 1 && mod100 !== 11) return TH.pluralOne;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return TH.pluralFew;
+  return TH.pluralMany;
+}
+
+function resultsTitle(count: number): string {
+  return TH.titleTemplate
+    .replace("{count}", count.toLocaleString("ru-RU"))
+    .replace("{plural}", pluralizeMasters(count));
 }
 
 function toMapPoint(
@@ -176,7 +178,10 @@ function toMapPoint(
       title: item.name,
       type: item.providerType === "STUDIO" ? "studio" : "master",
       avatarUrl: item.avatarUrl,
+      photoUrl: item.photos[0] ?? null,
+      subtitle: item.service.title,
       ratingAvg: item.ratingAvg,
+      reviewsCount: item.reviewsCount,
       priceFrom: item.priceFrom,
       publicUsername: item.publicUsername ?? null,
       geoLat: item.geoLat,
@@ -191,23 +196,14 @@ function toMapPoint(
     title: item.title,
     type: item.type,
     avatarUrl: item.avatarUrl,
+    photoUrl: item.photos[0] ?? null,
+    subtitle: item.tagline ?? item.primaryService?.title ?? null,
     ratingAvg: item.ratingAvg,
+    reviewsCount: item.reviewsCount,
     priceFrom: item.minPrice,
     publicUsername: item.publicUsername ?? null,
     geoLat: item.geoLat,
     geoLng: item.geoLng,
-  };
-}
-
-function toSidebarItem(point: CatalogMapPoint): MapSidebarItem {
-  return {
-    id: point.id,
-    title: point.title,
-    type: point.type,
-    avatarUrl: point.avatarUrl,
-    ratingAvg: point.ratingAvg,
-    priceFrom: point.priceFrom,
-    href: providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map-sidebar"),
   };
 }
 
@@ -265,19 +261,20 @@ export default function CatalogPageClient({
   const sort = parseSort(searchParams.get("sort"));
   const page = parsePage(searchParams.get("page"));
   const todayIso = new Date().toISOString().slice(0, 10);
+  // `date=<сегодня>` — прежняя форма фильтра «сегодня» (ссылки со снятого
+  // блока «Когда»); читается как «Свободно сегодня».
   const isTodaySelected = date === todayIso;
   const effectiveAvailableToday = availableToday || isTodaySelected;
+  // Поиск по окошкам во времени остаётся доступным по прямой ссылке с
+  // `serviceId` + датой + диапазоном. Неполный набор параметров просто не
+  // включает этот режим — раньше он показывал «Сначала выберите услугу», а
+  // выбрать услугу на странице было негде.
   const presetRange = timePresetRaw ? TIME_PRESET_RANGES[timePresetRaw] : null;
   const effectiveTimeFrom = timeFrom || presetRange?.from || "";
   const effectiveTimeTo = timeTo || presetRange?.to || "";
-  const timePreset: TimePreset | null =
-    timePresetRaw ?? (effectiveTimeFrom && effectiveTimeTo ? "custom" : null);
-  const hasTimeRange = Boolean(effectiveTimeFrom && effectiveTimeTo);
-  const needsService = hasTimeRange && !serviceId;
-  const needsDate = hasTimeRange && !date;
-  const timeModeActive = hasTimeRange && !needsService && !needsDate;
+  const timeModeActive = Boolean(effectiveTimeFrom && effectiveTimeTo && serviceId && date);
 
-  // Active sidebar filter count (excludes time/service/date handled by DateTimeFilterBar)
+  // Счётчик на кнопке «Фильтры»: всё, что выставляется в панели фильтров.
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (globalCategoryId) count++;
@@ -286,9 +283,9 @@ export default function CatalogPageClient({
     if (priceMin || priceMax) count++;
     if (hot) count++;
     if (entityType !== "all") count++;
-    if (availableToday) count++;
+    if (effectiveAvailableToday) count++;
     return count;
-  }, [globalCategoryId, district, ratingMin, priceMin, priceMax, hot, entityType, availableToday]);
+  }, [globalCategoryId, district, ratingMin, priceMin, priceMax, hot, entityType, effectiveAvailableToday]);
 
   const [draftServiceQuery, setDraftServiceQuery] = useState(serviceQuery);
   const [loading, setLoading] = useState(true);
@@ -300,10 +297,7 @@ export default function CatalogPageClient({
   // we don't try to keep this set in sync after mount.
   const favoriteSet = useMemo(() => new Set(favoriteUsernames), [favoriteUsernames]);
   const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
-  const [mapSearchApplied, setMapSearchApplied] = useState(false);
-  const [mapSidebarItems, setMapSidebarItems] = useState<MapSidebarItem[]>([]);
-  const [mapSidebarOpen, setMapSidebarOpen] = useState(false);
-  const [activeMapId, setActiveMapId] = useState<string | null>(null);
+  const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
   const [visualSearchOpen, setVisualSearchOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -327,8 +321,27 @@ export default function CatalogPageClient({
     [pathname, router, searchParams]
   );
 
+  /**
+   * Любое изменение фильтра возвращает на первую страницу: оставаться на
+   * третьей странице ПРЕЖНЕЙ выдачи значило показать пустоту при сузившемся
+   * наборе.
+   *
+   * CATALOG-COMPACT-SEARCH — фильтр больше НЕ стирает введённый запрос
+   * (прежнее правило 22a-fix-3 «поиск и фильтры — разные режимы»). На
+   * телефоне поле и чипы стоят вплотную, и «маникюр» + «Свободно сегодня»
+   * — естественная пара, как в любом приложении записи; стирание запроса
+   * тапом по соседнему чипу выглядело как поломка. Запрос и фильтры и раньше
+   * уходили в один запрос к API, так что выдача считает их вместе.
+   */
+  const applyFilters = useCallback(
+    (updates: Record<string, string | null>) => {
+      updateParams({ ...updates, page: null });
+    },
+    [updateParams],
+  );
+
   const resetFilters = useCallback(() => {
-    updateParams({
+    applyFilters({
       globalCategoryId: null,
       district: null,
       ratingMin: null,
@@ -337,13 +350,14 @@ export default function CatalogPageClient({
       hot: null,
       entityType: null,
       availableToday: null,
+      date: null,
     });
-  }, [updateParams]);
+  }, [applyFilters]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (draftServiceQuery !== serviceQuery) {
-        updateParams({ serviceQuery: draftServiceQuery });
+        updateParams({ serviceQuery: draftServiceQuery, page: null });
       }
     }, DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
@@ -354,8 +368,8 @@ export default function CatalogPageClient({
   }, [serviceQuery]);
 
   const onSubmit = useCallback(() => {
-    updateParams({ serviceQuery: draftServiceQuery, district, date });
-  }, [date, district, draftServiceQuery, updateParams]);
+    updateParams({ serviceQuery: draftServiceQuery, page: null });
+  }, [draftServiceQuery, updateParams]);
 
   const onServiceQueryInput = useCallback(
     (value: string) => {
@@ -458,10 +472,9 @@ export default function CatalogPageClient({
   );
 
   const applyMapSearch = useCallback(
-    async (nextMapSearch: MapSearchState, source: MapSearchSource) => {
+    async (nextMapSearch: MapSearchState) => {
       skipCatalogFetchRef.current = true;
       setMapSearch(nextMapSearch);
-      setMapSearchApplied(source === "manual");
       setLoading(true);
       setError(null);
       try {
@@ -547,7 +560,11 @@ export default function CatalogPageClient({
   const currentLoading = timeModeActive ? availabilityLoading : loading;
   const currentError = timeModeActive ? availabilityError : error;
 
-  const resultCount = useMemo(() => currentItems.length, [currentItems.length]);
+  // В режиме поиска по окошкам `data` — это прежняя выдача каталога, и её
+  // `totalCount` к показанным карточкам отношения не имеет.
+  const resultCount = timeModeActive ? currentItems.length : (data.totalCount ?? currentItems.length);
+  const countPending = currentLoading && currentItems.length === 0;
+
   const mapPoints = useMemo(
     () =>
       currentItems
@@ -555,56 +572,26 @@ export default function CatalogPageClient({
         .filter((item): item is CatalogMapPoint => Boolean(item)),
     [currentItems]
   );
-  const missingMapCount = useMemo(
-    () =>
-      currentItems.reduce((count, item) => {
-        const lat = item.geoLat;
-        const lng = item.geoLng;
-        const hasCoords =
-          typeof lat === "number" &&
-          Number.isFinite(lat) &&
-          typeof lng === "number" &&
-          Number.isFinite(lng);
-        return count + (hasCoords ? 0 : 1);
-      }, 0),
-    [currentItems]
-  );
+  const missingMapCount = currentItems.length - mapPoints.length;
 
-  const handleClusterSelect = useCallback((items: CatalogMapPoint[]) => {
-    setMapSidebarItems(items.map(toSidebarItem));
-    setMapSidebarOpen(true);
-  }, []);
+  // Выбор, указывающий на мастера, которого в новой выдаче нет, — не выбор.
+  const selectedMapId =
+    mapSelection && mapPoints.some((point) => point.id === mapSelection.id) ? mapSelection.id : null;
+  const selectFromMap = useCallback((id: string) => setMapSelection({ id, source: "map" }), []);
+  const selectFromCarousel = useCallback((id: string) => setMapSelection({ id, source: "carousel" }), []);
 
-  const closeMapSidebar = useCallback(() => {
-    setMapSidebarOpen(false);
-    setMapSidebarItems([]);
-    setActiveMapId(null);
-  }, []);
-
-  useEffect(() => {
-    if (view !== "map") {
-      closeMapSidebar();
-    }
-  }, [closeMapSidebar, view]);
-
-  // Single-source-of-truth rule (22a-fix-3): touching any sidebar filter
-  // clears the search input. The text query and the sidebar filters are
-  // distinct interaction modes — search-input drives the autocomplete
-  // dropdown / free-text submit, while the sidebar drives faceted browse.
-  // Mixing them confuses results, so we wipe the input as the user steps
-  // into "browse" mode.
-  //
-  // CATALOG-FILTER-DEBOUNCE: очистка поиска и сам фильтр идут ОДНИМ
-  // `updateParams`, а не двумя подряд. Два вызова = два `router.replace` на
-  // одно намерение, причём второй строился от ещё не обновлённого
-  // `searchParams` и молча терял удаление `serviceQuery` из первого.
-  const withSearchCleared = useCallback(
-    (updates: Record<string, string | null>) => {
-      setDraftServiceQuery("");
-      updateParams({ serviceQuery: null, serviceId: null, ...updates });
+  const setView = useCallback(
+    (next: ViewMode) => {
+      setMapSelection(null);
+      updateParams({ view: next === "map" ? "map" : null });
     },
     [updateParams],
   );
+
+  // Режим карты на телефоне — полноэкранный слой. Страница под ним не должна
+  // прокручиваться: жест по шапке слоя уезжал бы в неё, и вместе с ней —
+  // фиксированные панели iOS Safari.
+  useBodyScrollLock(view === "map", MOBILE_LAYOUT_QUERY);
 
   // Shared filter props for sidebar and drawer
   const filterProps = {
@@ -615,50 +602,40 @@ export default function CatalogPageClient({
     priceMax,
     hot,
     entityType,
-    availableToday,
+    availableToday: effectiveAvailableToday,
     onGlobalCategoryChange: (value: string | null) => {
-      withSearchCleared({ globalCategoryId: value });
+      applyFilters({ globalCategoryId: value });
     },
     onDistrictChange: (value: string) => {
-      withSearchCleared({ district: value || null });
+      applyFilters({ district: value || null });
     },
     onRatingMinChange: (value: string) => {
-      withSearchCleared({ ratingMin: value || null });
+      applyFilters({ ratingMin: value || null });
     },
     onPriceChange: (min: string, max: string) => {
-      withSearchCleared({
+      applyFilters({
         priceMin: min.length > 0 ? min : null,
         priceMax: max.length > 0 ? max : null,
       });
     },
     onToggleHot: () => {
-      withSearchCleared({ hot: hot ? null : "true" });
+      applyFilters({ hot: hot ? null : "true" });
     },
     onEntityTypeChange: (value: EntityType) => {
-      withSearchCleared({ entityType: value === "all" ? null : value });
+      applyFilters({ entityType: value === "all" ? null : value });
     },
     onToggleAvailableToday: () => {
-      withSearchCleared({ availableToday: availableToday ? null : "true" });
+      applyFilters(
+        effectiveAvailableToday ? { availableToday: null, date: null } : { availableToday: "true" },
+      );
     },
-    onReset: () => {
-      withSearchCleared({
-        globalCategoryId: null,
-        district: null,
-        ratingMin: null,
-        priceMin: null,
-        priceMax: null,
-        hot: null,
-        entityType: null,
-        availableToday: null,
-      });
-    },
+    onReset: resetFilters,
     activeCount: activeFilterCount,
     priceDistribution: data.priceDistribution,
   };
 
   // Selecting a category from the autocomplete dropdown — clear input AND
-  // apply the filter. Same end-state as a sidebar click, but bypasses the
-  // wrapper helper so we don't double-fire updateParams calls.
+  // apply the filter: the typed text was a way to FIND the category.
   const handleCategorySelectFromSearch = useCallback(
     (category: AutocompleteCategory) => {
       setDraftServiceQuery("");
@@ -681,32 +658,86 @@ export default function CatalogPageClient({
     setCitySlug(getCurrentCitySlug());
   }, []);
 
+  /**
+   * CATALOG-COMPACT-SEARCH — шапка каталога на телефоне: строка поиска с
+   * кнопкой фильтров и одна полоса быстрых фильтров, ≈100 px вместо прежних
+   * ≈450 (карточка поиска с кнопкой «Найти», два ряда чипов «Когда», строка
+   * «Фильтры / Список / На карте», редакционный заголовок и сортировка во всю
+   * ширину). Устройство — как у приложений записи и маркетплейсов: поиск
+   * применяется сам по мере ввода (кнопка «Найти» — клавиша клавиатуры),
+   * частые фильтры — в один тап, остальное — в панели, переключатель карты —
+   * плавающая кнопка у нижней кромки. Один и тот же узел стоит либо в
+   * липкой шапке списка, либо сверху полноэкранной карты — поиск и фильтры
+   * доступны в обоих режимах.
+   */
+  const mobileHeader = (
+    <div className="space-y-2 py-2">
+      <div className="flex items-center gap-2">
+        <ServiceSearchInput
+          appearance="field"
+          value={draftServiceQuery}
+          onChange={onServiceQueryInput}
+          onCategorySelect={handleCategorySelectFromSearch}
+          onSubmit={onSubmit}
+          citySlug={citySlug}
+          className="min-w-0 flex-1"
+          trailingAction={
+            visualSearchEnabled ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full text-text-sec hover:text-text-main"
+                aria-label={UI_TEXT.home.visualSearch.button}
+                onClick={() => setVisualSearchOpen(true)}
+              >
+                <Camera className="h-4 w-4" aria-hidden />
+              </Button>
+            ) : undefined
+          }
+        />
+        <div className="relative shrink-0">
+          <Button
+            variant="secondary"
+            size="none"
+            onClick={() => setDrawerOpen(true)}
+            className="h-11 w-11 rounded-full p-0"
+            aria-label={UI_TEXT.catalog2.searchBar.filtersAria(activeFilterCount)}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden />
+          </Button>
+          {activeFilterCount > 0 ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-semibold tabular-nums text-white ring-2 ring-bg-page"
+            >
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <CatalogQuickFilters
+        availableToday={effectiveAvailableToday}
+        hot={hot}
+        ratingMin={ratingMin}
+        entityType={entityType}
+        globalCategoryId={globalCategoryId || null}
+        priceMin={priceMin}
+        priceMax={priceMax}
+        district={district}
+        onChange={applyFilters}
+      />
+    </div>
+  );
+
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-4 sm:px-6 lg:px-8">
-      {/* Sticky search section — full-bleed sticky wrapper that hugs the
-          global navbar (top-16 ≈ 64px). The unified <CatalogSearchBar> card
-          owns its own background and chrome; the wrapper just supplies the
-          translucent backdrop blur so content scrolls cleanly underneath. */}
-      <div className="sticky top-16 z-20 -mx-4 mb-6 bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8 lg:pb-8 lg:pt-4">
+      {/* Десктоп: одна строка поиска в карточке, липкая под шапкой сайта. */}
+      <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 mb-6 hidden bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:block lg:px-8">
         <CatalogSearchBar
           serviceQuery={draftServiceQuery}
-          date={date}
-          timePreset={timePreset}
-          timeFrom={effectiveTimeFrom}
-          timeTo={effectiveTimeTo}
           citySlug={citySlug}
           onServiceQueryChange={onServiceQueryInput}
           onCategorySelectFromSearch={handleCategorySelectFromSearch}
-          onDateChange={(value) => updateParams({ date: value || null })}
-          onTimePresetChange={(preset, from, to) =>
-            updateParams({ timePreset: preset, timeFrom: from, timeTo: to })
-          }
-          onCustomTimeChange={(from, to) =>
-            updateParams({ timePreset: null, timeFrom: from, timeTo: to })
-          }
-          onClearTime={() =>
-            updateParams({ timePreset: null, timeFrom: null, timeTo: null })
-          }
           onSubmit={onSubmit}
           showPhotoSearch={visualSearchEnabled}
           onOpenPhotoSearch={() => {
@@ -715,88 +746,58 @@ export default function CatalogPageClient({
         />
       </div>
 
-      {/* Mobile filter button row */}
-      <div className="mb-4 flex items-center justify-between lg:hidden">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 rounded-full"
-          aria-label={UI_TEXT.catalog.sidebar.filtersButton}
-        >
-          <SlidersHorizontal className="h-4 w-4" aria-hidden />
-          {UI_TEXT.catalog.sidebar.filtersButton}
-          {activeFilterCount > 0 ? (
-            <Badge className="ml-0.5 h-5 min-w-5 rounded-full bg-primary px-1.5 text-[11px] text-white">
-              {UI_TEXT.catalog.sidebar.activeFiltersCount(activeFilterCount)}
-            </Badge>
-          ) : null}
-        </Button>
-
-        {/* View toggle — mobile */}
-        <div className="inline-flex rounded-full border border-border bg-card p-1">
-          <Button
-            onClick={() => updateParams({ view: "list" })}
-            variant={view === "list" ? "primary" : "ghost"}
-            size="sm"
-            className="rounded-full"
-          >
-            {UI_TEXT.catalog.viewList}
-          </Button>
-          <Button
-            onClick={() => updateParams({ view: "map" })}
-            variant={view === "map" ? "primary" : "ghost"}
-            size="sm"
-            className="rounded-full"
-          >
-            {UI_TEXT.catalog.viewMap}
-          </Button>
+      {/* Телефон, режим списка: компактная липкая шапка. В режиме карты тот же
+          узел переезжает наверх полноэкранного слоя. */}
+      {view === "list" ? (
+        <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 mb-3 border-b border-border-subtle/60 bg-bg-page/90 px-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:hidden">
+          {mobileHeader}
         </div>
-      </div>
+      ) : null}
 
       {/* Main layout: sidebar + content */}
       <div className="flex gap-6">
         {/* Sidebar — desktop only */}
         <aside className="hidden w-64 shrink-0 lg:block">
-          <div className="sticky top-20 rounded-2xl border border-border bg-card/80 p-5">
+          <div className="sticky top-[calc(var(--topbar-h)+6.5rem)] rounded-2xl border border-border bg-card/80 p-5">
             <CatalogSidebar {...filterProps} />
           </div>
         </aside>
 
         {/* Content area */}
         <div className="min-w-0 flex-1">
-          {/* Editorial header — eyebrow + display title + sort + view toggle.
-              Title pluralization respects Russian noun forms. Total count
-              comes from the page-mode response (`totalCount`); for
-              time-search and cursor-mode we fall back to the visible item
-              count. */}
-          <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          {/* Заголовок выдачи. На телефоне — одна строка «N мастеров рядом» +
+              сортировка; редакционная подводка и крупный кегль — с `lg`. */}
+          <header className="mb-3 flex items-center justify-between gap-3 lg:mb-6 lg:items-end">
             <div className="min-w-0">
-              <p className="mb-1.5 font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text">
-                {UI_TEXT.catalog2.resultsHeader.eyebrowNoCategory.replace("{city}", "")}
+              <p className="mb-1.5 hidden font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text lg:block">
+                {TH.eyebrow}
               </p>
-              <h1 className="font-display text-3xl leading-[1.1] text-text-main sm:text-4xl lg:text-5xl">
-                {(data.totalCount ?? resultCount).toLocaleString("ru-RU")}{" "}
-                {pluralizeMasters(data.totalCount ?? resultCount)} рядом
-              </h1>
-              <p className="mt-1 text-sm text-text-sec">
-                {UI_TEXT.catalog2.resultsHeader.subtitleAvailable}
-              </p>
+              {countPending ? (
+                <Skeleton className="h-7 w-44 lg:h-12 lg:w-72" />
+              ) : (
+                <h1 className="truncate font-display text-xl leading-tight text-text-main sm:text-2xl lg:text-5xl lg:leading-[1.1]">
+                  {resultsTitle(resultCount)}
+                </h1>
+              )}
+              <p className="mt-1 hidden text-sm text-text-sec lg:block">{TH.subtitleAvailable}</p>
             </div>
-            <div className="flex items-center gap-3">
-              <SortMenu
-                value={sort}
-                onChange={(next) =>
-                  updateParams({
-                    sort: next === "relevance" ? null : next,
-                    page: null,
-                  })
-                }
-              />
-              {/* View toggle — desktop only (mobile lives in the filter row above) */}
-              <div className="hidden lg:inline-flex rounded-full border border-border-subtle bg-bg-card p-1">
+            <div className="flex shrink-0 items-center gap-3">
+              <div className="lg:hidden">
+                <SortMenu
+                  compact
+                  value={sort}
+                  onChange={(next) => updateParams({ sort: next === "relevance" ? null : next, page: null })}
+                />
+              </div>
+              <div className="hidden lg:block">
+                <SortMenu
+                  value={sort}
+                  onChange={(next) => updateParams({ sort: next === "relevance" ? null : next, page: null })}
+                />
+              </div>
+              <div className="hidden rounded-full border border-border-subtle bg-bg-card p-1 lg:inline-flex">
                 <Button
-                  onClick={() => updateParams({ view: "list" })}
+                  onClick={() => setView("list")}
                   variant={view === "list" ? "primary" : "ghost"}
                   size="sm"
                   className="rounded-full"
@@ -804,7 +805,7 @@ export default function CatalogPageClient({
                   {UI_TEXT.catalog2.view.grid}
                 </Button>
                 <Button
-                  onClick={() => updateParams({ view: "map" })}
+                  onClick={() => setView("map")}
                   variant={view === "map" ? "primary" : "ghost"}
                   size="sm"
                   className="rounded-full"
@@ -815,18 +816,12 @@ export default function CatalogPageClient({
             </div>
           </header>
 
-          {needsService || needsDate ? (
-            <div role="status" className="mb-4 rounded-2xl border border-border bg-card/70 p-4 text-sm text-text-sec">
-              {needsService ? UI_TEXT.catalog.timeSearch.selectServiceFirst : UI_TEXT.catalog.timeSearch.selectDateFirst}
-            </div>
-          ) : null}
-
           {currentLoading && view === "list" ? <CatalogSkeletonGrid /> : null}
 
           {currentError ? (
             <div
               role="alert"
-              className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+              className="rounded-2xl border border-danger-border bg-danger-surface p-6 text-center text-sm text-danger-text"
             >
               <div>{currentError}</div>
               <Button
@@ -893,54 +888,55 @@ export default function CatalogPageClient({
             </motion.div>
           ) : null}
 
-          {/* PWA-FIX-11 — на телефоне режим карты занимает ВЕСЬ экран между шапкой
-              и нижней навигацией, а не коробку `min-h-[60vh]` внутри прокручиваемой
-              страницы. Прежняя раскладка делала карту неработоспособной именно на
-              телефоне: высота ~60% экрана, и при любом промежуточном положении
-              прокрутки половина карты уезжала за кромку, то есть тащить и
-              масштабировать приходилось в остатке видимой части, а страница под
-              пальцем норовила прокрутиться. Границы взяты у чужой фиксированной
-              хромы, а не «на весь vh»: сверху `--topbar-h` (город и поиск обязаны
-              остаться доступны), снизу высота нижней навигации плюс safe-area —
-              иначе карта уходила бы под панель вкладок. С `lg` — прежняя карточка
-              в потоке, там ширины и высоты хватает. */}
+          {/* Режим карты. На телефоне — слой на весь экран между шапкой сайта и
+              нижней навигацией (PWA-FIX-11): сверху поиск и быстрые фильтры,
+              ниже карта, под ней — полоса карточек, связанная с метками. Нижняя
+              граница — фактическая высота нижней навигации (`--bottom-nav-h`
+              публикует `BottomNav`); прежняя константа `4rem + инсет`
+              промахивалась, и в щель просвечивала страница. С `lg` — карточка в
+              потоке рядом с сайдбаром. */}
           {!currentError && view === "map" ? (
-            <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] top-[var(--topbar-h)] z-30 overflow-hidden border-y border-border bg-card/60 lg:static lg:bottom-auto lg:top-auto lg:z-auto lg:min-h-[620px] lg:rounded-2xl lg:border">
-              {/* Возврат к списку: переключатель вида живёт в строке фильтров над
-                  картой, а она на телефоне оказывается ПОД оверлеем — без этой
-                  кнопки из режима карты не выйти. На `lg` не рендерится: там
-                  переключатель на месте и виден. */}
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => updateParams({ view: "list" })}
-                className="absolute left-3 top-3 z-10 gap-1.5 rounded-full shadow-card lg:hidden"
-              >
-                <List className="h-4 w-4" aria-hidden />
-                {UI_TEXT.catalog.viewList}
-              </Button>
-              <CatalogMap
-                points={mapPoints}
-                itemsCount={currentItems.length}
-                missingCount={missingMapCount}
-                activeId={activeMapId}
-                searchEnabled={!timeModeActive}
-                loadingResults={currentLoading}
-                showEmptySearchNote={
-                  mapSearchApplied && !currentLoading && currentItems.length === 0 && !currentError && view === "map"
-                }
-                onSearchArea={(payload, source) => {
-                  if (timeModeActive) return;
-                  void applyMapSearch(payload, source);
-                }}
-                onClusterSelect={handleClusterSelect}
-              />
-              <CatalogMapSidebar
-                open={mapSidebarOpen}
-                items={mapSidebarItems}
-                onClose={closeMapSidebar}
-                onHover={setActiveMapId}
-              />
+            <div className="fixed inset-x-0 bottom-[var(--bottom-nav-h,4rem)] top-[var(--topbar-h)] z-30 flex flex-col overflow-hidden bg-bg-page lg:static lg:bottom-auto lg:top-auto lg:z-auto lg:h-[680px] lg:rounded-2xl lg:border lg:border-border-subtle">
+              <div className="relative z-20 shrink-0 border-b border-border-subtle/60 bg-bg-page px-4 sm:px-6 lg:hidden">
+                {mobileHeader}
+              </div>
+              <div className="relative min-h-0 flex-1">
+                <CatalogMap
+                  points={mapPoints}
+                  selectedId={selectedMapId}
+                  followSelection={mapSelection?.source === "carousel"}
+                  onSelect={selectFromMap}
+                  searchEnabled={!timeModeActive}
+                  loadingResults={currentLoading}
+                  autoFit={mapSearch === null}
+                  onSearchArea={(payload) => {
+                    if (timeModeActive) return;
+                    void applyMapSearch(payload);
+                  }}
+                  centerAction={
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => setView("list")}
+                      className="rounded-full px-5 lg:hidden"
+                    >
+                      <List className="h-4 w-4" aria-hidden />
+                      {UI_TEXT.catalog2.view.list}
+                    </Button>
+                  }
+                />
+              </div>
+              <div className="shrink-0 border-t border-border-subtle/60 bg-bg-page">
+                <CatalogMapCarousel
+                  points={mapPoints}
+                  selectedId={selectedMapId}
+                  followSelection={mapSelection?.source === "map"}
+                  onSelect={selectFromCarousel}
+                  loading={currentLoading}
+                  missingCount={missingMapCount}
+                  onShowList={() => setView("list")}
+                />
+              </div>
             </div>
           ) : null}
 
@@ -960,6 +956,22 @@ export default function CatalogPageClient({
           ) : null}
         </div>
       </div>
+
+      {/* Телефон, режим списка: переключатель на карту — плавающая кнопка над
+          нижней навигацией, как у приложений с картой в выдаче. */}
+      {view === "list" ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-h,4rem)+1rem)] z-30 flex justify-center lg:hidden">
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setView("map")}
+            className="pointer-events-auto rounded-full px-5"
+          >
+            <MapIcon className="h-4 w-4" aria-hidden />
+            {UI_TEXT.catalog2.view.map}
+          </Button>
+        </div>
+      ) : null}
 
       {/* Mobile filter drawer */}
       <MobileFilterDrawer

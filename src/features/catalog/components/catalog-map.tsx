@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useTheme } from "next-themes";
+import { Loader2, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { providerPublicUrl } from "@/lib/public-urls";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import { UI_TEXT } from "@/lib/ui/text";
 import { clientEnv } from "@/lib/env.client";
@@ -16,14 +15,24 @@ type MapSearchPayload = {
 
 type CatalogMapProps = {
   points: CatalogMapPoint[];
-  itemsCount: number;
-  missingCount: number;
-  activeId: string | null;
+  selectedId: string | null;
+  /**
+   * Вести карту к выбранной метке. Истинно, когда выбор родила полоса карточек
+   * (свайп); когда выбор пришёл тапом по самой метке, она и так на экране.
+   */
+  followSelection: boolean;
+  onSelect: (id: string) => void;
   searchEnabled: boolean;
   loadingResults: boolean;
-  showEmptySearchNote: boolean;
+  /**
+   * Подгонять видимую область под найденных при смене выдачи. Ложно, когда
+   * выдача сама получена поиском по области: иначе карта «отпрыгивала» от
+   * места, которое пользователь только что выбрал.
+   */
+  autoFit: boolean;
   onSearchArea: (payload: MapSearchPayload, source: "manual" | "auto") => void;
-  onClusterSelect: (items: CatalogMapPoint[]) => void;
+  /** Действие по центру у нижней кромки карты (на телефоне — «Список»). */
+  centerAction?: ReactNode;
 };
 
 type YTemplateLayout = Record<string, unknown>;
@@ -32,11 +41,17 @@ type YMapEvent = {
   get: (key: string) => unknown;
 };
 
+type YOptions = {
+  set: (key: string, value: unknown) => void;
+  unset: (key: string) => void;
+};
+
 type YPlacemark = {
   properties: {
     get: (key: string) => unknown;
     set: (key: string, value: unknown) => void;
   };
+  options: YOptions;
   events: {
     add: (name: string, cb: () => void) => void;
   };
@@ -49,6 +64,7 @@ type YCluster = {
 type YClusterer = {
   add: (items: YPlacemark[]) => void;
   removeAll: () => void;
+  getObjectState: (item: YPlacemark) => { isClustered?: boolean } | null;
   events: {
     add: (name: string, cb: (event: YMapEvent) => void) => void;
   };
@@ -60,21 +76,22 @@ type YMapInstance = {
     remove: (obj: unknown) => void;
     removeAll: () => void;
   };
+  controls: {
+    add: (control: string, options?: Record<string, unknown>) => void;
+  };
   events: {
     add: (name: string, cb: () => void) => void;
   };
   setBounds: (bounds: [[number, number], [number, number]], options?: Record<string, unknown>) => void;
   setCenter: (center: [number, number], zoom?: number, options?: Record<string, unknown>) => void;
+  panTo: (center: [number, number], options?: Record<string, unknown>) => void;
   getBounds: () => [[number, number], [number, number]] | null;
   getCenter: () => [number, number];
+  getZoom: () => number;
   options: {
     set: (key: string, value: unknown) => void;
   };
   destroy: () => void;
-};
-
-type YGeocodeResult = {
-  geoObjects?: { get?: (index: number) => { properties?: { get?: (key: string) => unknown } } | null };
 };
 
 type YMapsApi = {
@@ -91,14 +108,32 @@ type YMapsApi = {
   ) => YPlacemark;
   Clusterer: new (options?: Record<string, unknown>) => YClusterer;
   templateLayoutFactory: { createClass: (template: string) => YTemplateLayout };
-  geocode: (request: number[] | string, options?: Record<string, unknown>) => Promise<YGeocodeResult>;
 };
 
 type YMapsWindow = Window & { ymaps?: YMapsApi };
 
-const DEFAULT_CENTER = { lat: 43.238949, lng: 76.889709 };
+/**
+ * Москва. Раньше здесь стоял центр Алматы — остаток до RF-ONLY-SCOPE-01:
+ * карта без результатов открывалась над Казахстаном.
+ */
+const DEFAULT_CENTER = { lat: 55.751244, lng: 37.618423 };
 const DEFAULT_ZOOM = 11;
-const MAP_ZOOM_ON_GEO = 13;
+/** Масштаб «я здесь»: видно несколько кварталов вокруг. */
+const MAP_ZOOM_ON_GEO = 14;
+/** Масштаб, на котором одиночный результат или метка из кластера читается. */
+const MAP_ZOOM_ON_POINT = 15;
+/** Дальше этого масштаба кластер уже не раздвинуть — показываем карточку. */
+const CLUSTER_EXPAND_MAX_ZOOM = 17;
+/** Меньше этого разброса (градусы, ≈50 м) метки стоят в одном здании. */
+const SAME_PLACE_SPAN_DEG = 0.0005;
+/**
+ * Окно, в течение которого `actionend` считается следствием нашего же
+ * программного сдвига (подгонка, переход к метке). Прежний счётчик «пропустить
+ * два события» промахивался: анимация даёт одно событие, и второе «пропущенное»
+ * съедало первый настоящий жест — кнопка «Искать в этой области» не появлялась.
+ */
+const PROGRAMMATIC_MOVE_WINDOW_MS = 900;
+const GEO_NOTICE_MS = 5000;
 const YMAPS_SCRIPT_ID = "bh-ymaps-script";
 
 const darkMapCustomization = [
@@ -116,7 +151,6 @@ const darkMapCustomization = [
 const lightMapCustomization = null;
 
 let ymapsLoader: Promise<YMapsApi> | null = null;
-let geoRequestedOnce = false;
 let cachedGeoCoords: { lat: number; lng: number } | null = null;
 
 function svgDataUri(svg: string): string {
@@ -216,18 +250,6 @@ function buildHintText(title: string, ratingAvg: number): string {
   return title;
 }
 
-function formatLocation(address: { city?: string; district?: string; street?: string } | null): string | null {
-  if (!address) return null;
-  const parts = [address.city, address.district, address.street].filter(Boolean);
-  if (parts.length === 0) return null;
-  return parts.join(", ");
-}
-
-type YAddressComponent = {
-  kind?: string;
-  name?: string;
-};
-
 function isCluster(value: unknown): value is YCluster {
   return Boolean(value && typeof value === "object" && "getGeoObjects" in value);
 }
@@ -245,24 +267,37 @@ function isCatalogMapPoint(value: unknown): value is CatalogMapPoint {
   );
 }
 
+function boundsOf(points: ReadonlyArray<{ geoLat: number; geoLng: number }>): [[number, number], [number, number]] {
+  const lats = points.map((p) => p.geoLat);
+  const lngs = points.map((p) => p.geoLng);
+  return [
+    [Math.min(...lats), Math.min(...lngs)],
+    [Math.max(...lats), Math.max(...lngs)],
+  ];
+}
+
+/** Мышь с точным указателем — кнопки масштаба нужны; на тач-экране есть щипок. */
+function hasFinePointer(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches;
+}
+
 export function CatalogMap({
   points,
-  itemsCount,
-  missingCount,
-  activeId,
+  selectedId,
+  followSelection,
+  onSelect,
   searchEnabled,
   loadingResults,
-  showEmptySearchNote,
+  autoFit,
   onSearchArea,
-  onClusterSelect,
+  centerAction,
 }: CatalogMapProps) {
-  const router = useRouter();
   const { resolvedTheme } = useTheme();
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<YMapInstance | null>(null);
   const clustererRef = useRef<YClusterer | null>(null);
-  const placemarksRef = useRef(new Map<string, { placemark: YPlacemark; baseClass: string }>());
+  const placemarksRef = useRef(new Map<string, { placemark: YPlacemark; baseClass: string; point: CatalogMapPoint }>());
   const userPlacemarkRef = useRef<YPlacemark | null>(null);
   const layoutRef = useRef<{
     marker: YTemplateLayout;
@@ -271,30 +306,35 @@ export function CatalogMap({
     user: YTemplateLayout;
   } | null>(null);
 
-  const suppressDirtyRef = useRef(0);
-  const geoAutoSearchRef = useRef(false);
+  const programmaticUntilRef = useRef(0);
   const mountedRef = useRef(false);
+  const geoNoticeTimerRef = useRef<number | null>(null);
 
   // IMPORTANT: keep latest callbacks without reinitializing the map
-  const onClusterSelectRef = useRef(onClusterSelect);
+  const onSelectRef = useRef(onSelect);
   const onSearchAreaRef = useRef(onSearchArea);
+  const searchEnabledRef = useRef(searchEnabled);
+  // Читается в момент смены выдачи; сам по себе перерисовку меток не вызывает.
+  const autoFitRef = useRef(autoFit);
 
   useEffect(() => {
-    onClusterSelectRef.current = onClusterSelect;
-  }, [onClusterSelect]);
-
-  useEffect(() => {
+    onSelectRef.current = onSelect;
     onSearchAreaRef.current = onSearchArea;
-  }, [onSearchArea]);
+    searchEnabledRef.current = searchEnabled;
+    autoFitRef.current = autoFit;
+  }, [autoFit, onSearchArea, onSelect, searchEnabled]);
 
   const [mapStatus, setMapStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [mapError, setMapError] = useState<string | null>(null);
   const [dirtyArea, setDirtyArea] = useState(false);
-  const [geoStatus, setGeoStatus] = useState<"idle" | "requesting" | "granted" | "denied" | "error">("idle");
+  const [locating, setLocating] = useState(false);
+  const [geoNotice, setGeoNotice] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(cachedGeoCoords);
-  const [userAddress, setUserAddress] = useState<{ city?: string; district?: string; street?: string } | null>(null);
 
-  const locationText = useMemo(() => formatLocation(userAddress), [userAddress]);
+  /** Помечает ближайший `actionend` как следствие нашего сдвига, а не жеста. */
+  const markProgrammaticMove = useCallback(() => {
+    programmaticUntilRef.current = performance.now() + PROGRAMMATIC_MOVE_WINDOW_MS;
+  }, []);
 
   const buildSearchPayload = useCallback((): MapSearchPayload | null => {
     const map = mapRef.current;
@@ -320,59 +360,58 @@ export function CatalogMap({
     onSearchAreaRef.current(payload, "manual");
   }, [buildSearchPayload]);
 
-  const requestGeolocation = useCallback((force = false) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
-    if (geoRequestedOnce && !force) return;
+  const showGeoNotice = useCallback((text: string) => {
+    setGeoNotice(text);
+    if (geoNoticeTimerRef.current !== null) window.clearTimeout(geoNoticeTimerRef.current);
+    geoNoticeTimerRef.current = window.setTimeout(() => setGeoNotice(null), GEO_NOTICE_MS);
+  }, []);
 
-    geoRequestedOnce = true;
-    setGeoStatus("requesting");
-
+  /**
+   * «Показать, где я»: центр на пользователе и сразу поиск в этой области —
+   * пользователь, нажавший кнопку, хочет видеть мастеров рядом, а не ещё одну
+   * кнопку «Искать здесь». Разрешение спрашивается ТОЛЬКО по этому нажатию:
+   * прежний запрос при открытии карты выбрасывал системный диалог раньше, чем
+   * человек успевал увидеть карту, и вдобавок уводил её от результатов к
+   * пользователю — в другом городе карта открывалась пустой.
+   */
+  const locateUser = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      showGeoNotice(UI_TEXT.catalog.map.geoError);
+      return;
+    }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (!mountedRef.current) return;
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         cachedGeoCoords = coords;
-
-        if (!mountedRef.current) return;
-        setGeoStatus("granted");
+        setLocating(false);
         setUserCoords(coords);
 
-        void (async () => {
-          try {
-            const ymaps = await loadYmaps();
-            // component could unmount while awaiting
-            if (!mountedRef.current) return;
-
-            const res = await ymaps.geocode([coords.lat, coords.lng], { results: 1 });
-            if (!mountedRef.current) return;
-
-            const first = res?.geoObjects?.get?.(0);
-            const meta = first?.properties?.get?.("metaDataProperty") as
-              | { GeocoderMetaData?: { Address?: { Components?: YAddressComponent[] } } }
-              | undefined;
-
-            const components = meta?.GeocoderMetaData?.Address?.Components ?? [];
-            const city =
-              components.find((item) => item.kind === "locality")?.name ||
-              components.find((item) => item.kind === "province")?.name ||
-              components.find((item) => item.kind === "area")?.name;
-            const district = components.find((item) => item.kind === "district")?.name;
-            const street = components.find((item) => item.kind === "street")?.name;
-
-            setUserAddress({ city, district, street });
-          } catch {
-            if (!mountedRef.current) return;
-            setUserAddress(null);
+        const map = mapRef.current;
+        if (!map) return;
+        markProgrammaticMove();
+        map.setCenter([coords.lat, coords.lng], MAP_ZOOM_ON_GEO);
+        if (searchEnabledRef.current) {
+          const payload = buildSearchPayload();
+          if (payload) {
+            setDirtyArea(false);
+            onSearchAreaRef.current(payload, "manual");
           }
-        })();
+        }
       },
       (err) => {
         if (!mountedRef.current) return;
-        if (err.code === err.PERMISSION_DENIED) setGeoStatus("denied");
-        else setGeoStatus("error");
+        setLocating(false);
+        showGeoNotice(
+          err.code === err.PERMISSION_DENIED
+            ? UI_TEXT.catalog.map.geoAccessDenied
+            : UI_TEXT.catalog.map.geoError,
+        );
       },
-      { timeout: 7000, enableHighAccuracy: true }
+      { timeout: 7000, enableHighAccuracy: true, maximumAge: 60_000 }
     );
-  }, []);
+  }, [buildSearchPayload, markProgrammaticMove, showGeoNotice]);
 
   const destroyMap = useCallback(() => {
     const map = mapRef.current;
@@ -402,9 +441,7 @@ export function CatalogMap({
     placemarksRef.current.clear();
     userPlacemarkRef.current = null;
     layoutRef.current = null;
-
-    suppressDirtyRef.current = 0;
-    geoAutoSearchRef.current = false;
+    programmaticUntilRef.current = 0;
   }, []);
 
   const initMap = useCallback(async () => {
@@ -420,15 +457,21 @@ export function CatalogMap({
       if (!mapContainerRef.current) return;
       if (mapRef.current) return;
 
+      // Штатный вертикальный ползунок масштаба занимал на телефоне треть
+      // высоты карты и дублировал щипок. Кнопки масштаба остаются только там,
+      // где щипка нет, — у мыши, и в компактной форме.
       const map = new ymaps.Map(
         mapContainerRef.current,
         {
           center: [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng],
           zoom: DEFAULT_ZOOM,
-          controls: ["zoomControl"],
+          controls: [],
         },
         { suppressMapOpenBlock: true }
       );
+      if (hasFinePointer()) {
+        map.controls.add("zoomControl", { size: "small", position: { right: 12, top: 12 } });
+      }
 
       const markerLayout = ymaps.templateLayoutFactory.createClass(
         '<div class="map-marker $[properties.typeClass]" style="background-image:url($[properties.avatarUrl])"></div>'
@@ -453,6 +496,9 @@ export function CatalogMap({
         clusterIconOffset: [-24, -24],
       });
 
+      // Тап по кластеру раздвигает его, пока это возможно; когда метки стоят
+      // в одном здании (студия с несколькими мастерами) или масштаб уже
+      // предельный, — показывает первую карточку, остальные рядом в полосе.
       clusterer.events.add("click", (event: YMapEvent) => {
         const target = event.get("target");
         if (!isCluster(target)) return;
@@ -461,15 +507,21 @@ export function CatalogMap({
           .getGeoObjects()
           .map((geo) => geo.properties.get("data"))
           .filter(isCatalogMapPoint);
+        if (items.length === 0) return;
 
-        onClusterSelectRef.current(items);
+        const bounds = boundsOf(items);
+        const span = Math.max(bounds[1][0] - bounds[0][0], bounds[1][1] - bounds[0][1]);
+        const activeMap = mapRef.current;
+        if (!activeMap || span < SAME_PLACE_SPAN_DEG || activeMap.getZoom() >= CLUSTER_EXPAND_MAX_ZOOM) {
+          onSelectRef.current(items[0]!.id);
+          return;
+        }
+        markProgrammaticMove();
+        activeMap.setBounds(bounds, { checkZoomRange: true, zoomMargin: 64, duration: 300 });
       });
 
       map.events.add("actionend", () => {
-        if (suppressDirtyRef.current > 0) {
-          suppressDirtyRef.current -= 1;
-          return;
-        }
+        if (performance.now() < programmaticUntilRef.current) return;
         setDirtyArea(true);
       });
 
@@ -483,7 +535,7 @@ export function CatalogMap({
       setMapError(error instanceof Error ? error.message : UI_TEXT.catalog.map.loadFailed);
       ymapsLoader = null;
     }
-  }, []);
+  }, [markProgrammaticMove]);
 
   // INIT ONCE (do NOT depend on props/callbacks/theme/coords)
   useEffect(() => {
@@ -492,6 +544,7 @@ export function CatalogMap({
 
     return () => {
       mountedRef.current = false;
+      if (geoNoticeTimerRef.current !== null) window.clearTimeout(geoNoticeTimerRef.current);
       destroyMap();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map initialization runs once on mount
@@ -503,7 +556,7 @@ export function CatalogMap({
     if (!map) return;
     const customization = resolvedTheme === "dark" ? darkMapCustomization : lightMapCustomization;
     map.options.set("customization", customization);
-  }, [resolvedTheme]);
+  }, [mapStatus, resolvedTheme]);
 
   // render points (no re-init)
   useEffect(() => {
@@ -544,49 +597,62 @@ export function CatalogMap({
         }
       );
 
-      placemark.events.add("click", () => {
-        const href = providerPublicUrl({ id: point.id, publicUsername: point.publicUsername }, "catalog-map");
-        if (href) router.push(href);
-      });
+      // Тап по метке выбирает мастера (карточка в полосе под картой), а не
+      // уводит в профиль: переход — осознанным тапом по карточке.
+      placemark.events.add("click", () => onSelectRef.current(point.id));
 
-      placemarksRef.current.set(point.id, { placemark, baseClass });
+      placemarksRef.current.set(point.id, { placemark, baseClass, point });
       return placemark;
     });
 
     clusterer.add(placemarks);
 
-    if (points.length > 0) {
-      const lats = points.map((p) => p.geoLat);
-      const lngs = points.map((p) => p.geoLng);
-      const bounds: [[number, number], [number, number]] = [
-        [Math.min(...lats), Math.min(...lngs)],
-        [Math.max(...lats), Math.max(...lngs)],
-      ];
-
-      suppressDirtyRef.current = 2;
-      map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 64 });
+    if (autoFitRef.current && points.length > 0) {
+      markProgrammaticMove();
+      setDirtyArea(false);
+      if (points.length === 1) {
+        map.setCenter([points[0]!.geoLat, points[0]!.geoLng], MAP_ZOOM_ON_POINT);
+      } else {
+        map.setBounds(boundsOf(points), { checkZoomRange: true, zoomMargin: 64 });
+      }
     }
-  }, [mapStatus, points, router]);
+  }, [mapStatus, points, markProgrammaticMove]);
 
-  // hover sync
+  // selection sync: подсветка + выбранная метка поверх соседних
   useEffect(() => {
     placemarksRef.current.forEach(({ placemark, baseClass }, id) => {
-      const nextClass = activeId === id ? `${baseClass} map-marker--active` : baseClass;
-      placemark.properties.set("typeClass", nextClass);
+      const selected = selectedId === id;
+      placemark.properties.set("typeClass", selected ? `${baseClass} map-marker--active` : baseClass);
+      if (selected) placemark.options.set("zIndex", 1000);
+      else placemark.options.unset("zIndex");
     });
-  }, [activeId]);
+  }, [mapStatus, points, selectedId]);
 
-  // apply geolocation to map (no re-init)
+  // follow selection from the carousel
+  useEffect(() => {
+    if (mapStatus !== "ready" || !followSelection || !selectedId) return;
+    const map = mapRef.current;
+    const entry = placemarksRef.current.get(selectedId);
+    if (!map || !entry) return;
+
+    const coords: [number, number] = [entry.point.geoLat, entry.point.geoLng];
+    const clustered = Boolean(clustererRef.current?.getObjectState(entry.placemark)?.isClustered);
+    markProgrammaticMove();
+    if (clustered) {
+      map.setCenter(coords, Math.max(map.getZoom(), MAP_ZOOM_ON_POINT), { duration: 300 });
+    } else {
+      map.panTo(coords, { duration: 300, flying: false });
+    }
+  }, [followSelection, mapStatus, markProgrammaticMove, selectedId]);
+
+  // user marker (no recenter — центрирует только нажатие «Показать, где я»)
   useEffect(() => {
     if (mapStatus !== "ready") return;
     const map = mapRef.current;
-    if (!map) return;
-    if (!userCoords) return;
+    const layouts = layoutRef.current;
+    const ymaps = (window as YMapsWindow).ymaps;
+    if (!map || !layouts || !ymaps || !userCoords) return;
 
-    suppressDirtyRef.current = 2;
-    map.setCenter([userCoords.lat, userCoords.lng], MAP_ZOOM_ON_GEO, { duration: 300 });
-
-    // remove previous user marker
     if (userPlacemarkRef.current) {
       try {
         map.geoObjects.remove(userPlacemarkRef.current);
@@ -595,10 +661,6 @@ export function CatalogMap({
       }
       userPlacemarkRef.current = null;
     }
-
-    const layouts = layoutRef.current;
-    const ymaps = (window as YMapsWindow).ymaps;
-    if (!layouts || !ymaps) return;
 
     const userPlacemark = new ymaps.Placemark(
       [userCoords.lat, userCoords.lng],
@@ -621,25 +683,37 @@ export function CatalogMap({
     } catch {
       // no-op
     }
+  }, [mapStatus, userCoords]);
 
-    if (searchEnabled && !geoAutoSearchRef.current && itemsCount === 0) {
-      const payload = buildSearchPayload();
-      if (payload) {
-        geoAutoSearchRef.current = true;
-        onSearchAreaRef.current(payload, "auto");
-      }
-    }
-  }, [buildSearchPayload, itemsCount, mapStatus, searchEnabled, userCoords]);
-
-  // auto-request geolocation once after map is ready
+  // Если доступ к геолокации уже выдан раньше, показываем точку «я здесь» без
+  // диалога и без сдвига карты. Спросить впервые может только кнопка.
   useEffect(() => {
-    if (mapStatus !== "ready") return;
-    const timer = window.setTimeout(() => requestGeolocation(false), 0);
-    return () => window.clearTimeout(timer);
-  }, [mapStatus, requestGeolocation]);
+    if (mapStatus !== "ready" || userCoords) return;
+    if (typeof navigator === "undefined" || !navigator.permissions || !navigator.geolocation) return;
+    let cancelled = false;
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((status) => {
+        if (cancelled || status.state !== "granted") return;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (cancelled || !mountedRef.current) return;
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            cachedGeoCoords = coords;
+            setUserCoords(coords);
+          },
+          () => undefined,
+          { timeout: 7000, maximumAge: 300_000 }
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [mapStatus, userCoords]);
 
   return (
-    <div className="relative h-full min-h-[60vh] w-full">
+    <div className="relative h-full w-full">
       <div ref={mapContainerRef} className="absolute inset-0" />
 
       {mapStatus === "loading" ? (
@@ -664,65 +738,63 @@ export function CatalogMap({
         </div>
       ) : null}
 
-      {mapStatus === "ready" && loadingResults ? (
-        <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
-          <div className="rounded-full border border-border bg-background/90 px-4 py-2 text-xs text-muted-foreground shadow-sm">
-            {UI_TEXT.catalog.map.updatingResults}
+      {/* Верх карты: одно место под одно сообщение — либо идёт обновление,
+          либо предложение искать в сдвинутой области. Раньше здесь в углах
+          одновременно висели четыре плашки и перекрывали друг друга. */}
+      {mapStatus === "ready" ? (
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-col items-center gap-2 px-3">
+          {loadingResults ? (
+            <div
+              role="status"
+              className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card/95 px-4 py-2 text-xs text-text-sec shadow-card"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              {UI_TEXT.catalog.map.updatingResults}
+            </div>
+          ) : searchEnabled && dirtyArea ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleSearchArea}
+              className="pointer-events-auto rounded-full shadow-card"
+            >
+              {UI_TEXT.catalog.map.searchArea}
+            </Button>
+          ) : null}
+
+          {geoNotice ? (
+            <div
+              role="status"
+              className="max-w-[320px] rounded-2xl border border-border-subtle bg-bg-card/95 px-3 py-2 text-center text-xs text-text-sec shadow-card"
+            >
+              {geoNotice}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Низ карты: над строкой копирайта Яндекса (её закрывать нельзя). */}
+      {mapStatus === "ready" ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 z-10 flex items-center justify-center px-3">
+          {centerAction ? <div className="pointer-events-auto">{centerAction}</div> : null}
+          <div className="pointer-events-auto absolute right-3">
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={locateUser}
+              disabled={locating}
+              aria-label={UI_TEXT.catalog.map.myLocation}
+              title={UI_TEXT.catalog.map.myLocation}
+              className="rounded-full shadow-card"
+            >
+              {locating ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <LocateFixed className="h-4 w-4" aria-hidden />
+              )}
+            </Button>
           </div>
         </div>
-      ) : null}
-
-      {mapStatus === "ready" && showEmptySearchNote ? (
-        <div className="pointer-events-none absolute inset-x-4 top-24 z-10 rounded-2xl border border-border bg-background/95 p-3 text-center text-xs text-muted-foreground shadow-sm">
-          {UI_TEXT.catalog.map.emptyArea}
-        </div>
-      ) : null}
-
-      {mapStatus === "ready" && missingCount > 0 ? (
-        <div className="pointer-events-none absolute left-4 top-4 z-10 rounded-full border border-border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-          {UI_TEXT.catalog.map.missingCoords(missingCount)}
-        </div>
-      ) : null}
-
-      {mapStatus === "ready" && locationText ? (
-        <div className="pointer-events-none absolute left-4 top-14 z-10 rounded-full border border-border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-sm">
-          {UI_TEXT.catalog.map.yourLocation} {locationText}
-        </div>
-      ) : null}
-
-      {mapStatus === "ready" && geoStatus === "denied" ? (
-        <div className="pointer-events-none absolute left-4 top-24 z-10 max-w-[320px] rounded-2xl border border-border bg-background/95 p-3 text-xs text-muted-foreground shadow-sm">
-          {UI_TEXT.catalog.map.geoAccessDenied}
-        </div>
-      ) : null}
-
-      {mapStatus === "ready" && geoStatus === "error" ? (
-        <div className="pointer-events-none absolute left-4 top-24 z-10 max-w-[320px] rounded-2xl border border-border bg-background/95 p-3 text-xs text-muted-foreground shadow-sm">
-          {UI_TEXT.catalog.map.geoError}
-        </div>
-      ) : null}
-
-      {mapStatus === "ready" && searchEnabled && dirtyArea ? (
-        <div className="absolute inset-x-0 top-4 z-10 flex justify-center">
-          <Button
-            variant="secondary"
-            onClick={handleSearchArea}
-            className="rounded-full shadow-sm"
-          >
-            {UI_TEXT.catalog.map.searchArea}
-          </Button>
-        </div>
-      ) : null}
-
-      {mapStatus === "ready" ? (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => requestGeolocation(true)}
-          className="absolute right-4 top-4 z-10 rounded-full shadow-sm"
-        >
-          {UI_TEXT.catalog.map.myLocation}
-        </Button>
       ) : null}
     </div>
   );

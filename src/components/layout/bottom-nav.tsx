@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactElement } from "react";
-import { useId, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Check, User, Scissors, Building2, UserPlus, X, LogOut } from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
@@ -290,6 +290,34 @@ function RoleSwitcherDrawer({
   );
 }
 
+// ── Published height ──────────────────────────────────────────────────────────
+
+/**
+ * Публикует фактическую высоту панели в `--bottom-nav-h` на `<html>`.
+ *
+ * Полноэкранные слои над страницей (режим карты каталога) обязаны кончаться
+ * ровно у верхней кромки панели. Высоту нельзя угадать константой: в ней
+ * safe-area-инсет (у PWA на iPhone — десятки пикселей, причём панель берёт
+ * его не целиком, см. `paddingBottom` ниже) и высота строки подписи. Прежняя
+ * константа `4rem + инсет` промахивалась на ~15px, и в щель между картой и
+ * панелью просвечивала страница под слоем. На `lg` панель `display: none`,
+ * высота 0 — переменная честно говорит «панели нет».
+ */
+function usePublishedNavHeight() {
+  return useCallback((node: HTMLElement | null) => {
+    if (!node) return;
+    const root = document.documentElement;
+    const apply = () => root.style.setProperty("--bottom-nav-h", `${node.offsetHeight}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--bottom-nav-h");
+    };
+  }, []);
+}
+
 // ── Main BottomNav ────────────────────────────────────────────────────────────
 
 /**
@@ -303,6 +331,7 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
   const { user } = useMe();
   const { activeRole, availableRoles, hydrated } = useActiveRole();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const publishNavHeight = usePublishedNavHeight();
 
 
   const isAdmin = user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPERADMIN");
@@ -349,6 +378,7 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
       <RoleSwitcherDrawer open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
       <nav
+        ref={publishNavHeight}
         aria-label={UI_TEXT.a11y.mainNav}
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-bg-card/95 shadow-card backdrop-blur lg:hidden"
         // PWA-UX-BATCH-01: инсет минус 10px — кнопки ближе к нижней кромке,

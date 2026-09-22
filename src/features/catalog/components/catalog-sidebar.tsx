@@ -1,22 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DistrictSuggestInput } from "@/features/catalog/components/district-suggest-input";
 import { HistogramSlider } from "@/features/catalog/components/histogram-slider";
+import { useTopCategories, type CatalogCategory } from "@/features/catalog/lib/use-top-categories";
 import { useDeferredCommit } from "@/hooks/use-deferred-commit";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import { UI_TEXT } from "@/lib/ui/text";
-import type { ApiResponse } from "@/lib/types/api";
 
-type Category = {
-  id: string;
-  title: string;
-  icon: string | null;
-  parentId: string | null;
-};
+type Category = CatalogCategory;
 
 export type CatalogFilters = {
   globalCategoryId: string | null;
@@ -145,7 +140,7 @@ export function CatalogSidebar({
   showHeader = true,
   priceDistribution,
 }: Props) {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const topCategories = useTopCategories();
 
   // Slider domain — derived from server-supplied distribution when present,
   // otherwise a sensible 0..20k fallback so the widget is interactive even
@@ -178,30 +173,6 @@ export function CatalogSidebar({
     commitPrice,
     FILTER_COMMIT_DELAY_MS,
     priceRangeEqual,
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: Category[] }>
-          | null;
-        if (!res.ok || !json || !json.ok || cancelled) return;
-        setCategories(json.data.categories);
-      } catch {
-        /* silent */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const topCategories = useMemo(
-    () => categories.filter((c) => c.parentId === null),
-    [categories]
   );
 
   const ratingValue = parseFloat(ratingMin) || 0;

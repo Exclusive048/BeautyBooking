@@ -58,7 +58,7 @@ describe("QA-109 source guard — public surfaces don't format kopecks with a no
   // `moneyRUBFromKopeks(` / `moneyRUBPlainFromKopeks(`) must be absent.
   const SITES: ReadonlyArray<{ file: string; marker: string }> = [
     { file: "src/features/catalog/components/catalog-card.tsx", marker: "moneyRUBFromKopeks(" },
-    { file: "src/features/catalog/components/catalog-map-sidebar.tsx", marker: "moneyRUBFromKopeks(" },
+    { file: "src/features/catalog/components/catalog-map-carousel.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/catalog/components/histogram-slider.tsx", marker: "/ 100" },
     { file: "src/features/client-cabinet/bookings/client-bookings-page.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/client-cabinet/favorites/client-favorites-page.tsx", marker: "moneyRUBFromKopeks(" },

@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import type { CatalogSort } from "@/lib/catalog/schemas";
+import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.catalog2.sort;
@@ -18,15 +19,33 @@ const OPTIONS: ReadonlyArray<{ value: CatalogSort; label: string }> = [
 type Props = {
   value: CatalogSort;
   onChange: (next: CatalogSort) => void;
+  /**
+   * Компактная форма для строки результатов на телефоне: иконка + текущее
+   * значение, без слова «Сортировка» — строка результатов должна уместиться
+   * в одну линию рядом со счётчиком.
+   */
+  compact?: boolean;
 };
 
-export function SortMenu({ value, onChange }: Props) {
+export function SortMenu({ value, onChange, compact = false }: Props) {
   const current = OPTIONS.find((o) => o.value === value) ?? OPTIONS[0];
 
   return (
     <details className="relative inline-block">
-      <summary className="inline-flex h-9 shrink-0 cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-xl border border-border-subtle bg-bg-card px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input [&::-webkit-details-marker]:hidden">
-        <span className="text-text-sec">{T.label}</span>
+      <summary
+        aria-label={compact ? `${T.label}: ${current.label}` : undefined}
+        className={cn(
+          "inline-flex shrink-0 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-medium transition-colors [&::-webkit-details-marker]:hidden",
+          compact
+            ? "h-9 rounded-full px-2 text-xs text-text-sec hover:text-text-main"
+            : "h-9 rounded-xl border border-border-subtle bg-bg-card px-3 text-sm text-text-main hover:bg-bg-input",
+        )}
+      >
+        {compact ? (
+          <ArrowUpDown className="h-3.5 w-3.5" aria-hidden />
+        ) : (
+          <span className="text-text-sec">{T.label}</span>
+        )}
         <span>{current.label}</span>
         <ChevronDown className="h-3.5 w-3.5 text-text-sec" aria-hidden />
       </summary>

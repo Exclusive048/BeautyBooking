@@ -307,10 +307,23 @@ export const UI_TEXT = {
       findCta: "Найти",
       filtersLabel: "Фильтры",
       todayLabel: "Сегодня",
-      whenLabel: "Когда",
-      todayChip: "Сегодня",
-      tomorrowChip: "Завтра",
-      calendarChip: "Календарь",
+      clearAria: "Очистить поиск",
+      filtersAria: (count: number) =>
+        count > 0 ? `Фильтры, выбрано: ${count}` : "Фильтры",
+    },
+    // CATALOG-COMPACT-SEARCH: быстрые фильтры под строкой поиска на телефоне —
+    // одна прокручиваемая полоса вместо двух рядов чипов «Когда».
+    quickFilters: {
+      ariaLabel: "Быстрые фильтры",
+      availableToday: "Свободно сегодня",
+      hot: "Горящие окошки",
+      ratingFrom: (value: string) => `${value}+`,
+      masters: "Мастера",
+      studios: "Студии",
+      removeAria: (label: string) => `Убрать фильтр «${label}»`,
+      priceUpTo: (max: string) => `до ${max}`,
+      priceFrom: (min: string) => `от ${min}`,
+      priceRange: (min: string, max: string) => `${min} – ${max}`,
     },
     categories: {
       all: "Все",
@@ -322,6 +335,9 @@ export const UI_TEXT = {
     resultsHeader: {
       eyebrowTemplate: "Каталог · {city} · {category}",
       eyebrowNoCategory: "Каталог · {city}",
+      // Без выбранного города прежний `eyebrowNoCategory.replace("{city}", "")`
+      // печатал «Каталог · » с висящей точкой.
+      eyebrow: "Каталог",
       titleTemplate: "{count} {plural} рядом",
       subtitleAvailable: "свободны на этой неделе",
       // FIX-EXP-CONTENT-GRAMMAR (EXP-008): the count is all published providers
@@ -343,6 +359,7 @@ export const UI_TEXT = {
     view: {
       grid: "Сетка",
       map: "Карта",
+      list: "Список",
     },
     chips: {
       today: "Свободно сегодня",
@@ -2059,20 +2076,10 @@ export const UI_TEXT = {
       find: "Найти",
     },
     timeSearch: {
-      title: "Дата и время",
-      morning: "Утро",
-      day: "День",
-      evening: "Вечер",
-      custom: "Свой диапазон",
-      from: "С",
-      to: "По",
       freeInTime: "Свободно в выбранное время",
-      selectServiceFirst: "Сначала выберите услугу",
-      selectDateFirst: "Сначала выберите дату",
       emptyTitle: "Свободных окошек нет",
       emptyDesc: "Попробуйте другой диапазон времени или дату.",
       loadFailed: "Не удалось подобрать окошки. Попробуйте ещё раз.",
-      noServices: "Ничего не найдено",
     },
     chips: {
       price: "Цена",
@@ -2134,16 +2141,16 @@ export const UI_TEXT = {
       loadFailed: "Не удалось загрузить карту. Попробуйте ещё раз.",
       retry: "Повторить",
       updatingResults: "Обновляем результаты…",
-      emptyArea: "В этой области ничего не найдено. Передвиньте карту и нажмите «Поиск в этой области».",
-      missingCoords: (count: number) => `Без адреса на карте: ${count}`,
-      yourLocation: "Ваше местоположение:",
+      emptyArea: "Здесь пока никого нет. Передвиньте карту или измените фильтры.",
       geoAccessDenied: "Разрешите доступ к геолокации, чтобы показывать мастеров рядом с вами.",
       geoError: "Не удалось определить местоположение. Попробуйте ещё раз.",
-      searchArea: "Поиск в этой области",
-      myLocation: "Моё местоположение",
+      searchArea: "Искать в этой области",
+      myLocation: "Показать, где я",
       ratingHint: (title: string, rating: number) => `${title} • Рейтинг ${rating.toFixed(1)}`,
-      foundInPoint: (count: number) => `Найдено в этой точке: ${count}`,
-      clusterHint: "Нажмите на кружок с цифрой, чтобы увидеть мастеров.",
+      carouselAria: "Мастера на карте",
+      missingTail: (count: number) =>
+        `Ещё ${count} ${pluralize(count, "мастер", "мастера", "мастеров")} без адреса на карте`,
+      showInList: "Смотреть списком",
     },
   },
   analytics: {

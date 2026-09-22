@@ -584,7 +584,7 @@
 /* react-day-picker v9 theming. Library ships its own table-based layout
    via `react-day-picker/style.css`; we only retint surfaces here so the
    calendar reads as МастерРядом without reimplementing the structure.
-   See `<DatePresetChips>` for the wrapping `.rdp-theme` div. */
+   See `exception-modal.tsx` for the wrapping `.rdp-theme` div. */
 .rdp-theme {
   --rdp-accent-color: rgb(var(--primary));
   --rdp-accent-background-color: rgb(var(--primary) / 0.1);

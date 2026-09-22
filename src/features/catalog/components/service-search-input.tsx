@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Loader2, Palette, Search, Star, User } from "lucide-react";
+import { Building2, Loader2, Palette, Search, Star, User, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/cn";
 import { formatReviews } from "@/lib/utils/pluralize-reviews";
@@ -46,6 +47,14 @@ type Props = {
   /** Optional city slug to scope provider results — when set the endpoint filters providers by `city.slug`. */
   citySlug?: string | null;
   className?: string;
+  /**
+   * `bare` — прозрачное поле внутри общей карточки поиска (десктоп).
+   * `field` — самостоятельная пилюля с собственной рамкой и заливкой
+   * (компактная шапка каталога на телефоне).
+   */
+  appearance?: "bare" | "field";
+  /** Действие справа в поле, пока в нём пусто (например, поиск по фото). */
+  trailingAction?: ReactNode;
 };
 
 const T = UI_TEXT.catalog2.searchAutocomplete;
@@ -69,8 +78,11 @@ export function ServiceSearchInput({
   onCategorySelect,
   citySlug,
   className,
+  appearance = "bare",
+  trailingAction,
 }: Props) {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<AutocompleteResponse>({
@@ -81,8 +93,8 @@ export function ServiceSearchInput({
 
   const debouncedQuery = useDebouncedValue(value.trim(), DEBOUNCE_MS);
 
-  // Click-outside dismissal — same pattern used in date-preset-chips and
-  // filter-chips. Listens at document level only while the panel is open.
+  // Click-outside dismissal — same pattern used in filter-chips. Listens at
+  // document level only while the panel is open.
   useEffect(() => {
     if (!open) return;
     const onMouseDown = (event: MouseEvent) => {
@@ -160,7 +172,11 @@ export function ServiceSearchInput({
         className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
       />
       <input
+        ref={inputRef}
         type="text"
+        inputMode="search"
+        enterKeyHint="search"
+        autoComplete="off"
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
@@ -173,20 +189,54 @@ export function ServiceSearchInput({
           if (e.key === "Enter") {
             setOpen(false);
             onSubmit();
+            // На телефоне «Найти» на клавиатуре обязано её убрать — иначе
+            // клавиатура закрывает половину выдачи, которую пользователь
+            // только что запросил.
+            e.currentTarget.blur();
           } else if (e.key === "Escape") {
             setOpen(false);
           }
         }}
         placeholder={UI_TEXT.catalog2.searchBar.searchPlaceholder}
         aria-label={UI_TEXT.catalog2.searchBar.searchPlaceholder}
-        className="h-11 w-full rounded-xl bg-transparent pl-9 pr-9 text-base text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className={cn(
+          "h-11 w-full pl-9 text-base text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30",
+          appearance === "field"
+            ? "rounded-full border border-border-control bg-bg-input pr-11"
+            : "rounded-xl bg-transparent pr-9",
+        )}
       />
 
       {loading ? (
         <Loader2
           aria-hidden
-          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-sec"
+          className={cn(
+            "pointer-events-none absolute top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-sec",
+            appearance === "field" && value ? "right-11" : "right-3",
+          )}
         />
+      ) : null}
+
+      {appearance === "field" ? (
+        <div className="absolute right-0.5 top-1/2 -translate-y-1/2">
+          {value ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-text-sec hover:text-text-main"
+              aria-label={UI_TEXT.catalog2.searchBar.clearAria}
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+                inputRef.current?.focus();
+              }}
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </Button>
+          ) : loading ? null : (
+            trailingAction
+          )}
+        </div>
       ) : null}
 
       {dropdownVisible ? (

@@ -181,6 +181,28 @@ export function useFocusTrap(
 }
 
 /**
+ * Блокировка прокрутки страницы под слоем — единственная реализация в
+ * проекте (UI-13: копии этого блока уже однажды разъехались по примитивам).
+ *
+ * Отдельным хуком, а не только внутри `useOverlayA11y`, потому что бывают
+ * полноэкранные слои, которые НЕ модальны: режим карты каталога на телефоне
+ * закрывает страницу, но нижняя навигация под ним остаётся рабочей, и
+ * запирать фокус там нельзя. `mediaQuery` ограничивает блокировку раскладкой,
+ * где слой действительно полноэкранный.
+ */
+export function useBodyScrollLock(active: boolean, mediaQuery?: string): void {
+  useEffect(() => {
+    if (!active) return;
+    if (mediaQuery && !window.matchMedia(mediaQuery).matches) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [active, mediaQuery]);
+}
+
+/**
  * UI-13 — весь контракт модального оверлея одним вызовом.
  *
  * Три focus-хука выше существовали и раньше, но контракт ими не
@@ -210,16 +232,14 @@ export function useOverlayA11y({
   containerRef: RefObject<HTMLElement | null>;
   initialFocusRef?: RefObject<HTMLElement | null>;
 }): void {
+  useBodyScrollLock(open);
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKey);
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKey);
     };
   }, [open, onClose]);
