@@ -288,7 +288,9 @@ export function PackageBookingFlow({
   const handleConfirm = useCallback(async () => {
     if (!proposal) return;
     const trimmedName = name.trim() || me?.displayName?.trim() || "";
-    const trimmedPhone = (me?.phone ?? phone).trim();
+    // BOOKING-AUTH-NO-PHONE-01: у вошедшего по почте/VK/Яндексу телефона в
+    // профиле нет (вход по телефону в проде выключен) — берём введённый.
+    const trimmedPhone = (me?.phone || phone).trim();
     if (!trimmedName) {
       setError(T.nameRequired);
       return;
@@ -577,6 +579,20 @@ export function PackageBookingFlow({
               {T.bookingAs.replace("{name}", me.displayName ?? name)}
             </div>
           )}
+          {/* BOOKING-AUTH-NO-PHONE-01: вошедший без телефона в профиле. Раньше
+              поле рендерилось только гостю, а проверка требовала номер —
+              запись падала на «Проверьте телефон» без поля, куда его ввести. */}
+          {me && !me.phone ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={T.phonePlaceholder}
+                inputMode="tel"
+              />
+            </label>
+          ) : null}
           {/* RKN-FIX-02 — guests give consent per purpose; the server refuses
               the package booking without both required ones. */}
           {!me ? <LegalConsentGroup compact value={consent} onChange={setConsent} /> : null}

@@ -58,6 +58,7 @@ const MIRRORS: Mirror[] = [
   { key: "darkSurfacePage", variable: "bg-page", scope: "dark" },
   { key: "darkSurfaceCard", variable: "bg-card", scope: "dark" },
   { key: "darkTextMain", variable: "text-main", scope: "dark" },
+  { key: "darkTextSoft", variable: "primary-foreground", scope: "dark" },
   { key: "darkTextSecondary", variable: "text-sec", scope: "dark" },
   { key: "darkBorderSubtle", variable: "border-subtle", scope: "dark" },
 ];

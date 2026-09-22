@@ -1,3 +1,4 @@
+import { studioReviewsWhere } from "@/lib/reviews/studio-scope";
 import {
   MembershipStatus,
   ProviderType,
@@ -106,7 +107,8 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
   const reviews = await prisma.review.findMany({
     where: {
       ...ACTIVE_REVIEW_FILTER,
-      studioId: studio.id,
+      // STUDIO-REVIEWS-SCOPE-01: и отзывы с целью `studio` без `studioId`.
+      ...studioReviewsWhere(studio),
     },
     select: {
       id: true,

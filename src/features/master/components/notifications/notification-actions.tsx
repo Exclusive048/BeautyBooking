@@ -10,6 +10,9 @@ import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { NotificationPayload } from "./lib/payload";
 import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { usePrompt } from "@/hooks/use-prompt";
+
+const TC = UI_TEXT.cabinetMaster.bookings.card;
 
 const T = UI_TEXT.cabinetMaster.notifications.actions;
 const ERR = UI_TEXT.cabinetMaster.notifications.errors;
@@ -42,6 +45,7 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
   const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const { prompt, modal: promptModal } = usePrompt();
 
   const refresh = () => startTransition(() => router.refresh());
 
@@ -73,18 +77,36 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
         () => null,
       );
       refresh();
-    } catch {
-      setError(action === "confirm" ? ERR.bookingConfirm : ERR.bookingDecline);
+    } catch (caught) {
+      // Серверная строка курируемая («Укажите комментарий», «Запись уже
+      // изменилась»), и на неё можно отреагировать — показываем её.
+      const message = caught instanceof Error ? caught.message : "";
+      setError(
+        message && message !== DEFAULT_ERROR_MESSAGE
+          ? message
+          : action === "confirm"
+            ? ERR.bookingConfirm
+            : ERR.bookingDecline,
+      );
     } finally {
       setBusy(null);
     }
   };
 
   const handleConfirm = () => void updateBookingStatus("confirm", "CONFIRMED");
-  const handleDecline = () => {
-    const reasonRaw = window.prompt(T.declinePrompt) ?? "";
-    const reason = reasonRaw.trim();
-    void updateBookingStatus("decline", "REJECTED", reason.length > 0 ? reason : undefined);
+  // NOTIF-DECLINE-REASON-01: сервер требует причину отказа (она уходит клиенту).
+  // Прежний `window.prompt` отправлял отказ и при «Отмене», и с пустой строкой —
+  // то есть отменить действие было нельзя, а запрос всегда падал 400.
+  const handleDecline = async () => {
+    const reason = await prompt({
+      title: TC.declineTitle,
+      label: TC.declineLabel,
+      placeholder: TC.declinePlaceholder,
+      confirmLabel: TC.declineConfirmLabel,
+      variant: "danger",
+    });
+    if (!reason) return;
+    void updateBookingStatus("decline", "REJECTED", reason);
   };
 
   if (type === NotificationType.BOOKING_REQUEST || type === NotificationType.BOOKING_CREATED) {
@@ -111,12 +133,13 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
           variant="secondary"
           size="sm"
           className="rounded-lg"
-          onClick={handleDecline}
+          onClick={() => void handleDecline()}
           disabled={!payload.bookingId || busy !== null}
         >
           <X className="mr-1 h-3.5 w-3.5" aria-hidden />
           {T.decline}
         </Button>
+        {promptModal}
       </ActionRow>
     );
   }

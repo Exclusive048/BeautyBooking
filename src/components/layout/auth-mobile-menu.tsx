@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Menu, X, Scissors, Building2 } from "lucide-react";
+import { Menu, X, Scissors, Building2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import type { CabinetKind } from "@/lib/auth/available-cabinets";
-import { hasProfessionalCabinet } from "@/lib/auth/available-cabinets";
+import { BECOME_MASTER_HREF, hasProfessionalCabinet } from "@/lib/auth/available-cabinets";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
@@ -34,6 +34,13 @@ type Props = {
    * это же и верно для того, у кого роли нет.
    */
   availableCabinets?: CabinetKind[];
+  /**
+   * NAV-BECOME-MASTER-01 — клиент без кабинета: «Стать мастером» встаёт
+   * заметной карточкой в слот кабинетов (туда, где потом появятся «Кабинет
+   * мастера» / «Кабинет студии»), а не строкой среди «Профиль / Настройки».
+   * Значение считает `topbar.tsx` тем же предикатом, что и кнопку в шапке.
+   */
+  offerBecomeMaster?: boolean;
   /**
    * AUTH-GATE-01 — server-resolved `resolveAuthMethods().any`. Only affects the
    * guest branch: with no login method available the «Вход» CTA is dropped.
@@ -95,6 +102,7 @@ export function AuthMobileMenu({
   studioWorkspace,
   isGuest = false,
   availableCabinets = [],
+  offerBecomeMaster = false,
   authEnabled = true,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -193,6 +201,22 @@ export function AuthMobileMenu({
               </div>
             )}
 
+            {!isGuest && offerBecomeMaster ? (
+              <div className="mt-2">
+                <Link
+                  href={BECOME_MASTER_HREF}
+                  className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 px-3 py-2.5 text-sm font-semibold text-accent-text transition hover:bg-primary/15"
+                  onClick={closeMenu}
+                >
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground">
+                    <Scissors className="h-4 w-4" aria-hidden />
+                  </span>
+                  <span className="flex-1">{UI_TEXT.nav.becomeMaster}</span>
+                  <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                </Link>
+              </div>
+            ) : null}
+
             <div className="mt-2 space-y-1">
               {NAV_LINKS.map((link) => (
                 <Link
@@ -237,14 +261,18 @@ export function AuthMobileMenu({
                       он не рендерится вовсе, и внутри /cabinet глобальный
                       <BottomNav> скрыт в пользу <CabinetBottomNav>. Итог: с
                       телефона кабинет мастера/студии было не создать. Позиция
-                      зеркалит десктоп (профиль → роли → настройки). */}
-                  <Link
-                    href="/cabinet/roles"
-                    className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
-                    onClick={closeMenu}
-                  >
-                    {professionalLabel}
-                  </Link>
+                      зеркалит десктоп (профиль → роли → настройки).
+                      NAV-BECOME-MASTER-01: у клиента без кабинета этот вход
+                      — карточка вверху меню, здесь не дублируется. */}
+                  {offerBecomeMaster ? null : (
+                    <Link
+                      href="/cabinet/roles"
+                      className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
+                      onClick={closeMenu}
+                    >
+                      {professionalLabel}
+                    </Link>
+                  )}
                   <Link
                     href="/cabinet/settings"
                     className="block rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"

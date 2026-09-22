@@ -59,6 +59,12 @@ export const BRAND_COLORS = {
   darkSurfaceCard: "#302026",
   /** `.dark --text-main` — основной текст на тёмном. */
   darkTextMain: "#FDF2F0",
+  /**
+   * `.dark --primary-foreground` — мягкий светлый без розового подтона. В
+   * тёмной версии письма им набран основной текст абзаца: `--text-label`
+   * тёмной темы (#DCB8C0) в длинном тексте читается розовым (EMAIL-DARK-01).
+   */
+  darkTextSoft: "#EDE3E4",
   /** `.dark --text-sec` — вторичный текст на тёмном. */
   darkTextSecondary: "#C79BA2",
   /** `.dark --border-subtle` — бордовая граница на тёмном. */

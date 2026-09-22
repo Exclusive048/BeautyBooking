@@ -887,6 +887,10 @@ export const UI_TEXT = {
     activeRole: "Текущий кабинет",
     roleSwitcherTitle: "Кабинет",
     becomeMasterCta: "Стать мастером",
+    /** NAV-BECOME-MASTER-01 — подпись пятой вкладки нижней навигации PWA. */
+    becomeMasterTab: "Стать мастером",
+    /** То же на экранах уже 360px — полная подпись там налезает на соседнюю вкладку. */
+    becomeMasterTabShort: "Мастерам",
     createStudioCta: "Создать студию",
     more: "Ещё",
   },
@@ -1985,6 +1989,8 @@ export const UI_TEXT = {
         // (429 + Retry-After до конца UTC-суток), не 500.
         budgetExhausted: "Поиск по фото на сегодня закончился. Попробуйте завтра.",
         searchFailed: "Не удалось выполнить поиск. Попробуйте позже.",
+        // VISUAL-SEARCH-TRANSIENT-01: отказал провайдер, а не «на фото ничего нет».
+        unavailable: "Не удалось разобрать фото — сервис сейчас не отвечает. Попробуйте ещё раз.",
       },
     },
     loading: "Загружаем ленту…",
@@ -3675,6 +3681,13 @@ export const UI_TEXT = {
         guestClient: "Без аккаунта",
         // RESCHEDULE-CURRENT-TIME: запрошенное клиентом время под текущим.
         proposedWhenPrefix: "Перенос на",
+        // RESCHEDULE-DECLINE-NOTIFY-01: ответ на запрос переноса от клиента —
+        // это ответ про ВРЕМЯ, а не про запись: запись остаётся в любом случае.
+        acceptReschedule: "Принять перенос",
+        keepOriginalTime: "Оставить прежнее время",
+        keepOriginalTitle: "Оставить прежнее время?",
+        keepOriginalMessage:
+          "Клиент просил перенести запись. Запись останется на прежнем времени, клиент получит уведомление.",
       },
       empty: "Пока пусто",
       declineReasonPrompt: "Укажите причину отказа — она будет отправлена клиенту:",
@@ -5635,6 +5648,11 @@ export const UI_TEXT = {
       cancelConfirmTitle: "Отменить запись?",
       cancelConfirmBody: "Мастер получит уведомление. Действие необратимо.",
       cancelConfirmAction: "Отменить запись",
+      // PACKAGE-CANCEL-UI-01: пакет отменяется только целиком.
+      cancelPackageConfirmTitle: "Отменить весь пакет?",
+      cancelPackageConfirmBody:
+        "Эта услуга входит в пакет — отменить её можно только вместе с остальными услугами пакета. Мастер получит уведомление.",
+      cancelPackageConfirmAction: "Отменить пакет",
       // CANCEL-DURING-RESCHEDULE: своя строка — только для отказа без тела;
       // серверные отказы отмены действенные («не позднее чем за 60 минут»,
       // «срок отмены прошёл») и показываются дословно (FIX-C8).
@@ -6815,6 +6833,11 @@ export const UI_TEXT = {
         moveToMaster: "Перенести на другого мастера",
         moveTime: "Перенести по времени",
         cancel: "Отменить запись",
+        // STUDIO-CONFIRM-01: студийные записи рождаются неподтверждёнными, а
+        // подтвердить их из кабинета студии было нечем.
+        confirm: "Подтвердить запись",
+        awaitingConfirmation: "Запись ждёт подтверждения",
+        confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
       },
       // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline a client-proposed
       // reschedule from the calendar cell + journal row action menu (parity with

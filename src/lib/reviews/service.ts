@@ -226,6 +226,10 @@ async function ensureMasterReviewAccess(review: {
   targetType: ReviewTargetType;
   targetId: string;
 }, currentUserId: string): Promise<void> {
+  if (review.targetType === "studio") {
+    await ensureStudioReviewAccess(review.targetId, currentUserId);
+    return;
+  }
   if (review.targetType !== "provider") {
     throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
@@ -270,6 +274,33 @@ async function ensureMasterReviewAccess(review: {
     }
   }
 
+  throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
+}
+
+/**
+ * STUDIO-REVIEWS-REPLY-01 — отвечать на отзыв о студии (цель `studio`,
+ * `targetId` = `Provider.id` студии) может владелец студии и её активные
+ * OWNER/ADMIN. Раньше такой отзыв отбивался 403 для всех: доступ строился
+ * только для цели `provider`, и форма ответа в кабинете студии не работала.
+ */
+async function ensureStudioReviewAccess(studioProviderId: string, currentUserId: string): Promise<void> {
+  const studio = await prisma.studio.findUnique({
+    where: { providerId: studioProviderId },
+    select: { id: true, provider: { select: { ownerUserId: true } } },
+  });
+  if (studio) {
+    if (studio.provider.ownerUserId === currentUserId) return;
+    const membership = await prisma.studioMembership.findFirst({
+      where: {
+        studioId: studio.id,
+        userId: currentUserId,
+        status: MembershipStatus.ACTIVE,
+        roles: { hasSome: [StudioRole.OWNER, StudioRole.ADMIN] },
+      },
+      select: { id: true },
+    });
+    if (membership) return;
+  }
   throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
 }
 
@@ -345,6 +376,7 @@ export async function createReview(input: {
       status: true,
       startAtUtc: true,
       endAtUtc: true,
+      masterProviderId: true,
       service: { select: { durationMin: true } },
       provider: {
         select: {
@@ -410,6 +442,7 @@ export async function createReview(input: {
 
   try {
     created = await prisma.$transaction(async (tx) => {
+      let studioScope: { studioId: string; masterId: string | null } | null = null;
       if (target.targetType === "studio") {
         const studio = await tx.studio.findUnique({
           where: { providerId: target.targetId },
@@ -418,6 +451,11 @@ export async function createReview(input: {
         if (!studio) {
           throw new AppError("Профиль для отзыва не найден.", 404, "REVIEW_TARGET_NOT_FOUND");
         }
+        // STUDIO-REVIEWS-SCOPE-01: кабинет студии (отзывы, дашборд, бейдж
+        // сайдбара) отбирает отзывы по `Review.studioId`, а создание его не
+        // заполняло — отзыв на визит в студию был виден на публичной странице и
+        // не виден владельцу. `masterId` — кто оказывал услугу.
+        studioScope = { studioId: studio.id, masterId: booking.masterProviderId ?? null };
       }
 
       const review = await tx.review.create({
@@ -426,6 +464,7 @@ export async function createReview(input: {
           authorId: input.currentUserId,
           targetType: target.targetType,
           targetId: target.targetId,
+          ...(studioScope ? { studioId: studioScope.studioId, masterId: studioScope.masterId } : {}),
           rating: input.rating,
           text: input.text?.trim() || null,
           tags:

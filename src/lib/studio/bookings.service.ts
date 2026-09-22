@@ -24,6 +24,7 @@ import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { resolveMoveDurationMin, resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 
 /**
  * STUDIO-RESCHEDULE-VALIDATION-A defaults — used when a master has no
@@ -287,7 +288,7 @@ export async function moveStudioBooking(input: {
   targetStartAt: Date;
   strategy: MoveStrategy;
   pricing: MovePricing;
-}): Promise<{ id: string }> {
+}): Promise<StudioMoveResult> {
   const booking = await prisma.booking.findUnique({
     where: { id: input.bookingId },
     include: {
@@ -309,6 +310,35 @@ export async function moveStudioBooking(input: {
   // could be seized by any studio. Assert the booking belongs to this studio —
   // a null / foreign studioId is rejected.
   await assertBelongsToStudio("booking", input.bookingId, input.studioId);
+
+  // STUDIO-MOVE-GUARDS-01: переносить можно только живую запись и только в
+  // будущее. Раньше перенос из журнала проходил и для отменённой/завершённой
+  // записи, и на прошедшее время — такая «запись» появлялась в прошлом у
+  // нового мастера и выпадала из всех списков.
+  const runtimeBefore = resolveBookingRuntimeStatus({
+    status: booking.status,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
+  if (runtimeBefore === "REJECTED" || runtimeBefore === "FINISHED" || runtimeBefore === "IN_PROGRESS") {
+    throw new AppError(
+      "Запись уже началась, завершена или отменена — перенести её нельзя.",
+      409,
+      "CONFLICT",
+    );
+  }
+  if (input.targetStartAt.getTime() <= Date.now()) {
+    throw new AppError("Нельзя перенести запись на прошедшее время.", 409, "CONFLICT");
+  }
+
+  // STUDIO-MOVE-DURATION-01: у другого мастера та же услуга может длиться иначе
+  // (`MasterService.durationOverrideMin`). Диалог и перетаскивание в календаре
+  // всегда шлют KEEP_SERVICE, и окно считалось по длительности ПРЕЖНЕГО
+  // мастера: 60-минутная запись у мастера, которому нужно 90, оставляла хвост
+  // незащищённым — туда можно было записать следующего клиента. При смене
+  // мастера длительность берётся у нового мастера; цена — по `pricing`.
+  const masterChanged = input.targetMasterId !== booking.masterProviderId;
+  const durationStrategy: MoveStrategy = masterChanged ? "CHANGE_SERVICE" : input.strategy;
 
   // STUDIO-BUGS-FIX-A bug #5: target master must be ACTIVE.
   const studio = await prisma.studio.findUnique({
@@ -384,7 +414,7 @@ export async function moveStudioBooking(input: {
   // `endAtUtc` equals the `durationSnapshotMin` written in the transaction.
   const durationMin = resolveMoveDurationMin(
     booking.serviceItems,
-    input.strategy,
+    durationStrategy,
     overrideByServiceId,
   );
   const safeDuration = durationMin > 0 ? durationMin : 60;
@@ -487,6 +517,29 @@ export async function moveStudioBooking(input: {
           endAtUtc: newEnd,
         });
 
+        // STUDIO-MOVE-GUARDS-01: администратор студии переносит напрямую (инв.
+        // #22), то есть висящий запрос переноса этим решён. Прежде предложение
+        // оставалось: календарь продолжал показывать «Принять», клиент — старое
+        // предложение, а его принятие вернуло бы запись на предложенное время
+        // уже у нового мастера без проверки рабочих часов.
+        if (booking.status === "CHANGE_REQUESTED") {
+          await applyBookingTransition(tx, {
+            id: booking.id,
+            expectedStatus: "CHANGE_REQUESTED",
+            data: {
+              status: "CONFIRMED",
+              proposedStartAt: null,
+              proposedEndAt: null,
+              requestedBy: null,
+              actionRequiredBy: null,
+              changeComment: null,
+            },
+            select: { id: true },
+          });
+        }
+
+        const timeChanged =
+          previousStartAtUtc?.getTime() !== input.targetStartAt.getTime();
         await tx.booking.update({
           where: { id: booking.id },
           data: {
@@ -495,10 +548,15 @@ export async function moveStudioBooking(input: {
             masterId: input.targetMasterId,
             startAtUtc: input.targetStartAt,
             endAtUtc: endAt,
+            // STUDIO-MOVE-REMINDERS-01: напоминания привязаны к времени. Отметки
+            // «отправлено» за прежнее время не должны гасить напоминание о
+            // новом (клиент, перенёсшийся за час до визита на следующую неделю,
+            // иначе не получал ни одного).
+            ...(timeChanged ? { reminder24hSentAt: null, reminder2hSentAt: null } : {}),
           },
         });
 
-        if (input.strategy === "CHANGE_SERVICE" || input.pricing === "APPLY_TARGET") {
+        if (durationStrategy === "CHANGE_SERVICE" || input.pricing === "APPLY_TARGET") {
           // FIX-6: reuse the overrides resolved up front (the same map that
           // sized the validated/stored `endAtUtc` window) and the same
           // duration helper — no divergent in-tx re-fetch, so the persisted
@@ -514,7 +572,7 @@ export async function moveStudioBooking(input: {
               data: {
                 durationSnapshotMin: resolveMoveItemDurationMin(
                   item,
-                  input.strategy,
+                  durationStrategy,
                   overrideByServiceId,
                 ),
                 priceSnapshot:
@@ -562,15 +620,41 @@ export async function moveStudioBooking(input: {
     },
   });
 
-  return { id: booking.id };
+  // STUDIO-MOVE-REMINDERS-01: старые задачи отбросит сверка времени в
+  // `processBookingReminder`; новые — по новому времени. Пост-коммитная обёртка.
+  await scheduleBookingRemindersSafe(booking.id);
+
+  return {
+    id: booking.id,
+    previousMasterProviderId: previousMasterProviderId ?? null,
+    masterChanged,
+    timeChanged: previousStartAtUtc?.getTime() !== input.targetStartAt.getTime(),
+  };
 }
+
+export type StudioMoveResult = {
+  id: string;
+  previousMasterProviderId: string | null;
+  masterChanged: boolean;
+  timeChanged: boolean;
+};
 
 export async function updateMasterBookingStatus(input: {
   bookingId: string;
   masterId: string;
   status: "CONFIRMED" | "REJECTED" | "CANCELLED" | "NO_SHOW";
   comment?: string;
-}): Promise<{ id: string; status: string }> {
+}): Promise<{
+  id: string;
+  status: string;
+  unchanged?: true;
+  /**
+   * RESCHEDULE-DECLINE-NOTIFY-01: «Отклонить» на запросе переноса от клиента
+   * отклоняет ПЕРЕНОС, а не запись (бронь остаётся на прежнем времени).
+   * Вызывающему нужно это знать, чтобы не слать клиенту «Запись отклонена».
+   */
+  outcome?: "RESCHEDULE_DECLINED";
+}> {
   // AUDIT (мастерские действия по статусу):
   // - реализовано: подтверждение PENDING и подтверждение клиентского CHANGE_REQUESTED.
   // - реализовано: отклонение initial booking -> REJECTED с обязательным комментарием.
@@ -610,7 +694,11 @@ export async function updateMasterBookingStatus(input: {
 
   if (input.status === "CONFIRMED") {
     const confirmed = await confirmBooking(booking.id, "MASTER");
-    return { id: confirmed.id, status: confirmed.status };
+    return {
+      id: confirmed.id,
+      status: confirmed.status,
+      ...(confirmed.unchanged ? { unchanged: true as const } : {}),
+    };
   }
 
   if (runtimeStatus === "REJECTED") {
@@ -645,7 +733,8 @@ export async function updateMasterBookingStatus(input: {
   // time (no move, no slot change). Shared with the studio decline route so the
   // two paths can't drift.
   if (rejectsChangeRequest) {
-    return declineClientRescheduleRequest(booking.id, "MASTER");
+    const declined = await declineClientRescheduleRequest(booking.id, "MASTER");
+    return { ...declined, outcome: "RESCHEDULE_DECLINED" };
   }
 
   // LOGIC-04: компонент пакета нельзя отменить в одиночку — ни клиентом, ни

@@ -8,15 +8,15 @@ type StudioMasterRecord = {
   studioId: string | null;
 };
 
-async function ensureStudio(studioId: string): Promise<Result<{ id: string }>> {
+async function ensureStudio(studioId: string): Promise<Result<{ id: string; timezone: string }>> {
   const studio = await prisma.provider.findUnique({
     where: { id: studioId },
-    select: { id: true, type: true },
+    select: { id: true, type: true, timezone: true },
   });
   if (!studio || studio.type !== ProviderType.STUDIO) {
     return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
   }
-  return { ok: true, data: { id: studio.id } };
+  return { ok: true, data: { id: studio.id, timezone: studio.timezone } };
 }
 
 export async function listStudioMasters(studioId: string): Promise<Result<StudioMasterRecord[]>> {
@@ -55,7 +55,7 @@ export async function attachMasterToStudio(
       type: ProviderType.MASTER,
       OR: [{ studioId: null }, { studioId }],
     },
-    select: { id: true, name: true, studioId: true },
+    select: { id: true, name: true, studioId: true, timezone: true },
   });
 
   if (!master) {
@@ -71,6 +71,16 @@ export async function attachMasterToStudio(
   }
 
   if (master.studioId === studioId) {
+    // STUDIO-MASTER-TZ-01: приглашённый мастер создаётся уже с `studioId` этой
+    // студии (staged-профиль в `studio/masters.service.ts`), поэтому приём
+    // приглашения приходит именно сюда — и пояс синхронизируется и здесь.
+    if (master.timezone !== studio.data.timezone) {
+      await prisma.provider.update({
+        where: { id: master.id },
+        data: { timezone: studio.data.timezone },
+        select: { id: true },
+      });
+    }
     return { ok: true, data: { id: master.id, name: master.name, studioId: master.studioId } };
   }
 
@@ -79,7 +89,11 @@ export async function attachMasterToStudio(
   // гонка кончалась отказом, а не тихой перепривязкой.
   const attached = await prisma.provider.updateMany({
     where: { id: master.id, type: ProviderType.MASTER, studioId: null },
-    data: { studioId },
+    // STUDIO-MASTER-TZ-01: мастер студии работает в её часовом поясе. Рабочие
+    // часы мастера проверяются в ЕГО поясе (`studio/bookings.service.ts`), а
+    // календарь студии рисуется в поясе студии; расхождение сдвигало и проверку,
+    // и публичные слоты мастера на разницу поясов.
+    data: { studioId, timezone: studio.data.timezone },
   });
 
   if (attached.count === 0) {

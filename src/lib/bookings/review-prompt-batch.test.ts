@@ -104,3 +104,56 @@ describe("PERF-26 · проход не читает снапшоты пошту�
     expect(loadBookingsWithRelations).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * REVIEW-PROMPT-01 — запрос отзыва уходит тогда, когда отзыв уже можно оставить,
+ * по всем незакрытым статусам и один раз на пакет.
+ *
+ * @probe 2026-09-22 — `readyBefore` заменён на `now` (прежняя форма): красным
+ * стал «не раньше открытия окна отзыва» (`lte` = 10:00 вместо 09:00). Фильтр
+ * статуса, возвращённый к `status: "CONFIRMED"`, красит кейс статусов; отбор
+ * пакета без `dropNonFinalPackageComponents` красит кейс пакета.
+ */
+describe("REVIEW-PROMPT-01 · когда и кому уходит запрос отзыва", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("не раньше открытия окна отзыва (конец визита + 60 минут)", async () => {
+    arrange([]);
+    await runBookingReviewPromptJob(new Date("2026-08-06T10:00:00Z"));
+
+    const where = bookingFindMany.mock.calls[0][0].where;
+    expect(where.endAtUtc.lte).toEqual(new Date("2026-08-06T09:00:00Z"));
+  });
+
+  it("берёт любой незакрытый статус, а не только CONFIRMED", async () => {
+    arrange([]);
+    await runBookingReviewPromptJob(new Date("2026-08-06T10:00:00Z"));
+
+    const where = bookingFindMany.mock.calls[0][0].where;
+    expect(where.status).toEqual({ notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] });
+  });
+
+  it("пакет получает один запрос — по последней услуге", async () => {
+    bookingFindMany
+      .mockResolvedValueOnce([
+        { id: "p1", bookingPackageId: "pkg", endAtUtc: new Date("2026-08-06T07:00:00Z") },
+        { id: "p2", bookingPackageId: "pkg", endAtUtc: new Date("2026-08-06T08:00:00Z") },
+        { id: "solo", bookingPackageId: null, endAtUtc: new Date("2026-08-06T08:00:00Z") },
+      ])
+      .mockResolvedValueOnce([
+        { id: "p1", bookingPackageId: "pkg", endAtUtc: new Date("2026-08-06T07:00:00Z") },
+        { id: "p2", bookingPackageId: "pkg", endAtUtc: new Date("2026-08-06T08:00:00Z") },
+      ]);
+    notificationFindMany.mockResolvedValue([]);
+    loadBookingsWithRelations.mockImplementation(async (wanted: string[]) =>
+      new Map(wanted.map((id) => [id, { id }]))
+    );
+
+    await runBookingReviewPromptJob(new Date("2026-08-06T10:00:00Z"));
+
+    const notified = notifyBookingCompletedReview.mock.calls.map((call) => call[0].id).sort();
+    expect(notified).toEqual(["p2", "solo"]);
+  });
+});

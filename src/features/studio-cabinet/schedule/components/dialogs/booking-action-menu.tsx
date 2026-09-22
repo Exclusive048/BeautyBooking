@@ -54,6 +54,14 @@ export function BookingActionMenu({
   const [rsError, setRsError] = useState<string | null>(null);
 
   const open = booking !== null;
+  // STUDIO-CONFIRM-01: студийные записи рождаются PENDING (автоподтверждение
+  // только у соло-мастеров), и до подтверждения клиент не получает напоминаний.
+  // Подтвердить мог только назначенный мастер из своего кабинета; `/confirm`
+  // администратора студии пускает (как сторону провайдера), не было кнопки.
+  // Время здесь не сверяется (чтение часов в рендере — нечистый рендер): на
+  // уже начавшуюся запись сервер ответит «Запись уже началась», и это видно.
+  const awaitsConfirmation =
+    booking !== null && (booking.status === "PENDING" || booking.status === "NEW");
 
   function handleClose() {
     setMoveMode(null);
@@ -66,6 +74,7 @@ export function BookingActionMenu({
   async function handleRescheduleDecision(
     bookingId: string,
     decision: "accept" | "decline",
+    fallbackError: string = T.errors.bookingReschedule,
   ) {
     if (rsBusy) return;
     setRsBusy(decision);
@@ -78,14 +87,14 @@ export function BookingActionMenu({
         const body = (await response.json().catch(() => null)) as
           | { error?: { message?: string } }
           | null;
-        setRsError(body?.error?.message ?? T.errors.bookingReschedule);
+        setRsError(body?.error?.message ?? fallbackError);
         setRsBusy(null);
         return;
       }
       startTransition(() => router.refresh());
       handleClose();
     } catch {
-      setRsError(T.errors.bookingReschedule);
+      setRsError(fallbackError);
       setRsBusy(null);
     }
   }
@@ -114,6 +123,30 @@ export function BookingActionMenu({
                 </p>
               ) : null}
             </div>
+
+            {awaitsConfirmation ? (
+              <div className="space-y-2 rounded-lg border border-warning-border bg-warning-surface p-3">
+                <p className="text-xs font-semibold text-warning-text">
+                  {T.actions.awaitingConfirmation}
+                </p>
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  disabled={rsBusy !== null}
+                  onClick={() =>
+                    void handleRescheduleDecision(booking.id, "accept", T.actions.confirmError)
+                  }
+                >
+                  <Check className="h-3.5 w-3.5" aria-hidden />
+                  {T.actions.confirm}
+                </Button>
+                {rsError ? (
+                  <p role="alert" className="text-xs text-danger-text">
+                    {rsError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
             {isPendingClientReschedule(booking) && booking.proposedStartAtUtc ? (
               <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-950/40">

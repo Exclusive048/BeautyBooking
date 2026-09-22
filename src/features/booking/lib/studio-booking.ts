@@ -240,9 +240,14 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingC
   }
 
   if (!res.ok) {
+    // Серверная строка курируемая (AppError): «Укажите телефон», «Это время уже
+    // занято», «Запись возможна не раньше чем за N ч» — на каждую из них
+    // пользователь может отреагировать, а общий канон «попробуйте ещё раз»
+    // для них прямо неверен (повтор даст тот же отказ).
+    const serverMessage = json && json.ok !== true ? json.error?.message : undefined;
     return {
       ok: false,
-      error: "Не удалось создать запись. Попробуйте ещё раз.",
+      error: serverMessage || "Не удалось создать запись. Попробуйте ещё раз.",
       code: errorCode,
       status: res.status,
     };

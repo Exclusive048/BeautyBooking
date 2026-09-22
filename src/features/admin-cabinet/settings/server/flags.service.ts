@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { isTelegramEnabled } from "@/lib/env";
+import {
+  VISUAL_SEARCH_TOGGLE_DEFAULT,
+  resolveVisualSearchEnabled,
+} from "@/lib/visual-search/enabled";
 import type { SystemFlags } from "@/features/admin-cabinet/settings/types";
 
 const FLAG_KEYS: ReadonlyArray<keyof SystemFlags> = [
@@ -11,7 +15,8 @@ const FLAG_KEYS: ReadonlyArray<keyof SystemFlags> = [
 
 const DEFAULTS: SystemFlags = {
   onlinePaymentsEnabled: false,
-  visualSearchEnabled: false,
+  // Не читается: действующее значение даёт `resolveVisualSearchEnabled`.
+  visualSearchEnabled: VISUAL_SEARCH_TOGGLE_DEFAULT,
   // `legalDraftMode` defaults to true so the banner stays visible until a
   // human flips it. Mirrors `getLegalDraftMode()` semantics.
   legalDraftMode: true,
@@ -42,7 +47,10 @@ export async function getSystemFlags(): Promise<SystemFlags> {
 
   return {
     onlinePaymentsEnabled: parseFlag(byKey.get("onlinePaymentsEnabled"), DEFAULTS.onlinePaymentsEnabled),
-    visualSearchEnabled: parseFlag(byKey.get("visualSearchEnabled"), DEFAULTS.visualSearchEnabled),
+    // VISUAL-SEARCH-TOGGLE-01: показываем ДЕЙСТВУЮЩЕЕ значение той же формулой,
+    // что и рантайм, — иначе при заданных кредах и без строки админ видел
+    // «выключено», а поиск работал.
+    visualSearchEnabled: resolveVisualSearchEnabled(byKey.get("visualSearchEnabled")),
     legalDraftMode: parseFlag(byKey.get("legalDraftMode"), DEFAULTS.legalDraftMode),
     telegramEnabled,
   };

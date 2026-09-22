@@ -98,6 +98,34 @@ function getErrorStatus(error: unknown): number | null {
   return typeof status === "number" ? status : null;
 }
 
+/**
+ * VISUAL-SEARCH-TRANSIENT-01 — отказ ПРОВАЙДЕРА (сеть, таймаут, HTTP-ошибка),
+ * а не «модель ничего не нашла».
+ *
+ * 🔴 До него оба случая приходили к вызывающему одним `null`, а классификатор
+ * превращал `null` в `{ category: "none" }`. На пути индексации это значило:
+ * один 429 или обрыв сети — и фото навсегда помечалось «нераспознанным»
+ * (`visualIndexed = true`, категории нет), индексатор его больше не брал, а
+ * ретрай очереди в воркере был недостижим. На пути поиска клиент получал «не
+ * поняли, что на фото», и ответ ещё и кэшировался на сутки.
+ *
+ * Теперь отказ провайдера — исключение, а `null` остаётся только за ответом,
+ * который пришёл, но непригоден (пустой, не JSON, не той размерности). Потолок
+ * расходов (`AiSpendCeilingError`) сюда не относится и летит как раньше.
+ */
+export class VisualProviderUnavailableError extends Error {
+  /** Имеет ли смысл повторить: сеть/таймаут/429/5xx — да; 400/401/402/403 — нет. */
+  readonly retryable: boolean;
+  readonly status: number | null;
+
+  constructor(scope: "vision" | "embedding", cause: unknown) {
+    super(`Yandex ${scope} request failed`, { cause });
+    this.name = "VisualProviderUnavailableError";
+    this.status = getErrorStatus(cause);
+    this.retryable = this.status === null ? true : isRetryableProviderError(cause);
+  }
+}
+
 function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
@@ -224,7 +252,7 @@ export async function requestVisionJson(input: {
     }
   } catch (error) {
     logProviderFailure("vision", error);
-    return null;
+    throw new VisualProviderUnavailableError("vision", error);
   }
 }
 
@@ -276,8 +304,11 @@ async function createEmbedding(
 ): Promise<number[] | null> {
   await takeAiSpendBudget(meter);
 
+  // VISUAL-SEARCH-TRANSIENT-01: транспорт и HTTP-статус — отказ провайдера
+  // (исключение), разбор ответа ниже — непригодный ответ (`null`).
+  let response: Response;
   try {
-    const response = await fetch(YANDEX_EMBEDDING_URL, {
+    response = await fetch(YANDEX_EMBEDDING_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -290,12 +321,17 @@ async function createEmbedding(
       }),
       signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
     });
+  } catch (error) {
+    logProviderFailure("embedding", error);
+    throw new VisualProviderUnavailableError("embedding", error);
+  }
 
-    if (!response.ok) {
-      logProviderFailure("embedding", { status: response.status });
-      return null;
-    }
+  if (!response.ok) {
+    logProviderFailure("embedding", { status: response.status });
+    throw new VisualProviderUnavailableError("embedding", { status: response.status });
+  }
 
+  try {
     const json = (await response.json()) as { embedding?: unknown };
     const embedding = json.embedding;
     if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
@@ -309,7 +345,12 @@ async function createEmbedding(
     }
     return embedding as number[];
   } catch (error) {
-    logProviderFailure("embedding", error);
+    logError("Yandex returned an unreadable embedding response", {
+      scope: "embedding",
+      model: modelSlug,
+      error: error instanceof Error ? error.message : String(error),
+      __skipAlert: true,
+    });
     return null;
   }
 }
@@ -330,6 +371,7 @@ export async function createQueryEmbedding(text: string): Promise<number[] | nul
 
 export function isRetryableProviderError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
+  if (error instanceof VisualProviderUnavailableError) return error.retryable;
 
   const record = error as { status?: unknown; code?: unknown; name?: unknown };
   const status = typeof record.status === "number" ? record.status : null;

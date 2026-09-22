@@ -111,9 +111,30 @@ export function YouStep({
           <LegalConsentGroup compact value={consent} onChange={onConsentChange} />
         </div>
       ) : me ? (
-        <div className="rounded-xl border border-border-subtle bg-bg-card p-4 text-sm">
-          <div className="font-semibold text-text">{me.displayName ?? me.phone ?? "—"}</div>
-          {me.phone ? <div className="text-text-muted">{me.phone}</div> : null}
+        <div className="space-y-3 rounded-xl border border-border-subtle bg-bg-card p-4 text-sm">
+          <div>
+            <div className="font-semibold text-text">{me.displayName ?? me.phone ?? "—"}</div>
+            {me.phone ? <div className="text-text-muted">{me.phone}</div> : null}
+          </div>
+          {/* BOOKING-AUTH-NO-PHONE-01: у вошедшего по почте/VK/Яндексу телефона
+              в профиле нет, а без него запись отклоняется. Раньше поля не было
+              вовсе, и запись падала без способа это исправить. */}
+          {!me.phone ? (
+            <div>
+              <label htmlFor="auth-phone" className="text-xs font-medium text-text-muted">
+                {UI_TEXT.bookingWidget.youStep.phoneLabel}
+              </label>
+              <Input
+                id="auth-phone"
+                type="tel"
+                autoComplete="tel"
+                value={guestPhone}
+                onChange={(event) => onGuestPhoneChange(event.target.value)}
+                placeholder={UI_TEXT.bookingWidget.youStep.phonePlaceholder}
+                className="mt-1"
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -7,6 +7,11 @@ import { parseBody } from "@/lib/validation";
 import { bookingCancelSchema } from "@/lib/validation/bookings";
 import { cancelSoloPackageBooking } from "@/lib/bookings/package-booking";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import {
+  loadBookingWithRelations,
+  notifyCancelledByClient,
+  notifyCancelledByMaster,
+} from "@/lib/notifications/booking-notifications";
 
 /**
  * PACKAGE-BOOKING-MVP-1 — cancel a whole package atomically.
@@ -42,6 +47,30 @@ export async function POST(
       cancelledBy: access.cancelledBy,
       reason: parsed.reason ?? null,
     });
+
+    // PACKAGE-CANCEL-UI-01: отмена пакета не уведомляла никого — ни мастера
+    // при отмене клиентом, ни клиента при отмене мастером. Одно уведомление на
+    // пакет (по первой отменённой услуге), как и у создания пакета.
+    const firstCancelledId = result.cancelledBookingIds[0];
+    if (firstCancelledId) {
+      try {
+        const fullBooking = await loadBookingWithRelations(firstCancelledId);
+        if (fullBooking) {
+          if (access.cancelledBy === "CLIENT") {
+            await notifyCancelledByClient(fullBooking);
+          } else {
+            await notifyCancelledByMaster(fullBooking);
+          }
+        }
+      } catch (error) {
+        logError("POST /api/bookings/package/[id]/cancel notification failed", {
+          requestId: getRequestId(req),
+          route: "POST /api/bookings/package/{id}/cancel",
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     return jsonOk(result);
   } catch (error) {

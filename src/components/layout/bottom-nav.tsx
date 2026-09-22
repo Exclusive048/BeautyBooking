@@ -10,6 +10,7 @@ import { useMe } from "@/lib/hooks/use-me";
 import { useActiveRole, type ActiveRole } from "@/lib/hooks/use-active-role";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
+import { BECOME_MASTER_HREF, shouldOfferBecomeMaster } from "@/lib/auth/available-cabinets";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -372,6 +373,13 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
   if (isHidden || isInsideMaster || isInsideStudio || isInsideClientCabinet) return null;
 
   const showSwitcher = isLoggedIn && availableRoles.length > 1;
+  // NAV-BECOME-MASTER-01: у клиента без кабинета пятый слот — «Стать мастером».
+  // Тот же слот с первым кабинетом занимает переключатель кабинетов, так что
+  // кнопка уходит сама. До гидратации ролей не показываем: иначе у мастера
+  // на первом кадре мелькнула бы кнопка создания кабинета.
+  const showBecomeMaster =
+    isLoggedIn && hydrated && !showSwitcher && shouldOfferBecomeMaster(user?.roles ?? []);
+  const becomeMasterActive = pathname === BECOME_MASTER_HREF;
 
   return (
     <>
@@ -419,6 +427,34 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
               <IconSwitch className="h-5 w-5" />
               <span className="font-medium">{ROLE_LABELS[activeRole]}</span>
             </Button>
+          ) : null}
+
+          {showBecomeMaster ? (
+            <Link
+              href={BECOME_MASTER_HREF}
+              className={cn(
+                "flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 pb-1 pt-1.5 text-[11px] transition",
+                becomeMasterActive ? "text-accent-text" : "text-text-main"
+              )}
+              aria-current={becomeMasterActive ? "page" : undefined}
+              aria-label={t.becomeMasterCta}
+            >
+              {/* Бренд-кружок выделяет вкладку, не притворяясь «активной»:
+                  активность у панели передаёт цвет подписи. `-my-0.5` гасит
+                  лишние 4px кружка — строка иконок остаётся одной высоты. */}
+              <span className="-my-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground">
+                <Scissors className="h-3.5 w-3.5" aria-hidden />
+              </span>
+              {/* Полная подпись не помещается пятой вкладкой уже на 320px
+                  (налезает на «Профиль», замер) — там короткая; на 360+ полная.
+                  Полное имя всегда в aria-label. */}
+              <span aria-hidden className="whitespace-nowrap font-medium min-[360px]:hidden">
+                {t.becomeMasterTabShort}
+              </span>
+              <span aria-hidden className="hidden whitespace-nowrap font-medium min-[360px]:inline">
+                {t.becomeMasterTab}
+              </span>
+            </Link>
           ) : null}
         </div>
       </nav>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { MessageSquare, CalendarClock, X } from "lucide-react";
-import { useConfirm } from "@/hooks/use-confirm";
+import { usePrompt } from "@/hooks/use-prompt";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
@@ -12,6 +12,7 @@ import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
+const TC = UI_TEXT.cabinetMaster.bookings.card;
 
 type Props = {
   booking: DashboardBooking;
@@ -48,7 +49,7 @@ const TERMINAL_STATUSES = new Set([
 export function BookingRowActions({ booking }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const { confirm, modal } = useConfirm();
+  const { prompt, modal } = usePrompt();
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,20 +73,25 @@ export function BookingRowActions({ booking }: Props) {
     : null;
 
   async function handleCancel() {
-    const ok = await confirm({
-      title: T.cancelConfirmTitle,
-      message: T.cancelConfirmMessage,
-      confirmLabel: T.cancelConfirmCta,
+    // DASHBOARD-CANCEL-REASON-01: сервер требует причину отмены (она уходит
+    // клиенту), а здесь было голое «Вы уверены?» — отмена с дашборда всегда
+    // падала 400 «Укажите комментарий», и поля, куда его ввести, не было.
+    // Тот же запрос причины, что у отмены в канбане.
+    const comment = await prompt({
+      title: TC.cancelTitle,
+      label: TC.cancelLabel,
+      placeholder: TC.cancelPlaceholder,
+      confirmLabel: TC.cancelConfirmLabel,
       variant: "danger",
     });
-    if (!ok) return;
+    if (!comment) return;
     setCancelling(true);
     setError(null);
     try {
       await fetchJson(`/api/master/bookings/${encodeURIComponent(booking.id)}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CANCELLED" }),
+        body: JSON.stringify({ status: "CANCELLED", comment }),
       });
       startTransition(() => router.refresh());
     } catch (caught) {

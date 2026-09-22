@@ -1,3 +1,4 @@
+import { studioReviewsWhere } from "@/lib/reviews/studio-scope";
 import { ScheduleChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getUnreadBadgeCount } from "@/lib/notifications/badge";
@@ -21,13 +22,18 @@ export async function getStudioSidebarCounts(input: {
   userId: string;
   phone: string | null;
 }): Promise<StudioSidebarCounts> {
+  const studio = await prisma.studio.findUnique({
+    where: { id: input.studioId },
+    select: { id: true, providerId: true },
+  });
   const [scheduleRequestsPending, reviewsUnanswered, badge] = await Promise.all([
     prisma.scheduleChangeRequest.count({
       where: { studioId: input.studioId, status: ScheduleChangeRequestStatus.PENDING },
     }),
     prisma.review.count({
       where: {
-        studioId: input.studioId,
+        // STUDIO-REVIEWS-SCOPE-01
+        ...(studio ? studioReviewsWhere(studio) : { studioId: input.studioId }),
         replyText: null,
         reportedAt: null,
         ...ACTIVE_REVIEW_FILTER,

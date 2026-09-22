@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { usePrompt } from "@/hooks/use-prompt";
+import { useConfirm } from "@/hooks/use-confirm";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
@@ -37,11 +38,18 @@ type Props = {
 export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = null }: Props) {
   const router = useRouter();
   const { prompt, modal: promptModal } = usePrompt();
+  const { confirm, modal: confirmModal } = useConfirm();
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState<"confirm" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isInitiatorWaitingResponse =
     rawStatus === "CHANGE_REQUESTED" && actionRequiredBy === "CLIENT";
+  // RESCHEDULE-DECLINE-NOTIFY-01: клиент попросил перенос, ответ за мастером.
+  // «Отклонить» здесь отклоняет ПЕРЕНОС (сервер оставляет запись на прежнем
+  // времени и причину не читает), поэтому ни «Отклонить запись», ни поля
+  // причины отказа — только подтверждение «оставить прежнее время».
+  const answersClientReschedule =
+    rawStatus === "CHANGE_REQUESTED" && actionRequiredBy === "MASTER";
 
   async function patch(status: "CONFIRMED" | "REJECTED", comment?: string) {
     setBusy(status === "CONFIRMED" ? "confirm" : "decline");
@@ -71,6 +79,15 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
   }
 
   const handleDecline = async () => {
+    if (answersClientReschedule) {
+      const ok = await confirm({
+        title: T.card.keepOriginalTitle,
+        message: T.card.keepOriginalMessage,
+        confirmLabel: T.card.keepOriginalTime,
+      });
+      if (ok) void patch("REJECTED");
+      return;
+    }
     const comment = await prompt({
       title: T.card.declineTitle,
       label: T.card.declineLabel,
@@ -108,7 +125,7 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
             data-testid="booking-decline"
             className="flex-1"
           >
-            {T.card.decline}
+            {answersClientReschedule ? T.card.keepOriginalTime : T.card.decline}
           </Button>
           <Button
             type="button"
@@ -119,7 +136,7 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
             data-testid="booking-confirm"
             className="flex-1"
           >
-            {T.card.confirm}
+            {answersClientReschedule ? T.card.acceptReschedule : T.card.confirm}
           </Button>
         </div>
         {error ? (
@@ -127,6 +144,7 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
         ) : null}
       </div>
       {promptModal}
+      {confirmModal}
     </>
   );
 }

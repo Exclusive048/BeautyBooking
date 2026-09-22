@@ -32,7 +32,9 @@ export async function POST(
         ?.status === "CHANGE_REQUESTED";
 
     const booking = await confirmBooking(p.id, access.actor);
-    if (access.actor === "MASTER" || answersProposal) {
+    // CONFIRM-IDEMPOTENT-NOTIFY-01: повторное подтверждение уже подтверждённой
+    // брони — не событие; «Запись подтверждена» второй раз клиенту не уходит.
+    if (!booking.unchanged && (access.actor === "MASTER" || answersProposal)) {
       try {
         const fullBooking = await loadBookingWithRelations(booking.id);
         if (fullBooking) {

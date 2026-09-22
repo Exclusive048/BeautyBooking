@@ -212,7 +212,7 @@ describe("LOGIC-02 · шестой переход не пройдёт молча
     ).toEqual([]);
   });
 
-  it("все шесть путей записи статуса переведены на примитив", () => {
+  it("все пути записи статуса переведены на примитив", () => {
     for (const rel of [
       "src/lib/bookings/confirmBooking.ts",
       "src/lib/bookings/decline-reschedule.ts",
@@ -221,6 +221,8 @@ describe("LOGIC-02 · шестой переход не пройдёт молча
       "src/lib/studio/bookings.service.ts",
       // шестой путь, которого в аудите не было — нашёл сам guard
       "src/lib/bookings/package-booking.ts",
+      // седьмой — задача воркера: подтверждённый визит → FINISHED (BOOKING-FINALIZE-01)
+      "src/lib/bookings/finalize-past.ts",
     ]) {
       const source = readFileSync(resolve(PROJECT_ROOT, rel), "utf8");
       expect(source, rel).toContain("applyBookingTransition");

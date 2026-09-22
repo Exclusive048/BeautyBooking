@@ -9,6 +9,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { clearLegalDraftModeCache } from "@/lib/legal/config";
 import { logInfo } from "@/lib/logging/logger";
 import { clearVisualSearchEnabledCache } from "@/lib/visual-search/config";
+import { VISUAL_SEARCH_TOGGLE_DEFAULT } from "@/lib/visual-search/enabled";
 import { clearTelegramEnabledCache } from "@/lib/telegram/feature";
 
 const updateSchema = z.object({
@@ -27,7 +28,10 @@ const updateSchema = z.object({
 
 const FLAG_DEFAULTS = {
   onlinePaymentsEnabled: false,
-  visualSearchEnabled: false,
+  // VISUAL-SEARCH-TOGGLE-01: сырой тумблер по умолчанию включён (потолок —
+  // креды, см. `resolveVisualSearchEnabled`). С прежним `false` PATCH «выключить»
+  // без строки в БД был no-op: значение совпадало с подставленным.
+  visualSearchEnabled: VISUAL_SEARCH_TOGGLE_DEFAULT,
   // legalDraftMode defaults to true (banner visible) to match runtime semantics
   // in `getLegalDraftMode()`.
   legalDraftMode: true,

@@ -234,8 +234,10 @@ export function assertWithinMasterWorkHours(input: {
  * engine keeps the guard and slot-gen in agreement — a slot the engine
  * offered passes the guard; a time the engine would not offer fails it.
  *
- * - `weekday` (0=Sun..6=Sat) matches `WeeklyScheduleDay.weekday` and the
- *   engine's local-weekday resolution.
+ * - `weekday` (0=Sun..6=Sat) is the engine's local-weekday resolution.
+ *   ⚠️ `WeeklyScheduleDay.weekday` is stored 1=Mon..7=Sun — lookups must
+ *   convert via `toScheduleWeekday` (`schedule/master-work-window.ts`,
+ *   SCHEDULE-SUNDAY-01); a raw 0 never matches Sunday.
  * - `dateKey` matches the engine's `toLocalDateKey(override.date, tz)`
  *   bucketing for the `ScheduleOverride` lookup (overrides are stored at
  *   UTC-midnight of the local date key, so the local dateKey resolves

@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
 import { enqueue } from "@/lib/queue/queue";
@@ -61,6 +61,23 @@ export function resolveReminderSchedule(startAtUtc: Date, now = new Date()): Rem
   return items;
 }
 
+/**
+ * REMINDER-STATUSES-01 — статусы, для которых напоминание уместно.
+ *
+ * `CHANGE_REQUESTED` здесь потому, что запрошенный, но не принятый перенос
+ * ничего не меняет: визит остаётся на исходном времени, пока другая сторона
+ * не согласилась. Раньше напоминания требовали строго `CONFIRMED`, и задачи,
+ * срабатывавшие во время согласования, молча отбрасывались — клиент, попросивший
+ * перенос и не дождавшийся ответа, не получал напоминания о действующей записи.
+ * Принятый перенос меняет `startAtUtc`, и старые задачи отбрасывает сверка
+ * времени в `processBookingReminder`; новые планирует `confirmBooking`.
+ */
+const REMINDABLE_STATUSES: ReadonlyArray<BookingStatus> = ["CONFIRMED", "CHANGE_REQUESTED"];
+
+function isRemindable(status: BookingStatus): boolean {
+  return REMINDABLE_STATUSES.includes(status);
+}
+
 export async function scheduleBookingReminders(bookingId: string): Promise<void> {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -73,9 +90,12 @@ export async function scheduleBookingReminders(bookingId: string): Promise<void>
     },
   });
 
-  if (!booking || booking.status !== "CONFIRMED") return;
+  if (!booking || !isRemindable(booking.status)) return;
   if (!booking.startAtUtc) return;
-  if (booking.silentMode) return;
+  // REMINDER-SILENT-01: «Хочу помолчать» — это тихий визит (мастер работает без
+  // разговоров, `silentHint`), а не отказ от напоминаний. Прежняя проверка здесь
+  // отключала клиенту и мастеру оба напоминания за то, что клиент попросил
+  // тишины во время процедуры.
   if (!booking.provider.remindersEnabled) return;
 
   const schedule = resolveReminderSchedule(booking.startAtUtc);
@@ -164,8 +184,7 @@ export async function reconcileBookingReminders(
 
   const candidates = await prisma.booking.findMany({
     where: {
-      status: "CONFIRMED",
-      silentMode: false,
+      status: { in: [...REMINDABLE_STATUSES] },
       reminder2hSentAt: null,
       // Момент отправки прошёл, а визит ещё впереди: напоминать задним числом
       // бессмысленно, и `processBookingReminder` такую задачу всё равно
@@ -230,11 +249,10 @@ export async function processBookingReminder(payload: BookingReminderPayload): P
     });
 
     if (!booking) return { sent: false };
-    if (booking.status !== "CONFIRMED") return { sent: false };
+    if (!isRemindable(booking.status)) return { sent: false };
     if (!booking.startAtUtc) return { sent: false };
     if (booking.startAtUtc.toISOString() !== payload.startAtUtc) return { sent: false };
     if (booking.startAtUtc.getTime() <= jobStart.getTime()) return { sent: false };
-    if (booking.silentMode) return { sent: false };
     if (!booking.provider.remindersEnabled) return { sent: false };
     if (payload.kind === "REMINDER_24H" && booking.reminder24hSentAt) return { sent: false };
     if (payload.kind === "REMINDER_2H" && booking.reminder2hSentAt) return { sent: false };

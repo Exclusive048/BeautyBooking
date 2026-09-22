@@ -17,6 +17,7 @@ import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { prisma } from "@/lib/prisma";
 import { prismaDirect } from "@/lib/prisma-direct";
 
@@ -415,6 +416,12 @@ export async function POST(req: Request, ctx: RouteContext) {
       startAtUtc,
       endAtUtc,
     });
+
+    // MODEL-OFFER-REMINDERS-01: бронь рождается CONFIRMED, а напоминания здесь
+    // не планировались вовсе — 24-часовое не уходило никогда, 2-часовое
+    // подбирал только сторожевой свип с опозданием. Пост-коммитная обёртка:
+    // сбой очереди не должен давать 500 на уже созданную бронь (RES-03).
+    await scheduleBookingRemindersSafe(bookingId);
 
     return jsonOk({ bookingId });
   } catch (error) {

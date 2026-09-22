@@ -7,6 +7,10 @@ import { ensureStudioRole } from "@/lib/studio/access";
 import { moveStudioBooking } from "@/lib/studio/bookings.service";
 import { moveStudioBookingSchema } from "@/lib/studio/schemas";
 import { parseBody } from "@/lib/validation";
+import {
+  loadBookingWithRelations,
+  notifyStudioBookingMoved,
+} from "@/lib/notifications/booking-notifications";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -36,7 +40,18 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       strategy: body.strategy,
       pricing: body.pricing,
     });
-    return jsonOk(result);
+    // STUDIO-MOVE-NOTIFY-01: после коммита; сбой рассылки перенос не откатывает.
+    try {
+      const fullBooking = await loadBookingWithRelations(result.id);
+      if (fullBooking) await notifyStudioBookingMoved(fullBooking, result);
+    } catch (error) {
+      logError("PATCH /api/studio/bookings/[id]/move notification failed", {
+        requestId: getRequestId(req),
+        route: "PATCH /api/studio/bookings/{id}/move",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return jsonOk({ id: result.id });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

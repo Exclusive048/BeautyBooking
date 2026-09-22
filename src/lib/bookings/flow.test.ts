@@ -209,15 +209,13 @@ describe("bookings/flow — ensureCancellationDeadline", () => {
     }
   });
 
-  it("throws CANCELLATION_DEADLINE_PASSED (423) when deadlineHours ≤ 0", () => {
+  // CANCEL-DEADLINE-ZERO-01: 0 = «поздней отмены нет». Прежний кейс пиннил
+  // отказ на `<= 0`, то есть закреплял дефект: провайдер, вписавший 0, лишал
+  // клиентов отмены вообще.
+  it("deadlineHours ≤ 0 means no deadline — cancel is allowed", () => {
     const start = new Date("2026-05-19T12:00:00.000Z");
-    try {
-      ensureCancellationDeadline(start, 0, now);
-      throw new Error("should have thrown");
-    } catch (err) {
-      expect((err as AppError).status).toBe(423);
-      expect((err as AppError).code).toBe("CANCELLATION_DEADLINE_PASSED");
-    }
+    expect(() => ensureCancellationDeadline(start, 0, now)).not.toThrow();
+    expect(() => ensureCancellationDeadline(start, -1, now)).not.toThrow();
   });
 
   it("throws when now is past the deadline window", () => {

@@ -1,7 +1,7 @@
 import { env } from "@/lib/env";
-import { BRAND_COLORS, brandGradientCss, withAlpha } from "@/lib/ui/brand-colors";
+import { BRAND_COLORS, brandGradientCss } from "@/lib/ui/brand-colors";
+import { EMAIL_BRAND as BRAND, EMAIL_CLASS as K, buildEmailDocument } from "@/lib/email/templates/layout";
 
-const BRAND = "МастерРядом";
 const C = BRAND_COLORS;
 /**
  * Brand URL для email body links. Production resolves via `NEXT_PUBLIC_APP_URL`
@@ -64,47 +64,36 @@ export function buildNotificationEmailHtml(opts: {
     : "";
 
   const unsubBlock = opts.unsubscribeUrl
-    ? `<a href="${escapeHtml(opts.unsubscribeUrl)}" style="color:${C.textSecondary};text-decoration:underline;">Отписаться от писем</a>`
+    ? `<a class="${K.muted}" href="${escapeHtml(opts.unsubscribeUrl)}" style="color:${C.textSecondary};text-decoration:underline;">Отписаться от писем</a>`
     : "";
 
-  return `<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>${title}</title>
-</head>
-<body style="margin:0;padding:0;background:${C.surfacePage};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:${C.surfacePage};padding:40px 16px;">
-  <tr><td align="center">
-    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${C.surfaceCard};border-radius:20px;overflow:hidden;box-shadow:0 2px 12px ${withAlpha(C.textMain, 0.08)};">
-      <tr>
-        <td style="background:${C.brandFrom};background:${brandGradientCss()};padding:28px 32px 22px;text-align:center;">
-          <p style="margin:0;font-size:20px;font-weight:700;color:${C.textOnBrand};letter-spacing:-0.3px;">${BRAND}</p>
-          <p style="margin:5px 0 0;font-size:12px;color:${withAlpha(C.textOnBrand, 0.75)};">Запись к мастерам красоты</p>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:28px 32px 24px;">
-          <p style="margin:0 0 12px;font-size:20px;font-weight:700;color:${C.textMain};">${title}</p>
-          <p style="margin:0;font-size:15px;color:${C.textLabel};line-height:1.65;">${body}</p>
-          ${ctaBlock}
-        </td>
-      </tr>
-      <tr>
-        <td style="background:${C.surfacePage};padding:18px 32px;border-top:1px solid ${C.borderSubtle};">
-          <p style="margin:0;font-size:12px;color:${C.textSecondary};text-align:center;line-height:1.6;">
-            Вы получили это письмо, потому что подключили уведомления на <a href="${BRAND_URL}" style="color:${C.brandFrom};">${BRAND}</a>.<br/>
+  // Каркас, шапка и тёмная тема — `layout.ts` (EMAIL-DARK-01). CTA-кнопка стоит
+  // на бренд-градиенте в обеих темах: тёмный фон + белый текст инверторы не трогают.
+  const content = `          <p class="${K.title}" style="margin:0 0 12px;font-size:20px;font-weight:700;color:${C.textMain};">${title}</p>
+          <p class="${K.text}" style="margin:0;font-size:15px;color:${C.textLabel};line-height:1.65;">${body}</p>
+          ${ctaBlock}`;
+  const footer = `          <p class="${K.muted}" style="margin:0;font-size:12px;color:${C.textSecondary};text-align:center;line-height:1.6;">
+            Вы получили это письмо, потому что подключили уведомления на <a class="${K.link}" href="${BRAND_URL}" style="color:${C.brandFrom};">${BRAND}</a>.<br/>
             ${unsubBlock}
             <br/>&copy; ${year} ${BRAND}
-          </p>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>`;
+          </p>`;
+
+  return buildEmailDocument({
+    title,
+    preheader: previewText(body),
+    contentHtml: content,
+    footerHtml: footer,
+  });
+}
+
+/**
+ * Превью письма в списке — первая строка текста уведомления, а не «МастерРядом
+ * Запись к мастерам красоты» из шапки. Берётся из УЖЕ экранированного тела:
+ * обрезка по `<br/>` не разрывает сущность, а длина ограничена с запасом.
+ */
+function previewText(escapedBody: string): string {
+  const firstLine = escapedBody.split("<br/>")[0]?.trim() ?? "";
+  return firstLine.length > 140 ? `${firstLine.slice(0, 140).replace(/&[^;]*$/, "")}…` : firstLine;
 }
 
 export function buildNotificationEmailText(opts: {

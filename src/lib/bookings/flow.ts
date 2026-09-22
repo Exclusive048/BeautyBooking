@@ -96,9 +96,14 @@ export function ensureCancellationDeadline(
     throw new AppError("Проверьте время записи.", 409, "BOOKING_TIME_REQUIRED");
   }
 
-  if (deadlineHours <= 0) {
-    throw new AppError("Отменить запись уже нельзя.", 423, "CANCELLATION_DEADLINE_PASSED");
-  }
+  // CANCEL-DEADLINE-ZERO-01: «0 часов» — это «поздней отмены нет», а не «отменять
+  // нельзя никогда». Прежний отказ на `<= 0` запирал клиентскую отмену у любого
+  // провайдера, который вписал 0 в поле «Бесплатная отмена» (кабинет студии
+  // принимает 0…168 и подписывает поле «позже этого срока отмена считается
+  // поздней»), — клиент не мог отменить ни одной записи. Отмена после начала
+  // визита по-прежнему запрещена — отдельным правилом (`canCancelBookingStatus`
+  // + окно действия), не этим.
+  if (deadlineHours <= 0) return;
 
   const deadlineMs = startMs - deadlineHours * 60 * 60 * 1000;
   if (now.getTime() > deadlineMs) {

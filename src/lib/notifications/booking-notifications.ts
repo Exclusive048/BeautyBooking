@@ -127,6 +127,12 @@ function bookingPushUrl(bookingId: string, audience: "CLIENT" | "MASTER"): strin
   return `/cabinet/bookings?focus=${bookingId}`;
 }
 
+/** REVIEW-PROMPT-01 — «Мои записи» с открытой формой отзыва по этой записи. */
+export function reviewPromptUrl(bookingId: string): string {
+  const id = encodeURIComponent(bookingId);
+  return `/cabinet/bookings?focus=${id}&review=${id}`;
+}
+
 // BOOKING-STUDIO-RESCHEDULE-PARITY-01: studio push deep-link lands on the exact
 // booking — `?date=<salon-day>` (salon tz) loads the correct day, `?focus=<id>`
 // scrolls + highlights the cell (mirrors the in-app openHref).
@@ -200,9 +206,27 @@ export async function loadBookingsWithRelations(
   return new Map(rows.map((row) => [row.id, row]));
 }
 
-export async function notifyBookingCreated(booking: BookingWithRelations): Promise<void> {
-  const masterUserId = resolveMasterUserId(booking);
-  if (!masterUserId) return;
+/**
+ * Новая запись — стороне провайдера.
+ *
+ * STUDIO-NEW-BOOKING-NOTIFY-01: адресаты те же, что у запроса переноса
+ * (`resolveProviderRecipientUserIds`): мастер, владелец кабинета и активные
+ * OWNER/ADMIN студии. Раньше уведомление получал только назначенный мастер —
+ * администратор студии, который ведёт журнал и подтверждает записи, о новой
+ * записи со страницы студии не узнавал. Ссылка — по каналу получателя
+ * (журнал студии у администратора, кабинет у мастера).
+ */
+export async function notifyBookingCreated(
+  booking: BookingWithRelations,
+  /** Кто создал запись сам (администратор студии в кабинете) — ему не шлём. */
+  options: { excludeUserId?: string } = {},
+): Promise<void> {
+  const recipientIds = await resolveProviderRecipientUserIds(booking);
+  const clientUserId = resolveClientUserId(booking);
+  const recipients = recipientIds.filter(
+    (userId) => userId !== clientUserId && userId !== options.excludeUserId,
+  );
+  if (recipients.length === 0) return;
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
@@ -211,16 +235,21 @@ export async function notifyBookingCreated(booking: BookingWithRelations): Promi
     ? `${booking.clientName} записался на ${serviceName} ${whenLabel}`
     : `${booking.clientName} записался на ${serviceName}`;
 
-  await deliverNotification({
-    userId: masterUserId,
-    type: NotificationType.BOOKING_CREATED,
-    title,
-    body,
-    payloadJson: buildBookingPayload(booking),
-    bookingId: booking.id,
-    pushUrl: bookingPushUrl(booking.id, "MASTER"),
-    telegramText: buildTelegramText(title, body),
-  });
+  const payload = buildBookingPayload(booking);
+  await Promise.all(
+    recipients.map((userId) =>
+      deliverNotification({
+        userId,
+        type: NotificationType.BOOKING_CREATED,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: providerNotificationPushUrl(booking, userId),
+        telegramText: buildTelegramText(title, body),
+      })
+    )
+  );
 }
 
 export async function notifyBookingConfirmed(booking: BookingWithRelations): Promise<void> {
@@ -352,6 +381,68 @@ export async function notifyBookingRescheduled(booking: BookingWithRelations): P
     pushUrl: bookingPushUrl(booking.id, "CLIENT"),
     telegramText: buildTelegramText(title, body),
   });
+}
+
+/**
+ * STUDIO-MOVE-NOTIFY-01 — администратор студии перенёс запись (напрямую,
+ * инв. #22). До этого перенос не уведомлял никого: клиент не знал о новом
+ * времени, новый мастер — о новой записи, прежний — о том, что её забрали
+ * (часть NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS).
+ *   · клиенту — «Запись перенесена» с новым временем (`notifyBookingRescheduled`);
+ *   · мастеру, у которого запись теперь стоит, — время и клиент;
+ *   · прежнему мастеру, если мастер сменился, — что запись передана.
+ */
+export async function notifyStudioBookingMoved(
+  booking: BookingWithRelations,
+  move: { previousMasterProviderId: string | null; masterChanged: boolean; timeChanged: boolean },
+): Promise<void> {
+  if (move.timeChanged || move.masterChanged) {
+    await notifyBookingRescheduled(booking);
+  }
+
+  const serviceName = resolveServiceLabel(booking.service);
+  const whenLabel = bookingWhenLabel(booking);
+  const clientLabel = booking.clientName?.trim() || "Клиент";
+
+  const currentMasterUserId = resolveMasterUserId(booking);
+  if (currentMasterUserId) {
+    const title = move.masterChanged ? "Новая запись от администратора" : "Запись перенесена";
+    const body = whenLabel
+      ? `${clientLabel} — ${serviceName}, ${whenLabel}.`
+      : `${clientLabel} — ${serviceName}.`;
+    await deliverNotification({
+      userId: currentMasterUserId,
+      type: NotificationType.BOOKING_RESCHEDULED,
+      title,
+      body,
+      payloadJson: buildBookingPayload(booking),
+      bookingId: booking.id,
+      pushUrl: bookingPushUrl(booking.id, "MASTER"),
+      telegramText: buildTelegramText(title, body),
+    });
+  }
+
+  if (move.masterChanged && move.previousMasterProviderId) {
+    const previous = await prisma.provider.findUnique({
+      where: { id: move.previousMasterProviderId },
+      select: { ownerUserId: true, masterProfile: { select: { userId: true } } },
+    });
+    const previousUserId = previous?.ownerUserId ?? previous?.masterProfile?.userId ?? null;
+    if (previousUserId && previousUserId !== currentMasterUserId) {
+      const title = "Запись передана другому мастеру";
+      const body = `Администратор передал запись ${clientLabel} на ${serviceName} другому мастеру.`;
+      await deliverNotification({
+        userId: previousUserId,
+        type: NotificationType.BOOKING_RESCHEDULED,
+        title,
+        body,
+        payloadJson: buildBookingPayload(booking),
+        bookingId: booking.id,
+        pushUrl: "/cabinet/master/bookings",
+        telegramText: buildTelegramText(title, body),
+      });
+    }
+  }
 }
 
 /**
@@ -534,7 +625,9 @@ export async function notifyBookingCompletedReview(booking: BookingWithRelations
     body,
     payloadJson: buildBookingPayload(booking),
     bookingId: booking.id,
-    pushUrl: bookingPushUrl(booking.id, "CLIENT"),
+    // REVIEW-PROMPT-01: `?review=` открывает форму отзыва сразу, `?focus=`
+    // подсвечивает строку, если отзыв уже оставлен или окно закрылось.
+    pushUrl: reviewPromptUrl(booking.id),
     telegramText: buildTelegramText(title, body),
   });
 }

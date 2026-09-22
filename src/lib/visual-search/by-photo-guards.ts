@@ -55,9 +55,39 @@ export async function getCachedByPhotoResult(
   return cacheGet<VisualSearchHttpResponse>(resultCacheKey(imageHash));
 }
 
+/**
+ * VISUAL-SEARCH-CACHE-01 — сколько держать ответ, по его исходу.
+ *
+ * 🔴 Раньше сутки держался ЛЮБОЙ ответ, включая те, что зависят не от фото, а
+ * от состояния системы: «пока мало работ» (индекс растёт — мастер загрузил
+ * портфолио, и через час поиск уже нашёл бы его) и отказ провайдера (сбой
+ * проходит за минуты). Пользователь, повторивший тот же поиск, до завтра видел
+ * прежний отказ.
+ *   · выдача и «не распознали / нечётко» — свойство самого фото → сутки;
+ *   · «мало работ» — короткое окно: дедуп всё ещё гасит серию повторов (ради
+ *     него слой и заведён), но рост индекса виден в пределах минут;
+ *   · провайдер не ответил → не кэшируется вовсе.
+ */
+const NOT_ENOUGH_INDEXED_TTL_SECONDS = 10 * 60;
+
+export function byPhotoCacheTtlSeconds(result: VisualSearchHttpResponse): number | null {
+  if (result.ok) return RESULT_CACHE_TTL_SECONDS;
+  switch (result.reason) {
+    case "unrecognized":
+    case "low_confidence":
+      return RESULT_CACHE_TTL_SECONDS;
+    case "not_enough_indexed":
+      return NOT_ENOUGH_INDEXED_TTL_SECONDS;
+    case "unavailable":
+      return null;
+  }
+}
+
 export async function setCachedByPhotoResult(
   imageHash: string,
   result: VisualSearchHttpResponse,
 ): Promise<void> {
-  await cacheSet(resultCacheKey(imageHash), result, RESULT_CACHE_TTL_SECONDS);
+  const ttl = byPhotoCacheTtlSeconds(result);
+  if (ttl === null) return;
+  await cacheSet(resultCacheKey(imageHash), result, ttl);
 }

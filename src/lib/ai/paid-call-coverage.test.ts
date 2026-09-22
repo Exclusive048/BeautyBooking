@@ -158,6 +158,11 @@ const CLASSIFIED: Record<string, Classification> = {
     why: "test-only сброс кэша клиента",
     invoke: () => providerModule._resetClientForTesting(),
   },
+  VisualProviderUnavailableError: {
+    kind: "free",
+    why: "класс ошибки отказа провайдера (VISUAL-SEARCH-TRANSIENT-01); конструктор в сеть не ходит",
+    invoke: () => new providerModule.VisualProviderUnavailableError("vision", new Error("x")),
+  },
 };
 
 function functionExportsOf(mod: Record<string, unknown>): string[] {

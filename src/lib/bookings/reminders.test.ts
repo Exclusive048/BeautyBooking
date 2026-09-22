@@ -167,12 +167,14 @@ describe("bookings/reminders", () => {
 
       expect(summary).toEqual({ candidates: 0, rescheduled: 0 });
       const where = bookingFindMany.mock.calls[0]?.[0]?.where;
+      // REMINDER-STATUSES-01 / REMINDER-SILENT-01: согласуемый перенос визит
+      // не отменяет, а «Хочу помолчать» — не отказ от напоминаний.
       expect(where).toMatchObject({
-        status: "CONFIRMED",
-        silentMode: false,
+        status: { in: ["CONFIRMED", "CHANGE_REQUESTED"] },
         reminder2hSentAt: null,
         provider: { remindersEnabled: true },
       });
+      expect(where).not.toHaveProperty("silentMode");
       // Верхняя граница — момент отправки минус запас; нижняя — «сейчас»:
       // напоминать после начала визита бессмысленно.
       expect(where.startAtUtc.gt).toEqual(now);
@@ -213,5 +215,42 @@ describe("bookings/reminders", () => {
       expect(summary.candidates).toBe(2);
       expect(logError).toHaveBeenCalled();
     });
+  });
+});
+
+/**
+ * REMINDER-SILENT-01 / REMINDER-STATUSES-01 — кому уходит напоминание.
+ *
+ * @probe 2026-09-22 — в `scheduleBookingReminders` возвращена строка
+ * `if (booking.silentMode) return;`: красным стал «тихий визит напоминание
+ * получает». Возвращено — зелёный.
+ */
+describe("scheduleBookingReminders — тихий визит и согласуемый перенос", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("тихий визит («Хочу помолчать») напоминание получает", async () => {
+    bookingFindUnique.mockResolvedValueOnce({
+      id: "silent-1",
+      status: "CONFIRMED",
+      startAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      silentMode: true,
+      provider: { remindersEnabled: true },
+    });
+    await scheduleBookingReminders("silent-1");
+    expect(enqueue).toHaveBeenCalled();
+  });
+
+  it("запись с согласуемым переносом напоминание получает", async () => {
+    bookingFindUnique.mockResolvedValueOnce({
+      id: "cr-1",
+      status: "CHANGE_REQUESTED",
+      startAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      silentMode: false,
+      provider: { remindersEnabled: true },
+    });
+    await scheduleBookingReminders("cr-1");
+    expect(enqueue).toHaveBeenCalled();
   });
 });

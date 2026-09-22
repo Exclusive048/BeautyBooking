@@ -1,4 +1,4 @@
-import { MediaKind, Prisma } from "@prisma/client";
+import { MediaAssetStatus, MediaKind, Prisma } from "@prisma/client";
 import { logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import type {
@@ -12,6 +12,7 @@ import {
   createQueryEmbedding,
   describeImageWithStrategy,
   resizeForVision,
+  VisualProviderUnavailableError,
 } from "@/lib/visual-search/provider";
 import type { VisualCategorySlug, VisualSearchStrategy } from "@/lib/visual-search/prompt";
 
@@ -21,6 +22,24 @@ const VECTOR_LIMIT = 50;
 const EMBEDDING_DIMENSIONS = 256;
 const MAX_PROVIDER_RESULTS = 5;
 const MAX_PROVIDER_PHOTOS = 3;
+/** Так же строит `PortfolioItem.mediaUrl` `resolvePortfolioMediaUrl` (profile.service). */
+const MEDIA_FILE_PATH_PREFIX = "/api/media/file/";
+/**
+ * VISUAL-SEARCH-RANK-01 — множитель рейтинга. Раньше счёт умножался на
+ * `ratingAvg / 5`, и у мастера без единого отзыва он был НУЛЁМ: любой
+ * оценённый мастер, хоть с 1.0, стоял выше самого точного совпадения. На старте
+ * платформы отзывов нет почти ни у кого, то есть рейтинг решал выдачу вместо
+ * похожести. Теперь рейтинг подталкивает (5.0 → ×1, 1.0 → ×0.68), но не
+ * обнуляет, а «ещё без отзывов» считается как крепкая середина (≈3.5).
+ */
+const RATING_FACTOR_FLOOR = 0.6;
+const RATING_FACTOR_UNRATED = 0.88;
+
+export function ratingFactor(ratingAvg: number): number {
+  if (!Number.isFinite(ratingAvg) || ratingAvg <= 0) return RATING_FACTOR_UNRATED;
+  const clamped = Math.min(5, ratingAvg);
+  return RATING_FACTOR_FLOOR + (1 - RATING_FACTOR_FLOOR) * (clamped / 5);
+}
 
 type FilteredAssetRow = {
   id: string;
@@ -99,8 +118,21 @@ async function findFilteredAssets(input: {
   const clauses: Prisma.Sql[] = [
     Prisma.sql`"deletedAt" IS NULL`,
     Prisma.sql`"kind" = ${MediaKind.PORTFOLIO}::"MediaKind"`,
+    // Битый файл (`BROKEN`) в выдаче — это плитка без картинки.
+    Prisma.sql`"status" = ${MediaAssetStatus.READY}::"MediaAssetStatus"`,
     Prisma.sql`"visualIndexed" = TRUE`,
     Prisma.sql`"visualCategory" = ${input.category}`,
+    // VISUAL-SEARCH-VISIBILITY-01: работа, которую мастер скрыл из портфолио,
+    // не выдаётся и поиском. Условие — «нет СКРЫТОЙ работы с этим фото», а не
+    // «есть публичная»: у студийного портфолио строк `PortfolioItem` нет вовсе
+    // (фото — это сам `MediaAsset`), и требование публичной работы вычеркнуло
+    // бы из поиска все студии. Раньше скрытая работа не только находилась, но
+    // и рендерилась битой плиткой: её файл анониму не отдаётся.
+    Prisma.sql`NOT EXISTS (
+      SELECT 1 FROM "PortfolioItem" p
+      WHERE p."mediaUrl" = ${MEDIA_FILE_PATH_PREFIX}::text || "MediaAsset"."id"
+        AND p."isPublic" = FALSE
+    )`,
   ];
 
   if (input.useStrictFilters) {
@@ -176,10 +208,9 @@ function buildProviderResults(input: {
   }
 
   const results = Array.from(aggregations.values()).map((item) => {
-    const ratingFactor = Math.max(0, item.provider.ratingAvg) / 5;
     const recencyFactor =
       item.rawSimilaritySum > 0 ? item.recencyWeightedSum / item.rawSimilaritySum : 0;
-    const score = item.rawSimilaritySum * recencyFactor * ratingFactor;
+    const score = item.rawSimilaritySum * recencyFactor * ratingFactor(item.provider.ratingAvg);
 
     const matchingPhotos = [...item.photos]
       .sort((a, b) => b.similarity - a.similarity)
@@ -228,6 +259,24 @@ function logSearchOutcome(meta: Record<string, unknown>): void {
 export async function searchByImage(imageBytes: Uint8Array): Promise<VisualSearchResponse> {
   await assertVisualSearchEnabled();
 
+  try {
+    return await runSearch(imageBytes);
+  } catch (error) {
+    // VISUAL-SEARCH-TRANSIENT-01: провайдер не ответил — это не «на фото ничего
+    // нет». Отдельная причина: другой текст пользователю и ответ не кэшируется.
+    if (error instanceof VisualProviderUnavailableError) {
+      logSearchOutcome({
+        stage: "provider_unavailable",
+        reason: "unavailable",
+        providerStatus: error.status,
+      });
+      return { ok: false, reason: "unavailable" };
+    }
+    throw error;
+  }
+}
+
+async function runSearch(imageBytes: Uint8Array): Promise<VisualSearchResponse> {
   const resizedBytes = await resizeForVision(imageBytes);
   const classification = await classifyImage(resizedBytes, "visual-search:search");
 

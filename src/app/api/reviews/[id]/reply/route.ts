@@ -36,7 +36,11 @@ export async function POST(req: Request, ctx: RouteContext) {
     });
 
     try {
-      const fullReview = await loadReviewWithRelations(review.id);
+      // REVIEW-REPLY-NOTIFY-01: `review.id` из сервиса — ПУБЛИЧНЫЙ токен
+      // (`toReviewDto` → `encodePublicId`), а поиск сырой. Без декодирования
+      // `findFirst` не находил строку, и клиент не узнавал об ответе мастера —
+      // тот же дефект, что R2-06-E закрыл в `POST /api/reviews`.
+      const fullReview = await loadReviewWithRelations(decodePublicId(review.id));
       if (fullReview) {
         await notifyReviewReplied(fullReview);
       }

@@ -37,6 +37,12 @@ export type ClientBookingDTO = {
   proposedStartAt: string | null;
   proposedEndAt: string | null;
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /**
+   * PACKAGE-CANCEL-UI-01: услуга входит в пакет. Пакет отменяется только
+   * целиком (инв. #34), и отмена отдельной услуги отвечает 409 — поверхности
+   * нужно знать об этом заранее, чтобы предложить отмену пакета.
+   */
+  bookingPackageId: string | null;
   /** Maps action shows when address exists and viewing is master-on-site */
   isOnSite: boolean;
   address: string | null;
@@ -96,6 +102,7 @@ export async function listClientBookings(
       proposedStartAt: true,
       proposedEndAt: true,
       actionRequiredBy: true,
+      bookingPackageId: true,
       slotLabel: true,
       providerId: true,
       service: {
@@ -213,6 +220,7 @@ export async function listClientBookings(
       proposedEndAt:
         r.status === "CHANGE_REQUESTED" && r.proposedEndAt ? r.proposedEndAt.toISOString() : null,
       actionRequiredBy: r.status === "CHANGE_REQUESTED" ? (r.actionRequiredBy ?? null) : null,
+      bookingPackageId: r.bookingPackageId ?? null,
       isOnSite: !!address,
       address,
       provider: {

@@ -359,7 +359,9 @@ function deriveAction(n: NotificationItem): { href: string; label: string } | nu
   if (bookingId) {
     if (n.type === "BOOKING_COMPLETED_REVIEW") {
       return {
-        href: `/cabinet/bookings?review=${bookingId}`,
+        // REVIEW-PROMPT-01: раньше `?review=` не читал никто — открывался
+        // общий список без формы и без подсветки строки.
+        href: `/cabinet/bookings?focus=${encodeURIComponent(bookingId)}&review=${encodeURIComponent(bookingId)}`,
         label: T.actionLeaveReview,
       };
     }

@@ -37,6 +37,27 @@ export function hasProfessionalCabinet(cabinets: readonly CabinetKind[]): boolea
   return cabinets.some((cabinet) => cabinet !== "user");
 }
 
+/** Куда ведёт «Стать мастером» у вошедшего: карточки создания кабинета мастера/студии. */
+export const BECOME_MASTER_HREF = "/cabinet/roles";
+
+/**
+ * NAV-BECOME-MASTER-01 — показывать ли вошедшему пользователю «Стать мастером»
+ * как отдельную кнопку (шапка на десктопе, нижняя навигация и бургер в PWA).
+ *
+ * Кнопка живёт ровно до появления первого профессионального кабинета: на её
+ * месте потом встают ярлыки кабинетов (десктоп) и переключатель кабинетов
+ * (нижняя навигация). Источник — РОЛИ, тот же, что у `hasProfessionalCabinet`,
+ * иначе кнопка и подпись пункта меню разъехались бы. Администраторы платформы
+ * клиентами не являются — им кнопка не предлагается.
+ *
+ * Принимает `string[]`, а не `AccountType[]`: клиентские потребители получают
+ * роли из `/api/me` (`MeIdentity.roles: string[]`).
+ */
+export function shouldOfferBecomeMaster(roles: readonly string[]): boolean {
+  if (roles.includes(AccountType.ADMIN) || roles.includes(AccountType.SUPERADMIN)) return false;
+  return !hasProfessionalCabinet(getAvailableCabinets(roles as AccountType[]));
+}
+
 export function detectCurrentCabinet(pathname: string): CabinetKind {
   if (pathname.startsWith("/cabinet/master")) return "master";
   if (pathname.startsWith("/cabinet/studio")) return "studio";

@@ -195,7 +195,7 @@ function PendingReviewsBlock({ pending }: { pending: PendingReviewBooking[] }) {
               </div>
             </div>
             <Link
-              href={`/cabinet/bookings?review=${p.bookingId}`}
+              href={`/cabinet/bookings?focus=${encodeURIComponent(p.bookingId)}&review=${encodeURIComponent(p.bookingId)}`}
               className="shrink-0"
             >
               <Button size="sm" variant="primary">

@@ -1,4 +1,4 @@
-import { NotificationType, type ProviderType } from "@prisma/client";
+import { NotificationType, type Prisma, type ProviderType } from "@prisma/client";
 import {
   classifyNotificationChannel,
   resolveModelChannel,
@@ -50,11 +50,9 @@ export const MASTER_NOTIFICATION_TYPES: NotificationType[] = [
   NotificationType.BOOKING_RESCHEDULE_REQUESTED,
   NotificationType.BOOKING_REMINDER_24H, // ambiguous
   NotificationType.BOOKING_REMINDER_2H, // ambiguous
-  NotificationType.BOOKING_COMPLETED_REVIEW,
   NotificationType.BOOKING_NO_SHOW,
   // Reviews
   NotificationType.REVIEW_LEFT,
-  NotificationType.REVIEW_REPLIED, // ambiguous
   // Model offers — master side
   NotificationType.MODEL_NEW_APPLICATION,
   NotificationType.MODEL_APPLICATION_RECEIVED,
@@ -122,7 +120,58 @@ export const PERSONAL_ONLY_TYPES: NotificationType[] = [
   NotificationType.SUBSCRIPTION_GRANTED_BY_ADMIN,
   // Review removal notice — recipient is the review author (client side).
   NotificationType.REVIEW_DELETED_BY_ADMIN,
+  // NOTIF-PERSONAL-AMBIGUOUS-01: оба уходят ТОЛЬКО клиенту — запрос отзыва после
+  // визита (`notifyBookingCompletedReview`) и ответ мастера автору отзыва
+  // (`notifyReviewReplied`). Раньше они числились в мастерском списке, и
+  // личная лента (`notIn` этого списка) прятала их от единственного адресата.
+  NotificationType.BOOKING_COMPLETED_REVIEW,
+  NotificationType.REVIEW_REPLIED,
 ];
+
+/**
+ * NOTIF-PERSONAL-AMBIGUOUS-01 — типы из `MASTER_NOTIFICATION_TYPES`, которые про
+ * конкретную запись и уходят ОБЕИМ сторонам (напоминания 24ч/2ч, перенос и его
+ * запрос). Личная лента обязана показывать их клиенту этой записи.
+ *
+ * 🔴 Дефект: личный контекст строился как `type NOT IN MASTER_NOTIFICATION_TYPES`,
+ * то есть неоднозначные типы вырезались ЦЕЛИКОМ — клиент не видел у себя ни
+ * напоминаний о записи, ни предложения мастера перенести её, ни сообщений
+ * мастера в чате (бейдж их тоже не считал). Отличаем адресата по записи:
+ * `booking.clientUserId = получатель` — это уведомление клиенту.
+ */
+export const BOOKING_SCOPED_AMBIGUOUS_TYPES: NotificationType[] = [
+  NotificationType.BOOKING_REQUEST,
+  NotificationType.BOOKING_CREATED,
+  NotificationType.BOOKING_CANCELLED_BY_CLIENT,
+  NotificationType.BOOKING_RESCHEDULED,
+  NotificationType.BOOKING_RESCHEDULE_REQUESTED,
+  NotificationType.BOOKING_REMINDER_24H,
+  NotificationType.BOOKING_REMINDER_2H,
+  NotificationType.BOOKING_NO_SHOW,
+];
+
+/**
+ * Условие личной ленты для получателя `userId` (NOTIF-PERSONAL-AMBIGUOUS-01):
+ *   · всё, что не в мастерском списке;
+ *   · неоднозначные типы про запись, где получатель — клиент;
+ *   · сообщение чата, отправленное МАСТЕРОМ (его адресат — клиент). Колонка
+ *     `bookingId` у чатовых уведомлений не заполнена, поэтому признак — в
+ *     полезной нагрузке (`senderType`, `chat/message-sender.ts`).
+ * Одно место на ленту, счётчик непрочитанного, «прочитать все» и бейдж
+ * клиентского сайдбара — иначе бейдж и лента разъехались бы.
+ */
+export function personalNotificationWhere(userId: string): Prisma.NotificationWhereInput {
+  return {
+    OR: [
+      { type: { notIn: MASTER_NOTIFICATION_TYPES } },
+      { type: { in: BOOKING_SCOPED_AMBIGUOUS_TYPES }, booking: { clientUserId: userId } },
+      {
+        type: NotificationType.CHAT_MESSAGE_RECEIVED,
+        payloadJson: { path: ["senderType"], equals: "MASTER" },
+      },
+    ],
+  };
+}
 
 export type NotificationContext = "master" | "personal" | "all";
 

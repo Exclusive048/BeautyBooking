@@ -3,6 +3,7 @@ import { env, isVisualSearchEnabled } from "@/lib/env";
 import { createSystemDisabledError } from "@/lib/billing/guards";
 import { del, get, set } from "@/lib/cache/cache";
 import { prisma } from "@/lib/prisma";
+import { resolveVisualSearchEnabled } from "@/lib/visual-search/enabled";
 
 export const VISUAL_SEARCH_SYSTEM_CONFIG_KEY = "visualSearchEnabled";
 export const VISUAL_SEARCH_CACHE_KEY = "system:visual-search-enabled";
@@ -39,10 +40,8 @@ export async function getVisualSearchEnabled(): Promise<boolean> {
     select: { value: true },
   });
 
-  const resolved =
-    typeof setting?.value === "boolean"
-      ? setting.value
-      : getVisualSearchEnabledByEnv();
+  // VISUAL-SEARCH-TOGGLE-01: креды — потолок, тумблер админа — ниже него.
+  const resolved = resolveVisualSearchEnabled(setting?.value);
 
   await set(VISUAL_SEARCH_CACHE_KEY, resolved, VISUAL_SEARCH_CACHE_TTL_SECONDS);
   return resolved;

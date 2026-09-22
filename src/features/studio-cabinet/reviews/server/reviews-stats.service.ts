@@ -1,3 +1,4 @@
+import { studioReviewsWhere } from "@/lib/reviews/studio-scope";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import type {
@@ -21,8 +22,13 @@ const TOP_SERVICES_LIMIT = 5;
  * the reference's "топ/анти-топ мастера" stat (simpler + actionable).
  */
 export async function loadStudioReviewsStats(studioId: string): Promise<StudioReviewsStats> {
+  const studio = await prisma.studio.findUnique({
+    where: { id: studioId },
+    select: { id: true, providerId: true },
+  });
   const reviews = await prisma.review.findMany({
-    where: { ...ACTIVE_REVIEW_FILTER, studioId },
+    // STUDIO-REVIEWS-SCOPE-01
+    where: { ...ACTIVE_REVIEW_FILTER, ...(studio ? studioReviewsWhere(studio) : { studioId }) },
     select: {
       rating: true,
       booking: { select: { service: { select: { name: true, title: true } } } },

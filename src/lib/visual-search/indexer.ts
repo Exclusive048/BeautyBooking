@@ -13,6 +13,7 @@ import {
   describeImageWithStrategy,
   isRetryableProviderError,
   resizeForVision,
+  VisualProviderUnavailableError,
 } from "@/lib/visual-search/provider";
 
 const EMBEDDING_DIMENSIONS = 256;
@@ -204,6 +205,12 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
       `;
     });
   } catch (error) {
+    // VISUAL-SEARCH-TRANSIENT-01: отказ провайдера отдаётся воркеру — он
+    // ретраит с backoff и после исчерпания попыток кладёт задачу в dead-letter.
+    // Фото при этом остаётся `visualIndexed = false`, то есть его подберёт
+    // следующая переиндексация. Раньше здесь глотались ВСЕ ошибки, и ветка
+    // ретрая в `worker.ts` была недостижима.
+    if (error instanceof VisualProviderUnavailableError) throw error;
     logError("Visual search indexing failed", {
       assetId,
       error: error instanceof Error ? error.message : String(error),

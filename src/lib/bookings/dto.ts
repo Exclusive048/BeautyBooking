@@ -53,6 +53,12 @@ export type BookingClientDto = Omit<BookingDto, "service"> & {
 export type BookingStatusUpdateDto = {
   id: string;
   status: BookingStatus;
+  /**
+   * CONFIRM-IDEMPOTENT-NOTIFY-01: переход не состоялся — бронь уже была в этом
+   * статусе (повторный сабмит, второе устройство). Вызывающий по нему НЕ шлёт
+   * уведомление повторно.
+   */
+  unchanged?: true;
 };
 
 export type ClientBookingStatus = BookingStatus;

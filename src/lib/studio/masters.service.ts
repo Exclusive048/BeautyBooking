@@ -1,5 +1,4 @@
 import { AppError } from "@/lib/api/errors";
-import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
@@ -25,12 +24,13 @@ export type StudioMasterDetails = {
 type StudioContext = {
   id: string;
   providerId: string;
+  provider: { timezone: string };
 };
 
 async function getStudioContext(studioId: string): Promise<StudioContext> {
   const studio = await prisma.studio.findUnique({
     where: { id: studioId },
-    select: { id: true, providerId: true },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
     throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
@@ -137,7 +137,10 @@ export async function createStudioMaster(input: {
             contactPhone: input.phone,
             address: "",
             district: "",
-            timezone: env.DEFAULT_TIMEZONE,
+            // STUDIO-MASTER-TZ-01: пояс студии, а не пояс по умолчанию (Москва):
+            // рабочие часы мастера и его слоты считаются в его поясе, и у
+            // екатеринбургской студии они съезжали на 2 часа.
+            timezone: studio.provider.timezone,
             categories: [],
             availableToday: false,
           },

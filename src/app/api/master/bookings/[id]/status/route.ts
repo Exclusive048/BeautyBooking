@@ -12,6 +12,7 @@ import {
   notifyBookingNoShow,
   notifyBookingRejected,
   notifyCancelledByMaster,
+  notifyRescheduleDeclinedByMaster,
 } from "@/lib/notifications/booking-notifications";
 
 type RouteContext = {
@@ -39,9 +40,14 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       comment: body.comment,
     });
     try {
-      const fullBooking = await loadBookingWithRelations(result.id);
+      const fullBooking = result.unchanged ? null : await loadBookingWithRelations(result.id);
       if (fullBooking) {
-        if (body.status === "CONFIRMED") {
+        if (result.outcome === "RESCHEDULE_DECLINED") {
+          // RESCHEDULE-DECLINE-NOTIFY-01: запись осталась на прежнем времени —
+          // прежний `notifyBookingRejected` сообщал клиенту «Запись отклонена»,
+          // и клиент считал визит отменённым, а мастер его ждал.
+          await notifyRescheduleDeclinedByMaster(fullBooking);
+        } else if (body.status === "CONFIRMED") {
           await notifyBookingConfirmed(fullBooking);
         } else if (body.status === "NO_SHOW") {
           await notifyBookingNoShow(fullBooking);

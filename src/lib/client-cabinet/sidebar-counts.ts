@@ -3,7 +3,7 @@ import { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
 import { reviewCandidateWhere } from "@/lib/client-cabinet/reviews.service";
-import { MASTER_NOTIFICATION_TYPES } from "@/lib/notifications/groups";
+import { personalNotificationWhere } from "@/lib/notifications/groups";
 
 export type SidebarCounts = {
   favorites: number;
@@ -58,7 +58,8 @@ export const getClientSidebarCounts = cache(
             userId,
             isRead: false,
             deletedAt: null,
-            type: { notIn: MASTER_NOTIFICATION_TYPES },
+            // NOTIF-PERSONAL-AMBIGUOUS-01: то же условие, что у ленты и колокольчика.
+            ...personalNotificationWhere(userId),
           },
         }),
         prisma.booking.findMany({

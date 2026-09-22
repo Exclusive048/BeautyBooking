@@ -41,6 +41,7 @@ import {
 import { runHotSlotExpiringJob } from "@/lib/hot-slots/job";
 import { runSmartPriceJob } from "@/lib/hot-slots/smart-price-job";
 import { runBookingReviewPromptJob } from "@/lib/bookings/review-prompts";
+import { finalizePastBookings } from "@/lib/bookings/finalize-past";
 import {
   indexMediaAsset,
   isVisualSearchMissingAssetError,
@@ -184,6 +185,29 @@ function startPeriodicJobs() {
   // Startup run — non-blocking (fire-and-forget; never delays worker boot).
   runAvailableTodaySweep();
 
+  // BOOKING-FINALIZE-01: подтверждённые визиты после окончания → `FINISHED` в БД
+  // (раньше статус только вычислялся, и всё, что фильтрует по нему, видело
+  // ноль). Батч 200; за тик — до 10 батчей, чтобы первый запуск на накопленной
+  // истории не растягивался на сутки, но и не держал БД одним длинным проходом.
+  const runFinalizePastBookings = async () => {
+    let total = 0;
+    for (let batch = 0; batch < 10; batch += 1) {
+      const summary = await finalizePastBookings();
+      total += summary.finished;
+      if (summary.candidates < 200) break;
+    }
+    if (total > 0) logInfo("bookings.finalize.done", { finished: total });
+  };
+  const runFinalizeSafe = () => {
+    void runFinalizePastBookings().catch((error) => {
+      logError("Booking finalize job failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      reportWorkerFailure("bookings.finalize", error);
+    });
+  };
+  runFinalizeSafe();
+
   const intervalMs = 30 * 60 * 1000;
   setInterval(() => {
     void runHotSlotExpiringJob().catch((error) => {
@@ -192,6 +216,7 @@ function startPeriodicJobs() {
       });
       reportWorkerFailure("hotSlots.expiring", error);
     });
+    runFinalizeSafe();
     void runBookingReviewPromptJob().catch((error) => {
       logError("Booking review prompt job failed", {
         error: error instanceof Error ? error.message : String(error),

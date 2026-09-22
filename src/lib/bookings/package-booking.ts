@@ -37,6 +37,7 @@ import {
   type PackageBookingResult,
 } from "@/lib/bookings/package-idempotency";
 import { logError } from "@/lib/logging/logger";
+import { notifyPackageBookingCreated } from "@/lib/bookings/package-notify";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 
 /**
@@ -621,6 +622,13 @@ async function createSoloPackageBookingUnguarded(
       });
     }
   }
+
+  // PACKAGE-NOTIFY-01: одно уведомление на пакет — стороне провайдера (и
+  // клиенту при автоподтверждении). Раньше пакет не уведомлял никого.
+  await notifyPackageBookingCreated({
+    bookingIds: result.bookingIds,
+    autoConfirmed: shouldAutoConfirm,
+  });
 
   return result;
 }

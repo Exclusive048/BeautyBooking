@@ -41,6 +41,8 @@ import {
   describeImageWithStrategy,
   createDocEmbedding,
   createQueryEmbedding,
+  isRetryableProviderError,
+  VisualProviderUnavailableError,
   _resetClientForTesting,
 } from "./provider";
 
@@ -189,10 +191,52 @@ describe("embeddings — doc/query split, native 256, no dim param", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns null on a non-ok embedding response", async () => {
-    const fetchMock = mockEmbeddingFetch(256, false, 400);
-    vi.stubGlobal("fetch", fetchMock);
-    expect(await createQueryEmbedding("x")).toBeNull();
+  // VISUAL-SEARCH-TRANSIENT-01: HTTP-отказ — это отказ ПРОВАЙДЕРА, а не
+  // непригодный ответ. Прежний контракт (`null`) и был дефектом: индексатор
+  // превращал его в «нераспознано» навсегда.
+  it("non-ok embedding response throws VisualProviderUnavailableError", async () => {
+    vi.stubGlobal("fetch", mockEmbeddingFetch(256, false, 429));
+    const error = await createQueryEmbedding("x").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(VisualProviderUnavailableError);
+    expect((error as VisualProviderUnavailableError).status).toBe(429);
+    expect(isRetryableProviderError(error)).toBe(true);
     vi.unstubAllGlobals();
+  });
+
+  it("402 (баланс) — отказ провайдера без ретрая", async () => {
+    vi.stubGlobal("fetch", mockEmbeddingFetch(256, false, 402));
+    const error = await createDocEmbedding("x").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(VisualProviderUnavailableError);
+    expect(isRetryableProviderError(error)).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("network failure throws a retryable VisualProviderUnavailableError", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("fetch failed"))));
+    const error = await createDocEmbedding("x").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(VisualProviderUnavailableError);
+    expect(isRetryableProviderError(error)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("vision — отказ провайдера отличим от непригодного ответа", () => {
+  it("SDK-исключение → VisualProviderUnavailableError (а не null → «нераспознано»)", async () => {
+    mockCreate.mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }));
+    const error = await requestVisionJson({
+      imageBytes: IMAGE,
+      systemPrompt: "s",
+      userPrompt: "u",
+      meter: "visual-search:index",
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(VisualProviderUnavailableError);
+    expect(isRetryableProviderError(error)).toBe(true);
+  });
+
+  it("пустой ответ модели — по-прежнему null (ответ пришёл, но непригоден)", async () => {
+    mockCreate.mockResolvedValueOnce({ choices: [{ message: { content: "" } }] });
+    expect(
+      await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" })
+    ).toBeNull();
   });
 });

@@ -267,6 +267,16 @@ export async function updateStudioProviderProfile(
 
   if (!provider || provider.type !== ProviderType.STUDIO) return null;
 
+  // STUDIO-MASTER-TZ-01: мастера студии работают в её поясе (см.
+  // `attachMasterToStudio`). Сменилась зона студии — меняется и у команды,
+  // иначе проверка рабочих часов и слоты мастеров остаются в старой зоне.
+  if (resolvedTimezone !== undefined) {
+    await prisma.provider.updateMany({
+      where: { studioId: provider.id, type: ProviderType.MASTER, timezone: { not: resolvedTimezone } },
+      data: { timezone: resolvedTimezone },
+    });
+  }
+
   if (input.bannerAssetId !== undefined) {
     await setStudioBannerAssetId(provider.id, input.bannerAssetId);
   }

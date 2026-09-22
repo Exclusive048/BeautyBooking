@@ -297,7 +297,9 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   const handleConfirm = useCallback(async () => {
     if (!proposal) return;
     const trimmedName = name.trim() || me?.displayName?.trim() || "";
-    const trimmedPhone = (me?.phone ?? phone).trim();
+    // BOOKING-AUTH-NO-PHONE-01: у вошедшего по почте/VK/Яндексу телефона в
+    // профиле нет (вход по телефону в проде выключен) — берём введённый.
+    const trimmedPhone = (me?.phone || phone).trim();
     if (!trimmedName) {
       setError(T.nameRequired);
       return;
@@ -602,6 +604,14 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
               {T.bookingAs.replace("{name}", me.displayName ?? name)}
             </div>
           )}
+          {/* BOOKING-AUTH-NO-PHONE-01: вошедший без телефона в профиле — см.
+              `package-booking-flow.tsx`. */}
+          {me && !me.phone ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={T.phonePlaceholder} inputMode="tel" />
+            </label>
+          ) : null}
           {/* RKN-FIX-02 — guest consent per purpose (server-enforced). */}
           {!me ? <LegalConsentGroup compact value={consent} onChange={setConsent} /> : null}
           <label className="block text-sm">

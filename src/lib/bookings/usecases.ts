@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
 import { toBookingDto } from "@/lib/bookings/mappers";
@@ -18,6 +19,9 @@ import {
 import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { AppError } from "@/lib/api/errors";
 import { applyBookingTransition } from "@/lib/bookings/transition";
+import { confirmBooking } from "@/lib/bookings/confirmBooking";
+import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
+import { isGuestClassProfile } from "@/lib/legal/consent";
 
 type RescheduleRecord = BookingDto;
 
@@ -103,6 +107,28 @@ async function resolveBufferMinutes(
   });
   return normalizeBufferMinutes(provider?.bufferBetweenBookingsMin);
 }
+
+const RESCHEDULE_RESULT_SELECT = {
+  id: true,
+  status: true,
+  slotLabel: true,
+  providerId: true,
+  masterProviderId: true,
+  clientName: true,
+  clientPhone: true,
+  comment: true,
+  silentMode: true,
+  startAtUtc: true,
+  endAtUtc: true,
+  actionRequiredBy: true,
+  requestedBy: true,
+  changeComment: true,
+  proposedStartAt: true,
+  proposedEndAt: true,
+  clientChangeRequestsCount: true,
+  masterChangeRequestsCount: true,
+  service: { select: { id: true, name: true } },
+} satisfies Prisma.BookingSelect;
 
 export async function rescheduleBooking(input: {
   bookingId: string;
@@ -347,27 +373,7 @@ export async function rescheduleBooking(input: {
         : { masterChangeRequestsCount: { increment: 1 } }),
       ...(typeof input.silentMode === "boolean" ? { silentMode: input.silentMode } : {}),
     },
-    select: {
-      id: true,
-      status: true,
-      slotLabel: true,
-      providerId: true,
-      masterProviderId: true,
-      clientName: true,
-      clientPhone: true,
-      comment: true,
-      silentMode: true,
-      startAtUtc: true,
-      endAtUtc: true,
-      actionRequiredBy: true,
-      requestedBy: true,
-      changeComment: true,
-      proposedStartAt: true,
-      proposedEndAt: true,
-      clientChangeRequestsCount: true,
-      masterChangeRequestsCount: true,
-      service: { select: { id: true, name: true } },
-    },
+    select: RESCHEDULE_RESULT_SELECT,
   });
 
   await invalidateSlotsForBookingMove({
@@ -387,7 +393,37 @@ export async function rescheduleBooking(input: {
     },
   });
 
+  // RESCHEDULE-NO-CLIENT-ACCOUNT-01: у клиента нет аккаунта, в который можно
+  // войти (ручная запись по звонку — `clientUserId` пуст; гостевая бронь —
+  // пассивный профиль без единого входа, а вход по телефону в проде выключен).
+  // Предложение уходило стороне, которая ответить не может: запись навсегда
+  // застревала в «ждём ответа клиента», прежнее время оставалось занятым, новое
+  // не держалось, а мастер отозвать предложение не мог. Мастер в этом случае
+  // договорился с клиентом сам (по телефону) — перенос применяется сразу, тем
+  // же `confirmBooking` за клиента: in-tx проверка пересечений, перепланирование
+  // напоминаний и инвалидация слотов — общие с обычным согласием.
+  if (input.actor === "MASTER" && (await isClientUnreachable(booking.clientUserId))) {
+    try {
+      await confirmBooking(updated.id, "CLIENT");
+    } catch (error) {
+      // Окно успели занять между предложением и применением — не оставляем
+      // запись зависшей: откатываем предложение, отдаём отказ.
+      await declineClientRescheduleRequest(updated.id, "CLIENT").catch(() => undefined);
+      throw error;
+    }
+    const applied = await prisma.booking.findUnique({
+      where: { id: updated.id },
+      select: RESCHEDULE_RESULT_SELECT,
+    });
+    if (applied) return { ok: true, data: toBookingDto(applied) };
+  }
+
   return { ok: true, data: toBookingDto(updated) };
+}
+
+async function isClientUnreachable(clientUserId: string | null): Promise<boolean> {
+  if (!clientUserId) return true;
+  return isGuestClassProfile(clientUserId);
 }
 
 

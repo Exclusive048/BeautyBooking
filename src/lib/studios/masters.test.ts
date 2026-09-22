@@ -33,7 +33,11 @@ const MASTER_ID = "master-1";
 beforeEach(() => {
   vi.clearAllMocks();
   // ensureStudio
-  findUnique.mockResolvedValue({ id: STUDIO_ID, type: ProviderType.STUDIO });
+  findUnique.mockResolvedValue({
+    id: STUDIO_ID,
+    type: ProviderType.STUDIO,
+    timezone: "Asia/Yekaterinburg",
+  });
 });
 
 describe("attachMasterToStudio — SEC-27", () => {
@@ -67,12 +71,18 @@ describe("attachMasterToStudio — SEC-27", () => {
   });
 
   it("идемпотентен для мастера, уже состоящего в ЭТОЙ студии — без записи", async () => {
-    findFirst.mockResolvedValue({ id: MASTER_ID, name: "Аня", studioId: STUDIO_ID });
+    findFirst.mockResolvedValue({
+      id: MASTER_ID,
+      name: "Аня",
+      studioId: STUDIO_ID,
+      timezone: "Asia/Yekaterinburg",
+    });
 
     const result = await attachMasterToStudio(STUDIO_ID, MASTER_ID);
 
     expect(result.ok).toBe(true);
     expect(updateMany).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("отдаёт 409 мастеру, занятому ДРУГОЙ студией — текст ответа не изменился", async () => {
@@ -113,8 +123,39 @@ describe("attachMasterToStudio — SEC-27", () => {
 
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: MASTER_ID, type: ProviderType.MASTER, studioId: null },
-      data: { studioId: STUDIO_ID },
+      data: { studioId: STUDIO_ID, timezone: "Asia/Yekaterinburg" },
     });
     expect(update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * STUDIO-MASTER-TZ-01 — мастер студии живёт в её часовом поясе.
+ *
+ * Приглашённый мастер создавался с поясом по умолчанию (Москва) и таким
+ * оставался: у екатеринбургской студии проверка рабочих часов при создании и
+ * переносе записи и публичные слоты мастера съезжали на 2 часа.
+ *
+ * @probe 2026-09-22 — в ветке «уже в этой студии» убрана синхронизация пояса:
+ * красным стал «приём приглашения выравнивает пояс мастера с поясом студии»
+ * (`update` не вызван). Возвращена — зелёный.
+ */
+describe("attachMasterToStudio — STUDIO-MASTER-TZ-01", () => {
+  it("приём приглашения выравнивает пояс мастера с поясом студии", async () => {
+    // staged-профиль приглашённого мастера уже несёт `studioId` этой студии
+    findFirst.mockResolvedValue({
+      id: MASTER_ID,
+      name: "Аня",
+      studioId: STUDIO_ID,
+      timezone: "Europe/Moscow",
+    });
+
+    await attachMasterToStudio(STUDIO_ID, MASTER_ID);
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: MASTER_ID },
+      data: { timezone: "Asia/Yekaterinburg" },
+      select: { id: true },
+    });
   });
 });

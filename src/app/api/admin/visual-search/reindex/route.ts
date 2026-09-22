@@ -34,6 +34,20 @@ export async function POST(req: Request) {
       take: BATCH_SIZE,
     });
 
+    // VISUAL-SEARCH-TRANSIENT-01: и без `force` у выбранных фото снимается
+    // `visualIndexed`. Отбор по умолчанию — «без категории», а в него входят и
+    // фото, помеченные нераспознанными (`visualIndexed = true`): индексатор их
+    // пропускал, то есть кнопка ставила задачи, которые ничего не делали, а
+    // фото, потерянные из-за прежнего сбоя провайдера (он тоже помечал их
+    // нераспознанными), не восстанавливались без `force`. Векторов у таких
+    // фото нет — сбрасывать нечего, кроме флага.
+    if (!force && assets.length > 0) {
+      await prisma.mediaAsset.updateMany({
+        where: { id: { in: assets.map((asset) => asset.id) }, visualIndexed: true },
+        data: { visualIndexed: false, visualIndexedAt: null },
+      });
+    }
+
     if (force && assets.length > 0) {
       const ids = assets.map((asset) => asset.id);
       await prisma.$transaction(async (tx) => {

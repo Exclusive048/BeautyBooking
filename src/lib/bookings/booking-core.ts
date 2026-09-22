@@ -54,6 +54,7 @@ export type BookingCoreContext = {
     studioId: string | null;
     timezone: string;
     bufferBetweenBookingsMin: number;
+    autoConfirmBookings: boolean;
   } | null;
   resolvedMasterProviderId: string | null;
   durationMin: number;
@@ -340,6 +341,7 @@ export async function resolveBookingCore(input: {
             studioId: true,
             timezone: true,
             bufferBetweenBookingsMin: true,
+            autoConfirmBookings: true,
           },
         })
       : null;
@@ -466,8 +468,17 @@ export async function resolveBookingCore(input: {
       : provider.bufferBetweenBookingsMin;
   const bufferMin = normalizeBufferMinutes(bufferSource);
 
+  // STUDIO-AUTOCONFIRM-01: решает флаг ИСПОЛНИТЕЛЯ. Переключатель
+  // «Автоподтверждение» пишет `autoConfirmBookings` в строку мастера — и из
+  // правил мастера в кабинете студии, и из кабинета самого мастера, — а здесь
+  // флаг читался только у соло-мастера. Итог: у студии переключатель ничего не
+  // делал, каждая запись висела неподтверждённой (без напоминаний клиенту),
+  // пока мастер не откроет кабинет. Буфер уже берётся у исполнителя тем же
+  // правилом (см. выше).
   const shouldAutoConfirm =
-    provider.type === ProviderType.MASTER && !provider.studioId && provider.autoConfirmBookings;
+    resolvedMasterProviderId && resolvedMasterProviderId !== provider.id
+      ? Boolean(master?.autoConfirmBookings)
+      : provider.type === ProviderType.MASTER && provider.autoConfirmBookings;
 
   return {
     provider,

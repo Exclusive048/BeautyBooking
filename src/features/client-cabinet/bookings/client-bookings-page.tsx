@@ -54,6 +54,9 @@ type Filter = {
 const fetcher = (url: string) =>
   fetchJson<ClientBookingsPayload>(url, { credentials: "include" });
 
+/** REVIEW-PROMPT-01 — deep-link «открыть форму отзыва по этой записи». */
+const REVIEW_PARAM = "review";
+
 export function ClientBookingsPage() {
   const [filter, setFilter] = useState<Filter>({ status: "all", search: "" });
   const [rescheduleTarget, setRescheduleTarget] = useState<ClientBookingDTO | null>(null);
@@ -91,6 +94,28 @@ export function ClientBookingsPage() {
   // FIX-R2-06-B: honor `?focus=<bookingId>` deep-link — scroll-to + highlight
   // the row once the SWR list has loaded (rows aren't in the DOM on mount).
   useFocusHighlight(bookings.length);
+
+  // REVIEW-PROMPT-01: `?review=<bookingId>` из запроса отзыва (уведомление,
+  // пуш, «Ждут отзыва») открывает форму сразу. Раньше параметр не читал никто:
+  // клиент попадал в общий список и искал запись сам. Параметр снимается после
+  // первой попытки — иначе форма открывалась бы заново после каждого
+  // обновления списка. `replaceState(null, …)` — см. schedule-view-state.ts:
+  // состояние с `__NA` патч Next считает своим и не синхронизирует роутер.
+  useEffect(() => {
+    if (bookings.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const reviewId = params.get(REVIEW_PARAM);
+    if (!reviewId) return;
+    const target = bookings.find((b) => b.id === reviewId);
+    if (target?.canReview) startTransition(() => setReviewTarget(target));
+    params.delete(REVIEW_PARAM);
+    const search = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`,
+    );
+  }, [bookings]);
 
   // FIX-B18: `GET /api/bookings/[id]/ics` — навигация (ссылка «В календарь»), и
   // её отказы раньше рисовали в окне JSON-конверт. Теперь она возвращает
@@ -160,16 +185,32 @@ export function ClientBookingsPage() {
   }
 
   async function handleCancel(booking: ClientBookingDTO) {
-    const ok = await confirm({
-      title: T.cancelConfirmTitle,
-      message: T.cancelConfirmBody,
-      confirmLabel: T.cancelConfirmAction,
-      variant: "danger",
-    });
+    // PACKAGE-CANCEL-UI-01: услуга из пакета отменяется только вместе с пакетом.
+    // Раньше «Отменить» на ней отвечало 409 «Этот пакет отменяется целиком» —
+    // и следующего шага не было: отмену пакета не вызывала ни одна кнопка.
+    const packageId = booking.bookingPackageId;
+    const ok = await confirm(
+      packageId
+        ? {
+            title: T.cancelPackageConfirmTitle,
+            message: T.cancelPackageConfirmBody,
+            confirmLabel: T.cancelPackageConfirmAction,
+            variant: "danger",
+          }
+        : {
+            title: T.cancelConfirmTitle,
+            message: T.cancelConfirmBody,
+            confirmLabel: T.cancelConfirmAction,
+            variant: "danger",
+          },
+    );
     if (!ok) return;
     setCancelState({ id: booking.id, busy: true, error: null });
     try {
-      await fetchJson(`/api/bookings/${booking.id}/cancel`, {
+      const url = packageId
+        ? `/api/bookings/package/${encodeURIComponent(packageId)}/cancel`
+        : `/api/bookings/${booking.id}/cancel`;
+      await fetchJson(url, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

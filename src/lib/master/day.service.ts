@@ -12,6 +12,7 @@ import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { BookingSource, type BookingStatus } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
 import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 
 export type MasterDayBooking = {
   id: string;
@@ -494,7 +495,13 @@ export async function createSoloMasterBooking(input: {
           notes: input.notes?.trim() || null,
           // Мастер заносит уже известную запись руками — MANUAL здесь правда.
           source: BookingSource.MANUAL,
-          status: "PENDING",
+          // MANUAL-BOOKING-CONFIRMED-01: мастер сам заносит известную ему запись —
+          // подтверждать её самому себе бессмысленно, а неподтверждённая она
+          // выпадала из жизненного цикла целиком: ни напоминаний (они только для
+          // подтверждённых — мастеру тоже), ни `FINISHED` после визита
+          // (BOOKING-FINALIZE-01 не объявляет визитом неподтверждённое), то есть
+          // ручные клиенты не попадали в CRM, «визиты» и выручку.
+          status: "CONFIRMED",
           // R2-01-D: a solo master entering a manual booking is recording a known
           // appointment — flagging the master to "action" their own booking is a
           // redundant self-action (it nagged in the dashboard attention panel). Drop
@@ -530,6 +537,9 @@ export async function createSoloMasterBooking(input: {
     endAtUtc: endAt,
   });
   await invalidateAdvisorCache(input.masterId);
+  // MANUAL-BOOKING-CONFIRMED-01: пост-коммитная обёртка (сбой очереди не даёт
+  // 500 на уже созданную запись, RES-03).
+  await scheduleBookingRemindersSafe(created.id);
 
   return { id: created.id };
 }

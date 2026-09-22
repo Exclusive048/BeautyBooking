@@ -47,6 +47,9 @@ function mapReasonToMessage(reason: VisualSearchFailureReason): string {
   if (reason === "low_confidence") {
     return UI_TEXT.home.visualSearch.messages.lowConfidence;
   }
+  if (reason === "unavailable") {
+    return UI_TEXT.home.visualSearch.messages.unavailable;
+  }
   return UI_TEXT.home.visualSearch.messages.notEnoughIndexed;
 }
 
@@ -119,6 +122,7 @@ export async function POST(req: Request) {
     const response: VisualSearchHttpResponse = result.ok
       ? result
       : { ...result, message: mapReasonToMessage(result.reason) };
+    // Срок хранения зависит от исхода (VISUAL-SEARCH-CACHE-01) — см. guards.
     await setCachedByPhotoResult(imageHash, response);
     return jsonOk<VisualSearchHttpResponse>(response);
   } catch (error) {

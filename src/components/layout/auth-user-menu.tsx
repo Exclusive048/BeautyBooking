@@ -23,6 +23,12 @@ type Props = {
    * Empty array hides the switcher entirely (legacy guests, fallback).
    */
   availableCabinets?: CabinetKind[];
+  /**
+   * NAV-BECOME-MASTER-01 — «Стать мастером» вынесено в шапку (слот ярлыков
+   * кабинетов, `topbar.tsx`). Пока оно там, пункт `/cabinet/roles` в этом
+   * меню не дублируется; с первым кабинетом он возвращается как «Мои кабинеты».
+   */
+  offerBecomeMaster?: boolean;
 };
 
 const CABINET_ICON: Record<CabinetKind, typeof UserCircle2> = {
@@ -37,7 +43,12 @@ const CABINET_LABEL: Record<CabinetKind, string> = {
   studio: UI_TEXT.clientCabinet.switcher.studio,
 };
 
-export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] }: Props) {
+export function AuthUserMenu({
+  userLabel,
+  showAdminLink,
+  availableCabinets = [],
+  offerBecomeMaster = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const reduce = useReducedMotion();
@@ -155,14 +166,16 @@ export function AuthUserMenu({ userLabel, showAdminLink, availableCabinets = [] 
                 <User className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
                 {UI_TEXT.nav.profile}
               </Link>
-              <Link
-                href="/cabinet/roles"
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
-                onClick={closeMenu}
-              >
-                <LogIn className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
-                {professionalLabel}
-              </Link>
+              {offerBecomeMaster ? null : (
+                <Link
+                  href="/cabinet/roles"
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"
+                  onClick={closeMenu}
+                >
+                  <LogIn className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
+                  {professionalLabel}
+                </Link>
+              )}
               <Link
                 href="/cabinet/settings"
                 className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-text-main transition hover:bg-bg-input"

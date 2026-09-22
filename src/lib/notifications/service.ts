@@ -10,6 +10,7 @@ import { logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import {
   MASTER_NOTIFICATION_TYPES,
+  personalNotificationWhere,
   type NotificationContext,
 } from "@/lib/notifications/groups";
 import { getNotificationsNotifier } from "@/lib/notifications/notifier";
@@ -497,13 +498,12 @@ export async function markAllNotificationsRead(
   userId: string,
   context?: NotificationContext
 ): Promise<void> {
-  const typeFilter = buildTypeFilter(context);
   await prisma.notification.updateMany({
     where: {
       userId,
       isRead: false,
       deletedAt: null,
-      ...(typeFilter ? { type: typeFilter } : {}),
+      ...buildContextWhere(context, userId),
     },
     data: { isRead: true, readAt: new Date() },
   });
@@ -542,13 +542,11 @@ export async function listNotifications(input: {
 }): Promise<{ items: NotificationRecord[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(input.limit ?? 30, 1), 100);
   const cursorId = input.cursor?.trim();
-  const typeFilter = buildTypeFilter(input.context);
-
   const items = await prisma.notification.findMany({
     where: {
       userId: input.userId,
       deletedAt: null,
-      ...(typeFilter ? { type: typeFilter } : {}),
+      ...buildContextWhere(input.context, input.userId),
     },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     take: limit,
@@ -569,13 +567,12 @@ export async function getUnreadCount(
   userId: string,
   context?: NotificationContext
 ): Promise<number> {
-  const typeFilter = buildTypeFilter(context);
   return prisma.notification.count({
     where: {
       userId,
       isRead: false,
       deletedAt: null,
-      ...(typeFilter ? { type: typeFilter } : {}),
+      ...buildContextWhere(context, userId),
     },
   });
 }
@@ -620,10 +617,16 @@ export async function setNotificationRead(
   return { id: notificationId, isRead };
 }
 
-function buildTypeFilter(
-  context: NotificationContext | undefined
-): { in: NotificationType[] } | { notIn: NotificationType[] } | null {
-  if (!context || context === "all") return null;
-  if (context === "master") return { in: MASTER_NOTIFICATION_TYPES };
-  return { notIn: MASTER_NOTIFICATION_TYPES };
+/**
+ * Условие контекста ленты (26-NOTIF-A). `master` — грубый SQL-список, точную
+ * классификацию делает центр уведомлений; `personal` — см.
+ * `personalNotificationWhere` (NOTIF-PERSONAL-AMBIGUOUS-01).
+ */
+function buildContextWhere(
+  context: NotificationContext | undefined,
+  userId: string,
+): Prisma.NotificationWhereInput {
+  if (!context || context === "all") return {};
+  if (context === "master") return { type: { in: MASTER_NOTIFICATION_TYPES } };
+  return personalNotificationWhere(userId);
 }

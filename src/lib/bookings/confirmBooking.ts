@@ -93,7 +93,7 @@ export async function confirmBooking(
   }
 
   if (runtimeStatus === "CONFIRMED") {
-    return { id: booking.id, status: "CONFIRMED" };
+    return { id: booking.id, status: "CONFIRMED", unchanged: true };
   }
 
   const previousStartAtUtc = booking.startAtUtc;
@@ -114,6 +114,18 @@ export async function confirmBooking(
     startAtUtc = booking.proposedStartAt;
     endAtUtc = booking.proposedEndAt;
     appliesRequestedChange = true;
+    // RESCHEDULE-STALE-PROPOSAL-01: статус судится по ИСХОДНОМУ началу, а
+    // применяется ПРЕДЛОЖЕННОЕ. Предложение, время которого уже прошло (мастер
+    // в понедельник предложил вторник, клиент нажал «Подтвердить» в среду),
+    // переносило запись в прошлое: будущий визит исчезал, а бронь тут же
+    // показывалась завершённой.
+    if (isValidDate(startAtUtc) && startAtUtc.getTime() <= Date.now()) {
+      throw new AppError(
+        "Предложенное время уже прошло. Предложите новое время или оставьте прежнее.",
+        409,
+        "CONFLICT",
+      );
+    }
   } else {
     throw new AppError("Эту запись уже нельзя подтвердить. Обновите страницу.", 409, "CONFLICT");
   }

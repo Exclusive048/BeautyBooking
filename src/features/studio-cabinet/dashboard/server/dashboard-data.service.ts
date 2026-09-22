@@ -1,3 +1,4 @@
+import { studioReviewsWhere } from "@/lib/reviews/studio-scope";
 import {
   BookingStatus,
   MembershipStatus,
@@ -352,7 +353,8 @@ async function buildAttentionItems(
       }),
       prisma.review.count({
         where: {
-          studioId: ctx.studioId,
+          // STUDIO-REVIEWS-SCOPE-01
+          ...studioReviewsWhere({ id: ctx.studioId, providerId: ctx.providerId }),
           replyText: null,
           reportedAt: null,
           ...ACTIVE_REVIEW_FILTER,

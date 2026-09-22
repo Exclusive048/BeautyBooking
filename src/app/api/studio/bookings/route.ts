@@ -7,6 +7,10 @@ import { ensureStudioRole } from "@/lib/studio/access";
 import { createStudioBookingSchema } from "@/lib/studio/schemas";
 import { createStudioBooking } from "@/lib/studio/bookings.service";
 import { parseBody } from "@/lib/validation";
+import {
+  loadBookingWithRelations,
+  notifyBookingCreated,
+} from "@/lib/notifications/booking-notifications";
 
 export const runtime = "nodejs";
 
@@ -31,6 +35,19 @@ export async function POST(req: Request) {
       clientPhone: body.clientPhone,
       notes: body.notes,
     });
+    // STUDIO-NEW-BOOKING-NOTIFY-01: запись, созданная администратором, ждёт
+    // подтверждения мастера (PENDING, ответ за MASTER) — а мастер о ней не
+    // узнавал. Создателю не шлём; сбой рассылки запись не откатывает.
+    try {
+      const fullBooking = await loadBookingWithRelations(data.id);
+      if (fullBooking) await notifyBookingCreated(fullBooking, { excludeUserId: user.id });
+    } catch (error) {
+      logError("POST /api/studio/bookings notification failed", {
+        requestId: getRequestId(req),
+        route: "POST /api/studio/bookings",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return jsonOk(data, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

@@ -393,7 +393,12 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   // promises a booking the API will refuse.
   const guestValid =
     guestName.trim().length > 0 && guestPhone.trim().length > 0 && hasRequiredConsents(consent);
-  const contactsReady = isGuest ? guestValid : !!me;
+  // BOOKING-AUTH-NO-PHONE-01: вошедший без телефона в профиле (почта/VK/Яндекс —
+  // вход по телефону в проде выключен) вводит номер тем же полем, что и гость.
+  const authNeedsPhone = !!me && !me.phone;
+  const contactsReady = isGuest
+    ? guestValid
+    : !!me && (!authNeedsPhone || guestPhone.trim().length > 0);
 
   const submitDisabled =
     !studio ||
@@ -452,6 +457,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           setSubmitLoading(false);
           return;
         }
+      } else if (authNeedsPhone && !guestPhone.trim()) {
+        setSubmitError(UI_TEXT.publicStudio.guestPhoneRequired);
+        setSubmitLoading(false);
+        return;
       }
 
       if (bookingConfig?.requiresReferencePhoto && !referencePhotoAssetId) {
@@ -488,7 +497,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         endAtUtc: slot.endAtUtc,
         slotLabel: slot.label,
         clientName: me?.displayName ?? (guestName.trim() || UI_TEXT.publicProfile.booking.clientFallbackName),
-        clientPhone: me?.phone ?? guestPhone.trim(),
+        clientPhone: me?.phone || guestPhone.trim(),
         comment: comment.trim() ? comment.trim() : null,
         silentMode,
         referencePhotoAssetId,

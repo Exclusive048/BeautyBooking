@@ -3,6 +3,7 @@ import { AppError } from "@/lib/api/errors";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { applyBookingTransition } from "@/lib/bookings/transition";
+import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 
 /**
  * FIX-R2-06-A — decline a pending reschedule request (two-sided approval).
@@ -61,6 +62,12 @@ export async function declineClientRescheduleRequest(
     },
     select: { id: true, status: true },
   });
+
+  // REMINDER-STATUSES-01: отказ от переноса возвращает запись в CONFIRMED на
+  // прежнем времени. Если перенос просили на ещё неподтверждённой записи,
+  // напоминаний у неё не было никогда — планируем. Для уже подтверждённой это
+  // безвредно: повтор отсекают отметки `reminder*SentAt`.
+  await scheduleBookingRemindersSafe(updated.id);
 
   return { id: updated.id, status: updated.status };
 }

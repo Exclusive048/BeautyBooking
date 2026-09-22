@@ -20,6 +20,20 @@ const DEFAULT_WORK_END_MIN = 19 * 60; // 19:00
 const DEFAULT_ACTIVE_DAYS = new Set([1, 2, 3, 4, 5, 6]);
 
 /**
+ * SCHEDULE-SUNDAY-01 — `WeeklyScheduleDay.weekday` хранится как 1 = Пн … 7 = Вс
+ * (`editor.ts`, `unified.ts`; движок переводит воскресенье в 7 в
+ * `engine-context.ts`), а на вход резолвера приходит JS-день 0 = Вс … 6 = Сб
+ * (`resolveSalonLocalParts`). Без перевода воскресенье искалось как `0`, строки
+ * не находилось, и срабатывал дефолт «вс — выходной»: мастер, работающий по
+ * воскресеньям, получал 422 «Мастер не работает в выбранный день» на создании и
+ * переносе записи в студии и на любом переносе — хотя публичные слоты на это
+ * воскресенье продавались.
+ */
+export function toScheduleWeekday(jsWeekday: number): number {
+  return jsWeekday === 0 ? 7 : jsWeekday;
+}
+
+/**
  * STUDIO-RESCHEDULE-VALIDATION-A — resolves the target master's work
  * window for a given weekday by reading the `WeeklyScheduleConfig` +
  * `ScheduleOverride` for the requested date. Returns a normalized
@@ -69,7 +83,7 @@ export async function resolveMasterWorkWindow(
       include: { template: { select: { startLocal: true, endLocal: true } } },
     }),
     prisma.weeklyScheduleDay.findFirst({
-      where: { config: { providerId: masterProviderId }, weekday },
+      where: { config: { providerId: masterProviderId }, weekday: toScheduleWeekday(weekday) },
       include: { template: { select: { startLocal: true, endLocal: true } } },
     }),
   ]);

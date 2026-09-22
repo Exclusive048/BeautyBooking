@@ -11,7 +11,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import { resolveAuthMethods } from "@/lib/auth/auth-methods";
-import { getAvailableCabinets, type CabinetKind } from "@/lib/auth/available-cabinets";
+import {
+  getAvailableCabinets,
+  shouldOfferBecomeMaster,
+  type CabinetKind,
+} from "@/lib/auth/available-cabinets";
 import { MASTER_CABINET_PATH, STUDIO_CABINET_PATH } from "@/lib/auth/cabinet-paths";
 import { hasAdminRole } from "@/lib/auth/guards";
 import { hasMasterProfile } from "@/lib/auth/roles";
@@ -22,6 +26,7 @@ import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { TopbarAuthButton } from "@/components/layout/topbar-auth-button";
+import { BecomeMasterShortcut } from "@/components/layout/become-master-shortcut";
 
 type WorkspaceLink = {
   href: string;
@@ -145,6 +150,7 @@ export async function Topbar() {
     studio: null,
   };
   let availableCabinets: CabinetKind[] = [];
+  let offerBecomeMaster = false;
 
   if (user) {
     const links = await loadWorkspaceLinks(user.id);
@@ -152,6 +158,12 @@ export async function Topbar() {
     showAdminLink = hasAdminRole(user);
     workspaceLinks = links;
     availableCabinets = getAvailableCabinets(user.roles ?? []);
+    // NAV-BECOME-MASTER-01: кнопка стоит на месте ярлыков кабинетов и уходит,
+    // как только появится первый из них. Проверка по ролям и по фактическим
+    // ярлыкам вместе — чтобы кнопка и ярлык не оказались в шапке одновременно
+    // даже при рассинхроне роли и профиля.
+    offerBecomeMaster =
+      shouldOfferBecomeMaster(user.roles ?? []) && !links.master && !links.studio;
   }
 
   return (
@@ -218,10 +230,12 @@ export async function Topbar() {
                 {workspaceLinks.studio ? (
                   <WorkspaceShortcutLink item={workspaceLinks.studio} isStudio />
                 ) : null}
+                {offerBecomeMaster ? <BecomeMasterShortcut /> : null}
                 <AuthUserMenu
                   userLabel={userLabel}
                   showAdminLink={showAdminLink}
                   availableCabinets={availableCabinets}
+                  offerBecomeMaster={offerBecomeMaster}
                 />
               </div>
               <AuthMobileMenu
@@ -230,6 +244,7 @@ export async function Topbar() {
                 masterWorkspace={workspaceLinks.master}
                 studioWorkspace={workspaceLinks.studio}
                 availableCabinets={availableCabinets}
+                offerBecomeMaster={offerBecomeMaster}
               />
             </>
           ) : (

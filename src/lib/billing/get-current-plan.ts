@@ -9,6 +9,7 @@ import {
   type PlanTier,
 } from "@/lib/billing/features";
 import { isSubscriptionActive } from "@/lib/billing/subscription-active";
+import { resolveVisualSearchEnabled } from "@/lib/visual-search/enabled";
 
 const PLAN_CACHE_TTL_SECONDS = 300;
 
@@ -48,7 +49,7 @@ async function getSystemFlags(): Promise<SystemFlags> {
 
   return {
     onlinePaymentsEnabled: parseSystemFlag(onlinePayments?.value, false),
-    visualSearchEnabled: parseSystemFlag(visualSearch?.value, false),
+    visualSearchEnabled: resolveVisualSearchEnabled(visualSearch?.value),
   };
 }
 

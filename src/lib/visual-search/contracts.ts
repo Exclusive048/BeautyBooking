@@ -13,7 +13,17 @@ export type VisualSearchProviderResult = {
   category: VisualCategorySlug;
 };
 
-export type VisualSearchFailureReason = "unrecognized" | "not_enough_indexed" | "low_confidence";
+/**
+ * `unavailable` (VISUAL-SEARCH-TRANSIENT-01) — отказал провайдер (сеть, таймаут,
+ * 429/5xx), а не «на фото ничего нет». Отдельная причина нужна по двум поводам:
+ * клиенту честнее «попробуйте ещё раз», чем «не поняли, что на фото», а роут
+ * такой ответ не кэширует — иначе один сбой держался бы на этом фото сутки.
+ */
+export type VisualSearchFailureReason =
+  | "unrecognized"
+  | "not_enough_indexed"
+  | "low_confidence"
+  | "unavailable";
 
 export type VisualSearchResponse =
   | { ok: true; results: VisualSearchProviderResult[]; category: VisualCategorySlug }

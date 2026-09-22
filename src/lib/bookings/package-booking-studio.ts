@@ -29,6 +29,7 @@ import {
 } from "@/lib/bookings/package-idempotency";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { logError } from "@/lib/logging/logger";
+import { notifyPackageBookingCreated } from "@/lib/bookings/package-notify";
 
 /**
  * PACKAGE-BOOKING-MVP-2 — studio multi-master sequential package booking.
@@ -427,6 +428,13 @@ async function createStudioPackageBookingUnguarded(
       });
     }
   }
+
+  // PACKAGE-NOTIFY-01: одно уведомление на пакет — стороне провайдера (и
+  // клиенту при автоподтверждении). Раньше пакет не уведомлял никого.
+  await notifyPackageBookingCreated({
+    bookingIds: result.bookingIds,
+    autoConfirmed: shouldAutoConfirm,
+  });
 
   return result;
 }
