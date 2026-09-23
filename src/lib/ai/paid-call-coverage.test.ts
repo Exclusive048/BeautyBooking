@@ -400,8 +400,12 @@ describe("реестр потолков", () => {
     }
   });
 
-  it("ратифицированный SEC-04 бюджет сохранён по смыслу: 200 запросов = 600 вызовов", () => {
-    // Один поиск по фото = classify + describe + query-embedding.
-    expect(AI_SPEND_CEILINGS["visual-search:search"]).toBe(200 * 3);
+  it("ратифицированный SEC-04 бюджет сохранён по смыслу: 200 запросов в худшем случае", () => {
+    // Один поиск по фото = classify + describe + query-embedding; classify и
+    // describe повторяются С рассуждением на непригодном ответе
+    // (VISUAL-SEARCH-UNRECOGNIZED-01) — до 5 платных вызовов.
+    expect(AI_SPEND_CEILINGS["visual-search:search"]).toBe(200 * 5);
+    // Индексация — те же до 5 вызовов на фото, 1 000 фото в сутки.
+    expect(AI_SPEND_CEILINGS["visual-search:index"]).toBe(1000 * 5);
   });
 });

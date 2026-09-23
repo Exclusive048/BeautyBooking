@@ -32,9 +32,10 @@ export function CityPromptOverlay() {
   const pathname = usePathname();
   const [show, setShow] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // CITY-LIST-FRESH-01: ключ общий с селектором в шапке — политика
+  // перечитывания одна (см. `city-selector.tsx`).
   const { data, isLoading } = useSWR<CitiesResponse>("/api/cities", fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 60_000,
+    dedupingInterval: 10_000,
   });
 
   // After mount: decide whether to show. Done in effect (not during render)

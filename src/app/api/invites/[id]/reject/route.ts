@@ -19,6 +19,9 @@ export async function POST(
     phone: auth.user.phone,
     // PHONE-CLAIM-01: отклонить инвайт может тоже только доказанный владелец.
     phoneVerifiedAt: auth.user.phoneVerifiedAt,
+    // STUDIO-INVITE-EMAIL-01: приглашение по почте — только подтверждённому адресу.
+    email: auth.user.email,
+    emailVerifiedAt: auth.user.emailVerifiedAt,
   });
 
   if (!result.ok) return fail(result.message, result.status, result.code);

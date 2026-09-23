@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { BottomTab, BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -54,13 +55,15 @@ const TABS: TabItem[] = [
  * мог настроить график вообще — единственный вход был условной ссылкой в блоке
  * «Требует внимания» на дашборде. Паритет держит `master-nav-parity.test.ts`.
  */
-const MORE_ITEMS = [
+type AttentionKey = "notifications" | "messages" | "reviews";
+
+const MORE_ITEMS: Array<{ href: string; label: string; icon: LucideIcon; attentionKey?: AttentionKey }> = [
   { href: "/cabinet/master/schedule/settings", label: tItems.scheduleSettings, icon: SlidersHorizontal },
-  { href: "/cabinet/master/notifications", label: tItems.notifications, icon: Bell },
-  { href: "/cabinet/master/messages", label: tItems.messages, icon: MessageSquare },
+  { href: "/cabinet/master/notifications", label: tItems.notifications, icon: Bell, attentionKey: "notifications" },
+  { href: "/cabinet/master/messages", label: tItems.messages, icon: MessageSquare, attentionKey: "messages" },
   { href: "/cabinet/master/clients", label: t.menuClients, icon: Users },
   { href: "/cabinet/master/model-offers", label: t.menuModels, icon: Sparkles },
-  { href: "/cabinet/master/reviews", label: t.menuReviews, icon: Star },
+  { href: "/cabinet/master/reviews", label: t.menuReviews, icon: Star, attentionKey: "reviews" },
   { href: "/cabinet/master/analytics", label: t.menuAnalytics, icon: BarChart3 },
   { href: "/cabinet/master/billing", label: t.menuBilling, icon: CreditCard },
   { href: "/cabinet/master/account", label: t.menuSettings, icon: Settings },
@@ -78,14 +81,32 @@ function isMoreActive(pathname: string): boolean {
   return MORE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/**
+ * Подсвечена ровно одна вкладка. «Настройки расписания» лежат под
+ * `/schedule/*`, но живут в листе «Ещё»: без этого правила на них горели и
+ * «Расписание», и «Ещё» — два индикатора с общим `layoutId` (как `profileActive`
+ * у студии).
+ */
+export function isMasterTabActive(pathname: string, href: string, exact?: boolean): boolean {
+  return !isMoreActive(pathname) && isActive(pathname, href, exact);
+}
+
 type Props = {
   /** Optional badge count rendered on the Bookings tab — pending master actions. */
   pendingBookingsCount?: number;
+  /**
+   * NAV-ATTENTION-01 — счётчики разделов из листа «Ещё»: число у пункта листа
+   * и точка на самой вкладке «Ещё», пока хоть что-то внутри ждёт действия.
+   */
+  attention?: Record<AttentionKey, number>;
 };
 
-export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
+const NO_ATTENTION: Record<AttentionKey, number> = { notifications: 0, messages: 0, reviews: 0 };
+
+export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTENTION }: Props = {}) {
   const pathname = usePathname();
   const moreActive = isMoreActive(pathname);
+  const moreNeedsAttention = MORE_ITEMS.some((item) => item.attentionKey && attention[item.attentionKey] > 0);
   const [moreOpen, setMoreOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTitleId = useId();
@@ -148,18 +169,27 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
                 {MORE_ITEMS.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(pathname, item.href);
+                  const count = item.attentionKey ? attention[item.attentionKey] : 0;
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => setMoreOpen(false)}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
+                        "relative flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
                         active ? "bg-primary/10 text-accent-text" : "text-text-sec hover:bg-bg-input"
                       )}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
                       <span className="text-[11px] font-medium leading-tight">{item.label}</span>
+                      {count > 0 ? (
+                        <span
+                          aria-hidden
+                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums text-primary-foreground"
+                        >
+                          {count > 99 ? "99+" : count}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}
@@ -177,74 +207,31 @@ export function MasterBottomNav({ pendingBookingsCount = 0 }: Props = {}) {
         ) : null}
       </AnimatePresence>
 
-      {/* Tab bar */}
-      {/* PWA-FIX-06 — фон панели доходит ДО нижней кромки экрана, а safe-area
-          отдаётся строке вкладок, а не прозрачному `<nav>`. Раньше отступ
-          `env(safe-area-inset-bottom)` стоял на самом `<nav>` (прозрачном), а
-          фон — на внутреннем блоке: в PWA на устройстве с home-indicator под
-          панелью оставалась полоса высотой инсета, через которую просвечивала
-          страница, и панель читалась как «не прижатая к низу». Форма взята у
-          клиентского кабинета (`CabinetBottomNav`), где она изначально верна:
-          подложка `absolute inset-0` покрывает весь `<nav>` целиком. */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
-        aria-label={UI_TEXT.a11y.mainNav}
-      >
-        <div className="absolute inset-0 border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl" />
-        {/* PWA-UX-BATCH-01: инсет вычитается на 10px, строка вкладок ниже —
-            иначе кнопки висели над пустой полосой высотой инсета. */}
-        <div className="relative pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-10px))]">
-          <ul className="flex items-stretch">
-            {TABS.map((tab) => {
-              const active = isActive(pathname, tab.href, tab.exact);
-              const Icon = tab.icon;
-              const isBookings = tab.href === "/cabinet/master/bookings";
-              const showBadge = isBookings && pendingBookingsCount > 0;
-              return (
-                <li key={tab.href} className="flex-1">
-                  <Link
-                    href={tab.href}
-                    className="relative flex flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
-                    aria-current={active ? "page" : undefined}
-                  >
-                    <span className="relative">
-                      <Icon className={cn("h-5 w-5", active ? "text-accent-text" : "text-text-sec")} aria-hidden />
-                      {showBadge ? (
-                        <span
-                          aria-label={`${pendingBookingsCount}`}
-                          className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-medium text-white tabular-nums"
-                        >
-                          {pendingBookingsCount}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className={cn("text-[10px] font-medium", active ? "text-accent-text" : "text-text-sec")}>
-                      {tab.label}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-            <li className="flex-1">
-              <button
-                type="button"
-                onClick={() => setMoreOpen(true)}
-                className="flex w-full flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
-                aria-expanded={moreOpen}
-              >
-                <MoreHorizontal
-                  className={cn("h-5 w-5", moreActive || moreOpen ? "text-accent-text" : "text-text-sec")}
-                  aria-hidden
-                />
-                <span className={cn("text-[10px] font-medium", moreActive || moreOpen ? "text-accent-text" : "text-text-sec")}>
-                  {tNav.more}
-                </span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </nav>
-      <div className="h-14 lg:hidden" aria-hidden="true" />
+      {/* NAV-ALIGN-01 — разметка панели общая (`BottomTabBar`): высота,
+          подложка и вид вкладки одинаковы во всех кабинетах. Зазора в потоке
+          здесь нет — его держит `pb-` у `<main>` шелла (флекс в ряд, спейсер
+          был бы инертен, см. `master-cabinet-shell.tsx`). */}
+      <BottomTabBar ariaLabel={UI_TEXT.a11y.mainNav}>
+        {TABS.map((tab) => (
+          <BottomTab
+            key={tab.href}
+            href={tab.href}
+            icon={tab.icon}
+            label={tab.label}
+            active={isMasterTabActive(pathname, tab.href, tab.exact)}
+            badge={tab.href === "/cabinet/master/bookings" ? pendingBookingsCount : 0}
+          />
+        ))}
+        <BottomTab
+          onClick={() => setMoreOpen(true)}
+          expanded={moreOpen}
+          icon={MoreHorizontal}
+          label={tNav.more}
+          active={moreActive || moreOpen}
+          dot={moreNeedsAttention}
+          dotLabel={UI_TEXT.nav.needsAttention}
+        />
+      </BottomTabBar>
     </>
   );
 }

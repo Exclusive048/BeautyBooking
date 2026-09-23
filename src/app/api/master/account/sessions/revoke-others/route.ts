@@ -19,10 +19,11 @@ const jsonUtf8Headers = { "Content-Type": "application/json; charset=utf-8" };
  *   - All other devices' refresh tokens become inactive → forced
  *     re-login the next time they hit `/api/auth/refresh`.
  *
- * Why not "revoke except current"? The refresh cookie is path-scoped to
- * `/api/auth/refresh` and isn't sent to this route, so we can't read
- * the current `sid`. The revoke-and-reissue pattern gives the same
- * user-facing semantic without leaking refresh tokens across paths.
+ * Why not "revoke except current"? Historically the refresh cookie was
+ * path-scoped to `/api/auth/refresh` and never reached this route. Since
+ * SESSION-REFRESH-PATH-01 it is sent site-wide, but revoke-and-reissue
+ * gives the same user-facing semantic and stays correct for browsers still
+ * holding the legacy-path cookie, so it is kept.
  */
 export async function POST(req: Request) {
   try {

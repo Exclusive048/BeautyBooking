@@ -153,6 +153,10 @@ export async function createMasterProfile(
         timezone: env.DEFAULT_TIMEZONE,
         publicUsername: uniqueUsername,
         publicUsernameUpdatedAt: new Date(),
+        // VISIBILITY-DEFAULT-01: видимость включена с рождения кабинета (решение
+        // владельца). В каталоге профиль появится сам, когда будут город и
+        // расписание (`catalogVisibleProviderWhere`); выключить — в настройках.
+        isPublished: true,
       },
       select: { id: true },
     });
@@ -247,6 +251,10 @@ export async function createStudioProfile(
           })
         ),
         publicUsernameUpdatedAt: new Date(),
+        // VISIBILITY-DEFAULT-01: видимость включена с рождения кабинета (решение
+        // владельца). В каталоге профиль появится сам, когда будут город и
+        // расписание (`catalogVisibleProviderWhere`); выключить — в настройках.
+        isPublished: true,
       },
       select: { id: true },
     }));

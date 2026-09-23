@@ -7,13 +7,14 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
-import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
-import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-input";
+import {
+  OperatorSlotPicker,
+  type OperatorSlot,
+} from "@/features/booking/components/operator-slot-picker";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.createDialog;
-const TV = UI_TEXT.studioCabinet.scheduleV2;
 const E = UI_TEXT.studioCabinet.scheduleV2.errors;
 
 type ServiceOption = {
@@ -32,8 +33,8 @@ type Props = {
   services: ServiceOption[];
   /**
    * TZ-DISPLAY-SALON-PARITY-01: salon (provider) tz. The read-only time card
-   * and the datetime-local input (header-button flow) render + read back in
-   * SALON-local time, matching the calendar grid the admin clicked.
+   * and the slot picker (header-button flow) render in SALON-local time,
+   * matching the calendar grid the admin clicked.
    */
   timezone: string;
   open: boolean;
@@ -65,14 +66,11 @@ export function CreateBookingDialog({
   const [clientPhone, setClientPhone] = useState(prefilledClient?.phone ?? "");
   const [serviceId, setServiceId] = useState("");
   const [selectedMasterId, setSelectedMasterId] = useState(masterId ?? "");
-  // STUDIO-BOOKINGS-FIX-A #3б: when the dialog opens via the «Новая
-  // запись» header button, `startAtUtc` is null and the user needs a
-  // time picker. When opened via a calendar empty-slot click,
-  // `startAtUtc` is pre-filled and the time card renders read-only —
-  // matches the existing flow.
-  const [startAtLocal, setStartAtLocal] = useState<string>(
-    startAtUtc ? utcIsoToSalonInput(startAtUtc, timezone) : "",
-  );
+  // MANUAL-BOOKING-SLOTS-01: время — всегда свободное окошко мастера (тот же
+  // пикер, что у ручной записи мастера и переноса). Клик по пустой ячейке
+  // календаря (`startAtUtc`) выбирает её день и — если окошко свободно — само
+  // время; раньше время ячейки принималось как есть, без проверки занятости.
+  const [slot, setSlot] = useState<OperatorSlot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // STUDIO-BOOKINGS-FIX-A #3в: real-time phone validation feedback.
@@ -93,9 +91,9 @@ export function CreateBookingDialog({
     setClientPhone(prefilledClient?.phone ?? "");
     setServiceId("");
     setSelectedMasterId(masterId ?? "");
-    setStartAtLocal(startAtUtc ? utcIsoToSalonInput(startAtUtc, timezone) : "");
+    setSlot(null);
     setError(null);
-  }, [open, masterId, startAtUtc, prefilledClient, timezone]);
+  }, [open, masterId, startAtUtc, prefilledClient]);
 
   const availableServices = useMemo(() => {
     if (!selectedMasterId) return services;
@@ -131,14 +129,11 @@ export function CreateBookingDialog({
       setError(E.clientPhoneInvalid);
       return;
     }
-    // STUDIO-BOOKINGS-FIX-A #3б: resolve the effective UTC start
-    // from either the pre-fill (calendar-click flow) or the new
-    // local datetime input (header-button flow). Either path must
-    // produce a valid ISO string for the API.
-    const effectiveStartIso =
-      startAtUtc ?? salonInputToUtcIso(startAtLocal, timezone);
+    // MANUAL-BOOKING-SLOTS-01: и клик по ячейке, и кнопка в шапке приходят
+    // к выбранному окошку.
+    const effectiveStartIso = slot?.startAtUtc ?? null;
     if (!effectiveStartIso) {
-      setError(E.startAtRequired);
+      setError(UI_TEXT.schedule.operatorSlots.required);
       return;
     }
 
@@ -176,42 +171,16 @@ export function CreateBookingDialog({
   return (
     <ModalSurface open={open} onClose={handleClose} title={T.title}>
       <div className="space-y-4">
-        {startAtUtc ? (
-          // Calendar-click flow — time pre-filled, render read-only.
-          // TZ-DISPLAY-SALON-PARITY-01: salon-tz (matches the grid the admin
-          // clicked), not the browser tz.
-          <div className="rounded-lg border border-border-subtle bg-bg-input/40 px-3 py-2 text-sm text-text-main">
-            <span className="text-text-sec">{T.timeLabel}: </span>
-            {UI_FMT.dateTimeShort(startAtUtc, { timeZone: timezone })}
-          </div>
-        ) : (
-          // STUDIO-BOOKINGS-FIX-A #3б: header-button flow — let
-          // the studio admin pick a time. Without this control the
-          // form silently failed at submit because `!startAtUtc`
-          // was treated as a generic error.
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
-              {T.timeLabel}{" "}
-              <span className="font-normal text-text-sec">
-                · {TV.salonTimeInputHint}
-              </span>
-            </span>
-            <Input
-              type="datetime-local"
-              value={startAtLocal}
-              onChange={(e) => setStartAtLocal(e.target.value)}
-              disabled={submitting}
-            />
-          </label>
-        )}
-
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-text-main">
             {T.masterLabel}
           </span>
           <Select
             value={selectedMasterId}
-            onChange={(e) => setSelectedMasterId(e.target.value)}
+            onChange={(e) => {
+              setSelectedMasterId(e.target.value);
+              setSlot(null);
+            }}
             disabled={submitting}
           >
             <option value="">{T.masterPlaceholder}</option>
@@ -231,17 +200,35 @@ export function CreateBookingDialog({
           </span>
           <Select
             value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
+            onChange={(e) => {
+              setServiceId(e.target.value);
+              setSlot(null);
+            }}
             disabled={submitting}
           >
             <option value="">{T.servicePlaceholder}</option>
             {availableServices.map((service) => (
               <option key={service.id} value={service.id}>
-                {service.name} · {service.durationMin} мин
+                {service.name} · {service.durationMin} {UI_TEXT.common.minutesShort}
               </option>
             ))}
           </Select>
         </label>
+
+        {open ? (
+          // MANUAL-BOOKING-SLOTS-01: free slots of the chosen master for the
+          // chosen service; a calendar-click preselects the clicked cell.
+          <OperatorSlotPicker
+            providerId={selectedMasterId || null}
+            serviceId={serviceId || null}
+            timeZone={timezone}
+            value={slot}
+            onChange={setSlot}
+            prefillIso={startAtUtc}
+            missingHint={UI_TEXT.schedule.operatorSlots.chooseMasterFirst}
+            disabled={submitting}
+          />
+        ) : null}
 
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-text-main">

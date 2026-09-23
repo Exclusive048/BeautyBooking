@@ -4,6 +4,7 @@ import { HeaderBlock } from "@/components/ui/header-block";
 import { RolesCards } from "@/features/cabinet/roles/roles-cards";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
+import { resolveCatalogPresence, type CatalogPresence } from "@/lib/providers/catalog-presence";
 import { getMeProfile } from "@/lib/users/profile";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -11,6 +12,19 @@ const masterCabinetHref = "/cabinet/master";
 const studioCabinetHref = "/cabinet/studio";
 const createMasterHref = "/api/onboarding/professional/master";
 const createStudioHref = "/api/onboarding/professional/studio";
+
+const CP = UI_TEXT.cabinet.catalogPresence;
+
+/**
+ * VISIBILITY-CATALOG-STATUS (2026-09-23): карточка роли говорит, есть ли
+ * кабинет в каталоге и чего не хватает, — а не только «опубликован» (желание).
+ */
+function catalogStatusLabel(presence: CatalogPresence, type: "master" | "studio"): string {
+  if (presence.listed) return CP.statusListed;
+  if (presence.gaps.includes("hidden")) return CP.statusHidden;
+  const labels = type === "studio" ? CP.gapsStudio : CP.gapsMaster;
+  return `${CP.statusIncomplete}: ${presence.gaps.map((gap) => labels[gap]).join(", ")}`;
+}
 
 export default async function RolesPage() {
   const user = await getSessionUser();
@@ -25,6 +39,7 @@ export default async function RolesPage() {
         select: {
           provider: {
             select: {
+              id: true,
               name: true,
               avatarUrl: true,
               tagline: true,
@@ -42,6 +57,7 @@ export default async function RolesPage() {
     ? await prisma.provider.findFirst({
         where: { ownerUserId: user.id, type: ProviderType.STUDIO },
         select: {
+          id: true,
           name: true,
           avatarUrl: true,
           ratingAvg: true,
@@ -53,6 +69,10 @@ export default async function RolesPage() {
     : null;
 
   const masterProvider = masterProfile?.provider ?? null;
+  const [masterPresence, studioPresence] = await Promise.all([
+    masterProvider ? resolveCatalogPresence(masterProvider.id) : Promise.resolve(null),
+    studioProvider ? resolveCatalogPresence(studioProvider.id) : Promise.resolve(null),
+  ]);
   const masterData = me.hasMasterProfile
     ? masterProvider
       ? {
@@ -60,10 +80,12 @@ export default async function RolesPage() {
           specialization: masterProvider.tagline || masterProvider.categories?.[0] || null,
           ratingAvg: masterProvider.ratingAvg,
           ratingCount: masterProvider.ratingCount,
-          isPublished: masterProvider.isPublished,
-          statusLabel: masterProvider.isPublished
-            ? UI_TEXT.cabinetRolesPage.masterPublished
-            : UI_TEXT.cabinetRolesPage.masterDraft,
+          isPublished: masterPresence ? masterPresence.listed : masterProvider.isPublished,
+          statusLabel: masterPresence
+            ? catalogStatusLabel(masterPresence, "master")
+            : masterProvider.isPublished
+              ? UI_TEXT.cabinetRolesPage.masterPublished
+              : UI_TEXT.cabinetRolesPage.masterDraft,
           avatarUrl: masterProvider.avatarUrl,
           actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: masterCabinetHref,
@@ -88,9 +110,6 @@ export default async function RolesPage() {
               .replace("{rating}", studioProvider.ratingAvg.toFixed(1))
               .replace("{count}", String(studioProvider.ratingCount))
           : null,
-        studioProvider.isPublished
-          ? UI_TEXT.cabinetRolesPage.studioPublished
-          : UI_TEXT.cabinetRolesPage.studioDraft,
       ].filter((item): item is string => Boolean(item))
     : [];
 
@@ -99,6 +118,14 @@ export default async function RolesPage() {
       ? {
           name: studioProvider.name,
           logoUrl: studioProvider.avatarUrl,
+          catalogStatus: studioPresence
+            ? { label: catalogStatusLabel(studioPresence, "studio"), listed: studioPresence.listed }
+            : {
+                label: studioProvider.isPublished
+                  ? UI_TEXT.cabinetRolesPage.studioPublished
+                  : UI_TEXT.cabinetRolesPage.studioDraft,
+                listed: studioProvider.isPublished,
+              },
           metrics: studioMetrics,
           actionLabel: UI_TEXT.cabinetRolesPage.openCabinet,
           actionHref: studioCabinetHref,

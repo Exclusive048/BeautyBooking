@@ -13,6 +13,7 @@ import {
   type StudioServiceListItem,
   type StudioServicesKpis,
 } from "../lib/types";
+import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
 
 /**
  * CATEGORY-UNIFICATION-A: services-data service reads + groups by
@@ -428,14 +429,13 @@ export async function loadStudioServiceDetail(input: {
   if (!service) return null;
 
   // STUDIO-BUGS-FIX-A bug #5: assign-master picker shows only ACTIVE
-  // masters. INVITED (ownerUserId IS NULL) and DISABLED (isPublished=false)
+  // masters. INVITED (ownerUserId IS NULL) and DISABLED (studioPaused)
   // are filtered out at the source so they never appear in the dropdown.
   const allMasters = await prisma.provider.findMany({
     where: {
       type: ProviderType.MASTER,
       studioId: studio.providerId,
-      ownerUserId: { not: null },
-      isPublished: true,
+      ...STUDIO_ACTIVE_MASTER_WHERE,
     },
     select: { id: true, name: true, avatarUrl: true },
     orderBy: { name: "asc" },

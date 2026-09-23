@@ -53,6 +53,12 @@ export type StudioMasterDetail = StudioMasterListItem & {
    * chat-attachment-token + client-key-token).
    */
   viewToken: string;
+  /**
+   * STUDIO-EDIT-MASTER-PROFILE-01 — то, что студия может править в профиле
+   * мастера: публичное имя (`Provider.name`, его видят клиенты — в шапке выше
+   * стоит имя из аккаунта), специализация и описание.
+   */
+  profile: { name: string; tagline: string; description: string };
 };
 
 export type StudioMasterFilter = "all" | "active" | "invited" | "disabled";

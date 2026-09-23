@@ -92,3 +92,31 @@ export function assetHasCrop(asset: Pick<MediaAssetDto, "cropX" | "cropY" | "cro
     asset.cropHeight !== null
   );
 }
+
+type CropFields = Pick<MediaAssetDto, "cropX" | "cropY" | "cropWidth" | "cropHeight">;
+
+/**
+ * CROP-PUBLIC-01 — версия области обрезки в ссылке: четыре доли с точностью
+ * 1e-4 («5000-2500-3333-5000»). Нужна не серверу — он режет по сохранённой
+ * области из БД, — а кэшам: ответ отдаётся как `immutable`, поэтому новая
+ * область обязана давать новую ссылку.
+ */
+export function cropVersionToken(crop: CropFields): string {
+  return [crop.cropX, crop.cropY, crop.cropWidth, crop.cropHeight]
+    .map((value) => String(Math.round((value ?? 0) * 10_000)))
+    .join("-");
+}
+
+/**
+ * CROP-PUBLIC-01 — ссылка, по которой аватар показывают ВНЕ редактора
+ * (`Provider.avatarUrl`, логотип сайта): при сохранённой области — вырезанная
+ * сервером картинка (`/api/media/file/[id]/crop/[v]`), иначе исходник.
+ *
+ * До этого область хранилась, но снаружи редактора её не применял никто:
+ * профиль мастера, карточка каталога, страница студии и шапка брали голую
+ * ссылку на файл и показывали центр фото, а не выбранный кадр.
+ */
+export function buildAvatarDisplayUrl(asset: { id: string } & CropFields): string {
+  const base = buildMediaFileUrl(asset.id);
+  return assetHasCrop(asset) ? `${base}/crop/${cropVersionToken(asset)}` : base;
+}

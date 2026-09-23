@@ -24,9 +24,13 @@ export function CitySelector() {
   const [open, setOpen] = useState(false);
   const [currentSlug, setCurrentSlug] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { data } = useSWR<CitiesResponse>("/api/cities", fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 60_000,
+  // CITY-LIST-FRESH-01: список перечитывается при возврате в приложение и при
+  // каждом открытии выпадашки. С `revalidateOnFocus: false` он загружался
+  // ОДИН раз за жизнь страницы, а PWA живёт сутками без перезагрузки: город,
+  // где только что появился мастер, не попадал в список, пока приложение не
+  // переоткроют.
+  const { data, mutate } = useSWR<CitiesResponse>("/api/cities", fetcher, {
+    dedupingInterval: 10_000,
   });
 
   // Hydrate from localStorage / cookie after mount (avoids SSR mismatch).
@@ -73,7 +77,10 @@ export function CitySelector() {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) void mutate();
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={T.label}

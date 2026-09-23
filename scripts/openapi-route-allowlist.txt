@@ -231,7 +231,6 @@
 /api/studio/service-packages/{id}
 /api/studio/services/{id}/booking-config
 /api/studio/services/{id}/unassign-master
-/api/studios/{id}/invites
 /api/studios/{id}/leave
 /api/studios/{id}/masters
 /api/studios/{id}/masters/{masterId}/schedule/buffer

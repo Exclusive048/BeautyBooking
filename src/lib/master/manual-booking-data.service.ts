@@ -19,8 +19,17 @@ import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
  */
 
 export type ManualBookingData = {
+  /**
+   * MANUAL-BOOKING-SLOTS-01: `Provider.id` мастера — по нему модаль берёт
+   * свободные окошки (`/api/masters/{id}/availability?manual=1`).
+   */
+  providerId: string;
   services: DashboardServiceLite[];
-  isSolo: boolean;
+  /**
+   * STUDIO-MASTER-OWN-BOOKINGS-01: ручная запись доступна на собственные
+   * услуги — соло-мастеру всегда, мастеру студии, когда свои услуги есть.
+   */
+  canManualBook: boolean;
   /**
    * LOGIC-21 · tz-источник — **salon-tz** (`Provider.timezone`, тот же, что
    * читает `getMasterScheduleWeek` для позиционирования сетки). Модаль вводит и
@@ -59,8 +68,9 @@ export const getMasterManualBookingData = cache(
     }));
 
     return {
+      providerId: master.id,
       services,
-      isSolo: master.studioId === null,
+      canManualBook: master.studioId === null || services.length > 0,
       timezone: master.timezone,
     };
   },

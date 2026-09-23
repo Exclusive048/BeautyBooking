@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ClassificationResult } from "@/lib/visual-search/prompt";
-import { requestVisionJson } from "@/lib/visual-search/provider";
+import { requestVisionJson, type VisionMode } from "@/lib/visual-search/provider";
 import type { AiSpendMeter } from "@/lib/ai/spend-ceiling";
 
 const classificationSchema = z.object({
@@ -27,22 +27,29 @@ export async function classifyImage(
   // разные карманы, и умолчание здесь молча списывало бы с чужого.
   meter: AiSpendMeter
 ): Promise<ClassificationResult> {
+  // VISUAL-SEARCH-UNRECOGNIZED-01: быстрый ответ без рассуждения (см.
+  // `VISION_MAX_TOKENS` в provider.ts); повтор с рассуждением — только если
+  // ответ непригоден. Осмысленный `none` не повторяется: это ответ, а не сбой.
+  const fast = await classifyOnce(imageBytes, meter, "fast");
+  if (fast) return fast;
+  const careful = await classifyOnce(imageBytes, meter, "reasoning");
+  return careful ?? { category: "none", confidence: "low" };
+}
+
+async function classifyOnce(
+  imageBytes: Uint8Array,
+  meter: AiSpendMeter,
+  mode: VisionMode
+): Promise<ClassificationResult | null> {
   const json = await requestVisionJson({
     imageBytes,
     systemPrompt: CLASSIFIER_SYSTEM_PROMPT,
     userPrompt: CLASSIFIER_USER_PROMPT,
     meter,
+    mode,
   });
-
-  if (!json) {
-    return { category: "none", confidence: "low" };
-  }
-
+  if (!json) return null;
   const parsed = classificationSchema.safeParse(json);
-  if (!parsed.success) {
-    return { category: "none", confidence: "low" };
-  }
-
-  return parsed.data;
+  return parsed.success ? parsed.data : null;
 }
 

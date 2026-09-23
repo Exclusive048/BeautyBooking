@@ -155,7 +155,26 @@ const excludeBookingIdQuery: ParameterObject = {
   required: false,
   schema: { type: "string" },
   description:
-    "Booking being rescheduled: its own window (and buffer) is not treated as occupied. Requires a session of a party to that booking.",
+    "Booking being rescheduled: its own window (and buffer) is not treated as occupied, and slots use that booking's own length (service snapshots). Requires a session of a party to that booking.",
+};
+
+// MOVE-PICKER-DURATION: студийный перенос этой записи к запрошенному мастеру.
+const moveBookingIdQuery: ParameterObject = {
+  name: "moveBookingId",
+  in: "query",
+  required: false,
+  schema: { type: "string" },
+  description:
+    "Studio booking being moved to this master: slots use the window length the move will validate (all booking services, this master's durations); for the booking's own master its window is not occupied. Studio owner/admin only; foreign booking or master of another studio — 404.",
+};
+
+const manualWindowQuery: ParameterObject = {
+  name: "manual",
+  in: "query",
+  required: false,
+  schema: { type: "string", enum: ["1"] },
+  description:
+    "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden. Honoured only for the provider's own side; ignored otherwise.",
 };
 
 export const openApiSpec = {
@@ -2350,7 +2369,16 @@ export const openApiSpec = {
       get: {
         summary: "List available slots for master",
         tags: ["schedule", "masters"],
-        parameters: [masterIdParam, serviceIdQuery, fromQuery, toQuery, limitQuery, excludeBookingIdQuery],
+        parameters: [
+          masterIdParam,
+          serviceIdQuery,
+          fromQuery,
+          toQuery,
+          limitQuery,
+          excludeBookingIdQuery,
+          moveBookingIdQuery,
+          manualWindowQuery,
+        ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/AvailabilitySlotsData" }),
           "400": errorResponse("Validation error"),
@@ -2656,6 +2684,76 @@ export const openApiSpec = {
         ],
         responses: {
           "200": { description: "Binary image stream" },
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/me/attention": {
+      get: {
+        summary: "Counts of items awaiting the signed-in client (bottom navigation dots)",
+        tags: ["me"],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              bookings: { type: "integer", description: "Reschedules proposed by a master, awaiting the client" },
+              messages: { type: "integer", description: "Unread chat messages from masters" },
+              reviews: { type: "integer", description: "Finished visits the client can still review" },
+            },
+            required: ["bookings", "messages", "reviews"],
+          }),
+        },
+      },
+    },
+    "/api/me/catalog-presence": {
+      get: {
+        summary: "Whether the signed-in user's own master/studio cabinet is listed in the catalog, and which conditions are missing",
+        tags: ["me"],
+        parameters: [
+          {
+            name: "type",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["master", "studio"] },
+            description: "Which own cabinet to check (default: master).",
+          },
+        ],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              listed: { type: "boolean" },
+              gaps: {
+                type: "array",
+                items: { type: "string", enum: ["hidden", "address", "schedule"] },
+              },
+            },
+            required: ["listed", "gaps"],
+          }),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Not found"),
+        },
+      },
+    },
+    "/api/media/file/{id}/crop/{v}": {
+      get: {
+        summary: "Serve media file cut to its saved crop area (avatar display)",
+        tags: ["media"],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          {
+            name: "v",
+            in: "path",
+            required: true,
+            description: "Crop version token; a stale token redirects to the current URL",
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": { description: "Binary image (webp) cut to the saved crop area" },
+          "307": { description: "Crop changed or removed — redirect to the current URL" },
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
           "500": errorResponse("Internal error"),

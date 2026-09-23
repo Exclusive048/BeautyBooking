@@ -145,6 +145,7 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
         geoLat: null,
         geoLng: null,
         studioId: null,
+        studioPaused: false,
       },
     });
 

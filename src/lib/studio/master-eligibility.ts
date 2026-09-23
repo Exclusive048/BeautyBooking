@@ -6,35 +6,40 @@ import { prisma } from "@/lib/prisma";
  * STUDIO-BUGS-FIX-A bug #5: an INVITED master (Provider row that exists in
  * the studio but the invitee hasn't claimed it yet — `ownerUserId IS NULL`)
  * must NOT be assignable to services, bookable, or counted as a working
- * column in the schedule grid. Only ACTIVE masters (claimed + published)
+ * column in the schedule grid. Only ACTIVE masters (claimed + not paused)
  * are eligible.
  *
  * The `ownerUserId IS NOT NULL` check is the canonical "invite accepted"
  * predicate — the StudioInvite acceptance flow sets `Provider.ownerUserId`
- * to the invitee's user id. `isPublished` then governs Pause/Activate
+ * to the invitee's user id. `studioPaused` then governs Pause/Activate
  * (DISABLED state).
+ *
+ * STUDIO-PAUSE-SPLIT-01 (2026-09-23): пауза жила в `isPublished` — том же
+ * флаге, что личная видимость мастера, поэтому пауза в студии гасила и его
+ * личную страницу. Теперь пауза — `studioPaused`, а `isPublished` к активности
+ * в студии отношения не имеет.
  */
 
 export type StudioMasterEligibility = {
   ownerUserId: string | null;
-  isPublished: boolean;
+  studioPaused: boolean;
 };
 
 export function isStudioMasterActive(
   master: StudioMasterEligibility,
 ): boolean {
-  return master.ownerUserId !== null && master.isPublished;
+  return master.ownerUserId !== null && !master.studioPaused;
 }
 
 /**
  * Prisma `where` fragment — the query equivalent of {@link isStudioMasterActive}
- * (invite accepted → `ownerUserId` set, and published → not paused). Canonical
+ * (invite accepted → `ownerUserId` set, and not paused in the studio). Canonical
  * "ACTIVE master" filter for counting seats against the team cap (BC-CAP). Spread
  * alongside `{ type: "MASTER", studioId }` in a `provider.count`/`findMany`.
  */
 export const STUDIO_ACTIVE_MASTER_WHERE = {
   ownerUserId: { not: null },
-  isPublished: true,
+  studioPaused: false,
 } satisfies Prisma.ProviderWhereInput;
 
 /**
@@ -51,7 +56,7 @@ export async function requireActiveStudioMaster(input: {
 }): Promise<{
   id: string;
   ownerUserId: string | null;
-  isPublished: boolean;
+  studioPaused: boolean;
   // FIX-R2-04-B: the master provider's own timezone — the salon-local
   // tz in which the work-hours window (and the engine's slot-gen) is
   // interpreted. Surfaced here so the studio create/move paths read the
@@ -64,7 +69,7 @@ export async function requireActiveStudioMaster(input: {
       type: "MASTER",
       studioId: input.studioProviderId,
     },
-    select: { id: true, ownerUserId: true, isPublished: true, timezone: true },
+    select: { id: true, ownerUserId: true, studioPaused: true, timezone: true },
   });
   if (!master) {
     throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");

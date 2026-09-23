@@ -7,7 +7,7 @@ export type ScheduleMasterColumn = {
   avatarUrl: string | null;
   rating: number;
   reviewsCount: number;
-  /** False when the master is paused (`Provider.isPublished = false`). */
+  /** False when the master is paused in the studio (`Provider.studioPaused`) or not yet claimed. */
   isAvailable: boolean;
   /**
    * STUDIO-RESCHEDULE-VALIDATION-A: serviceIds the master has enabled
@@ -41,6 +41,13 @@ export type ScheduleBookingCell = {
   proposedStartAtUtc: string | null;
   proposedEndAtUtc: string | null;
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /**
+   * STUDIO-MASTER-OWN-BOOKINGS-01 — запись с личной страницы мастера студии
+   * (`Booking.studioId = null`). Календарь показывает её, чтобы админ видел
+   * занятость мастера (LOGIC-01), но студия ею не управляет (`auth/ownership.ts`
+   * выводит право из `Booking.studioId`): ни данных клиента, ни действий.
+   */
+  isPersonal: boolean;
 };
 
 export type ScheduleBreakCell = {

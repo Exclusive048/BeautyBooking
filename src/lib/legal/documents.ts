@@ -38,7 +38,9 @@ export const LEGAL_DOCUMENTS = {
    * a consent act: nothing records a `PRIVACY` row (see `consent.ts`). Versioned
    * here anyway so the page has one source for its «последнее обновление».
    */
-  PRIVACY: { version: "1.0", updatedAt: "2026-04-28", href: "/privacy" },
+  // 1.1 (2026-09-23, SESSION-REFRESH-PATH-01): из описания `bh_refresh` убран
+  // путь `/api/auth/refresh` — кука теперь отправляется на весь сайт.
+  PRIVACY: { version: "1.1", updatedAt: "2026-09-23", href: "/privacy" },
   /**
    * Согласие на обработку персональных данных — `/consent`. The separate
    * per-purpose document the law asks for; deliberately NOT the privacy policy.

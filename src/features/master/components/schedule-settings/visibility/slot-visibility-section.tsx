@@ -4,6 +4,7 @@ import type { SlotPrecision, VisibilityDto } from "@/lib/schedule/editor-shared"
 import { UI_TEXT } from "@/lib/ui/text";
 import { ChipGroup } from "../components/chip-group";
 import { SettingRow } from "../components/setting-row";
+import { CatalogPresenceNote } from "@/features/cabinet/components/catalog-presence-note";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.visibility.slot;
 
@@ -43,6 +44,9 @@ export function SlotVisibilitySection({ visibility, onChange }: Props) {
         <SettingRow
           title={T.publishedTitle}
           subtitle={T.publishedSubtitle}
+          // VISIBILITY-CATALOG-STATUS: не желание, а факт — в каталоге ли
+          // кабинет и чего не хватает.
+          note={<CatalogPresenceNote type="master" refreshKey={visibility.isPublished} />}
           control={
             <ChipGroup
               value={visibility.isPublished}

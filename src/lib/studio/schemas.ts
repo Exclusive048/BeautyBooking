@@ -121,22 +121,36 @@ export const updateStudioMasterSchema = z.object({
   studioId: z.string().trim().min(1),
   displayName: z.string().trim().min(1).max(120).optional(),
   tagline: z.string().trim().min(1).max(240).optional(),
+  // STUDIO-EDIT-MASTER-PROFILE-01: описание можно и очистить (пустая строка).
+  description: z.string().trim().max(2000).optional(),
   isActive: z.boolean().optional(),
 });
 
-export const createStudioMasterSchema = z.object({
-  studioId: z.string().trim().min(1),
-  displayName: z.string().trim().min(1).max(120),
-  phone: z
-    .string()
-    .trim()
-    .min(1, "Phone is required")
-    .transform((value) => normalizeRussianPhone(value))
-    .refine((value): value is string => value !== null, {
-      message: "Phone must match +7XXXXXXXXXX or 8XXXXXXXXXX",
-    }),
-  title: z.string().trim().min(1, "Title is required").max(240),
-});
+/**
+ * STUDIO-INVITE-EMAIL-01 — мастера приглашают по телефону ИЛИ по почте, ровно
+ * одним контактом. Почта приводится к нижнему регистру: так она хранится в
+ * `StudioInvite.email` и так сравнивается с адресом аккаунта.
+ */
+export const createStudioMasterSchema = z
+  .object({
+    studioId: z.string().trim().min(1),
+    displayName: z.string().trim().min(1).max(120),
+    phone: z
+      .string()
+      .trim()
+      .min(1, "Phone is required")
+      .transform((value) => normalizeRussianPhone(value))
+      .refine((value): value is string => value !== null, {
+        message: "Phone must match +7XXXXXXXXXX or 8XXXXXXXXXX",
+      })
+      .optional(),
+    email: z.string().trim().toLowerCase().email("Проверьте адрес почты.").max(254).optional(),
+    title: z.string().trim().min(1, "Title is required").max(240),
+  })
+  .refine((value) => Boolean(value.phone) !== Boolean(value.email), {
+    message: "Укажите телефон или почту мастера.",
+    path: ["phone"],
+  });
 
 export const bulkMasterServicesSchema = z.object({
   studioId: z.string().trim().min(1),

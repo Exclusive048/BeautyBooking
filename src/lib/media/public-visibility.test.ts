@@ -68,6 +68,35 @@ describe("isProviderMediaPubliclyVisible", () => {
     expect(await isProviderMediaPubliclyVisible(PORTFOLIO_ASSET)).toBe(false);
   });
 
+  // STUDIO-PHOTOS-PUBLIC-01: у студии строк работ нет вовсе, поэтому правило
+  // «нужна публичная работа» не выполнялось никогда и все фото студии были 403.
+  //
+  // @probe 2026-09-23 — ветка STUDIO убрана из `isProviderMediaPubliclyVisible`
+  // (студия снова идёт по правилу мастера): красный «STUDIO … без строк работ →
+  // visible». Возвращено — зелёный.
+  it("STUDIO PORTFOLIO on a PUBLISHED studio without any item rows → visible", async () => {
+    providerFindUnique.mockResolvedValue({ isPublished: true });
+    portfolioFindFirst.mockResolvedValue(null);
+    expect(
+      await isProviderMediaPubliclyVisible({ ...PORTFOLIO_ASSET, entityType: MediaEntityType.STUDIO }),
+    ).toBe(true);
+  });
+
+  it("STUDIO PORTFOLIO on an UNPUBLISHED studio → NOT visible", async () => {
+    providerFindUnique.mockResolvedValue({ isPublished: false });
+    expect(
+      await isProviderMediaPubliclyVisible({ ...PORTFOLIO_ASSET, entityType: MediaEntityType.STUDIO }),
+    ).toBe(false);
+  });
+
+  it("STUDIO PORTFOLIO referenced by a HIDDEN item → NOT visible", async () => {
+    providerFindUnique.mockResolvedValue({ isPublished: true });
+    portfolioFindFirst.mockResolvedValue({ id: "hidden-item" });
+    expect(
+      await isProviderMediaPubliclyVisible({ ...PORTFOLIO_ASSET, entityType: MediaEntityType.STUDIO }),
+    ).toBe(false);
+  });
+
   it("AVATAR is public regardless of provider state (no DB lookup)", async () => {
     expect(
       await isProviderMediaPubliclyVisible({ ...PORTFOLIO_ASSET, kind: MediaKind.AVATAR })

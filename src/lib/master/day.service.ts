@@ -430,9 +430,9 @@ export async function createSoloMasterBooking(input: {
   if (!master || master.type !== "MASTER") {
     throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
-  if (master.studioId !== null) {
-    throw new AppError("Ручная запись доступна только мастерам без студии.", 403, "FORBIDDEN");
-  }
+  // STUDIO-MASTER-OWN-BOOKINGS-01: ручная запись — на СОБСТВЕННЫЕ услуги
+  // мастера (выборка ниже ограничена `providerId: masterId`), поэтому мастеру
+  // студии она доступна так же; студийные услуги вручную записывает студия.
 
   const service = await prisma.service.findFirst({
     where: {

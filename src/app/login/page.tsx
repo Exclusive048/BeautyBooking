@@ -13,10 +13,21 @@ import { getLoginHeroImageAsset } from "@/lib/media/queries";
 import { getPublicStats, type PublicStats } from "@/lib/stats/public-stats";
 import { env } from "@/lib/env";
 import { resolveAuthMethods } from "@/lib/auth/auth-methods";
+import { parseInternalPath } from "@/lib/http/safe-redirect";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
   const user = await getSessionUser();
   if (user) {
+    // SESSION-LOSS-01: вошедшего (в т.ч. с сессией, обновлённой прокси прямо
+    // на этом запросе) возвращаем туда, откуда его привели на вход, — иначе
+    // `?next=` работал только после ввода кода.
+    const nextRaw = (await searchParams).next;
+    const next = parseInternalPath(typeof nextRaw === "string" ? nextRaw : null);
+    if (next && !next.startsWith("/login")) redirect(next);
     const decision = await resolveCabinetRedirect(user.id);
     redirect(decision.target);
   }

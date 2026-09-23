@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 export type PublicStats = {
   masters: number;
@@ -13,7 +14,7 @@ const CACHE_TTL_SECONDS = 3600; // 1 hour
 
 async function fetchFromDb(): Promise<PublicStats> {
   const [masters, services, bookings] = await Promise.all([
-    prisma.provider.count({ where: { isPublished: true } }),
+    prisma.provider.count({ where: catalogVisibleProviderWhere() }),
     prisma.service.count({ where: { isEnabled: true } }),
     prisma.booking.count({ where: { status: "FINISHED" } }),
   ]);

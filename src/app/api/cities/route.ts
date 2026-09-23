@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { publicReferenceCacheInit } from "@/lib/api/cache-headers";
 import { jsonFail } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 export const runtime = "nodejs";
 
@@ -28,12 +30,14 @@ export const runtime = "nodejs";
  * скрываем НЕподтверждённое и пустое, а не всё пустое. Города-призраки из
  * геокодера по-прежнему не видны до первого опубликованного мастера.
  *
- * Cached for 5 minutes via response headers — selector is dropdown-frequent
- * and the underlying data changes slowly.
+ * CITY-LIST-FRESH-01: заголовок — общий для публичных справочников
+ * (`publicReferenceCacheInit`), путь — в `PUBLIC_REFERENCE_API_PATHS`. Раньше
+ * здесь стоял собственный `public, max-age=300, s-maxage=300`, а в списке
+ * путей роута не было: прокси на протухшем access-токене прикладывал к этому
+ * `public`-ответу `Set-Cookie` с сессией — ровно то, от чего список заведён
+ * (PERF-13). Попутно браузер держит ответ 60 с вместо 300: город, где только
+ * что появился мастер, доходит до селектора быстрее.
  */
-const CACHE_HEADERS: HeadersInit = {
-  "Cache-Control": "public, max-age=300, s-maxage=300",
-};
 
 export async function GET(req: Request) {
   try {
@@ -41,7 +45,9 @@ export async function GET(req: Request) {
       where: {
         isActive: true,
         OR: [
-          { providers: { some: { isPublished: true } } },
+          // VISIBILITY-DEFAULT-01: город появляется вместе с первым провайдером,
+          // которого в нём можно НАЙТИ (тот же предикат, что у каталога).
+          { providers: { some: catalogVisibleProviderWhere() } },
           { autoCreated: false },
         ],
       },
@@ -56,10 +62,7 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json(
-      { ok: true, data: { items: cities } },
-      { headers: CACHE_HEADERS },
-    );
+    return NextResponse.json({ ok: true, data: { items: cities } }, publicReferenceCacheInit());
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

@@ -4,6 +4,7 @@ import {
   OPEN_STATUSES,
   READONLY_WINDOW_HOURS,
   getChatAvailability,
+  isBookingChatOpen,
 } from "@/lib/chat/status";
 import type { ConversationKey } from "@/lib/chat/conversation-slug";
 
@@ -90,7 +91,7 @@ export async function resolveConversationAccess(input: {
   }
 
   // Find the booking we'd send into — most recent OPEN.
-  const openBooking = bookings.find((b) => OPEN_STATUSES.includes(b.status));
+  const openBooking = bookings.find((b) => isBookingChatOpen(b));
   // readonlyOnly = there's a FINISHED booking in the 24h window but
   // nothing currently open. UI uses this to soften the disabled
   // composer ("ваша запись завершена, есть 24ч на финальные сообщения").

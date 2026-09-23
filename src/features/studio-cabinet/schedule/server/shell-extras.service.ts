@@ -51,7 +51,7 @@ export async function loadStudioCabinetShellExtras(
         id: true,
         name: true,
         avatarUrl: true,
-        isPublished: true,
+        studioPaused: true,
         ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,

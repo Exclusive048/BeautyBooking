@@ -260,8 +260,7 @@ export function PrivacyContent() {
         </li>
         <li>
           <strong><code>bh_refresh</code></strong> — токен обновления сессии. Свойство httpOnly,
-          путь <code>/api/auth/refresh</code>, срок жизни 30 дней. Используется для продления
-          входа без повторной аутентификации.
+          срок жизни 30 дней. Используется для продления входа без повторной аутентификации.
         </li>
         <li>
           <strong>

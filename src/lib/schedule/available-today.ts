@@ -11,6 +11,7 @@ import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
+import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
 
 /**
  * CATALOG-AVAILABLE-TODAY — Phase 1: the pure `hasFreeSlotToday` probe.
@@ -167,7 +168,7 @@ const PROBE_SELECT = {
  * Public entry: true iff the provider has ≥1 free bookable slot today.
  *  - MASTER → single-provider probe.
  *  - STUDIO → OR over its ACTIVE masters (invariant #24: `ownerUserId != null`
- *    && `isPublished`) — free-today if ANY active master is free (short-circuit).
+ *    && !`studioPaused`) — free-today if ANY active master is free (short-circuit).
  *
  * No DB write, no caller yet — Phase 2 wires the recompute sweep.
  */
@@ -192,8 +193,7 @@ export async function hasFreeSlotToday(
       type: ProviderType.MASTER,
       studioId: provider.id,
       // isStudioMasterActive (STUDIO-BUGS-FIX-A / invariant #24), expressed as WHERE.
-      ownerUserId: { not: null },
-      isPublished: true,
+      ...STUDIO_ACTIVE_MASTER_WHERE,
     },
     select: PROBE_SELECT,
   });

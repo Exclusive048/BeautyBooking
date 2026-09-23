@@ -56,9 +56,10 @@ export const PUBLIC_REFERENCE_API_PATHS = [
   "/api/home/tags",
   "/api/reviews/tags",
   "/api/billing/plans",
+  "/api/cities",
 ] as const;
 
-/** Совпадение точное: у всех четырёх путей нет динамических сегментов. */
+/** Совпадение точное: ни у одного пути списка нет динамических сегментов. */
 export function isPublicReferenceApiPath(pathname: string): boolean {
   return (PUBLIC_REFERENCE_API_PATHS as readonly string[]).includes(pathname);
 }
@@ -66,4 +67,29 @@ export function isPublicReferenceApiPath(pathname: string): boolean {
 /** Готовые заголовки для `ok(data, publicReferenceCacheInit())`. */
 export function publicReferenceCacheInit(): ResponseInit {
   return { headers: { "Cache-Control": PUBLIC_REFERENCE_CACHE_CONTROL } };
+}
+
+/**
+ * PUBLIC-CACHE-SET-COOKIE — `public`-ответы ВНЕ списка выше.
+ *
+ * Три роута (медиа-файл, его вырез, OG-картинка) объявляют разделяемый кэш, но
+ * из-под обновления сессии их вывести нельзя: медиа читает сессию на приватной
+ * ветке, и пропуск обновления ломал бы приватные вложения при протухшем
+ * access-токене. С SESSION-REFRESH-PATH-01 (`bh_refresh` на `Path=/`) прокси
+ * действительно ротирует сессию и на этих путях — и дописывает `Set-Cookie` к
+ * ответу, который сам объявил себя `public`.
+ *
+ * Понизить директиву из прокси нельзя (заголовок обработчика выигрывает, см.
+ * шапку). Поэтому решение принимает обработчик — единственное место, где
+ * известны ОБА факта: прокси сообщает заголовком ЗАПРОСА, что в ответ этого
+ * запроса уйдёт обновлённая кука, а обработчик тогда отдаёт `private, no-store`.
+ * Цена — один некэшируемый ответ раз в два часа на пользователя. Заголовок,
+ * присланный клиентом, прокси снимает; подделка всё равно могла бы только
+ * отключить кэш у самого подделавшего.
+ */
+export const SESSION_REFRESHED_REQUEST_HEADER = "x-mr-session-refreshed";
+
+/** Директива для `public`-ответа вне `PUBLIC_REFERENCE_API_PATHS`. */
+export function sharedCacheControlFor(req: Request, cacheControl: string): string {
+  return req.headers.get(SESSION_REFRESHED_REQUEST_HEADER) === "1" ? "private, no-store" : cacheControl;
 }

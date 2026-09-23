@@ -75,27 +75,30 @@ describe("BC-CAP — isStudioTeamAtCap (enforcement boundary)", () => {
 });
 
 describe("BC-CAP — ACTIVE-only counting basis", () => {
-  it("counts an ACTIVE master (invite accepted + published)", () => {
-    expect(isStudioMasterActive({ ownerUserId: "u1", isPublished: true })).toBe(true);
+  it("counts an ACTIVE master (invite accepted + not paused in the studio)", () => {
+    expect(isStudioMasterActive({ ownerUserId: "u1", studioPaused: false })).toBe(true);
   });
 
   it("does NOT count an INVITED master (invite not accepted — ownerUserId null)", () => {
-    expect(isStudioMasterActive({ ownerUserId: null, isPublished: true })).toBe(false);
-    // ...even if the stub was published — an unclaimed seat is not consumed.
-    expect(isStudioMasterActive({ ownerUserId: null, isPublished: false })).toBe(false);
+    expect(isStudioMasterActive({ ownerUserId: null, studioPaused: false })).toBe(false);
+    // ...even if the stub is not paused — an unclaimed seat is not consumed.
+    expect(isStudioMasterActive({ ownerUserId: null, studioPaused: true })).toBe(false);
   });
 
-  it("does NOT count a DISABLED master (paused — isPublished false)", () => {
-    expect(isStudioMasterActive({ ownerUserId: "u1", isPublished: false })).toBe(false);
+  it("does NOT count a DISABLED master (paused in the studio)", () => {
+    expect(isStudioMasterActive({ ownerUserId: "u1", studioPaused: true })).toBe(false);
   });
 
-  it("STUDIO_ACTIVE_MASTER_WHERE is the query equivalent (ownerUserId set + published)", () => {
+  it("STUDIO_ACTIVE_MASTER_WHERE is the query equivalent (ownerUserId set + not paused)", () => {
     // Pins the counting basis the DB query uses so it can't drift from the
     // in-memory predicate. Pending invites are a separate table (StudioInvite)
     // entirely — they never appear in this master-count.
+    // STUDIO-PAUSE-SPLIT-01: `isPublished` is the master's PERSONAL visibility
+    // and must not appear here — a master who hides his own page keeps working
+    // in the studio, and a studio pause no longer hides his page.
     expect(STUDIO_ACTIVE_MASTER_WHERE).toEqual({
       ownerUserId: { not: null },
-      isPublished: true,
+      studioPaused: false,
     });
   });
 });

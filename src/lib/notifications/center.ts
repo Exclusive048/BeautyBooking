@@ -1,5 +1,5 @@
 import { MembershipStatus, NotificationType, ProviderType, StudioRole } from "@prisma/client";
-import { listAdministeredStudioIds } from "@/lib/invites/access";
+import { pendingInvitesVisibleToUserWhere } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { resolveNotificationOpenHref } from "@/lib/notifications/presentation";
 import { prisma } from "@/lib/prisma";
@@ -185,29 +185,15 @@ function describeScheduleRequest(payloadJson: unknown): string {
 }
 
 /**
- * PHONE-CLAIM-01: инвайты матчатся по телефону, а телефон бывает кабинетной
- * ЗАЯВКОЙ без OTP-доказательства — показывать по ней чужие приглашения нельзя
- * (заявитель номера видел бы инвайты, адресованные его владельцу). Гейт живёт
- * здесь, а не в контракте вызывающих: одно PK-чтение вместо флага, который
- * каждый вызывающий обязан был бы не забыть. Зеркало —
- * `countPendingInvitesForVerifiedOwner` в `badge.ts`.
+ * PHONE-CLAIM-01 / STUDIO-INVITE-EMAIL-01: какие приглашения пользователь
+ * вправе видеть (телефон и почта, подтверждённые и нет), решает
+ * `pendingInvitesVisibleToUserWhere` — одно место на центр и бейдж.
  */
-async function listPendingInvitesForVerifiedOwner(userId: string, normalizedPhone: string) {
-  const owner = await prisma.userProfile.findUnique({
-    where: { id: userId },
-    select: { phoneVerifiedAt: true },
-  });
-  // FIX-STUDIO-SELF-INVITE: зеркало `countPendingInvitesForVerifiedOwner` —
-  // непроверенный номер видит только приглашения СВОИХ студий (самоприглашения).
-  const studioScope = owner?.phoneVerifiedAt
-    ? {}
-    : { studioId: { in: await listAdministeredStudioIds(userId) } };
+async function listVisiblePendingInvites(userId: string) {
+  const where = await pendingInvitesVisibleToUserWhere(userId);
+  if (!where) return [];
   return prisma.studioInvite.findMany({
-    where: {
-      phone: normalizedPhone,
-      status: MembershipStatus.PENDING,
-      ...studioScope,
-    },
+    where,
     select: {
       id: true,
       createdAt: true,
@@ -234,8 +220,6 @@ export async function getNotificationCenterData(input: {
   userId: string;
   phone: string | null;
 }): Promise<NotificationCenterData> {
-  const normalizedPhone = input.phone ? normalizeRussianPhone(input.phone) : null;
-
   const [studioMemberships, ownedStudios, invites, notifications, unreadCount] = await Promise.all([
     prisma.studioMembership.findMany({
       where: { userId: input.userId, status: MembershipStatus.ACTIVE },
@@ -247,9 +231,7 @@ export async function getNotificationCenterData(input: {
       },
       select: { id: true },
     }),
-    normalizedPhone
-      ? listPendingInvitesForVerifiedOwner(input.userId, normalizedPhone)
-      : Promise.resolve([]),
+    listVisiblePendingInvites(input.userId),
     prisma.notification.findMany({
       where: { userId: input.userId, deletedAt: null },
       select: {
@@ -407,6 +389,6 @@ export async function getNotificationCenterData(input: {
       })),
     notifications: timelineNotifications,
     unreadCount: unreadCount + scheduleRequestNotifications.length,
-    hasPhone: Boolean(normalizedPhone),
+    hasPhone: Boolean(input.phone && normalizeRussianPhone(input.phone)),
   };
 }

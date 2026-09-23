@@ -16,7 +16,27 @@ import { recordSurfaceEvent } from "@/lib/monitoring/status";
 const ACCESS_COOKIE_MAX_AGE_SECONDS = 2 * 60 * 60;
 const REFRESH_COOKIE_MAX_AGE_SECONDS = REFRESH_TOKEN_TTL_SECONDS;
 const REFRESH_COOKIE_NAME = "bh_refresh";
-const REFRESH_COOKIE_PATH = "/api/auth/refresh";
+/**
+ * SESSION-REFRESH-PATH-01 — кука обновления отправляется на ВЕСЬ сайт.
+ *
+ * Прежний путь `/api/auth/refresh` означал, что браузер присылает её ровно
+ * одному роуту, поэтому прозрачное обновление сессии в `src/proxy.ts`
+ * (LOGIC-22 / PERF-14: прокси читает `bh_refresh` и ротирует сессию до
+ * обработчика) в настоящем браузере не срабатывало НИКОГДА — его тесты клали
+ * куку на `/cabinet/*` руками. Следствие: через 2 часа (жизнь access-токена)
+ * любой переход по кабинету уводил на `/login`, а любая форма на обычном
+ * `fetch` получала 401 «Требуется вход в аккаунт» — так тестировщик и увидел
+ * отказ при создании категории, хотя первую отправил минутой раньше.
+ * Кука по-прежнему httpOnly + Secure + SameSite=Lax; второй слой CSRF — в прокси.
+ */
+const REFRESH_COOKIE_PATH = "/";
+/**
+ * Путь, по которому кука жила до SESSION-REFRESH-PATH-01. Браузер держит её
+ * отдельно (имя то же, путь другой) и на `/api/auth/refresh` прислал бы ПЕРВОЙ
+ * (более длинный путь идёт раньше) — поэтому каждая выдача новой куки и выход
+ * явно гасят старую.
+ */
+const LEGACY_REFRESH_COOKIE_PATH = "/api/auth/refresh";
 
 export function getAccessCookieName(): string {
   return env.AUTH_COOKIE_NAME;
@@ -176,6 +196,16 @@ function setAccessCookie(response: NextResponse, accessToken: string): void {
   });
 }
 
+function expireLegacyRefreshCookie(response: NextResponse): void {
+  // `cookies.set` держит одну запись на имя, поэтому второй `Set-Cookie` с тем
+  // же именем, но другим путём дописывается в заголовки напрямую.
+  const secure = isSecureCookie() ? "; Secure" : "";
+  response.headers.append(
+    "set-cookie",
+    `${REFRESH_COOKIE_NAME}=; Path=${LEGACY_REFRESH_COOKIE_PATH}; Max-Age=0; HttpOnly; SameSite=Lax${secure}`,
+  );
+}
+
 function setRefreshCookie(response: NextResponse, refreshToken: string): void {
   response.cookies.set(REFRESH_COOKIE_NAME, refreshToken, {
     httpOnly: true,
@@ -184,6 +214,7 @@ function setRefreshCookie(response: NextResponse, refreshToken: string): void {
     path: REFRESH_COOKIE_PATH,
     maxAge: REFRESH_COOKIE_MAX_AGE_SECONDS,
   });
+  expireLegacyRefreshCookie(response);
 }
 
 export async function setSessionCookies(response: NextResponse, payload: SessionCookiePayload): Promise<void> {
@@ -221,6 +252,33 @@ export function setAccessSessionCookie(response: NextResponse, payload: SessionC
   setAccessCookie(response, accessToken);
 }
 
+/**
+ * SESSION-LOSS-01 (2026-09-23) — отставший на ОДИН шаг refresh-токен
+ * восстанавливает сессию, а не выкидывает на `/login`.
+ *
+ * Ротация одноразовая: предъявленный токен помечается использованным, а новый
+ * уезжает к браузеру в `Set-Cookie` ответа. Если этот ответ до браузера не
+ * дошёл — мобильная сеть оборвалась, приложение свернули посреди запроса,
+ * параллельный запрос проиграл гонку, — браузер остаётся с уже использованным
+ * токеном. Прежняя защита (SESSION-REFRESH-PATH-01) прощала это только 20
+ * секунд и при этом выдавала проигравшему лишь access-токен, НЕ новую
+ * refresh-куку, — то есть рассчитывала, что ответ победителя дойдёт. Не дошёл —
+ * через два часа (следующее протухание access-токена) вылет на `/login`.
+ * Воспроизведено: один потерянный ответ → `/login` (`.qa/diagnostics/session-loss`).
+ *
+ * Теперь: предъявлен использованный токен, а его ПРЕЕМНИК ещё не использован и
+ * жив — значит, клиент просто не получил ответ. Ему повторно выдаётся тот же
+ * преемник (refresh + access), срок не ограничен окном. Отставание на два шага
+ * и больше (преемник уже использован) по-прежнему отказ: клиент ту куку
+ * получал и сам же её предъявлял, старый токен — не его обычное состояние.
+ *
+ * Цена для безопасности: тот, кто украл уже использованный токен, может
+ * получить преемника, пока законный клиент его не использовал. Украсть
+ * httpOnly + Secure куку — уже компрометация сессии целиком (неиспользованный
+ * токен давал то же самое и раньше), а обнаружения повторного использования с
+ * отзывом семьи в проекте не было и до этого.
+ */
+
 export async function rotateSessionCookies(
   response: NextResponse,
   refreshToken: string
@@ -241,7 +299,43 @@ export async function rotateSessionCookies(
       },
       data: { usedAt: now },
     });
-    if (claimed.count !== 1) return null;
+    if (claimed.count !== 1) {
+      // SESSION-LOSS-01: токен уже использован — выдаём его преемника повторно,
+      // если тот ещё не использован и жив (клиент не получил ответ ротации).
+      const used = await tx.refreshSession.findFirst({
+        where: {
+          id: claims.sid,
+          userId: claims.sub,
+          jti: claims.jti,
+          revokedAt: null,
+          rotatedToSessionId: { not: null },
+        },
+        select: { familyId: true, rotatedToSessionId: true },
+      });
+      if (!used?.rotatedToSessionId) return null;
+      const successor = await tx.refreshSession.findFirst({
+        where: {
+          id: used.rotatedToSessionId,
+          userId: claims.sub,
+          revokedAt: null,
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        select: { id: true, jti: true, familyId: true },
+      });
+      if (!successor) return null;
+      const reissueUser = await tx.userProfile.findFirst({
+        where: { id: claims.sub, isDeleted: false },
+        select: { id: true, phone: true, roles: true },
+      });
+      if (!reissueUser) return null;
+      return {
+        user: reissueUser,
+        nextSession: { id: successor.id, jti: successor.jti },
+        familyId: successor.familyId ?? used.familyId ?? claims.sid,
+        reissued: true,
+      };
+    }
 
     const user = await tx.userProfile.findFirst({
       where: { id: claims.sub, isDeleted: false },
@@ -280,7 +374,7 @@ export async function rotateSessionCookies(
       data: { rotatedToSessionId: nextSession.id },
     });
 
-    return { user, nextSession, familyId };
+    return { user, nextSession, familyId, reissued: false };
   });
 
   if (!rotated) return null;
@@ -302,7 +396,9 @@ export async function rotateSessionCookies(
   void recordSurfaceEvent({
     surface: "auth",
     outcome: "success",
-    operation: "refresh-rotate",
+    // Повторная выдача преемника — отдельная метка: по ней видно, как часто
+    // ответ ротации до клиента не доходит.
+    operation: rotated.reissued ? "refresh-rotate-reissue" : "refresh-rotate",
   });
   return payload;
 }
@@ -324,6 +420,7 @@ export async function revokeRefreshSessionByToken(
       select: {
         id: true,
         rotatedToSessionId: true,
+        familyId: true,
       },
     });
     if (!session) {
@@ -343,10 +440,21 @@ export async function revokeRefreshSessionByToken(
       cursorId = nextSession?.rotatedToSessionId ?? null;
     }
 
+    // Выход гасит ВСЮ семью (SEC-13: семья = один вход/устройство), а не
+    // только цепочку вперёд от предъявленного токена. Ротация помечает
+    // предшественника `usedAt`, но не `revokedAt`, а проверка access-токена
+    // (`loadActiveSessionUser`) принимает семью, пока в ней есть хоть одна
+    // неотозванная строка, — то есть использованный предшественник держал
+    // украденный access-токен живым до конца его двух часов. С SESSION-LOSS-01
+    // вдобавок использованный токен восстанавливает сессию через неиспользованного
+    // преемника; отзыв семьи закрывает и этот путь.
     const revoked = await tx.refreshSession.updateMany({
       where: {
-        id: { in: chainIds },
         revokedAt: null,
+        OR: [
+          { id: { in: chainIds } },
+          ...(session.familyId ? [{ userId: claims.sub, familyId: session.familyId }] : []),
+        ],
       },
       data: {
         revokedAt: new Date(),
@@ -382,6 +490,7 @@ export function clearSessionCookies(response: NextResponse): void {
     path: REFRESH_COOKIE_PATH,
     maxAge: 0,
   });
+  expireLegacyRefreshCookie(response);
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   MEDIA_MAX_FILE_SIZE_BYTES,
   MEDIA_PORTFOLIO_LIMIT,
   MEDIA_USER_STORAGE_QUOTA_BYTES,
+  buildAvatarDisplayUrl,
   toMediaAssetDto,
   type MediaAssetDto,
 } from "@/lib/media/types";
@@ -256,6 +257,15 @@ async function enforceUserStorageQuota(userId: string, incomingBytes: number): P
  * absolute, so we match on `contains: <assetId>` — the asset id is a cuid,
  * globally unique, so this cannot false-match another item.
  */
+/** CROP-PUBLIC-01 — всё, что нужно `buildAvatarDisplayUrl`. */
+const AVATAR_URL_SELECT = {
+  id: true,
+  cropX: true,
+  cropY: true,
+  cropWidth: true,
+  cropHeight: true,
+} as const;
+
 export async function isProviderMediaPubliclyVisible(asset: {
   id: string;
   entityType: MediaEntityType;
@@ -275,11 +285,42 @@ export async function isProviderMediaPubliclyVisible(asset: {
   });
   if (!provider?.isPublished) return false;
 
+  // STUDIO-PHOTOS-PUBLIC-01: у студийного портфолио строк `PortfolioItem` нет
+  // вовсе — фото студии И ЕСТЬ `MediaAsset` (редактор студии умеет только
+  // загрузить, заменить и удалить; скрытого состояния у него нет). Правило
+  // «нужна публичная работа» здесь не выполнялось НИКОГДА: каждое фото студии
+  // отдавалось анониму и оптимизатору картинок как 403, и страница студии
+  // показывала серые плитки. Для студии скрытым считается только фото, на
+  // которое ссылается непубличная работа, — то же правило, что у визуального
+  // поиска (`visual-search/searcher.ts`). Удалённые и не-READY ассеты отсекает
+  // вызывающий раньше (404), неопубликованную студию — проверка выше.
+  if (asset.entityType === MediaEntityType.STUDIO) {
+    const hiddenItem = await prisma.portfolioItem.findFirst({
+      where: { isPublic: false, mediaUrl: { contains: asset.id } },
+      select: { id: true },
+    });
+    return !hiddenItem;
+  }
+
   const publicItem = await prisma.portfolioItem.findFirst({
     where: { isPublic: true, mediaUrl: { contains: asset.id } },
     select: { id: true },
   });
   return Boolean(publicItem);
+}
+
+/** STUDIO-PHOTOS-PUBLIC-01 — подмножество `assetIds`, на которые ссылается НЕпубличная работа. */
+async function findHiddenPortfolioAssetIds(assetIds: string[]): Promise<Set<string>> {
+  const hidden = new Set<string>();
+  if (assetIds.length === 0) return hidden;
+  const items = await prisma.portfolioItem.findMany({
+    where: { isPublic: false, OR: assetIds.map((id) => ({ mediaUrl: { contains: id } })) },
+    select: { mediaUrl: true },
+  });
+  for (const id of assetIds) {
+    if (items.some((item) => item.mediaUrl.includes(id))) hidden.add(id);
+  }
+  return hidden;
 }
 
 /** Subset of `assetIds` referenced by a public `PortfolioItem` (see above). */
@@ -338,6 +379,13 @@ export async function listMediaAssets(
       select: { isPublished: true },
     });
     if (!provider?.isPublished) return [];
+
+    // STUDIO-PHOTOS-PUBLIC-01: зеркало `isProviderMediaPubliclyVisible` — у
+    // студии нет строк работ, поэтому видно всё, кроме привязанного к скрытой.
+    if (entityType === MediaEntityType.STUDIO) {
+      const hiddenIds = await findHiddenPortfolioAssetIds(assets.map((a) => a.id));
+      return assets.filter((a) => !hiddenIds.has(a.id)).map(toMediaAssetDto);
+    }
 
     const publicIds = await filterPublicPortfolioAssetIds(assets.map((a) => a.id));
     return assets.filter((a) => publicIds.has(a.id)).map(toMediaAssetDto);
@@ -466,7 +514,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
   ) {
     await prisma.provider.update({
       where: { id: entityId },
-      data: { avatarUrl: `/api/media/file/${readyAsset.id}` },
+      data: { avatarUrl: buildAvatarDisplayUrl(readyAsset) },
     });
   }
 
@@ -700,12 +748,12 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
         status: MediaAssetStatus.READY,
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true },
+      select: AVATAR_URL_SELECT,
     });
     await prisma.provider.update({
       where: { id: asset.entityId },
       data: {
-        avatarUrl: nextAvatar ? `/api/media/file/${nextAvatar.id}` : null,
+        avatarUrl: nextAvatar ? buildAvatarDisplayUrl(nextAvatar) : null,
       },
     });
   }
@@ -744,6 +792,32 @@ export async function updateMediaCrop(
       cropHeight: input.cropHeight,
     },
   });
+
+  // CROP-PUBLIC-01: публичная ссылка аватара несёт версию области, поэтому
+  // новая область — новая ссылка в `Provider.avatarUrl`. Только если это
+  // ТЕКУЩИЙ аватар кабинета (тот же выбор, что при удалении: последний READY).
+  if (
+    updated.kind === MediaKind.AVATAR &&
+    (updated.entityType === MediaEntityType.MASTER || updated.entityType === MediaEntityType.STUDIO)
+  ) {
+    const current = await prisma.mediaAsset.findFirst({
+      where: {
+        entityType: updated.entityType,
+        entityId: updated.entityId,
+        kind: MediaKind.AVATAR,
+        deletedAt: null,
+        status: MediaAssetStatus.READY,
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (current?.id === updated.id) {
+      await prisma.provider.update({
+        where: { id: updated.entityId },
+        data: { avatarUrl: buildAvatarDisplayUrl(updated) },
+      });
+    }
+  }
 
   return toMediaAssetDto(updated);
 }
@@ -794,9 +868,9 @@ export async function getAvatarUrlForEntity(input: {
       status: MediaAssetStatus.READY,
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true },
+    select: AVATAR_URL_SELECT,
   });
 
-  if (avatar?.id) return `/api/media/file/${avatar.id}`;
+  if (avatar) return buildAvatarDisplayUrl(avatar);
   return input.externalUrl ?? null;
 }

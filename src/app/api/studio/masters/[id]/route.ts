@@ -72,6 +72,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       masterId: params.id,
       displayName: body.displayName,
       tagline: body.tagline,
+      description: body.description,
       isActive: body.isActive,
     });
     return jsonOk(result);

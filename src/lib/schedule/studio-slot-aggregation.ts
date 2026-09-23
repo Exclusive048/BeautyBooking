@@ -3,6 +3,7 @@ import { ProviderType } from "@prisma/client";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDurations } from "@/lib/schedule/resolveDuration";
 import { isDateKey } from "@/lib/schedule/dateKey";
+import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
 
 /**
  * Studio-wide slot aggregation for «любой свободный мастер» UX.
@@ -64,8 +65,7 @@ async function loadEligibleMasterIds(input: {
       masterProvider: {
         type: ProviderType.MASTER,
         studioId: input.studioProviderId,
-        ownerUserId: { not: null },
-        isPublished: true,
+        ...STUDIO_ACTIVE_MASTER_WHERE,
       },
     },
     select: { masterProviderId: true },

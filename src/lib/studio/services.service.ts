@@ -309,6 +309,8 @@ export async function updateStudioService(input: {
   baseDurationMin?: number;
   isActive?: boolean;
   onlinePaymentEnabled?: boolean;
+  /** STUDIO-SERVICE-PENDING-CATEGORY-01: кто правит — для правила «своя на модерации». */
+  proposerUserId?: string;
 }): Promise<{ id: string }> {
   const service = await prisma.service.findUnique({
     where: { id: input.serviceId },
@@ -335,13 +337,28 @@ export async function updateStudioService(input: {
   if (input.globalCategoryId !== undefined) {
     const trimmed = typeof input.globalCategoryId === "string" ? input.globalCategoryId.trim() : "";
     nextGlobalCategoryId = trimmed.length > 0 ? trimmed : null;
-    if (nextGlobalCategoryId) {
+    // STUDIO-SERVICE-PENDING-CATEGORY-01: правило то же, что при создании
+    // (`createStudioService`): одобренная ИЛИ своя, ещё на модерации. Раньше
+    // правка требовала строго одобренную, а форма шлёт категорию при каждом
+    // сохранении — поэтому любая правка услуги с категорией на модерации, в
+    // том числе назначение мастера, падала «Глобальная категория не найдена».
+    // Неизменённую категорию не перепроверяем вовсе: её уже приняли.
+    if (nextGlobalCategoryId && nextGlobalCategoryId !== service.globalCategoryId) {
       const globalCategory = await prisma.globalCategory.findUnique({
         where: { id: nextGlobalCategoryId },
-        select: { id: true, status: true, visualSearchSlug: true },
+        select: { id: true, status: true, visualSearchSlug: true, proposedBy: true, createdByUserId: true },
       });
-      if (!globalCategory || globalCategory.status !== CategoryStatus.APPROVED || globalCategory.visualSearchSlug === "hot") {
+      if (!globalCategory || globalCategory.visualSearchSlug === "hot") {
         throw new AppError("Глобальная категория не найдена", 404, "NOT_FOUND");
+      }
+      const isApproved = globalCategory.status === CategoryStatus.APPROVED;
+      const isOwnPending =
+        globalCategory.status === CategoryStatus.PENDING &&
+        Boolean(input.proposerUserId) &&
+        (globalCategory.proposedBy === input.proposerUserId ||
+          globalCategory.createdByUserId === input.proposerUserId);
+      if (!isApproved && !isOwnPending) {
+        throw new AppError("Глобальная категория недоступна", 404, "NOT_FOUND");
       }
     }
   }
@@ -439,7 +456,7 @@ export async function assignMasterToService(input: {
 
   const studio = await getStudioContext(input.studioId);
   // STUDIO-BUGS-FIX-A bug #5: gate assignment on ACTIVE master status.
-  // INVITED (ownerUserId IS NULL) or DISABLED (isPublished=false) masters
+  // INVITED (ownerUserId IS NULL) or DISABLED (studioPaused) masters
   // throw 409 MASTER_NOT_ACTIVE.
   await requireActiveStudioMaster({
     studioProviderId: studio.providerId,

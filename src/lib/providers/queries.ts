@@ -6,6 +6,7 @@ import {
   PROVIDER_LIST_MAX_LIMIT,
 } from "@/lib/providers/schemas";
 import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 type ListProviderCardsInput = {
   cursor?: string | null;
@@ -25,10 +26,7 @@ export async function listProviderCards(input: ListProviderCardsInput = {}) {
 
   if (cursorId) {
     const cursorProvider = await prisma.provider.findFirst({
-      where: {
-        id: cursorId,
-        isPublished: true,
-      },
+      where: { AND: [{ id: cursorId }, catalogVisibleProviderWhere()] },
       select: { id: true },
     });
     if (!cursorProvider) {
@@ -37,7 +35,7 @@ export async function listProviderCards(input: ListProviderCardsInput = {}) {
   }
 
   const providers = await prisma.provider.findMany({
-    where: { isPublished: true },
+    where: catalogVisibleProviderWhere(),
     orderBy: [{ rating: "desc" }, { reviews: "desc" }, { id: "asc" }],
     take: limit + 1,
     ...(cursorId

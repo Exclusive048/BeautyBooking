@@ -6,10 +6,9 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { enqueue } from "@/lib/queue/queue";
 import { createVisualSearchIndexJob } from "@/lib/queue/types";
+import { REINDEX_BATCH_SIZE, requeueUncategorizedPortfolio } from "@/lib/visual-search/reindex";
 
 export const runtime = "nodejs";
-
-const BATCH_SIZE = 500;
 
 export async function POST(req: Request) {
   const auth = await requireAdminAuth();
@@ -23,32 +22,21 @@ export async function POST(req: Request) {
     // the reset the guard would silently no-op already-indexed assets (audit F1).
     const force = new URL(req.url).searchParams.get("force") === "true";
 
-    const assets = await prisma.mediaAsset.findMany({
-      where: {
-        kind: MediaKind.PORTFOLIO,
-        deletedAt: null,
-        ...(force ? {} : { visualCategory: null }),
-      },
-      select: { id: true },
-      orderBy: { createdAt: "desc" },
-      take: BATCH_SIZE,
-    });
-
-    // VISUAL-SEARCH-TRANSIENT-01: и без `force` у выбранных фото снимается
-    // `visualIndexed`. Отбор по умолчанию — «без категории», а в него входят и
-    // фото, помеченные нераспознанными (`visualIndexed = true`): индексатор их
-    // пропускал, то есть кнопка ставила задачи, которые ничего не делали, а
-    // фото, потерянные из-за прежнего сбоя провайдера (он тоже помечал их
-    // нераспознанными), не восстанавливались без `force`. Векторов у таких
-    // фото нет — сбрасывать нечего, кроме флага.
-    if (!force && assets.length > 0) {
-      await prisma.mediaAsset.updateMany({
-        where: { id: { in: assets.map((asset) => asset.id) }, visualIndexed: true },
-        data: { visualIndexed: false, visualIndexedAt: null },
-      });
+    // Без `force` — общий путь «фото без категории» (он же разовый прогон
+    // воркера после смены конвейера, `lib/visual-search/reindex.ts`).
+    if (!force) {
+      const result = await requeueUncategorizedPortfolio();
+      return jsonOk({ enqueued: result.enqueued, forced: false, batchLimited: result.batchLimited });
     }
 
-    if (force && assets.length > 0) {
+    const assets = await prisma.mediaAsset.findMany({
+      where: { kind: MediaKind.PORTFOLIO, deletedAt: null },
+      select: { id: true },
+      orderBy: { createdAt: "desc" },
+      take: REINDEX_BATCH_SIZE,
+    });
+
+    if (assets.length > 0) {
       const ids = assets.map((asset) => asset.id);
       await prisma.$transaction(async (tx) => {
         await tx.mediaAsset.updateMany({
@@ -75,7 +63,7 @@ export async function POST(req: Request) {
       forced: force,
       // A full re-index across >BATCH_SIZE assets needs the CLI backfill script
       // (scripts/backfill-visual-embeddings.ts) — this route caps at one batch.
-      batchLimited: assets.length === BATCH_SIZE,
+      batchLimited: assets.length === REINDEX_BATCH_SIZE,
     });
   } catch (error) {
     const appError = toAppError(error);

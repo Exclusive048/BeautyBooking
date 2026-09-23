@@ -45,7 +45,7 @@ export type MediaCleanupPayload = Record<string, never>;
  */
 export type MediaPurgePayload = {
   assets: Array<{ id: string; storageKey: string }>;
-  reason: "account-deletion" | "master-cabinet-deletion" | "studio-cabinet-deletion";
+  reason: "account-deletion" | "master-cabinet-deletion" | "studio-cabinet-deletion" | "staged-master-discard";
   actorUserId: string | null;
 };
 

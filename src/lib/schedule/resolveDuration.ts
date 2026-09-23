@@ -50,6 +50,12 @@ function decideServiceDuration(input: {
     return { ok: false, status: 409, message: "Эта услуга сейчас недоступна. Выберите другую.", code: "SERVICE_DISABLED" };
   }
 
+  // STUDIO-MASTER-OWN-BOOKINGS-01: собственная услуга мастера студии — как у
+  // соло-мастера, без связи со студией.
+  if (master.studioId && service.providerId === master.id) {
+    return { ok: true, data: service.durationMin };
+  }
+
   if (master.studioId) {
     if (service.providerId !== master.studioId) {
       return { ok: false, status: 400, message: "Эта услуга больше не в списке студии. Обновите страницу.", code: "SERVICE_INVALID" };

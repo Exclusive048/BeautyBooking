@@ -8,15 +8,67 @@ type StudioMasterRecord = {
   studioId: string | null;
 };
 
-async function ensureStudio(studioId: string): Promise<Result<{ id: string; timezone: string }>> {
+type StudioLocation = {
+  cityId: string | null;
+  address: string;
+  district: string;
+  geoLat: number | null;
+  geoLng: number | null;
+};
+
+async function ensureStudio(
+  studioId: string
+): Promise<Result<{ id: string; timezone: string; location: StudioLocation }>> {
   const studio = await prisma.provider.findUnique({
     where: { id: studioId },
-    select: { id: true, type: true, timezone: true },
+    select: {
+      id: true,
+      type: true,
+      timezone: true,
+      cityId: true,
+      address: true,
+      district: true,
+      geoLat: true,
+      geoLng: true,
+    },
   });
   if (!studio || studio.type !== ProviderType.STUDIO) {
     return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
   }
-  return { ok: true, data: { id: studio.id, timezone: studio.timezone } };
+  return {
+    ok: true,
+    data: {
+      id: studio.id,
+      timezone: studio.timezone,
+      location: {
+        cityId: studio.cityId ?? null,
+        address: studio.address,
+        district: studio.district,
+        geoLat: studio.geoLat ?? null,
+        geoLng: studio.geoLng ?? null,
+      },
+    },
+  };
+}
+
+/**
+ * VISIBILITY-DEFAULT-01 — в каталоге мастера находят по ГОРОДУ, а приглашённый
+ * мастер рождается без адреса (заготовка в `studio/masters.service.ts`), и ни
+ * приём приглашения, ни привязка город не ставили: мастер, пришедший в студию
+ * без своего кабинета, не находился нигде, а его кабинет просил «добавить
+ * адрес», который на деле адрес студии. Поэтому мастер без своего города
+ * получает город и адрес студии — как уже получает её часовой пояс. Свой адрес
+ * мастера (соло-кабинет до вступления) не перезаписывается никогда.
+ */
+function inheritStudioLocation(master: { cityId?: string | null }, location: StudioLocation) {
+  if (master.cityId || !location.cityId) return {};
+  return {
+    cityId: location.cityId,
+    address: location.address,
+    district: location.district,
+    geoLat: location.geoLat,
+    geoLng: location.geoLng,
+  };
 }
 
 export async function listStudioMasters(studioId: string): Promise<Result<StudioMasterRecord[]>> {
@@ -55,7 +107,7 @@ export async function attachMasterToStudio(
       type: ProviderType.MASTER,
       OR: [{ studioId: null }, { studioId }],
     },
-    select: { id: true, name: true, studioId: true, timezone: true },
+    select: { id: true, name: true, studioId: true, timezone: true, cityId: true },
   });
 
   if (!master) {
@@ -74,10 +126,14 @@ export async function attachMasterToStudio(
     // STUDIO-MASTER-TZ-01: приглашённый мастер создаётся уже с `studioId` этой
     // студии (staged-профиль в `studio/masters.service.ts`), поэтому приём
     // приглашения приходит именно сюда — и пояс синхронизируется и здесь.
-    if (master.timezone !== studio.data.timezone) {
+    const sync = {
+      ...(master.timezone !== studio.data.timezone ? { timezone: studio.data.timezone } : {}),
+      ...inheritStudioLocation(master, studio.data.location),
+    };
+    if (Object.keys(sync).length > 0) {
       await prisma.provider.update({
         where: { id: master.id },
-        data: { timezone: studio.data.timezone },
+        data: sync,
         select: { id: true },
       });
     }
@@ -93,7 +149,14 @@ export async function attachMasterToStudio(
     // часы мастера проверяются в ЕГО поясе (`studio/bookings.service.ts`), а
     // календарь студии рисуется в поясе студии; расхождение сдвигало и проверку,
     // и публичные слоты мастера на разницу поясов.
-    data: { studioId, timezone: studio.data.timezone },
+    // STUDIO-PAUSE-SPLIT-01: присоединившийся мастер активен (место в команде
+    // уже проверено у приглашения), даже если свою страницу он скрыл.
+    data: {
+      studioId,
+      timezone: studio.data.timezone,
+      studioPaused: false,
+      ...inheritStudioLocation(master, studio.data.location),
+    },
   });
 
   if (attached.count === 0) {
@@ -120,7 +183,8 @@ export async function detachMasterFromStudio(
 
   const updated = await prisma.provider.update({
     where: { id: master.id },
-    data: { studioId: null },
+    // STUDIO-PAUSE-SPLIT-01: пауза — свойство членства в студии, уходит вместе с ним.
+    data: { studioId: null, studioPaused: false },
     select: { id: true, name: true, studioId: true },
   });
 

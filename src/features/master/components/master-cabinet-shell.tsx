@@ -14,6 +14,7 @@ import { getPendingBookingsCountForMaster } from "@/lib/bookings/counts";
 import { getMasterManualBookingData } from "@/lib/master/manual-booking-data.service";
 import { getUnreadBadgeCount } from "@/lib/notifications/badge";
 import { getUnansweredReviewsCountForMaster } from "@/lib/reviews/counts";
+import { countUnreadChatMessages } from "@/lib/chat/conversation-aggregator";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -58,12 +59,14 @@ export async function MasterCabinetShell({
     unreadBadge,
     unansweredReviews,
     manualBookingData,
+    unreadMessages,
   ] = await Promise.all([
     getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
     getPendingBookingsCountForMaster(master.id),
     getUnreadBadgeCount({ userId, phone: sessionUser?.phone ?? null, context: "master" }),
     getUnansweredReviewsCountForMaster(master.id),
     getMasterManualBookingData(userId),
+    countUnreadChatMessages({ userId, perspective: "MASTER" }),
   ]);
 
   const trialActive = isActiveTrial(subscription);
@@ -103,13 +106,11 @@ export async function MasterCabinetShell({
         </div>
 
         {/* PWA-FIX-06 — зазор под фиксированной нижней навигацией считается от её
-            реальной высоты (~56px) плюс safe-area, а не круглым `pb-24` (96px):
-            спейсер `h-16` внутри самой навигации здесь инертен, потому что этот
-            шелл — `display:flex` в РЯД, и спейсер становится нулевым по ширине
+            реальной высоты (48px строка, `BottomTabBar`) плюс safe-area, а не
+            круглым `pb-24` (96px). Спейсер в потоке здесь не работает: шелл —
+            `display:flex` в РЯД, и спейсер стал бы нулевым по ширине
             флекс-элементом рядом с `<main>`, ничего не добавляя снизу. То есть
-            единственный работающий зазор — этот, и прежние 96px давали 40px
-            мёртвого низа на каждой странице кабинета, ничего не страхуя от
-            home-indicator (инсет в `pb-24` не входит). */}
+            единственный работающий зазор — этот. */}
         <main
           data-testid="page-main"
           className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
@@ -117,7 +118,14 @@ export async function MasterCabinetShell({
           {children}
         </main>
 
-        <MasterBottomNav pendingBookingsCount={pendingBookings} />
+        <MasterBottomNav
+          pendingBookingsCount={pendingBookings}
+          attention={{
+            notifications: unreadBadge.count,
+            messages: unreadMessages,
+            reviews: unansweredReviews,
+          }}
+        />
       </div>
     </ManualBookingProvider>
   );

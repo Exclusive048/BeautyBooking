@@ -1,11 +1,14 @@
 import { ok, fail } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/access";
 import { requireProviderOwner } from "@/lib/auth/ownership";
+import { prisma } from "@/lib/prisma";
+import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
+import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
@@ -46,6 +49,28 @@ async function loadProviderForOwnSide(req: Request, providerKey: string) {
   return provider;
 }
 
+/**
+ * STUDIO-PAUSE-SPLIT-01 — мастер, АКТИВНЫЙ в опубликованной студии, отдаёт
+ * окошки виджету студии, даже если скрыл свою личную страницу: `isPublished`
+ * теперь только личная видимость, а работа в студии — `studioPaused`. Раньше
+ * это было одно поле, поэтому публичного резолва хватало.
+ */
+async function loadStudioActiveMaster(providerKey: string) {
+  const master = await resolveProviderBySlugOrId({
+    key: providerKey,
+    select: { ...PROVIDER_SELECT, type: true, studioId: true, ownerUserId: true, studioPaused: true },
+  });
+  if (!master || master.type !== "MASTER" || !master.studioId || !isStudioMasterActive(master)) {
+    return null;
+  }
+  const studio = await prisma.provider.findUnique({
+    where: { id: master.studioId },
+    select: { isPublished: true },
+  });
+  if (!studio?.isPublished) return null;
+  return { id: master.id, timezone: master.timezone, minBookingHoursAhead: master.minBookingHoursAhead };
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
@@ -67,15 +92,24 @@ export async function GET(
       return fail("Слишком длинный список. Сузьте поиск.", 400, "LIMIT_INVALID");
     }
 
+    // MANUAL-BOOKING-SLOTS-01: `?manual=1` — окно ручной записи (без
+    // `minBookingHoursAhead`, см. `operatorWindow`). Действует только для своей
+    // стороны кабинета; чужой запрос с флагом получает обычное клиентское окно.
+    const operatorProvider =
+      url.searchParams.get("manual") === "1" ? await loadProviderForOwnSide(req, p.id) : null;
+
     // SEC-05: сначала — публичный резолв с обязательной публикацией (тот же
     // примитив, что у соседнего `/slots`). Неопубликованный кабинет доступен
     // только своей стороне.
     const provider =
+      operatorProvider ??
       (await resolveProviderBySlugOrId({
         key: p.id,
         select: PROVIDER_SELECT,
         requirePublished: true,
-      })) ?? (await loadProviderForOwnSide(req, p.id));
+      })) ??
+      (await loadStudioActiveMaster(p.id)) ??
+      (await loadProviderForOwnSide(req, p.id));
     if (!provider) return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
 
     const duration = await resolveServiceDuration(provider.id, serviceId);
@@ -87,12 +121,20 @@ export async function GET(
     const toKeyExclusive = toKey ? addDaysToDateKey(toKey, 1) : undefined;
 
     // RESCHEDULE-SELF-SLOT: окно переносимой брони не занято — только для
-    // сторон этой брони (см. reschedule-exclusion.ts).
-    const excludeBookingId = await resolveRescheduleExclusion(
+    // сторон этой брони (см. reschedule-exclusion.ts). MOVE-PICKER-DURATION:
+    // окошки переноса — по длине самой записи, как её проверит перенос.
+    const exclusion = await resolveRescheduleExclusion(
       req,
       provider.id,
       url.searchParams.get("excludeBookingId"),
     );
+    // MOVE-PICKER-DURATION: студийный перенос — окошки ровно той длины, которую
+    // проверит `moveStudioBooking` (в том числе к ДРУГОМУ мастеру и для записи
+    // из нескольких услуг): общий `planStudioMoveDuration`.
+    const studioMove = await resolveStudioMoveSlots(req, provider.id, url.searchParams.get("moveBookingId"));
+    const windowMinutes =
+      studioMove?.durationMin ??
+      (exclusion && exclusion.durationMin > 0 ? exclusion.durationMin : duration.data);
 
     // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
     // applied identically. A slot returned here is one `assertBookingWindow`
@@ -100,12 +142,13 @@ export async function GET(
     const bookable = await listBookableSlots({
       provider,
       serviceId,
-      durationMinutes: duration.data,
+      durationMinutes: windowMinutes,
       fromKey,
       toKeyExclusive,
       limit,
       now: new Date(),
-      excludeBookingId,
+      excludeBookingId: studioMove ? studioMove.excludeBookingId : exclusion?.bookingId,
+      operatorWindow: operatorProvider !== null,
     });
     if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
 

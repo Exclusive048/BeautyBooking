@@ -159,7 +159,8 @@ export async function deleteStudioCabinet(userId: string, options: CabinetDeleti
     });
     await tx.provider.updateMany({
       where: { studioId: studio.providerId, type: ProviderType.MASTER },
-      data: { studioId: null },
+      // STUDIO-PAUSE-SPLIT-01: пауза — свойство членства в студии, уходит вместе с ним.
+      data: { studioId: null, studioPaused: false },
     });
 
     // Услуги с историей броней остаются (FK), но продаваться не должны.

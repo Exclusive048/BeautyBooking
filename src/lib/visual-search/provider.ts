@@ -39,7 +39,26 @@ const VISION_IMAGE_MAX_SIDE = 512;
 const VISION_IMAGE_QUALITY = 85;
 const EMBEDDING_DIMENSIONS = 256;
 const VISION_TIMEOUT_MS = 30_000;
+/**
+ * VISUAL-SEARCH-UNRECOGNIZED-01 (2026-09-23). Модель `qwen3.6` — «думающая»:
+ * по умолчанию она сначала рассуждает, и рассуждение считается в `max_tokens`.
+ * Замер на настоящих фото маникюра: описание по стратегии съедало 1400–1700
+ * токенов, то есть при лимите 1024 ответ ОБРЫВАЛСЯ (`finish_reason: length`,
+ * `content` пустой или недописанный JSON) → `null` → «на фото не маникюр» →
+ * пользователю «Не поняли, что на фото» на КАЖДОМ реальном фото. Классификация
+ * короткая и проходила, поэтому индексация местами успевала, а поиск — нет.
+ *
+ * Поэтому два режима. `fast` — рассуждение выключено (`reasoning_effort:
+ * "none"`): 15–120 токенов, ~2 с, в замере верно на всех фото, но изредка
+ * модель отдаёт кривой JSON (ключи пустыми строками). `reasoning` — рассуждение
+ * включено с запасом токенов: верно, но ~10 с и ~1500 токенов; им повторяют
+ * только непригодный или противоречивый быстрый ответ. Обе границы конечны —
+ * требование SEC-04 (цена ответа ограничена не только таймаутом) сохранено.
+ */
 const VISION_MAX_TOKENS = 1024;
+const VISION_REASONING_MAX_TOKENS = 4096;
+
+export type VisionMode = "fast" | "reasoning";
 const EMBEDDING_TIMEOUT_MS = 30_000;
 
 let visionClient: OpenAI | null = null;
@@ -204,10 +223,13 @@ export async function requestVisionJson(input: {
    * вовсе, она идёт из воркера), и вывести одно из другого здесь неоткуда.
    */
   meter: AiSpendMeter;
+  /** VISUAL-SEARCH-UNRECOGNIZED-01: см. `VISION_MAX_TOKENS`. По умолчанию — `fast`. */
+  mode?: VisionMode;
 }): Promise<Record<string, unknown> | null> {
   // Потолок — до первого байта в сеть и ДО отправки картинки: отказ обязан
   // быть дешевле вызова, иначе он не защищает от того, ради чего заведён.
   await takeAiSpendBudget(input.meter);
+  const mode: VisionMode = input.mode ?? "fast";
 
   try {
     const completion = await getVisionClient().chat.completions.create(
@@ -216,9 +238,10 @@ export async function requestVisionJson(input: {
         temperature: 0.1,
         // SEC-04: без `max_tokens` единственной границей ответа был таймаут в
         // 30 с — то есть стоимость одного анонимного запроса не была ограничена
-        // сверху ничем, кроме времени. Ответ здесь всегда компактный JSON
-        // (классификация или описание + meta), 1024 токена дают запас в разы.
-        max_tokens: VISION_MAX_TOKENS,
+        // сверху ничем, кроме времени. Граница своя у каждого режима.
+        max_tokens: mode === "fast" ? VISION_MAX_TOKENS : VISION_REASONING_MAX_TOKENS,
+        // Без рассуждения ответ — сам JSON; с ним рассуждение считается в лимит.
+        ...(mode === "fast" ? { reasoning_effort: "none" as const } : {}),
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: input.systemPrompt },
@@ -234,7 +257,22 @@ export async function requestVisionJson(input: {
       { signal: AbortSignal.timeout(VISION_TIMEOUT_MS) }
     );
 
-    const content = completion.choices[0]?.message?.content;
+    const choice = completion.choices[0];
+    // Обрыв по лимиту — отдельный след: иначе он неотличим от «модель ответила
+    // пусто» и снова читался бы как «на фото ничего нет».
+    if (choice?.finish_reason === "length") {
+      logError("Yandex response truncated by max_tokens", { scope: "vision", mode, __skipAlert: true });
+      // Быстрый режим: обрыв — повод повторить с рассуждением (вызывающие так и
+      // делают). Обрыв ответа С рассуждением — сбой конвейера, а не свойство
+      // фото: `null` здесь снова стал бы «нераспознано» — закэшированным на
+      // сутки в поиске и навсегда в индексе. Отказ провайдера повторяем:
+      // воркер ретраит, поиск отвечает `unavailable` без кэша.
+      if (mode === "reasoning") {
+        throw new VisualProviderUnavailableError("vision", new Error("vision response truncated by max_tokens"));
+      }
+      return null;
+    }
+    const content = choice?.message?.content;
     if (typeof content !== "string" || content.trim().length === 0) {
       logError("Yandex returned an empty response", { scope: "vision", __skipAlert: true });
       return null;
@@ -251,21 +289,42 @@ export async function requestVisionJson(input: {
       return null;
     }
   } catch (error) {
+    if (error instanceof VisualProviderUnavailableError) throw error;
     logProviderFailure("vision", error);
     throw new VisualProviderUnavailableError("vision", error);
   }
 }
 
+/**
+ * VISUAL-SEARCH-UNRECOGNIZED-01: сюда приходят, когда классификатор УЖЕ назвал
+ * категорию. Если быстрый ответ её отрицает (`not_applicable`) или непригоден
+ * (кривой JSON, нет `text_description`), это противоречие, а не приговор фото:
+ * один повтор с рассуждением. Цена повтора — один платный вызов, и только на
+ * спорных фото (на заглушке с надписью «Маникюр» ответ так и останется «не
+ * маникюр» — там его и ждут).
+ */
 export async function describeImageWithStrategy(
   imageBytes: Uint8Array,
   strategy: VisualSearchStrategy,
   meter: AiSpendMeter
+): Promise<VisualSearchResult> {
+  const fast = await describeOnce(imageBytes, strategy, meter, "fast");
+  if (!fast.error) return fast;
+  return describeOnce(imageBytes, strategy, meter, "reasoning");
+}
+
+async function describeOnce(
+  imageBytes: Uint8Array,
+  strategy: VisualSearchStrategy,
+  meter: AiSpendMeter,
+  mode: VisionMode
 ): Promise<VisualSearchResult> {
   const json = await requestVisionJson({
     imageBytes,
     systemPrompt: strategy.systemPrompt,
     userPrompt: strategy.userPrompt,
     meter,
+    mode,
   });
 
   if (!json || json.error === "not_applicable") {

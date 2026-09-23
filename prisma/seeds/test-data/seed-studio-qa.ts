@@ -104,14 +104,14 @@ export async function seedStudioQa(): Promise<number> {
 
   // Team, ordered by slug so master #1/#2/#3 are stable across runs.
   const team = await prisma.provider.findMany({
-    where: { studioId: studioProvider.id, type: "MASTER", ownerUserId: { not: null }, isPublished: true },
+    where: { studioId: studioProvider.id, type: "MASTER", ownerUserId: { not: null }, studioPaused: false },
     select: { id: true, name: true, publicUsername: true, ownerUserId: true },
     orderBy: { publicUsername: "asc" },
   });
   if (team.length < 3) {
     throw new Error(
       `seed-studio-qa: expected >=3 ACTIVE masters in ${STUDIO_USERNAME}, found ${team.length}. ` +
-        `seedProviders must set Provider.studioId + ownerUserId + isPublished.`,
+        `seedProviders must set Provider.studioId + ownerUserId (studioPaused stays false).`,
     );
   }
 

@@ -14,7 +14,7 @@ export function AccountTab({ data }: Props) {
       <PlanCard plan={data.plan} />
       <RolesCard roles={data.roles} />
       <ExportCard />
-      <DangerZoneCard phone={data.identity.phone} />
+      <DangerZoneCard />
     </div>
   );
 }

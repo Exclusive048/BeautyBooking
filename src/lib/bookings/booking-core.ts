@@ -11,6 +11,8 @@ import {
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import type { BookingTx } from "@/lib/bookings/booking-transaction";
+import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
+import { assertStudioAcceptsBookings, studioAcceptsBookings, STUDIO_NOT_ACCEPTING_MESSAGE } from "@/lib/studio/accepts-bookings";
 
 /**
  * FIX-C6 (инв. #31) — клиент, которому позволено спрашивать про конфликт.
@@ -271,6 +273,8 @@ export async function resolveBookingCore(input: {
         id: true,
         type: true,
         ownerUserId: true,
+        isPublished: true,
+        studioPaused: true,
         timezone: true,
         studioId: true,
         autoConfirmBookings: true,
@@ -339,6 +343,8 @@ export async function resolveBookingCore(input: {
             id: true,
             type: true,
             studioId: true,
+            ownerUserId: true,
+            studioPaused: true,
             timezone: true,
             bufferBetweenBookingsMin: true,
             autoConfirmBookings: true,
@@ -354,7 +360,26 @@ export async function resolveBookingCore(input: {
     throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
-  const needsOverride = provider.type === ProviderType.STUDIO || provider.studioId;
+  // STUDIO-MASTER-OWN-BOOKINGS-01: связь `MasterService` (и её цена/длительность)
+  // нужна только для услуги СТУДИИ. Собственная услуга мастера студии
+  // (`service.providerId === provider.id`) бронируется как у соло-мастера.
+  const needsOverride =
+    provider.type === ProviderType.STUDIO ||
+    (Boolean(provider.studioId) && service.providerId !== provider.id);
+
+  // STUDIO-HIDDEN-MASTER-SERVICES: услуга СТУДИИ бронируется, только пока
+  // студия принимает записи — и со страницы студии, и со страницы её мастера.
+  // Скрытая студия записей не принимает; её мастер — только личные на свои
+  // услуги (ветка выше их не задевает: у своей услуги `needsOverride` ложно).
+  if (needsOverride) {
+    if (provider.type === ProviderType.STUDIO) {
+      if (!studioAcceptsBookings(provider)) {
+        throw new AppError(STUDIO_NOT_ACCEPTING_MESSAGE, 409, "STUDIO_NOT_ACCEPTING_BOOKINGS");
+      }
+    } else if (provider.studioId) {
+      await assertStudioAcceptsBookings(provider.studioId);
+    }
+  }
   const override =
     resolvedMasterProviderId && needsOverride
       ? await prisma.masterService.findUnique({
@@ -375,6 +400,15 @@ export async function resolveBookingCore(input: {
   if (resolvedMasterProviderId && needsOverride) {
     if (!override || override.isEnabled === false) {
       throw new AppError("Мастер не оказывает выбранную услугу.", 409, "SERVICE_INVALID");
+    }
+    // STUDIO-PAUSE-SPLIT-01: услугу СТУДИИ оказывает только мастер, активный в
+    // студии (инв. #24). Пауза в студии больше не скрывает личную страницу
+    // мастера, поэтому без этой проверки мастер на паузе продавал бы студийные
+    // услуги со своей страницы. Со стороны студии проверки не было вовсе:
+    // виджет лишь не показывал такого мастера, а прямой запрос проходил.
+    const performer = provider.type === ProviderType.MASTER ? provider : master;
+    if (!performer || !isStudioMasterActive(performer)) {
+      throw new AppError("Мастер сейчас не принимает записи в студии.", 409, "MASTER_NOT_ACTIVE");
     }
   }
 

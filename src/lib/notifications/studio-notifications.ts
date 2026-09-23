@@ -1,6 +1,11 @@
 import { Prisma, NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { listAdministeredStudioIds } from "@/lib/invites/access";
+import { listAdministeredStudioIds, normalizeInviteEmail } from "@/lib/invites/access";
+import { buildNotificationEmailHtml, buildNotificationEmailText } from "@/lib/email/templates/notification";
+import { isEmailConfigured, sendEmail } from "@/lib/email/sender";
+import { env } from "@/lib/env";
+import { logError } from "@/lib/logging/logger";
+import { maskEmail } from "@/lib/logging/masking";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { publishRealtime } from "@/lib/notifications/service";
@@ -88,6 +93,47 @@ function buildPhoneCandidates(phone: string): string[] {
   return Array.from(candidates);
 }
 
+/**
+ * STUDIO-INVITE-EMAIL-01 — получатель приглашения, выписанного на ПОЧТУ:
+ * владелец подтверждённого адреса (инв. #41), либо — как у телефона —
+ * администратор той же студии со своим же адресом в профиле.
+ */
+async function resolveInviteRecipientUserIdByEmail(
+  email: string,
+  studioId: string,
+): Promise<string | null> {
+  // Адрес приглашения — в нижнем регистре, а профиль мог сохранить его как
+  // ввели («Anna@Mail.ru»): сравнение — без регистра, как в `resolveInviteAccess`.
+  const owner = await prisma.userProfile.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, emailVerifiedAt: { not: null }, isDeleted: false },
+    select: { id: true },
+  });
+  if (owner) return owner.id;
+  // Заявок на один адрес может быть несколько (заявить может кто угодно,
+  // инв. #41), поэтому ищется та, чей держатель администрирует эту студию.
+  const claimants = await prisma.userProfile.findMany({
+    where: { email: { equals: email, mode: "insensitive" }, emailVerifiedAt: null, isDeleted: false },
+    select: { id: true },
+    take: 20,
+  });
+  for (const claimant of claimants) {
+    const administered = await listAdministeredStudioIds(claimant.id);
+    if (administered.includes(studioId)) return claimant.id;
+  }
+  return null;
+}
+
+async function resolveInviteRecipientUserIdFor(invite: {
+  phone: string | null;
+  email: string | null;
+  studio: { id: string };
+}): Promise<string | null> {
+  const email = normalizeInviteEmail(invite.email);
+  if (email) return resolveInviteRecipientUserIdByEmail(email, invite.studio.id);
+  if (invite.phone) return resolveInviteRecipientUserId(invite.phone, invite.studio.id);
+  return null;
+}
+
 async function resolveInviteRecipientUserId(
   phone: string,
   studioId: string,
@@ -118,7 +164,22 @@ async function resolveInviteRecipientUserId(
 }
 
 async function resolveInviteUserLabel(invite: InviteWithRelations): Promise<string> {
-  const phoneCandidates = buildPhoneCandidates(invite.phone);
+  const email = normalizeInviteEmail(invite.email);
+  if (email) {
+    // Имя — только от владельца подтверждённого адреса (зеркало телефона ниже).
+    const owner = await prisma.userProfile.findFirst({
+      where: { email: { equals: email, mode: "insensitive" }, emailVerifiedAt: { not: null } },
+      select: { displayName: true, firstName: true, lastName: true },
+    });
+    return resolveUserLabel({
+      displayName: owner?.displayName ?? null,
+      firstName: owner?.firstName ?? null,
+      lastName: owner?.lastName ?? null,
+      phone: null,
+      fallback: "Мастер",
+    });
+  }
+  const phoneCandidates = buildPhoneCandidates(invite.phone ?? "");
   // PHONE-CLAIM-01: имя в тексте уведомления — тоже только от владельца, иначе
   // студия увидела бы имя заявителя чужого номера.
   const profile = await prisma.userProfile.findFirst({
@@ -158,8 +219,42 @@ export async function loadScheduleRequestWithRelations(
   });
 }
 
+/**
+ * STUDIO-INVITE-EMAIL-01 — письмо на адрес приглашения.
+ *
+ * Внутреннее уведомление доходит только до аккаунта, а приглашают часто того,
+ * у кого аккаунта ещё нет. Письмо уходит на адрес ПРИГЛАШЕНИЯ, а не на адрес
+ * аккаунта: ПДн третьего лица здесь нет (адрес вписала студия, письмо идёт на
+ * него же), а принять приглашение сможет только тот, кто войдёт с этим адресом
+ * — вход по коду из письма и есть подтверждение владения.
+ */
+async function sendStudioInviteEmail(invite: InviteWithRelations): Promise<void> {
+  const email = normalizeInviteEmail(invite.email);
+  if (!email || !isEmailConfigured()) return;
+  const studioName = invite.studio.provider.name || "Студия";
+  const baseUrl = env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru";
+  const title = "Вас пригласили в студию";
+  const body = `Студия ${studioName} приглашает вас в команду мастеров на МастерРядом. Войдите с этой почтой — приглашение будет в уведомлениях.`;
+  const ctaUrl = `${baseUrl}/login?next=${encodeURIComponent("/notifications")}`;
+  try {
+    await sendEmail({
+      to: email,
+      subject: `${title}: ${studioName}`,
+      html: buildNotificationEmailHtml({ title, body, ctaUrl, ctaLabel: "Открыть приглашение" }),
+      text: buildNotificationEmailText({ title, body, ctaUrl }),
+    });
+  } catch (error) {
+    logError("studio invite email failed", {
+      inviteId: invite.id,
+      to: maskEmail(email),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export async function notifyStudioInviteReceived(invite: InviteWithRelations): Promise<void> {
-  const invitedUserId = await resolveInviteRecipientUserId(invite.phone, invite.studio.id);
+  await sendStudioInviteEmail(invite);
+  const invitedUserId = await resolveInviteRecipientUserIdFor(invite);
   if (!invitedUserId) return;
 
   const studioName = invite.studio.provider.name || "Студия";
@@ -240,7 +335,7 @@ export async function notifyStudioInviteRejected(invite: InviteWithRelations): P
 }
 
 export async function notifyStudioInviteRevoked(invite: InviteWithRelations): Promise<void> {
-  const invitedUserId = await resolveInviteRecipientUserId(invite.phone, invite.studio.id);
+  const invitedUserId = await resolveInviteRecipientUserIdFor(invite);
   if (!invitedUserId) return;
 
   const studioName = invite.studio.provider.name || "Студия";

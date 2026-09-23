@@ -9,6 +9,7 @@ import { resolvePublicAppUrl } from "@/lib/app-url";
 import { withQuery } from "@/lib/public-urls";
 import { looksLikeProviderId, resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { UI_TEXT } from "@/lib/ui/text";
+import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };
@@ -38,8 +39,8 @@ async function isStudioUnbookable(studioId: string): Promise<boolean> {
       where: {
         studioId,
         type: "MASTER",
-        ownerUserId: { not: null },
-        isPublished: true,
+        // STUDIO-PAUSE-SPLIT-01: активный в студии (не личная видимость).
+        ...STUDIO_ACTIVE_MASTER_WHERE,
       },
     }),
   ]);

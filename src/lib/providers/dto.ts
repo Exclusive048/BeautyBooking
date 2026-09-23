@@ -82,4 +82,10 @@ export type ProviderProfileDto = {
   geoLng: number | null;
   superpowerBadges: ProviderSuperpowerBadgeDto[];
   services: ProviderServiceDto[];
+  /**
+   * STUDIO-MASTER-OWN-BOOKINGS-01 — услуги в `services` собственные и
+   * бронируются на этой странице (соло-мастер; мастер студии со своими
+   * услугами). `false` — это услуги студии, и запись идёт через студию.
+   */
+  sellsOwnServices: boolean;
 };

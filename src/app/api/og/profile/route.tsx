@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { sharedCacheControlFor } from "@/lib/api/cache-headers";
 import { prisma } from "@/lib/prisma";
 import { BRAND_COLORS, brandGradientCss, withAlpha } from "@/lib/ui/brand-colors";
 
@@ -251,7 +252,11 @@ export async function GET(req: Request) {
       width: CARD_WIDTH,
       height: CARD_HEIGHT,
       headers: {
-        "Cache-Control": "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+        // PUBLIC-CACHE-SET-COOKIE: не `public`, если прокси приложит сессию.
+        "Cache-Control": sharedCacheControlFor(
+          req,
+          "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800",
+        ),
       },
     }
   );

@@ -47,18 +47,19 @@ function resolveBookingRevenueKopeks(booking: {
 
 function deriveStatus(input: {
   hasOwner: boolean;
-  isPublished: boolean;
+  /** STUDIO-PAUSE-SPLIT-01: пауза в студии, а не личная видимость мастера. */
+  studioPaused: boolean;
   hasPendingInvite: boolean;
 }): StudioMasterDisplayStatus {
   if (input.hasPendingInvite) return "INVITED";
   if (!input.hasOwner) return "INVITED";
-  return input.isPublished ? "ACTIVE" : "DISABLED";
+  return input.studioPaused ? "DISABLED" : "ACTIVE";
 }
 
 /**
  * Lists all masters under a studio with derived display status, metrics
  * over the last 30 days, and filter counts. Status is derived from
- * `Provider.ownerUserId` + `Provider.isPublished` + pending
+ * `Provider.ownerUserId` + `Provider.studioPaused` + pending
  * `StudioInvite` for that provider's phone — matching the existing
  * `listStudioMasters` semantics (no schema change). Counts always
  * cover the full studio; `items` is the filtered subset.
@@ -93,7 +94,8 @@ export async function loadStudioMastersList(input: {
         avatarUrl: true,
         tagline: true,
         contactPhone: true,
-        isPublished: true,
+        contactEmail: true,
+        studioPaused: true,
         ownerUserId: true,
         publicUsername: true,
         ratingAvg: true,
@@ -112,7 +114,7 @@ export async function loadStudioMastersList(input: {
     }),
     prisma.studioInvite.findMany({
       where: { studioId: studio.id, status: MembershipStatus.PENDING },
-      select: { phone: true },
+      select: { phone: true, email: true },
     }),
     prisma.booking.findMany({
       where: {
@@ -132,7 +134,10 @@ export async function loadStudioMastersList(input: {
     }),
   ]);
 
-  const pendingPhones = new Set(pendingInvites.map((invite) => invite.phone));
+  // STUDIO-INVITE-EMAIL-01: приглашение бывает на телефон или на почту —
+  // «Приглашён» ставится по совпадению любого из двух контактов заготовки.
+  const pendingPhones = new Set(pendingInvites.map((invite) => invite.phone).filter(Boolean));
+  const pendingEmails = new Set(pendingInvites.map((invite) => invite.email).filter(Boolean));
 
   type Totals = { revenueKopeks: number; bookings: number };
   const totalsByMaster = new Map<string, Totals>();
@@ -147,10 +152,11 @@ export async function loadStudioMastersList(input: {
   const allItems: StudioMasterListItem[] = providers.map((provider) => {
     const hasOwner = Boolean(provider.ownerUserId);
     const hasPendingInvite =
-      Boolean(provider.contactPhone) && pendingPhones.has(provider.contactPhone!);
+      (Boolean(provider.contactPhone) && pendingPhones.has(provider.contactPhone!)) ||
+      (Boolean(provider.contactEmail) && pendingEmails.has(provider.contactEmail!));
     const status = deriveStatus({
       hasOwner,
-      isPublished: provider.isPublished,
+      studioPaused: provider.studioPaused,
       hasPendingInvite,
     });
 

@@ -1,4 +1,4 @@
-import { MembershipStatus, StudioRole } from "@prisma/client";
+import { MembershipStatus, Prisma, StudioRole } from "@prisma/client";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 
@@ -34,7 +34,21 @@ import { prisma } from "@/lib/prisma";
  * Чужую заявку это не легализует: номер сравнивается с ЗАПИСАННЫМ в профиле, а
  * не с введённым в форме, и грант действует только внутри своей студии.
  */
-export type InviteAccessGrant = "PHONE_OWNER" | "STUDIO_ADMIN";
+export type InviteAccessGrant = "PHONE_OWNER" | "EMAIL_OWNER" | "STUDIO_ADMIN";
+
+/**
+ * STUDIO-INVITE-EMAIL-01 — приглашение можно адресовать ПОЧТЕ. Право на него —
+ * по тому же принципу, что у телефона, но опора другая: `EMAIL_OWNER` = адрес
+ * ПОДТВЕРЖДЁН (`emailVerifiedAt`, ставит только успешно введённый код — инв.
+ * #41) и совпадает. В проде почта подтверждается самим входом, поэтому
+ * приглашение по почте доходит, а по телефону — нет (SMS-шлюза нет, см. выше).
+ * Неподтверждённый адрес в профиле — заявка: чужое приглашение он не открывает,
+ * кроме гранта `STUDIO_ADMIN` своей же студии (то же, что у телефона).
+ */
+export function normalizeInviteEmail(email: string | null | undefined): string | null {
+  const trimmed = email?.trim().toLowerCase();
+  return trimmed ? trimmed : null;
+}
 
 const ADMIN_ROLES: StudioRole[] = [StudioRole.OWNER, StudioRole.ADMIN];
 
@@ -83,16 +97,67 @@ export async function resolveInviteAccess(input: {
   userId: string;
   userPhone: string | null;
   userPhoneVerifiedAt: Date | null;
-  invitePhone: string;
+  userEmail: string | null;
+  userEmailVerifiedAt: Date | null;
+  invitePhone: string | null;
+  inviteEmail: string | null;
   inviteStudioId: string;
   administeredStudioIds?: string[];
 }): Promise<InviteAccessGrant | null> {
-  const phoneMatches = invitePhoneMatchesProfile(input.userPhone, input.invitePhone);
-  if (!phoneMatches) return null;
+  let ownerGrant: InviteAccessGrant | null = null;
+  let matches = false;
 
-  if (input.userPhoneVerifiedAt) return "PHONE_OWNER";
+  const inviteEmail = normalizeInviteEmail(input.inviteEmail);
+  if (inviteEmail) {
+    matches = normalizeInviteEmail(input.userEmail) === inviteEmail;
+    if (matches && input.userEmailVerifiedAt) ownerGrant = "EMAIL_OWNER";
+  } else if (input.invitePhone) {
+    matches = invitePhoneMatchesProfile(input.userPhone, input.invitePhone);
+    if (matches && input.userPhoneVerifiedAt) ownerGrant = "PHONE_OWNER";
+  }
+
+  if (!matches) return null;
+  if (ownerGrant) return ownerGrant;
 
   const administered =
     input.administeredStudioIds ?? (await listAdministeredStudioIds(input.userId));
   return administered.includes(input.inviteStudioId) ? "STUDIO_ADMIN" : null;
+}
+
+/**
+ * STUDIO-INVITE-EMAIL-01 — условие выборки ожидающих приглашений, которые
+ * пользователь вправе ВИДЕТЬ (бейдж колокольчика и центр уведомлений). Одно
+ * место на обе поверхности, те же гранты, что у `resolveInviteAccess`:
+ * подтверждённый номер/адрес видит все свои приглашения, неподтверждённый —
+ * только приглашения студий, которыми пользователь сам управляет. `null` —
+ * смотреть не по чему (нет ни номера, ни адреса).
+ */
+export async function pendingInvitesVisibleToUserWhere(
+  userId: string,
+): Promise<Prisma.StudioInviteWhereInput | null> {
+  const user = await prisma.userProfile.findUnique({
+    where: { id: userId },
+    select: { phone: true, phoneVerifiedAt: true, email: true, emailVerifiedAt: true },
+  });
+  if (!user) return null;
+
+  const phone = user.phone ? normalizeRussianPhone(user.phone) : null;
+  const email = normalizeInviteEmail(user.email);
+  if (!phone && !email) return null;
+
+  const needsAdminScope = (phone && !user.phoneVerifiedAt) || (email && !user.emailVerifiedAt);
+  const administered = needsAdminScope ? await listAdministeredStudioIds(userId) : [];
+
+  const branches: Prisma.StudioInviteWhereInput[] = [];
+  if (phone) {
+    branches.push(
+      user.phoneVerifiedAt ? { phone } : { phone, studioId: { in: administered } },
+    );
+  }
+  if (email) {
+    branches.push(
+      user.emailVerifiedAt ? { email } : { email, studioId: { in: administered } },
+    );
+  }
+  return { status: MembershipStatus.PENDING, OR: branches };
 }

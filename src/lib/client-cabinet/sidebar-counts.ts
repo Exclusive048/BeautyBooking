@@ -1,15 +1,23 @@
 import { cache } from "react";
-import { BookingStatus } from "@prisma/client";
+import { BookingActionRequiredBy, BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
 import { reviewCandidateWhere } from "@/lib/client-cabinet/reviews.service";
 import { personalNotificationWhere } from "@/lib/notifications/groups";
+import { countUnreadChatMessages } from "@/lib/chat/conversation-aggregator";
 
 export type SidebarCounts = {
   favorites: number;
   upcomingBookings: number;
   unreadNotifications: number;
   pendingReviews: number;
+  /**
+   * NAV-ATTENTION-01 — записи, где ход за клиентом: мастер предложил перенос
+   * (`CHANGE_REQUESTED` + `actionRequiredBy = CLIENT`), визит ещё впереди.
+   */
+  bookingsAwaitingClient: number;
+  /** NAV-ATTENTION-01 — непрочитанные сообщения мастеров (`countUnreadChatMessages`). */
+  unreadMessages: number;
 };
 
 /**
@@ -26,7 +34,14 @@ export const getClientSidebarCounts = cache(
   async (userId: string): Promise<SidebarCounts> => {
     const now = new Date();
 
-    const [favorites, upcomingBookings, unreadNotifications, pendingReviewCandidates] =
+    const [
+      favorites,
+      upcomingBookings,
+      unreadNotifications,
+      pendingReviewCandidates,
+      bookingsAwaitingClient,
+      unreadMessages,
+    ] =
       await Promise.all([
         prisma.userFavorite.count({ where: { userId } }),
         prisma.booking.count({
@@ -71,6 +86,15 @@ export const getClientSidebarCounts = cache(
             service: { select: { durationMin: true } },
           },
         }),
+        prisma.booking.count({
+          where: {
+            clientUserId: userId,
+            status: BookingStatus.CHANGE_REQUESTED,
+            actionRequiredBy: BookingActionRequiredBy.CLIENT,
+            startAtUtc: { gte: now },
+          },
+        }),
+        countUnreadChatMessages({ userId, perspective: "CLIENT" }),
       ]);
 
     const pendingReviews = pendingReviewCandidates.filter((b) =>
@@ -82,6 +106,8 @@ export const getClientSidebarCounts = cache(
       upcomingBookings,
       unreadNotifications,
       pendingReviews,
+      bookingsAwaitingClient,
+      unreadMessages,
     };
   },
 );

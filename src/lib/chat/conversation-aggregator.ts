@@ -1,6 +1,6 @@
 import { ChatSenderType, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { OPEN_STATUSES } from "@/lib/chat/status";
+import { isBookingChatOpen } from "@/lib/chat/status";
 import {
   getOrCreateConversationSlug,
   type ConversationKey,
@@ -119,6 +119,31 @@ function previewBody(body: string): string {
  * List all conversations for the caller. Master sees every client
  * they have at least one booking with; client sees every provider.
  */
+/**
+ * NAV-ATTENTION-01 — сколько сообщений ждёт прочтения у участника переписки.
+ * Тот же скоуп и тот же счётчик, что у `listConversations` (брони мастера либо
+ * клиента, сообщения ДРУГОЙ стороны без `readAt`, чат только у мастеров), но
+ * одним `count` — для точки на вкладке навигации, без выборки карточек.
+ */
+export async function countUnreadChatMessages(input: {
+  userId: string;
+  perspective: ConversationParticipant;
+}): Promise<number> {
+  const { userId, perspective } = input;
+  return prisma.chatMessage.count({
+    where: {
+      readAt: null,
+      senderType: perspective === "MASTER" ? ChatSenderType.CLIENT : ChatSenderType.MASTER,
+      chat: {
+        booking:
+          perspective === "MASTER"
+            ? { provider: { ownerUserId: userId, type: ProviderType.MASTER } }
+            : { clientUserId: userId, provider: { type: ProviderType.MASTER } },
+      },
+    },
+  });
+}
+
 export async function listConversations(input: {
   userId: string;
   perspective: ConversationParticipant;
@@ -209,7 +234,7 @@ export async function listConversations(input: {
         }
       : null;
     const latestActivityAt = lastRaw?.createdAt ?? chat.createdAt;
-    const isOpen = OPEN_STATUSES.includes(booking.status);
+    const isOpen = isBookingChatOpen(booking);
 
     const existing = grouped.get(pairId);
     if (!existing) {
@@ -452,7 +477,7 @@ export async function getConversationThread(input: {
   });
   flat.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-  const openBooking = bookings.find((b) => OPEN_STATUSES.includes(b.status));
+  const openBooking = bookings.find((b) => isBookingChatOpen(b));
   const partner = buildPartner({
     perspective,
     providerSrc: bookings[0]?.provider ?? null,

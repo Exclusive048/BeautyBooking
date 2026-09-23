@@ -2,6 +2,7 @@ import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
+import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 
 export type CalendarView = "day" | "week" | "month";
 
@@ -90,7 +91,7 @@ export async function getStudioCalendar(input: {
       studioId: studio.providerId,
       ...(masterFilter ? { id: { in: masterFilter } } : {}),
     },
-    select: { id: true, name: true, isPublished: true, avatarUrl: true },
+    select: { id: true, name: true, ownerUserId: true, studioPaused: true, avatarUrl: true },
     orderBy: { name: "asc" },
   });
 
@@ -141,7 +142,8 @@ export async function getStudioCalendar(input: {
     masters: masters.map((master) => ({
       id: master.id,
       name: master.name,
-      isActive: master.isPublished,
+      // STUDIO-PAUSE-SPLIT-01: активность в студии, не личная видимость.
+      isActive: isStudioMasterActive(master),
       avatarUrl: master.avatarUrl ?? null,
     })),
     bookings: bookings.map((booking) => ({

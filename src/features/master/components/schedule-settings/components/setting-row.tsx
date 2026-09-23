@@ -6,6 +6,8 @@ import { cn } from "@/lib/cn";
 type Props = {
   title: string;
   subtitle?: string;
+  /** Строка-состояние под подсказкой (например, статус в каталоге). */
+  note?: ReactNode;
   control: ReactNode;
   className?: string;
 };
@@ -21,7 +23,7 @@ type Props = {
  * колонку в одно слово («Минимум / за», подсказка — в семь строк). Из-за этого
  * подсказки писались телеграфно, а объяснить «шаг окошек» без примера нельзя.
  */
-export function SettingRow({ title, subtitle, control, className }: Props) {
+export function SettingRow({ title, subtitle, note, control, className }: Props) {
   return (
     <div
       className={cn(
@@ -32,6 +34,7 @@ export function SettingRow({ title, subtitle, control, className }: Props) {
       <div className="min-w-0 basis-full sm:flex-1">
         <p className="text-sm font-medium text-text-main">{title}</p>
         {subtitle ? <p className="mt-0.5 text-xs text-text-sec">{subtitle}</p> : null}
+        {note ? <div className="mt-1">{note}</div> : null}
       </div>
       <div className="shrink-0">{control}</div>
     </div>

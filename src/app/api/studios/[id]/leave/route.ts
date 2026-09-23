@@ -87,7 +87,8 @@ export async function POST(
       type: ProviderType.MASTER,
       studioId: studio.providerId,
     },
-    data: { studioId: null },
+    // STUDIO-PAUSE-SPLIT-01: пауза — свойство членства в студии, уходит вместе с ним.
+    data: { studioId: null, studioPaused: false },
   });
 
   try {

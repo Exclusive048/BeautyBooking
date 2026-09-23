@@ -2,6 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 export const runtime = "nodejs";
 
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
       where: {
         isEnabled: true,
         isActive: true,
-        provider: { isPublished: true, publicUsername: { not: null } },
+        provider: { AND: [catalogVisibleProviderWhere(), { publicUsername: { not: null } }] },
         OR: [
           { name: { contains: query, mode: "insensitive" } },
           { title: { contains: query, mode: "insensitive" } },

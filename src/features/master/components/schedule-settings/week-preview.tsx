@@ -51,7 +51,9 @@ function DayColumn({ day, label }: { day: DayScheduleDto; label: string }) {
       <div className="flex flex-col items-center gap-1.5">
         <span className="text-xs font-medium text-text-sec">{label}</span>
         <div className="h-32 w-full rounded-lg border border-dashed border-border-subtle bg-bg-input" aria-hidden />
-        <span className="text-[10px] uppercase tracking-wide text-text-sec/70">{T.empty}</span>
+        <abbr title={T.emptyFull} className="text-[10px] uppercase tracking-wide text-text-sec/70 decoration-transparent">
+          {T.empty}
+        </abbr>
       </div>
     );
   }

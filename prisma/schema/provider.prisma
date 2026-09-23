@@ -94,6 +94,13 @@ model Provider {
 
   isPublished Boolean @default(false)
 
+  // STUDIO-PAUSE-SPLIT-01 (2026-09-23): пауза мастера В СТУДИИ (ставит админ
+  // студии). Отдельно от `isPublished` — тот теперь только личная видимость
+  // мастера: пауза в студии не гасит его личную страницу и собственные услуги.
+  // «Активен в студии» = `ownerUserId != null && !studioPaused`
+  // (`lib/studio/master-eligibility.ts`, инв. #24).
+  studioPaused Boolean @default(false)
+
   publicUsername String? @unique
 
   publicUsernameUpdatedAt DateTime?
@@ -291,7 +298,14 @@ model StudioInvite {
 
   studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
 
-  phone String
+  // STUDIO-INVITE-EMAIL-01: приглашение адресуется телефону ИЛИ почте (ровно
+  // одному из двух — проверяет схема создания `createStudioMasterSchema`).
+  // Почта хранится в нижнем регистре; право на приглашение по почте даёт
+  // только ПОДТВЕРЖДЁННЫЙ адрес (`emailVerifiedAt`, инв. #41), по телефону —
+  // подтверждённый номер (инв. #46) либо грант администратора своей студии.
+  phone String?
+
+  email String?
 
   status MembershipStatus @default(PENDING)
 
@@ -304,7 +318,9 @@ model StudioInvite {
   updatedAt DateTime @updatedAt
 
   @@unique([studioId, phone])
+  @@unique([studioId, email])
   @@index([studioId])
   @@index([phone])
+  @@index([email])
   @@index([status])
 }

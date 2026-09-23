@@ -7,6 +7,7 @@ import { ProviderType } from "@prisma/client";
 import { getStudioBannerUrl } from "@/lib/studios/banner";
 import { getProviderSuperpowerBadges } from "@/lib/reviews/badges";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
+import { studioAcceptsBookings } from "@/lib/studio/accepts-bookings";
 
 // AUDIT (section 5):
 // - Superpower badges are computed server-side from public review tags.
@@ -28,6 +29,8 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       id: true,
       type: true,
       studioId: true,
+      studioPaused: true,
+      studio: { select: { isPublished: true } },
       name: true,
       avatarUrl: true,
       tagline: true,
@@ -98,8 +101,27 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
     // Запрос делается только при `studioId != null`: у соло-мастера связей нет
     // по построению, и лишнее обращение к БД на каждый публичный профиль не
     // окупается.
+    //
+    // STUDIO-MASTER-OWN-BOOKINGS-01: если у мастера студии есть СОБСТВЕННЫЕ
+    // услуги, личная страница продаёт их сама (запись идёт мимо студии,
+    // `studioId = null`), а на студийные ведёт ссылка «записаться через
+    // студию». Своих услуг нет — прежнее поведение FIX-D1: показываем
+    // студийные, запись через студию.
     if (provider.studioId) {
-      profile.services = await loadStudioMasterServices(provider.id);
+      if (provider.studioPaused || !studioAcceptsBookings(provider.studio)) {
+        // STUDIO-PAUSE-SPLIT-01: мастер на паузе в студии. Личная страница
+        // по-прежнему открыта (пауза больше её не гасит), но продаёт только
+        // СВОИ услуги: студийных нет, ссылки «записаться через студию» — тоже,
+        // иначе клиент дошёл бы до отказа `MASTER_NOT_ACTIVE` в конце записи.
+        // STUDIO-HIDDEN-MASTER-SERVICES: так же — у мастера скрытой студии: она
+        // записей не принимает, мастер — только личные записи на свои услуги.
+        profile.studioId = null;
+        profile.sellsOwnServices = true;
+      } else if (profile.services.length > 0) {
+        profile.sellsOwnServices = true;
+      } else {
+        profile.services = await loadStudioMasterServices(provider.id);
+      }
     }
     profile.superpowerBadges = await getProviderSuperpowerBadges(provider.id);
   }

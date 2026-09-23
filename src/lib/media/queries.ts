@@ -1,6 +1,7 @@
 import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAvatarUrlForEntity } from "@/lib/media/service";
+import { buildAvatarDisplayUrl, buildMediaFileUrl } from "@/lib/media/types";
 import {
   SITE_LOGIN_HERO_SETTING_KEY,
   SITE_LOGO_SETTING_KEY,
@@ -35,6 +36,10 @@ async function getSiteAssetBySettingKey(
       entityType: true,
       entityId: true,
       status: true,
+      cropX: true,
+      cropY: true,
+      cropWidth: true,
+      cropHeight: true,
     },
   });
 
@@ -49,8 +54,11 @@ async function getSiteAssetBySettingKey(
     return null;
   }
 
+  // CROP-PUBLIC-01: логотип (AVATAR) показывают вырезанным по сохранённой
+  // области. Картинка экрана входа (PORTFOLIO) — исходником: её кадр задаёт
+  // `object-position` на месте показа.
   return {
-    url: `/api/media/file/${asset.id}`,
+    url: kind === MediaKind.AVATAR ? buildAvatarDisplayUrl(asset) : buildMediaFileUrl(asset.id),
   };
 }
 

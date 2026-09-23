@@ -101,6 +101,14 @@ export async function listBookableSlots(input: {
   now: Date;
   /** RESCHEDULE-SELF-SLOT: бронь, которую переносят — её окно не занято (см. usecases.ts). */
   excludeBookingId?: string;
+  /**
+   * MANUAL-BOOKING-SLOTS-01: окно для ОПЕРАТОРА — ручной записи мастером или
+   * администратором студии. Ручные пути `minBookingHoursAhead` намеренно не
+   * проверяют (это правило для клиентов: мастер, записывающий звонок на
+   * через полчаса, его не нарушает), поэтому и пикер прячет только прошедшие
+   * окошки. Решает роут и только для своей стороны кабинета.
+   */
+  operatorWindow?: boolean;
 }): Promise<BookableSlotsResult> {
   const { provider, serviceId, durationMinutes, fromKey, toKeyExclusive, limit, now } = input;
 
@@ -205,7 +213,7 @@ export async function listBookableSlots(input: {
 
   // EXP-025: anything before `now + minBookingHoursAhead` is non-bookable.
   // This is the cutoff `/slots` already applied and `/availability` lacked.
-  const earliestBookable = earliestBookableUtc(provider, now);
+  const earliestBookable = input.operatorWindow ? now : earliestBookableUtc(provider, now);
 
   const slots = result.data.slots.filter((slot) => {
     const startsAt = toDate(slot.startAtUtc);

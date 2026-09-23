@@ -2,6 +2,7 @@ import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { decodePublicId, encodePublicId } from "@/lib/public-id";
 import { Prisma } from "@prisma/client";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 /**
  * FEED-UNPUBLISHED-MASTER (2026-09-15). Лента портфолио на главной для
@@ -13,7 +14,13 @@ import { Prisma } from "@prisma/client";
  * ценой, но с плейсхолдером вместо фото. Предикат один на все четыре чтения
  * ленты — лента, домашняя лента, «похожие», карточка работы.
  */
-const PUBLISHED_MASTER_WHERE = { master: { isPublished: true } } as const;
+//
+// VISIBILITY-DEFAULT-01: все три потребителя — лента, домашняя лента и
+// «похожие работы» — это места, где работу НАХОДЯТ, поэтому мастер обязан быть
+// виден в каталоге (есть город и расписание). Сама карточка работы по ссылке
+// проверяет только публикацию (`getPortfolioDetail`), как и отдача медиа, —
+// «найти» ⊂ «открыть», поэтому фото у найденной работы всегда отдаётся.
+const PUBLISHED_MASTER_WHERE = { master: catalogVisibleProviderWhere() };
 
 type PortfolioServiceOption = {
   serviceId: string;

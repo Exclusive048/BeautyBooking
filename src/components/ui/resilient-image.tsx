@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { cropAreaImageStyle, toCropArea } from "@/lib/media/crop-geometry";
 import { IMAGE_FALLBACK_SRC, isOptimizableImageSrc } from "./image-host";
 
 type ResilientImageProps = {
@@ -12,6 +13,16 @@ type ResilientImageProps = {
   cropY?: number | null;
   cropWidth?: number | null;
   cropHeight?: number | null;
+  /**
+   * CROP-PREVIEW-01 — как применить область обрезки.
+   * `focal` (по умолчанию): `object-position` в центр области — приблизительно,
+   * зато годится для бокса любых пропорций.
+   * `exact`: область заполняет бокс целиком (`cropAreaImageStyle`) — ровно то,
+   * что было в рамке кроппера. Только для fill-режима и только когда пропорции
+   * бокса совпадают с пропорциями области (аватар: квадрат в квадрате), иначе
+   * картинка исказится. В fixed-size режиме молча остаётся `focal`.
+   */
+  cropFit?: "focal" | "exact";
   // Fixed-size mode (for avatars with known dimensions)
   width?: number;
   height?: number;
@@ -97,6 +108,7 @@ export function ResilientImage({
   cropY,
   cropWidth,
   cropHeight,
+  cropFit = "focal",
   width,
   height,
   sizes,
@@ -113,6 +125,8 @@ export function ResilientImage({
 }: ResilientImageProps) {
   const [errored, setErrored] = useState(false);
   const objectPosition = buildObjectPosition(cropX, cropY, cropWidth, cropHeight);
+  const exactArea =
+    cropFit === "exact" && !(width && height) ? toCropArea(cropX, cropY, cropWidth, cropHeight) : null;
   const combinedStyle: CSSProperties = { ...style, objectPosition };
 
   const showFallback = errored || !isOptimizableImageSrc(src);
@@ -170,6 +184,31 @@ export function ResilientImage({
         onError={() => setErrored(true)}
         onLoad={onLoad}
       />
+    );
+  }
+
+  if (exactArea) {
+    // Растягивается и сдвигается ОБЁРТКА, а не <img>: `next/image` с `fill`
+    // запрещает `style.width` (в dev — исключение, роняющее кабинет). Картинка
+    // заполняет обёртку, а у обёртки пропорции исходника — `object-cover`
+    // внутри ничего не срезает.
+    return (
+      <div style={cropAreaImageStyle(exactArea)}>
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes={sizes ?? "100vw"}
+          quality={quality}
+          priority={priority}
+          loading={loading}
+          unoptimized={unoptimized}
+          className={className}
+          style={style}
+          onError={() => setErrored(true)}
+          onLoad={onLoad}
+        />
+      </div>
     );
   }
 

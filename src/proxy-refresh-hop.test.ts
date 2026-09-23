@@ -96,3 +96,35 @@ describe("PERF-14 · прокси обновляет сессию вызовом
     expect(PROXY_SOURCE).toContain("rotateSessionWithTelemetry");
   });
 });
+
+/**
+ * SESSION-LOSS-01 — запрос, который ротировал сессию и упёрся в лимитер,
+ * обязан отдать новую куку и с отказом 429/503. Иначе ротация уже сделана
+ * (старый токен помечен использованным), а браузер остаётся с ним.
+ *
+ * @probe 2026-09-23 — в ветке `result.limited` снят цикл, дописывающий
+ * `refreshedSetCookies`: красный этот кейс. Возвращено — зелёный.
+ */
+describe("SESSION-LOSS-01 · отказ лимитера не теряет обновлённую куку", () => {
+  it("429 после ротации несёт Set-Cookie с новой сессией", async () => {
+    verifyToken.mockReturnValue(null);
+    rotateSessionWithTelemetry.mockReset();
+    rotateSessionWithTelemetry.mockImplementation(async (response: { headers: Headers }) => {
+      response.headers.append("set-cookie", "bh_refresh=next-token; Path=/; HttpOnly");
+      response.headers.append("set-cookie", "bh_session=next-access; Path=/; HttpOnly");
+      return true;
+    });
+    checkRateLimit.mockResolvedValueOnce({ limited: true, retryAfterSeconds: 30 } as never);
+
+    const res = await proxy(
+      new NextRequest("https://example.test/api/bookings/my", {
+        method: "GET",
+        headers: { cookie: "bh_session=stale-access; bh_refresh=refresh-token" },
+      }),
+    );
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("set-cookie") ?? "").toContain("bh_refresh=next-token");
+  });
+});
+

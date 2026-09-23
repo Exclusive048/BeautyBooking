@@ -52,9 +52,19 @@ function resolveMasterUserId(booking: BookingWithRelations): string | null {
   );
 }
 
+/**
+ * Студия записи — из ПОВЕРХНОСТИ (инв. #45), а не из членства мастера. Запись
+ * с личной страницы мастера студии (STUDIO-MASTER-OWN-BOOKINGS-01) несёт
+ * `studioId = null`: студия ею не управляет, и её администраторам о ней ни
+ * знать (имя клиента, услуга, время), ни отвечать нечем. Прежний откат на
+ * `provider.studioId` рассылал им такие записи — тот же вывод из членства, от
+ * которого `auth/ownership.ts` уже отказался.
+ */
 async function resolveStudioIdForBooking(booking: BookingWithRelations): Promise<string | null> {
   if (booking.studioId) return booking.studioId;
 
+  // Записи, созданные до FIX-C1, могли не нести `studioId` — поверхность
+  // студии узнаётся по самому провайдеру записи.
   if (booking.provider.type === ProviderType.STUDIO) {
     const studio = await prisma.studio.findUnique({
       where: { providerId: booking.provider.id },
@@ -63,12 +73,7 @@ async function resolveStudioIdForBooking(booking: BookingWithRelations): Promise
     return studio?.id ?? null;
   }
 
-  if (!booking.provider.studioId) return null;
-  const studio = await prisma.studio.findUnique({
-    where: { providerId: booking.provider.studioId },
-    select: { id: true },
-  });
-  return studio?.id ?? null;
+  return null;
 }
 
 async function resolveProviderRecipientUserIds(booking: BookingWithRelations): Promise<string[]> {

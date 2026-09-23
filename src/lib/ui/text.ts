@@ -887,10 +887,14 @@ export const UI_TEXT = {
     activeRole: "Текущий кабинет",
     roleSwitcherTitle: "Кабинет",
     becomeMasterCta: "Стать мастером",
-    /** NAV-BECOME-MASTER-01 — подпись пятой вкладки нижней навигации PWA. */
-    becomeMasterTab: "Стать мастером",
-    /** То же на экранах уже 360px — полная подпись там налезает на соседнюю вкладку. */
+    /**
+     * NAV-BECOME-MASTER-01 — подпись пятой вкладки нижней навигации PWA.
+     * NAV-ALIGN-01: короткая на любой ширине — полная делала вкладку вдвое шире
+     * соседних; полное имя («Стать мастером») уходит в aria-label.
+     */
     becomeMasterTabShort: "Мастерам",
+    /** NAV-ATTENTION-01 — подпись точки на вкладке для скринридера. */
+    needsAttention: "есть то, что ждёт вашего действия",
     createStudioCta: "Создать студию",
     more: "Ещё",
   },
@@ -1223,8 +1227,40 @@ export const UI_TEXT = {
       add: "Добавить окошко",
       hint: "Клиенты смогут записаться только в эти часы",
     },
+    // MANUAL-BOOKING-SLOTS-01: выбор окошка в ручной записи (кабинет мастера и
+    // студии) — те же свободные окошки, что видит клиент, без «записи не ранее
+    // чем за N часов».
+    operatorSlots: {
+      dateLabel: "Дата",
+      timeLabel: "Окошко",
+      chooseFirst: "Сначала выберите услугу — окошки зависят от её длительности.",
+      chooseMasterFirst: "Сначала выберите мастера и услугу — окошки зависят от них.",
+      loading: "Загружаем свободные окошки…",
+      empty: "Свободных окошек в этот день нет. Выберите другую дату.",
+      error: "Не удалось загрузить свободные окошки. Попробуйте ещё раз.",
+      required: "Выберите свободное окошко.",
+    },
   },
   cabinet: {
+    // VISIBILITY-CATALOG-STATUS: есть ли кабинет в каталоге и чего не хватает.
+    catalogPresence: {
+      listedMaster: "Вы в каталоге — клиенты находят вас в поиске.",
+      listedStudio: "Студия в каталоге — клиенты находят её в поиске.",
+      notListedPrefix: "Пока не в каталоге:",
+      gapsMaster: {
+        hidden: "включите видимость",
+        address: "укажите адрес с городом",
+        schedule: "настройте рабочие дни",
+      },
+      gapsStudio: {
+        hidden: "включите видимость",
+        address: "укажите адрес с городом",
+        schedule: "нужен хотя бы один мастер с рабочими днями",
+      },
+      statusListed: "В каталоге",
+      statusHidden: "Скрыт из каталога",
+      statusIncomplete: "Не в каталоге",
+    },
     trial: {
       badgePrefix: "PREMIUM",
       bannerTitleTomorrow: "Пробный период заканчивается завтра",
@@ -1541,7 +1577,7 @@ export const UI_TEXT = {
   studio: {
     profile: {
       subtitle: "Управление студией",
-      publicationLabel: "Опубликован",
+      publicationLabel: "Виден в каталоге",
       coverUpload: "Загрузить обложку",
       editCover: "Изменить",
       nameFallback: "Название студии",
@@ -2290,7 +2326,10 @@ export const UI_TEXT = {
       preview: {
         title: "Как видит клиент",
         hint: "Слева — ваши часы, справа — то же самое глазами клиента",
-        empty: "Выходной",
+        // Колонка дня узкая (7 в ряд): полное слово не помещалось под днём и
+        // наезжало на соседнюю колонку. Полное — в `title` сокращения.
+        empty: "Вых.",
+        emptyFull: "Выходной",
         legend: {
           working: "Рабочее время",
           break: "Перерыв",
@@ -2392,10 +2431,14 @@ export const UI_TEXT = {
         slot: {
           title: "Как клиенты видят окошки",
           publishedTitle: "Показывать в каталоге",
-          publishedSubtitle: "Вас находят в поиске и подборках",
+          // VISIBILITY-DEFAULT-01: включено с рождения кабинета; в каталог
+          // профиль попадает, когда есть адрес и рабочие дни.
+          publishedSubtitle: "Вас находят в поиске и подборках, когда указан адрес и есть рабочие дни",
           publishedOptions: {
             yes: "Да",
-            link: "Только по ссылке",
+            // Было «Только по ссылке» — неправда: выключенная видимость
+            // закрывает и страницу по ссылке, и запись по ней.
+            link: "Нет",
           },
           precisionTitle: "Точность времени",
           precisionSubtitle: "Что показывать в карточке мастера",
@@ -3402,9 +3445,14 @@ export const UI_TEXT = {
           "Скоро вы сможете запросить копию всех своих данных одним файлом: профиль, записи, отзывы, портфолио.",
         exportSoonCta: "Скоро",
         dangerZoneHeading: "Необратимые действия",
-        dangerZoneTitle: "Удаление аккаунта",
+        // CABINET-DELETE-SCOPE-01: карточка удаляет КАБИНЕТ мастера, а не
+        // аккаунт — удаление аккаунта целиком живёт в /cabinet/settings.
+        dangerZoneTitle: "Удаление кабинета мастера",
         dangerZoneBody:
-          "Удаление аккаунта необратимо. Все личные данные будут удалены безвозвратно согласно №152-ФЗ. Записи и отзывы останутся без вашего имени.",
+          "Удалятся профиль мастера, услуги, расписание и портфолио, а ваша страница пропадёт из каталога. Аккаунт останется: вход, ваши записи к другим мастерам и студия, если она у вас есть.",
+        dangerZoneCta: "Удалить кабинет мастера",
+        accountDeletionHint: "Удалить аккаунт целиком, со всеми кабинетами, можно в",
+        accountDeletionLink: "настройках аккаунта",
       },
     },
     servicesPage: {
@@ -3808,8 +3856,9 @@ export const UI_TEXT = {
         cancel: "Отмена",
         create: "Создать запись",
         saving: "Сохраняем…",
-        notSoloHint: "Так можно только мастерам, которые работают без студии.",
-        invalidTime: "Не удалось создать запись. Проверьте дату и время.",
+        // STUDIO-MASTER-OWN-BOOKINGS-01: вручную записывают на СВОИ услуги.
+        notSoloHint: "Сначала добавьте свои услуги — вручную записывают на ваши собственные услуги.",
+        createError: "Не удалось создать запись. Попробуйте ещё раз.",
       },
       bookingActions: {
         confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
@@ -5910,6 +5959,8 @@ export const UI_TEXT = {
       studioBookingTitle: "Запись через студию",
       studioBookingDescription: "Этот мастер принимает записи через студийный календарь.",
       studioBookingCta: "Открыть запись в студии",
+      // STUDIO-MASTER-OWN-BOOKINGS-01: у мастера студии со своими услугами.
+      studioBookingAlso: "Услуги студии — запись через студию",
       ownerViewTitle: "Это ваш профиль",
       ownerViewHint: "Так вашу страницу видят клиенты. Запись к самому себе недоступна.",
       ownerViewEditCta: "Редактировать профиль",
@@ -6323,6 +6374,8 @@ export const UI_TEXT = {
       more: "Ещё",
       moreTitle: "Дополнительно",
       close: "Закрыть",
+      // NAV-STUDIO-SETTINGS-TAB — вкладка раздела «Профиль» настроек студии.
+      profile: "Профиль",
     },
     dashboard: {
       title: "Главная",
@@ -6742,9 +6795,10 @@ export const UI_TEXT = {
       },
       // STUDIO-SCHEDULE-SETTINGS-A Phase B — Visibility tab.
       visibility: {
-        publishedTitle: "Виден в каталоге",
-        publishedHint:
-          "Если выключить, мастер не появится в публичном поиске и каталоге.",
+        // STUDIO-PAUSE-SPLIT-01: личную страницу мастера скрывает только он
+        // сам; студия ставит мастера на паузу в разделе «Мастера».
+        personalVisibilityNote:
+          "Личную страницу мастера в каталоге включает и скрывает сам мастер. Чтобы мастер временно не принимал записи в студии, поставьте его на паузу в разделе «Мастера».",
         slotPrecisionTitle: "Точность времени",
         slotPrecisionHint:
           "Что видит клиент в каталоге: точное время, «сегодня свободно» или только даты.",
@@ -6821,6 +6875,10 @@ export const UI_TEXT = {
         // BOOKING-STUDIO-RESCHEDULE-PARITY-01: at-a-glance marker on a cell
         // whose client asked to move it — the studio must accept/decline.
         rescheduleBadge: "Клиент просит перенос",
+        // STUDIO-MASTER-OWN-BOOKINGS-01: запись с личной страницы мастера —
+        // студия видит только, что время занято; управляет ею мастер.
+        personalBooking: "Личная запись мастера",
+        personalBookingHint: "Мастер принял эту запись сам — ею управляет он",
       },
       // TZ-DISPLAY-SALON-PARITY-01: the datetime-local inputs in the
       // create/move dialogs are edited as SALON-local wall-clock (converted
@@ -6853,7 +6911,6 @@ export const UI_TEXT = {
       },
       createDialog: {
         title: "Новая запись",
-        timeLabel: "Время",
         masterLabel: "Мастер",
         masterPlaceholder: "Выберите мастера",
         serviceLabel: "Услуга",
@@ -6879,7 +6936,6 @@ export const UI_TEXT = {
         masterIncompatibleSuffix: "не выполняет эту услугу",
         masterIncompatibleHint:
           "Этот мастер не выполняет выбранную услугу — выберите другого.",
-        timeLabel: "Новое время",
         cancel: "Отмена",
         confirm: "Перенести",
         submitting: "Переносим…",
@@ -6896,7 +6952,9 @@ export const UI_TEXT = {
       weekView: {
         masterColumn: "Мастер",
         occupancyTemplate: "{booked}/{total}",
-        dayOff: "Выходной",
+        // Ячейка дня узкая (7 в ряд) — полное слово налезало на соседнюю. Полное — в `title`.
+        dayOff: "Вых.",
+        dayOffFull: "Выходной",
         empty: "В этой студии пока нет мастеров.",
       },
       empty: {
@@ -6919,7 +6977,6 @@ export const UI_TEXT = {
         // «Новая запись» button is used but the studio admin didn't
         // pick a time. Pre-fix the form fell back to generic «create»
         // — confusing because there was nothing visible to fix.
-        startAtRequired: "Укажите дату и время записи.",
         breakMasterRequired: "Выберите мастера для перерыва.",
         breakTimeRange: "Время окончания должно быть позже начала.",
         breakCreate: "Не удалось создать перерыв. Попробуйте ещё раз.",
@@ -7636,6 +7693,8 @@ export const UI_TEXT = {
           activate: "Вернуть к работе",
           // FIX-STUDIO-02 (F7): revoke a still-pending invite (INVITED status).
           revoke: "Отозвать приглашение",
+          // STUDIO-EDIT-MASTER-PROFILE-01
+          editProfile: "Редактировать профиль",
         },
         kpis: {
           revenue: "Выручка · 30д",
@@ -7654,15 +7713,20 @@ export const UI_TEXT = {
           subtitle: "Мастер меняет своё расписание через заявку вам",
           seeCalendar: "В календарь →",
           slotsTemplate: "{booked}/{total}",
-          dayOff: "Выходной",
+          // Ячейка дня узкая (7 в ряд) — полное слово налезало на соседнюю. Полное — в `title`.
+          dayOff: "Вых.",
+          dayOffFull: "Выходной",
         },
       },
       inviteDialog: {
         title: "Пригласить мастера",
         // AUTH-GATE-01: see inviteCard.subtitle — no SMS is sent for invites.
-        subtitle: "Введите номер телефона — мастер появится в команде с пометкой «Приглашён».",
-        phoneLabel: "Телефон",
-        phonePlaceholder: "+7 999 123-45-67",
+        // STUDIO-INVITE-EMAIL-01: по почте уходит письмо со ссылкой, и принять
+        // такое приглашение можно сразу — почта подтверждается входом.
+        subtitle:
+          "Введите телефон или почту — мастер появится в команде с пометкой «Приглашён». На почту придёт письмо с приглашением.",
+        phoneLabel: "Телефон или почта",
+        phonePlaceholder: "+7 999 123-45-67 или anna@mail.ru",
         nameLabel: "Имя",
         namePlaceholder: "Анна Соколова",
         taglineLabel: "Специализация",
@@ -7670,6 +7734,22 @@ export const UI_TEXT = {
         cancel: "Отмена",
         submit: "Отправить приглашение",
         submitting: "Отправляем…",
+      },
+      // STUDIO-EDIT-MASTER-PROFILE-01 — руководитель студии правит профиль мастера.
+      editProfileDialog: {
+        title: "Профиль мастера",
+        subtitle: "Так мастера увидят клиенты — на странице студии, на его странице и в каталоге.",
+        photoLabel: "Фото",
+        nameLabel: "Имя",
+        taglineLabel: "Специализация",
+        taglinePlaceholder: "Маникюр, педикюр",
+        descriptionLabel: "О мастере",
+        descriptionPlaceholder: "Опыт, техники, чем мастер хорош",
+        nameRequired: "Укажите имя мастера.",
+        taglineRequired: "Укажите специализацию мастера.",
+        saveFailed: "Не удалось сохранить профиль мастера. Попробуйте ещё раз.",
+        submit: "Сохранить",
+        cancel: "Отмена",
       },
       pauseDialog: {
         title: "Поставить на паузу",
@@ -7695,7 +7775,7 @@ export const UI_TEXT = {
         submitting: "Отзываем…",
       },
       errors: {
-        phoneInvalid: "Укажите корректный номер телефона.",
+        phoneInvalid: "Укажите телефон или почту мастера.",
         nameRequired: "Укажите имя мастера.",
         taglineRequired: "Укажите специализацию.",
         inviteFailed: "Не удалось отправить приглашение. Попробуйте ещё раз.",

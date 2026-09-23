@@ -33,13 +33,15 @@
 // Поэтому потолок теперь durable (Postgres, `AiSpendCounter`) и живёт в
 // ЧОКПОЙНТЕ провайдера, а не здесь: у пути ИНДЕКСАЦИИ запроса нет вовсе
 // (воркер), и роут-уровневый счётчик его покрыть не мог физически. Ратифицированное
-// число сохранено по смыслу: 200 запросов = 600 платных вызовов
-// (classify + describe + query-embedding), см. `AI_SPEND_CEILINGS`.
+// число сохранено по смыслу: 200 запросов = до 1 000 платных вызовов
+// (classify + describe + query-embedding, classify и describe — с повтором на
+// непригодном ответе), см. `AI_SPEND_CEILINGS`.
 // ───────────────────────────────────────────────────────────────────────────
 
 import { createHash } from "crypto";
 import { get as cacheGet, set as cacheSet } from "@/lib/cache/cache";
 import type { VisualSearchHttpResponse } from "@/lib/visual-search/contracts";
+import { VISUAL_PIPELINE_VERSION } from "@/lib/visual-search/pipeline-version";
 
 const RESULT_CACHE_TTL_SECONDS = 24 * 60 * 60;
 
@@ -47,7 +49,10 @@ export function byPhotoImageHash(image: Uint8Array): string {
   return createHash("sha256").update(image).digest("hex");
 }
 
-const resultCacheKey = (imageHash: string) => `vs:by-photo:result:${imageHash}`;
+// Версия конвейера в ключе: ответы старого конвейера кэш не отдаёт (см.
+// `pipeline-version.ts`).
+const resultCacheKey = (imageHash: string) =>
+  `vs:by-photo:result:${VISUAL_PIPELINE_VERSION}:${imageHash}`;
 
 export async function getCachedByPhotoResult(
   imageHash: string,

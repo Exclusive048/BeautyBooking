@@ -17,6 +17,7 @@ import {
   resolveSalonLocalParts,
 } from "@/lib/bookings/policy-enforcement";
 import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
+import { resolveBookingDurationMin } from "@/lib/bookings/booking-duration";
 import { AppError } from "@/lib/api/errors";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
@@ -275,19 +276,9 @@ export async function rescheduleBooking(input: {
   // Источник длительности — снапшоты `BookingServiceItem.durationSnapshotMin`,
   // а не текущее окно брони: перенос не меняет длину услуги, а окно могло уже
   // разойтись со снапшотом. Пустой набор снапшотов → длина текущего окна как
-  // последний ориентир.
-  const snapshotDurationMin = booking.serviceItems.reduce(
-    (sum, item) => sum + Math.max(0, item.durationSnapshotMin ?? 0),
-    0,
-  );
-  const currentWindowMin =
-    booking.startAtUtc && booking.endAtUtc
-      ? Math.max(
-          0,
-          Math.round((booking.endAtUtc.getTime() - booking.startAtUtc.getTime()) / 60_000),
-        )
-      : 0;
-  const durationMin = snapshotDurationMin > 0 ? snapshotDurationMin : currentWindowMin;
+  // последний ориентир. Правило общее с выдачей окошек для переноса
+  // (`resolveBookingDurationMin`, MOVE-PICKER-DURATION).
+  const durationMin = resolveBookingDurationMin(booking);
   if (durationMin <= 0) {
     return { ok: false, status: 400, message: "Проверьте длительность записи.", code: "DURATION_INVALID" };
   }

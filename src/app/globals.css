@@ -271,6 +271,20 @@
     height: 100%;
   }
 
+  /* NAV-PIN-01 — в установленном приложении пружинящий доскролл документа
+     (iOS standalone) тянет за собой фиксированную нижнюю навигацию: у края
+     страницы панель отъезжает от низа экрана и возвращается. В Chromium не
+     воспроизводится — там панель стоит на месте при любой прокрутке (замер
+     `.qa/diagnostics/nav-align/scroll`). Ограничено `display-mode: standalone`
+     намеренно: во вкладке браузера на Android то же свойство выключило бы
+     pull-to-refresh, а в установленном приложении его нет и так. */
+  @media (display-mode: standalone) {
+    html,
+    body {
+      overscroll-behavior-y: none;
+    }
+  }
+
   * {
     -webkit-tap-highlight-color: transparent;
   }

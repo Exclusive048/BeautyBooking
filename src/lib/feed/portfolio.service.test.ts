@@ -46,6 +46,7 @@ import {
   listPortfolioFeed,
   loadMasterServiceOverridesMap,
 } from "./portfolio.service";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 function makeMaster(id: string, overrides: Partial<{ name: string; publicUsername: string | null; avatarUrl: string | null; ratingAvg: number; studio: { name: string } | null; isPublished: boolean }> = {}) {
   return {
@@ -260,7 +261,9 @@ describe("FEED-UNPUBLISHED-MASTER · работы неопубликованны
     expect(masterServiceFindMany).not.toHaveBeenCalled();
   });
 
-  it("«похожие» на карточке тоже требуют опубликованного мастера", async () => {
+  // VISIBILITY-DEFAULT-01: «похожие» — место, где работу НАХОДЯТ, поэтому мастер
+  // обязан быть виден в каталоге, а не только опубликован.
+  it("«похожие» на карточке требуют мастера, видимого в каталоге", async () => {
     portfolioItemFindUnique.mockResolvedValue({
       ...makePortfolioRow({ id: "detail-pub", masterId: "m-pub", serviceIds: ["s-p"] }),
       isPublic: true,
@@ -272,7 +275,7 @@ describe("FEED-UNPUBLISHED-MASTER · работы неопубликованны
 
     expect(portfolioItemFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ isPublic: true, master: { isPublished: true } }),
+        where: expect.objectContaining({ isPublic: true, master: catalogVisibleProviderWhere() }),
       }),
     );
   });

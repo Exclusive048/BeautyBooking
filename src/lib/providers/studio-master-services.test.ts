@@ -70,7 +70,7 @@ beforeEach(() => {
 
 describe("FIX-D1 · услуги мастера студии доходят до профиля", () => {
   it("🔴 мастер студии: услуги берутся через MasterService", async () => {
-    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", services: [] });
+    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: true }, services: [] });
     findMany.mockResolvedValue([
       {
         priceOverride: null,
@@ -103,7 +103,7 @@ describe("FIX-D1 · услуги мастера студии доходят до
   it("персональные переопределения перебивают студийные значения", async () => {
     // Показывать студийную цену там, где мастер берёт свою, значит обещать не ту
     // сумму — а цена с карточки уезжает прямо в экран подтверждения записи.
-    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", services: [] });
+    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: true }, services: [] });
     findMany.mockResolvedValue([
       {
         priceOverride: 300000,
@@ -123,7 +123,7 @@ describe("FIX-D1 · услуги мастера студии доходят до
   });
 
   it("предикат тот же, что у каталога — иначе профиль и каталог разойдутся", async () => {
-    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", services: [] });
+    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: true }, services: [] });
     findMany.mockResolvedValue([]);
     await getProviderProfile("marina");
 
@@ -159,5 +159,26 @@ describe("FIX-D1 · услуги мастера студии доходят до
 
     expect(profile.services.map((s) => s.id)).toEqual(["own_1"]);
     expect(findMany, "соло-мастер не должен стоить лишнего запроса").not.toHaveBeenCalled();
+  });
+
+  // STUDIO-HIDDEN-MASTER-SERVICES · @probe 2026-09-23 — в `getProviderProfile`
+  // условие `!studioAcceptsBookings(provider.studio)` снято: красный этот кейс
+  // (подтянулись студийные услуги). Возвращено — зелёный.
+  it("мастер скрытой студии: студийных услуг и ссылки «через студию» нет", async () => {
+    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: false }, services: [] });
+    findMany.mockResolvedValue([
+      {
+        priceOverride: null,
+        durationOverrideMin: null,
+        service: { id: "svc_1", name: "Маникюр", durationMin: 60, price: 220000, globalCategory: null },
+      },
+    ]);
+
+    const profile = await getProviderProfile("marina");
+
+    expect(profile.services).toEqual([]);
+    expect(profile.studioId).toBeNull();
+    expect(profile.sellsOwnServices).toBe(true);
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

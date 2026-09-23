@@ -36,7 +36,7 @@ type Props = {
   availableCabinets?: CabinetKind[];
   /**
    * NAV-BECOME-MASTER-01 — клиент без кабинета: «Стать мастером» встаёт
-   * заметной карточкой в слот кабинетов (туда, где потом появятся «Кабинет
+   * карточкой в слот кабинетов (туда, где потом появятся «Кабинет
    * мастера» / «Кабинет студии»), а не строкой среди «Профиль / Настройки».
    * Значение считает `topbar.tsx` тем же предикатом, что и кнопку в шапке.
    */
@@ -203,16 +203,20 @@ export function AuthMobileMenu({
 
             {!isGuest && offerBecomeMaster ? (
               <div className="mt-2">
+                {/* NAV-ALIGN-01: тот же вид, что у ярлыков кабинетов
+                    (`WorkspaceMenuItem`), которые встанут на это место после
+                    создания кабинета. Бренд-заливка и градиентный кружок делали
+                    пункт самым громким в меню — громче навигации. */}
                 <Link
                   href={BECOME_MASTER_HREF}
-                  className="flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 px-3 py-2.5 text-sm font-semibold text-accent-text transition hover:bg-primary/15"
+                  className="flex items-center gap-3 rounded-2xl border border-border-subtle/80 bg-bg-input px-3 py-2.5 text-sm font-medium text-text-main transition hover:bg-bg-card"
                   onClick={closeMenu}
                 >
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-subtle/80 bg-bg-card text-accent-text">
                     <Scissors className="h-4 w-4" aria-hidden />
                   </span>
                   <span className="flex-1">{UI_TEXT.nav.becomeMaster}</span>
-                  <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
                 </Link>
               </div>
             ) : null}

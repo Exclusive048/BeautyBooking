@@ -58,7 +58,7 @@ export default async function StudioScheduleSettingsRoute({
   }
 
   // Load active masters of this studio for the picker. Filter via
-  // `isStudioMasterActive` (invariant #24 — ownerUserId + isPublished)
+  // `isStudioMasterActive` (invariant #24 — ownerUserId + !studioPaused)
   // so the studio admin can't accidentally edit an INVITED or DISABLED
   // master's schedule.
   const mastersRaw = await prisma.provider.findMany({
@@ -68,7 +68,7 @@ export default async function StudioScheduleSettingsRoute({
       name: true,
       avatarUrl: true,
       ownerUserId: true,
-      isPublished: true,
+      studioPaused: true,
     },
     orderBy: { name: "asc" },
   });

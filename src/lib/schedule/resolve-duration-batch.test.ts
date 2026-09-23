@@ -118,6 +118,35 @@ describe("PERF-08 · пакетный резолвер длительности 
     expect(batch).toEqual(single);
   });
 
+  // STUDIO-MASTER-OWN-BOOKINGS-01: мастер студии бронируется и на СВОИ услуги
+  // (личная страница), без связи `MasterService`.
+  //
+  // @probe 2026-09-23 — убрана ветка «своя услуга мастера студии» в
+  // `decideServiceDuration`: красный «мастер студии и его СОБСТВЕННАЯ услуга»
+  // (получено 400 SERVICE_INVALID «Эта услуга больше не в списке студии»).
+  // Возвращено — зелёный.
+  it("мастер студии и его СОБСТВЕННАЯ услуга — длительность услуги, без связи", async () => {
+    const { single, batch } = await bothForms({
+      masterId: IN_STUDIO.id,
+      master: IN_STUDIO,
+      service: { ...STUDIO_SERVICE, providerId: IN_STUDIO.id, durationMin: 45 },
+      override: null,
+    });
+    expect(single).toEqual({ ok: true, data: 45 });
+    expect(batch).toEqual(single);
+  });
+
+  it("мастер студии и услуга ДРУГОГО провайдера — по-прежнему отказ", async () => {
+    const { single, batch } = await bothForms({
+      masterId: IN_STUDIO.id,
+      master: IN_STUDIO,
+      service: { ...STUDIO_SERVICE, providerId: "someone_else" },
+      override: null,
+    });
+    expect(single).toMatchObject({ ok: false, code: "SERVICE_INVALID" });
+    expect(batch).toEqual(single);
+  });
+
   it("соло-мастер и его собственная услуга", async () => {
     const { single, batch } = await bothForms({
       masterId: SOLO.id,

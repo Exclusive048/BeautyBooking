@@ -93,3 +93,19 @@ describe("PWA-FIX-04 · паритет навигации кабинета ма�
     expect(read(SCHEDULE_SETTINGS_LINK)).toMatch(/href="\/cabinet\/master\/schedule\/settings"/);
   });
 });
+
+/**
+ * Подсвечена одна вкладка: на «Настройках расписания» (`/schedule/settings`,
+ * пункт листа «Ещё») «Расписание» не горит.
+ *
+ * @probe 2026-09-23 — `isMasterTabActive` без проверки листа «Ещё»: красный.
+ * Возвращено — зелёный.
+ */
+describe("нижняя навигация мастера — одна активная вкладка", () => {
+  it("на настройках расписания вкладка «Расписание» не подсвечена, на самом расписании — да", async () => {
+    const { isMasterTabActive } = await import("./master-bottom-nav");
+    expect(isMasterTabActive("/cabinet/master/schedule/settings/hours", "/cabinet/master/schedule")).toBe(false);
+    expect(isMasterTabActive("/cabinet/master/schedule", "/cabinet/master/schedule")).toBe(true);
+    expect(isMasterTabActive("/cabinet/master/bookings/abc", "/cabinet/master/bookings")).toBe(true);
+  });
+});

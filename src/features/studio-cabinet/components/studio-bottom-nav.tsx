@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MoreHorizontal, X, type LucideIcon } from "lucide-react";
+import { MoreHorizontal, UserRound, X } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   STUDIO_NAV,
@@ -12,6 +12,7 @@ import {
   type StudioNavItem,
 } from "@/features/studio-cabinet/config/studio-nav";
 import type { StudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
+import { BottomTab, BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -22,7 +23,13 @@ type Props = {
 
 const T = UI_TEXT.studioCabinet;
 
-const PRIMARY_TAB_IDS = ["dashboard", "schedule", "schedule-requests", "masters"] as const;
+// NAV-STUDIO-SETTINGS-TAB (решение владельца 2026-09-23): на панели — «Профиль»
+// студии (раздел профиля в настройках) вместо «Заявок». Заявки и остальные
+// разделы настроек ушли в «Ещё»; сама «Ещё» получает точку, пока что-то внутри
+// ждёт действия. Вкладка названа «Профиль», а не «Настройки»: так её и ищут.
+const PRIMARY_TAB_IDS = ["dashboard", "schedule", "masters"] as const;
+const PROFILE_TAB_HREF = "/cabinet/studio/settings?section=profile";
+const SETTINGS_PATH = "/cabinet/studio/settings";
 
 function flatNavItems(): StudioNavItem[] {
   return STUDIO_NAV.flatMap((group) => group.items);
@@ -48,49 +55,6 @@ function badgeValue(
   return counts[badgeKey];
 }
 
-function NavTab({
-  item,
-  badge,
-  active,
-}: {
-  item: StudioNavItem;
-  badge: number;
-  active: boolean;
-}) {
-  const Icon: LucideIcon = item.icon;
-  const label = T.nav.items[item.labelKey];
-  return (
-    <Link
-      href={item.href}
-      className="relative flex flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
-      aria-current={active ? "page" : undefined}
-    >
-      <span className="relative">
-        <Icon
-          className={cn("h-5 w-5", active ? "text-accent-text" : "text-text-sec")}
-          aria-hidden
-        />
-        {badge > 0 ? (
-          <span
-            aria-hidden
-            className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white"
-          >
-            {badge > 9 ? "9+" : badge}
-          </span>
-        ) : null}
-      </span>
-      <span
-        className={cn(
-          "text-[10px] font-medium",
-          active ? "text-accent-text" : "text-text-sec",
-        )}
-      >
-        {label}
-      </span>
-    </Link>
-  );
-}
-
 export function StudioBottomNav({ counts }: Props) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -109,7 +73,9 @@ export function StudioBottomNav({ counts }: Props) {
 
   const primary = pickPrimaryTabs();
   const more = pickMoreItems();
-  const moreActive = more.some((item) => isStudioNavItemActive(pathname, item));
+  const profileActive = pathname === SETTINGS_PATH || pathname.startsWith(`${SETTINGS_PATH}/`);
+  const moreActive = !profileActive && more.some((item) => isStudioNavItemActive(pathname, item));
+  const moreNeedsAttention = more.some((item) => badgeValue(counts, item.badgeKey) > 0);
 
   return (
     <>
@@ -194,54 +160,31 @@ export function StudioBottomNav({ counts }: Props) {
         ) : null}
       </AnimatePresence>
 
-      {/* PWA-FIX-06 — см. `MasterBottomNav`: safe-area отдаётся строке вкладок,
-          подложка покрывает весь `<nav>` до нижней кромки экрана. С отступом на
-          прозрачном `<nav>` под панелью просвечивала страница. */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
-        aria-label={T.nav.ariaLabel}
-      >
-        <div className="absolute inset-0 border-t border-border-subtle bg-bg-card/90 backdrop-blur-xl" />
-        {/* PWA-UX-BATCH-01: см. MasterBottomNav — инсет минус 10px, строка ниже. */}
-        <div className="relative pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-10px))]">
-          <ul className="flex items-stretch">
-            {primary.map((item) => {
-              const active = isStudioNavItemActive(pathname, item);
-              const badge = badgeValue(counts, item.badgeKey);
-              return (
-                <li key={item.id} className="flex-1">
-                  <NavTab item={item} badge={badge} active={active} />
-                </li>
-              );
-            })}
-            <li className="flex-1">
-              <button
-                type="button"
-                onClick={() => setMoreOpen(true)}
-                className="flex w-full flex-col items-center gap-0.5 px-1 pb-1 pt-1.5 transition-colors"
-                aria-expanded={moreOpen}
-              >
-                <MoreHorizontal
-                  className={cn(
-                    "h-5 w-5",
-                    moreActive || moreOpen ? "text-accent-text" : "text-text-sec",
-                  )}
-                  aria-hidden
-                />
-                <span
-                  className={cn(
-                    "text-[10px] font-medium",
-                    moreActive || moreOpen ? "text-accent-text" : "text-text-sec",
-                  )}
-                >
-                  {T.bottomNav.more}
-                </span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </nav>
-      <div className="h-16 lg:hidden" aria-hidden="true" />
+      {/* NAV-ALIGN-01 — разметка панели общая (`BottomTabBar`), как у
+          кабинетов мастера и клиента. Зазор под панелью держит `pb-` у
+          `<main>` в `studio/layout.tsx` — шелл флекс в ряд, спейсер инертен. */}
+      <BottomTabBar ariaLabel={T.nav.ariaLabel}>
+        {primary.map((item) => (
+          <BottomTab
+            key={item.id}
+            href={item.href}
+            icon={item.icon}
+            label={T.nav.items[item.labelKey]}
+            active={isStudioNavItemActive(pathname, item)}
+            badge={badgeValue(counts, item.badgeKey)}
+          />
+        ))}
+        <BottomTab href={PROFILE_TAB_HREF} icon={UserRound} label={T.bottomNav.profile} active={profileActive} />
+        <BottomTab
+          onClick={() => setMoreOpen(true)}
+          expanded={moreOpen}
+          icon={MoreHorizontal}
+          label={T.bottomNav.more}
+          active={moreActive || moreOpen}
+          dot={moreNeedsAttention}
+          dotLabel={UI_TEXT.nav.needsAttention}
+        />
+      </BottomTabBar>
     </>
   );
 }

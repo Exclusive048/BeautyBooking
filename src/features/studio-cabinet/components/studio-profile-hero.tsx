@@ -5,6 +5,7 @@ import { Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { Switch } from "@/components/ui/switch";
+import { CatalogPresenceNote } from "@/features/cabinet/components/catalog-presence-note";
 import { UI_TEXT } from "@/lib/ui/text";
 
 type Props = {
@@ -106,6 +107,10 @@ export function StudioProfileHero({
                 {studioName || UI_TEXT.studio.profile.nameFallback}
               </h1>
               <p className="text-sm text-text-sec">{subtitle}</p>
+              {/* VISIBILITY-CATALOG-STATUS: не желание, а факт — в каталоге ли
+                  студия и чего не хватает (заменила общую подсказку «появится,
+                  когда…»). */}
+              <CatalogPresenceNote type="studio" refreshKey={isPublished} className="mt-1" />
             </div>
             <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
               <span className="text-xs text-text-sec">{publicationLabel}</span>

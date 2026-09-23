@@ -1,51 +1,73 @@
 "use client";
 
 import { AlertTriangle, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DeleteAccountModal } from "@/components/deletion/DeleteAccountModal";
+import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.account.account;
 
-type Props = {
-  phone: string | null;
+type ErrorPayload = {
+  ok: false;
+  error: { message: string; code?: string; details?: unknown };
 };
 
 /**
- * Danger zone framed in rose-tinted card. The actual confirm-and-delete
- * flow is delegated to the proven `<DeleteAccountModal>` (multi-step
- * confirm, phone re-entry) and `/api/me/delete` endpoint — same pieces
- * the client cabinet's `/settings` page uses. We just wrap them in a
- * card that matches the rest of the account-tab visual language.
+ * Необратимое действие кабинета мастера — удаление КАБИНЕТА, а не аккаунта.
+ *
+ * CABINET-DELETE-SCOPE-01: раньше здесь стояло удаление аккаунта целиком
+ * (`/api/me/delete`). Внутри кабинета мастера человек ждёт, что удалится этот
+ * кабинет, — а уходило всё: клиентская история, студия, если она есть, сам
+ * вход. Кабинет студии уже был устроен правильно (удаляет только студию), так
+ * что мастер был единственным расхождением. Теперь карточка зовёт тот же
+ * `DELETE /api/cabinet/master/delete` и тот же `DeleteCabinetModal`, что и
+ * страница «Мои кабинеты», а удаление аккаунта целиком живёт в одном месте —
+ * `/cabinet/settings`, куда ведёт ссылка под кнопкой.
  */
-export function DangerZoneCard({ phone }: Props) {
+export function DangerZoneCard() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeBookingsCount, setActiveBookingsCount] = useState<number | null>(null);
+
+  const openModal = () => {
+    setError(null);
+    setActiveBookingsCount(null);
+    setOpen(true);
+  };
 
   const handleDelete = async () => {
     setLoading(true);
     setError(null);
+    setActiveBookingsCount(null);
     try {
-      const response = await fetch("/api/me/delete", { method: "DELETE" });
-      const json = (await response.json().catch(() => null)) as ApiResponse<{
-        deleted: boolean;
-      }> | null;
+      const response = await fetch("/api/cabinet/master/delete", { method: "DELETE" });
+      const json = (await response.json().catch(() => null)) as
+        | ApiResponse<{ deleted: boolean }>
+        | ErrorPayload
+        | null;
       if (!response.ok || !json || !json.ok) {
-        throw new Error(
-          json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE
-        );
+        const failure = json && !json.ok ? json.error : null;
+        if (failure?.code === "ACTIVE_BOOKINGS") {
+          const details = failure.details as { count?: number } | undefined;
+          setActiveBookingsCount(typeof details?.count === "number" ? details.count : 0);
+        } else {
+          // Серверная строка курируемая (например, «Слишком часто…») и говорит
+          // больше канона; своя — только когда тела нет.
+          setError(failure?.message || UI_TEXT.cabinetRolesPage.deleteFailed);
+        }
+        return;
       }
       setOpen(false);
-      router.push("/?deleted=1");
+      router.push("/cabinet/roles");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : T.dangerZoneTitle);
+    } catch {
+      setError(UI_TEXT.cabinetRolesPage.deleteFailed);
     } finally {
       setLoading(false);
     }
@@ -69,24 +91,31 @@ export function DangerZoneCard({ phone }: Props) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              setError(null);
-              setOpen(true);
-            }}
+            onClick={openModal}
             className="gap-1.5 border border-rose-200 text-rose-700 hover:bg-rose-100/60 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/40"
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            {T.dangerZoneTitle}
+            {T.dangerZoneCta}
           </Button>
         </div>
+        <p className="mt-4 text-xs leading-relaxed text-text-sec">
+          {T.accountDeletionHint}{" "}
+          <Link
+            href="/cabinet/settings"
+            className="font-medium text-text-main underline decoration-border-subtle underline-offset-4 transition hover:decoration-text-main"
+          >
+            {T.accountDeletionLink}
+          </Link>
+        </p>
       </section>
 
-      <DeleteAccountModal
+      <DeleteCabinetModal
         open={open}
-        phone={phone}
+        type="master"
         onCancel={() => setOpen(false)}
         onConfirm={handleDelete}
         loading={loading}
+        activeBookingsCount={activeBookingsCount}
         error={error}
       />
     </>

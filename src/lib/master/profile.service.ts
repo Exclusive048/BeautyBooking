@@ -380,7 +380,9 @@ export async function updateMasterProfile(
     timezone?: string;
   }
 ): Promise<{ id: string }> {
-  const context = await getMasterContext(masterId);
+  // Проверка существования (404 MASTER_NOT_FOUND). Сами поля контекста здесь
+  // больше не нужны: их читал только снятый гейт публикации.
+  await getMasterContext(masterId);
 
   // FEAT-PROVIDER-SOCIALS: validate before any write (throws 400 on invalid).
   const nextSocialVk =
@@ -418,9 +420,9 @@ export async function updateMasterProfile(
 
   // 2. If address changed, run server-side geocode + city detection. The
   //    server geocoder is authoritative — it overwrites any client-supplied
-  //    geo and writes cityId. On failure we explicitly null cityId so the
-  //    publish gate below blocks (and the master sees the address banner).
-  let resolvedCityId: string | null = context.cityId;
+  //    geo and writes cityId. On failure we explicitly null cityId: без
+  //    города провайдера не найти в каталоге (`catalogVisibleProviderWhere`),
+  //    и мастер видит баннер адреса.
   if (trimmedAddress !== undefined) {
     if (!trimmedAddress) {
       // Address cleared — drop the city link.
@@ -428,7 +430,6 @@ export async function updateMasterProfile(
         where: { id: masterId },
         data: { cityId: null },
       });
-      resolvedCityId = null;
     } else {
       const detection = await detectCityFromAddress(trimmedAddress);
       if (detection.ok) {
@@ -444,13 +445,11 @@ export async function updateMasterProfile(
             timezone: detection.timezone,
           },
         });
-        resolvedCityId = detection.cityId;
       } else {
         await prisma.provider.update({
           where: { id: masterId },
           data: { cityId: null },
         });
-        resolvedCityId = null;
       }
     }
   }
@@ -466,21 +465,11 @@ export async function updateMasterProfile(
     });
   }
 
-  // 3. Publication gate: requires both a non-empty address AND a resolved cityId.
-  //    Read-back the canonical address from the row in case input.address was
-  //    omitted but we're still asked to publish.
+  // 3. Visibility. VISIBILITY-DEFAULT-01: переключатель — это только желание
+  //    быть видимым, адрес для него больше не нужен. Условие «есть город»
+  //    переехало в предикат поиска (`catalogVisibleProviderWhere`): видимость
+  //    включена с рождения кабинета, когда адреса ещё нет.
   if (typeof input.isPublished === "boolean") {
-    if (input.isPublished) {
-      const canonicalAddress =
-        trimmedAddress !== undefined ? trimmedAddress : context.address;
-      if (!canonicalAddress || !resolvedCityId) {
-        throw new AppError(
-          "Заполните адрес, чтобы опубликовать профиль",
-          400,
-          "ADDRESS_REQUIRED",
-        );
-      }
-    }
     await prisma.provider.update({
       where: { id: masterId },
       data: { isPublished: input.isPublished },
@@ -732,10 +721,10 @@ export async function createSoloMasterService(
     onlinePaymentEnabled?: boolean;
   }
 ): Promise<{ id: string }> {
+  // STUDIO-MASTER-OWN-BOOKINGS-01: мастер студии тоже заводит СВОИ услуги —
+  // запись на них идёт с его личной страницы мимо студии. Услуги студии этим
+  // путём не создаются: строка получает `providerId` самого мастера.
   const context = await getMasterContext(masterId);
-  if (!context.isSolo) {
-    throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
-  }
 
   const normalizedTitle = input.title.trim();
   if (!normalizedTitle) {

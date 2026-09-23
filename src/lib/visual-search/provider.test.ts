@@ -36,6 +36,7 @@ vi.mock("openai", () => {
 });
 
 // Import AFTER mocks.
+import { classifyImage } from "./classifier";
 import {
   requestVisionJson,
   describeImageWithStrategy,
@@ -238,5 +239,89 @@ describe("vision — отказ провайдера отличим от неп�
     expect(
       await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" })
     ).toBeNull();
+  });
+});
+
+/**
+ * VISUAL-SEARCH-UNRECOGNIZED-01 — модель «думающая», и при лимите 1024 токена
+ * рассуждение съедало ответ целиком (замер: 1400–1700 токенов на описание).
+ * Каждое реальное фото уходило в «Не поняли, что на фото».
+ *
+ * @probe 2026-09-23 — (а) из быстрого режима убран `reasoning_effort: "none"`:
+ * красный «быстрый режим выключает рассуждение». (б) в
+ * `describeImageWithStrategy` снят повтор (возврат быстрого ответа как есть):
+ * красный «противоречивый быстрый ответ — повтор с рассуждением». (в) в
+ * `classifyImage` снят повтор: красный «непригодная классификация — повтор».
+ * Возвращено — зелёный.
+ */
+describe("vision — режимы без рассуждения и с ним", () => {
+  const describeJson = JSON.stringify({ shape: "овал", text_description: "Нюдовый маникюр с блёстками." });
+
+  it("быстрый режим выключает рассуждение и держит свой лимит", async () => {
+    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" });
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.reasoning_effort).toBe("none");
+    expect(call.max_tokens).toBe(1024);
+  });
+
+  it("режим с рассуждением — без reasoning_effort и с запасом токенов", async () => {
+    await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search", mode: "reasoning" });
+    const call = mockCreate.mock.calls[0][0];
+    expect(call).not.toHaveProperty("reasoning_effort");
+    expect(call.max_tokens).toBe(4096);
+  });
+
+  it("обрыв по лимиту — непригодный ответ (null), даже если JSON случайно дописан", async () => {
+    mockCreate.mockResolvedValueOnce({
+      choices: [{ finish_reason: "length", message: { content: '{"category":"manicure","confidence":"high"}' } }],
+    });
+    expect(
+      await requestVisionJson({ imageBytes: IMAGE, systemPrompt: "s", userPrompt: "u", meter: "visual-search:search" })
+    ).toBeNull();
+  });
+
+  // @probe 2026-09-23 — ветка `mode === "reasoning"` при обрыве убрана (снова
+  // `null`): красный этот кейс. Возвращено — зелёный.
+  it("обрыв ответа С рассуждением — повторяемый отказ провайдера, не «нераспознано»", async () => {
+    mockCreate.mockResolvedValueOnce({ choices: [{ finish_reason: "length", message: { content: "" } }] });
+    const error = await requestVisionJson({
+      imageBytes: IMAGE,
+      systemPrompt: "s",
+      userPrompt: "u",
+      meter: "visual-search:index",
+      mode: "reasoning",
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(VisualProviderUnavailableError);
+    expect(isRetryableProviderError(error)).toBe(true);
+  });
+
+  it("противоречивый быстрый ответ — повтор с рассуждением", async () => {
+    mockCreate
+      .mockResolvedValueOnce({ choices: [{ finish_reason: "stop", message: { content: '{"error":"not_applicable"}' } }] })
+      .mockResolvedValueOnce({ choices: [{ finish_reason: "stop", message: { content: describeJson } }] });
+    const result = await describeImageWithStrategy(IMAGE, strategy, "visual-search:search");
+    expect(result.error).toBeUndefined();
+    expect(result.text_description).toBe("Нюдовый маникюр с блёстками.");
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+    expect(mockCreate.mock.calls[1][0]).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("пригодный быстрый ответ — второго вызова нет", async () => {
+    mockCreate.mockResolvedValueOnce({ choices: [{ finish_reason: "stop", message: { content: describeJson } }] });
+    await describeImageWithStrategy(IMAGE, strategy, "visual-search:search");
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("непригодная классификация — повтор; осмысленный none — без повтора", async () => {
+    mockCreate
+      .mockResolvedValueOnce({ choices: [{ finish_reason: "stop", message: { content: '{"":"manicure"}' } }] })
+      .mockResolvedValueOnce({ choices: [{ finish_reason: "stop", message: { content: '{"category":"manicure","confidence":"high"}' } }] });
+    await expect(classifyImage(IMAGE, "visual-search:search")).resolves.toEqual({ category: "manicure", confidence: "high" });
+    expect(mockCreate).toHaveBeenCalledTimes(2);
+
+    mockCreate.mockClear();
+    mockCreate.mockResolvedValueOnce({ choices: [{ finish_reason: "stop", message: { content: '{"category":"none","confidence":"high"}' } }] });
+    await expect(classifyImage(IMAGE, "visual-search:search")).resolves.toEqual({ category: "none", confidence: "high" });
+    expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 });

@@ -10,6 +10,12 @@ import { UI_TEXT } from "@/lib/ui/text";
 type StudioActiveData = {
   name: string;
   logoUrl?: string | null;
+  /**
+   * VISIBILITY-CATALOG-STATUS: статус в каталоге, посчитанный сервером
+   * (`resolveCatalogPresence`). Если задан — строка статуса берётся отсюда,
+   * а не угадывается по тексту метрики.
+   */
+  catalogStatus?: { label: string; listed: boolean } | null;
   metrics?: string[];
   actionLabel?: string;
   actionHref?: string;
@@ -102,16 +108,20 @@ export function RoleCardStudio(props: Props) {
   }
 
   const { data } = props;
-  const statusMetric =
-    data.metrics?.find(
-      (metric) =>
-        metric === UI_TEXT.cabinetRoles.studio.statusPublished ||
-        metric === UI_TEXT.cabinetRoles.studio.statusDraft
-    ) ?? null;
-  const otherMetrics = statusMetric
-    ? data.metrics?.filter((metric) => metric !== statusMetric)
+  const legacyStatusMetric = data.catalogStatus
+    ? null
+    : (data.metrics?.find(
+        (metric) =>
+          metric === UI_TEXT.cabinetRoles.studio.statusPublished ||
+          metric === UI_TEXT.cabinetRoles.studio.statusDraft
+      ) ?? null);
+  const statusMetric = data.catalogStatus?.label ?? legacyStatusMetric;
+  const otherMetrics = legacyStatusMetric
+    ? data.metrics?.filter((metric) => metric !== legacyStatusMetric)
     : data.metrics;
-  const isPublished = statusMetric === UI_TEXT.cabinetRoles.studio.statusPublished;
+  const isPublished = data.catalogStatus
+    ? data.catalogStatus.listed
+    : legacyStatusMetric === UI_TEXT.cabinetRoles.studio.statusPublished;
 
   return (
     <Card className="h-full">

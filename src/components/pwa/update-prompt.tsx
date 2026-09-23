@@ -17,7 +17,20 @@ import { isProduction } from "@/lib/env.client";
  * открытия и посреди заполнения формы после выкатки. Старая вкладка под новым
  * SW работоспособна: навигации идут в сеть (`NetworkOnly`), а рассинхрон
  * версии Next сам разрешает жёсткой навигацией на следующем переходе.
+ *
+ * PWA-UPDATE-BUTTON-01 — «Обновить» не делала ничего. Из-за того же
+ * `skipWaiting` новый SW не ждёт: плашка показывается в `installed`, а через
+ * миллисекунды он уже `activating`, и `controllerchange` проходит ДО клика
+ * (замер в Chromium: плашка 531 мс → `controllerchange` 533 мс). Кнопка же
+ * слала `SKIP_WAITING` и ждала `controllerchange`, которого больше не будет,
+ * а при `skipWaiting: true` serwist этот message даже не слушает. Теперь:
+ * воркер, который действительно ждёт (`installed`), просим активироваться и
+ * перезагружаемся по `controllerchange`; уже активный — перезагружаем сразу.
  */
+
+/** Страховка: если `controllerchange` после `SKIP_WAITING` так и не пришёл. */
+const RELOAD_FALLBACK_MS = 3000;
+
 export function PWAUpdatePrompt() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [visible, setVisible] = useState(false);
@@ -85,13 +98,16 @@ export function PWAUpdatePrompt() {
             type="button"
             size="sm"
             onClick={() => {
-              if (waitingWorker) {
+              if (waitingWorker?.state === "installed") {
                 // Перезагрузка — в `controllerchange`, когда новый SW
                 // действительно взял страницу, иначе она ушла бы под старым.
                 reloadRequestedRef.current = true;
                 waitingWorker.postMessage({ type: "SKIP_WAITING" });
+                window.setTimeout(() => window.location.reload(), RELOAD_FALLBACK_MS);
                 return;
               }
+              // Новый SW уже активен и страницу взял (skipWaiting + clientsClaim):
+              // ждать нечего, осталось подгрузить свежий HTML и чанки.
               window.location.reload();
             }}
           >

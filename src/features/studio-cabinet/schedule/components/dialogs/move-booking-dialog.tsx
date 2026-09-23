@@ -3,15 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import {
+  OperatorSlotPicker,
+  type OperatorSlot,
+} from "@/features/booking/components/operator-slot-picker";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
-import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-input";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.moveDialog;
-const TV = UI_TEXT.studioCabinet.scheduleV2;
 const E = UI_TEXT.studioCabinet.scheduleV2.errors;
 
 type Props = {
@@ -29,9 +30,8 @@ type Props = {
   masters: ScheduleMasterColumn[];
   mode: "master" | "time";
   /**
-   * TZ-DISPLAY-SALON-PARITY-01: salon (provider) tz. The datetime-local input
-   * is populated + read back as SALON-local wall-clock, so a cross-tz admin
-   * edits the salon's time (matching the grid), not their browser tz.
+   * TZ-DISPLAY-SALON-PARITY-01: salon (provider) tz — the day strip and slot
+   * times render in it, matching the grid a cross-tz admin is looking at.
    */
   timezone: string;
   open: boolean;
@@ -52,18 +52,21 @@ export function MoveBookingDialog({
 }: Props) {
   const router = useRouter();
   const [masterId, setMasterId] = useState(currentMasterId);
-  const [startAt, setStartAt] = useState(
-    utcIsoToSalonInput(currentStartAtUtc, timezone),
-  );
+  // MOVE-BOOKING-SLOTS-01: новое время — свободное окошко исполнителя (тот же
+  // `OperatorSlotPicker`, что у ручной записи), а не `datetime-local`. Раньше
+  // администратор вбивал любое время и узнавал о занятости отказом сервера.
+  const [slot, setSlot] = useState<OperatorSlot | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setMasterId(currentMasterId);
-    setStartAt(utcIsoToSalonInput(currentStartAtUtc, timezone));
+    setSlot(null);
     setError(null);
-  }, [open, currentMasterId, currentStartAtUtc, timezone]);
+  }, [open, currentMasterId, currentStartAtUtc]);
+
+  const targetMasterId = mode === "master" ? masterId : currentMasterId;
 
   function handleClose() {
     if (submitting) return;
@@ -71,6 +74,10 @@ export function MoveBookingDialog({
   }
 
   async function handleSubmit() {
+    if (!slot) {
+      setError(UI_TEXT.schedule.operatorSlots.required);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -81,12 +88,9 @@ export function MoveBookingDialog({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             studioId,
-            targetMasterId: mode === "master" ? masterId : currentMasterId,
-            // TZ-DISPLAY-SALON-PARITY-01: interpret the entered wall-clock in
-            // the SALON tz → UTC (not the browser tz). Fall back to the current
-            // instant if the input is somehow empty/malformed — never shift the
-            // booked time by accident.
-            targetStartAt: salonInputToUtcIso(startAt, timezone) ?? currentStartAtUtc,
+            targetMasterId,
+            // Окошко пришло с сервера инстантом UTC — конвертировать нечего.
+            targetStartAt: slot.startAtUtc,
             strategy: "KEEP_SERVICE",
             pricing: "KEEP_PRICE",
           }),
@@ -126,7 +130,10 @@ export function MoveBookingDialog({
                 in case a stale UI sends a forbidden value. */}
             <Select
               value={masterId}
-              onChange={(e) => setMasterId(e.target.value)}
+              onChange={(e) => {
+                setMasterId(e.target.value);
+                setSlot(null);
+              }}
               disabled={submitting}
             >
               {masters
@@ -156,20 +163,24 @@ export function MoveBookingDialog({
           </label>
         ) : null}
 
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
-            {T.timeLabel}{" "}
-            <span className="font-normal text-text-sec">
-              · {TV.salonTimeInputHint}
-            </span>
-          </span>
-          <Input
-            type="datetime-local"
-            value={startAt}
-            onChange={(e) => setStartAt(e.target.value)}
+        {open ? (
+          <OperatorSlotPicker
+            providerId={targetMasterId || null}
+            serviceId={bookingServiceId || null}
+            timeZone={timezone}
+            value={slot}
+            onChange={setSlot}
+            // Текущее время записи предвыбрано: при переносе к другому мастеру
+            // «в то же время» ничего больше выбирать не нужно, если он свободен.
+            prefillIso={currentStartAtUtc}
+            // MOVE-PICKER-DURATION: окошки — той длины, которую проверит
+            // перенос к выбранному мастеру (все услуги записи, его
+            // длительности); у того же мастера окно самой записи не занято.
+            moveBookingId={bookingId}
+            missingHint={UI_TEXT.schedule.operatorSlots.chooseMasterFirst}
             disabled={submitting}
           />
-        </label>
+        ) : null}
 
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
@@ -181,7 +192,7 @@ export function MoveBookingDialog({
           <Button variant="ghost" onClick={handleClose} disabled={submitting}>
             {T.cancel}
           </Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+          <Button variant="primary" onClick={handleSubmit} disabled={submitting || !slot}>
             {submitting ? T.submitting : T.confirm}
           </Button>
         </div>

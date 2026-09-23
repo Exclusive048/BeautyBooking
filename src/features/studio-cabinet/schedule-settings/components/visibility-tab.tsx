@@ -38,8 +38,8 @@ const SLOT_PRECISION_OPTIONS: ReadonlyArray<{ value: SlotPrecision; labelKey: ke
  * body slice through the existing
  * `/api/cabinet/master/schedule?studioId&masterId` endpoint.
  *
- * Fields:
- *   - `isPublished` — master discoverable in public catalog
+ * Fields (`isPublished` — личная видимость мастера — студия не меняет,
+ * STUDIO-PAUSE-SPLIT-01; сервер это поле от администратора игнорирует):
  *   - `slotPrecision` — what the public sees («exact time» / «today
  *     has free slots» / «date only»)
  *   - `visibleSlotDays` — booking horizon visible to clients
@@ -91,13 +91,10 @@ export function VisibilityTab({ studioId, masterId, initialSnapshot }: Props) {
   return (
     <div className="space-y-4">
       <div className="space-y-3 rounded-2xl border border-border-subtle bg-bg-card p-5">
-        <Row title={T.publishedTitle} hint={T.publishedHint}>
-          <Switch
-            size="md"
-            checked={draft.isPublished}
-            onCheckedChange={(next) => update({ isPublished: next })}
-          />
-        </Row>
+        {/* STUDIO-PAUSE-SPLIT-01: переключателя «Виден в каталоге» здесь больше
+            нет — личную страницу мастера скрывает только он сам, а рычаг
+            студии — пауза в разделе «Мастера» (`studioPaused`). */}
+        <p className="text-xs text-text-sec">{T.personalVisibilityNote}</p>
 
         <Row title={T.slotPrecisionTitle} hint={T.slotPrecisionHint}>
           <Select

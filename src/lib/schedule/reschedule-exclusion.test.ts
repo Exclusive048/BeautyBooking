@@ -27,6 +27,7 @@ import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion"
 
 const REQ = new Request("http://localhost/api/masters/m1/availability");
 const MASTER = "prov_master";
+const NO_SNAPSHOTS = { serviceItems: [], startAtUtc: null, endAtUtc: null };
 const STUDIO = "prov_studio";
 
 describe("RESCHEDULE-SELF-SLOT · resolveRescheduleExclusion", () => {
@@ -48,8 +49,9 @@ describe("RESCHEDULE-SELF-SLOT · resolveRescheduleExclusion", () => {
       clientUserId: "u_client",
       providerId: MASTER,
       masterProviderId: null,
+      ...NO_SNAPSHOTS,
     });
-    await expect(resolveRescheduleExclusion(REQ, MASTER, "bk1")).resolves.toBe("bk1");
+    await expect(resolveRescheduleExclusion(REQ, MASTER, "bk1")).resolves.toMatchObject({ bookingId: "bk1" });
     expect(requireProviderOwner).not.toHaveBeenCalled();
   });
 
@@ -59,12 +61,13 @@ describe("RESCHEDULE-SELF-SLOT · resolveRescheduleExclusion", () => {
       clientUserId: "u_other",
       providerId: STUDIO,
       masterProviderId: MASTER,
+      ...NO_SNAPSHOTS,
     });
     requireProviderOwner
       .mockRejectedValueOnce(new AppError("Недостаточно прав.", 403, "FORBIDDEN"))
       .mockResolvedValueOnce(undefined);
 
-    await expect(resolveRescheduleExclusion(REQ, MASTER, "bk2")).resolves.toBe("bk2");
+    await expect(resolveRescheduleExclusion(REQ, MASTER, "bk2")).resolves.toMatchObject({ bookingId: "bk2" });
     expect(requireProviderOwner).toHaveBeenNthCalledWith(1, expect.anything(), MASTER);
     expect(requireProviderOwner).toHaveBeenNthCalledWith(2, expect.anything(), STUDIO);
   });
@@ -75,6 +78,7 @@ describe("RESCHEDULE-SELF-SLOT · resolveRescheduleExclusion", () => {
       clientUserId: "u_other",
       providerId: MASTER,
       masterProviderId: null,
+      ...NO_SNAPSHOTS,
     });
     await expect(resolveRescheduleExclusion(REQ, MASTER, "bk3")).rejects.toMatchObject({ status: 403 });
   });
@@ -85,10 +89,43 @@ describe("RESCHEDULE-SELF-SLOT · resolveRescheduleExclusion", () => {
       clientUserId: "u_client",
       providerId: "prov_elsewhere",
       masterProviderId: null,
+      ...NO_SNAPSHOTS,
     });
     await expect(resolveRescheduleExclusion(REQ, MASTER, "bk4")).rejects.toMatchObject({
       status: 404,
       code: "BOOKING_NOT_FOUND",
     });
+  });
+
+  /**
+   * MOVE-PICKER-DURATION — окошки переноса считаются по длине самой записи
+   * (снимки услуг), как её проверит перенос, а не по текущей длительности
+   * услуги.
+   *
+   * @probe 2026-09-23 — `durationMin` отдавался `0` всегда (роуты брали
+   * длительность услуги): красный «длина — сумма снимков». Возвращено — зелёный.
+   */
+  it("длина переносимой записи — сумма снимков услуг, без них — текущее окно", async () => {
+    prismaMock.booking.findUnique.mockResolvedValueOnce({
+      id: "bk5",
+      clientUserId: "u_client",
+      providerId: MASTER,
+      masterProviderId: null,
+      serviceItems: [{ durationSnapshotMin: 45 }, { durationSnapshotMin: 30 }],
+      startAtUtc: new Date("2026-10-01T09:00:00Z"),
+      endAtUtc: new Date("2026-10-01T10:00:00Z"),
+    });
+    await expect(resolveRescheduleExclusion(REQ, MASTER, "bk5")).resolves.toEqual({ bookingId: "bk5", durationMin: 75 });
+
+    prismaMock.booking.findUnique.mockResolvedValueOnce({
+      id: "bk6",
+      clientUserId: "u_client",
+      providerId: MASTER,
+      masterProviderId: null,
+      serviceItems: [],
+      startAtUtc: new Date("2026-10-01T09:00:00Z"),
+      endAtUtc: new Date("2026-10-01T10:30:00Z"),
+    });
+    await expect(resolveRescheduleExclusion(REQ, MASTER, "bk6")).resolves.toEqual({ bookingId: "bk6", durationMin: 90 });
   });
 });

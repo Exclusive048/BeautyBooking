@@ -486,6 +486,38 @@
           "bannerAssetId": {
             "type": "string",
             "nullable": true
+          },
+          "socialVk": {
+            "type": "string",
+            "nullable": true
+          },
+          "socialInstagram": {
+            "type": "string",
+            "nullable": true
+          },
+          "minBookingHoursAhead": {
+            "type": "integer"
+          },
+          "maxBookingDaysAhead": {
+            "type": "integer"
+          },
+          "cancellationDeadlineHours": {
+            "type": "integer",
+            "nullable": true
+          },
+          "lateCancelAction": {
+            "type": "string",
+            "enum": [
+              "none",
+              "reminder",
+              "fine"
+            ]
+          },
+          "acceptNewClients": {
+            "type": "boolean"
+          },
+          "remindersEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -3193,11 +3225,10 @@
       "MeUpdateInput": {
         "type": "object",
         "properties": {
-          "displayName": {
-            "type": "string"
-          },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "nullable": true,
+            "description": "Канон +7XXXXXXXXXX; null снимает номер"
           },
           "email": {
             "type": "string"
@@ -3214,8 +3245,11 @@
           "birthDate": {
             "type": "string"
           },
-          "address": {
-            "type": "string"
+          "emailNotificationsEnabled": {
+            "type": "boolean"
+          },
+          "pushNotificationsEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -5864,6 +5898,36 @@
               "maximum": 14
             },
             "description": "Page size (days)."
+          },
+          {
+            "name": "excludeBookingId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Booking being rescheduled: its own window (and buffer) is not treated as occupied, and slots use that booking's own length (service snapshots). Requires a session of a party to that booking."
+          },
+          {
+            "name": "moveBookingId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Studio booking being moved to this master: slots use the window length the move will validate (all booking services, this master's durations); for the booking's own master its window is not occupied. Studio owner/admin only; foreign booking or master of another studio — 404."
+          },
+          {
+            "name": "manual",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden. Honoured only for the provider's own side; ignored otherwise."
           }
         ],
         "responses": {
@@ -6190,23 +6254,14 @@
     "/api/auth/vk/start": {
       "get": {
         "summary": "Start VK ID authorization flow",
+        "description": "FIX-B14: это НАВИГАЦИЯ браузера, поэтому конверта ошибки у роута нет вовсе — каждый исход отвечает редиректом. Успех → VK ID; отказ → /login?error=<исход>, где исход один из provider_unavailable (килсвитч ФЗ-199 либо не сконфигурирован) · consent_required (обязательные согласия не отмечены, RKN-FIX-01) · start_failed (прочее). Не-браузерный клиент обязан НЕ следовать редиректу и читать ключ из Location.",
         "tags": [
           "auth",
           "vk"
         ],
         "responses": {
           "307": {
-            "description": "Redirect to VK ID"
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
+            "description": "Redirect to VK ID, or back to /login?error=<исход>"
           }
         }
       }
@@ -6258,34 +6313,14 @@
     "/api/auth/yandex/start": {
       "get": {
         "summary": "Start Yandex ID authorization flow",
-        "description": "Bespoke-parallel к VK (PKCE S256 + HMAC-signed state/verifier cookies). Согласия из формы входа едут через подписанную state-bound cookie — см. RKN-FIX-01.",
+        "description": "Bespoke-parallel к VK (PKCE S256 + HMAC-signed state/verifier cookies). Согласия из формы входа едут через подписанную state-bound cookie — см. RKN-FIX-01. FIX-B14: конверта ошибки нет — исходы те же три, что у VK-близнеца, редиректом на /login?error=<исход>.",
         "tags": [
           "auth",
           "yandex"
         ],
         "responses": {
           "307": {
-            "description": "Redirect to Yandex ID"
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Auth method not configured",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
+            "description": "Redirect to Yandex ID, or back to /login?error=<исход>"
           }
         }
       }
@@ -6348,33 +6383,14 @@
     "/api/integrations/vk/start": {
       "get": {
         "summary": "Start VK ID integration linking",
+        "description": "FIX-B14: тоже навигация (кабинетная кнопка «подключить»), конверта ошибки нет. Аудитория — уже вошедший пользователь, поэтому адрес возврата не /login, а страница-источник (Referer, прогнанный через sanitizeInternalPath; дефолт /cabinet/profile) с ?vk=<исход>. Исключение — отсутствие сессии: /login?next=<страница-источник>.",
         "tags": [
           "integrations",
           "vk"
         ],
         "responses": {
           "307": {
-            "description": "Redirect to VK ID"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
+            "description": "Redirect to VK ID, back to the connect surface with ?vk=<исход>, or /login"
           }
         }
       }
@@ -7054,6 +7070,215 @@
         "responses": {
           "200": {
             "description": "Binary image stream"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/attention": {
+      "get": {
+        "summary": "Counts of items awaiting the signed-in client (bottom navigation dots)",
+        "tags": [
+          "me"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiSuccess"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "bookings": {
+                              "type": "integer",
+                              "description": "Reschedules proposed by a master, awaiting the client"
+                            },
+                            "messages": {
+                              "type": "integer",
+                              "description": "Unread chat messages from masters"
+                            },
+                            "reviews": {
+                              "type": "integer",
+                              "description": "Finished visits the client can still review"
+                            }
+                          },
+                          "required": [
+                            "bookings",
+                            "messages",
+                            "reviews"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/catalog-presence": {
+      "get": {
+        "summary": "Whether the signed-in user's own master/studio cabinet is listed in the catalog, and which conditions are missing",
+        "tags": [
+          "me"
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "master",
+                "studio"
+              ]
+            },
+            "description": "Which own cabinet to check (default: master)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ApiSuccess"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "listed": {
+                              "type": "boolean"
+                            },
+                            "gaps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "hidden",
+                                  "address",
+                                  "schedule"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "listed",
+                            "gaps"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/file/{id}/crop/{v}": {
+      "get": {
+        "summary": "Serve media file cut to its saved crop area (avatar display)",
+        "tags": [
+          "media"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "v",
+            "in": "path",
+            "required": true,
+            "description": "Crop version token; a stale token redirects to the current URL",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binary image (webp) cut to the saved crop area"
+          },
+          "307": {
+            "description": "Crop changed or removed — redirect to the current URL"
           },
           "403": {
             "description": "Forbidden",

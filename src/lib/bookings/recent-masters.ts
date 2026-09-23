@@ -77,6 +77,7 @@ async function loadRecentMasters(userId: string): Promise<RecentMasterItem[]> {
           avatarUrl: true,
           publicUsername: true,
           isPublished: true,
+          studioPaused: true,
           type: true,
           timezone: true,
         },
@@ -88,6 +89,7 @@ async function loadRecentMasters(userId: string): Promise<RecentMasterItem[]> {
           avatarUrl: true,
           publicUsername: true,
           isPublished: true,
+          studioPaused: true,
           type: true,
           timezone: true,
         },
@@ -96,6 +98,7 @@ async function loadRecentMasters(userId: string): Promise<RecentMasterItem[]> {
         select: {
           id: true,
           name: true,
+          providerId: true,
           price: true,
           durationMin: true,
           isEnabled: true,
@@ -120,6 +123,9 @@ async function loadRecentMasters(userId: string): Promise<RecentMasterItem[]> {
   for (const booking of bookings) {
     const master = booking.masterProvider ?? booking.provider;
     if (!master.isPublished || master.type !== "MASTER") continue;
+    // STUDIO-PAUSE-SPLIT-01: услугу студии мастер на паузе в студии не оказывает
+    // (`booking-core` → MASTER_NOT_ACTIVE); свою — оказывает как обычно.
+    if (master.studioPaused && booking.service.providerId !== master.id) continue;
     if (seen.has(master.id)) continue;
     if (!booking.service.isEnabled || !booking.service.isActive) continue;
     seen.add(master.id);

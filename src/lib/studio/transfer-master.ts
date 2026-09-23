@@ -1,5 +1,6 @@
 import { MembershipStatus, Prisma, ProviderType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { normalizeInviteEmail } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prismaDirect } from "@/lib/prisma-direct";
 
@@ -48,6 +49,7 @@ export async function transferMasterOutOfStudio(
           studioId: true,
           ownerUserId: true,
           contactPhone: true,
+          contactEmail: true,
         },
       });
       if (!master || master.type !== ProviderType.MASTER) {
@@ -212,18 +214,25 @@ export async function transferMasterOutOfStudio(
 
       await tx.provider.update({
         where: { id: masterId },
-        data: { studioId: null },
+        // STUDIO-PAUSE-SPLIT-01: пауза — свойство членства в студии, уходит вместе с ним.
+        data: { studioId: null, studioPaused: false },
       });
 
       const contactPhone = master.contactPhone?.trim() ?? "";
+      // STUDIO-INVITE-EMAIL-01: висящее приглашение по почте отзывается так же,
+      // как по телефону, — иначе ушедший мастер мог бы вернуться по старому.
+      const contactEmail = normalizeInviteEmail(master.contactEmail);
       let revokedInviteIds: string[] = [];
-      if (contactPhone) {
-        const phoneCandidates = buildPhoneCandidates(contactPhone);
+      const contactMatches: Prisma.StudioInviteWhereInput[] = [
+        ...(contactPhone ? [{ phone: { in: buildPhoneCandidates(contactPhone) } }] : []),
+        ...(contactEmail ? [{ email: contactEmail }] : []),
+      ];
+      if (contactMatches.length > 0) {
         const pendingInvites = await tx.studioInvite.findMany({
           where: {
             studioId: studio.id,
             status: MembershipStatus.PENDING,
-            phone: { in: phoneCandidates },
+            OR: contactMatches,
           },
           select: { id: true },
         });

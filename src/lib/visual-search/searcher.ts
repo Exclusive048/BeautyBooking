@@ -15,8 +15,19 @@ import {
   VisualProviderUnavailableError,
 } from "@/lib/visual-search/provider";
 import type { VisualCategorySlug, VisualSearchStrategy } from "@/lib/visual-search/prompt";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
-const MIN_FILTERED_ASSETS = 5;
+/**
+ * VISUAL-SEARCH-UNRECOGNIZED-01 (2026-09-23): два разных порога, которые жили
+ * одним числом. Строгий отбор (по фильтрам стратегии) ослабляется, когда дал
+ * меньше `RELAX_FILTERS_BELOW` кандидатов, — это про ширину выдачи. А отказ
+ * «мало работ» теперь только при НУЛЕ кандидатов: выдача и так ранжируется по
+ * похожести, а при прежнем «не меньше 5 работ в категории» на старте (у
+ * категории 1–4 проиндексированные работы) поиск не находил НИЧЕГО, даже
+ * загруженное фото самой проиндексированной работы.
+ */
+const RELAX_FILTERS_BELOW = 5;
+const MIN_FILTERED_ASSETS = 1;
 const FILTER_LIMIT = 5000;
 const VECTOR_LIMIT = 50;
 const EMBEDDING_DIMENSIONS = 256;
@@ -328,7 +339,7 @@ async function runSearch(imageBytes: Uint8Array): Promise<VisualSearchResponse> 
   // числу не видно, отсеяли кандидатов фильтры или их не было вовсе.
   const strictFilteredCount = filterPairs.length > 0 ? filtered.length : null;
 
-  if (filtered.length < MIN_FILTERED_ASSETS && filterPairs.length > 0) {
+  if (filtered.length < RELAX_FILTERS_BELOW && filterPairs.length > 0) {
     filtered = await findFilteredAssets({
       category: classification.category,
       filterPairs,
@@ -380,10 +391,7 @@ async function runSearch(imageBytes: Uint8Array): Promise<VisualSearchResponse> 
 
   const providerIds = Array.from(new Set(filtered.map((item) => item.entityId)));
   const providers = await prisma.provider.findMany({
-    where: {
-      id: { in: providerIds },
-      isPublished: true,
-    },
+    where: { AND: [{ id: { in: providerIds } }, catalogVisibleProviderWhere()] },
     select: {
       id: true,
       name: true,

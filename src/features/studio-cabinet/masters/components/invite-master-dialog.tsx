@@ -39,10 +39,14 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
   }
 
   async function handleSubmit() {
-    const normalizedPhone = normalizeRussianPhone(phone);
+    // STUDIO-INVITE-EMAIL-01: одно поле на оба контакта — «@» значит почта.
+    const contact = phone.trim();
+    const isEmail = contact.includes("@");
+    const email = isEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) ? contact.toLowerCase() : null;
+    const normalizedPhone = isEmail ? null : normalizeRussianPhone(contact);
     const trimmedName = displayName.trim();
     const trimmedTagline = tagline.trim();
-    if (!normalizedPhone) {
+    if (!email && !normalizedPhone) {
       setError(E.phoneInvalid);
       return;
     }
@@ -62,7 +66,7 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           studioId,
-          phone: normalizedPhone,
+          ...(email ? { email } : { phone: normalizedPhone }),
           displayName: trimmedName,
           title: trimmedTagline,
         }),
@@ -104,8 +108,8 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
           onChange={(e) => setPhone(e.target.value)}
           placeholder={T.phonePlaceholder}
           disabled={submitting}
-          inputMode="tel"
-          autoComplete="tel"
+          inputMode="email"
+          autoComplete="off"
         />
       </label>
       <label className="block">

@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isPublicReferenceApiPath } from "@/lib/api/cache-headers";
+import { isPublicReferenceApiPath, SESSION_REFRESHED_REQUEST_HEADER } from "@/lib/api/cache-headers";
 import { rotateSessionWithTelemetry } from "@/lib/auth/session-refresh";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
@@ -160,7 +160,17 @@ const HEALTH_READINESS_PATH = "/api/health/ready";
  * ушла: ограничивать больше нечего, а гонка вокруг ротации токена вредна
  * (см. комментарий на месте вызова). Константа удалена намеренно, не забыта.
  */
-const PUBLIC_PATHS = ["/login", "/register", "/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
+/**
+ * Пути, где прокси НЕ обновляет сессию.
+ *
+ * SESSION-LOSS-01 (2026-09-23): `/login` отсюда убран. Пользователь с живой
+ * refresh-кукой и протухшим access-токеном, попавший на `/login` (закладка,
+ * переход после временного сбоя), видел форму входа: страница умеет отправить
+ * вошедшего в кабинет, но без обновления сессии она его не узнавала. Теперь
+ * сессия обновляется и там, и страница уводит по `next`. Отсутствующий
+ * `/register` убран вместе с ним.
+ */
+const PUBLIC_PATHS = ["/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
 
 function resolveRequestId(request: NextRequest): string {
   const header = request.headers.get("x-request-id");
@@ -312,6 +322,14 @@ function readSetCookieHeaders(headers: Headers): string[] {
  * затереть их значило бы сломать соседние механизмы. Удаление (`Max-Age=0`,
  * так `clearSessionCookies` гасит пару) обязано убирать имя из запроса, иначе
  * обработчик увидел бы отозванную сессию живой.
+ *
+ * 🔴 Запрос несёт куки, видимые ЭТОМУ пути, а `Set-Cookie` с чужим `Path`
+ * описывает ДРУГУЮ куку с тем же именем (браузер хранит пару «имя + путь»).
+ * С SESSION-REFRESH-PATH-01 каждая выдача `bh_refresh` (`Path=/`) идёт вместе с
+ * гашением прежней (`Path=/api/auth/refresh; Max-Age=0`) — и слияние по одному
+ * имени удаляло из запроса только что выданный токен: обработчик `/logout`
+ * получал `NO_TOKEN` и не отзывал ничего. Поэтому здесь учитываются только
+ * куки корня (`Path=/` либо без пути — так пишет вся сессионная пара).
  */
 export function mergeRefreshedCookies(
   currentCookieHeader: string | null,
@@ -331,6 +349,11 @@ export function mergeRefreshedCookies(
     if (!pair || separator <= 0) continue;
     const name = pair.slice(0, separator).trim();
     if (!name) continue;
+
+    const path = attributes
+      .map((attribute) => /^\s*path\s*=\s*(\S*)\s*$/i.exec(attribute))
+      .find((match) => match !== null);
+    if (path && path[1] !== "/") continue;
 
     const maxAge = attributes
       .map((attribute) => /^\s*max-age\s*=\s*(-?\d+)\s*$/i.exec(attribute))
@@ -403,6 +426,8 @@ export async function proxy(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-request-id", requestId);
+  // Сигнал «в ответ уйдёт обновлённая кука» ставит только прокси (ниже).
+  requestHeaders.delete(SESSION_REFRESHED_REQUEST_HEADER);
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
   // PERF-13: на публичных справочниках refresh-хоп не делается вовсе. Иначе к
   // ответу, который сам объявил себя `public, s-maxage=…`, прикладывался бы
@@ -460,6 +485,9 @@ export async function proxy(request: NextRequest) {
                 "cookie",
                 mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies),
               );
+              // PUBLIC-CACHE-SET-COOKIE: обработчик `public`-ответа обязан
+              // знать, что к его ответу приложится сессия (`sharedCacheControlFor`).
+              requestHeaders.set(SESSION_REFRESHED_REQUEST_HEADER, "1");
             }
           }
         } catch {
@@ -491,7 +519,7 @@ export async function proxy(request: NextRequest) {
       // ответ обработчика одинаково; собрана здесь руками, потому что
       // `getRequestId()` работает через request-контекст, которого у прокси нет.
       const unavailable = result.reason === "unavailable";
-      return withRequestId(
+      const limitedResponse = withRequestId(
         NextResponse.json(
           {
             ok: false,
@@ -517,6 +545,13 @@ export async function proxy(request: NextRequest) {
         ),
         requestId
       );
+      // SESSION-LOSS-01: если этот же запрос уже ротировал сессию, новая
+      // кука обязана доехать и с отказом — иначе браузер останется с
+      // использованным refresh-токеном.
+      for (const setCookie of refreshedSetCookies) {
+        limitedResponse.headers.append("set-cookie", setCookie);
+      }
+      return limitedResponse;
     }
   }
 

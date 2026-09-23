@@ -13,6 +13,8 @@ export type CropPickerCanvasProps = {
   onCropChange: (crop: Point) => void;
   onZoomChange: (zoom: number) => void;
   onCropComplete: (croppedArea: Area) => void;
+  /** Сохранённая область в процентах — кроппер сам выведет из неё сдвиг и увеличение. */
+  initialCroppedAreaPercentages?: Area;
 };
 
 /**

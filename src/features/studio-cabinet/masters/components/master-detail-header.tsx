@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ExternalLink, Pause, Play, UserX } from "lucide-react";
+import { CalendarDays, ExternalLink, Pause, Pencil, Play, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
@@ -12,6 +12,7 @@ import {
   getStatusTone,
 } from "../lib/status-display";
 import type { StudioMasterDetail } from "../server/types";
+import { EditMasterProfileDialog } from "./edit-master-profile-dialog";
 import { PauseMasterDialog } from "./pause-master-dialog";
 import { RevokeInviteDialog } from "./revoke-invite-dialog";
 
@@ -45,6 +46,7 @@ export function MasterDetailHeader({
 }) {
   const [pauseOpen, setPauseOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const tone = getStatusTone(detail.status);
   // FIX-STUDIO-02 (F7): an INVITED master is an unclaimed stub — pausing it is
   // meaningless (it accepts no bookings). Offer «Отозвать приглашение» instead;
@@ -118,6 +120,11 @@ export function MasterDetailHeader({
             <CalendarDays className="h-3.5 w-3.5" aria-hidden />
             {T.actions.schedule}
           </Link>
+          {/* STUDIO-EDIT-MASTER-PROFILE-01: имя, специализация, описание, фото. */}
+          <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-3.5 w-3.5" aria-hidden />
+            {T.actions.editProfile}
+          </Button>
           {detail.publicProfileUrl ? (
             <Link
               href={detail.publicProfileUrl}
@@ -183,6 +190,15 @@ export function MasterDetailHeader({
           onClose={() => setPauseOpen(false)}
         />
       )}
+      {editOpen ? (
+        <EditMasterProfileDialog
+          key={detail.providerId}
+          studioId={studioId}
+          detail={detail}
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

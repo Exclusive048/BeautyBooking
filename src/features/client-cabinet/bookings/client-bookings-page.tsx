@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
   Calendar,
@@ -58,6 +59,10 @@ const fetcher = (url: string) =>
 const REVIEW_PARAM = "review";
 
 export function ClientBookingsPage() {
+  // NAV-ATTENTION-01: счётчики «ждёт действия» (нижняя навигация, сайдбар)
+  // считает серверный layout кабинета, а он при клиентской навигации не
+  // перерисовывается — после ответа на перенос или отмены их надо обновить.
+  const router = useRouter();
   const [filter, setFilter] = useState<Filter>({ status: "all", search: "" });
   const [rescheduleTarget, setRescheduleTarget] = useState<ClientBookingDTO | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ClientBookingDTO | null>(null);
@@ -175,6 +180,7 @@ export function ClientBookingsPage() {
       );
       setAnswerState(null);
       await mutate();
+      startTransition(() => router.refresh());
     } catch (error) {
       setAnswerState({
         id: booking.id,
@@ -218,6 +224,7 @@ export function ClientBookingsPage() {
       });
       setCancelState(null);
       await mutate();
+      startTransition(() => router.refresh());
     } catch (error) {
       // Отказы отмены действенные (окно 60 минут, срок отмены, «запись уже
       // изменилась — обновите страницу») — серверная строка дословно (FIX-C8).

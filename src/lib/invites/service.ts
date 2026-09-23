@@ -1,8 +1,11 @@
-import { AccountType, MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
+import { AccountType, MediaEntityType, MembershipStatus, Prisma, ProviderType, StudioRole } from "@prisma/client";
 import { toAppError } from "@/lib/api/errors";
 import { addRoleToUser } from "@/lib/auth/roles";
+import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import type { Result, StatusCode } from "@/lib/domain/result";
-import { resolveInviteAccess } from "@/lib/invites/access";
+import { normalizeInviteEmail, resolveInviteAccess } from "@/lib/invites/access";
+import { logError } from "@/lib/logging/logger";
+import { collectProviderMedia } from "@/lib/media/purge";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { createMasterProfile } from "@/lib/profiles/professional";
@@ -30,29 +33,53 @@ type InviteRejectResult = {
  * Без него до включения SMS-шлюза принять приглашение не мог никто —
  * подтверждённых номеров в проде нет ни у кого.
  */
-async function hasInvitePhoneAccess(
-  user: { id: string; phone: string | null; phoneVerifiedAt: Date | null },
-  invite: { phone: string; studioId: string },
+type InviteActor = {
+  id: string;
+  phone: string | null;
+  phoneVerifiedAt: Date | null;
+  email: string | null;
+  emailVerifiedAt: Date | null;
+};
+
+async function hasInviteAccess(
+  user: InviteActor,
+  invite: { phone: string | null; email: string | null; studioId: string },
 ): Promise<boolean> {
   const grant = await resolveInviteAccess({
     userId: user.id,
     userPhone: user.phone,
     userPhoneVerifiedAt: user.phoneVerifiedAt,
+    userEmail: user.email,
+    userEmailVerifiedAt: user.emailVerifiedAt,
     invitePhone: invite.phone,
+    inviteEmail: invite.email,
     inviteStudioId: invite.studioId,
   });
   return grant !== null;
 }
 
+/**
+ * STUDIO-INVITE-EMAIL-01 — заготовка мастера, которую студия завела вместе с
+ * приглашением, ищется по тому контакту, на который приглашение выписано:
+ * `contactPhone` для телефона, `contactEmail` для почты.
+ */
+function stagedMasterContactWhere(invite: { phone: string | null; email: string | null }) {
+  const email = normalizeInviteEmail(invite.email);
+  if (email) return { contactEmail: email };
+  const phone = invite.phone ? (normalizeRussianPhone(invite.phone) ?? invite.phone) : null;
+  return phone ? { contactPhone: phone } : null;
+}
+
 export async function acceptStudioInvite(
   inviteId: string,
-  user: { id: string; phone: string | null; phoneVerifiedAt: Date | null; roles: AccountType[] }
+  user: InviteActor & { roles: AccountType[] }
 ): Promise<Result<InviteAcceptResult>> {
   const invite = await prisma.studioInvite.findUnique({
     where: { id: inviteId },
     select: {
       id: true,
       phone: true,
+      email: true,
       studioId: true,
       status: true,
       studio: { select: { providerId: true } },
@@ -63,7 +90,7 @@ export async function acceptStudioInvite(
     return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
-  if (!(await hasInvitePhoneAccess(user, invite))) {
+  if (!(await hasInviteAccess(user, invite))) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
@@ -95,23 +122,26 @@ export async function acceptStudioInvite(
     return { ok: false, status, message: appError.message, code: appError.code };
   }
 
-  const normalizedInvitePhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
-
-  const stagedMaster = await prisma.provider.findFirst({
-    where: {
-      type: ProviderType.MASTER,
-      studioId: invite.studio.providerId,
-      contactPhone: normalizedInvitePhone,
-    },
-    select: { id: true, ownerUserId: true, isPublished: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const contactWhere = stagedMasterContactWhere(invite);
+  const stagedMaster = contactWhere
+    ? await prisma.provider.findFirst({
+        where: {
+          type: ProviderType.MASTER,
+          studioId: invite.studio.providerId,
+          ...contactWhere,
+        },
+        select: { id: true, ownerUserId: true, isPublished: true, studioPaused: true },
+        orderBy: { createdAt: "asc" },
+      })
+    : null;
 
   if (stagedMaster?.ownerUserId && stagedMaster.ownerUserId !== user.id) {
     return {
       ok: false,
       status: 409,
-      message: "Этот телефон уже привязан к другому аккаунту.",
+      message: invite.email
+        ? "Эта почта уже привязана к другому аккаунту."
+        : "Этот телефон уже привязан к другому аккаунту.",
       code: "INVITE_PHONE_ALREADY_USED",
     };
   }
@@ -122,23 +152,26 @@ export async function acceptStudioInvite(
   });
 
   let masterProviderId: string;
+  // Заготовка уходит только ПОСЛЕ успешного принятия: откажи привязка (мастер
+  // уже в другой студии — 409), приглашение осталось бы висеть, а у студии не
+  // было бы строки, по которой его отозвать.
+  let stagedToDiscard: string | null = null;
   if (existingMasterProfile) {
     masterProviderId = existingMasterProfile.providerId;
     if (stagedMaster && stagedMaster.id !== masterProviderId) {
-      await prisma.provider.update({
-        where: { id: stagedMaster.id },
-        data: { studioId: null, ownerUserId: null, isPublished: false },
-        select: { id: true },
-      });
+      stagedToDiscard = stagedMaster.id;
     }
   } else if (stagedMaster) {
-    if (!stagedMaster.ownerUserId || !stagedMaster.isPublished) {
+    if (!stagedMaster.ownerUserId || !stagedMaster.isPublished || stagedMaster.studioPaused) {
       await prisma.provider.update({
         where: { id: stagedMaster.id },
         data: {
           ownerUserId: user.id,
+          // STUDIO-PAUSE-SPLIT-01: личная страница — по умолчанию видима (как у
+          // нового кабинета), в студии — активен.
           isPublished: true,
-          contactPhone: normalizedInvitePhone,
+          studioPaused: false,
+          ...contactWhere,
         },
         select: { id: true },
       });
@@ -198,6 +231,18 @@ export async function acceptStudioInvite(
     return savedMembership.id;
   });
 
+  if (stagedToDiscard) {
+    try {
+      await discardStagedMaster(stagedToDiscard);
+    } catch (error) {
+      // Приглашение уже принято; брошенная заготовка — мусор, а не отказ.
+      logError("Failed to discard staged master after invite accept", {
+        stagedMasterId: stagedToDiscard,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   if (!user.roles.includes(AccountType.MASTER)) {
     await addRoleToUser(user.id, user.roles, AccountType.MASTER);
   }
@@ -215,13 +260,14 @@ export async function acceptStudioInvite(
 
 export async function rejectStudioInvite(
   inviteId: string,
-  user: { id: string; phone: string | null; phoneVerifiedAt: Date | null }
+  user: InviteActor
 ): Promise<Result<InviteRejectResult>> {
   const invite = await prisma.studioInvite.findUnique({
     where: { id: inviteId },
     select: {
       id: true,
       phone: true,
+      email: true,
       status: true,
       studioId: true,
       studio: { select: { providerId: true } },
@@ -232,7 +278,7 @@ export async function rejectStudioInvite(
     return { ok: false, status: 404, message: "Приглашение не найдено.", code: "INVITE_NOT_FOUND" };
   }
 
-  if (!(await hasInvitePhoneAccess(user, invite))) {
+  if (!(await hasInviteAccess(user, invite))) {
     return { ok: false, status: 403, message: "Недостаточно прав для этого действия.", code: "FORBIDDEN" };
   }
 
@@ -248,26 +294,75 @@ export async function rejectStudioInvite(
     return { ok: true, data: { inviteId: invite.id } };
   }
 
-  const normalizedPhone = normalizeRussianPhone(invite.phone) ?? invite.phone;
+  const contactWhere = stagedMasterContactWhere(invite);
+  const staged = contactWhere
+    ? await prisma.provider.findMany({
+        where: {
+          type: ProviderType.MASTER,
+          studioId: invite.studio.providerId,
+          ...contactWhere,
+          ownerUserId: null,
+        },
+        select: { id: true },
+      })
+    : [];
 
-  await prisma.$transaction([
-    // Mark invite as rejected
-    prisma.studioInvite.update({
-      where: { id: invite.id },
-      data: { status: MembershipStatus.REJECTED },
-      select: { id: true },
-    }),
-    // Remove the staged (unclaimed) Provider slot created when the invite was sent.
-    // Only deletes if ownerUserId is null — never removes a Provider already claimed by a user.
-    prisma.provider.deleteMany({
-      where: {
-        type: ProviderType.MASTER,
-        studioId: invite.studio.providerId,
-        contactPhone: normalizedPhone,
-        ownerUserId: null,
-      },
-    }),
-  ]);
+  await prisma.studioInvite.update({
+    where: { id: invite.id },
+    data: { status: MembershipStatus.REJECTED },
+    select: { id: true },
+  });
+
+  // Заготовка (ничейный Provider под приглашение) уходит тем же путём, что при
+  // принятии, — вместе с фото, которые мог загрузить админ студии. Удаляется
+  // только строка без владельца: условие стоит в самой записи.
+  for (const { id } of staged) {
+    try {
+      await discardStagedMaster(id);
+    } catch (error) {
+      logError("Failed to discard staged master after invite reject", {
+        stagedMasterId: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   return { ok: true, data: { inviteId: invite.id } };
+}
+
+/**
+ * STUDIO-INVITE-STUB-01 (2026-09-23) — заготовка мастера, которую студия завела
+ * под приглашение (`studio/masters.service.ts` → `createStudioMaster`), не
+ * нужна, если принимающий уже мастер: к студии прикрепляется его собственный
+ * кабинет. Раньше заготовку «отвязывали» (`studioId`/`ownerUserId` = null), и
+ * она навсегда оставалась сиротой без владельца и без студии.
+ *
+ * На заготовке ничего не держится по построению: INVITED не назначается на
+ * услуги и не принимает записей (инв. #24). Поэтому она удаляется; если внешний
+ * ключ всё же держит строку (P2003) — прежнее поведение, отвязать.
+ */
+export async function discardStagedMaster(
+  stagedMasterId: string
+): Promise<"deleted" | "detached" | "kept"> {
+  // Фото заготовки мог загрузить админ студии (редактор профиля мастера), а у
+  // `MediaAsset` нет внешнего ключа на `Provider` — каскада к нему нет. Снимок
+  // до удаления: после него указателей на объекты не найти (DELETION-02).
+  const media = await collectProviderMedia(MediaEntityType.MASTER, stagedMasterId);
+  try {
+    // Удаляется только НИЧЕЙНАЯ строка: условие в самой записи, а не в
+    // вызывающем, — кабинет, успевший получить владельца, не удалится никогда.
+    const removed = await prisma.provider.deleteMany({ where: { id: stagedMasterId, ownerUserId: null } });
+    if (removed.count === 0) return "kept";
+    await enqueueMediaPurge(media, "staged-master-discard", null);
+    return "deleted";
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2003") {
+      throw error;
+    }
+    await prisma.provider.updateMany({
+      where: { id: stagedMasterId, ownerUserId: null },
+      data: { studioId: null, isPublished: false },
+    });
+    return "detached";
+  }
 }

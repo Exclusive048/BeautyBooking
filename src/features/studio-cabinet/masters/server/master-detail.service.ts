@@ -46,12 +46,13 @@ function resolveBookingRevenueKopeks(booking: {
 
 function deriveStatus(input: {
   hasOwner: boolean;
-  isPublished: boolean;
+  /** STUDIO-PAUSE-SPLIT-01: пауза в студии, а не личная видимость мастера. */
+  studioPaused: boolean;
   hasPendingInvite: boolean;
 }): StudioMasterDisplayStatus {
   if (input.hasPendingInvite) return "INVITED";
   if (!input.hasOwner) return "INVITED";
-  return input.isPublished ? "ACTIVE" : "DISABLED";
+  return input.studioPaused ? "DISABLED" : "ACTIVE";
 }
 
 /**
@@ -85,10 +86,11 @@ export async function loadStudioMasterDetail(input: {
       name: true,
       avatarUrl: true,
       tagline: true,
+      description: true,
       contactPhone: true,
       contactEmail: true,
       publicUsername: true,
-      isPublished: true,
+      studioPaused: true,
       ownerUserId: true,
       ratingAvg: true,
       ratingCount: true,
@@ -144,12 +146,16 @@ export async function loadStudioMasterDetail(input: {
         select: { clientUserId: true },
         distinct: ["clientUserId"],
       }),
-      provider.contactPhone
+      // STUDIO-INVITE-EMAIL-01: приглашение ищется по любому из двух контактов.
+      provider.contactPhone || provider.contactEmail
         ? prisma.studioInvite.findFirst({
             where: {
               studioId: studio.id,
-              phone: provider.contactPhone,
               status: MembershipStatus.PENDING,
+              OR: [
+                ...(provider.contactPhone ? [{ phone: provider.contactPhone }] : []),
+                ...(provider.contactEmail ? [{ email: provider.contactEmail }] : []),
+              ],
             },
             select: { id: true },
           })
@@ -190,7 +196,7 @@ export async function loadStudioMasterDetail(input: {
 
   const status = deriveStatus({
     hasOwner: Boolean(provider.ownerUserId),
-    isPublished: provider.isPublished,
+    studioPaused: provider.studioPaused,
     hasPendingInvite: Boolean(pendingInvite),
   });
 
@@ -224,6 +230,11 @@ export async function loadStudioMasterDetail(input: {
 
   return {
     ...baseItem,
+    profile: {
+      name: provider.name,
+      tagline: provider.tagline ?? "",
+      description: provider.description ?? "",
+    },
     phone,
     email,
     joinedAt: joinedAtDate.toISOString(),

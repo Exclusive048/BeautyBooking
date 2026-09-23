@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { encodePublicId } from "@/lib/public-id";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * V2: getActiveStoriesGroups (used by /api/feed/stories)
@@ -69,8 +70,7 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
       isPublic: true,
       createdAt: { gte: since },
       master: {
-        isPublished: true,
-        autoPublishStoriesEnabled: true,
+        AND: [catalogVisibleProviderWhere(), { autoPublishStoriesEnabled: true }],
       },
     },
     select: {

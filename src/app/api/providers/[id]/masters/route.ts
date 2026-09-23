@@ -6,6 +6,7 @@ import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { logError } from "@/lib/logging/logger";
+import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -61,7 +62,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
     }
 
     const masters = await prisma.provider.findMany({
-      where: { studioId: provider.id, type: ProviderType.MASTER, isPublished: true },
+      // STUDIO-PAUSE-SPLIT-01: команда студии — мастера, АКТИВНЫЕ в студии
+      // (приглашение принято, не на паузе). Личная видимость мастера здесь не
+      // решает: скрывший свою страницу продолжает работать в студии.
+      where: { studioId: provider.id, type: ProviderType.MASTER, ...STUDIO_ACTIVE_MASTER_WHERE },
       // EXP-024: `masterServices` (enabled MasterService rows) is the source
       // of truth for which team master performs which service. The booking
       // wizard filters its picker on this — so it never lists (and never
@@ -71,6 +75,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
         id: true,
         name: true,
         publicUsername: true,
+        isPublished: true,
         bufferBetweenBookingsMin: true,
         masterServices: {
           where: { isEnabled: true },
@@ -84,7 +89,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
       masters: masters.map((m) => ({
         id: m.id,
         name: m.name,
-        publicUsername: m.publicUsername,
+        // Ссылка на личную страницу — только если мастер её не скрыл: иначе
+        // карточка команды вела бы на 404.
+        publicUsername: m.isPublished ? m.publicUsername : null,
         serviceIds: m.masterServices.map((s) => s.serviceId),
         // PACKAGE-STUDIO-SAME-MASTER-BUFFER: the same normalization the
         // create-side `resolveBookingCore` applies — the package wizard's

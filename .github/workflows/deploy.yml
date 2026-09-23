@@ -293,6 +293,11 @@ jobs:
             # Провал = стоп ДО рестарта: прежняя версия продолжает работать.
             $COMPOSE_BASE --profile db run --rm --no-deps migrate npm run seed:plans
 
+            echo "=== 5/7 (в) Пост-деплой: ссылки аватаров на вырез + админ-аккаунты (идемпотентно) ==="
+            # CROP-PUBLIC-01 + BOOTSTRAP-ADMIN-01 — scripts/post-deploy.ts. Тем же
+            # worker-образом; второй проход находит ноль строк. Провал = стоп до рестарта.
+            $COMPOSE_BASE --profile db run --rm --no-deps migrate npm run deploy:post
+
             echo "=== 6/7 Подъём готовыми образами ==="
             # Ориентир для страницы работ: подъём + healthcheck укладываются в 5 минут.
             $SUDO mkdir -p "$APP_DIR/.maintenance-state"

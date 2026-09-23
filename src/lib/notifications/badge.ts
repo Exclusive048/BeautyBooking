@@ -1,6 +1,4 @@
-import { MembershipStatus } from "@prisma/client";
-import { listAdministeredStudioIds } from "@/lib/invites/access";
-import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { pendingInvitesVisibleToUserWhere } from "@/lib/invites/access";
 import { prisma } from "@/lib/prisma";
 import type { NotificationContext } from "@/lib/notifications/groups";
 import { getUnreadCount } from "@/lib/notifications/service";
@@ -26,7 +24,6 @@ export async function getUnreadBadgeCount(input: {
   context?: NotificationContext;
 }): Promise<{ count: number; hasUnread: boolean }> {
   const context = input.context ?? "all";
-  const normalizedPhone = input.phone ? normalizeRussianPhone(input.phone) : null;
 
   // Studio invites belong to the personal stream — they are user-level
   // events that have nothing to do with master operations. Master badge
@@ -35,9 +32,7 @@ export async function getUnreadBadgeCount(input: {
 
   const [unreadCount, inviteCount] = await Promise.all([
     getUnreadCount(input.userId, context === "all" ? undefined : context),
-    includeInvites && normalizedPhone
-      ? countPendingInvitesForVerifiedOwner(input.userId, normalizedPhone)
-      : Promise.resolve(0),
+    includeInvites ? countVisiblePendingInvites(input.userId) : Promise.resolve(0),
   ]);
 
   const count = unreadCount + inviteCount;
@@ -45,31 +40,12 @@ export async function getUnreadBadgeCount(input: {
 }
 
 /**
- * PHONE-CLAIM-01: инвайты матчятся по телефону, а телефон бывает кабинетной
- * ЗАЯВКОЙ без OTP-доказательства — считать по ней чужие приглашения нельзя
- * (утечка факта инвайта заявителю номера). Гейт живёт ЗДЕСЬ, а не в контракте
- * вызывающих: одно PK-чтение вместо флага, который каждый из шести вызывающих
- * обязан был бы не забыть.
+ * PHONE-CLAIM-01 / STUDIO-INVITE-EMAIL-01: кто какие приглашения видит, решает
+ * `pendingInvitesVisibleToUserWhere` — одно место на бейдж и центр
+ * уведомлений (телефон и почта, подтверждённые и нет). Гейт живёт в нём, а не
+ * в контракте вызывающих.
  */
-async function countPendingInvitesForVerifiedOwner(
-  userId: string,
-  normalizedPhone: string,
-): Promise<number> {
-  const owner = await prisma.userProfile.findUnique({
-    where: { id: userId },
-    select: { phoneVerifiedAt: true },
-  });
-  const where = owner?.phoneVerifiedAt
-    ? { phone: normalizedPhone, status: MembershipStatus.PENDING }
-    : // FIX-STUDIO-SELF-INVITE: непроверенный номер считает приглашения ТОЛЬКО
-      // тех студий, которыми пользователь управляет, — то есть ровно свои
-      // самоприглашения. Утечки нет: он же их и выписал. Без этой ветки бейдж
-      // был нулём у всех, потому что подтверждённых номеров в проде нет
-      // (SMS-шлюз не подключён). Разбор грантов — `lib/invites/access.ts`.
-      {
-        phone: normalizedPhone,
-        status: MembershipStatus.PENDING,
-        studioId: { in: await listAdministeredStudioIds(userId) },
-      };
-  return prisma.studioInvite.count({ where });
+async function countVisiblePendingInvites(userId: string): Promise<number> {
+  const where = await pendingInvitesVisibleToUserWhere(userId);
+  return where ? prisma.studioInvite.count({ where }) : 0;
 }

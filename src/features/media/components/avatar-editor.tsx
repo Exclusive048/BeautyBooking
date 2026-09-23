@@ -168,6 +168,7 @@ export function AvatarEditor({
       cropY={activeAsset?.cropY ?? null}
       cropWidth={activeAsset?.cropWidth ?? null}
       cropHeight={activeAsset?.cropHeight ?? null}
+      cropFit="exact"
       sizes="(max-width: 768px) 30vw, 200px"
       unoptimized={isPrivateAvatar}
       className="object-cover"
@@ -196,6 +197,7 @@ export function AvatarEditor({
                 cropY={activeAsset?.cropY ?? null}
                 cropWidth={activeAsset?.cropWidth ?? null}
                 cropHeight={activeAsset?.cropHeight ?? null}
+                cropFit="exact"
                 sizes="(max-width: 768px) 30vw, 200px"
                 unoptimized={isPrivateAvatar}
                 className="object-cover"

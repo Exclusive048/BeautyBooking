@@ -5,6 +5,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { parseQuery } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
 import { encodePublicId } from "@/lib/public-id";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 export const runtime = "nodejs";
 
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
       }),
       prisma.provider.findMany({
         where: {
-          isPublished: true,
+          AND: [catalogVisibleProviderWhere()],
           publicUsername: { not: null },
           name: { contains: q, mode: "insensitive" },
           ...(citySlug ? { city: { slug: citySlug } } : {}),

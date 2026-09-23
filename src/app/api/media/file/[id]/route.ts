@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { jsonFail } from "@/lib/api/contracts";
+import { sharedCacheControlFor } from "@/lib/api/cache-headers";
 import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { Readable } from "stream";
 import { getSessionUser } from "@/lib/auth/session";
@@ -111,7 +112,8 @@ export async function GET(req: Request, ctx: RouteContext) {
           "Content-Length": String(publicFile.sizeBytes),
           // Public, immutable assets — agressive cache. Asset id is unique per upload,
           // so changing the file means changing the URL.
-          "Cache-Control": "public, max-age=31536000, immutable",
+          // PUBLIC-CACHE-SET-COOKIE: не `public`, если прокси приложит сессию.
+          "Cache-Control": sharedCacheControlFor(req, "public, max-age=31536000, immutable"),
         },
       });
     }

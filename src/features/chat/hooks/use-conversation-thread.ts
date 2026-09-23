@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { ConversationThreadDto, ChatPerspective } from "@/features/chat/types";
 
@@ -27,6 +28,7 @@ export function useConversationThread(input: {
   markRead: () => Promise<void>;
 } {
   const { perspective, conversationSlug } = input;
+  const router = useRouter();
   const [state, setState] = useState<State>({
     detail: null,
     isLoading: Boolean(conversationSlug),
@@ -97,14 +99,17 @@ export function useConversationThread(input: {
   const markRead = useCallback(async () => {
     if (!conversationSlug) return;
     try {
-      await fetch(
+      const res = await fetch(
         `/api/chat/threads/${encodeURIComponent(conversationSlug)}/read?as=${perspective}`,
         { method: "POST" },
       );
+      // NAV-ATTENTION-01: число непрочитанных у вкладки «Сообщения» считает
+      // серверный layout кабинета — после прочтения его надо перерисовать.
+      if (res.ok) startTransition(() => router.refresh());
     } catch {
       // Best-effort — UI re-fetches anyway on next focus.
     }
-  }, [conversationSlug, perspective]);
+  }, [conversationSlug, perspective, router]);
 
   return { ...state, refresh: fetchThread, markRead };
 }

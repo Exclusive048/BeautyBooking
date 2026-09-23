@@ -62,7 +62,9 @@ export function MasterDetailWeekSchedule({
                 {cell.dateLabel}
               </p>
               {cell.isDayOff ? (
-                <p className="mt-2 text-[10px] text-text-sec">{T.dayOff}</p>
+                <p className="mt-2 text-[10px] text-text-sec">
+                  <abbr title={T.dayOffFull} className="decoration-transparent">{T.dayOff}</abbr>
+                </p>
               ) : (
                 <>
                   <p className="mt-1.5 font-display text-sm font-semibold tabular-nums text-text-main">

@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/access";
+import { resolveBookingDurationMin } from "@/lib/bookings/booking-duration";
 import { requireProviderOwner } from "@/lib/auth/ownership";
 import { prisma } from "@/lib/prisma";
 
@@ -20,12 +21,26 @@ import { prisma } from "@/lib/prisma";
  * студии (та же проверка, что у остальных provider-действий). Бронь обязана
  * принадлежать именно тому исполнителю, чьи окошки запрошены — иначе
  * исключение ничего не значит и молча искажало бы выдачу.
+ *
+ * MOVE-PICKER-DURATION (2026-09-23): вместе с id отдаётся длина САМОЙ записи
+ * (`resolveBookingDurationMin` — то же правило, что у записи переноса). Окошки
+ * для переноса обязаны считаться по ней, а не по текущей длительности услуги:
+ * если длительность поменяли после записи или в записи несколько услуг, пикер
+ * предлагал время, которое сервер затем отклонял, либо прятал допустимое.
+ * Исполнитель здесь по построению тот же, что у записи, — то есть ровно тот
+ * случай, где и перенос держит длину по снимку.
  */
+export type RescheduleExclusion = {
+  bookingId: string;
+  /** Длина переносимой записи; `0` — вывести не из чего (роут берёт длительность услуги). */
+  durationMin: number;
+};
+
 export async function resolveRescheduleExclusion(
   req: Request,
   performerProviderId: string,
   bookingIdRaw: string | null,
-): Promise<string | undefined> {
+): Promise<RescheduleExclusion | undefined> {
   const bookingId = bookingIdRaw?.trim();
   if (!bookingId) return undefined;
 
@@ -33,7 +48,15 @@ export async function resolveRescheduleExclusion(
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    select: { id: true, clientUserId: true, providerId: true, masterProviderId: true },
+    select: {
+      id: true,
+      clientUserId: true,
+      providerId: true,
+      masterProviderId: true,
+      startAtUtc: true,
+      endAtUtc: true,
+      serviceItems: { select: { durationSnapshotMin: true } },
+    },
   });
   const performsHere =
     booking !== null &&
@@ -43,17 +66,21 @@ export async function resolveRescheduleExclusion(
     throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
 
-  if (booking.clientUserId === user.userId) return booking.id;
+  const exclusion: RescheduleExclusion = {
+    bookingId: booking.id,
+    durationMin: resolveBookingDurationMin(booking),
+  };
+  if (booking.clientUserId === user.userId) return exclusion;
 
   // Сторона провайдера: владелец кабинета исполнителя либо админ студии, через
   // которую бронь оформлена. `requireProviderOwner` бросает 403 сам.
   try {
     await requireProviderOwner(user, performerProviderId);
-    return booking.id;
+    return exclusion;
   } catch (error) {
     if (booking.providerId !== performerProviderId) {
       await requireProviderOwner(user, booking.providerId);
-      return booking.id;
+      return exclusion;
     }
     throw error;
   }

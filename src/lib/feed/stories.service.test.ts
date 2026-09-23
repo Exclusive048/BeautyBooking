@@ -21,6 +21,7 @@ vi.mock("@/lib/redis/connection", () => ({
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn() }));
 
 import { getActiveStoriesGroups } from "@/lib/feed/stories.service";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 type RawItem = {
   id: string;
@@ -138,15 +139,16 @@ describe("feed/stories getActiveStoriesGroups", () => {
     expect(result.groups).toHaveLength(50);
   });
 
-  it("passes autoPublishStoriesEnabled=true into the query filter", async () => {
+  // VISIBILITY-DEFAULT-01: истории — место, где мастера НАХОДЯТ, поэтому мастер
+  // обязан быть виден в каталоге (город + расписание), а не только опубликован.
+  it("passes autoPublishStoriesEnabled=true and the catalog-visibility filter", async () => {
     portfolioFindMany.mockResolvedValue([]);
     await getActiveStoriesGroups();
 
     expect(portfolioFindMany).toHaveBeenCalledTimes(1);
     const args = portfolioFindMany.mock.calls[0]![0];
     expect(args.where.master).toEqual({
-      isPublished: true,
-      autoPublishStoriesEnabled: true,
+      AND: [catalogVisibleProviderWhere(), { autoPublishStoriesEnabled: true }],
     });
     expect(args.where.isPublic).toBe(true);
   });

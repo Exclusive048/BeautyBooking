@@ -2,123 +2,82 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactElement } from "react";
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Check, User, Scissors, Building2, UserPlus, X, LogOut } from "lucide-react";
+import {
+  ArrowDownUp,
+  Building2,
+  Calendar,
+  Check,
+  Clock,
+  House,
+  LayoutGrid,
+  LogOut,
+  Scissors,
+  Search,
+  User,
+  UserPlus,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
 import { useActiveRole, type ActiveRole } from "@/lib/hooks/use-active-role";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { BECOME_MASTER_HREF, shouldOfferBecomeMaster } from "@/lib/auth/available-cabinets";
 import { Button } from "@/components/ui/button";
+import { BottomTab, BottomTabBar, BottomTabBarSpacer } from "@/components/layout/bottom-tab-bar";
 import { cn } from "@/lib/cn";
+import { fetchJson } from "@/lib/http/client";
+
+/** NAV-ATTENTION-01 — ответ `GET /api/me/attention`. */
+type Attention = { bookings: number; messages: number; reviews: number };
+const attentionFetcher = (url: string) => fetchJson<Attention>(url);
 
 const t = UI_TEXT.nav;
 
 type NavItem = {
   label: string;
   href: string;
-  icon: (props: { className?: string }) => ReactElement;
+  icon: LucideIcon;
 };
-
-// ── SVG icons (keep as-is for small bundle) ──────────────────────────────────
-
-function IconHome({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M3 10.5 12 3l9 7.5" />
-      <path d="M5 9.5V20h14V9.5" />
-      <path d="M9 20v-6h6v6" />
-    </svg>
-  );
-}
-function IconSearch({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="11" cy="11" r="7" />
-      <path d="M16.5 16.5 21 21" />
-    </svg>
-  );
-}
-function IconCalendar({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
-      <path d="M7 3v3M17 3v3M3 9h18" />
-    </svg>
-  );
-}
-function IconUser({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c1.6-4 5.4-6 8-6s6.4 2 8 6" />
-    </svg>
-  );
-}
-function IconClock({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 3" />
-    </svg>
-  );
-}
-function IconGrid({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
-function IconSwitch({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M7 16V4m0 0L3 8m4-4 4 4" />
-      <path d="M17 8v12m0 0 4-4m-4 4-4-4" />
-    </svg>
-  );
-}
 
 // ── Tab sets per role ─────────────────────────────────────────────────────────
 
 const NAV_GUEST: NavItem[] = [
-  { label: t.home, href: "/", icon: IconHome },
-  { label: t.catalog, href: "/catalog", icon: IconSearch },
-  { label: t.book, href: "/book", icon: IconCalendar },
-  { label: t.loginAction, href: "/login", icon: IconUser },
+  { label: t.home, href: "/", icon: House },
+  { label: t.catalog, href: "/catalog", icon: Search },
+  { label: t.book, href: "/book", icon: Calendar },
+  { label: t.loginAction, href: "/login", icon: User },
 ];
 
 const NAV_CLIENT: NavItem[] = [
-  { label: t.home, href: "/", icon: IconHome },
-  { label: t.catalog, href: "/catalog", icon: IconSearch },
-  { label: t.bookings, href: "/cabinet/bookings", icon: IconCalendar },
-  { label: t.profile, href: "/cabinet/profile", icon: IconUser },
+  { label: t.home, href: "/", icon: House },
+  { label: t.catalog, href: "/catalog", icon: Search },
+  { label: t.bookings, href: "/cabinet/bookings", icon: Calendar },
+  { label: t.profile, href: "/cabinet/profile", icon: User },
 ];
 
 const NAV_MASTER: NavItem[] = [
-  { label: t.home, href: "/cabinet/master/dashboard", icon: IconHome },
-  { label: t.bookings, href: "/cabinet/master/bookings", icon: IconCalendar },
-  { label: t.schedule, href: "/cabinet/master/schedule", icon: IconClock },
-  { label: t.profile, href: "/cabinet/master/profile", icon: IconUser },
+  { label: t.home, href: "/cabinet/master/dashboard", icon: House },
+  { label: t.bookings, href: "/cabinet/master/bookings", icon: Calendar },
+  { label: t.schedule, href: "/cabinet/master/schedule", icon: Clock },
+  { label: t.profile, href: "/cabinet/master/profile", icon: User },
 ];
 
 const NAV_STUDIO: NavItem[] = [
-  { label: t.home, href: "/cabinet/studio", icon: IconHome },
-  { label: t.calendar, href: "/cabinet/studio/calendar", icon: IconCalendar },
-  { label: t.clients, href: "/cabinet/studio/clients", icon: IconUser },
-  { label: t.services, href: "/cabinet/studio/settings?tab=services", icon: IconGrid },
+  { label: t.home, href: "/cabinet/studio", icon: House },
+  { label: t.calendar, href: "/cabinet/studio/calendar", icon: Calendar },
+  { label: t.clients, href: "/cabinet/studio/clients", icon: User },
+  { label: t.services, href: "/cabinet/studio/settings?tab=services", icon: LayoutGrid },
 ];
 
 const NAV_ADMIN: NavItem[] = [
-  { label: t.home, href: "/", icon: IconHome },
-  { label: t.adminShort, href: "/admin", icon: IconGrid },
-  { label: t.catalog, href: "/catalog", icon: IconSearch },
-  { label: t.profile, href: "/cabinet/profile", icon: IconUser },
+  { label: t.home, href: "/", icon: House },
+  { label: t.adminShort, href: "/admin", icon: LayoutGrid },
+  { label: t.catalog, href: "/catalog", icon: Search },
+  { label: t.profile, href: "/cabinet/profile", icon: User },
 ];
 
 // ── Role config ───────────────────────────────────────────────────────────────
@@ -291,34 +250,6 @@ function RoleSwitcherDrawer({
   );
 }
 
-// ── Published height ──────────────────────────────────────────────────────────
-
-/**
- * Публикует фактическую высоту панели в `--bottom-nav-h` на `<html>`.
- *
- * Полноэкранные слои над страницей (режим карты каталога) обязаны кончаться
- * ровно у верхней кромки панели. Высоту нельзя угадать константой: в ней
- * safe-area-инсет (у PWA на iPhone — десятки пикселей, причём панель берёт
- * его не целиком, см. `paddingBottom` ниже) и высота строки подписи. Прежняя
- * константа `4rem + инсет` промахивалась на ~15px, и в щель между картой и
- * панелью просвечивала страница под слоем. На `lg` панель `display: none`,
- * высота 0 — переменная честно говорит «панели нет».
- */
-function usePublishedNavHeight() {
-  return useCallback((node: HTMLElement | null) => {
-    if (!node) return;
-    const root = document.documentElement;
-    const apply = () => root.style.setProperty("--bottom-nav-h", `${node.offsetHeight}px`);
-    apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(node);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty("--bottom-nav-h");
-    };
-  }, []);
-}
-
 // ── Main BottomNav ────────────────────────────────────────────────────────────
 
 /**
@@ -332,8 +263,6 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
   const { user } = useMe();
   const { activeRole, availableRoles, hydrated } = useActiveRole();
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const publishNavHeight = usePublishedNavHeight();
-
 
   const isAdmin = user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPERADMIN");
   const isGuest = !user;
@@ -370,7 +299,16 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
     !isInsideMaster &&
     !isInsideStudio &&
     !isCabinetBillingFallback;
-  if (isHidden || isInsideMaster || isInsideStudio || isInsideClientCabinet) return null;
+  // NAV-ATTENTION-01: числа «ждёт действия» — только у вошедшего клиента и
+  // только там, где панель видна (в кабинетах свои панели со своими числами).
+  const navHidden = isHidden || isInsideMaster || isInsideStudio || isInsideClientCabinet;
+  const attentionKey =
+    isLoggedIn && !isAdmin && hydrated && activeRole === "CLIENT" && !navHidden ? "/api/me/attention" : null;
+  const { data: attention } = useSWR<Attention>(attentionKey, attentionFetcher, {
+    dedupingInterval: 30_000,
+  });
+
+  if (navHidden) return null;
 
   const showSwitcher = isLoggedIn && availableRoles.length > 1;
   // NAV-BECOME-MASTER-01: у клиента без кабинета пятый слот — «Стать мастером».
@@ -385,80 +323,53 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
     <>
       <RoleSwitcherDrawer open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
 
-      <nav
-        ref={publishNavHeight}
-        aria-label={UI_TEXT.a11y.mainNav}
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-subtle bg-bg-card/95 shadow-card backdrop-blur lg:hidden"
-        // PWA-UX-BATCH-01: инсет минус 10px — кнопки ближе к нижней кромке,
-        // без пустой полосы высотой инсета под ними (см. MasterBottomNav).
-        style={{ paddingBottom: "max(0px, calc(env(safe-area-inset-bottom, 0px) - 10px))" }}
-      >
-        <div className="mx-auto flex max-w-4xl items-center justify-around px-3 pb-0.5 pt-1.5">
-          {items.map((item) => {
-            const itemPath = item.href.split("?")[0] ?? item.href;
-            const isActive =
-              pathname === "/" ? itemPath === "/" : pathname.startsWith(itemPath) && itemPath !== "/";
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 pb-1 pt-1.5 text-[11px] transition",
-                  isActive ? "text-accent-text" : "text-text-sec"
-                )}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
+      <BottomTabBar ariaLabel={UI_TEXT.a11y.mainNav}>
+        {items.map((item) => {
+          const itemPath = item.href.split("?")[0] ?? item.href;
+          const isActive =
+            pathname === "/" ? itemPath === "/" : pathname.startsWith(itemPath) && itemPath !== "/";
+          const isClientBookings = items === NAV_CLIENT && item.href === "/cabinet/bookings";
+          const isClientProfile = items === NAV_CLIENT && item.href === "/cabinet/profile";
+          return (
+            <BottomTab
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              active={isActive}
+              badge={isClientBookings ? attention?.bookings ?? 0 : 0}
+              dot={isClientProfile && ((attention?.messages ?? 0) > 0 || (attention?.reviews ?? 0) > 0)}
+              dotLabel={t.needsAttention}
+            />
+          );
+        })}
 
-          {/* Role switcher tab — only when user has multiple roles */}
-          {showSwitcher ? (
-            <Button
-              variant="wrapper"
-              size="none"
-              onClick={() => setSwitcherOpen(true)}
-              className="flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] text-text-sec transition hover:text-text-main"
-              aria-label={t.switchRole}
-            >
-              <IconSwitch className="h-5 w-5" />
-              <span className="font-medium">{ROLE_LABELS[activeRole]}</span>
-            </Button>
-          ) : null}
+        {/* Role switcher tab — only when user has multiple roles */}
+        {showSwitcher ? (
+          <BottomTab
+            onClick={() => setSwitcherOpen(true)}
+            expanded={switcherOpen}
+            icon={ArrowDownUp}
+            label={ROLE_LABELS[activeRole]}
+            ariaLabel={t.switchRole}
+          />
+        ) : null}
 
-          {showBecomeMaster ? (
-            <Link
-              href={BECOME_MASTER_HREF}
-              className={cn(
-                "flex min-w-[56px] flex-col items-center gap-0.5 rounded-xl px-2 pb-1 pt-1.5 text-[11px] transition",
-                becomeMasterActive ? "text-accent-text" : "text-text-main"
-              )}
-              aria-current={becomeMasterActive ? "page" : undefined}
-              aria-label={t.becomeMasterCta}
-            >
-              {/* Бренд-кружок выделяет вкладку, не притворяясь «активной»:
-                  активность у панели передаёт цвет подписи. `-my-0.5` гасит
-                  лишние 4px кружка — строка иконок остаётся одной высоты. */}
-              <span className="-my-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground">
-                <Scissors className="h-3.5 w-3.5" aria-hidden />
-              </span>
-              {/* Полная подпись не помещается пятой вкладкой уже на 320px
-                  (налезает на «Профиль», замер) — там короткая; на 360+ полная.
-                  Полное имя всегда в aria-label. */}
-              <span aria-hidden className="whitespace-nowrap font-medium min-[360px]:hidden">
-                {t.becomeMasterTabShort}
-              </span>
-              <span aria-hidden className="hidden whitespace-nowrap font-medium min-[360px]:inline">
-                {t.becomeMasterTab}
-              </span>
-            </Link>
-          ) : null}
-        </div>
-      </nav>
-      <div className="h-16 lg:hidden" aria-hidden="true" />
+        {/* NAV-ALIGN-01: обычная вкладка, как соседние. Бренд-кружок и полная
+            подпись делали её вдвое шире остальных (97px против 56 на 375px)
+            и самой громкой точкой панели — предложение, а не навигация,
+            перекрикивало навигацию. Полное имя — в aria-label. */}
+        {showBecomeMaster ? (
+          <BottomTab
+            href={BECOME_MASTER_HREF}
+            icon={Scissors}
+            label={t.becomeMasterTabShort}
+            ariaLabel={t.becomeMasterCta}
+            active={becomeMasterActive}
+          />
+        ) : null}
+      </BottomTabBar>
+      <BottomTabBarSpacer />
     </>
   );
 }

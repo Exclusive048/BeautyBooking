@@ -6,6 +6,8 @@ import type { SessionUser } from "@/lib/auth/access";
 type BookingAccess = {
   id: string;
   clientUserId: string | null;
+  /** Студия ПОВЕРХНОСТИ брони (инв. #45) — её и только её админ управляет бронью. */
+  studioId: string | null;
   provider: {
     id: string;
     type: ProviderType;
@@ -21,6 +23,7 @@ async function loadBookingAccess(bookingId: string): Promise<BookingAccess> {
     select: {
       id: true,
       clientUserId: true,
+      studioId: true,
       provider: {
         select: {
           id: true,
@@ -119,7 +122,7 @@ export async function requireBookingCancelAccess(
     return { cancelledBy: "PROVIDER" };
   }
 
-  const studioId = await resolveStudioIdForProvider(booking.provider);
+  const studioId = booking.studioId;
   if (studioId && (await isStudioAdmin(user.userId, studioId))) {
     return { cancelledBy: "PROVIDER" };
   }
@@ -141,7 +144,7 @@ export async function requireBookingConfirmAccess(
     return { actor: "MASTER" };
   }
 
-  const studioId = await resolveStudioIdForProvider(booking.provider);
+  const studioId = booking.studioId;
   if (studioId && (await isStudioAdmin(user.userId, studioId))) return { actor: "MASTER" };
 
   throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
@@ -158,7 +161,7 @@ export async function requireBookingRescheduleAccess(
     return { actor: "MASTER" };
   }
 
-  const studioId = await resolveStudioIdForProvider(booking.provider);
+  const studioId = booking.studioId;
   if (studioId && (await isStudioAdmin(user.userId, studioId))) return { actor: "MASTER" };
 
   throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");

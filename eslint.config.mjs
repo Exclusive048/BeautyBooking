@@ -29,6 +29,11 @@ const eslintConfig = defineConfig([
     // `.qa/*.spec.ts` harness + helpers stay linted.
     ".qa/diagnostics/**",
     ".qa/screenshots/**",
+    // Brand/marketing assets (VK cover renderers etc.) sit under the
+    // gitignored `docs/*` tree: absent from CI and clean checkouts, so on the
+    // one machine that has them their CommonJS `require()` only turned local
+    // `npm run check` red at its very first step — hiding the other 17.
+    "docs/brand/**",
   ]),
   // GUARDRAILS-01 (H1 overlays): a hand-rolled `fixed inset-0` modal/overlay
   // surface breaks whenever an ancestor gains transform/filter/overflow — the

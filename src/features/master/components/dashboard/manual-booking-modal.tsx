@@ -7,10 +7,12 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  OperatorSlotPicker,
+  type OperatorSlot,
+} from "@/features/booking/components/operator-slot-picker";
 import type { ApiResponse } from "@/lib/types/api";
 import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
-import { salonInputToUtcIso, utcIsoToSalonInput } from "@/lib/schedule/datetime-input";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
@@ -18,12 +20,13 @@ import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 const T = UI_TEXT.cabinetMaster.dashboard.manualBooking;
 
 type Props = {
+  /** MANUAL-BOOKING-SLOTS-01: `Provider.id` мастера — источник свободных окошек. */
+  providerId: string;
   services: DashboardServiceLite[];
-  isSolo: boolean;
+  canManualBook: boolean;
   /**
-   * LOGIC-21 · tz-источник — **salon-tz** (`Provider.timezone` мастера). Поле
-   * `startAt` — `datetime-local`, а он всегда трактуется в таймзоне БРАУЗЕРА;
-   * зона нужна, чтобы и заполнение, и отправка шли по стенным часам салона.
+   * LOGIC-21 · tz-источник — **salon-tz** (`Provider.timezone` мастера): в нём
+   * строятся полоса дней и время окошек.
    */
   timezone: string;
 };
@@ -37,7 +40,7 @@ const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
  * clears the param and refreshes the server tree so KPIs and the
  * upcoming-bookings list update without a full reload.
  */
-export function ManualBookingModal({ services, isSolo, timezone }: Props) {
+export function ManualBookingModal({ providerId, services, canManualBook, timezone }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -46,32 +49,16 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
   const isOpen = searchParams.get("manual") === "1";
   const prefillTime = searchParams.get("prefillTime");
 
-  // MASTER-DASHBOARD-FIX-A #1б: initial value must NOT depend on
-  // `new Date()` — server renders the SSR HTML at server-local time,
-  // client hydrates at client-local time, and the two date strings
-  // differ around midnight or in different timezones. That trips
-  // React's hydration check and surfaces as a console warning on
-  // dashboard load. Start empty, then seed from the mount effect
-  // below so the initial render is deterministic.
-  const [startAt, setStartAt] = useState("");
+  // MANUAL-BOOKING-SLOTS-01: время — выбранное свободное окошко, а не
+  // `datetime-local`. «Сегодня» полоса дней считает сама после монтирования
+  // (MASTER-DASHBOARD-FIX-A #1б: SSR и клиент не обязаны совпадать по часам).
+  const [slot, setSlot] = useState<OperatorSlot | null>(null);
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Client-only default for `startAt`. Runs after hydration so the
-  // initial SSR/CSR markup matches (see #1б note above). Skips when
-  // the user has already edited the field or `?prefillTime=` will
-  // seed it via the next effect.
-  useEffect(() => {
-    if (!startAt && !prefillTime) {
-      // LOGIC-21: «сегодня» — день по часам САЛОНА, а не UTC-срез и не день
-      // браузера; иначе дефолт разъезжается с тем, как поле теперь читается.
-      setStartAt(`${toLocalDateKey(new Date(), timezone)}T10:00`);
-    }
-  }, [startAt, prefillTime, timezone]);
 
   // When the modal opens fresh, default the service to the first available
   // option if the user previously cleared it.
@@ -81,18 +68,12 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
     }
   }, [isOpen, serviceId, services]);
 
-  // Seed `startAt` from `?prefillTime=ISO` (set by the schedule's empty-cell
-  // overlay). Runs only when the modal toggles open or the param value
-  // changes — keeps user edits intact mid-session.
+  // `?prefillTime=ISO` (клик по пустой ячейке расписания) выбирает день этой
+  // ячейки и — если окошко свободно — само окошко; это делает пикер.
+  // Закрытая модаль выбор не хранит.
   useEffect(() => {
-    if (!isOpen || !prefillTime) return;
-    // LOGIC-21: раскодировать UTC-инстант host-локальными геттерами значило
-    // показать мастеру СВОИ стенные часы вместо салонных. Round-trip был
-    // самосогласован в таймзоне браузера и оттого визуально незаметен.
-    const salonLocal = utcIsoToSalonInput(prefillTime, timezone);
-    if (!salonLocal) return;
-    setStartAt(salonLocal);
-  }, [isOpen, prefillTime, timezone]);
+    if (!isOpen) setSlot(null);
+  }, [isOpen]);
 
   // fix-04a: ESC + body-scroll-lock effects were dropped along with
   // the bespoke fixed-inset wrapper. `<ModalSurface>` now provides
@@ -110,18 +91,16 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
   }
 
   async function submit() {
-    if (!serviceId || !clientName.trim() || !startAt) return;
+    if (!serviceId || !clientName.trim()) return;
+    if (!slot) {
+      setError(UI_TEXT.schedule.operatorSlots.required);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      // LOGIC-21: введённое значение — стенные часы САЛОНА (так же оно и
-      // заполняется), поэтому в UTC его переводит salon-конвертер, а не
-      // `new Date(value)`, который читает строку в таймзоне браузера.
-      const startAtIso = salonInputToUtcIso(startAt, timezone);
-      if (!startAtIso) {
-        setError(T.invalidTime);
-        return;
-      }
+      // Окошко пришло с сервера инстантом UTC — конвертировать нечего.
+      const startAtIso = slot.startAtUtc;
       const res = await fetch("/api/master/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,10 +120,11 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
       setClientName("");
       setClientPhone("");
       setNotes("");
+      setSlot(null);
       closeModal();
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось создать запись. Попробуйте ещё раз.");
+      setError(err instanceof Error ? err.message : T.createError);
     } finally {
       setSaving(false);
     }
@@ -158,31 +138,38 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
       className="max-w-md"
     >
       <>
-        {!isSolo ? (
+        {!canManualBook ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-400/30 dark:bg-amber-950/30 dark:text-amber-200">
             {T.notSoloHint}
           </p>
         ) : null}
         <div className="mt-4 space-y-3">
-          <Input
-            type="datetime-local"
-            value={startAt}
-            onChange={(event) => setStartAt(event.target.value)}
-            className="h-11 rounded-xl px-3 text-sm"
-            disabled={!isSolo}
-          />
           <Select
             value={serviceId}
-            onChange={(event) => setServiceId(event.target.value)}
-            disabled={!isSolo}
+            onChange={(event) => {
+              setServiceId(event.target.value);
+              setSlot(null);
+            }}
+            disabled={!canManualBook}
           >
             <option value="">{T.chooseService}</option>
             {services.map((service) => (
               <option key={service.id} value={service.id}>
-                {service.title} • {service.durationMin} мин • {formatRub(service.price)}
+                {service.title} • {service.durationMin} {UI_TEXT.common.minutesShort} • {formatRub(service.price)}
               </option>
             ))}
           </Select>
+          {isOpen ? (
+            <OperatorSlotPicker
+              providerId={canManualBook ? providerId : null}
+              serviceId={serviceId || null}
+              timeZone={timezone}
+              value={slot}
+              onChange={setSlot}
+              prefillIso={prefillTime}
+              disabled={!canManualBook}
+            />
+          ) : null}
           {/* FIX-NAME-HINT: у поля нет отдельной подписи, поэтому формат
               несёт сам плейсхолдер, а подсказка под ним объясняет зачем. */}
           <div>
@@ -192,7 +179,7 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
               onChange={(event) => setClientName(event.target.value)}
               placeholder={T.clientNamePlaceholder}
               className="h-11 rounded-xl px-3 text-sm"
-              disabled={!isSolo}
+              disabled={!canManualBook}
             />
             <p className="mt-1.5 text-xs text-text-sec">{UI_TEXT.common.clientNameHint}</p>
           </div>
@@ -202,13 +189,13 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
             onChange={(event) => setClientPhone(event.target.value)}
             placeholder={T.phonePlaceholder}
             className="h-11 rounded-xl px-3 text-sm"
-            disabled={!isSolo}
+            disabled={!canManualBook}
           />
           <Textarea
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
             placeholder={T.commentPlaceholder}
-            disabled={!isSolo}
+            disabled={!canManualBook}
           />
         </div>
         {error ? <p className="mt-3 text-xs text-red-600">{error}</p> : null}
@@ -228,7 +215,7 @@ export function ManualBookingModal({ services, isSolo, timezone }: Props) {
             size="md"
             className="rounded-xl"
             onClick={() => void submit()}
-            disabled={!isSolo || saving || !serviceId || !clientName.trim()}
+            disabled={!canManualBook || saving || !serviceId || !slot || !clientName.trim()}
           >
             {saving ? T.saving : T.create}
           </Button>

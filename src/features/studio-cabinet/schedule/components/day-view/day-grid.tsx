@@ -220,6 +220,29 @@ export function DayGrid({
                       const { left, width } = laneStyle(columnLanes.get(booking.id));
                       const pendingReschedule =
                         isPendingClientReschedule(booking);
+                      if (booking.isPersonal) {
+                        // STUDIO-MASTER-OWN-BOOKINGS-01: только занятость — ни
+                        // данных клиента, ни меню действий (сервер их отклонил бы).
+                        return (
+                          <div
+                            key={booking.id}
+                            title={T.cell.personalBookingHint}
+                            className="absolute z-10 overflow-hidden rounded-lg border border-dashed border-border-subtle bg-bg-input p-1.5 text-left text-[11px] leading-tight text-text-sec"
+                            style={{
+                              top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
+                              height: durationPx(start, end),
+                              left,
+                              width,
+                            }}
+                          >
+                            <div className="font-mono text-[10px]">
+                              {formatLocalHm(start, timezone)} —{" "}
+                              {formatLocalHm(end, timezone)}
+                            </div>
+                            <div className="truncate">{T.cell.personalBooking}</div>
+                          </div>
+                        );
+                      }
                       return (
                         <button
                           key={booking.id}

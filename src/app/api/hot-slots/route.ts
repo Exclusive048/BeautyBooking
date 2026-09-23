@@ -10,6 +10,8 @@ import { diffDateKeys } from "@/lib/schedule/dateKey";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { prisma } from "@/lib/prisma";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
+import { STUDIO_ACCEPTS_BOOKINGS_WHERE } from "@/lib/studio/accepts-bookings";
 import { encodeCursor } from "@/lib/pagination/cursor";
 import * as cache from "@/lib/cache/cache";
 import { getClientIp } from "@/lib/http/ip";
@@ -102,13 +104,28 @@ async function buildHotSlotFeed(from: Date, to: Date, category: string | undefin
     where: {
       isEnabled: true,
       provider: {
-        type: "MASTER",
-        // SECURITY-EXPOSURE-AUDIT-01 · Y11: only published providers belong in
-        // the public hot-slots feed — an unpublished/paused master's discount
-        // rules were leaking (and advertising bookable slots that 409 later).
-        isPublished: true,
-        publicUsername: { not: null },
-        ...(category ? { categories: { has: category } } : {}),
+        AND: [
+          // SECURITY-EXPOSURE-AUDIT-01 · Y11: only published providers belong in
+          // the public hot-slots feed — an unpublished/paused master's discount
+          // rules were leaking (and advertising bookable slots that 409 later).
+          // VISIBILITY-DEFAULT-01: лента — поверхность, где мастера НАХОДЯТ,
+          // поэтому предикат каталога (видимость + город + расписание), а не
+          // один переключатель.
+          catalogVisibleProviderWhere(),
+          // STUDIO-HIDDEN-MASTER-SERVICES: горящие окошки мастера студии —
+          // по услугам студии (`hot-slots/service.ts`), а скрытая студия
+          // записей не принимает.
+          { OR: [{ studioId: null }, { studio: { is: STUDIO_ACCEPTS_BOOKINGS_WHERE } }] },
+          {
+            type: "MASTER",
+            // STUDIO-PAUSE-SPLIT-01: у мастера студии горящие окошки — по услугам
+            // студии, а на паузе в студии их не забронировать (MASTER_NOT_ACTIVE).
+            // У соло-мастера `studioPaused` всегда false.
+            studioPaused: false,
+            publicUsername: { not: null },
+            ...(category ? { categories: { has: category } } : {}),
+          },
+        ],
       },
     },
     select: {

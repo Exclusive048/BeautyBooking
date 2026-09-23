@@ -48,6 +48,7 @@ import {
   isVisualSearchRetryableError,
 } from "@/lib/visual-search/indexer";
 import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
+import { requeueAfterPipelineChangeOnce } from "@/lib/visual-search/reindex";
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
 import { runMediaCleanup } from "@/lib/media/cleanup";
 import { runMediaPurge } from "@/lib/media/purge";
@@ -207,6 +208,21 @@ function startPeriodicJobs() {
     });
   };
   runFinalizeSafe();
+
+  // VISUAL-SEARCH-UNRECOGNIZED-01: фото, которые прежний конвейер пометил
+  // нераспознанными (описание обрывалось лимитом токенов), один раз на версию
+  // конвейера уходят в индексацию заново. Метка в SystemConfig — повторный
+  // старт воркера платных вызовов не повторяет.
+  void requeueAfterPipelineChangeOnce()
+    .then((summary) => {
+      if (summary.ran) logInfo("visualSearch.pipelineReindex.done", summary);
+    })
+    .catch((error) => {
+      logError("visualSearch.pipelineReindex.failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      reportWorkerFailure("visualSearch.pipelineReindex", error);
+    });
 
   const intervalMs = 30 * 60 * 1000;
   setInterval(() => {

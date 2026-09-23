@@ -56,6 +56,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       baseDurationMin: body.baseDurationMin,
       isActive: body.isActive,
       onlinePaymentEnabled: body.onlinePaymentEnabled,
+      proposerUserId: user.id,
     });
     return jsonOk(data);
   } catch (error) {

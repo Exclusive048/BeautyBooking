@@ -21,6 +21,8 @@
  */
 
 import { afterEach, describe, it, expect, vi } from "vitest";
+import { NextResponse } from "next/server";
+import { clearSessionCookies } from "@/lib/auth/session";
 import {
   getAllowedOrigin,
   mergeRefreshedCookies,
@@ -298,7 +300,7 @@ describe("getAllowedOrigin — SEC-19", () => {
 describe("mergeRefreshedCookies — LOGIC-22", () => {
   const REFRESHED = [
     "bh_session=new.access.jwt; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200",
-    "bh_refresh=new.refresh.jwt; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=2592000",
+    "bh_refresh=new.refresh.jwt; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000",
   ];
 
   it("подменяет протухшую сессионную пару свежей", () => {
@@ -351,5 +353,34 @@ describe("mergeRefreshedCookies — LOGIC-22", () => {
 
   it("игнорирует мусорные сегменты, не роняя остальной jar", () => {
     expect(mergeRefreshedCookies("a=1;; =nameless; b=2", ["; broken"])).toBe("a=1; b=2");
+  });
+
+  /**
+   * SESSION-REFRESH-PATH-01 — выдача `bh_refresh` идёт вместе с гашением
+   * прежней куки С ТЕМ ЖЕ ИМЕНЕМ, но другим путём. Форму этой пары пиннит
+   * писатель (`session-rotation-recovery.test.ts`, «ротация пишет…»); здесь —
+   * что слияние не принимает гашение чужого пути за гашение выданной куки.
+   *
+   * @probe 2026-09-23 — из `mergeRefreshedCookies` снята проверка `Path`:
+   * красный «гашение прежней куки…» (в запросе нет `bh_refresh`, `/logout`
+   * получал NO_TOKEN). Возвращено — зелёный.
+   */
+  it("гашение прежней куки по другому пути не удаляет только что выданную", () => {
+    const merged = mergeRefreshedCookies("bh_session=stale; bh_refresh=old.refresh.jwt", [
+      ...REFRESHED,
+      "bh_refresh=; Path=/api/auth/refresh; Max-Age=0; HttpOnly; SameSite=Lax",
+    ]);
+    expect(merged).toContain("bh_refresh=new.refresh.jwt");
+    expect(merged).not.toContain("old.refresh.jwt");
+  });
+
+  it("выход по-прежнему убирает из запроса обе куки (Path=/, Max-Age=0)", () => {
+    const response = NextResponse.next();
+    clearSessionCookies(response);
+    const merged = mergeRefreshedCookies(
+      "bh_session=stale; bh_refresh=old.refresh.jwt; theme=dark",
+      response.headers.getSetCookie(),
+    );
+    expect(merged).toBe("theme=dark");
   });
 });

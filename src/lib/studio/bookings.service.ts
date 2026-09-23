@@ -20,8 +20,10 @@ import { invalidateSlotsForBookingMove, invalidateSlotsForBookingRange } from "@
 import { prisma } from "@/lib/prisma";
 import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
+import { assertStudioAcceptsBookings } from "@/lib/studio/accepts-bookings";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
-import { resolveMoveDurationMin, resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
+import { resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
+import { planStudioMoveDuration } from "@/lib/studio/move-plan";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
@@ -51,6 +53,13 @@ export async function createStudioBooking(input: {
   if (!studio) {
     throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
   }
+  // STUDIO-HIDDEN-MASTER-SERVICES: скрытая студия новых записей не принимает —
+  // и ручных из кабинета тоже («по-другому никак»). Отказ действенный: причина
+  // и что сделать. Существующие записи переносятся и отменяются как прежде.
+  await assertStudioAcceptsBookings(
+    studio.providerId,
+    "Студия скрыта и не принимает записи. Включите видимость студии в настройках.",
+  );
 
   const service = await prisma.service.findFirst({
     where: {
@@ -337,8 +346,16 @@ export async function moveStudioBooking(input: {
   // мастера: 60-минутная запись у мастера, которому нужно 90, оставляла хвост
   // незащищённым — туда можно было записать следующего клиента. При смене
   // мастера длительность берётся у нового мастера; цена — по `pricing`.
-  const masterChanged = input.targetMasterId !== booking.masterProviderId;
-  const durationStrategy: MoveStrategy = masterChanged ? "CHANGE_SERVICE" : input.strategy;
+  // MOVE-PICKER-DURATION: расчёт вынесен в `planStudioMoveDuration` — его же
+  // зовёт выдача окошек для переноса, иначе пикер предлагал время, которое
+  // перенос затем отклонял.
+  const plan = await planStudioMoveDuration({
+    serviceItems: booking.serviceItems,
+    currentMasterId: booking.masterProviderId,
+    targetMasterId: input.targetMasterId,
+    strategy: input.strategy,
+  });
+  const { masterChanged, durationStrategy, bookingServiceIds, overrideByServiceId } = plan;
 
   // STUDIO-BUGS-FIX-A bug #5: target master must be ACTIVE.
   const studio = await prisma.studio.findUnique({
@@ -370,33 +387,8 @@ export async function moveStudioBooking(input: {
   // second booking could land inside the tail (double-book). Resolving once
   // here (and reusing the same map + helper for the snapshot write below)
   // keeps the checked window, the stored `endAtUtc`, and the stored
-  // `durationSnapshotMin` provably identical.
-  const bookingServiceIds = Array.from(
-    new Set(
-      booking.serviceItems
-        .map((item) => item.serviceId)
-        .filter((sid): sid is string => Boolean(sid)),
-    ),
-  );
-  const targetOverrides =
-    bookingServiceIds.length > 0
-      ? await prisma.masterService.findMany({
-          where: {
-            masterProviderId: input.targetMasterId,
-            serviceId: { in: bookingServiceIds },
-          },
-          select: {
-            serviceId: true,
-            isEnabled: true,
-            priceOverride: true,
-            durationOverrideMin: true,
-            service: { select: { price: true, durationMin: true } },
-          },
-        })
-      : [];
-  const overrideByServiceId = new Map(
-    targetOverrides.map((override) => [override.serviceId, override]),
-  );
+  // `durationSnapshotMin` provably identical. (The map is built once in
+  // `planStudioMoveDuration`, above.)
 
   // #1а: target master must have an enabled MasterService for every serviceId
   // on the booking (both strategies — KEEP_SERVICE keeps the current service,
@@ -412,12 +404,7 @@ export async function moveStudioBooking(input: {
   // Window duration = what this move will PERSIST (CHANGE_SERVICE → target
   // durations, KEEP_SERVICE → current snapshots), so the validated/stored
   // `endAtUtc` equals the `durationSnapshotMin` written in the transaction.
-  const durationMin = resolveMoveDurationMin(
-    booking.serviceItems,
-    durationStrategy,
-    overrideByServiceId,
-  );
-  const safeDuration = durationMin > 0 ? durationMin : 60;
+  const safeDuration = plan.windowMin;
   const endAt = new Date(input.targetStartAt.getTime() + safeDuration * 60 * 1000);
 
   // #1в: new time must lie within target master's work window for

@@ -85,7 +85,7 @@ async function buildDayData(
         id: true,
         name: true,
         avatarUrl: true,
-        isPublished: true,
+        studioPaused: true,
         ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,
@@ -119,6 +119,7 @@ async function buildDayData(
       },
       select: {
         id: true,
+        studioId: true,
         masterProviderId: true,
         providerId: true,
         serviceId: true,
@@ -158,7 +159,14 @@ async function buildDayData(
   // Per-master first-time-client detection — a single grouped query
   // gives every client's earliest booking in the studio; the booking
   // on the current day is "new" if its id matches the earliest.
+  // STUDIO-MASTER-OWN-BOOKINGS-01: личная запись мастера — не запись студии.
+  // Та же развилка, что у права на управление (`auth/ownership.ts`): студия
+  // управляет записью её поверхности (`studioId` либо её `providerId`).
+  const isPersonalBooking = (b: { studioId: string | null; providerId: string }) =>
+    b.studioId !== studioId && b.providerId !== providerId;
+
   const clientKeys = bookings
+    .filter((booking) => !isPersonalBooking(booking))
     .map((booking) => booking.clientUserId)
     .filter((value): value is string => Boolean(value));
   const earliestByClient = new Map<string, string>();
@@ -181,7 +189,7 @@ async function buildDayData(
 
   // STUDIO-BUGS-FIX-A bug #5: INVITED masters (no ownerUserId) render as
   // disabled columns — they cannot accept bookings until the invite is
-  // accepted. `isStudioMasterActive` covers both ownership + isPublished.
+  // accepted. `isStudioMasterActive` covers both ownership + studio pause.
   const columns: ScheduleMasterColumn[] = masters.map((master) => ({
     id: master.id,
     name: master.name,
@@ -196,6 +204,28 @@ async function buildDayData(
     .filter((b) => b.startAtUtc && b.endAtUtc)
     .map((b) => {
       const masterId = b.masterProviderId ?? b.providerId;
+      if (isPersonalBooking(b)) {
+        // Только занятость: ни имени и телефона клиента, ни услуги с ценой,
+        // ни предложения переноса — студия этой записью не управляет.
+        return {
+          id: b.id,
+          masterId,
+          startAtUtc: b.startAtUtc!.toISOString(),
+          endAtUtc: b.endAtUtc!.toISOString(),
+          status: b.status,
+          tone: bookingToneFromStatus(b.status),
+          clientName: "",
+          clientPhone: null,
+          isNewClient: false,
+          serviceTitle: "",
+          serviceId: b.serviceId,
+          priceKopeks: 0,
+          proposedStartAtUtc: null,
+          proposedEndAtUtc: null,
+          actionRequiredBy: null,
+          isPersonal: true,
+        };
+      }
       const isNew =
         b.clientUserId !== null &&
         earliestByClient.get(b.clientUserId) === b.id;
@@ -215,6 +245,7 @@ async function buildDayData(
         serviceId: b.serviceId,
         priceKopeks: resolveBookingPriceKopeks(b),
         ...mapProposedReschedule(b),
+        isPersonal: false,
       };
     });
 
@@ -237,7 +268,10 @@ async function buildDayData(
 }
 
 function computeKpis(day: ScheduleDayData): ScheduleKpis {
-  const completed = day.bookings.filter(
+  // Записи и выручка — студийные; личные записи мастеров занимают время
+  // (загрузка и свободные окошки их учитывают), но записями студии не являются.
+  const studioBookings = day.bookings.filter((b) => !b.isPersonal);
+  const completed = studioBookings.filter(
     (b) =>
       b.status === BookingStatus.CONFIRMED ||
       b.status === BookingStatus.PREPAID ||
@@ -246,8 +280,9 @@ function computeKpis(day: ScheduleDayData): ScheduleKpis {
       b.status === BookingStatus.FINISHED,
   );
   const confirmedCount = completed.length;
-  const totalCount = day.bookings.length;
-  const revenue = day.bookings.reduce(
+  const totalCount = studioBookings.length;
+  const occupiedCount = day.bookings.length;
+  const revenue = studioBookings.reduce(
     (sum, b) => sum + b.priceKopeks,
     0,
   );
@@ -256,7 +291,7 @@ function computeKpis(day: ScheduleDayData): ScheduleKpis {
   const occupancyDenominator = onShift.length * DAILY_CAPACITY;
   const occupancy =
     occupancyDenominator > 0
-      ? Math.min(Math.round((totalCount / occupancyDenominator) * 100), 100)
+      ? Math.min(Math.round((occupiedCount / occupancyDenominator) * 100), 100)
       : 0;
 
   return {
@@ -266,7 +301,7 @@ function computeKpis(day: ScheduleDayData): ScheduleKpis {
     occupancyPercent: occupancy,
     occupancyHoursDenominator: occupancyDenominator,
     mastersOnShift: onShift.length,
-    freeWindowsCount: Math.max(occupancyDenominator - totalCount, 0),
+    freeWindowsCount: Math.max(occupancyDenominator - occupiedCount, 0),
   };
 }
 
@@ -292,7 +327,7 @@ async function buildWeekData(
         id: true,
         name: true,
         avatarUrl: true,
-        isPublished: true,
+        studioPaused: true,
         ownerUserId: true,
         ratingAvg: true,
         ratingCount: true,

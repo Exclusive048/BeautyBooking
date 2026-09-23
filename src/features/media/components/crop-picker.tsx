@@ -7,6 +7,7 @@ import { ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import type { ApiResponse } from "@/lib/types/api";
+import { cropAreaImageStyle, toCropArea } from "@/lib/media/crop-geometry";
 import { UI_TEXT } from "@/lib/ui/text";
 
 /**
@@ -47,46 +48,51 @@ type CropPickerProps = {
   onSkip: () => void;
 };
 
+/**
+ * CROP-PREVIEW-01 — миниатюра показывает ровно то, что в рамке кроппера.
+ * Геометрия — общая с показом сохранённого аватара (`cropAreaImageStyle`),
+ * поэтому превью и итог не могут разойтись между собой. Бокс держит то же
+ * соотношение сторон, что рамка (`aspectRatio`), иначе картинка исказилась бы.
+ */
 function CropPreview({
   src,
   croppedAreaPercent,
   size,
+  aspectRatio,
   shape,
 }: {
   src: string;
   croppedAreaPercent: Area | null;
   size: number;
+  aspectRatio: number;
   shape: CropPickerShape;
 }) {
-  if (!croppedAreaPercent) return null;
-
-  const { x, y, width } = croppedAreaPercent;
-  const scale = 100 / width;
-  const translateX = -(x * scale);
-  const translateY = -(y * scale);
+  const area = croppedAreaPercent
+    ? toCropArea(
+        croppedAreaPercent.x / 100,
+        croppedAreaPercent.y / 100,
+        croppedAreaPercent.width / 100,
+        croppedAreaPercent.height / 100,
+      )
+    : null;
+  if (!area) return null;
 
   return (
     <div className="flex flex-col items-center gap-1">
       <div
         className={[
-          "overflow-hidden border-2 border-border-subtle bg-bg-input",
+          "relative overflow-hidden border-2 border-border-subtle bg-bg-input",
           shape === "circle" ? "rounded-full" : "rounded-xl",
         ].join(" ")}
-        style={{ width: size, height: size }}
+        style={{ width: size, height: size / aspectRatio }}
         aria-hidden="true"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- crop preview uses CSS transform that next/image doesn't support */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- превью кроппера: картинка позиционируется абсолютно и растягивается за пределы бокса, next/image этого не даёт */}
         <img
           src={src}
           alt=""
           draggable={false}
-          style={{
-            width: `${scale * 100}%`,
-            height: `${scale * 100}%`,
-            transform: `translate(${translateX}%, ${translateY}%)`,
-            objectFit: "cover",
-            display: "block",
-          }}
+          style={{ ...cropAreaImageStyle(area), display: "block" }}
         />
       </div>
       <span className="text-[11px] text-text-sec">{size}px</span>
@@ -109,17 +115,26 @@ export function CropPicker({
 }: CropPickerProps) {
   const t = UI_TEXT.media.crop;
 
-  const hasSavedCrop =
-    initialCropX != null &&
-    initialCropY != null &&
-    initialCropWidth != null &&
-    initialCropHeight != null;
+  // CROP-PREVIEW-01: сохранённая область восстанавливается штатным
+  // `initialCroppedAreaPercentages`. Прежняя формула писала в `crop` проценты,
+  // а `react-easy-crop` ждёт там ПИКСЕЛИ сдвига, и выводила увеличение как
+  // `1 / cropWidth`, не учитывая, что при увеличении 1 квадратная рамка на
+  // неквадратном фото уже меньше его ширины: «Изменить обрезку» открывалась
+  // не на той области, что была сохранена.
+  const savedArea = toCropArea(initialCropX, initialCropY, initialCropWidth, initialCropHeight);
+  const [initialAreaPercent] = useState<Area | undefined>(() =>
+    savedArea
+      ? {
+          x: savedArea.x * 100,
+          y: savedArea.y * 100,
+          width: savedArea.width * 100,
+          height: savedArea.height * 100,
+        }
+      : undefined,
+  );
 
-  const [crop, setCrop] = useState({
-    x: hasSavedCrop ? ((initialCropX! + initialCropWidth! / 2 - 0.5) / 1) * -100 : 0,
-    y: hasSavedCrop ? ((initialCropY! + initialCropHeight! / 2 - 0.5) / 1) * -100 : 0,
-  });
-  const [zoom, setZoom] = useState(hasSavedCrop ? 1 / (initialCropWidth ?? 1) : 1);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const [croppedAreaPercent, setCroppedAreaPercent] = useState<Area | null>(null);
   const latestCropRef = useRef<{ cropX: number; cropY: number; cropWidth: number; cropHeight: number } | null>(null);
 
@@ -175,6 +190,7 @@ export function CropPicker({
           onCropChange={setCrop}
           onZoomChange={setZoom}
           onCropComplete={onCropCompletePercent}
+          initialCroppedAreaPercentages={initialAreaPercent}
         />
       </div>
 
@@ -219,6 +235,7 @@ export function CropPicker({
                 src={imageUrl}
                 croppedAreaPercent={croppedAreaPercent}
                 size={size}
+                aspectRatio={aspectRatio}
                 shape={shape}
               />
             ))}

@@ -123,10 +123,17 @@ describe("LOGIC-21 · компоненты ходят через salon-конв�
 
   it("ManualBookingModal не читает и не пишет время host-локальными методами", () => {
     const source = read("features/master/components/dashboard/manual-booking-modal.tsx");
-    expect(source).toContain("utcIsoToSalonInput");
-    expect(source).toContain("salonInputToUtcIso");
-    for (const hostLocal of ["getHours()", "getMinutes()", "getFullYear()", "getMonth()"]) {
+    // MANUAL-BOOKING-SLOTS-01: времени, набранного руками, больше нет — модаль
+    // выбирает свободное окошко и отправляет его UTC-инстант как есть, то есть
+    // конвертировать нечего. Предвыбор из ячейки расписания (`prefillTime`)
+    // уходит в пикер инстантом и сравнивается с окошками тоже инстантом.
+    expect(source).toContain("OperatorSlotPicker");
+    expect(source).toContain("slot.startAtUtc");
+    expect(source).not.toContain('type="datetime-local"');
+    const picker = read("features/booking/components/operator-slot-picker.tsx");
+    for (const hostLocal of ["getHours()", "getMinutes()", "getFullYear()", "getMonth()", "getDate()"]) {
       expect(source).not.toContain(hostLocal);
+      expect(picker).not.toContain(hostLocal);
     }
     // `new Date(startAt).toISOString()` — прежний путь отправки.
     expect(source).not.toMatch(/new Date\(startAt\)/);

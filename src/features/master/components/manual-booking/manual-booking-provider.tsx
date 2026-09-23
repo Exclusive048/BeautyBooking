@@ -29,7 +29,12 @@ const ManualBookingContext = createContext<ManualBookingContextValue | null>(nul
 type Props = {
   /** Server-fetched services + isSolo. `null` → master has no provider yet,
    * trigger is rendered as a no-op (consumers can check `enabled`). */
-  data: { services: DashboardServiceLite[]; isSolo: boolean; timezone: string } | null;
+  data: {
+    providerId: string;
+    services: DashboardServiceLite[];
+    canManualBook: boolean;
+    timezone: string;
+  } | null;
   children: ReactNode;
 };
 
@@ -58,8 +63,9 @@ export function ManualBookingProvider({ data, children }: Props) {
       {children}
       {data ? (
         <ManualBookingModal
+          providerId={data.providerId}
           services={data.services}
-          isSolo={data.isSolo}
+          canManualBook={data.canManualBook}
           timezone={data.timezone}
         />
       ) : null}

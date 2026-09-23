@@ -5,9 +5,9 @@
  * `StudioMember.status` column, which is not actively populated by the
  * invite flow). Three discrete states are surfaced in the UI:
  *
- *   - ACTIVE   — Provider.ownerUserId set + Provider.isPublished true
+ *   - ACTIVE   — Provider.ownerUserId set + Provider.studioPaused false
  *   - INVITED  — pending StudioInvite for this provider's phone, no owner yet
- *   - DISABLED — Provider.ownerUserId set + Provider.isPublished false
+ *   - DISABLED — Provider.ownerUserId set + Provider.studioPaused true
  *
  * The reference spec mentions a fourth status ("В отпуске" / vacation).
  * We do **not** introduce it here — there is no schema field to back it,

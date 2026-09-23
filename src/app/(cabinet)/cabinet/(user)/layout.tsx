@@ -18,7 +18,14 @@ export default async function UserCabinetLayout({ children }: Props) {
 
   const counts = user
     ? await getClientSidebarCounts(user.id)
-    : { favorites: 0, upcomingBookings: 0, unreadNotifications: 0, pendingReviews: 0 };
+    : {
+        favorites: 0,
+        upcomingBookings: 0,
+        unreadNotifications: 0,
+        pendingReviews: 0,
+        bookingsAwaitingClient: 0,
+        unreadMessages: 0,
+      };
 
   return (
     <CabinetLayout
@@ -27,6 +34,11 @@ export default async function UserCabinetLayout({ children }: Props) {
       upcomingBookingsCount={counts.upcomingBookings}
       unreadNotificationsCount={counts.unreadNotifications}
       pendingReviewsCount={counts.pendingReviews}
+      attention={{
+        bookings: counts.bookingsAwaitingClient,
+        messages: counts.unreadMessages,
+        reviews: counts.pendingReviews,
+      }}
     >
       {/* Mirror the master cabinet content pattern: full-width content area
           with per-page horizontal padding, generous top/bottom rhythm. No

@@ -9,6 +9,7 @@ import { isDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import type { CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { catalogVisibleProviderWhere, NO_OWN_SERVICES_WHERE } from "@/lib/providers/catalog-visibility";
 
 const DEFAULT_SEARCH_TIMEZONE = env.DEFAULT_TIMEZONE;
 const MAX_SLOTS_PER_PROVIDER = 12;
@@ -85,7 +86,9 @@ function buildWhere(
   hotProviderIds?: string[]
 ): Prisma.ProviderWhereInput {
   const and: Prisma.ProviderWhereInput[] = [
-    { isPublished: true },
+    // VISIBILITY-DEFAULT-01: поиск по времени — поверхность, где провайдера
+    // НАХОДЯТ, значит тот же предикат, что у каталога (город + расписание).
+    catalogVisibleProviderWhere(),
     { publicUsername: { not: null } },
     {
       OR: [
@@ -99,6 +102,11 @@ function buildWhere(
           },
         },
         {
+          // Студийная услуга продаётся с личной страницы только у мастера без
+          // своих услуг и не на паузе в студии — та же развилка, что у карточки
+          // каталога и страницы (иначе результат вёл бы на страницу, где
+          // искомой услуги нет).
+          ...NO_OWN_SERVICES_WHERE,
           masterServices: {
             some: {
               serviceId,

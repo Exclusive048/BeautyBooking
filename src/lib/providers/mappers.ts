@@ -105,5 +105,6 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     geoLng: provider.geoLng,
     superpowerBadges: [],
     services: provider.services.map(mapProviderService),
+    sellsOwnServices: provider.type === "MASTER" && !provider.studioId,
   };
 }

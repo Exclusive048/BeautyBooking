@@ -72,9 +72,9 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                 {row.cells.map((cell) => (
                   <td key={cell.dateKey} className="px-2 py-2.5 text-center">
                     {cell.isDayOff ? (
-                      <span className="font-mono text-[11px] text-text-sec/60">
+                      <abbr title={T.dayOffFull} className="font-mono text-[11px] text-text-sec/60 decoration-transparent">
                         {T.dayOff}
-                      </span>
+                      </abbr>
                     ) : (
                       <Link
                         href={`?view=day&date=${cell.dateKey}`}

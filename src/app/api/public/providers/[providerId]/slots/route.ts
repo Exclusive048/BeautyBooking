@@ -114,7 +114,8 @@ export async function GET(
 
     // RESCHEDULE-SELF-SLOT: окно переносимой брони не занято — только для
     // сторон этой брони (см. reschedule-exclusion.ts); аноним без сессии — 401.
-    const excludeBookingId = await resolveRescheduleExclusion(
+    // MOVE-PICKER-DURATION: окошки переноса — по длине самой записи.
+    const exclusion = await resolveRescheduleExclusion(
       req,
       provider.id,
       url.searchParams.get("excludeBookingId"),
@@ -129,12 +130,12 @@ export async function GET(
       listBookableSlots({
         provider,
         serviceId,
-        durationMinutes: duration.data,
+        durationMinutes: exclusion && exclusion.durationMin > 0 ? exclusion.durationMin : duration.data,
         fromKey,
         toKeyExclusive: effectiveToKeyExclusive,
         limit,
         now: nowForPolicy,
-        excludeBookingId,
+        excludeBookingId: exclusion?.bookingId,
       }),
       prisma.discountRule.findUnique({
         where: { providerId: provider.id },

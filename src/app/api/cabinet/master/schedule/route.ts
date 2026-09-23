@@ -48,6 +48,7 @@ import {
   notifyMasterScheduleUpdatedByStudio,
   notifyScheduleRequestSubmitted,
 } from "@/lib/notifications/studio-notifications";
+import { updateMasterProfile } from "@/lib/master/profile.service";
 
 export const runtime = "nodejs";
 
@@ -583,6 +584,25 @@ export async function PATCH(req: Request) {
     const bufferChanged =
       nextState.bufferBetweenBookingsMin !== currentSnapshot.bufferBetweenBookingsMin;
     const settingsPatch = readSettingsPatch(currentSnapshot, body);
+
+    // STUDIO-PAUSE-SPLIT-01: `isPublished` — ЛИЧНАЯ страница мастера, и её
+    // видимость решает только он сам. Администратор студии этим полем больше не
+    // управляет (его рычаг — пауза в студии, `studioPaused`, раздел «Мастера»),
+    // а мастер студии меняет её напрямую, без заявки: заявка согласует рабочее
+    // время, своя страница предметом согласования не является (раньше поле
+    // молча выпадало из заявки, и переключатель у мастера студии не работал).
+    // После обработки поле нейтрализуется в патче — иначе оно считалось бы
+    // изменением расписания и порождало пустую заявку.
+    if (settingsPatch.visibility) {
+      const currentPublished = currentSnapshot.visibility.isPublished;
+      if (actor.mode === "STUDIO_MASTER" && settingsPatch.visibility.isPublished !== currentPublished) {
+        await updateMasterProfile(actor.providerId, { isPublished: settingsPatch.visibility.isPublished });
+      }
+      if (actor.mode !== "SOLO_MASTER") {
+        settingsPatch.visibility = { ...settingsPatch.visibility, isPublished: currentPublished };
+      }
+    }
+
     const settingsChangedNow = settingsChanged(currentSnapshot, settingsPatch);
     const hasChanges =
       serializeScheduleState(currentState) !== serializeScheduleState(nextState) ||

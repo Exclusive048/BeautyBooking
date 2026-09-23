@@ -51,7 +51,11 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
         )
       : null;
 
-  if (studioBookingHref) {
+  // STUDIO-MASTER-OWN-BOOKINGS-01: мастер студии со своими услугами продаёт их
+  // здесь; на студийные ведёт отдельная ссылка под виджетом.
+  const studioLinkBelowWidget = provider.sellsOwnServices && studioBookingHref;
+
+  if (studioBookingHref && !provider.sellsOwnServices) {
     return (
       <Card>
         <CardContent className="space-y-3 p-5">
@@ -105,6 +109,15 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
             )}
           </div>
         )}
+
+        {studioLinkBelowWidget ? (
+          <Link
+            href={studioBookingHref}
+            className="mt-4 block text-center text-sm font-medium text-accent-text underline decoration-border-subtle underline-offset-4 transition hover:decoration-accent-text"
+          >
+            {tP.studioBookingAlso}
+          </Link>
+        ) : null}
       </div>
 
       {/* ── Mobile: bottom sheet (opened by MobileBookingCta) ── */}

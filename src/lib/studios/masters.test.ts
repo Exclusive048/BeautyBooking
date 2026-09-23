@@ -123,7 +123,7 @@ describe("attachMasterToStudio — SEC-27", () => {
 
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: MASTER_ID, type: ProviderType.MASTER, studioId: null },
-      data: { studioId: STUDIO_ID, timezone: "Asia/Yekaterinburg" },
+      data: { studioId: STUDIO_ID, timezone: "Asia/Yekaterinburg", studioPaused: false },
     });
     expect(update).not.toHaveBeenCalled();
   });
@@ -157,5 +157,65 @@ describe("attachMasterToStudio — STUDIO-MASTER-TZ-01", () => {
       data: { timezone: "Asia/Yekaterinburg" },
       select: { id: true },
     });
+  });
+});
+
+/**
+ * VISIBILITY-DEFAULT-01 — мастер без своего города получает город и адрес
+ * студии: в каталоге находят по городу, а приглашённый мастер рождается без
+ * адреса и иначе не находился нигде.
+ *
+ * @probe 2026-09-23 — `inheritStudioLocation` возвращал `{}` всегда: красные
+ * «привязка ставит мастеру без города…» и «приём приглашения ставит…».
+ * Возвращено — зелёный.
+ */
+describe("attachMasterToStudio — город студии мастеру без своего", () => {
+  const LOCATION = {
+    cityId: "city-ekb",
+    address: "Екатеринбург, ул. Ленина, 1",
+    district: "Центр",
+    geoLat: 56.83,
+    geoLng: 60.6,
+  };
+
+  beforeEach(() => {
+    findUnique.mockResolvedValue({
+      id: STUDIO_ID,
+      type: ProviderType.STUDIO,
+      timezone: "Asia/Yekaterinburg",
+      ...LOCATION,
+    });
+  });
+
+  it("привязка ставит мастеру без города город и адрес студии", async () => {
+    findFirst.mockResolvedValue({ id: MASTER_ID, name: "Аня", studioId: null, timezone: "Asia/Yekaterinburg", cityId: null });
+    updateMany.mockResolvedValue({ count: 1 });
+
+    await attachMasterToStudio(STUDIO_ID, MASTER_ID);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: MASTER_ID, type: ProviderType.MASTER, studioId: null },
+      data: { studioId: STUDIO_ID, timezone: "Asia/Yekaterinburg", studioPaused: false, ...LOCATION },
+    });
+  });
+
+  it("свой город мастера не перезаписывается", async () => {
+    findFirst.mockResolvedValue({ id: MASTER_ID, name: "Аня", studioId: null, timezone: "Asia/Yekaterinburg", cityId: "city-own" });
+    updateMany.mockResolvedValue({ count: 1 });
+
+    await attachMasterToStudio(STUDIO_ID, MASTER_ID);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: MASTER_ID, type: ProviderType.MASTER, studioId: null },
+      data: { studioId: STUDIO_ID, timezone: "Asia/Yekaterinburg", studioPaused: false },
+    });
+  });
+
+  it("приём приглашения (заготовка уже в студии) ставит город студии", async () => {
+    findFirst.mockResolvedValue({ id: MASTER_ID, name: "Аня", studioId: STUDIO_ID, timezone: "Asia/Yekaterinburg", cityId: null });
+
+    await attachMasterToStudio(STUDIO_ID, MASTER_ID);
+
+    expect(update).toHaveBeenCalledWith({ where: { id: MASTER_ID }, data: LOCATION, select: { id: true } });
   });
 });

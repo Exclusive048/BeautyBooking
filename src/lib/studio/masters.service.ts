@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { MembershipStatus, ProviderType } from "@prisma/client";
+import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
+import { normalizeInviteEmail } from "@/lib/invites/access";
+import { discardStagedMaster } from "@/lib/invites/service";
 
 export type StudioMasterServiceItem = {
   serviceId: string;
@@ -58,9 +61,10 @@ export async function listStudioMasters(studioId: string): Promise<{ masters: St
       select: {
         id: true,
         name: true,
-        isPublished: true,
+        studioPaused: true,
         tagline: true,
         contactPhone: true,
+        contactEmail: true,
         ownerUserId: true,
       },
       orderBy: { name: "asc" },
@@ -72,21 +76,26 @@ export async function listStudioMasters(studioId: string): Promise<{ masters: St
       },
       select: {
         phone: true,
+        email: true,
       },
     }),
   ]);
 
-  const pendingPhones = new Set(pendingInvites.map((invite) => invite.phone));
+  const pendingPhones = new Set(pendingInvites.map((invite) => invite.phone).filter(Boolean));
+  // STUDIO-INVITE-EMAIL-01: заготовка под приглашение по почте — тоже ожидающая.
+  const pendingEmails = new Set(pendingInvites.map((invite) => invite.email).filter(Boolean));
+  const isPendingInvite = (master: { contactPhone: string | null; contactEmail: string | null }) =>
+    (!!master.contactPhone && pendingPhones.has(master.contactPhone)) ||
+    (!!master.contactEmail && pendingEmails.has(normalizeInviteEmail(master.contactEmail)));
 
   return {
     masters: masters.map((master) => ({
       id: master.id,
       name: master.name,
-      isActive: master.isPublished,
+      // STUDIO-PAUSE-SPLIT-01: активность в студии, а не личная видимость.
+      isActive: isStudioMasterActive(master),
       title: master.tagline,
-      status: !master.ownerUserId && !!master.contactPhone && pendingPhones.has(master.contactPhone)
-        ? "PENDING"
-        : "ACTIVE",
+      status: !master.ownerUserId && isPendingInvite(master) ? "PENDING" : "ACTIVE",
       phone: master.contactPhone ?? null,
     })),
   };
@@ -95,24 +104,42 @@ export async function listStudioMasters(studioId: string): Promise<{ masters: St
 export async function createStudioMaster(input: {
   studioId: string;
   displayName: string;
-  phone: string;
+  /** STUDIO-INVITE-EMAIL-01: ровно один из двух контактов (проверяет схема). */
+  phone?: string | null;
+  email?: string | null;
   title: string;
   invitedByUserId: string;
 }): Promise<{ id: string; inviteId: string; shouldNotifyInvite: boolean }> {
   const studio = await getStudioContext(input.studioId);
+  const email = input.email?.trim().toLowerCase() || null;
+  const phone = email ? null : (input.phone ?? null);
+  if (!email && !phone) {
+    throw new AppError("Укажите телефон или почту мастера.", 400, "VALIDATION_ERROR");
+  }
+  // Заготовка мастера и приглашение ищутся по тому контакту, на который
+  // приглашение выписано.
+  const contact = email ? { contactEmail: email } : { contactPhone: phone as string };
+  const inviteKey = email
+    ? { studioId_email: { studioId: studio.id, email } }
+    : { studioId_phone: { studioId: studio.id, phone: phone as string } };
+
   const created = await prisma.$transaction(async (tx) => {
     const existing = await tx.provider.findFirst({
       where: {
         type: ProviderType.MASTER,
         studioId: studio.providerId,
-        contactPhone: input.phone,
+        ...contact,
       },
       select: { id: true, ownerUserId: true },
       orderBy: { createdAt: "asc" },
     });
 
     if (existing?.ownerUserId) {
-      throw new AppError("Мастер с таким телефоном уже добавлен.", 409, "ALREADY_EXISTS");
+      throw new AppError(
+        email ? "Мастер с такой почтой уже добавлен." : "Мастер с таким телефоном уже добавлен.",
+        409,
+        "ALREADY_EXISTS",
+      );
     }
 
     const master = existing
@@ -122,7 +149,7 @@ export async function createStudioMaster(input: {
             name: input.displayName.trim(),
             tagline: input.title.trim(),
             isPublished: false,
-            contactPhone: input.phone,
+            ...contact,
           },
           select: { id: true },
         })
@@ -134,7 +161,7 @@ export async function createStudioMaster(input: {
             studioId: studio.providerId,
             ownerUserId: null,
             isPublished: false,
-            contactPhone: input.phone,
+            ...contact,
             address: "",
             district: "",
             // STUDIO-MASTER-TZ-01: пояс студии, а не пояс по умолчанию (Москва):
@@ -148,29 +175,20 @@ export async function createStudioMaster(input: {
         });
 
     const existingInvite = await tx.studioInvite.findUnique({
-      where: {
-        studioId_phone: {
-          studioId: studio.id,
-          phone: input.phone,
-        },
-      },
+      where: inviteKey,
       select: { id: true, status: true },
     });
 
     const invite = await tx.studioInvite.upsert({
-      where: {
-        studioId_phone: {
-          studioId: studio.id,
-          phone: input.phone,
-        },
-      },
+      where: inviteKey,
       update: {
         status: MembershipStatus.PENDING,
         invitedByUserId: input.invitedByUserId,
       },
       create: {
         studioId: studio.id,
-        phone: input.phone,
+        phone,
+        email,
         status: MembershipStatus.PENDING,
         invitedByUserId: input.invitedByUserId,
       },
@@ -198,7 +216,8 @@ export async function getStudioMasterDetails(input: {
     select: {
       id: true,
       name: true,
-      isPublished: true,
+      ownerUserId: true,
+      studioPaused: true,
       tagline: true,
       masterServices: {
         select: {
@@ -220,7 +239,7 @@ export async function getStudioMasterDetails(input: {
   return {
     id: master.id,
     name: master.name,
-    isActive: master.isPublished,
+    isActive: isStudioMasterActive(master),
     tagline: master.tagline,
     services: master.masterServices.map((item) => ({
       serviceId: item.serviceId,
@@ -293,6 +312,8 @@ export async function updateStudioMasterProfile(input: {
   masterId: string;
   displayName?: string;
   tagline?: string;
+  /** STUDIO-EDIT-MASTER-PROFILE-01: пустая строка очищает описание. */
+  description?: string;
   isActive?: boolean;
 }): Promise<{ id: string }> {
   const studio = await getStudioContext(input.studioId);
@@ -303,18 +324,18 @@ export async function updateStudioMasterProfile(input: {
       type: "MASTER",
       studioId: studio.providerId,
     },
-    select: { id: true, ownerUserId: true, isPublished: true },
+    select: { id: true, ownerUserId: true, studioPaused: true },
   });
   if (!master) {
     throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   }
 
   // BC-CAP: re-activating a claimed-but-paused master (ownerUserId set,
-  // isPublished false → true) makes it ACTIVE and consumes a seat. Enforce the
+  // studioPaused true → false) makes it ACTIVE and consumes a seat. Enforce the
   // team cap at this transition. Activating an unclaimed stub (ownerUserId null)
   // does NOT make it ACTIVE, so it's not gated; pausing (isActive false) frees a
   // seat and is never gated.
-  if (input.isActive === true && master.ownerUserId !== null && !master.isPublished) {
+  if (input.isActive === true && master.ownerUserId !== null && master.studioPaused) {
     await ensureStudioTeamLimit(input.studioId);
   }
 
@@ -323,7 +344,10 @@ export async function updateStudioMasterProfile(input: {
     data: {
       ...(input.displayName ? { name: input.displayName } : {}),
       ...(input.tagline ? { tagline: input.tagline } : {}),
-      ...(typeof input.isActive === "boolean" ? { isPublished: input.isActive } : {}),
+      ...(input.description !== undefined ? { description: input.description || null } : {}),
+      // STUDIO-PAUSE-SPLIT-01: пауза — только в студии. Личную страницу мастера
+      // (`isPublished`) студия не трогает: он продолжает продавать свои услуги.
+      ...(typeof input.isActive === "boolean" ? { studioPaused: !input.isActive } : {}),
     },
   });
 
@@ -356,7 +380,7 @@ export async function revokeStudioMasterInvite(input: {
 
   const master = await prisma.provider.findFirst({
     where: { id: input.masterId, type: ProviderType.MASTER, studioId: studio.providerId },
-    select: { id: true, ownerUserId: true, contactPhone: true },
+    select: { id: true, ownerUserId: true, contactPhone: true, contactEmail: true },
   });
   if (!master) {
     throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
@@ -365,31 +389,34 @@ export async function revokeStudioMasterInvite(input: {
     throw new AppError("У мастера нет активного приглашения.", 409, "MASTER_NOT_INVITED");
   }
 
-  const invite = master.contactPhone
+  // STUDIO-INVITE-EMAIL-01: заготовка несёт ровно тот контакт, на который
+  // выписано приглашение (`createStudioMaster`). Поиск только по телефону
+  // приглашение по почте не находил: заготовка удалялась, а приглашение
+  // оставалось PENDING — приглашённый по-прежнему мог его принять.
+  const inviteEmail = normalizeInviteEmail(master.contactEmail);
+  const invite = inviteEmail
     ? await prisma.studioInvite.findUnique({
-        where: { studioId_phone: { studioId: studio.id, phone: master.contactPhone } },
+        where: { studioId_email: { studioId: studio.id, email: inviteEmail } },
         select: { id: true, status: true },
       })
-    : null;
+    : master.contactPhone
+      ? await prisma.studioInvite.findUnique({
+          where: { studioId_phone: { studioId: studio.id, phone: master.contactPhone } },
+          select: { id: true, status: true },
+        })
+      : null;
 
-  await prisma.$transaction(async (tx) => {
-    if (invite && invite.status === MembershipStatus.PENDING) {
-      await tx.studioInvite.update({
-        where: { id: invite.id },
-        data: { status: MembershipStatus.LEFT },
-        select: { id: true },
-      });
-    }
-    // Guarded on ownerUserId: null — never removes a claimed provider.
-    await tx.provider.deleteMany({
-      where: {
-        id: master.id,
-        type: ProviderType.MASTER,
-        studioId: studio.providerId,
-        ownerUserId: null,
-      },
+  if (invite && invite.status === MembershipStatus.PENDING) {
+    await prisma.studioInvite.update({
+      where: { id: invite.id },
+      data: { status: MembershipStatus.LEFT },
+      select: { id: true },
     });
-  });
+  }
+  // Заготовка уходит тем же путём, что при принятии и отказе, — вместе с фото,
+  // которые админ мог загрузить в редакторе профиля мастера. Удаляется только
+  // строка без владельца: условие стоит в самой записи.
+  await discardStagedMaster(master.id);
 
   return { inviteId: invite?.id ?? null };
 }

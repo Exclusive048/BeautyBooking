@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { CabinetSidebar } from "@/features/cabinet/layout/cabinet-sidebar";
-import { CabinetBottomNav } from "@/features/cabinet/layout/cabinet-bottom-nav";
+import { CabinetBottomNav, type ClientNavAttention } from "@/features/cabinet/layout/cabinet-bottom-nav";
 
 type Props = {
   children: ReactNode;
@@ -9,6 +9,8 @@ type Props = {
   upcomingBookingsCount?: number;
   unreadNotificationsCount?: number;
   pendingReviewsCount?: number;
+  /** NAV-ATTENTION-01 — счётчики «ждёт действия» для вкладок нижней панели. */
+  attention?: ClientNavAttention;
 };
 
 /**
@@ -28,6 +30,7 @@ export function CabinetLayout({
   upcomingBookingsCount,
   unreadNotificationsCount,
   pendingReviewsCount,
+  attention,
 }: Props) {
   return (
     <div className="flex min-h-screen bg-bg-page">
@@ -46,7 +49,7 @@ export function CabinetLayout({
 
       <main data-testid="page-main" className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
 
-      <CabinetBottomNav />
+      <CabinetBottomNav attention={attention} />
     </div>
   );
 }
