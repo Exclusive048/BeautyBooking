@@ -6,25 +6,27 @@ function studioBannerSettingKey(studioProviderId: string): string {
   return `studioBannerAssetId:${studioProviderId}`;
 }
 
-async function validateStudioBannerAsset(studioProviderId: string, assetId: string): Promise<void> {
+/**
+ * Изображение — работа из портфолио ЭТОЙ студии (не удалена). Общая проверка
+ * баннера и главного фото каталога (`catalog-cover.ts`): оба выбираются из
+ * портфолио студии, и ссылаться на чужой или удалённый файл не должны.
+ */
+export async function isStudioPortfolioAsset(studioProviderId: string, assetId: string): Promise<boolean> {
   const asset = await prisma.mediaAsset.findUnique({
     where: { id: assetId },
-    select: {
-      id: true,
-      entityType: true,
-      entityId: true,
-      kind: true,
-      deletedAt: true,
-    },
+    select: { entityType: true, entityId: true, kind: true, deletedAt: true },
   });
+  return Boolean(
+    asset &&
+      !asset.deletedAt &&
+      asset.entityType === MediaEntityType.STUDIO &&
+      asset.entityId === studioProviderId &&
+      asset.kind === MediaKind.PORTFOLIO,
+  );
+}
 
-  if (
-    !asset ||
-    asset.deletedAt ||
-    asset.entityType !== MediaEntityType.STUDIO ||
-    asset.entityId !== studioProviderId ||
-    asset.kind !== MediaKind.PORTFOLIO
-  ) {
+async function validateStudioBannerAsset(studioProviderId: string, assetId: string): Promise<void> {
+  if (!(await isStudioPortfolioAsset(studioProviderId, assetId))) {
     throw new AppError("Некорректное изображение баннера.", 400, "MEDIA_ASSET_NOT_FOUND");
   }
 }

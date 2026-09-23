@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Heart, Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
+import { cn } from "@/lib/cn";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -156,8 +159,8 @@ export function CatalogCard({
   });
 
   const isNew = item.reviewsCount <= 0;
-  const photo = item.photos[0] ?? null;
   const hue = hueFromId(item.publicUsername ?? item.title);
+  const avatarShape = item.type === "master" ? "rounded-full" : "rounded-xl";
 
   return (
     <article
@@ -167,38 +170,41 @@ export function CatalogCard({
       data-testid="catalog-card"
       onClick={() => router.push(href)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") router.push(href);
+        // Только когда в фокусе сама карточка: Enter на сердечке или стрелке
+        // карусели всплывал сюда и уводил в профиль вместо своего действия.
+        if (e.key === "Enter" && e.target === e.currentTarget) router.push(href);
       }}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition-all duration-200 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
+      className="group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition-all duration-200 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
     >
-      {/* Photo / hue placeholder. Aspect-[4/3] matches reference proportions. */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
-        {photo ? (
-          <ResilientImage
-            src={photo}
-            alt={item.title}
-            width={400}
-            height={300}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div
-            aria-hidden
-            className="h-full w-full"
-            style={{
-              background: `linear-gradient(135deg, hsl(${hue} 70% 70%), hsl(${(hue + 30) % 360} 60% 55%))`,
-            }}
-          />
-        )}
+      {/* CATALOG-CARD-COMPACT: на телефоне кадр 16:10 — карточка в один столбец
+          ниже почти на треть; с `md` ячейки у́же, там прежние 4:3. Фото —
+          все публичные работы, первым идёт выбранное главное. */}
+      <div className="relative">
+        <PhotoCarousel
+          photos={item.photos}
+          alt={item.title}
+          className="aspect-[16/10] md:aspect-[4/3]"
+          dotsClassName="md:group-hover:opacity-0"
+          placeholder={
+            <div
+              aria-hidden
+              className="h-full w-full"
+              style={{
+                background: `linear-gradient(135deg, hsl(${hue} 70% 70%), hsl(${(hue + 30) % 360} 60% 55%))`,
+              }}
+            />
+          }
+        />
 
         {item.isHighlighted ? (
-          <span className="absolute left-3 top-3 inline-flex items-center rounded-full bg-brand-gradient px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white shadow-sm">
+          <span className="absolute left-3 top-3 z-10 inline-flex items-center rounded-full bg-brand-gradient px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white shadow-sm">
             {TC.premiumBadge}
           </span>
         ) : null}
 
-        <button
-          type="button"
+        <Button
+          variant="wrapper"
+          size="none"
           aria-label={
             favorited
               ? UI_TEXT.catalog2.favoriteToggle.removeAria
@@ -208,23 +214,21 @@ export function CatalogCard({
           title={favoriteError ?? TC.saveTooltip}
           disabled={favoritePending}
           onClick={handleFavoriteToggle}
-          className={`absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-bg-card/80 backdrop-blur-sm transition-colors hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40 ${
-            favorited
-              ? "text-rose-500 hover:text-rose-600"
-              : "text-text-sec hover:text-rose-500"
-          } ${favoritePending ? "opacity-60" : ""}`}
+          className={cn(
+            "absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-bg-card/80 backdrop-blur-sm transition-colors hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/40",
+            favorited ? "text-rose-500 hover:text-rose-600" : "text-text-sec hover:text-rose-500",
+            favoritePending && "opacity-60",
+          )}
         >
-          <Heart
-            className={`h-4 w-4 ${favorited ? "fill-current" : ""}`}
-            aria-hidden
-          />
-        </button>
+          <Heart className={cn("h-4 w-4", favorited && "fill-current")} aria-hidden />
+        </Button>
 
-        {/* Booking CTA — appears on hover over the photo */}
+        {/* Кнопка записи — только мышью, при наведении на фото. Слой выше
+            ленты, но пропускает свайп/клик, пока не наведён. */}
         <Link
           href={bookingHref}
           onClick={(e) => e.stopPropagation()}
-          className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-center bg-gradient-to-t from-black/55 to-transparent pb-3 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden items-end justify-center bg-gradient-to-t from-black/55 to-transparent pb-3 pt-8 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 md:flex"
         >
           <span className="rounded-full bg-primary px-5 py-1.5 text-xs font-semibold text-white shadow-md">
             {UI_TEXT.catalog.book}
@@ -232,58 +236,53 @@ export function CatalogCard({
         </Link>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-3 md:gap-3 md:p-4">
+        <div className="flex min-w-0 items-center gap-2.5">
           {item.avatarUrl ? (
             <ResilientImage
               src={item.avatarUrl}
               alt=""
-              width={36}
-              height={36}
-              className={
-                item.type === "master"
-                  ? "h-9 w-9 rounded-full object-cover ring-1 ring-border-subtle"
-                  : "h-9 w-9 rounded-xl object-cover ring-1 ring-border-subtle"
-              }
+              width={32}
+              height={32}
+              className={cn("h-8 w-8 shrink-0 object-cover ring-1 ring-border-subtle", avatarShape)}
             />
           ) : (
             <span
               aria-hidden
-              className={
-                item.type === "master"
-                  ? "grid h-9 w-9 place-items-center rounded-full bg-muted text-xs font-semibold text-text-sec"
-                  : "grid h-9 w-9 place-items-center rounded-xl bg-muted text-xs font-semibold text-text-sec"
-              }
+              className={cn(
+                "grid h-8 w-8 shrink-0 place-items-center bg-muted text-xs font-semibold text-text-sec",
+                avatarShape,
+              )}
             >
               {item.title.charAt(0).toUpperCase()}
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-text-main">{item.title}</p>
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-sm font-semibold text-text-main">{item.title}</p>
+              {isNew ? (
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-accent-text">
+                  {TC.newLabel}
+                </span>
+              ) : (
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs text-text-sec">
+                  <Star className="h-3 w-3 fill-amber-500 text-amber-500" aria-hidden />
+                  <span className="font-semibold tabular-nums text-text-main">
+                    {item.ratingAvg.toFixed(1)}
+                  </span>
+                  <span aria-hidden>·</span>
+                  {/* CATALOG-RANKING-01: число отзывов словом, не «(47)». */}
+                  <span className="tabular-nums">{TC.reviewsLabel(item.reviewsCount)}</span>
+                </span>
+              )}
+            </div>
             {item.tagline ? (
               <p className="truncate text-xs text-text-sec">{item.tagline}</p>
             ) : null}
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs text-text-sec">
-          {isNew ? (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-accent-text">
-              {TC.newLabel}
-            </span>
-          ) : (
-            <>
-              <Star className="h-3 w-3 fill-amber-500 text-amber-500" aria-hidden />
-              <span className="font-semibold tabular-nums text-text-main">
-                {item.ratingAvg.toFixed(1)}
-              </span>
-              <span aria-hidden>·</span>
-              <span className="tabular-nums">{TC.reviewsLabel(item.reviewsCount)}</span>
-            </>
-          )}
-        </div>
-
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <div className="mt-auto flex min-w-0 items-center justify-between gap-2">
           <span className="text-sm font-semibold text-text-main">
             <span className="text-text-sec">{TC.fromPrice} </span>
             <span className="tabular-nums">{priceText}</span>

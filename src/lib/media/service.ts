@@ -310,7 +310,7 @@ export async function isProviderMediaPubliclyVisible(asset: {
 }
 
 /** STUDIO-PHOTOS-PUBLIC-01 — подмножество `assetIds`, на которые ссылается НЕпубличная работа. */
-async function findHiddenPortfolioAssetIds(assetIds: string[]): Promise<Set<string>> {
+export async function findHiddenPortfolioAssetIds(assetIds: string[]): Promise<Set<string>> {
   const hidden = new Set<string>();
   if (assetIds.length === 0) return hidden;
   const items = await prisma.portfolioItem.findMany({

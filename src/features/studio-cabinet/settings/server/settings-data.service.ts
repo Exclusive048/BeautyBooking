@@ -1,6 +1,7 @@
 import { MembershipStatus, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
+import { getStudioCatalogCoverAssetId } from "@/lib/studios/catalog-cover";
 import type {
   StudioSettingsData,
   StudioSettingsScope,
@@ -104,9 +105,10 @@ export async function loadStudioSettingsData(input: {
     )
     .map((m) => memberToTeam(m, input.currentUserId));
 
-  const pushCount = await prisma.pushSubscription.count({
-    where: { userId: input.currentUserId },
-  });
+  const [pushCount, catalogCoverAssetId] = await Promise.all([
+    prisma.pushSubscription.count({ where: { userId: input.currentUserId } }),
+    getStudioCatalogCoverAssetId(studio.providerId),
+  ]);
 
   const mapUrl = buildYandexMapsUrl({
     address: studio.provider.address ?? undefined,
@@ -125,6 +127,7 @@ export async function loadStudioSettingsData(input: {
       avatarUrl: studio.provider.avatarUrl ?? null,
       isPublished: studio.provider.isPublished,
       timezone: studio.provider.timezone,
+      catalogCoverAssetId,
       address: {
         cityName: studio.provider.city?.name ?? null,
         address: studio.provider.address ?? null,

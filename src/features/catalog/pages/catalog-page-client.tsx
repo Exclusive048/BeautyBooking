@@ -209,15 +209,14 @@ function toMapPoint(
 
 function CatalogSkeletonGrid() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card">
-          <div className="aspect-[4/3] animate-pulse bg-muted" />
-          <div className="space-y-2 p-4">
+        <div key={index} className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
+          <div className="aspect-[16/10] animate-pulse bg-muted md:aspect-[4/3]" />
+          <div className="space-y-2 p-3 md:p-4">
             <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
             <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
             <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
-            <div className="h-8 animate-pulse rounded bg-muted" />
           </div>
         </div>
       ))}
@@ -730,7 +729,9 @@ export default function CatalogPageClient({
   );
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 pb-24 sm:px-6 lg:px-8 lg:pb-8 lg:pt-4">
+    // Телефон: без своего `px-4` — боковой отступ уже даёт общий `<main>`
+    // сайта, и двойной отступ съедал у карточки 32px из 375.
+    <div className="mx-auto w-full max-w-7xl pb-24 sm:px-6 lg:px-8 lg:pb-8 lg:pt-4">
       {/* Десктоп: одна строка поиска в карточке, липкая под шапкой сайта. */}
       <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 mb-6 hidden bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:block lg:px-8">
         <CatalogSearchBar
@@ -857,7 +858,13 @@ export default function CatalogPageClient({
           {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
             <motion.div
               data-testid="catalog-list"
-              className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+              // CATALOG-CARD-OVERFLOW: колонка обязана быть ЯВНОЙ (`grid-cols-1`
+              // = `minmax(0, 1fr)`). Неявная колонка сетки — `auto`, и она
+              // растёт до min-content карточки, а у однострочной подписи
+              // (`truncate` = nowrap) min-content — вся строка: на 375px
+              // колонка была 363px в контейнере 311px, документ — 395px, и
+              // мобильный вьюпорт расползался вместе с фиксированными панелями.
+              className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3"
               initial="hidden"
               animate="visible"
               variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, MoreVertical, Pencil, Star, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,28 @@ export function PortfolioCard({
     }
   };
 
+  // CATALOG-MAIN-PHOTO: главное фото = первая публичная работа, поэтому
+  // «Сделать главным» — это перенос в начало портфолио.
+  const makeCover = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMenuOpen(false);
+    try {
+      const response = await fetch("/api/master/portfolio/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, direction: "top" }),
+      });
+      if (!response.ok) {
+        window.alert(M.makeCoverError);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (busy) return;
     setMenuOpen(false);
@@ -117,6 +139,13 @@ export function PortfolioCard({
           />
         </button>
 
+        {item.isCatalogCover ? (
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-white shadow-card">
+            <Star className="h-3 w-3 fill-current" aria-hidden />
+            {T.coverBadge}
+          </span>
+        ) : null}
+
         {!item.isPublic ? (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-bg-card/90 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec shadow-card">
             <EyeOff className="h-3 w-3" aria-hidden />
@@ -126,7 +155,9 @@ export function PortfolioCard({
 
         <ReorderControls itemId={item.id} isFirst={isFirst} isLast={isLast} />
 
-        <div className="absolute right-2 top-2 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        {/* На тач-экране наведения нет — без `hover:none` меню (и в нём
+            «Сделать главным») было бы невидимым. */}
+        <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
           <button
             type="button"
             onClick={(event) => {
@@ -158,6 +189,9 @@ export function PortfolioCard({
                     setEditOpen(true);
                   }}
                 />
+                {item.isPublic && !item.isCatalogCover ? (
+                  <MenuItem icon={Star} label={M.makeCover} onClick={makeCover} />
+                ) : null}
                 <MenuItem
                   icon={item.isPublic ? EyeOff : Eye}
                   label={item.isPublic ? M.hide : M.show}

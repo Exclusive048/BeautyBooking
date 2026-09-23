@@ -42,6 +42,8 @@ const updateSchema = z
       .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
       .optional(),
     bannerAssetId: z.string().trim().nullable().optional(),
+    // CATALOG-MAIN-PHOTO: главное фото карточки каталога — из портфолио студии.
+    catalogCoverAssetId: z.string().trim().min(1).max(64).nullable().optional(),
     // FIX-STUDIO-POLICY-EDITABLE: правила записи студии. Границы — те же, что у
     // мастерского редактора расписания (`editor-shared`), чтобы одно и то же
     // значение не оказывалось валидным на одной поверхности и отвергнутым на
@@ -71,6 +73,7 @@ const updateSchema = z
       data.isPublished !== undefined ||
       data.timezone !== undefined ||
       data.bannerAssetId !== undefined ||
+      data.catalogCoverAssetId !== undefined ||
       data.minBookingHoursAhead !== undefined ||
       data.maxBookingDaysAhead !== undefined ||
       data.cancellationDeadlineHours !== undefined ||

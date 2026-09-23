@@ -861,7 +861,6 @@ export const UI_TEXT = {
     siteLogoAlt: "Логотип сайта",
     forModels: "Для моделей",
     home: "Главная",
-    book: "Запись",
     bookings: "Записи",
     clients: "Клиенты",
     schedule: "Расписание",
@@ -3273,6 +3272,8 @@ export const UI_TEXT = {
       },
       card: {
         hiddenBadge: "скрыта",
+        // CATALOG-MAIN-PHOTO: первая публичная работа — обложка карточки каталога.
+        coverBadge: "Главное фото",
         moveUpAria: "Переместить выше",
         moveDownAria: "Переместить ниже",
         menuAria: "Действия",
@@ -3285,6 +3286,8 @@ export const UI_TEXT = {
       },
       menu: {
         edit: "Изменить",
+        makeCover: "Сделать главным",
+        makeCoverError: "Не удалось сделать фото главным. Попробуйте ещё раз.",
         hide: "Скрыть из каталога",
         show: "Показать в каталоге",
         delete: "Удалить",
@@ -5440,6 +5443,11 @@ export const UI_TEXT = {
       openPreviewAriaTemplate: "Открыть фото № {n}",
       photoAltTemplate: "Работа из портфолио № {n}",
       previewAlt: "Фото во весь экран",
+      // CATALOG-MAIN-PHOTO: главное фото карточки каталога (портфолио студии).
+      coverBadge: "Главное фото",
+      coverHint: "Главное фото открывает карточку в каталоге. Если не выбрать, им станет самое новое.",
+      makeCover: "Сделать главным",
+      makeCoverFailed: "Не удалось сделать фото главным. Попробуйте ещё раз.",
     },
   },
   clientCabinet: {

@@ -1,5 +1,6 @@
 import { CategoryStatus, ProviderType } from "@prisma/client";
 import { getMasterContext } from "@/lib/master/profile.service";
+import { findCatalogCoverId, PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -50,6 +51,9 @@ export type PortfolioItemView = {
   /** Total count of the master's portfolio (also unfiltered). Saves the
    * UI another lookup when computing `isLast`. */
   globalCount: number;
+  /** CATALOG-MAIN-PHOTO: первая публичная работа — главное фото карточки
+   * каталога. Считается по полному списку, поэтому фильтр его не сбивает. */
+  isCatalogCover: boolean;
 };
 
 export type PortfolioKpi = {
@@ -126,7 +130,7 @@ export async function getMasterPortfolioView(input: {
   const [allItems, masterTagsRows, categoriesAll, services] = await Promise.all([
     prisma.portfolioItem.findMany({
       where: { masterId: provider.id },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+      orderBy: PORTFOLIO_DISPLAY_ORDER,
       include: {
         services: { select: { serviceId: true } },
         tags: { select: { tagId: true, tag: { select: { name: true } } } },
@@ -177,6 +181,7 @@ export async function getMasterPortfolioView(input: {
     return true;
   });
 
+  const catalogCoverId = findCatalogCoverId(allItems);
   const globalIndexById = new Map<string, number>();
   allItems.forEach((item, index) => globalIndexById.set(item.id, index));
 
@@ -194,6 +199,7 @@ export async function getMasterPortfolioView(input: {
     createdAt: item.createdAt.toISOString(),
     globalIndex: globalIndexById.get(item.id) ?? 0,
     globalCount: allItems.length,
+    isCatalogCover: item.id === catalogCoverId,
   }));
 
   return {

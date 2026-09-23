@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
+import { getStudioCatalogCoverAssetId, setStudioCatalogCoverAssetId } from "@/lib/studios/catalog-cover";
 import {
   applyProviderBookingPolicy,
   type LateCancelAction,
@@ -46,6 +47,8 @@ export type StudioProviderPrivateDto = {
   bufferBetweenBookingsMin: number;
   bannerAssetId: string | null;
   bannerUrl: string | null;
+  /** CATALOG-MAIN-PHOTO: главное фото карточки каталога (из портфолио студии). */
+  catalogCoverAssetId: string | null;
   // FIX-STUDIO-POLICY-EDITABLE: правила записи студии — читаются и правятся
   // прямо в настройках студии, без экрана расписания мастера.
   minBookingHoursAhead: number;
@@ -92,9 +95,10 @@ export async function getStudioProviderById(
 
   if (!provider || provider.type !== ProviderType.STUDIO) return null;
 
-  const [bannerAssetId, bannerUrl] = await Promise.all([
+  const [bannerAssetId, bannerUrl, catalogCoverAssetId] = await Promise.all([
     getStudioBannerAssetId(provider.id),
     getStudioBannerUrl(provider.id),
+    getStudioCatalogCoverAssetId(provider.id),
   ]);
 
   return {
@@ -118,6 +122,7 @@ export async function getStudioProviderById(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    catalogCoverAssetId,
     minBookingHoursAhead: provider.minBookingHoursAhead,
     maxBookingDaysAhead: provider.maxBookingDaysAhead,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
@@ -144,6 +149,7 @@ export type StudioProfileUpdate = {
   isPublished?: boolean;
   timezone?: string;
   bannerAssetId?: string | null;
+  catalogCoverAssetId?: string | null;
   minBookingHoursAhead?: number;
   maxBookingDaysAhead?: number;
   cancellationDeadlineHours?: number | null;
@@ -259,6 +265,10 @@ export async function updateStudioProviderProfile(
     await setStudioBannerAssetId(provider.id, input.bannerAssetId);
   }
 
+  if (input.catalogCoverAssetId !== undefined) {
+    await setStudioCatalogCoverAssetId(provider.id, input.catalogCoverAssetId);
+  }
+
   // FIX-STUDIO-POLICY-EDITABLE: правила записи пишет `editor.ts` (CLAUDE.md
   // rule 5) — там же живёт инвалидация кэша слотов. Здесь остаётся ПРОФИЛЬ.
   // Пишем целиком, а не по полю: `applyProviderBookingPolicy` — снимок правил,
@@ -290,9 +300,10 @@ export async function updateStudioProviderProfile(
     await applyProviderBookingPolicy(provider.id, policy);
   }
 
-  const [bannerAssetId, bannerUrl] = await Promise.all([
+  const [bannerAssetId, bannerUrl, catalogCoverAssetId] = await Promise.all([
     getStudioBannerAssetId(provider.id),
     getStudioBannerUrl(provider.id),
+    getStudioCatalogCoverAssetId(provider.id),
   ]);
 
   return {
@@ -316,6 +327,7 @@ export async function updateStudioProviderProfile(
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
     bannerUrl,
+    catalogCoverAssetId,
     minBookingHoursAhead: policy.minHoursAhead,
     maxBookingDaysAhead: policy.maxDaysAhead,
     cancellationDeadlineHours: policy.freeCancelHours,

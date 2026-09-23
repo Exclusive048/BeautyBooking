@@ -13,6 +13,9 @@ import {
   sortByBayesianRating,
 } from "@/lib/catalog/ranking";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { CARD_PHOTO_LIMIT, composeCardPhotos } from "@/lib/catalog/card-photos";
+import { PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
+import { loadStudioCardPhotos } from "@/lib/studios/catalog-cover";
 // SEC-12: курсорные хелперы переехали в общий модуль — их переиспользуют
 // `providers/queries.ts` и `/api/hot-slots`, которые раньше отдавали сырой id.
 import { encodeCursor, decodeCursor } from "@/lib/pagination/cursor";
@@ -1010,15 +1013,15 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       },
       portfolioItems: {
         where: { isPublic: true },
-        orderBy: { createdAt: "desc" },
-        take: 8,
+        orderBy: PORTFOLIO_DISPLAY_ORDER,
+        take: CARD_PHOTO_LIMIT,
         select: { mediaUrl: true },
       },
       masters: {
         select: {
           portfolioItems: {
             where: { isPublic: true },
-            orderBy: { createdAt: "desc" },
+            orderBy: PORTFOLIO_DISPLAY_ORDER,
             take: 4,
             select: { mediaUrl: true },
           },
@@ -1065,17 +1068,23 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   // which is exactly the per-page mis-ranking this change removes.
   const rankedRows = rows;
 
+  const studioPhotos = await loadStudioCardPhotos(
+    rankedRows.filter((provider) => provider.type === ProviderType.STUDIO).map((provider) => provider.id),
+  );
+
   const items: CatalogProviderItem[] = rankedRows.map((provider) => {
     const services = resolveCardServices(provider);
 
     const primaryService = resolvePrimaryService(services, input.serviceQuery);
     const minPrice = resolveMinPrice(services) ?? (provider.priceFrom > 0 ? provider.priceFrom : null);
 
-    const masterPhotos = provider.portfolioItems.map((item) => item.mediaUrl);
-    const studioPhotos = provider.masters.flatMap((master) =>
-      master.portfolioItems.map((item) => item.mediaUrl)
-    );
-    const photos = (provider.type === ProviderType.STUDIO ? studioPhotos : masterPhotos).slice(0, 8);
+    const photos =
+      provider.type === ProviderType.STUDIO
+        ? composeCardPhotos(
+            studioPhotos.get(provider.id) ?? [],
+            provider.masters.flatMap((master) => master.portfolioItems.map((item) => item.mediaUrl)),
+          )
+        : composeCardPhotos(provider.portfolioItems.map((item) => item.mediaUrl));
 
     return {
       type: provider.type === ProviderType.STUDIO ? "studio" : "master",

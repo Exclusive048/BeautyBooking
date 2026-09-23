@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Star, Trash2 } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
@@ -16,6 +16,12 @@ type Props = {
   entityType: MediaEntityType;
   entityId: string;
   canEdit?: boolean;
+  /**
+   * CATALOG-MAIN-PHOTO — выбор главного фото карточки каталога. Передаётся
+   * только портфолио студии (`entityId` — её `Provider.id`); `undefined`
+   * выключает выбор совсем, `null` — «не выбрано, главным будет самое новое».
+   */
+  initialCatalogCoverAssetId?: string | null;
 };
 
 function buildListUrl(entityType: MediaEntityType, entityId: string): string {
@@ -27,7 +33,12 @@ function buildListUrl(entityType: MediaEntityType, entityId: string): string {
   return `/api/media?${params.toString()}`;
 }
 
-export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props) {
+export function PortfolioEditor({
+  entityType,
+  entityId,
+  canEdit = true,
+  initialCatalogCoverAssetId,
+}: Props) {
   const addInputRef = useRef<HTMLInputElement | null>(null);
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
@@ -46,6 +57,8 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const coverEnabled = initialCatalogCoverAssetId !== undefined && entityType === "STUDIO";
+  const [coverId, setCoverId] = useState<string | null>(initialCatalogCoverAssetId ?? null);
   const [dropActive, setDropActive] = useState(false);
   const plan = usePlanFeatures(entityType === "STUDIO" ? "STUDIO" : "MASTER");
   const portfolioText = UI_TEXT.master.profile.portfolio;
@@ -131,6 +144,36 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
     [load, mediaText.deleteFailed]
   );
 
+  const makeCover = useCallback(
+    async (id: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/studios/${encodeURIComponent(entityId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ catalogCoverAssetId: id }),
+        });
+        const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && !json.ok ? json.error.message : mediaText.makeCoverFailed);
+        }
+        setCoverId(id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : mediaText.makeCoverFailed);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [entityId, mediaText.makeCoverFailed]
+  );
+
+  // Без выбора (или если выбранное удалили) главным считается самое новое —
+  // так же решает карточка каталога (`loadStudioCardPhotos`).
+  const effectiveCoverId = coverEnabled
+    ? (coverId && assets.some((asset) => asset.id === coverId) ? coverId : (assets[0]?.id ?? null))
+    : null;
+
   const handleDragOver = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       if (!canEdit || busy || limitReached) return;
@@ -204,6 +247,10 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
         </div>
       ) : null}
 
+      {coverEnabled && assets.length > 0 ? (
+        <p className="text-xs text-text-sec">{mediaText.coverHint}</p>
+      ) : null}
+
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {assets.map((asset, index) => (
           <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
@@ -220,6 +267,27 @@ export function PortfolioEditor({ entityType, entityId, canEdit = true }: Props)
                 className="object-cover"
               />
             </Button>
+
+            {asset.id === effectiveCoverId ? (
+              <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-white shadow-card">
+                <Star className="h-3 w-3 fill-current" aria-hidden />
+                {mediaText.coverBadge}
+              </span>
+            ) : null}
+
+            {coverEnabled && canEdit && effectiveCoverId !== null && asset.id !== effectiveCoverId ? (
+              <Button
+                variant="wrapper"
+                size="none"
+                onClick={() => void makeCover(asset.id)}
+                disabled={busy}
+                aria-label={`${mediaText.makeCover}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
+                className="absolute bottom-2 left-2 inline-flex h-7 items-center gap-1 rounded-full border border-border-subtle bg-bg-card/90 px-2.5 text-[11px] font-medium text-text-main opacity-0 shadow-card transition hover:bg-bg-input focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+              >
+                <Star className="h-3.5 w-3.5" aria-hidden />
+                {mediaText.makeCover}
+              </Button>
+            ) : null}
 
             {canEdit ? (
               <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">

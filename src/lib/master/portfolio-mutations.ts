@@ -13,7 +13,8 @@ import { prisma } from "@/lib/prisma";
  * category + isPublic in one call) and reorder.
  */
 
-export type ReorderDirection = "up" | "down";
+/** `top` — «Сделать главным» (CATALOG-MAIN-PHOTO): в начало портфолио. */
+export type ReorderDirection = "up" | "down" | "top";
 
 export type UpdatePortfolioItemInput = {
   globalCategoryId?: string | null;
@@ -182,6 +183,23 @@ export async function reorderMasterPortfolio(
       });
       if (!target || target.masterId !== masterId) {
         throw new AppError("Ничего не найдено.", 404, "NOT_FOUND");
+      }
+
+      // CATALOG-MAIN-PHOTO: «Сделать главным» — в начало портфолио, строго
+      // раньше всех остальных (равенство `sortOrder` решал бы `createdAt`, то
+      // есть более свежая работа обгоняла бы выбранную).
+      if (direction === "top") {
+        const others = await tx.portfolioItem.aggregate({
+          where: { masterId, id: { not: itemId } },
+          _min: { sortOrder: true },
+        });
+        const otherMin = others._min.sortOrder;
+        if (otherMin === null || target.sortOrder < otherMin) {
+          return { id: target.id, sortOrder: target.sortOrder };
+        }
+        const topOrder = otherMin - 1;
+        await tx.portfolioItem.update({ where: { id: target.id }, data: { sortOrder: topOrder } });
+        return { id: target.id, sortOrder: topOrder };
       }
 
       // Find neighbour in the requested direction. Ordering matches the

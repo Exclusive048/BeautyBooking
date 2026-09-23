@@ -7,6 +7,7 @@ const T = UI_TEXT.studioCabinet.settingsV2.portfolio;
 
 type Props = {
   providerId: string;
+  catalogCoverAssetId: string | null;
 };
 
 /**
@@ -15,10 +16,15 @@ type Props = {
  * mounting the same `PortfolioEditor` (entityType STUDIO) — same upload
  * path, now reachable from the settings nav.
  */
-export function PortfolioSection({ providerId }: Props) {
+export function PortfolioSection({ providerId, catalogCoverAssetId }: Props) {
   return (
     <SectionCard title={T.cardTitle} description={T.cardDesc}>
-      <PortfolioEditor entityType={MediaEntityType.STUDIO} entityId={providerId} canEdit />
+      <PortfolioEditor
+        entityType={MediaEntityType.STUDIO}
+        entityId={providerId}
+        canEdit
+        initialCatalogCoverAssetId={catalogCoverAssetId}
+      />
     </SectionCard>
   );
 }

@@ -70,6 +70,8 @@ export type StudioGeneralData = {
    * Здесь поле оставлено как часть снапшота настроек (SSR-данные раздела).
    */
   timezone: string;
+  /** CATALOG-MAIN-PHOTO: выбранное главное фото карточки каталога (id работы портфолио). */
+  catalogCoverAssetId: string | null;
   address: {
     cityName: string | null;
     address: string | null;

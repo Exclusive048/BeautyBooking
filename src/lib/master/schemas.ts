@@ -198,5 +198,6 @@ export const updateMasterPortfolioItemSchema = z
 
 export const reorderMasterPortfolioSchema = z.object({
   itemId: z.string().trim().min(1),
-  direction: z.enum(["up", "down"]),
+  // `top` — «Сделать главным» (CATALOG-MAIN-PHOTO).
+  direction: z.enum(["up", "down", "top"]),
 });

@@ -289,6 +289,15 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* PWA-ZOOM-01 — двойной тап больше не приближает страницу (быстрые тапы по
+     кнопкам и чипам читались как жест зума). `manipulation` оставляет
+     прокрутку и щипок, убирает только двойной тап. Вторая причина случайного
+     зума — автоприближение полей на iOS — закрыта во вьюпорте
+     (`lib/pwa/viewport.ts`). */
+  html {
+    touch-action: manipulation;
+  }
+
   body {
     min-height: 100%;
     background-color: rgb(var(--bg-page));

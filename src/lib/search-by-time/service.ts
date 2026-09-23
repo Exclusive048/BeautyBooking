@@ -9,6 +9,9 @@ import { isDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts } from "@/lib/schedule/timezone";
 import type { CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { CARD_PHOTO_LIMIT, composeCardPhotos } from "@/lib/catalog/card-photos";
+import { PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
+import { loadStudioCardPhotos } from "@/lib/studios/catalog-cover";
 import { catalogVisibleProviderWhere, NO_OWN_SERVICES_WHERE } from "@/lib/providers/catalog-visibility";
 
 const DEFAULT_SEARCH_TIMEZONE = env.DEFAULT_TIMEZONE;
@@ -279,15 +282,15 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
       },
       portfolioItems: {
         where: { isPublic: true },
-        orderBy: { createdAt: "desc" },
-        take: 8,
+        orderBy: PORTFOLIO_DISPLAY_ORDER,
+        take: CARD_PHOTO_LIMIT,
         select: { mediaUrl: true },
       },
       masters: {
         select: {
           portfolioItems: {
             where: { isPublic: true },
-            orderBy: { createdAt: "desc" },
+            orderBy: PORTFOLIO_DISPLAY_ORDER,
             take: 4,
             select: { mediaUrl: true },
           },
@@ -301,6 +304,9 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
   // ranking; it is stripped before the public response (rule 12).
   type RankableItem = AvailabilityProviderItem & { providerId: string };
   const items: RankableItem[] = [];
+  const studioPhotos = await loadStudioCardPhotos(
+    providers.filter((provider) => provider.type === ProviderType.STUDIO).map((provider) => provider.id),
+  );
 
   await Promise.all(
     providers.map(async (provider) => {
@@ -350,8 +356,11 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
         priceFrom: provider.priceFrom > 0 ? provider.priceFrom : null,
         photos:
           provider.type === ProviderType.STUDIO
-            ? provider.masters.flatMap((master) => master.portfolioItems.map((item) => item.mediaUrl)).slice(0, 8)
-            : provider.portfolioItems.map((item) => item.mediaUrl).slice(0, 8),
+            ? composeCardPhotos(
+                studioPhotos.get(provider.id) ?? [],
+                provider.masters.flatMap((master) => master.portfolioItems.map((item) => item.mediaUrl)),
+              )
+            : composeCardPhotos(provider.portfolioItems.map((item) => item.mediaUrl)),
         address: provider.address || null,
         district: provider.district || null,
         geoLat: provider.geoLat ?? null,

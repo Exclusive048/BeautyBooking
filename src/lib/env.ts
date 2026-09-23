@@ -429,12 +429,37 @@ export type AppEnv = z.infer<typeof refinedSchema>;
  */
 export const envSchemaForTests = refinedSchema;
 
+/**
+ * ENV-FALLBACK-DEFAULTS — фолбэк отдаёт ДЕФОЛТЫ схемы для отсутствующих переменных.
+ *
+ * Прежний фолбэк был сырым `process.env`, то есть без дефолтов: в CI (`.env`
+ * нет, `DATABASE_URL=""` валит парс) `env.AUTH_COOKIE_NAME` был `undefined`, и
+ * `clearSessionCookies` гасил куку с именем `"undefined"` — сессионная кука
+ * переживала выход. Локально это не воспроизводилось: импорт Prisma подгружает
+ * `.env` в `process.env` уже ПОСЛЕ парса, а фолбэк — ссылка на него.
+ *
+ * Поэтому здесь прокси, а не снимок: чтение остаётся живым (на нём держатся
+ * тесты с `vi.stubEnv` и тот самый поздний `.env` от Prisma), а заданные
+ * значения отдаются сырыми, как раньше. Меняется ровно одно — отсутствующая
+ * переменная получает дефолт своего поля вместо `undefined`.
+ */
+function withSchemaDefaults(source: NodeJS.ProcessEnv): AppEnv {
+  const shape: Record<string, z.ZodType> = envSchema.shape;
+  return new Proxy(source, {
+    get(target, key, receiver) {
+      const raw: unknown = Reflect.get(target, key, receiver);
+      if (raw !== undefined || typeof key !== "string" || !Object.hasOwn(shape, key)) return raw;
+      const fallback = shape[key].safeParse(undefined);
+      return fallback.success ? fallback.data : undefined;
+    },
+  }) as unknown as AppEnv;
+}
+
 // Parse провалился, но мы не в прод-рантайме (vitest / dev с недо-конфигом /
-// build-phase): отдаём сырой process.env, чтобы серверные секреты
-// (AUTH_JWT_SECRET, OTP_HMAC_SECRET, …) остались доступны (FIX-10).
-export const env: AppEnv = _parsed.success
-  ? _parsed.data
-  : (process.env as unknown as AppEnv);
+// build-phase): отдаём process.env, чтобы серверные секреты
+// (AUTH_JWT_SECRET, OTP_HMAC_SECRET, …) остались доступны (FIX-10), — с
+// дефолтами схемы для незаданных переменных (ENV-FALLBACK-DEFAULTS).
+export const env: AppEnv = _parsed.success ? _parsed.data : withSchemaDefaults(process.env);
 
 // ── Computed flags ────────────────────────────────────────────────────────────
 // ENV-SPLIT-01: единый принцип — фича включена, когда сконфигурирована.

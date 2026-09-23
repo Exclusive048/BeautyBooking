@@ -1,6 +1,6 @@
 import "@/lib/startup";
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Playfair_Display } from "next/font/google";
 import "./globals.css";
 
@@ -25,6 +25,7 @@ import { PushManager } from "@/components/pwa/push-manager";
 import { SWRProvider } from "@/components/providers/swr-provider";
 import { resolveAuthMethods } from "@/lib/auth/auth-methods";
 import { getNonce } from "@/lib/csp/nonce";
+import { resolveViewport } from "@/lib/pwa/viewport";
 import { COOKIE_NOTICE_COOKIE, hasAcknowledgedCookieNotice } from "@/lib/legal/cookie-notice";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
@@ -66,23 +67,14 @@ const LOCAL_SW_RESET_SCRIPT = `
 })();
 `;
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  // FIX-EXP-A11Y-PWA (EXP-033): no `maximumScale`/`userScalable: false` — those
-  // block pinch-to-zoom, breaking WCAG 1.4.4 (Resize Text) for low-vision users.
-  viewportFit: "cover",
-  // PWA-FIX-07: тинт хрома = фон страницы (`--bg-page`), чтобы полоса статуса
-  // читалась продолжением шапки, а не отдельной бордовой плашкой. Эти две
-  // записи — SSR-база первого кадра (верна для системной настройки); дальше
-  // мету перебивает `<ThemeColorMeta>`, потому что тему в продукте переключает
-  // `next-themes`, а он `prefers-color-scheme` не меняет. Значения зеркалят
-  // `BRAND_COLORS.surfacePage` / `.darkSurfacePage` (инв. #40).
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F6F0EA" },
-    { media: "(prefers-color-scheme: dark)", color: "#1F1417" },
-  ],
-};
+// FIX-EXP-A11Y-PWA (EXP-033): никому не ставится `userScalable: false` — он
+// запрещает щипок (WCAG 1.4.4). PWA-ZOOM-01: iOS получает `maximumScale: 1`,
+// который гасит автоприближение полей ввода, но не щипок — `lib/pwa/viewport.ts`.
+// Layout и так динамический (nonce читает заголовки), поэтому чтение UA ничего
+// не меняет в режиме рендера.
+export async function generateViewport(): Promise<Viewport> {
+  return resolveViewport((await headers()).get("user-agent"));
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru"),

@@ -53,7 +53,10 @@ export function StudioSettingsPage({ data, section }: Props) {
         <div className="min-w-0 space-y-4">
           {effectiveSection === "profile" ? <ProfileMediaSection data={data.general} /> : null}
           {effectiveSection === "portfolio" ? (
-            <PortfolioSection providerId={data.general.providerId} />
+            <PortfolioSection
+              providerId={data.general.providerId}
+              catalogCoverAssetId={data.general.catalogCoverAssetId}
+            />
           ) : null}
           {effectiveSection === "owner-team" ? <OwnerTeamSection team={data.team} /> : null}
           {effectiveSection === "notifications" ? (

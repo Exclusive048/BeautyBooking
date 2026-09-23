@@ -45,10 +45,19 @@ type NavItem = {
 
 // ── Tab sets per role ─────────────────────────────────────────────────────────
 
+/**
+ * NAV-GUEST-BOOKINGS — у гостя третья вкладка вела на `/book`, а это страница
+ * «записаться по фото из ленты»: без `?portfolioId=` она показывает только
+ * ошибку, и так было с момента появления вкладки. Теперь вкладка та же, что у
+ * клиента («Записи»), через вход с возвратом: после входа панель не
+ * перестраивается, а человек попадает туда, куда нажал.
+ */
+const GUEST_BOOKINGS_HREF = `/login?next=${encodeURIComponent("/cabinet/bookings")}`;
+
 const NAV_GUEST: NavItem[] = [
   { label: t.home, href: "/", icon: House },
   { label: t.catalog, href: "/catalog", icon: Search },
-  { label: t.book, href: "/book", icon: Calendar },
+  { label: t.bookings, href: GUEST_BOOKINGS_HREF, icon: Calendar },
   { label: t.loginAction, href: "/login", icon: User },
 ];
 
@@ -270,9 +279,11 @@ export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
 
   const items = useMemo<NavItem[]>(() => {
     if (isAdmin) return NAV_ADMIN;
-    // AUTH-GATE-01: guests lose the «Войти» tab when no login method is
-    // available. Catalog + booking stay — neither needs an account.
-    if (isGuest) return authEnabled ? NAV_GUEST : NAV_GUEST.filter((item) => item.href !== "/login");
+    // AUTH-GATE-01: guests lose the login-backed tabs («Войти», «Записи» —
+    // the latter goes through /login too) when no login method is available.
+    if (isGuest) {
+      return authEnabled ? NAV_GUEST : NAV_GUEST.filter((item) => !item.href.startsWith("/login"));
+    }
     if (!hydrated) return NAV_CLIENT; // default while hydrating
 
     if (activeRole === "MASTER") return NAV_MASTER;
