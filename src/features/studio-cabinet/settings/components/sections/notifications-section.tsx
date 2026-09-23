@@ -18,9 +18,10 @@ type Props = {
  * получает push — настраивается в Настройках студии" — this section
  * fulfils that promise.
  *
- * Real channels surfaced today (3): in-app (Notification, always on),
- * Telegram (via TelegramLink + existing `<TelegramNotificationsSection>`),
- * VK (via VkLink + existing `<VkNotificationsSection>`). PWA push status
+ * Real channels surfaced today: in-app (Notification, always on),
+ * Telegram (via TelegramLink + existing `<TelegramNotificationsSection>`).
+ * VK is intentionally absent — VK-COMMUNITY-NOTIFY-01: VK notifications are
+ * configured only in the general settings (/cabinet/settings). PWA push status
  * is read-only here (subscription happens implicitly via the install
  * prompt — managing per-team toggles needs a schema model that doesn't
  * exist yet, tracked as backlog).
@@ -70,11 +71,8 @@ export function NotificationsSection({ data }: Props) {
         </SectionCard>
       )}
 
-      {/* CONSOLIDATE-EXTERNAL-LINKING-01: VK notification card hidden — VK Bot
-          delivery isn't built (VK-NOTIFICATIONS backlog), so a toggle would
-          promise delivery that can't happen. Component + endpoint + field
-          preserved; VK login/identity stays in the profile «Связанные
-          аккаунты» card. */}
+      {/* VK-COMMUNITY-NOTIFY-01: уведомлений ВКонтакте здесь нет намеренно —
+          они настраиваются только в общих настройках (/cabinet/settings). */}
     </div>
   );
 }

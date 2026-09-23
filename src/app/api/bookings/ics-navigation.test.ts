@@ -293,11 +293,13 @@ describe("FIX-B18 · производный пин: набор навигаци�
   it("набор навигационных целей не вырос молча", () => {
     // Заморожен инвентарь, а не число: дельта красная в обе стороны.
     // `/api/bookings/:id/ics` записан шаблоном — id подставляется в JSX.
+    // VK-COMMUNITY-NOTIFY-01: `/api/integrations/vk/start` выбыл — секция
+    // уведомлений ВКонтакте больше не подключает ВК сама, привязка идёт через
+    // профиль (`/api/auth/vk/start`).
     const FROZEN = [
       "/api/auth/vk/start",
       "/api/auth/telegram/link",
       "/api/bookings/",
-      "/api/integrations/vk/start",
     ].sort();
     const normalized = [...navTargets]
       .map((t) => (t.startsWith("/api/bookings/") ? "/api/bookings/" : t))

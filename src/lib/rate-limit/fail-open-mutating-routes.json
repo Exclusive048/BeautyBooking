@@ -16,6 +16,7 @@
   "/api/admin/settings",
   "/api/admin/system-config",
   "/api/admin/visual-search/reindex",
+  "/api/admin/vk-community",
   "/api/billing/mrr/snapshot/run",
   "/api/billing/renew/run",
   "/api/cabinet/master/leave-studio",

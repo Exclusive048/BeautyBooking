@@ -71,10 +71,12 @@ async function upsertVkLink(params: { userId: string; vkUserId: string; deviceId
       deviceId: params.deviceId,
       isEnabled: true,
     },
+    // VK-COMMUNITY-NOTIFY-01: повторный вход не трогает `isEnabled` — иначе
+    // выключенные человеком уведомления ВКонтакте молча включались бы при
+    // каждом входе через VK. При первой привязке (`create`) они включены.
     update: {
       vkUserId: params.vkUserId,
       deviceId: params.deviceId,
-      isEnabled: true,
     },
   });
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { CheckCircle2, ExternalLink, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { VK_NOTIFICATIONS_AVAILABLE } from "@/lib/vk/notifications-availability";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -12,79 +12,79 @@ import { UI_TEXT } from "@/lib/ui/text";
 type VkStatus = {
   linked: boolean;
   enabled: boolean;
+  available: boolean;
+  messagesAllowed: boolean | null;
+  chatUrl: string | null;
 };
 
 type Props = {
-  embedded?: boolean;
-  leadingIcon?: ReactNode;
-  title?: string;
-  hint?: string;
-  connectLabel?: string;
-  connectButtonClassName?: string;
+  /** Серверный `isVkAuthEnabled`: без него привязать ВК негде, и непривязанному
+   * пользователю секцию не показываем — ссылка вела бы в профиль без кнопки. */
+  connectAvailable: boolean;
 };
 
 function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
   return json && !json.ok ? json.error.message ?? fallback : fallback;
 }
 
-export function VkNotificationsSection({
-  embedded = false,
-  leadingIcon,
-  title,
-  hint,
-  connectLabel,
-  connectButtonClassName,
-}: Props) {
-  const vkText = UI_TEXT.settings.vk;
-  const vkStartText = UI_TEXT.settings.vk.connectFailure;
-  const legacyVkText = UI_TEXT.clientCabinet.vk;
+/**
+ * VK-COMMUNITY-NOTIFY-01 — «Уведомления ВКонтакте» в общих настройках.
+ *
+ * Решения владельца (2026-09-24): настраиваются ТОЛЬКО здесь, одна секция на
+ * все роли; в кабинетах мастера и студии их нет. Уведомления включены по
+ * умолчанию (при привязке ВК), человек может их выключить. Кнопка «Разрешить
+ * сообщения» появляется при подключённом ВК, пока ВКонтакте отвечает, что
+ * сообщения от сообщества не разрешены: без этого разрешения VK не пропустит
+ * ни одного сообщения.
+ *
+ * Привязка ВК — в профиле («Связанные аккаунты»), здесь только указатель туда:
+ * подключение — акт личности, а не настройка уведомлений
+ * (CONSOLIDATE-EXTERNAL-LINKING-01).
+ */
+export function VkNotificationsSection({ connectAvailable }: Props) {
+  const t = UI_TEXT.settings.notifications.vk;
   const [status, setStatus] = useState<VkStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadStatus = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetchWithAuth("/api/integrations/vk/status", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<VkStatus> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, legacyVkText.loadFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, legacyVkText.loadFailed));
-      setStatus(json.data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : legacyVkText.loadFailed);
-    } finally {
-      setLoading(false);
-    }
-  }, [legacyVkText.loadFailed]);
+  const fetchStatus = useCallback(async () => {
+    const res = await fetchWithAuth("/api/integrations/vk/status", { cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as ApiResponse<VkStatus> | null;
+    if (!res.ok || !json || !json.ok) throw new Error(getErrorMessage(json, t.loadFailed));
+    return json.data;
+  }, [t.loadFailed]);
 
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    let cancelled = false;
+    fetchStatus()
+      .then((data) => {
+        if (!cancelled) setStatus(data);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : t.loadFailed);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchStatus, t.loadFailed]);
 
-  // FIX-B14: `/api/integrations/vk/start` — навигация (см. `onConnect` ниже), и
-  // её отказы раньше рисовали в окне JSON-конверт. Теперь она возвращает
-  // браузер сюда с `?vk=<исход>`. Читаем флаг здесь, а не на странице-хозяине:
-  // компонент рендерится в нескольких кабинетах, и per-page плюмбинг разошёлся
-  // бы ровно там, где кнопку добавят следующей. `window.location.search`, а не
-  // `useSearchParams()` — последний требует Suspense-границы у каждого хозяина.
+  // Разрешение даётся во ВКонтакте, в другой вкладке или приложении. Когда
+  // человек возвращается, тихо перепроверяем — без мигания «Загрузка…».
+  const waitingForPermission = Boolean(status?.linked && status.messagesAllowed !== true);
   useEffect(() => {
-    const failure = new URLSearchParams(window.location.search).get("vk");
-    if (!failure) return;
-    if (failure === "provider_unavailable") setError(vkStartText.providerUnavailable);
-    else if (failure === "start_failed") setError(vkStartText.startFailed);
-    else return;
-    const url = new URL(window.location.href);
-    url.searchParams.delete("vk");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [vkStartText.providerUnavailable, vkStartText.startFailed]);
-
-  const onConnect = () => {
-    setError(null);
-    setSaving(true);
-    window.location.assign("/api/integrations/vk/start");
-  };
+    if (!waitingForPermission) return;
+    const onFocus = () => {
+      fetchStatus()
+        .then(setStatus)
+        .catch(() => undefined);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [waitingForPermission, fetchStatus]);
 
   const onToggle = async (enabled: boolean) => {
     if (!status?.linked) return;
@@ -97,75 +97,91 @@ export function VkNotificationsSection({
         body: JSON.stringify({ enabled }),
       });
       const json = (await res.json().catch(() => null)) as ApiResponse<{ enabled: boolean }> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, legacyVkText.settingsFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, legacyVkText.settingsFailed));
+      if (!res.ok || !json || !json.ok) throw new Error(getErrorMessage(json, t.updateFailed));
       setStatus((prev) => (prev ? { ...prev, enabled: json.data.enabled } : prev));
     } catch (e) {
-      setError(e instanceof Error ? e.message : legacyVkText.settingsFailed);
+      setError(e instanceof Error ? e.message : t.updateFailed);
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className={embedded ? "p-4 text-sm text-text-sec" : "rounded-2xl bg-white/[0.04] p-4 text-sm text-text-sec"}>
-        {UI_TEXT.common.loading}
-      </div>
-    );
-  }
+  if (loading) return null;
+  // Сообщество не настроено в админке — канала нет, и обещать его нельзя.
+  if (status && !status.available) return null;
+  if (status && !status.linked && !connectAvailable) return null;
 
   const linked = Boolean(status?.linked);
-  const enabled = Boolean(status?.enabled);
-  const titleText = title ?? vkText.title;
-  const hintText = hint ?? legacyVkText.hint;
-  const connectText = connectLabel ?? UI_TEXT.settings.vk.connect;
 
   return (
-    <div className={embedded ? "p-4" : "rounded-2xl bg-white/[0.04] p-4"}>
-      <div className="flex items-center justify-between gap-3">
-        {leadingIcon ? <div className="shrink-0">{leadingIcon}</div> : null}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">{titleText}</p>
-          <p className="mt-0.5 text-xs text-text-sec">{linked ? vkText.connected : legacyVkText.notConnected}</p>
+    <div className="lux-card rounded-[20px] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bg-input">
+          <Users className="h-4 w-4 text-text-sec" aria-hidden />
         </div>
-        {linked ? (
-          // VK-NOTIFICATIONS-FLAG-A: disable the toggle (visibility-over-
-          // hiding) when the subsystem is off. Linked status is still
-          // shown — login/connection stays intact. Tooltip explains
-          // the temporary lock so the user doesn't think it's broken.
-          <Switch
-            checked={VK_NOTIFICATIONS_AVAILABLE ? enabled : false}
-            onCheckedChange={(next) => void onToggle(next)}
-            disabled={saving || !VK_NOTIFICATIONS_AVAILABLE}
-            title={!VK_NOTIFICATIONS_AVAILABLE ? vkText.temporarilyUnavailable : undefined}
-            className="shrink-0"
-          />
-        ) : (
-          // FIX-EXTERNAL-GATING-01 (G-3): this is a VK-OAuth *link* action. It
-          // intentionally doesn't gate on the notifications-delivery flag
-          // (`VK_NOTIFICATIONS_AVAILABLE`); the VK-auth gate (`isVkAuthEnabled`,
-          // server-only) is applied by every call-site that mounts this section,
-          // so an unlinked user only reaches this button when VK auth is on.
-          <Button
-            variant="secondary"
-            onClick={onConnect}
-            disabled={saving}
-            className={connectButtonClassName}
-          >
-            {connectText}
-          </Button>
-        )}
-      </div>
 
-      <p className="mt-2 text-xs text-text-sec">{hintText}</p>
-      {linked ? <p className="mt-2 text-xs text-text-sec">{enabled ? legacyVkText.enabled : legacyVkText.disabled}</p> : null}
-      {!VK_NOTIFICATIONS_AVAILABLE ? (
-        <p className="mt-2 rounded-lg bg-bg-input/60 px-2.5 py-2 text-xs text-text-sec">
-          {vkText.temporarilyUnavailableHint}
-        </p>
-      ) : null}
-      {error ? <p className="mt-2 text-xs text-rose-400">{error}</p> : null}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-text-main">{t.title}</div>
+          {status ? (
+            <div className="mt-1 text-xs text-text-sec">{linked ? t.connected : t.notConnected}</div>
+          ) : null}
+
+          {status && linked ? (
+            <>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span className="text-sm text-text-main">{t.receiveToggle}</span>
+                <Switch
+                  checked={status.enabled}
+                  disabled={saving}
+                  onCheckedChange={(next) => void onToggle(next)}
+                />
+              </div>
+
+              {status.messagesAllowed === false ? (
+                <div className="mt-3 rounded-xl border border-warning-border bg-warning-surface px-3 py-2">
+                  <p className="text-xs font-medium text-warning-text">{t.allowTitle}</p>
+                  <p className="mt-1 text-xs text-warning-text">{t.allowHint}</p>
+                  <AllowMessagesButton href={status.chatUrl} label={t.allowAction} />
+                </div>
+              ) : status.messagesAllowed === null ? (
+                <div className="mt-3">
+                  <p className="text-xs text-text-sec">{t.allowUnknownHint}</p>
+                  <AllowMessagesButton href={status.chatUrl} label={t.allowAction} />
+                </div>
+              ) : (
+                <p className="mt-2 flex items-center gap-1.5 text-xs text-success-text">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                  {t.allowed}
+                </p>
+              )}
+            </>
+          ) : status ? (
+            <>
+              <p className="mt-2 text-xs text-text-sec">{t.notConnectedHint}</p>
+              <Link
+                href="/cabinet/profile"
+                className="mt-2 inline-flex text-xs font-medium text-accent-text hover:underline"
+              >
+                {t.connectInProfile}
+              </Link>
+            </>
+          ) : null}
+
+          {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+        </div>
+      </div>
     </div>
+  );
+}
+
+function AllowMessagesButton({ href, label }: { href: string | null; label: string }) {
+  if (!href) return null;
+  return (
+    <Button asChild variant="secondary" size="sm" className="mt-2 rounded-xl">
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {label}
+        <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+      </a>
+    </Button>
   );
 }

@@ -13,6 +13,7 @@ import { createHealthcheckPinger } from "@/lib/queue/healthcheck-ping";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
+import { processVkSendPayload } from "@/lib/vk/notify";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
@@ -34,6 +35,7 @@ import {
   SLOT_FREED_JOB_TYPE,
   TELEGRAM_SEND_JOB_TYPE,
   VISUAL_SEARCH_INDEX_JOB_TYPE,
+  VK_SEND_JOB_TYPE,
   YOOKASSA_WEBHOOK_JOB_TYPE,
   createMediaCleanupJob,
   normalizeJobMeta,
@@ -671,10 +673,45 @@ async function processPlanEditedNotifyJob(
   });
 }
 
+/**
+ * VK-COMMUNITY-NOTIFY-01: личное сообщение от сообщества ВКонтакте. Повтор —
+ * только на сбой сети и лимиты VK (`retry`); отказ по получателю или по ключу
+ * повтором не лечится и закрывает задачу сразу (`skipped`).
+ */
+async function processVkSend(
+  job: Extract<Job, { type: typeof VK_SEND_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  const outcome = await processVkSendPayload(job.payload);
+  if (outcome !== "retry") return;
+
+  const nextAttempts = getJobAttempts(job) + 1;
+  if (nextAttempts < getJobMaxAttempts(job)) {
+    await enqueueRetry({ ...job, attempts: nextAttempts }, getRetryDelaySeconds(nextAttempts) * 1000);
+    return;
+  }
+
+  await moveToDeadQueue({ ...job, attempts: nextAttempts });
+  logError("Worker dead letter job", {
+    jobId: job.id,
+    type: job.type,
+    attempts: nextAttempts,
+    maxAttempts: getJobMaxAttempts(job),
+    __skipAlert: true,
+  });
+}
+
 async function processJob(job: Job): Promise<void> {
   try {
     if (job.type === TELEGRAM_SEND_JOB_TYPE) {
       await processTelegramSend(job);
+    } else if (job.type === VK_SEND_JOB_TYPE) {
+      await processVkSend(job);
     } else if (job.type === BOOKING_REMINDER_JOB_TYPE) {
       await processBookingReminderJob(job);
     } else if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {

@@ -41,9 +41,22 @@ export type MediaCleanupStatsView = {
   brokenCount: number;
 };
 
+/** VK-COMMUNITY-NOTIFY-01 — зеркало `VkCommunityAdminView` (lib/vk/community.ts):
+ * клиентский модуль не импортирует server-only, поэтому форма повторена здесь,
+ * а совпадение проверяет компилятор в `settings-data.service.ts`. */
+export type VkCommunityView = {
+  communityUrl: string | null;
+  urlRecognized: boolean;
+  configured: boolean;
+  community: { groupId: number; screenName: string; name: string; chatUrl: string } | null;
+  mismatch: boolean;
+  unreadable: boolean;
+};
+
 export type AdminSettingsSnapshot = {
   flags: SystemFlags;
   seo: SeoValues;
+  vkCommunity: VkCommunityView;
   queue: QueueSnapshot;
   visualSearch: VisualSearchStatsView;
   mediaCleanup: MediaCleanupStatsView;

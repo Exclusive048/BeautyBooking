@@ -9,7 +9,7 @@ const T = UI_TEXT.cabinetMaster.account.notifications;
 const FG = UI_TEXT.billing.featureGate;
 
 /**
- * Wraps the channel-specific sections (Telegram / VK / Email / Push) into a
+ * Wraps the channel-specific sections (Telegram / Email / Push) into a
  * single visually-cohesive card. Each child component is shared with
  * `/cabinet/(user)/settings` — we just frame them.
  *
@@ -37,10 +37,9 @@ export function ChannelsCard() {
             <TelegramNotificationsSection embedded />
           </FeatureGate>
         )}
-        {/* CONSOLIDATE-EXTERNAL-LINKING-01: VK notification section hidden — VK
-            Bot delivery isn't built (VK-NOTIFICATIONS backlog). Component +
-            endpoint + field preserved; VK login/identity stays in the profile
-            «Связанные аккаунты» card. */}
+        {/* VK-COMMUNITY-NOTIFY-01: уведомлений ВКонтакте в кабинете нет намеренно —
+            решение владельца: они настраиваются только в общих настройках
+            (/cabinet/settings), одна секция на все роли. */}
         <EmailNotificationsSection />
         <PushNotificationsSection />
       </div>

@@ -880,10 +880,46 @@ export const openApiSpec = {
       },
       VkStatusData: {
         type: "object",
-        required: ["linked", "enabled"],
+        required: ["linked", "enabled", "available", "messagesAllowed", "chatUrl"],
         properties: {
           linked: { type: "boolean" },
           enabled: { type: "boolean" },
+          available: { type: "boolean", description: "Ключ сообщества сохранён в админке — канал ВКонтакте есть" },
+          messagesAllowed: {
+            type: "boolean",
+            nullable: true,
+            description: "Разрешил ли пользователь сообщения от сообщества; null — VK не ответил",
+          },
+          chatUrl: { type: "string", nullable: true, description: "Чат с сообществом (vk.me) — кнопка «Разрешить сообщения»" },
+        },
+      },
+      AdminVkCommunityData: {
+        type: "object",
+        required: ["communityUrl", "urlRecognized", "configured", "community", "mismatch", "unreadable"],
+        properties: {
+          communityUrl: { type: "string", nullable: true },
+          urlRecognized: { type: "boolean" },
+          configured: { type: "boolean" },
+          community: {
+            type: "object",
+            nullable: true,
+            required: ["groupId", "screenName", "name", "chatUrl"],
+            properties: {
+              groupId: { type: "integer" },
+              screenName: { type: "string" },
+              name: { type: "string" },
+              chatUrl: { type: "string" },
+            },
+          },
+          mismatch: { type: "boolean" },
+          unreadable: { type: "boolean" },
+        },
+      },
+      AdminVkCommunityInput: {
+        type: "object",
+        required: ["token"],
+        properties: {
+          token: { type: "string", description: "Ключ доступа сообщества ВКонтакте, 20–512 символов" },
         },
       },
       VkDisableData: {
@@ -3922,6 +3958,49 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/HotSlotRuleData" }),
           "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/admin/vk-community": {
+      get: {
+        summary: "VK community used for notifications (token never returned)",
+        tags: ["admin", "vk"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminVkCommunityData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      put: {
+        summary: "Save VK community access token",
+        description:
+          "VK-COMMUNITY-NOTIFY-01: ключ проверяется у VK (сообщество из NEXT_PUBLIC_VK_COMMUNITY_URL + право «Сообщения сообщества») и хранится зашифрованным в SystemConfig.",
+        tags: ["admin", "vk"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/AdminVkCommunityInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminVkCommunityData" }),
+          "400": errorResponse("Invalid token"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "409": errorResponse("Community link missing or token of another community"),
+          "503": errorResponse("VK unavailable"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      delete: {
+        summary: "Remove VK community access token",
+        tags: ["admin", "vk"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminVkCommunityData" }),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
           "500": errorResponse("Internal error"),

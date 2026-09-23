@@ -15,6 +15,7 @@ import {
   buildNotificationEmailText,
 } from "@/lib/email/templates/notification";
 import { resolvePublicAppUrl } from "@/lib/app-url";
+import { enqueueVkNotification } from "@/lib/vk/notify";
 
 type DeliveryInput = {
   userId: string;
@@ -31,8 +32,10 @@ type DeliveryInput = {
   emailCtaUrl?: string;
 };
 
-// Notification types that should be delivered via email (important, non-spammy)
-const EMAIL_NOTIFICATION_TYPES = new Set<NotificationType>([
+// Важные и не-спамные типы: уходят на почту и во ВКонтакте. Чат и прочие
+// частые события остаются в центре уведомлений и пуше — в мессенджере они
+// превратились бы в поток.
+const IMPORTANT_NOTIFICATION_TYPES = new Set<NotificationType>([
   "BOOKING_CREATED",
   "BOOKING_CONFIRMED",
   "BOOKING_CANCELLED",
@@ -126,7 +129,7 @@ async function deliverEmailNotification(
 }
 
 /**
- * PUSH-COVERAGE-01 — внешние каналы (push + почта) для УЖЕ созданной и
+ * PUSH-COVERAGE-01 — внешние каналы (push + почта + ВКонтакте) для УЖЕ созданной и
  * закоммиченной in-app записи. Единственное место, где решается, куда ещё
  * уходит уведомление, кроме центра: `deliverNotification` зовёт его сам, а
  * пути, которые создают запись ВНУТРИ транзакции (напоминания о записи:
@@ -161,7 +164,7 @@ export function deliverExternalChannels(
   });
 
   // Email channel — silent fail, only for important notification types
-  if (EMAIL_NOTIFICATION_TYPES.has(record.type)) {
+  if (IMPORTANT_NOTIFICATION_TYPES.has(record.type)) {
     void deliverEmailNotification(
       record.userId,
       record.title,
@@ -169,6 +172,21 @@ export function deliverExternalChannels(
       urls.emailCtaUrl ?? urls.pushUrl
     ).catch((error) => {
       logError("Email notification delivery failed", {
+        userId: record.userId,
+        type: record.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
+    // VK-COMMUNITY-NOTIFY-01: личное сообщение от сообщества ВКонтакте. Для
+    // всех ролей, без тарифа; условия и отказы — в `vk/notify.ts`.
+    void enqueueVkNotification({
+      userId: record.userId,
+      title: record.title,
+      body: record.body,
+      url: urls.emailCtaUrl ?? urls.pushUrl,
+    }).catch((error) => {
+      logError("VK notification delivery failed", {
         userId: record.userId,
         type: record.type,
         error: error instanceof Error ? error.message : String(error),

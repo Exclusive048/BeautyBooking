@@ -156,15 +156,6 @@ export const FEATURE_CATALOG = {
     uiOrder: 90,
     status: "active",
   },
-  vkNotifications: {
-    kind: "boolean",
-    title: "Уведомления в VK",
-    description: "Уведомления приходят в VK.",
-    group: "Уведомления",
-    appliesTo: "BOTH",
-    uiOrder: 100,
-    status: "active",
-  },
   maxNotifications: {
     kind: "boolean",
     title: "Уведомления Max",

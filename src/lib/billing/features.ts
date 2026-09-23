@@ -52,7 +52,6 @@ const DEFAULT_FEATURES: PlanFeatures = {
   analytics_forecast: false,
   financeReport: false,
   tgNotifications: false,
-  vkNotifications: false,
   maxNotifications: false,
   smsNotifications: false,
   clientVisitHistory: false,

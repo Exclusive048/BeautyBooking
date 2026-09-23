@@ -6,6 +6,7 @@ import { SeoSection } from "@/features/admin-cabinet/settings/components/seo-sec
 import { SettingsHeader } from "@/features/admin-cabinet/settings/components/settings-header";
 import { SystemFlagsSection } from "@/features/admin-cabinet/settings/components/system-flags-section";
 import { VisualSearchSection } from "@/features/admin-cabinet/settings/components/visual-search-section";
+import { VkCommunitySection } from "@/features/admin-cabinet/settings/components/vk-community-section";
 import type { AdminSettingsSnapshot } from "@/features/admin-cabinet/settings/types";
 
 type Props = {
@@ -13,7 +14,7 @@ type Props = {
 };
 
 /** Server orchestrator for `/admin/settings`. Layout: caption →
- * logo + login hero (2-col on lg) → flags → SEO → queue → visual
+ * logo + login hero (2-col on lg) → flags → SEO → VK community → queue → visual
  * search + media cleanup (2-col on lg). Each section ships its own
  * mutations; this component is pure render. */
 export function AdminSettings({ data }: Props) {
@@ -29,6 +30,8 @@ export function AdminSettings({ data }: Props) {
       <SystemFlagsSection initial={data.flags} />
 
       <SeoSection initial={data.seo} />
+
+      <VkCommunitySection initial={data.vkCommunity} />
 
       <QueueStatusSection initial={data.queue} />
 

@@ -67,7 +67,7 @@ const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
   "templates", "threads", "tickets", "time-slots", "timeline",
   "toggle", "unassign-master", "unlink", "unread-count", "unsubscribe",
   "upload-attachment", "upload-reference", "user", "users", "verify",
-  "visual-search", "vk", "webhook", "weekly", "worker",
+  "visual-search", "vk", "vk-community", "webhook", "weekly", "worker",
   "yandex", "yookassa",
 ]);
 

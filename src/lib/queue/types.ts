@@ -5,6 +5,19 @@ export type TelegramSendPayload = {
   text: string;
 };
 
+/**
+ * VK-COMMUNITY-NOTIFY-01 — личное сообщение от имени сообщества ВКонтакте.
+ * В payload — пользователь, а не его VK ID: воркер перечитывает привязку в
+ * момент отправки, поэтому выключенный тумблер или отвязанный ВК останавливают
+ * уже поставленную задачу. `randomId` — `random_id` VK, фиксируется при
+ * постановке: повтор той же задачи VK не примет за новое сообщение.
+ */
+export type VkSendPayload = {
+  userId: string;
+  text: string;
+  randomId: number;
+};
+
 export type BookingReminderKind = "REMINDER_24H" | "REMINDER_2H";
 
 export type BookingReminderPayload = {
@@ -101,6 +114,12 @@ export type TelegramSendJob = {
   payload: TelegramSendPayload;
 } & JobMeta;
 
+export type VkSendJob = {
+  id: string;
+  type: "vk.send";
+  payload: VkSendPayload;
+} & JobMeta;
+
 export type BookingReminderJob = {
   id: string;
   type: "booking.reminder";
@@ -157,6 +176,7 @@ export type PlanEditedNotifyJob = {
 
 export type Job =
   | TelegramSendJob
+  | VkSendJob
   | BookingReminderJob
   | VisualSearchIndexJob
   | SlotFreedJob
@@ -168,6 +188,7 @@ export type Job =
   | PlanEditedNotifyJob;
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
+export const VK_SEND_JOB_TYPE = "vk.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
 export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
 export const SLOT_FREED_JOB_TYPE = "slot.freed";
@@ -198,6 +219,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isTelegramSendPayload(value: unknown): value is TelegramSendPayload {
   if (!isRecord(value)) return false;
   return typeof value.chatId === "string" && typeof value.text === "string";
+}
+
+function isVkSendPayload(value: unknown): value is VkSendPayload {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.userId === "string" &&
+    value.userId.length > 0 &&
+    typeof value.text === "string" &&
+    typeof value.randomId === "number" &&
+    Number.isInteger(value.randomId)
+  );
 }
 
 function isBookingReminderPayload(value: unknown): value is BookingReminderPayload {
@@ -287,6 +319,10 @@ export function isJob(value: unknown): value is Job {
     return isTelegramSendPayload(value.payload);
   }
 
+  if (value.type === VK_SEND_JOB_TYPE) {
+    return isVkSendPayload(value.payload);
+  }
+
   if (value.type === BOOKING_REMINDER_JOB_TYPE) {
     return isBookingReminderPayload(value.payload);
   }
@@ -338,6 +374,27 @@ export function createTelegramSendJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: TELEGRAM_SEND_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createVkSendJob(
+  payload: VkSendPayload,
+  input?: Partial<
+    Pick<
+      VkSendJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): VkSendJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: VK_SEND_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
