@@ -107,82 +107,82 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
     return <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 text-sm text-text-sec">{UI_TEXT.publicStudio.noMasters}</div>;
   }
 
+  // Команда — сеткой рядами и колонками, без горизонтальной прокрутки
+  // (решение владельца 2026-09-24).
   return (
-    <div className="overflow-x-auto pb-1">
-      <div className="flex min-w-max gap-4">
-        {masterCards.map((master) => {
-          const masterHref = providerPublicUrl(
-            { id: master.id, publicUsername: master.publicUsername },
-            "studio-masters-carousel"
-          ) ?? "#";
-          const bookingHref = studioBookingUrl(
-            studio,
-            master.publicUsername ? { master: master.publicUsername } : undefined,
-            "studio-masters-carousel"
-          ) ?? "#";
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+      {masterCards.map((master) => {
+        const masterHref = providerPublicUrl(
+          { id: master.id, publicUsername: master.publicUsername },
+          "studio-masters-carousel"
+        ) ?? "#";
+        const bookingHref = studioBookingUrl(
+          studio,
+          master.publicUsername ? { master: master.publicUsername } : undefined,
+          "studio-masters-carousel"
+        ) ?? "#";
 
-          return (
-            <article key={master.id} className="group relative w-72 overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
-              <div className="relative h-48 overflow-hidden bg-muted">
-                {master.avatarUrl ? (
-                  <ResilientImage
-                    src={master.avatarUrl}
-                    alt={master.name}
-                    sizes="288px"
-                    className="object-cover transition group-hover:scale-[1.03]"
-                  />
+        return (
+          <article key={master.id} className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
+            <div className="relative h-44 shrink-0 overflow-hidden bg-muted sm:h-48">
+              {master.avatarUrl ? (
+                <ResilientImage
+                  src={master.avatarUrl}
+                  alt={master.name}
+                  sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+                  className="object-cover transition group-hover:scale-[1.03]"
+                />
+              ) : (
+                <div className="h-full w-full bg-bg-input" />
+              )}
+              <div className="absolute left-3 top-3 rounded-full border border-border-subtle bg-bg-card/80 px-2 py-1 text-xs font-medium text-text-main backdrop-blur">
+                {master.grade}
+              </div>
+
+              <div className="absolute inset-x-0 bottom-0 translate-y-full bg-black/65 p-3 transition duration-200 group-hover:translate-y-0">
+                {master.thumbs.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-1">
+                    {master.thumbs.map((thumb, index) => (
+                      <div key={`${master.id}-${index}`} className="relative h-12 w-full overflow-hidden rounded-md">
+                        {/* RES-29: миниатюра портфолио — такой же пользовательский
+                            URL, как аватар 17 строками выше, и обязана деградировать
+                            так же. Сырой `next/image` на хосте вне `remotePatterns`
+                            БРОСАЕТ в рендере, а на мёртвой ссылке рисует сломанную
+                            картинку — без `onError` и без гейта `isOptimizableImageSrc`. */}
+                        <ResilientImage
+                          src={thumb}
+                          alt={UI_TEXT.publicStudio.masterWorkAltTemplate
+                            .replace("{name}", master.name)
+                            .replace("{n}", String(index + 1))}
+                          sizes="80px"
+                          className="object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="h-full w-full bg-bg-input" />
+                  <div className="text-xs text-white/80">{UI_TEXT.publicStudio.noPortfolio}</div>
                 )}
-                <div className="absolute left-3 top-3 rounded-full border border-border-subtle bg-bg-card/80 px-2 py-1 text-xs font-medium text-text-main backdrop-blur">
-                  {master.grade}
-                </div>
-
-                <div className="absolute inset-x-0 bottom-0 translate-y-full bg-black/65 p-3 transition duration-200 group-hover:translate-y-0">
-                  {master.thumbs.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-1">
-                      {master.thumbs.map((thumb, index) => (
-                        <div key={`${master.id}-${index}`} className="relative h-12 w-full overflow-hidden rounded-md">
-                          {/* RES-29: миниатюра портфолио — такой же пользовательский
-                              URL, как аватар 17 строками выше, и обязана деградировать
-                              так же. Сырой `next/image` на хосте вне `remotePatterns`
-                              БРОСАЕТ в рендере, а на мёртвой ссылке рисует сломанную
-                              картинку — без `onError` и без гейта `isOptimizableImageSrc`. */}
-                          <ResilientImage
-                            src={thumb}
-                            alt={UI_TEXT.publicStudio.masterWorkAltTemplate
-                              .replace("{name}", master.name)
-                              .replace("{n}", String(index + 1))}
-                            sizes="80px"
-                            className="object-cover"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-white/80">{UI_TEXT.publicStudio.noPortfolio}</div>
-                  )}
-                </div>
               </div>
+            </div>
 
-              <div className="space-y-2 p-4">
-                <div className="text-sm font-semibold text-text">{master.name}</div>
-                {master.specialization ? <div className="text-xs text-text-muted">{master.specialization}</div> : null}
-                <div className="flex items-center gap-2">
-                  <Link href={masterHref} className="text-xs font-medium text-text underline underline-offset-2">
-                    {UI_TEXT.publicStudio.openMaster}
-                  </Link>
-                  {hideBooking ? null : (
-                    <Button asChild size="sm" className="ml-auto h-8 rounded-lg px-2.5 text-xs">
-                      <Link href={bookingHref}>{UI_TEXT.publicStudio.book}</Link>
-                    </Button>
-                  )}
-                </div>
+            <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
+              <div className="truncate text-sm font-semibold text-text">{master.name}</div>
+              {master.specialization ? <div className="line-clamp-2 text-xs text-text-muted">{master.specialization}</div> : null}
+              <div className="mt-auto flex flex-wrap items-center gap-2">
+                <Link href={masterHref} className="text-xs font-medium text-text underline underline-offset-2">
+                  {UI_TEXT.publicStudio.openMaster}
+                </Link>
+                {hideBooking ? null : (
+                  <Button asChild size="sm" className="ml-auto h-8 rounded-lg px-2.5 text-xs">
+                    <Link href={bookingHref}>{UI_TEXT.publicStudio.book}</Link>
+                  </Button>
+                )}
               </div>
-            </article>
-          );
-        })}
-      </div>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }

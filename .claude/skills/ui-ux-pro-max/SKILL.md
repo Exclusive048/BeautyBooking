@@ -459,7 +459,7 @@ cn("animate-pulse bg-bg-input/50",
 
 ### Горизонтальная полоса — скроллер и дорожка на РАЗНЫХ элементах
 
-**FIX-D2 (2026-08-17).** Вкладки, чипы, карусели, которым на мобильном не хватает ширины, прокручиваются **внутри себя**, а страница остаётся ровно шириной экрана. Форма одна на весь проект (`clients-tabs`, `notifications-tabs`, `filter-chips`, `recent-masters-section`, `studio-masters-carousel`, `public-profile/master/section-nav`):
+**FIX-D2 (2026-08-17).** Вкладки, чипы, карусели, которым на мобильном не хватает ширины, прокручиваются **внутри себя**, а страница остаётся ровно шириной экрана. Форма одна на весь проект (`clients-tabs`, `notifications-tabs`, `filter-chips`, `recent-masters-section`, `public-profile/master/section-nav`; команда на странице студии — с 2026-09-24 сетка, не полоса):
 
 ```tsx
 {/* скроллер: bleed до краёв + свой overflow; scroll-px повторяет px, иначе snap съедает гаттер */}

@@ -13,7 +13,7 @@
  * полосу, а в документ. Легитимного случая нет: если нужна прокрутка, то
  * `min-w-max` обязан стоять на ДОРОЖКЕ внутри контейнера (так и сделаны все
  * остальные полосы проекта — `clients-tabs`, `notifications-tabs`,
- * `filter-chips`, `recent-masters-section`, `studio-masters-carousel`).
+ * `filter-chips`, `recent-masters-section`).
  *
  * ## Что стоило
  *
