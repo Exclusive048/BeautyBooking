@@ -36,7 +36,26 @@ vi.mock("@/lib/providers/resolve-provider", () => ({
     spies.resolveProvider(args);
     // Публичный резолв отдаёт строку только для опубликованного кабинета.
     if (args.requirePublished && !state.published) return Promise.resolve(null);
-    return Promise.resolve({ id: "prov1", timezone: "Europe/Moscow", minBookingHoursAhead: 2 });
+    return Promise.resolve({
+      id: "prov1",
+      timezone: "Europe/Moscow",
+      minBookingHoursAhead: 2,
+      maxBookingDaysAhead: 60,
+    });
+  },
+}));
+
+// BOOKING-WINDOW-SPLIT: роут читает окно записи владельца услуги напрямую из
+// Prisma. CI гоняет тесты без БД (`DATABASE_URL: ""`), поэтому без мока этот
+// запрос бросал бы и давал 500 — локально его маскировала живая dev-БД.
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    service: {
+      findUnique: vi.fn(async () => ({
+        provider: { minBookingHoursAhead: 2, maxBookingDaysAhead: 60 },
+      })),
+    },
+    provider: { findUnique: vi.fn(async () => null) },
   },
 }));
 
