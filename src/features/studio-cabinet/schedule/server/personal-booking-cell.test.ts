@@ -45,6 +45,10 @@ vi.mock("@/lib/prisma", () => ({
     timeBlock: { findMany: vi.fn(async () => []) },
     service: { findMany: vi.fn(async () => []) },
     masterService: { findMany: vi.fn(async () => []) },
+    // BOOKING-FLOW-AUDIT-RESIDUALS: сетка дня раздвигается под часы мастеров
+    // (`resolveMasterWorkHours`) — здесь расписания нет, окно по умолчанию.
+    scheduleOverride: { findFirst: vi.fn(async () => null) },
+    weeklyScheduleDay: { findFirst: vi.fn(async () => null) },
   },
 }));
 

@@ -33,7 +33,12 @@ const spies = vi.hoisted(() => ({
 vi.mock("@/lib/providers/resolve-provider", () => ({
   resolveProviderBySlugOrId: (args: { requirePublished?: boolean }) => {
     if (args.requirePublished && !state.published) return Promise.resolve(null);
-    return Promise.resolve({ id: "prov1", timezone: "Europe/Moscow", minBookingHoursAhead: 2 });
+    return Promise.resolve({
+      id: "prov1",
+      timezone: "Europe/Moscow",
+      minBookingHoursAhead: 2,
+      maxBookingDaysAhead: 10,
+    });
   },
 }));
 
@@ -76,6 +81,10 @@ vi.mock("@/lib/prisma", () => ({
       ]),
     },
     booking: { findUnique: (...args: unknown[]) => bookingFindUnique(...args) },
+    // BOOKING-WINDOW-SPLIT: окно записи — владельца услуги (у студийной — студии).
+    service: {
+      findUnique: vi.fn(async () => ({ provider: { minBookingHoursAhead: 5, maxBookingDaysAhead: 14 } })),
+    },
   },
 }));
 
@@ -200,5 +209,31 @@ describe("MANUAL-BOOKING-SLOTS-01 · роут", () => {
     state.sessionOk = true;
     state.ownerOk = true;
     expect(await operatorFlag("&manual=1")).toBe(true);
+  });
+});
+
+/**
+ * BOOKING-WINDOW-SPLIT (BOOKING-FLOW-AUDIT-RESIDUALS) — окошки считаются по
+ * окну записи ВЛАДЕЛЬЦА услуги: его же проверит `resolveBookingCore`. Раньше
+ * виджет студии получал окошки по правилам мастера и упирался в
+ * `BOOKING_TOO_SOON` при отправке.
+ *
+ * BOOKING-WINDOW-STRICTER (решение владельца 2026-09-24): берётся более
+ * строгое из окон владельца услуги и мастера — больший минимум, меньший максимум.
+ *
+ * @probe 2026-09-24 — `windowPolicy` не передаётся в `listBookableSlots`:
+ * красный кейс ниже. Возвращено — зелёный.
+ * @probe 2026-09-24 — `windowPolicy` = окно владельца без `stricterBookingWindow`:
+ * красный (максимум 14 вместо 10 у мастера).
+ */
+describe("BOOKING-WINDOW-SPLIT · окно записи владельца услуги", () => {
+  it("в примитив окошек уходит более строгое из окон владельца и мастера", async () => {
+    const res = await GET(new Request(BASE), { params: Promise.resolve({ id: "prov1" }) });
+    expect(res.status).toBe(200);
+    const input = spies.listBookableSlots.mock.calls.at(-1)?.[0] as {
+      windowPolicy?: { minBookingHoursAhead: number; maxBookingDaysAhead: number };
+    };
+    // владелец: 5 ч / 14 дн, мастер: 2 ч / 10 дн → 5 ч / 10 дн
+    expect(input.windowPolicy).toEqual({ minBookingHoursAhead: 5, maxBookingDaysAhead: 10 });
   });
 });

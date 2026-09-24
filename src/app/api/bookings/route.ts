@@ -3,6 +3,8 @@ import { bookingsQuerySchema } from "@/lib/bookings/schemas";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClientBooking } from "@/lib/bookings/createClientBooking";
 import { createBooking } from "@/lib/bookings/createBooking";
+import { isIdempotentReplay } from "@/lib/bookings/idempotency";
+import { issueGuestManagePath } from "@/lib/bookings/guest-manage";
 import { AccountType } from "@prisma/client";
 import { jsonOk, jsonFail } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
@@ -154,7 +156,10 @@ export async function POST(req: Request) {
         idempotencyKey: normalizedIdempotencyKey,
       });
       try {
-        const fullBooking = await loadBookingWithRelations(created.id);
+        // Повтор по ключу — та же бронь: уведомления о ней уже ушли.
+        const fullBooking = isIdempotentReplay(created)
+          ? null
+          : await loadBookingWithRelations(created.id);
         if (fullBooking) {
           await notifyBookingCreated(fullBooking);
           if (fullBooking.status === "CONFIRMED") {
@@ -177,7 +182,9 @@ export async function POST(req: Request) {
       // FIX-B15: `if` снят — переменная больше не nullable, и условие читалось
       // как «у гостя кэш не сбрасываем», чего не происходит с RKN-FIX-02.
       void invalidateRecentMastersCache(effectiveClientUserId);
-      return jsonOk({ booking: created }, { status: 201 });
+      // GUEST-MANAGE-LINK: гостю — ссылка «Управлять записью» (отмена/перенос без аккаунта).
+      const manageUrl = sessionUser ? null : await issueGuestManagePath(created.id, effectiveClientUserId);
+      return jsonOk({ booking: created, manageUrl }, { status: 201 });
     }
 
     // Legacy slotLabel-only path still requires a signed-in user
@@ -205,7 +212,7 @@ export async function POST(req: Request) {
       bookingAnswers,
     }, normalizedIdempotencyKey);
     try {
-      const fullBooking = await loadBookingWithRelations(booking.id);
+      const fullBooking = isIdempotentReplay(booking) ? null : await loadBookingWithRelations(booking.id);
       if (fullBooking) {
         await notifyBookingCreated(fullBooking);
         if (fullBooking.status === "CONFIRMED") {

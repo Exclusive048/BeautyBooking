@@ -43,6 +43,11 @@ import {
   type SaveStatus,
 } from "./hooks/use-profile-autosave";
 import { EmailVerifyModal } from "./modals/email-verify-modal";
+import {
+  PhoneVerifyActions,
+  type PhoneVerifyProviders,
+} from "@/features/cabinet/components/phone-verify-actions";
+import { PhoneVerifyNotice } from "@/features/cabinet/components/phone-verify-notice";
 import { TelegramConnectModal } from "./modals/telegram-connect-modal";
 import { isTelegramEnabled } from "@/lib/env.client";
 
@@ -69,6 +74,8 @@ type Props = {
    * provider that's been switched off.
    */
   vkAuthEnabled?: boolean;
+  /** PHONE-OAUTH-PROOF-01: server-resolved `isYandexAuthEnabled` — кнопка «Подтвердить через Яндекс ID». */
+  yandexAuthEnabled?: boolean;
 };
 
 const fetcher = (url: string) =>
@@ -115,7 +122,12 @@ function vkConnectFailureMessage(value: string | null): string | null {
   }
 }
 
-export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled = false }: Props) {
+export function ClientProfilePage({
+  userId,
+  emailEnabled = false,
+  vkAuthEnabled = false,
+  yandexAuthEnabled = false,
+}: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
@@ -243,6 +255,7 @@ export function ClientProfilePage({ userId, emailEnabled = false, vkAuthEnabled 
           onPatch={applyPatch}
           emailEnabled={emailEnabled}
           onEmailVerify={() => setEmailModalOpen(true)}
+          phoneVerifyProviders={{ vk: vkAuthEnabled, yandex: yandexAuthEnabled }}
         />
 
         <LinkedAccountsCard
@@ -505,11 +518,13 @@ function ContactsCard({
   onPatch,
   emailEnabled,
   onEmailVerify,
+  phoneVerifyProviders,
 }: {
   data: ProfileDTO;
   onPatch: (p: Partial<ProfileUpdatePatch>) => void;
   emailEnabled: boolean;
   onEmailVerify: () => void;
+  phoneVerifyProviders: PhoneVerifyProviders;
 }) {
   return (
     <Card className="p-6">
@@ -517,6 +532,8 @@ function ContactsCard({
         title={T.sections.contacts}
         subtitle={T.sectionHints.contacts}
       />
+
+      <PhoneVerifyNotice className="mb-4" />
 
       <FieldRow
         label={T.fields.phone}
@@ -534,6 +551,11 @@ function ContactsCard({
           value={data.contacts.phone}
           onPatch={onPatch}
         />
+        {/* PHONE-OAUTH-PROOF-01: SMS в проде нет — подтверждаем номер через
+            аккаунт, к которому он привязан. */}
+        {data.contacts.phoneVerified ? null : (
+          <PhoneVerifyActions providers={phoneVerifyProviders} className="mt-3" />
+        )}
       </FieldRow>
 
       <FieldRow

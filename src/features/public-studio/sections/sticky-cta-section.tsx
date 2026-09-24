@@ -15,11 +15,12 @@ export async function StudioStickyCta({ studioId }: { studioId: string }) {
   const isOwner = await isViewerProfileOwner(studioId);
   if (isOwner) return null;
   return (
+    // PUBLIC-PROFILE-FIXED-CTA-UNDER-BOTTOM-NAV: над нижней навигацией телефона
+    // (`--bottom-nav-h`), на `lg` навигации нет — прежний отступ от края.
     <Button
       asChild
       variant="secondary"
-      className="fixed bottom-5 right-5 z-20 rounded-full px-5 py-3 shadow-hover"
-      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      className="fixed bottom-[calc(var(--bottom-nav-h,calc(3rem+max(0px,calc(env(safe-area-inset-bottom,0px)-10px))))+1rem)] right-5 z-20 rounded-full px-5 py-3 shadow-hover lg:bottom-5"
     >
       <Link href="#studio-services">{UI_TEXT.publicStudio.toServices}</Link>
     </Button>

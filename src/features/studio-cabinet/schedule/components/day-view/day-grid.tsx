@@ -12,15 +12,16 @@ import { formatLocalHm, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import { BOOKING_CELL_CLASS } from "../../lib/booking-status-display";
 import { isPendingClientReschedule } from "../../lib/reschedule-decision";
 import {
-  GRID_HEIGHT_PX,
   SLOT_HEIGHT_PX,
-  TOTAL_SLOTS,
   durationPx,
   formatTime,
+  gridHeightPx,
+  gridTotalSlots,
   iterateSlotMinutes,
   offsetPxFromMinute,
   parseDateKey,
   salonMinuteOfDay,
+  type GridWindow,
 } from "../../lib/time-grid";
 import type {
   ScheduleBookingCell,
@@ -85,7 +86,8 @@ export function DayGrid({
   // when data changes); graceful no-op if the id isn't on the current day.
   useFocusHighlight(day.bookings.length);
 
-  const slotMinutes = Array.from(iterateSlotMinutes());
+  const gridWindow = day.gridWindow;
+  const slotMinutes = Array.from(iterateSlotMinutes(gridWindow));
 
   // STUDIO-MASTERS-PRIVACY-FIX-A: scroll the focused master's column
   // into view when the page arrives with a verified `?master=<token>`.
@@ -132,7 +134,7 @@ export function DayGrid({
           {/* Time axis sticky left */}
           <div className="sticky left-0 z-30 bg-bg-card">
             <div className="h-12 border-b border-r border-border-subtle bg-bg-card" />
-            <TimeAxis />
+            <TimeAxis gridWindow={gridWindow} />
           </div>
 
           {/* Master columns */}
@@ -171,10 +173,10 @@ export function DayGrid({
                       "relative",
                       !column.isAvailable && "pointer-events-none",
                     )}
-                    style={{ height: GRID_HEIGHT_PX }}
+                    style={{ height: gridHeightPx(gridWindow) }}
                   >
                     {/* Hour grid lines */}
-                    {Array.from({ length: TOTAL_SLOTS }, (_, index) => (
+                    {Array.from({ length: gridTotalSlots(gridWindow) }, (_, index) => (
                       <div
                         key={index}
                         className={cn(
@@ -210,6 +212,7 @@ export function DayGrid({
                         key={entry.id}
                         entry={entry}
                         timezone={timezone}
+                        gridWindow={gridWindow}
                       />
                     ))}
 
@@ -229,7 +232,7 @@ export function DayGrid({
                             title={T.cell.personalBookingHint}
                             className="absolute z-10 overflow-hidden rounded-lg border border-dashed border-border-subtle bg-bg-input p-1.5 text-left text-[11px] leading-tight text-text-sec"
                             style={{
-                              top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
+                              top: offsetPxFromMinute(salonMinuteOfDay(start, timezone), gridWindow),
                               height: durationPx(start, end),
                               left,
                               width,
@@ -254,7 +257,7 @@ export function DayGrid({
                             BOOKING_CELL_CLASS[booking.tone],
                           )}
                           style={{
-                            top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
+                            top: offsetPxFromMinute(salonMinuteOfDay(start, timezone), gridWindow),
                             height: durationPx(start, end),
                             left,
                             width,
@@ -292,6 +295,7 @@ export function DayGrid({
                       <CurrentTimeLine
                         dateKey={day.dateKey}
                         timezone={timezone}
+                        gridWindow={gridWindow}
                       />
                     ) : null}
 
@@ -331,9 +335,11 @@ export function DayGrid({
 function BreakCell({
   entry,
   timezone,
+  gridWindow,
 }: {
   entry: ScheduleBreakCell;
   timezone: string;
+  gridWindow: GridWindow;
 }) {
   const start = new Date(entry.startAtUtc);
   const end = new Date(entry.endAtUtc);
@@ -341,7 +347,7 @@ function BreakCell({
     <div
       className="absolute left-1 right-1 z-[5] flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-[11px] font-medium text-text-sec"
       style={{
-        top: offsetPxFromMinute(salonMinuteOfDay(start, timezone)),
+        top: offsetPxFromMinute(salonMinuteOfDay(start, timezone), gridWindow),
         height: durationPx(start, end),
       }}
       title={entry.note ?? undefined}

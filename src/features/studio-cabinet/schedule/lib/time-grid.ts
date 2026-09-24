@@ -13,9 +13,36 @@ export const DAY_END_HOUR = 21;
 export const SLOT_MINUTES = 30;
 export const SLOT_HEIGHT_PX = 28;
 
-export const TOTAL_HOURS = DAY_END_HOUR - DAY_START_HOUR;
-export const TOTAL_SLOTS = (TOTAL_HOURS * 60) / SLOT_MINUTES;
-export const GRID_HEIGHT_PX = TOTAL_SLOTS * SLOT_HEIGHT_PX;
+/**
+ * BOOKING-FLOW-AUDIT-RESIDUALS — окно сетки дня (часы салона). 09–21 —
+ * минимум, а не потолок: сервер раздвигает окно под часы мастеров, записи и
+ * перерывы дня (`resolveGridWindow`). Раньше окно было зашито, и запись в
+ * 08:00 или до 22:00 обрезалась краем сетки, а клик по такому времени был
+ * невозможен.
+ */
+export type GridWindow = { startHour: number; endHour: number };
+
+export const DEFAULT_GRID_WINDOW: GridWindow = { startHour: DAY_START_HOUR, endHour: DAY_END_HOUR };
+
+/** Окно, покрывающее все переданные минуты дня салона (и не уже 09–21). */
+export function resolveGridWindow(minutesOfDay: readonly number[]): GridWindow {
+  let startHour = DAY_START_HOUR;
+  let endHour = DAY_END_HOUR;
+  for (const minute of minutesOfDay) {
+    if (!Number.isFinite(minute)) continue;
+    startHour = Math.min(startHour, Math.floor(minute / 60));
+    endHour = Math.max(endHour, Math.ceil(minute / 60));
+  }
+  return { startHour: Math.max(0, startHour), endHour: Math.min(24, endHour) };
+}
+
+export function gridTotalSlots(window: GridWindow = DEFAULT_GRID_WINDOW): number {
+  return ((window.endHour - window.startHour) * 60) / SLOT_MINUTES;
+}
+
+export function gridHeightPx(window: GridWindow = DEFAULT_GRID_WINDOW): number {
+  return gridTotalSlots(window) * SLOT_HEIGHT_PX;
+}
 
 export function parseDateKey(value: string): Date {
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -53,8 +80,11 @@ export function salonMinuteOfDay(value: Date, timeZone: string): number {
  * anchoring on UTC-middnight drew a +5 salon's whole day above the top
  * edge (clipped). `top < 0` still means "before the visible window".
  */
-export function offsetPxFromMinute(minuteOfDay: number): number {
-  const dayStartMinutes = DAY_START_HOUR * 60;
+export function offsetPxFromMinute(
+  minuteOfDay: number,
+  window: GridWindow = DEFAULT_GRID_WINDOW,
+): number {
+  const dayStartMinutes = window.startHour * 60;
   return ((minuteOfDay - dayStartMinutes) / SLOT_MINUTES) * SLOT_HEIGHT_PX;
 }
 
@@ -63,8 +93,8 @@ export function durationPx(startUtc: Date, endUtc: Date): number {
   return Math.max((minutes / SLOT_MINUTES) * SLOT_HEIGHT_PX, SLOT_HEIGHT_PX);
 }
 
-export function* iterateSlotMinutes(): Generator<number> {
-  for (let m = DAY_START_HOUR * 60; m < DAY_END_HOUR * 60; m += SLOT_MINUTES) {
+export function* iterateSlotMinutes(window: GridWindow = DEFAULT_GRID_WINDOW): Generator<number> {
+  for (let m = window.startHour * 60; m < window.endHour * 60; m += SLOT_MINUTES) {
     yield m;
   }
 }

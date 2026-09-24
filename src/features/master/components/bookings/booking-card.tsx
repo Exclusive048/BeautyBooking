@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { BookingCardActions } from "@/features/master/components/bookings/booking-card-actions";
 import { BookingManageActions } from "@/features/master/components/bookings/booking-manage-actions";
+import { BookingNoShowAction } from "@/features/master/components/bookings/booking-no-show-action";
+import { canMarkNoShow } from "@/lib/bookings/flow";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -69,6 +71,12 @@ export function BookingCard({ booking, column }: Props) {
             {T.inProgressBadge}
           </Badge>
         ) : null}
+        {column === "cancelled" && booking.rawStatus === "NO_SHOW" ? (
+          // NO-SHOW-UI: неявка — не отмена; без бейджа карточка выглядела отменой.
+          <Badge variant="muted" className="shrink-0 text-[10px]">
+            {T.noShowBadge}
+          </Badge>
+        ) : null}
       </header>
 
       <p className="mb-2 text-sm text-text-main">{booking.serviceTitle}</p>
@@ -101,10 +109,22 @@ export function BookingCard({ booking, column }: Props) {
           bookingId={booking.id}
           rawStatus={booking.rawStatus}
           actionRequiredBy={booking.actionRequiredBy}
+          startAtUtc={booking.startAtUtc ? booking.startAtUtc.toISOString() : null}
         />
       ) : null}
 
-      {(column === "confirmed" || column === "today") &&
+      {column === "today" &&
+      canMarkNoShow({
+        status: booking.rawStatus,
+        startAtUtc: booking.startAtUtc,
+        endAtUtc: booking.endAtUtc,
+      }) ? (
+        // NO-SHOW-UI: в «Сегодня» приём уже начался — «Перенести»/«Отменить»
+        // тут всегда были выключены окном 60 минут, осмысленна только неявка.
+        <BookingNoShowAction bookingId={booking.id} />
+      ) : null}
+
+      {column === "confirmed" &&
       booking.startAtUtc &&
       booking.endAtUtc ? (
         <BookingManageActions

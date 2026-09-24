@@ -6,7 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
 import { Button } from "@/components/ui/button";
 import { FeedCard } from "@/features/home/components/feed-card";
-import { FeedSkeleton, FeedSkeletonGrid } from "@/features/home/components/feed-skeleton";
+import {
+  FEED_GRID_CLASS,
+  FeedSkeleton,
+  FeedSkeletonGrid,
+} from "@/features/home/components/feed-skeleton";
 import { RecentMastersSection } from "@/features/home/components/recent-masters-section";
 import { StoriesRail } from "@/features/home/components/stories-rail";
 import { StoriesViewerOverlayLazy } from "@/features/home/components/stories-viewer-overlay-lazy";
@@ -130,7 +134,7 @@ export function HomeFeed(props: HomeFeedProps) {
         </div>
       ) : null}
 
-      {isInitialLoading ? <FeedSkeletonGrid count={9} /> : null}
+      {isInitialLoading ? <FeedSkeletonGrid count={12} /> : null}
 
       {isEmpty ? (
         <div className="mx-auto max-w-md py-20 text-center">
@@ -145,17 +149,18 @@ export function HomeFeed(props: HomeFeedProps) {
       ) : null}
 
       {!isInitialLoading && items.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5">
+        // HOME-FEED-DENSE: 3 в ряд на телефоне, 6 на ПК (решение владельца).
+        <div className={FEED_GRID_CLASS}>
           {items.map((item, index) => (
             <FeedCard key={item.id} item={item} index={index} />
           ))}
         </div>
       ) : null}
 
-      {/* Loading next page — three skeletons in a row */}
+      {/* Loading next page — one row of skeletons */}
       {!isInitialLoading && isLoadingMore && !isReachingEnd ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 md:gap-5">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className={FEED_GRID_CLASS}>
+          {Array.from({ length: 6 }).map((_, i) => (
             <FeedSkeleton key={`more-${i}`} />
           ))}
         </div>

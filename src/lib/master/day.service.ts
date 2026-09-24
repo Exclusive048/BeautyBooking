@@ -12,6 +12,7 @@ import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { BookingSource, type BookingStatus } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
 import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 
 export type MasterDayBooking = {
@@ -528,7 +529,10 @@ export async function createSoloMasterBooking(input: {
       return booking;
     },
     // FIX-C6: изоляцию ставит `bookingTransaction` (инв. #31).
-  );
+  ).catch((error: unknown) => {
+    // Гонка на коммите — «время занято», а не 500.
+    throw mapPrismaBookingConflict(error) ?? error;
+  });
 
   await invalidateSlotsForBookingRange({
     providerId: input.masterId,

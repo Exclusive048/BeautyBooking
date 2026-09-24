@@ -54,7 +54,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
     const review = await prisma.review.findUnique({
       where: { id },
-      select: { id: true, targetType: true, targetId: true, deletedAt: true },
+      select: { id: true, targetType: true, targetId: true, masterId: true, deletedAt: true },
     });
 
     if (!review) {
@@ -81,7 +81,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
           deletedByUserId: auth.user.id,
         },
       });
-      await recalculateTargetRatings(tx, review.targetType, review.targetId);
+      await recalculateTargetRatings(tx, review);
     });
 
     return ok({ id });

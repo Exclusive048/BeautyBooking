@@ -2,6 +2,7 @@ import { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { claimNotificationDedup } from "@/lib/notifications/dedup-guard";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 import { getAppPublicUrl } from "@/lib/telegram/config";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -14,15 +15,10 @@ function buildAntiSpamKey(userId: string, providerId: string): string {
   return `slot-freed-notify:${userId}:${providerId}`;
 }
 
+// Rule 17: salon-tz с меткой зоны — подписчик может жить в другом поясе.
 function formatSlotDateTime(startAtUtc: string, timezone: string): string {
   const date = new Date(startAtUtc);
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  });
+  return formatBookingWhenLabel(date, timezone) ?? startAtUtc;
 }
 
 export async function processSlotFreed(payload: SlotFreedPayload): Promise<void> {

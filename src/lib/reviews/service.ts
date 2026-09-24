@@ -10,6 +10,7 @@ import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { canLeaveReview } from "@/lib/reviews/can-leave";
 import { recalculateTargetRatings } from "@/lib/reviews/recalculate-ratings";
+import { targetReviewsWhere } from "@/lib/reviews/review-scope";
 import {
   REVIEW_PRIVATE_TAGS_MAX,
   REVIEW_PUBLIC_TAGS_MAX,
@@ -477,7 +478,11 @@ export async function createReview(input: {
         include: reviewInclude,
       });
 
-      await recalculateTargetRatings(tx, target.targetType, target.targetId);
+      await recalculateTargetRatings(tx, {
+        targetType: target.targetType,
+        targetId: target.targetId,
+        masterId: studioScope?.masterId ?? null,
+      });
       return review;
     });
   } catch (error) {
@@ -509,11 +514,8 @@ export async function listReviews(input: {
   });
 
   const reviews = await prisma.review.findMany({
-    where: {
-      targetType: input.targetType,
-      targetId: input.targetId,
-      ...ACTIVE_REVIEW_FILTER,
-    },
+    // STUDIO-REVIEW-MASTER-RATING: у мастера — и отзывы о визитах в студию.
+    where: targetReviewsWhere(input.targetType, input.targetId),
     orderBy: { createdAt: "desc" },
     take: input.limit,
     skip: input.offset,
@@ -582,7 +584,8 @@ export async function replyToReview(input: {
   nowUtc?: Date;
 }): Promise<ReviewDto> {
   const review = await prisma.review.findUnique({
-    where: { id: input.reviewId },
+    // Удалённый (soft-delete) отзыв для действий не существует — инв. #17.
+    where: { id: input.reviewId, ...ACTIVE_REVIEW_FILTER },
     select: {
       id: true,
       targetType: true,
@@ -628,7 +631,8 @@ export async function editReviewReply(input: {
   nowUtc?: Date;
 }): Promise<ReviewDto> {
   const review = await prisma.review.findUnique({
-    where: { id: input.reviewId },
+    // Удалённый (soft-delete) отзыв для действий не существует — инв. #17.
+    where: { id: input.reviewId, ...ACTIVE_REVIEW_FILTER },
     select: {
       id: true,
       targetType: true,
@@ -670,7 +674,8 @@ export async function reportReview(input: {
 }): Promise<{ reported: boolean }> {
   const now = input.nowUtc ?? new Date();
   const review = await prisma.review.findUnique({
-    where: { id: input.reviewId },
+    // Удалённый (soft-delete) отзыв для действий не существует — инв. #17.
+    where: { id: input.reviewId, ...ACTIVE_REVIEW_FILTER },
     select: {
       id: true,
       authorId: true,
@@ -720,13 +725,15 @@ export async function updateReview(input: {
   text?: string;
 }): Promise<{ id: string; rating: number; text: string | null }> {
   const review = await prisma.review.findUnique({
-    where: { id: input.reviewId },
+    // Удалённый (soft-delete) отзыв для действий не существует — инв. #17.
+    where: { id: input.reviewId, ...ACTIVE_REVIEW_FILTER },
     select: {
       id: true,
       authorId: true,
       createdAt: true,
       targetType: true,
       targetId: true,
+      masterId: true,
     },
   });
   if (!review) {
@@ -758,7 +765,7 @@ export async function updateReview(input: {
     });
     // Avg rating must reflect the new score immediately — same recalc path
     // as create/delete keeps the four mutation sites symmetrical.
-    await recalculateTargetRatings(tx, review.targetType, review.targetId);
+    await recalculateTargetRatings(tx, review);
     return next;
   });
 
@@ -776,6 +783,7 @@ export async function deleteReview(input: {
       authorId: true,
       targetType: true,
       targetId: true,
+      masterId: true,
       replyText: true,
       repliedAt: true,
       reportedAt: true,
@@ -822,7 +830,7 @@ export async function deleteReview(input: {
         deletedReason: null,
       },
     });
-    await recalculateTargetRatings(tx, review.targetType, review.targetId);
+    await recalculateTargetRatings(tx, review);
   });
 
   return { id: review.id };

@@ -11,7 +11,15 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+  type AnimationPlaybackControls,
+} from "framer-motion";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
@@ -19,8 +27,10 @@ import { useStoriesViewer, type ViewerState } from "@/features/home/stories-view
 import { markItemViewed } from "@/features/home/stories-viewed-storage";
 import type { StoriesGroup, StoryItem } from "@/features/home/types/stories";
 import { formatRelativeTime } from "@/lib/utils/relative-time";
+import { formatWorkCaption } from "@/lib/feed/work-caption";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { UI_TEXT } from "@/lib/ui/text";
+import { cn } from "@/lib/cn";
 
 const STORY_DURATION_MS = 5000;
 
@@ -53,9 +63,27 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
   const item: StoryItem | undefined = group?.items[state.activeItemIdx];
 
   const [isPaused, setIsPaused] = useState(false);
+  // Эффект смены кадра читает паузу, не завися от неё: иначе снятие паузы
+  // перезапускало бы полоску с нуля (STORIES-PROGRESS-01).
+  const pausedRef = useRef(false);
+  const setPaused = useCallback((next: boolean) => {
+    pausedRef.current = next;
+    setIsPaused(next);
+  }, []);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const progressControls = useAnimationControls();
+  // STORIES-PROGRESS-01: прогресс текущего кадра — одно MotionValue (0…100) и
+  // императивный `animate()` с pause/play. Прежние общие `useAnimationControls`
+  // держали подписку каждой полоски, хоть раз бывшей текущей (пройденные
+  // заполнялись заново вместе с текущей), а у перемонтированной полоски
+  // подписка появлялась позже `start()` — и новая полоска стояла на нуле.
+  const progress = useMotionValue(0);
+  const progressWidth = useTransform(progress, (value) => `${value}%`);
+  const playbackRef = useRef<AnimationPlaybackControls | null>(null);
+  const onNextRef = useRef(onNext);
+  useEffect(() => {
+    onNextRef.current = onNext;
+  }, [onNext]);
 
   const T = UI_TEXT.homeFeed.stories.viewer;
 
@@ -75,10 +103,10 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
 
   // Pause when tab hidden.
   useEffect(() => {
-    const onVisibility = () => setIsPaused(document.hidden);
+    const onVisibility = () => setPaused(document.hidden);
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
+  }, [setPaused]);
 
   // Mark current item viewed once it loads (also called from <Image onLoad>).
   // Calling here too so non-image-load (e.g. image cached) still marks.
@@ -134,42 +162,59 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
     }
   }, []);
 
-  // Drive the current photo's progress bar via animation controls.
-  // Reset to 0 → animate to 100 over STORY_DURATION_MS whenever (master, item)
-  // changes; pause/resume on isPaused; stay full when reduced-motion is on.
+  // Новый кадр — отсчёт с нуля; по естественному концу — следующий кадр
+  // (`stop()` при смене кадра `onComplete` не вызывает). Пауза сюда НЕ входит:
+  // раньше её снятие тоже сбрасывало полоску, и удержанный кадр начинался заново.
   useEffect(() => {
+    playbackRef.current?.stop();
     if (reduceMotion) {
-      progressControls.set({ width: "100%" });
+      progress.set(100);
+      playbackRef.current = null;
       return;
     }
-    if (isPaused) {
-      progressControls.stop();
-      return;
-    }
-    progressControls.set({ width: "0%" });
-    void progressControls.start({
-      width: "100%",
-      transition: { duration: STORY_DURATION_MS / 1000, ease: "linear" },
+    progress.set(0);
+    const playback = animate(progress, 100, {
+      duration: STORY_DURATION_MS / 1000,
+      ease: "linear",
+      onComplete: () => onNextRef.current(),
     });
-  }, [state.activeMasterIdx, state.activeItemIdx, isPaused, reduceMotion, progressControls]);
+    if (pausedRef.current) playback.pause();
+    playbackRef.current = playback;
+    return () => playback.stop();
+  }, [state.activeMasterIdx, state.activeItemIdx, reduceMotion, progress]);
+
+  // Пауза замораживает отсчёт, снятие — продолжает с того же места.
+  useEffect(() => {
+    const playback = playbackRef.current;
+    if (!playback) return;
+    if (isPaused) playback.pause();
+    else playback.play();
+  }, [isPaused]);
 
   // Hold-to-pause (centre tap zone). Pointer capture guarantees pointerup fires
   // even if the finger drifts off the zone — so we don't need onPointerLeave.
-  const handleHoldStart = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsPaused(true);
-  }, []);
-  const handleHoldEnd = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-    setIsPaused(false);
-  }, []);
+  const handleHoldStart = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setPaused(true);
+    },
+    [setPaused],
+  );
+  const handleHoldEnd = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      setPaused(false);
+    },
+    [setPaused],
+  );
 
   if (!group || !item) return null;
 
   const profileHref = profileHrefFor(group);
   const totalItems = group.items.length;
+  const workCaption = formatWorkCaption(item.performerName, item.serviceTitle);
   const counterText = T.counter
     .replace("{current}", String(state.activeItemIdx + 1))
     .replace("{total}", String(totalItems));
@@ -274,44 +319,15 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
                 key={idx}
                 className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30"
               >
-                {reduceMotion ? (
+                {reduceMotion || !isCurrent ? (
                   <div
                     className="h-full bg-white"
-                    style={{ width: isPast || isCurrent ? "100%" : "0%" }}
+                    style={{ width: isPast || (reduceMotion && isCurrent) ? "100%" : "0%" }}
                   />
                 ) : (
-                  <motion.div
-                    // No unique key — we WANT React to reuse the same motion.div
-                    // across photo changes. The effect's `progressControls.set({
-                    // width: "0%" })` already cancels any in-flight animation
-                    // and resets width synchronously before `start()`. An outer
-                    // key would unmount/remount and detach from the controls
-                    // instance, breaking auto-progress on photo changes.
-                    className="h-full bg-white"
-                    initial={false}
-                    animate={
-                      isCurrent
-                        ? progressControls
-                        : { width: isPast ? "100%" : "0%" }
-                    }
-                    transition={isCurrent ? undefined : { duration: 0 }}
-                    onAnimationComplete={(definition) => {
-                      // Fire only when the CURRENT bar finished its 0→100 fill.
-                      // Stops triggered by `progressControls.stop()` (pause) or
-                      // by other branches don't pass this filter.
-                      if (
-                        !isCurrent ||
-                        isPaused ||
-                        reduceMotion ||
-                        typeof definition !== "object" ||
-                        !("width" in definition) ||
-                        definition.width !== "100%"
-                      ) {
-                        return;
-                      }
-                      onNext();
-                    }}
-                  />
+                  // Только текущая полоска читает общий прогресс; пройденные и
+                  // будущие — статичные 100% / 0% (STORIES-PROGRESS-01).
+                  <motion.div className="h-full bg-white" style={{ width: progressWidth }} />
                 )}
               </div>
             );
@@ -365,6 +381,21 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
             <X className="h-6 w-6" aria-hidden />
           </button>
         </div>
+
+        {/* STUDIO-PORTFOLIO-FEED: подпись работы — снизу слева, полупрозрачно,
+            без нажатий; под ней тап-зоны (pointer-events-none). */}
+        {workCaption ? (
+          <div
+            className={cn(
+              "pointer-events-none absolute left-3 right-16 z-20",
+              reduceMotion ? "bottom-20" : "bottom-5",
+            )}
+          >
+            <p className="inline-block max-w-full truncate rounded-full bg-black/35 px-3 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
+              {workCaption}
+            </p>
+          </div>
+        ) : null}
 
         {/* Tap zones (only when motion is allowed — otherwise visible buttons appear instead) */}
         {!reduceMotion ? (

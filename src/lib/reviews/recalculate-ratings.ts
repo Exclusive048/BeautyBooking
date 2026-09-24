@@ -1,7 +1,10 @@
-import "server-only";
+// Без `import "server-only"` (STUDIO-REVIEW-MASTER-RATING): модуль получает
+// клиент транзакции параметром и сам ни Prisma, ни Redis не импортирует, а зовёт
+// его и пост-деплой (`studio-review-master-backfill.ts`), который идёт обычным
+// `tsx` без условия `react-server`.
 import { Prisma, type ReviewTargetType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
-import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { targetReviewsWhere } from "@/lib/reviews/review-scope";
 
 /**
  * LOGIC-16 — пересчёт рейтинга цели отзыва. ЕДИНСТВЕННЫЙ писатель
@@ -36,7 +39,32 @@ import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
  * одного писателя — оно тут не про стиль, а про корректность.
  * Пин — `reviews/recalculate-ratings.test.ts`.
  */
+export type RatingRecalcTarget = {
+  targetType: ReviewTargetType;
+  targetId: string;
+  /**
+   * Исполнитель визита (`Review.masterId`). Обязателен ТИПОМ: у отзыва о визите
+   * в студию меняется и рейтинг мастера (STUDIO-REVIEW-MASTER-RATING), и
+   * вызывающий, забывший его передать, не компилируется, а не оставляет
+   * мастеру протухший рейтинг.
+   */
+  masterId: string | null;
+};
+
 export async function recalculateTargetRatings(
+  tx: Prisma.TransactionClient,
+  target: RatingRecalcTarget
+): Promise<void> {
+  await recalculateOneTarget(tx, target.targetType, target.targetId);
+  // STUDIO-REVIEW-MASTER-RATING: визит в студию — оценка и мастеру-исполнителю.
+  // Порядок блокировок фиксирован (студия → мастер), а обратного пути нет:
+  // пересчёт мастера никогда не берёт строку студии.
+  if (target.targetType === "studio" && target.masterId && target.masterId !== target.targetId) {
+    await recalculateOneTarget(tx, "provider", target.masterId);
+  }
+}
+
+async function recalculateOneTarget(
   tx: Prisma.TransactionClient,
   targetType: ReviewTargetType,
   targetId: string
@@ -50,8 +78,10 @@ export async function recalculateTargetRatings(
   // Soft-deleted reviews (REVIEW-SOFT-DELETE-A) are excluded from the
   // aggregate. The standard `deletedAt: null` filter applies here too —
   // a deleted review must not influence the target's public rating.
+  // STUDIO-REVIEW-MASTER-RATING: у мастера — и отзывы о визитах в студию, где
+  // он исполнитель; правило общее со списком отзывов (`review-scope.ts`).
   const aggregate = await tx.review.aggregate({
-    where: { targetType, targetId, ...ACTIVE_REVIEW_FILTER },
+    where: targetReviewsWhere(targetType, targetId),
     _avg: { rating: true },
     _count: { _all: true },
   });

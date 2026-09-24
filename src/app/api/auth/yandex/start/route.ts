@@ -2,12 +2,14 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import {
+  cabinetRefererPath,
   failOAuthStart,
   oauthStartLoginRedirect,
   oauthStartProviderRedirect,
   type OAuthStartNavigation,
 } from "@/lib/auth/oauth-start-error";
 import { getSessionUser } from "@/lib/auth/session";
+import { PHONE_VERIFY_START_PARAM, rememberPhoneVerifyReturn } from "@/lib/auth/phone-verify-return";
 import { buildYandexAuthorizeUrl, requireYandexRedirectUri } from "@/lib/yandex/oauth";
 import { generateCodeChallenge, generateCodeVerifier } from "@/lib/yandex/pkce";
 import {
@@ -73,6 +75,12 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
         path: "/",
         maxAge: YANDEX_STATE_TTL_SECONDS,
       });
+
+      // PHONE-OAUTH-PROOF-01: вход из кнопки «Подтвердить номер» в кабинете —
+      // колбэк вернёт на ту же страницу с итогом (`phone-verify-return.ts`).
+      if (isLinkingSession && new URL(req.url).searchParams.get(PHONE_VERIFY_START_PARAM) === "1") {
+        await rememberPhoneVerifyReturn(cabinetRefererPath(req));
+      }
 
       return oauthStartProviderRedirect(authUrl);
     } catch (error) {

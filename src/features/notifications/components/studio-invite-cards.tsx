@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
@@ -8,6 +9,7 @@ import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
+import { useRevalidateMe } from "@/lib/hooks/use-me";
 
 type Props = {
   invites: NotificationCenterInviteItem[];
@@ -21,6 +23,8 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
   const [items, setItems] = useState<NotificationCenterInviteItem[]>(invites);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const revalidateMe = useRevalidateMe();
 
   useEffect(() => {
     setItems(invites);
@@ -61,6 +65,14 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
       }
 
       removeInviteLocally(inviteId);
+      if (action === "accept") {
+        // INVITE-ROLE-REFRESH: принятие даёт кабинет мастера и роль MASTER.
+        // Шапка — серверный компонент корневого layout'а, мягкая навигация её
+        // не перерисовывает; нижняя навигация держит `/api/me` в SWR. Без
+        // обоих сбросов «Стать мастером» висело до перезагрузки.
+        void revalidateMe();
+        router.refresh();
+      }
     } catch {
       setError(t.networkError);
     } finally {

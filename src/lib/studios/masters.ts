@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
+import { findStudioLeaveBlock } from "@/lib/studio/leave-guard";
 import { ProviderType } from "@prisma/client";
 
 type StudioMasterRecord = {
@@ -180,6 +181,14 @@ export async function detachMasterFromStudio(
   if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioId) {
     return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
   }
+
+  // STUDIO-LEAVE-GUARD: живые записи студии сначала переносятся или отменяются.
+  const block = await findStudioLeaveBlock(prisma, {
+    studioProviderId: studioId,
+    masterProviderIds: [master.id],
+    actor: "STUDIO",
+  });
+  if (block) return { ok: false, status: 409, message: block.message, code: block.code };
 
   const updated = await prisma.provider.update({
     where: { id: master.id },

@@ -1,6 +1,7 @@
 import { AccountType, BookingSource } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
 import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -425,7 +426,8 @@ export async function POST(req: Request, ctx: RouteContext) {
 
     return jsonOk({ bookingId });
   } catch (error) {
-    const appError = toAppError(error);
+    // Гонка на коммите брони — «время занято» (409), а не 500.
+    const appError = mapPrismaBookingConflict(error) ?? toAppError(error);
     if (appError.status >= 500) {
       logError("POST /api/model-applications/[applicationId]/confirm failed", {
         requestId: getRequestId(req),

@@ -401,7 +401,7 @@ export function BookingFlowStepper({
       }
 
       const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { booking: { id: string } } }
+        | { ok: true; data: { booking: { id: string }; manageUrl?: string | null } }
         | { ok: false; error: { code: string; message: string } }
         | null;
 
@@ -433,6 +433,7 @@ export function BookingFlowStepper({
         timezone: providerTimezone,
         clientPhoneMasked: maskRussianPhone(submitPhone),
         isAuthenticatedUser: Boolean(me),
+        manageUrl: json.data.manageUrl ?? null,
       };
 
       writeBookingIdToUrl(json.data.booking.id);
@@ -460,7 +461,11 @@ export function BookingFlowStepper({
             // EXP-022: skip the state update if the stepper unmounted while
             // this detached fetch was in flight.
             if (enriched && mountedRef.current) {
-              dispatch({ type: "loadConfirmedBooking", booking: enriched });
+              // GUEST-MANAGE-LINK: ссылка есть только в ответе на создание — сохраняем её.
+              dispatch({
+                type: "loadConfirmedBooking",
+                booking: { ...enriched, manageUrl: fallbackConfirmation.manageUrl },
+              });
             }
           }
         } catch {

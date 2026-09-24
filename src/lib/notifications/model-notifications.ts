@@ -1,6 +1,9 @@
 import { NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
+import { dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
+import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 const applicationInclude = {
   offer: {
@@ -15,6 +18,7 @@ const applicationInclude = {
           id: true,
           name: true,
           ownerUserId: true,
+          timezone: true,
           masterProfile: { select: { userId: true } },
         },
       },
@@ -32,6 +36,39 @@ function resolveMasterUserId(application: ApplicationWithRelations): string | nu
     application.offer.master.masterProfile?.userId ??
     null
   );
+}
+
+/**
+ * BOOKING-FLOW-AUDIT-RESIDUALS · rule 17 — время модель-оффера хранится
+ * строками в поясе мастера (`dateLocal` + `HH:MM`), и уведомления печатали их
+ * сырыми («2026-09-30 13:00»), без метки зоны. Теперь — salon-tz с меткой, как
+ * во всех уведомлениях о записи (`formatBookingWhenLabel`).
+ */
+function parseLocalTime(value: string): { hour: number; minute: number } | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  return { hour: Number(match[1]), minute: Number(match[2]) };
+}
+
+function offerWhenLabel(dateLocal: string, timeLocal: string, timeZone: string): string {
+  const time = parseLocalTime(timeLocal);
+  if (!isDateKey(dateLocal) || !time) return `${dateLocal} ${timeLocal}`;
+  const at = dateFromLocalDateKey(dateLocal, timeZone, time.hour, time.minute);
+  return formatBookingWhenLabel(at, timeZone) ?? `${dateLocal} ${timeLocal}`;
+}
+
+function offerRangeLabel(dateLocal: string, startLocal: string, endLocal: string, timeZone: string): string {
+  const start = parseLocalTime(startLocal);
+  if (!isDateKey(dateLocal) || !start) return `${dateLocal} ${startLocal}–${endLocal}`;
+  const at = dateFromLocalDateKey(dateLocal, timeZone, start.hour, start.minute);
+  const day = at.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone });
+  const zone = formatZoneLabel({ iso: at.toISOString(), timeZone });
+  return `${day}, ${startLocal}–${endLocal}${zone ? ` ${zone}` : ""}`;
+}
+
+function offerTimeZone(application: ApplicationWithRelations): string {
+  // `Provider.timezone` не nullable (`@default` в схеме).
+  return application.offer.master.timezone;
 }
 
 function buildTelegramText(title: string, body: string): string {
@@ -54,7 +91,13 @@ export async function notifyModelApplicationReceived(
   if (!masterUserId) return;
 
   const title = "Новая заявка модели";
-  const body = `Новая заявка на предложение ${application.offer.dateLocal} ${application.offer.timeRangeStartLocal}-${application.offer.timeRangeEndLocal}.`;
+  const range = offerRangeLabel(
+    application.offer.dateLocal,
+    application.offer.timeRangeStartLocal,
+    application.offer.timeRangeEndLocal,
+    offerTimeZone(application),
+  );
+  const body = `Новая заявка на предложение ${range}.`;
 
   await deliverNotification({
     userId: masterUserId,
@@ -77,8 +120,9 @@ export async function notifyModelTimeProposed(
   if (!clientUserId) return;
 
   const timeLabel = application.proposedTimeLocal ?? application.offer.timeRangeStartLocal;
+  const when = offerWhenLabel(application.offer.dateLocal, timeLabel, offerTimeZone(application));
   const title = "Предложено время";
-  const body = `Мастер предложил время ${application.offer.dateLocal} ${timeLabel}. Подтвердите запись.`;
+  const body = `Мастер предложил время ${when}. Подтвердите запись.`;
 
   await deliverNotification({
     userId: clientUserId,
@@ -130,8 +174,9 @@ export async function notifyModelTimeConfirmed(
   if (!masterUserId) return;
 
   const timeLabel = application.proposedTimeLocal ?? application.offer.timeRangeStartLocal;
+  const when = offerWhenLabel(application.offer.dateLocal, timeLabel, offerTimeZone(application));
   const title = "Время подтверждено";
-  const body = `Модель подтвердила время ${application.offer.dateLocal} ${timeLabel}.`;
+  const body = `Модель подтвердила время ${when}.`;
 
   await deliverNotification({
     userId: masterUserId,

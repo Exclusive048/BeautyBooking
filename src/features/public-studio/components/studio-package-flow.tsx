@@ -26,6 +26,7 @@ import {
 } from "@/lib/bookings/package-cursor";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 import {
   fetchRetryingDuplicates,
   isDuplicateRequestResponse,
@@ -88,6 +89,8 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // GUEST-MANAGE-LINK: ссылка «Управлять записью» на весь пакет — только гостю.
+  const [manageUrl, setManageUrl] = useState<string | null>(null);
 
   const fmtTime = useCallback(
     (iso: string) => UI_FMT.timeShort(iso, { timeZone: studioTimezone }),
@@ -334,7 +337,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         }),
       });
       const json = (await res.json().catch(() => null)) as
-        | { ok: true }
+        | { ok: true; data?: { manageUrl?: string | null } }
         | { ok: false; error: { message: string } }
         | null;
       if (!res.ok || !json?.ok) {
@@ -350,6 +353,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
         }
         return;
       }
+      setManageUrl(json.data?.manageUrl ?? null);
       setPhase("success");
     } catch {
       setError(T.networkError);
@@ -642,6 +646,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           </div>
           <div className="font-display text-xl text-text-main">{T.successTitle}</div>
           <p className="text-sm text-text-sec">{T.successBody}</p>
+          {manageUrl ? <GuestManageLinkCard manageUrl={manageUrl} /> : null}
           <Button variant="secondary" size="md" onClick={onClose}>
             {T.close}
           </Button>

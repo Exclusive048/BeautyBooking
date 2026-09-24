@@ -22,6 +22,8 @@ type Props = {
   priceMin: string;
   priceMax: string;
   district: string;
+  /** CATALOG-DATE-TIME-FILTER: подпись выбранного «когда» (null — не выбрано). */
+  whenLabel?: string | null;
   /** Обновления параметров URL; `null` удаляет параметр. */
   onChange: (updates: Record<string, string | null>) => void;
 };
@@ -57,6 +59,7 @@ export function CatalogQuickFilters({
   priceMin,
   priceMax,
   district,
+  whenLabel = null,
   onChange,
 }: Props) {
   const categories = useTopCategories();
@@ -77,6 +80,14 @@ export function CatalogQuickFilters({
       className="-mx-4 overflow-x-auto px-4 scroll-px-4 scrollbar-hide sm:-mx-6 sm:px-6"
     >
       <div className="flex min-w-max items-center gap-2 py-0.5">
+        {whenLabel ? (
+          <RemovableChip
+            label={whenLabel}
+            onRemove={() =>
+              onChange({ date: null, timePreset: null, timeFrom: null, timeTo: null, availableToday: null })
+            }
+          />
+        ) : null}
         {priceActive ? (
           <RemovableChip
             label={priceLabel(priceMin, priceMax)}

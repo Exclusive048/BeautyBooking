@@ -6,14 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import {
-  ensureUniqueUsername,
-  generateDefaultUsername,
+  generateUniqueMasterUsername,
   isUsernameTaken,
   normalizeUsernameInput,
   validateUsername,
 } from "@/lib/publicUsername";
 import { parseBody } from "@/lib/validation";
-import { ProviderType } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -50,14 +48,11 @@ export async function GET(req: Request) {
         where: { id: auth.user.id },
         select: { firstName: true, lastName: true },
       });
-      const baseUsername = generateDefaultUsername({
-        providerType: ProviderType.MASTER,
-        firstName: owner?.firstName ?? null,
-        lastName: owner?.lastName ?? null,
-        allowLastName: false,
+      username = await generateUniqueMasterUsername(prisma, {
+        firstName: owner?.firstName,
+        lastName: owner?.lastName,
         serviceCategory: provider.categories[0] ?? null,
       });
-      username = await ensureUniqueUsername(prisma, baseUsername);
       const updated = await prisma.provider.update({
         where: { id: providerId },
         data: { publicUsername: username, publicUsernameUpdatedAt: new Date() },

@@ -21,6 +21,7 @@ import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { PublicBundleView } from "@/lib/master/public-profile-view.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
+import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 import {
   fetchRetryingDuplicates,
   isDuplicateRequestResponse,
@@ -122,6 +123,8 @@ export function PackageBookingFlow({
   const [phone, setPhone] = useState("");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // GUEST-MANAGE-LINK: ссылка «Управлять записью» на весь пакет — только гостю.
+  const [manageUrl, setManageUrl] = useState<string | null>(null);
 
   // The first not-yet-placed component (in sortOrder) is the active one.
   const activeIndex = useMemo(
@@ -325,7 +328,7 @@ export function PackageBookingFlow({
         }),
       });
       const json = (await res.json().catch(() => null)) as
-        | { ok: true }
+        | { ok: true; data?: { manageUrl?: string | null } }
         | { ok: false; error: { message: string } }
         | null;
       if (!res.ok || !json?.ok) {
@@ -342,6 +345,7 @@ export function PackageBookingFlow({
         }
         return;
       }
+      setManageUrl(json.data?.manageUrl ?? null);
       setPhase("success");
     } catch {
       setError(T.networkError);
@@ -631,6 +635,7 @@ export function PackageBookingFlow({
           </div>
           <div className="font-display text-xl text-text-main">{T.successTitle}</div>
           <p className="text-sm text-text-sec">{T.successBody}</p>
+          {manageUrl ? <GuestManageLinkCard manageUrl={manageUrl} /> : null}
           <Button variant="secondary" size="md" onClick={onClose}>
             {T.close}
           </Button>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { usePrompt } from "@/hooks/use-prompt";
 import { useConfirm } from "@/hooks/use-confirm";
+import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
@@ -23,6 +24,12 @@ type Props = {
    */
   rawStatus?: string;
   actionRequiredBy?: "CLIENT" | "MASTER" | null;
+  /**
+   * BOOKING-FLOW-AUDIT-RESIDUALS: отказ по записи сервер принимает не позже
+   * чем за 60 минут до начала (`ensureBookingActionWindow`) — кнопка
+   * выключается заранее, как «Отменить» в соседней колонке.
+   */
+  startAtUtc?: string | null;
 };
 
 /**
@@ -35,7 +42,12 @@ type Props = {
  * for non-CHANGE_REQUESTED rejections, and the customer message reads
  * better with one anyway.
  */
-export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = null }: Props) {
+export function BookingCardActions({
+  bookingId,
+  rawStatus,
+  actionRequiredBy = null,
+  startAtUtc = null,
+}: Props) {
   const router = useRouter();
   const { prompt, modal: promptModal } = usePrompt();
   const { confirm, modal: confirmModal } = useConfirm();
@@ -100,6 +112,10 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
   };
 
   const disabled = busy !== null;
+  // Отказ от ПЕРЕНОСА окна не знает (запись остаётся на прежнем времени) —
+  // гейтится только отказ по самой записи.
+  const declineLocked =
+    !answersClientReschedule && isBookingPastModifyWindow(startAtUtc ? new Date(startAtUtc) : null);
 
   // MASTER-BOOKING-UI-FIX-A #2а: master IS the initiator of a pending
   // change request — render the guard hint instead of the action
@@ -115,15 +131,19 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
   return (
     <>
       <div className="flex flex-col gap-1">
-        <div className="flex gap-2">
+        {/* KANBAN-ACTIONS-FIT: «Оставить прежнее время» + «Принять перенос» в
+            карточку 220 px одной строкой не помещаются — ряд переносится
+            (см. booking-manage-actions.tsx). */}
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            disabled={disabled}
+            disabled={disabled || declineLocked}
+            title={declineLocked ? UI_TEXT.cabinetMaster.dashboard.bookings.modifyWindowExpiredTooltip : undefined}
             onClick={handleDecline}
             data-testid="booking-decline"
-            className="flex-1"
+            className="flex-auto whitespace-nowrap"
           >
             {answersClientReschedule ? T.card.keepOriginalTime : T.card.decline}
           </Button>
@@ -134,7 +154,7 @@ export function BookingCardActions({ bookingId, rawStatus, actionRequiredBy = nu
             disabled={disabled}
             onClick={() => void patch("CONFIRMED")}
             data-testid="booking-confirm"
-            className="flex-1"
+            className="flex-auto whitespace-nowrap"
           >
             {answersClientReschedule ? T.card.acceptReschedule : T.card.confirm}
           </Button>

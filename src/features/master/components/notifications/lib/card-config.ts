@@ -92,6 +92,7 @@ const CONFIG_MAP: Partial<Record<NotificationType, CardConfig>> = {
   [NotificationType.BOOKING_REQUEST]: { icon: Calendar, ...ROSE_URGENT, label: "Новая запись" },
   [NotificationType.BOOKING_CREATED]: { icon: Calendar, ...ROSE_URGENT, label: "Новая запись" },
   [NotificationType.BOOKING_CANCELLED_BY_CLIENT]: { icon: X, ...ROSE_SOFT, label: "Отмена клиентом" },
+  [NotificationType.BOOKING_CANCELLED]: { icon: X, ...ROSE_SOFT, label: "Запись отменена" },
   [NotificationType.BOOKING_RESCHEDULED]: { icon: Clock, ...AMBER_SOFT, label: "Перенос записи" },
   [NotificationType.BOOKING_RESCHEDULE_REQUESTED]: { icon: Clock, ...AMBER, label: "Запрос переноса" },
   [NotificationType.BOOKING_REMINDER_24H]: { icon: Bell, ...BLUE, label: "Напоминание" },
@@ -147,6 +148,7 @@ export function classifyTabBucket(
     case NotificationType.MODEL_BOOKING_CREATED:
       return "new_booking";
     case NotificationType.BOOKING_CANCELLED_BY_CLIENT:
+    case NotificationType.BOOKING_CANCELLED:
     case NotificationType.BOOKING_NO_SHOW:
       return "cancelled";
     case NotificationType.BOOKING_RESCHEDULED:

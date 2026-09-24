@@ -1,16 +1,17 @@
 import {
-  GRID_HEIGHT_PX,
   SLOT_HEIGHT_PX,
   formatTime,
+  gridHeightPx,
   iterateSlotMinutes,
+  type GridWindow,
 } from "../../lib/time-grid";
 
-export function TimeAxis() {
-  const slots = Array.from(iterateSlotMinutes());
+export function TimeAxis({ gridWindow }: { gridWindow: GridWindow }) {
+  const slots = Array.from(iterateSlotMinutes(gridWindow));
   return (
     <div
       className="relative w-14 shrink-0 border-r border-border-subtle bg-bg-card"
-      style={{ height: GRID_HEIGHT_PX }}
+      style={{ height: gridHeightPx(gridWindow) }}
       aria-hidden
     >
       {slots.map((minutes, index) => (

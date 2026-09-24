@@ -723,7 +723,7 @@ function StatusBadge({
   isToday: boolean;
 }) {
   if (isToday && (status === "CONFIRMED" || status === "PREPAID")) {
-    return <Badge variant="info">Сегодня</Badge>;
+    return <Badge variant="info">{STATUS_T.today}</Badge>;
   }
   switch (status) {
     case "NEW":
@@ -744,9 +744,11 @@ function StatusBadge({
       return <Badge variant="info">{STATUS_T.inProgress}</Badge>;
     case "FINISHED":
       return <Badge variant="success">{STATUS_T.finished}</Badge>;
+    case "NO_SHOW":
+      // NO-SHOW-UI: неявка — не отмена, клиент должен видеть разницу.
+      return <Badge variant="muted">{STATUS_T.noShow}</Badge>;
     case "CANCELLED":
     case "REJECTED":
-    case "NO_SHOW":
       return <Badge variant="default">{STATUS_T.cancelled}</Badge>;
     default:
       return null;
@@ -781,7 +783,10 @@ function BookingActions({
     // FIX-07 (QA-120): action chips are ≥44px (min-h-[44px]) + gap-2 so the
     // destructive "Отменить" isn't mis-tapped next to the others when the row
     // wraps on mobile.
-    <div className="mt-2 flex flex-wrap items-center gap-2">
+    // KANBAN-ACTIONS-FIT (2026-09-24): на телефоне — ровная сетка в две колонки,
+    // а не «лесенка» из переносов (Чат+Перенести / Календарь+Маршрут / Отменить
+    // разной ширины). С `sm` — прежний ряд.
+    <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
       {booking.isUpcoming ? (
         <>
           {chatHref ? (
@@ -846,6 +851,10 @@ function BookingActions({
 
 type ActionVariant = "default" | "primary" | "danger";
 
+// В сетке телефона чип занимает ячейку целиком — подпись по центру ячейки.
+const ACTION_BASE =
+  "inline-flex min-h-[44px] items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-transparent px-2 py-2 text-xs font-medium transition sm:justify-start sm:px-3";
+
 function actionClass(variant: ActionVariant): string {
   switch (variant) {
     case "primary":
@@ -875,7 +884,7 @@ function ActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition disabled:pointer-events-none disabled:opacity-50 ${actionClass(
+      className={`${ACTION_BASE} disabled:pointer-events-none disabled:opacity-50 ${actionClass(
         variant,
       )}`}
     >
@@ -908,7 +917,7 @@ function ActionLink({
         target={target}
         rel={external ? "noopener noreferrer" : undefined}
         download={download}
-        className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition ${actionClass(
+        className={`${ACTION_BASE} ${actionClass(
           variant,
         )}`}
       >
@@ -920,7 +929,7 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-transparent px-3 py-2 text-xs font-medium transition ${actionClass(
+      className={`${ACTION_BASE} ${actionClass(
         variant,
       )}`}
     >

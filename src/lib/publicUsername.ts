@@ -225,6 +225,57 @@ export async function ensureUniqueUsername(prismaTx: PrismaTx, baseUsername: str
   throw new AppError("Не удалось подобрать свободный адрес профиля. Придумайте свой.", 409, "CONFLICT");
 }
 
+/**
+ * STAGED-MASTER-USERNAME (2026-09-24) — адрес страницы мастера по умолчанию.
+ *
+ * ОДНО правило для всех путей рождения кабинета мастера: обычное создание
+ * (`createMasterProfile`), принятие приглашения в студию на заготовку, которую
+ * студия создала до регистрации мастера (`acceptStudioInvite`), и ленивая
+ * выдача адреса кабинету, у которого его ещё нет. Раньше заготовка рождалась
+ * без адреса и получала его только при открытии «Поделиться»: у мастера,
+ * вошедшего в студию по приглашению, личная карточка в команде студии вела на
+ * `#`, а «Записаться» — на общую запись в студию.
+ */
+export async function generateUniqueMasterUsername(
+  prismaTx: PrismaTx,
+  input: { firstName?: string | null; lastName?: string | null; serviceCategory?: string | null },
+): Promise<string> {
+  const baseUsername = generateDefaultUsername({
+    providerType: ProviderType.MASTER,
+    firstName: input.firstName ?? null,
+    lastName: input.lastName ?? null,
+    allowLastName: false,
+    serviceCategory: input.serviceCategory ?? null,
+  });
+  return ensureUniqueUsername(prismaTx, baseUsername);
+}
+
+/**
+ * Пост-деплой: адрес тем кабинетам мастера, что уже приняли приглашение на
+ * заготовку и остались без него (идемпотентно — второй проход находит ноль).
+ * Заготовки без владельца не трогаем: их страница не публична.
+ */
+export async function backfillMissingMasterUsernames(db: PrismaClient): Promise<{ assigned: number }> {
+  const providers = await db.provider.findMany({
+    where: { type: ProviderType.MASTER, ownerUserId: { not: null }, publicUsername: null },
+    select: { id: true, categories: true, owner: { select: { firstName: true, lastName: true } } },
+  });
+  let assigned = 0;
+  for (const provider of providers) {
+    const username = await generateUniqueMasterUsername(db, {
+      firstName: provider.owner?.firstName,
+      lastName: provider.owner?.lastName,
+      serviceCategory: provider.categories[0] ?? null,
+    });
+    const updated = await db.provider.updateMany({
+      where: { id: provider.id, publicUsername: null },
+      data: { publicUsername: username, publicUsernameUpdatedAt: new Date() },
+    });
+    assigned += updated.count;
+  }
+  return { assigned };
+}
+
 export async function resolvePublicUsername(
   deps: ResolvePublicUsernameDeps,
   rawUsername: string

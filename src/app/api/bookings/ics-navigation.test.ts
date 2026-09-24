@@ -296,12 +296,19 @@ describe("FIX-B18 · производный пин: набор навигаци�
     // VK-COMMUNITY-NOTIFY-01: `/api/integrations/vk/start` выбыл — секция
     // уведомлений ВКонтакте больше не подключает ВК сама, привязка идёт через
     // профиль (`/api/auth/vk/start`).
+    // PHONE-OAUTH-PROOF-01: `/api/auth/yandex/start` — кнопка «Подтвердить
+    // номер через Яндекс ID» в кабинете. Это стартовая нога OAuth: навигацию на
+    // каждый исход держит тип `OAuthStartNavigation`
+    // (`api/auth/oauth-start-navigation.test.ts`). Query-строка (`?verifyPhone=1`)
+    // роут не меняет — сравнение идёт по пути.
     const FROZEN = [
       "/api/auth/vk/start",
+      "/api/auth/yandex/start",
       "/api/auth/telegram/link",
       "/api/bookings/",
     ].sort();
     const normalized = [...navTargets]
+      .map((t) => t.split("?")[0]!)
       .map((t) => (t.startsWith("/api/bookings/") ? "/api/bookings/" : t))
       .filter((t, i, a) => a.indexOf(t) === i)
       .sort();

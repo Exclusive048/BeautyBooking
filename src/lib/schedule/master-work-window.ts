@@ -3,6 +3,36 @@ import type { MasterWorkWindow } from "@/lib/bookings/policy-enforcement";
 import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
 import { timeToMinutes } from "@/lib/schedule/time";
 import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
+import { ScheduleEngine } from "@/lib/schedule/engine";
+
+type DayBreak = { startMinutes: number; endMinutes: number };
+
+/**
+ * BOOKING-FLOW-AUDIT-RESIDUALS — перерывы дня берутся из того же `DayPlan`,
+ * по которому движок режет окошки (шаблон, перерывы даты, правило-цикл).
+ * Своего вывода здесь нет намеренно: семантика слияния перерывов шаблона и
+ * даты нетривиальна (`rule-engine.ts`), а вторая копия разошлась бы с ней.
+ */
+async function resolveDayBreaks(masterProviderId: string, dateKey: string): Promise<DayBreak[]> {
+  const provider = await prisma.provider.findUnique({
+    where: { id: masterProviderId },
+    select: { timezone: true },
+  });
+  if (!provider) return [];
+  const plan = await ScheduleEngine.getDayPlan({
+    masterId: masterProviderId,
+    date: dateKey,
+    timezone: provider.timezone,
+  });
+  const breaks: DayBreak[] = [];
+  for (const item of plan.breaks) {
+    const startMinutes = timeToMinutes(item.start);
+    const endMinutes = timeToMinutes(item.end);
+    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
+    breaks.push({ startMinutes, endMinutes });
+  }
+  return breaks;
+}
 
 /**
  * LOGIC-03 — резолвер рабочего окна мастера, вынесенный из
@@ -61,6 +91,23 @@ export function toScheduleWeekday(jsWeekday: number): number {
  * as the engine buckets them via `toLocalDateKey(row.date, tz)`.
  */
 export async function resolveMasterWorkWindow(
+  masterProviderId: string,
+  weekday: number,
+  dateKey: string,
+): Promise<MasterWorkWindow> {
+  const [hours, breaks] = await Promise.all([
+    resolveMasterWorkHours(masterProviderId, weekday, dateKey),
+    resolveDayBreaks(masterProviderId, dateKey),
+  ]);
+  return hours.isActive && breaks.length > 0 ? { ...hours, breaks } : hours;
+}
+
+/**
+ * Границы рабочего дня мастера без перерывов — два точечных запроса, без
+ * движка. Нужны отдельно календарю студии: сетка дня раздвигается под часы
+ * мастеров, и звать ради этого движок на каждого мастера было бы дорого.
+ */
+export async function resolveMasterWorkHours(
   masterProviderId: string,
   weekday: number,
   dateKey: string,

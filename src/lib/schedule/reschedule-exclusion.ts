@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/access";
 import { resolveBookingDurationMin } from "@/lib/bookings/booking-duration";
+import { resolveGuestManageScope } from "@/lib/bookings/guest-manage";
 import { requireProviderOwner } from "@/lib/auth/ownership";
 import { prisma } from "@/lib/prisma";
 
@@ -29,6 +30,11 @@ import { prisma } from "@/lib/prisma";
  * предлагал время, которое сервер затем отклонял, либо прятал допустимое.
  * Исполнитель здесь по построению тот же, что у записи, — то есть ровно тот
  * случай, где и перенос держит длину по снимку.
+ *
+ * GUEST-MANAGE-LINK (2026-09-24): у гостя сессии нет — сторону брони
+ * доказывает подписанная ссылка «Управлять записью» (`?manageToken=`). Токен
+ * даёт ровно то же право, что и сессия клиента: исключить свою запись (или
+ * услугу своего пакета), не чужую.
  */
 export type RescheduleExclusion = {
   bookingId: string;
@@ -44,7 +50,12 @@ export async function resolveRescheduleExclusion(
   const bookingId = bookingIdRaw?.trim();
   if (!bookingId) return undefined;
 
-  const user = await getSessionUser(req);
+  // Кто доказывает сторону брони: подписанная ссылка гостя либо сессия.
+  // Сессия проверяется ДО чтения брони — аноним без ссылки получает 401, а не
+  // ответ «такая запись у этого мастера есть / нет».
+  const manageToken = new URL(req.url).searchParams.get("manageToken")?.trim();
+  const guestScope = manageToken ? await resolveGuestManageScope(manageToken) : null;
+  const user = guestScope ? null : await getSessionUser(req);
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -70,6 +81,15 @@ export async function resolveRescheduleExclusion(
     bookingId: booking.id,
     durationMin: resolveBookingDurationMin(booking),
   };
+
+  if (guestScope) {
+    if (!guestScope.bookingIds.includes(booking.id)) {
+      throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
+    }
+    return exclusion;
+  }
+  if (!user) throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
+
   if (booking.clientUserId === user.userId) return exclusion;
 
   // Сторона провайдера: владелец кабинета исполнителя либо админ студии, через

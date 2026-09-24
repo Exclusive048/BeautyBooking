@@ -9,6 +9,7 @@ import { collectProviderMedia } from "@/lib/media/purge";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { createMasterProfile } from "@/lib/profiles/professional";
+import { generateUniqueMasterUsername } from "@/lib/publicUsername";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { attachMasterToStudio } from "@/lib/studios/masters";
 
@@ -130,7 +131,14 @@ export async function acceptStudioInvite(
           studioId: invite.studio.providerId,
           ...contactWhere,
         },
-        select: { id: true, ownerUserId: true, isPublished: true, studioPaused: true },
+        select: {
+          id: true,
+          ownerUserId: true,
+          isPublished: true,
+          studioPaused: true,
+          publicUsername: true,
+          categories: true,
+        },
         orderBy: { createdAt: "asc" },
       })
     : null;
@@ -162,7 +170,32 @@ export async function acceptStudioInvite(
       stagedToDiscard = stagedMaster.id;
     }
   } else if (stagedMaster) {
-    if (!stagedMaster.ownerUserId || !stagedMaster.isPublished || stagedMaster.studioPaused) {
+    // STAGED-MASTER-USERNAME: заготовку студия создаёт без адреса страницы.
+    // Принявший приглашение получает адрес так же, как при обычном создании
+    // кабинета (`generateUniqueMasterUsername` — из СВОЕГО имени), иначе его
+    // личная страница недостижима, а «Записаться» ведёт на общую запись студии.
+    const usernameData = stagedMaster.publicUsername
+      ? {}
+      : await (async () => {
+          const owner = await prisma.userProfile.findUnique({
+            where: { id: user.id },
+            select: { firstName: true, lastName: true },
+          });
+          return {
+            publicUsername: await generateUniqueMasterUsername(prisma, {
+              firstName: owner?.firstName,
+              lastName: owner?.lastName,
+              serviceCategory: stagedMaster.categories[0] ?? null,
+            }),
+            publicUsernameUpdatedAt: new Date(),
+          };
+        })();
+    if (
+      !stagedMaster.ownerUserId ||
+      !stagedMaster.isPublished ||
+      stagedMaster.studioPaused ||
+      !stagedMaster.publicUsername
+    ) {
       await prisma.provider.update({
         where: { id: stagedMaster.id },
         data: {
@@ -171,6 +204,7 @@ export async function acceptStudioInvite(
           // нового кабинета), в студии — активен.
           isPublished: true,
           studioPaused: false,
+          ...usernameData,
           ...contactWhere,
         },
         select: { id: true },
@@ -188,6 +222,13 @@ export async function acceptStudioInvite(
       roles: user.roles,
     });
     masterProviderId = masterProfile.providerId;
+  }
+
+  // Роль — вместе с кабинетом мастера, ДО привязки к студии: откажи привязка
+  // (мастер уже в другой студии — 409), у пользователя остался бы кабинет без
+  // роли, и меню навсегда предлагало бы «Стать мастером».
+  if (!user.roles.includes(AccountType.MASTER)) {
+    await addRoleToUser(user.id, user.roles, AccountType.MASTER);
   }
 
   const attached = await attachMasterToStudio(invite.studio.providerId, masterProviderId);
@@ -241,10 +282,6 @@ export async function acceptStudioInvite(
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
-
-  if (!user.roles.includes(AccountType.MASTER)) {
-    await addRoleToUser(user.id, user.roles, AccountType.MASTER);
   }
 
   return {

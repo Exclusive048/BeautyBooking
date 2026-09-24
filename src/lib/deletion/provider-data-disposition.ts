@@ -79,7 +79,14 @@ export const PROVIDER_RELATION_DISPOSITION: Record<string, RelationDisposition> 
     kind: "DELETED",
     reason:
       "delete-master: строки портфолио. DELETION-02: связанные MediaAsset (AVATAR/PORTFOLIO) " +
-      "теперь ещё и вычищаются из хранилища задачей `media.purge`",
+      "теперь ещё и вычищаются из хранилища задачей `media.purge`. STUDIO-PORTFOLIO-FEED: " +
+      "delete-studio удаляет строки работ студии (к её фото) так же явно",
+  },
+  performedPortfolioItems: {
+    kind: "ANONYMIZED",
+    reason:
+      "STUDIO-PORTFOLIO-FEED: подпись исполнителя на фото студии. delete-master обнуляет " +
+      "`performerId` явно (SetNull не сработает — Provider выживает), фото остаётся у студии",
   },
   hotSlots: { kind: "DELETED", reason: "delete-master/delete-studio: горячие слоты кабинета" },
   modelOffers: { kind: "DELETED", reason: "delete-master/delete-studio: офферы моделям" },

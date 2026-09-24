@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { StudioReviewsSectionClient } from "@/features/public-studio/sections/reviews-section-client";
+import {
+  REVIEWS_PREVIEW_LIMIT,
+  reviewsProbeLimit,
+} from "@/features/public-profile/master/reviews-constants";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { serverApiFetch } from "@/lib/api/server-fetch";
@@ -13,11 +17,26 @@ type Props = {
   studioId: string;
 };
 
-async function fetchReviews(studioId: string): Promise<ReviewDto[]> {
-  const path = `/api/reviews?targetType=studio&targetId=${encodeURIComponent(studioId)}&limit=3&offset=0`;
-  const json = await serverApiFetch<{ reviews: ReviewDto[] }>(path);
-  if (!json.ok) return [];
-  return json.data.reviews ?? [];
+function reviewsPreviewPath(studioId: string): string {
+  return (
+    `/api/reviews?targetType=studio&targetId=${encodeURIComponent(studioId)}` +
+    `&limit=${reviewsProbeLimit(REVIEWS_PREVIEW_LIMIT)}&offset=0`
+  );
+}
+
+/**
+ * STUDIO-REVIEWS-NO-LOADMORE: те же размеры и та же n+1-проба, что у мастера
+ * (`reviews-constants.ts`): лишняя строка — только сигнал «есть ещё», в выдачу
+ * она не попадает. Счётчик `Provider.reviews` на этот вопрос не отвечает.
+ */
+async function fetchReviews(studioId: string): Promise<{ reviews: ReviewDto[]; hasMore: boolean }> {
+  const json = await serverApiFetch<{ reviews: ReviewDto[] }>(reviewsPreviewPath(studioId));
+  if (!json.ok) return { reviews: [], hasMore: false };
+  const batch = json.data.reviews ?? [];
+  return {
+    reviews: batch.slice(0, REVIEWS_PREVIEW_LIMIT),
+    hasMore: batch.length > REVIEWS_PREVIEW_LIMIT,
+  };
 }
 
 async function buildCookieHeader(): Promise<string | null> {
@@ -55,6 +74,7 @@ async function fetchCanReviewBookingId(providerId: string): Promise<string | nul
 export async function StudioReviewsSection({ studioId }: Props) {
   let studio = null;
   let reviews: ReviewDto[] = [];
+  let hasMoreReviews = false;
   let canReviewBookingId: string | null = null;
   let hasError = false;
 
@@ -65,14 +85,15 @@ export async function StudioReviewsSection({ studioId }: Props) {
         fetchReviews(studio.id),
         fetchCanReviewBookingId(studio.id),
       ]);
-      reviews = result[0];
+      reviews = result[0].reviews;
+      hasMoreReviews = result[0].hasMore;
       canReviewBookingId = result[1];
     }
   } catch (error) {
     hasError = true;
     logPublicStudioBlockError("reviews-section", error, [
       `/api/providers/${studioId}`,
-      `/api/reviews?targetType=studio&targetId=${encodeURIComponent(studioId)}&limit=3&offset=0`,
+      reviewsPreviewPath(studioId),
       "/api/me/bookings",
     ]);
   }
@@ -111,6 +132,7 @@ export async function StudioReviewsSection({ studioId }: Props) {
               initialRating={studio.rating}
               initialReviewsCount={studio.reviews}
               initialReviews={reviews}
+              initialHasMore={hasMoreReviews}
               canReviewBookingId={canReviewBookingId}
             />
           </CardContent>

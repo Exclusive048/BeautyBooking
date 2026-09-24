@@ -155,6 +155,7 @@ describe("LOGIC-01 · пятая копия скоупа не пройдёт м�
     "src/lib/master/day.service.ts": "день мастера на экране",
     "src/lib/master/public-profile-view.service.ts": "публичный профиль",
     "src/lib/schedule/available-today.ts": "пересчёт availableToday",
+    "src/lib/schedule/free-slot-keys.ts": "снимок свободного времени каталога (CATALOG-DATE-TIME-FILTER)",
     "src/lib/schedule/usecases.ts": "генератор слотов — сам источник правила скоупа",
     "src/lib/studio/clients.service.ts": "CRM-выборка клиентов студии",
   };

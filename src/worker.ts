@@ -44,6 +44,7 @@ import { runHotSlotExpiringJob } from "@/lib/hot-slots/job";
 import { runSmartPriceJob } from "@/lib/hot-slots/smart-price-job";
 import { runBookingReviewPromptJob } from "@/lib/bookings/review-prompts";
 import { finalizePastBookings } from "@/lib/bookings/finalize-past";
+import { expirePendingBookings } from "@/lib/bookings/expire-pending";
 import {
   indexMediaAsset,
   isVisualSearchMissingAssetError,
@@ -211,6 +212,23 @@ function startPeriodicJobs() {
   };
   runFinalizeSafe();
 
+  // PENDING-EXPIRY: неподтверждённые записи отменяются через 24 ч после
+  // создания или к началу визита. При старте и каждые 5 минут (ниже, рядом со
+  // свипом напоминаний): срок «к началу визита» опаздывать на полчаса не должен.
+  const runPendingExpirySafe = () => {
+    void expirePendingBookings()
+      .then((summary) => {
+        if (summary.expired > 0) logInfo("bookings.pendingExpiry.done", summary);
+      })
+      .catch((error) => {
+        logError("Booking pending expiry job failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("bookings.pendingExpiry", error);
+      });
+  };
+  runPendingExpirySafe();
+
   // VISUAL-SEARCH-UNRECOGNIZED-01: фото, которые прежний конвейер пометил
   // нераспознанными (описание обрывалось лимитом токенов), один раз на версию
   // конвейера уходят в индексацию заново. Метка в SystemConfig — повторный
@@ -253,6 +271,7 @@ function startPeriodicJobs() {
   // обнаружено опоздание, тем меньше пользы от самого напоминания.
   const reminderReconcileIntervalMs = 5 * 60 * 1000;
   setInterval(() => {
+    runPendingExpirySafe();
     void reconcileBookingReminders()
       .then((summary) => {
         if (summary.candidates > 0) {

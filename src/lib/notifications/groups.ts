@@ -46,6 +46,9 @@ export const MASTER_NOTIFICATION_TYPES: NotificationType[] = [
   NotificationType.BOOKING_REQUEST,
   NotificationType.BOOKING_CREATED,
   NotificationType.BOOKING_CANCELLED_BY_CLIENT,
+  // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: отмену/отказ со стороны провайдера
+  // получает остальная сторона провайдера (`notifyProviderSideCancelled`).
+  NotificationType.BOOKING_CANCELLED,
   NotificationType.BOOKING_RESCHEDULED, // ambiguous
   NotificationType.BOOKING_RESCHEDULE_REQUESTED,
   NotificationType.BOOKING_REMINDER_24H, // ambiguous
@@ -80,7 +83,6 @@ export const MASTER_NOTIFICATION_TYPES: NotificationType[] = [
 export const PERSONAL_ONLY_TYPES: NotificationType[] = [
   // Bookings — client side
   NotificationType.BOOKING_CONFIRMED,
-  NotificationType.BOOKING_CANCELLED,
   NotificationType.BOOKING_CANCELLED_BY_MASTER,
   NotificationType.BOOKING_DECLINED,
   NotificationType.BOOKING_REJECTED,

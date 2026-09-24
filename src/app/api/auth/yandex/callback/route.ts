@@ -7,6 +7,10 @@ import { AppError } from "@/lib/api/errors";
 import { failOAuthCallback } from "@/lib/auth/oauth-callback-error";
 import { fail } from "@/lib/api/response";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
+import {
+  applyProviderVerifiedPhoneSafe,
+} from "@/lib/auth/phone-provider-proof";
+import { phoneVerifyResultPath, takePhoneVerifyReturn } from "@/lib/auth/phone-verify-return";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { getSessionUser, setSessionCookies } from "@/lib/auth/session";
 import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
@@ -153,8 +157,20 @@ export async function GET(req: Request) {
           );
         }
 
-        const redirectDecision = await resolveCabinetRedirect(sessionUser.id);
-        const response = nextRedirect(req, redirectDecision.target);
+        // PHONE-OAUTH-PROOF-01: номер из аккаунта Яндекс ID подтверждён провайдером по
+        // SMS — засчитываем как владение (правила — `phone-provider-proof.ts`).
+        // Вход из кнопки «Подтвердить номер» возвращает на страницу-источник
+        // с итогом, остальные привязки — как прежде, в кабинет по роли.
+        const phoneOutcome = await applyProviderVerifiedPhoneSafe({
+          userId: sessionUser.id,
+          providerPhone: profile.phone,
+          provider: "yandex",
+        });
+        const verifyReturn = await takePhoneVerifyReturn();
+        const target = verifyReturn
+          ? phoneVerifyResultPath(verifyReturn, "yandex", phoneOutcome ?? "error")
+          : (await resolveCabinetRedirect(sessionUser.id)).target;
+        const response = nextRedirect(req, target);
         await setSessionCookies(response, {
           sub: sessionUser.id,
           phone: sessionUser.phone ?? null,
@@ -190,7 +206,8 @@ export async function GET(req: Request) {
             firstName: profile.firstName,
             lastName: profile.lastName,
             displayName: buildDisplayName(profile.firstName, profile.lastName),
-            phone: profile.phone ?? undefined,
+            // PHONE-OAUTH-PROOF-01: номер пишет `applyProviderVerifiedPhoneSafe`
+            // ниже (см. VK-близнец).
             email: profile.email ?? undefined,
             externalPhotoUrl: profile.avatarUrl ?? undefined,
             roles: [AccountType.CLIENT],
@@ -204,7 +221,6 @@ export async function GET(req: Request) {
           const displayName = buildDisplayName(profile.firstName, profile.lastName);
           if (displayName) updateData.displayName = displayName;
         }
-        if (!user.phone && profile.phone) updateData.phone = profile.phone;
         if (!user.email && profile.email) updateData.email = profile.email;
         if (profile.avatarUrl && profile.avatarUrl !== user.externalPhotoUrl) {
           updateData.externalPhotoUrl = profile.avatarUrl;
@@ -240,6 +256,8 @@ export async function GET(req: Request) {
         userId: user.id,
         yandexUserId,
       });
+
+      await applyProviderVerifiedPhoneSafe({ userId: user.id, providerPhone: profile.phone, provider: "yandex" });
 
       // Registration + repeat login share this write (no-op unless a document
       // version moved on).

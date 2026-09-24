@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/auth/session";
 import { ClientProfilePage } from "@/features/client-cabinet/profile/client-profile-page";
 import { isEmailConfigured } from "@/lib/email/sender";
-import { isVkAuthEnabled } from "@/lib/env";
+import { isVkAuthEnabled, isYandexAuthEnabled } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +22,7 @@ export default async function ProfilePage() {
       userId={userId}
       emailEnabled={isEmailConfigured()}
       vkAuthEnabled={isVkAuthEnabled}
+      yandexAuthEnabled={isYandexAuthEnabled}
     />
   );
 }

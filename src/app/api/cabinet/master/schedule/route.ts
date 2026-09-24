@@ -19,6 +19,7 @@ import { getCurrentMasterProviderContext } from "@/lib/master/access";
 import {
   loadBookingWithRelations,
   notifyCancelledByMaster,
+  notifyProviderSideCancelled,
 } from "@/lib/notifications/booking-notifications";
 import { prisma } from "@/lib/prisma";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
@@ -248,13 +249,21 @@ function assertConflictResolution(input: {
 async function runConflictCancellationSideEffects(input: {
   effects: CancelBookingSideEffects[];
   req: Request;
+  /** Кто сохранил расписание: мастер сам или администратор студии за него. */
+  actorUserId: string;
 }): Promise<void> {
   for (const effects of input.effects) {
     await runCancelBookingSideEffects(effects);
     try {
       const fullBooking = await loadBookingWithRelations(effects.bookingId);
       if (fullBooking && fullBooking.status === "REJECTED") {
-        await notifyCancelledByMaster(fullBooking);
+        await notifyCancelledByMaster(fullBooking, { actorUserId: input.actorUserId });
+        // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: выходной мастеру ставит и
+        // администратор студии — тогда мастер узнаёт об отменённых записях.
+        await notifyProviderSideCancelled(fullBooking, {
+          actorUserId: input.actorUserId,
+          kind: "CANCELLED",
+        });
       }
     } catch (error) {
       logError("PATCH /api/cabinet/master/schedule cancel notification failed", {
@@ -719,7 +728,7 @@ export async function PATCH(req: Request) {
     // `applyScheduleSnapshot`: до коммита кэш сбрасывать не на что, а откат
     // оставил бы его вычищенным под старые данные).
     await invalidateSlotsForMaster(actor.providerId);
-    await runConflictCancellationSideEffects({ effects: cancelEffects, req });
+    await runConflictCancellationSideEffects({ effects: cancelEffects, req, actorUserId: user.id });
 
     if (actor.mode === "STUDIO_ADMIN" && actor.studioProviderId) {
       try {

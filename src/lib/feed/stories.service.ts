@@ -13,7 +13,9 @@ import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility"
  * Lookback hours from SystemConfig key STORIES_LOOKBACK_HOURS, default 72.
  * ────────────────────────────────────────────────────────────────────────── */
 
-export const FEED_STORIES_CACHE_KEY = "feed:stories:v1";
+// v2 (STUDIO-PORTFOLIO-FEED): у элемента появилась подпись «мастер · услуга» —
+// кадры прежней формы её не несут, поэтому ключ новый, а не общий.
+export const FEED_STORIES_CACHE_KEY = "feed:stories:v2";
 export const STORIES_LOOKBACK_CONFIG_KEY = "STORIES_LOOKBACK_HOURS";
 export const STORIES_LOOKBACK_HOURS_DEFAULT = 72;
 
@@ -27,6 +29,13 @@ export type StoriesGroupItem = {
   id: string;
   mediaUrl: string;
   createdAt: string; // ISO
+  /**
+   * STUDIO-PORTFOLIO-FEED: подпись на фото. `performerName` — мастер студии,
+   * выполнивший работу (только у историй студии; у мастера исполнитель — автор
+   * группы). `serviceTitle` — первая привязанная услуга.
+   */
+  performerName: string | null;
+  serviceTitle: string | null;
 };
 
 export type StoriesGroup = {
@@ -86,6 +95,12 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
           avatarUrl: true,
         },
       },
+      performer: { select: { name: true } },
+      services: {
+        select: { service: { select: { name: true, title: true } } },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
     },
     orderBy: [{ masterId: "asc" }, { createdAt: "desc" }],
   });
@@ -106,10 +121,13 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
       byMaster.set(item.masterId, group);
     }
     if (group.items.length >= STORIES_MAX_ITEMS_PER_MASTER) continue;
+    const service = item.services[0]?.service;
     group.items.push({
       id: encodePublicId(item.id),
       mediaUrl: item.mediaUrl,
       createdAt: item.createdAt.toISOString(),
+      performerName: item.performer?.name ?? null,
+      serviceTitle: service ? service.title?.trim() || service.name : null,
     });
   }
 

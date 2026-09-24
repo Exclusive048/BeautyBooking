@@ -74,6 +74,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
       select: {
         id: true,
         name: true,
+        avatarUrl: true,
         publicUsername: true,
         isPublished: true,
         bufferBetweenBookingsMin: true,
@@ -89,6 +90,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
       masters: masters.map((m) => ({
         id: m.id,
         name: m.name,
+        // STUDIO-BOOKING-BANNER: аватар мастера в шапке и на шаге выбора мастера
+        // (вырезан сервером по сохранённой области — CROP-PUBLIC-01).
+        avatarUrl: m.avatarUrl,
         // Ссылка на личную страницу — только если мастер её не скрыл: иначе
         // карточка команды вела бы на 404.
         publicUsername: m.isPublished ? m.publicUsername : null,

@@ -30,6 +30,8 @@ import {
   SITE_LOGO_SETTING_KEY,
 } from "@/lib/media/settings";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
+import { carryStudioPortfolioItem, syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
+import { studioBannerSettingKey } from "@/lib/studios/portfolio-items-sync";
 import { enqueue } from "@/lib/queue/queue";
 import { logError } from "@/lib/logging/logger";
 
@@ -59,10 +61,6 @@ function fileExtFromMime(mimeType: string): string {
 
 function normalizeEntityId(entityId: string): string {
   return entityId.trim();
-}
-
-function studioBannerSettingKey(studioProviderId: string): string {
-  return `studioBannerAssetId:${studioProviderId}`;
 }
 
 async function clearSystemConfigFocal(key: string): Promise<void> {
@@ -294,6 +292,9 @@ export async function isProviderMediaPubliclyVisible(asset: {
   // которое ссылается непубличная работа, — то же правило, что у визуального
   // поиска (`visual-search/searcher.ts`). Удалённые и не-READY ассеты отсекает
   // вызывающий раньше (404), неопубликованную студию — проверка выше.
+  // STUDIO-PORTFOLIO-FEED: строки работ к фото студии теперь есть (публичные,
+  // для ленты и историй), но не у текущего баннера — поэтому правило остаётся
+  // «скрыто только привязанное к непубличной работе», а не «нужна публичная».
   if (asset.entityType === MediaEntityType.STUDIO) {
     const hiddenItem = await prisma.portfolioItem.findFirst({
       where: { isPublic: false, mediaUrl: { contains: asset.id } },
@@ -524,6 +525,20 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     (input.kind === MediaKind.AVATAR || input.kind === MediaKind.PORTFOLIO)
   ) {
     await invalidateAdvisorCache(entityId);
+  }
+
+  // STUDIO-PORTFOLIO-FEED: фото студии — работа в ленте и историях. При замене
+  // подпись «мастер · услуга» переезжает на новый файл.
+  if (input.entityType === MediaEntityType.STUDIO && input.kind === MediaKind.PORTFOLIO) {
+    if (input.replaceAssetId) {
+      await carryStudioPortfolioItem(entityId, input.replaceAssetId, readyAsset.id).catch((error) => {
+        logError("Failed to carry studio portfolio item to replaced asset", {
+          assetId: readyAsset.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+    await syncStudioPortfolioItemsSafe(entityId);
   }
 
   if (input.kind === MediaKind.PORTFOLIO) {
@@ -763,6 +778,11 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
     (asset.kind === MediaKind.AVATAR || asset.kind === MediaKind.PORTFOLIO)
   ) {
     await invalidateAdvisorCache(asset.entityId);
+  }
+
+  // STUDIO-PORTFOLIO-FEED: удалённое фото студии уходит из ленты и историй.
+  if (asset.entityType === MediaEntityType.STUDIO && asset.kind === MediaKind.PORTFOLIO) {
+    await syncStudioPortfolioItemsSafe(asset.entityId);
   }
 
   return { id: asset.id };

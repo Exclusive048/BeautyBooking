@@ -34,6 +34,8 @@ type RawItem = {
     publicUsername: string | null;
     avatarUrl: string | null;
   };
+  performer: { name: string } | null;
+  services: Array<{ service: { name: string; title: string | null } }>;
 };
 
 function makeItem(overrides: Partial<RawItem> & { id: string; masterId: string; createdAt: Date }): RawItem {
@@ -45,6 +47,8 @@ function makeItem(overrides: Partial<RawItem> & { id: string; masterId: string; 
       publicUsername: `m-${overrides.masterId}`,
       avatarUrl: null,
     },
+    performer: null,
+    services: [],
     ...overrides,
   };
 }
@@ -208,11 +212,40 @@ describe("feed/stories getActiveStoriesGroups", () => {
           publicUsername: "beauty",
           avatarUrl: "https://cdn/avatar.jpg",
         },
+        performer: null,
+        services: [],
       },
     ]);
 
     const result = await getActiveStoriesGroups();
     expect(result.groups[0]!.providerType).toBe("STUDIO");
     expect(result.groups[0]!.avatarUrl).toBe("https://cdn/avatar.jpg");
+  });
+
+  // STUDIO-PORTFOLIO-FEED: подпись «мастер · услуга» на фото истории.
+  it("carries performer name and first service title for the caption", async () => {
+    portfolioFindMany.mockResolvedValue([
+      makeItem({
+        id: "s1",
+        masterId: "studio-1",
+        createdAt: new Date(),
+        performer: { name: "Марина" },
+        services: [{ service: { name: "manicure", title: "Маникюр с покрытием" } }],
+      }),
+      makeItem({
+        id: "s2",
+        masterId: "studio-1",
+        createdAt: new Date(Date.now() - 1000),
+        services: [{ service: { name: "Педикюр", title: null } }],
+      }),
+    ]);
+
+    const [group] = (await getActiveStoriesGroups()).groups;
+    expect(group!.items[0]).toMatchObject({
+      performerName: "Марина",
+      serviceTitle: "Маникюр с покрытием",
+    });
+    // Без названия для витрины — имя услуги; без исполнителя — null.
+    expect(group!.items[1]).toMatchObject({ performerName: null, serviceTitle: "Педикюр" });
   });
 });

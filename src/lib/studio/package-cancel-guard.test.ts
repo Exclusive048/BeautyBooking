@@ -45,8 +45,15 @@ describe("LOGIC-04 · мастерский путь уважает «пакет 
   it("отказ стоит ПОСЛЕ ветки отклонения переноса", () => {
     // отклонить предложенный клиентом перенос — не отмена: бронь остаётся жить,
     // и для компонента пакета это законное действие
-    const declineIndex = source.indexOf("if (rejectsChangeRequest)");
-    const guardIndex = source.indexOf("booking.bookingPackageId) {");
+    // Только тело `updateMasterBookingStatus`: соседние функции файла тоже
+    // спрашивают о пакете (перенос компонента в студии — BOOKING-FLOW-AUDIT-
+    // RESIDUALS), и поиск по всему файлу находил бы их маркер.
+    const start = source.indexOf("export async function updateMasterBookingStatus");
+    const next = source.indexOf("\nexport ", start + 1);
+    const body = source.slice(start, next === -1 ? undefined : next);
+    const declineIndex = body.indexOf("if (rejectsChangeRequest)");
+    const guardIndex = body.indexOf("booking.bookingPackageId) {");
+    expect(start).toBeGreaterThanOrEqual(0);
     expect(declineIndex).toBeGreaterThanOrEqual(0);
     expect(guardIndex).toBeGreaterThan(declineIndex);
   });

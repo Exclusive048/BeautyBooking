@@ -22,6 +22,13 @@ vi.mock("@/lib/schedule/available-today", () => ({
   hasFreeSlotToday,
 }));
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
+// CATALOG-DATE-TIME-FILTER: снимок свободного времени считается тем же
+// проходом; здесь он неизменен (пишется только изменившийся), чтобы не
+// вмешиваться в оркестрацию `availableToday`.
+vi.mock("@/lib/schedule/free-slot-keys", () => ({
+  computeFreeSlotKeys: vi.fn(async (provider: { freeSlotKeys?: string[] }) => provider.freeSlotKeys ?? []),
+  sameFreeSlotKeys: () => true,
+}));
 
 import { recomputeAvailableTodayForProvider } from "./recompute-available-today";
 

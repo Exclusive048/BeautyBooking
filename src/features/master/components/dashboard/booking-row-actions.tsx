@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { MessageSquare, CalendarClock, X } from "lucide-react";
+import { MessageSquare, CalendarClock, UserX, X } from "lucide-react";
+import { useMarkNoShow } from "@/features/master/components/bookings/use-mark-no-show";
+import { useMasterBookingCancel } from "@/features/master/components/bookings/use-master-booking-cancel";
 import { usePrompt } from "@/hooks/use-prompt";
+import { canMarkNoShow } from "@/lib/bookings/flow";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
-import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import { serverMessageOr } from "@/lib/http/client";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -53,6 +56,14 @@ export function BookingRowActions({ booking }: Props) {
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const noShow = useMarkNoShow(booking.id);
+  const { cancelBooking, modal: packageModal } = useMasterBookingCancel();
+  // NO-SHOW-UI: от начала приёма до часа после конца — то же правило, что у сервера.
+  const canNoShow = canMarkNoShow({
+    status: booking.status,
+    startAtUtc: booking.startAtUtc,
+    endAtUtc: booking.endAtUtc,
+  });
 
   const isTerminal = TERMINAL_STATUSES.has(
     booking.status as (typeof TERMINAL_STATUSES extends Set<infer V> ? V : never),
@@ -88,12 +99,10 @@ export function BookingRowActions({ booking }: Props) {
     setCancelling(true);
     setError(null);
     try {
-      await fetchJson(`/api/master/bookings/${encodeURIComponent(booking.id)}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CANCELLED", comment }),
-      });
-      startTransition(() => router.refresh());
+      // BOOKING-FLOW-AUDIT-RESIDUALS: на «пакет отменяется целиком» —
+      // предложение отменить весь пакет (`useMasterBookingCancel`).
+      const cancelled = await cancelBooking(booking.id, comment);
+      if (cancelled) startTransition(() => router.refresh());
     } catch (caught) {
       // FIX-C8 · fromServer = ПОКАЗАТЬ СЕРВЕРНОЕ. Прежняя форма — `if (!res.ok)
       // throw new Error(T.cancelFailed)` — та самая, что называет постановка:
@@ -147,6 +156,19 @@ export function BookingRowActions({ booking }: Props) {
           </button>
         ) : null}
 
+        {canNoShow ? (
+          <button
+            type="button"
+            aria-label={TC.noShow}
+            title={TC.noShow}
+            className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
+            onClick={() => void noShow.markNoShow()}
+            disabled={noShow.busy}
+          >
+            <UserX className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : null}
+
         {!isTerminal ? (
           <button
             type="button"
@@ -162,9 +184,9 @@ export function BookingRowActions({ booking }: Props) {
       </div>
 
       {/* UI-26/27: статусная поверхность — токен, не сырой `red-*`. */}
-      {error ? (
+      {error || noShow.error ? (
         <p className="mt-1 text-[11px] text-danger-text" role="alert">
-          {error}
+          {error ?? noShow.error}
         </p>
       ) : null}
 
@@ -179,6 +201,8 @@ export function BookingRowActions({ booking }: Props) {
       ) : null}
 
       {modal}
+      {noShow.modal}
+      {packageModal}
     </>
   );
 }

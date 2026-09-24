@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { ChevronLeft, Clock, MapPin, Star, Users } from "lucide-react";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
+import { cn } from "@/lib/cn";
 import { UI_TEXT } from "@/lib/ui/text";
+import { MasterAvatar } from "./master-avatar";
 
 type Props = {
   studio: ProviderProfileDto;
@@ -24,6 +27,13 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
 
   const visibleMasters = masters.slice(0, 6);
   const rest = masters.length - visibleMasters.length;
+  const crop = studio.bannerCrop;
+
+  const initialsTile = (
+    <span className="flex h-full w-full items-center justify-center font-display text-3xl font-semibold text-primary">
+      {initials || "S"}
+    </span>
+  );
 
   return (
     <div>
@@ -40,17 +50,48 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         {UI_TEXT.bookingWidget.backToStudio}
       </Link>
       <div className="relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm">
-      <div className="relative h-28 bg-brand-gradient sm:h-32">
-        <div className="absolute inset-0 opacity-30" aria-hidden>
-          <svg width="100%" height="100%" viewBox="0 0 800 144" preserveAspectRatio="none">
-            <defs>
-              <pattern id="bw-dots" width="32" height="32" patternUnits="userSpaceOnUse">
-                <circle cx="16" cy="16" r="1.2" fill="white" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#bw-dots)" />
-          </svg>
-        </div>
+      {/* STUDIO-BOOKING-BANNER (2026-09-24): баннер, загруженный в кабинете,
+          а не декоративная полоса. На телефоне бокс 16:9 — те же пропорции,
+          что у рамки кроппера; шире — фиксированная высота, и кадр наводится
+          на центр выбранной области (`focal`: точная подгонка исказила бы
+          картинку в боксе других пропорций). Без баннера — прежняя полоса. */}
+      <div
+        className={cn(
+          "relative bg-brand-gradient",
+          studio.bannerUrl ? "aspect-[16/9] sm:aspect-auto sm:h-60" : "h-28 sm:h-32",
+        )}
+      >
+        {studio.bannerUrl ? (
+          <>
+            <ResilientImage
+              src={studio.bannerUrl}
+              alt=""
+              sizes="(min-width: 1024px) 800px, 100vw"
+              priority
+              cropX={crop?.x}
+              cropY={crop?.y}
+              cropWidth={crop?.width}
+              cropHeight={crop?.height}
+              className="object-cover"
+            />
+            {/* Скрим сверху: чипы адреса и рейтинга читаются на любом фото. */}
+            <div
+              className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-transparent"
+              aria-hidden
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0 opacity-30" aria-hidden>
+            <svg width="100%" height="100%" viewBox="0 0 800 144" preserveAspectRatio="none">
+              <defs>
+                <pattern id="bw-dots" width="32" height="32" patternUnits="userSpaceOnUse">
+                  <circle cx="16" cy="16" r="1.2" fill="white" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#bw-dots)" />
+            </svg>
+          </div>
+        )}
         {studio.address ? (
           <div className="absolute left-4 top-3 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-xs text-white backdrop-blur">
             <MapPin className="h-3 w-3" aria-hidden />
@@ -81,10 +122,21 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
           // Стопы сведены к встроенной розовой шкале: заливка стала полностью
           // фиксированной (правило пары соблюдено буквально), градиент так же
           // углубляется к углу, а худшая точка теперь 4.52 / 4.09.
-          className="-mt-14 flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-2xl border-4 border-bg-card bg-gradient-to-br from-pink-200 via-pink-300 to-pink-400 font-display text-3xl font-semibold text-primary shadow-brand"
+          className="relative -mt-14 h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-bg-card bg-gradient-to-br from-pink-200 via-pink-300 to-pink-400 shadow-brand"
           aria-hidden
         >
-          {initials || "S"}
+          {/* Аватар уже вырезан сервером по сохранённой области (CROP-PUBLIC-01). */}
+          {studio.avatarUrl ? (
+            <ResilientImage
+              src={studio.avatarUrl}
+              alt=""
+              sizes="80px"
+              className="object-cover"
+              fallback={initialsTile}
+            />
+          ) : (
+            initialsTile
+          )}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -112,9 +164,12 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
 
         {prefilledMaster ? (
           <div className="flex items-center gap-3 rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 to-amber-400/[0.08] px-3 py-2.5">
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-sm font-semibold text-white" aria-hidden>
-              {prefilledMaster.name.charAt(0).toUpperCase()}
-            </div>
+            <MasterAvatar
+              name={prefilledMaster.name}
+              avatarUrl={prefilledMaster.avatarUrl}
+              sizePx={40}
+              className="h-10 w-10 text-sm"
+            />
             <div className="text-xs leading-tight">
               <div className="font-mono text-[10px] uppercase tracking-[0.06em] text-text-muted">
                 {UI_TEXT.bookingWidget.hero.bookingToMaster}
@@ -128,11 +183,16 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
               {visibleMasters.map((m, i) => (
                 <span
                   key={m.id}
-                  className="-ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-bg-card bg-primary text-[11px] font-semibold text-white first:ml-0"
+                  className="relative -ml-2 first:ml-0"
                   style={{ zIndex: visibleMasters.length - i }}
                   title={m.name}
                 >
-                  {m.name.charAt(0).toUpperCase()}
+                  <MasterAvatar
+                    name={m.name}
+                    avatarUrl={m.avatarUrl}
+                    sizePx={32}
+                    className="h-8 w-8 border-2 border-bg-card text-[11px]"
+                  />
                 </span>
               ))}
               {rest > 0 ? (

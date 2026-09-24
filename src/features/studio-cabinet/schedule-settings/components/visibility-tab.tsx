@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type {
-  ScheduleEditorSnapshot,
-  SlotPrecision,
-  VisibilityDto,
+import {
+  BOOKING_RULE_LIMITS,
+  type ScheduleEditorSnapshot,
+  type SlotPrecision,
+  type VisibilityDto,
 } from "@/lib/schedule/editor-shared";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -112,16 +113,13 @@ export function VisibilityTab({ studioId, masterId, initialSnapshot }: Props) {
         </Row>
 
         <Row title={T.visibleSlotDaysTitle} hint={T.visibleSlotDaysHint}>
-          <Input
-            type="number"
-            min={1}
-            max={90}
+          <NumberInput
+            min={BOOKING_RULE_LIMITS.visibleSlotDays.min}
+            max={BOOKING_RULE_LIMITS.visibleSlotDays.max}
+            fallback={BOOKING_RULE_LIMITS.visibleSlotDays.fallback}
             value={draft.visibleSlotDays}
-            onChange={(e) =>
-              update({
-                visibleSlotDays: Math.max(1, Number(e.target.value) || 1),
-              })
-            }
+            onValueChange={(next) => update({ visibleSlotDays: next })}
+            aria-label={T.visibleSlotDaysTitle}
             className="w-24"
           />
         </Row>

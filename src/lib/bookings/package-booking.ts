@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError, type ErrorCode, toAppError } from "@/lib/api/errors";
+import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
 import {
-  Prisma,
   ProviderType,
   BookingPackageStatus,
   BookingSource,
@@ -55,18 +55,7 @@ import { applyBookingTransition } from "@/lib/bookings/transition";
  * multi-master is MVP-2.
  */
 
-export function mapPrismaBookingConflict(error: unknown): AppError | null {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2002" || error.code === "P2034") {
-      return new AppError(
-        "Это время уже занято. Пожалуйста, выберите другое окошко.",
-        409,
-        "BOOKING_CONFLICT",
-      );
-    }
-  }
-  return null;
-}
+export { mapPrismaBookingConflict };
 
 type SoloPackageComponent = {
   serviceId: string;

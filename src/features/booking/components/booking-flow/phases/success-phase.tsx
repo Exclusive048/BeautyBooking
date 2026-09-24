@@ -10,6 +10,7 @@ import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ConfirmedBooking } from "@/features/booking/components/booking-flow/types";
 import { buildSuccessHeadline } from "@/features/booking/components/booking-flow/lib/success-headline";
+import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 const TF = UI_TEXT.publicProfile.bookingFlow;
@@ -156,6 +157,8 @@ export function SuccessPhase({ booking, onCancel }: Props) {
           >
             {cancelling ? TF.calendarLoading : T.successCancelAuth}
           </Button>
+        ) : booking.manageUrl ? (
+          <GuestManageLinkCard manageUrl={booking.manageUrl} />
         ) : (
           <Link
             href="/login"

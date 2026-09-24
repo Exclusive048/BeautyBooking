@@ -4,12 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useMasterBookingCancel } from "@/features/master/components/bookings/use-master-booking-cancel";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
 import { usePrompt } from "@/hooks/use-prompt";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
-import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.bookings;
 
@@ -48,6 +47,7 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
   const isPastModifyWindow = isBookingPastModifyWindow(new Date(startAtUtc));
   const router = useRouter();
   const { prompt, modal: promptModal } = usePrompt();
+  const { cancelBooking, modal: packageModal } = useMasterBookingCancel();
   const [busy, setBusy] = useState<"reschedule" | "cancel" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -65,16 +65,9 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
     setBusy("cancel");
     setError(null);
     try {
-      const res = await fetch(`/api/master/bookings/${bookingId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CANCELLED", comment }),
-      });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      startTransition(() => router.refresh());
+      // Компонент пакета — с предложением отменить весь пакет.
+      const cancelled = await cancelBooking(bookingId, comment);
+      if (cancelled) startTransition(() => router.refresh());
     } catch (err) {
       setError(err instanceof Error ? err.message : T.card.cancelError);
     } finally {
@@ -87,7 +80,13 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
   return (
     <>
       <div className="flex flex-col gap-1">
-        <div className="flex gap-2">
+        {/* KANBAN-ACTIONS-FIT (2026-09-24): колонка канбана фиксированной ширины
+            (272 px на телефоне → 220 px под кнопки), а «Перенести» + «Отменить»
+            с иконками требуют ~240 px. `flex-1` в ряду без переноса не может
+            стать уже своего текста — «Отменить» вылезал за край карточки.
+            `flex-wrap` + `flex-auto`: влезают — одной строкой, нет — каждая
+            на свою строку во всю ширину. */}
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="secondary"
@@ -101,7 +100,7 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
                   : undefined
             }
             onClick={() => setRescheduleOpen(true)}
-            className="flex-1 gap-1"
+            className="flex-auto whitespace-nowrap"
           >
             <Calendar className="h-3.5 w-3.5" aria-hidden strokeWidth={1.8} />
             {T.card.reschedule}
@@ -117,7 +116,7 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
                 : undefined
             }
             onClick={handleCancel}
-            className="flex-1 gap-1 border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30"
+            className="flex-auto whitespace-nowrap border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30"
           >
             <X className="h-3.5 w-3.5" aria-hidden strokeWidth={1.8} />
             {T.card.cancel}
@@ -137,6 +136,7 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
       />
 
       {promptModal}
+      {packageModal}
     </>
   );
 }

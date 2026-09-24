@@ -6,6 +6,7 @@ import { parseISOToUTC } from "@/lib/time";
 import { createStudioPackageBooking } from "@/lib/bookings/package-booking-studio";
 import { findOrCreateGuestUserByPhone } from "@/lib/users/find-or-create-guest";
 import { getSessionUserFromRequest } from "@/lib/auth/session";
+import { issueGuestManagePath } from "@/lib/bookings/guest-manage";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
@@ -132,7 +133,12 @@ export async function POST(
       idempotencyKey,
     });
 
-    return jsonOk(result);
+    // GUEST-MANAGE-LINK: гостю — ссылка «Управлять записью» на весь пакет.
+    const firstBookingId = result.bookingIds[0];
+    const manageUrl =
+      session || !firstBookingId ? null : await issueGuestManagePath(firstBookingId, clientUserId);
+
+    return jsonOk({ ...result, manageUrl });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

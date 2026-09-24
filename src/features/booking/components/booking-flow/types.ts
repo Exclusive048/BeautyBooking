@@ -38,6 +38,12 @@ export type ConfirmedBooking = {
   clientPhoneMasked: string | null;
   /** True for users who came in via session; controls cancel CTA. */
   isAuthenticatedUser: boolean;
+  /**
+   * GUEST-MANAGE-LINK: ссылка «Управлять записью» — только гостю и только в
+   * ответе на создание (после перезагрузки страницы её нет: GET по id записи
+   * предъявительскую ссылку не отдаёт).
+   */
+  manageUrl?: string | null;
 };
 
 export type BookingFlowState = {

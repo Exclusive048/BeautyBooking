@@ -1,5 +1,6 @@
 import { MembershipStatus, NotificationType, Prisma, ProviderType, StudioRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { PENDING_EXPIRY_HOURS } from "@/lib/bookings/flow";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 // HARDENING-09 #13: shared salon-tz "when" formatter — the Telegram reminder
@@ -236,9 +237,15 @@ export async function notifyBookingCreated(
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
   const title = "У вас новая запись";
-  const body = whenLabel
+  const created = whenLabel
     ? `${booking.clientName} записался на ${serviceName} ${whenLabel}`
     : `${booking.clientName} записался на ${serviceName}`;
+  // PENDING-EXPIRY: без подтверждения запись отменится сама — сторона
+  // провайдера должна знать срок заранее, а не из уведомления об отмене.
+  const body =
+    booking.status === "PENDING" || booking.status === "NEW"
+      ? `${created}. Подтвердите запись в течение ${PENDING_EXPIRY_HOURS} часов — иначе она отменится автоматически (или к началу визита, если он раньше).`
+      : created;
 
   const payload = buildBookingPayload(booking);
   await Promise.all(
@@ -303,16 +310,38 @@ export async function notifyBookingRejected(booking: BookingWithRelations): Prom
   });
 }
 
-export async function notifyCancelledByMaster(booking: BookingWithRelations): Promise<void> {
+/**
+ * NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: отменил ли запись кто-то со стороны
+ * студии, а не сам мастер (администратор в календаре студии, владелец в
+ * расписании мастера). Тогда клиенту нельзя писать «мастер отменил» — это
+ * неправда, и мастер узнаёт об отмене из уведомления ниже.
+ */
+function assignedMasterUserId(booking: BookingWithRelations): string | null {
+  return booking.masterProvider?.ownerUserId ?? booking.masterProvider?.masterProfile?.userId ?? null;
+}
+
+function isCancelledByStudioSide(booking: BookingWithRelations, actorUserId?: string | null): boolean {
+  if (!actorUserId) return false;
+  if (booking.provider.type !== ProviderType.STUDIO) return false;
+  return actorUserId !== assignedMasterUserId(booking);
+}
+
+export async function notifyCancelledByMaster(
+  booking: BookingWithRelations,
+  /** Кто отменил — чтобы не приписывать мастеру отмену администратора студии. */
+  options: { actorUserId?: string | null } = {},
+): Promise<void> {
   const clientUserId = resolveClientUserId(booking);
   if (!clientUserId) return;
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Запись отменена мастером";
+  const byStudio = isCancelledByStudioSide(booking, options.actorUserId);
+  const title = byStudio ? "Запись отменена студией" : "Запись отменена мастером";
+  const who = byStudio ? `Студия «${booking.provider.name}» отменила` : "Мастер отменил";
   const body = whenLabel
-    ? `Мастер отменил запись на ${serviceName} ${whenLabel}.`
-    : `Мастер отменил запись на ${serviceName}.`;
+    ? `${who} запись на ${serviceName} ${whenLabel}.`
+    : `${who} запись на ${serviceName}.`;
 
   await deliverNotification({
     userId: clientUserId,
@@ -324,6 +353,126 @@ export async function notifyCancelledByMaster(booking: BookingWithRelations): Pr
     pushUrl: bookingPushUrl(booking.id, "CLIENT"),
     telegramText: buildTelegramText(title, body),
   });
+}
+
+/**
+ * NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS (2026-09-24) — отмена или отказ со
+ * стороны провайдера доходят до ВСЕЙ его стороны, кроме того, кто нажал.
+ * Раньше уведомлялся только клиент: администратор студии отменял запись — её
+ * мастер об этом не узнавал и ждал клиента; мастер отменял или отклонял
+ * студийную запись — не узнавали администраторы. Адресаты — те же, что у
+ * «новой записи» (`resolveProviderRecipientUserIds`); у соло-мастера после
+ * вычета отменившего никого не остаётся, то есть путь — только студийный.
+ *
+ * `excludeUserIds` — уже уведомлённые (отмена пакета шлёт по одному
+ * уведомлению на мастера, администраторам — одно). Возвращает, кого уведомили.
+ */
+export async function notifyProviderSideCancelled(
+  booking: BookingWithRelations,
+  input: {
+    actorUserId: string;
+    kind: "CANCELLED" | "REJECTED";
+    excludeUserIds?: ReadonlySet<string>;
+  },
+): Promise<string[]> {
+  const recipientIds = await resolveProviderRecipientUserIds(booking);
+  const clientUserId = resolveClientUserId(booking);
+  const recipients = recipientIds.filter(
+    (userId) =>
+      userId !== input.actorUserId &&
+      userId !== clientUserId &&
+      !input.excludeUserIds?.has(userId),
+  );
+  if (recipients.length === 0) return [];
+
+  const serviceName = resolveServiceLabel(booking.service);
+  const whenLabel = bookingWhenLabel(booking);
+  const masterUserId = assignedMasterUserId(booking);
+  const byMaster = masterUserId !== null && input.actorUserId === masterUserId;
+  const title = input.kind === "REJECTED" ? "Запись отклонена" : "Запись отменена";
+  const verb = input.kind === "REJECTED" ? "отклонил" : "отменил";
+  // Кроме мастера и администраторов студии, отменить может только
+  // администратор платформы (`requireBookingCancelAccess`).
+  const who = byMaster
+    ? `Мастер ${booking.masterProvider?.name ?? ""}`.trim()
+    : booking.provider.type === ProviderType.STUDIO
+      ? "Администратор студии"
+      : "Администратор платформы";
+  const subject = `запись ${booking.clientName} на ${serviceName}`;
+  const body = whenLabel ? `${who} ${verb} ${subject} ${whenLabel}.` : `${who} ${verb} ${subject}.`;
+
+  const payload = buildBookingPayload(booking);
+  await Promise.all(
+    recipients.map((userId) =>
+      deliverNotification({
+        userId,
+        type: NotificationType.BOOKING_CANCELLED,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: providerNotificationPushUrl(booking, userId),
+        telegramText: buildTelegramText(title, body),
+      })
+    )
+  );
+  return recipients;
+}
+
+/**
+ * PENDING-EXPIRY (решение владельца 2026-09-24) — неподтверждённая вовремя
+ * запись отменена задачей воркера. Клиенту — что запись не подтвердили и
+ * надо выбрать другое окошко; стороне провайдера (мастер + администраторы
+ * студии) — что запись отменилась сама и клиент об этом знает.
+ */
+export async function notifyPendingBookingExpired(booking: BookingWithRelations): Promise<void> {
+  const serviceName = resolveServiceLabel(booking.service);
+  const whenLabel = bookingWhenLabel(booking);
+  const when = whenLabel ? ` ${whenLabel}` : "";
+  const payload = buildBookingPayload(booking);
+  const clientUserId = resolveClientUserId(booking);
+
+  const deliveries: Promise<unknown>[] = [];
+  if (clientUserId) {
+    const who =
+      booking.provider.type === ProviderType.STUDIO ? "Студия не подтвердила" : "Мастер не подтвердил";
+    const title = "Запись не подтверждена";
+    const body = `${who} запись на ${serviceName}${when} вовремя, поэтому она отменена. Выберите другое окошко.`;
+    deliveries.push(
+      deliverNotification({
+        userId: clientUserId,
+        type: NotificationType.BOOKING_REJECTED,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: bookingPushUrl(booking.id, "CLIENT"),
+        telegramText: buildTelegramText(title, body),
+      }),
+    );
+  }
+
+  const recipients = (await resolveProviderRecipientUserIds(booking)).filter((userId) => userId !== clientUserId);
+  if (recipients.length > 0) {
+    const title = "Запись отменена автоматически";
+    const tail = clientUserId ? " Клиент получил уведомление." : "";
+    const body = `Запись ${booking.clientName} на ${serviceName}${when} не подтвердили вовремя — она отменена.${tail}`;
+    for (const userId of recipients) {
+      deliveries.push(
+        deliverNotification({
+          userId,
+          type: NotificationType.BOOKING_CANCELLED,
+          title,
+          body,
+          payloadJson: payload,
+          bookingId: booking.id,
+          pushUrl: providerNotificationPushUrl(booking, userId),
+          telegramText: buildTelegramText(title, body),
+        }),
+      );
+    }
+  }
+  await Promise.all(deliveries);
 }
 
 export async function notifyCancelledByClient(booking: BookingWithRelations): Promise<void> {
@@ -637,25 +786,31 @@ export async function notifyBookingCompletedReview(booking: BookingWithRelations
   });
 }
 
+/**
+ * NO-SHOW-UI (2026-09-24): неявку отмечает сам мастер, поэтому уведомление о
+ * ней адресовано КЛИЕНТУ — раньше оно уходило тому же мастеру, который только
+ * что нажал кнопку, а клиент узнавал о статусе, только открыв свои записи.
+ * Текст даёт действие на случай ошибки мастера.
+ */
 export async function notifyBookingNoShow(booking: BookingWithRelations): Promise<void> {
-  const masterUserId = resolveMasterUserId(booking);
-  if (!masterUserId) return;
+  const clientUserId = resolveClientUserId(booking);
+  if (!clientUserId) return;
 
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
-  const title = "Клиент не пришёл";
+  const title = "Запись отмечена как неявка";
   const body = whenLabel
-    ? `Клиент ${booking.clientName} не пришёл на ${serviceName} ${whenLabel}.`
-    : `Клиент ${booking.clientName} не пришёл на ${serviceName}.`;
+    ? `Мастер отметил, что вы не пришли на ${serviceName} ${whenLabel}. Если это ошибка — напишите мастеру.`
+    : `Мастер отметил, что вы не пришли на ${serviceName}. Если это ошибка — напишите мастеру.`;
 
   await deliverNotification({
-    userId: masterUserId,
+    userId: clientUserId,
     type: NotificationType.BOOKING_NO_SHOW,
     title,
     body,
     payloadJson: buildBookingPayload(booking),
     bookingId: booking.id,
-    pushUrl: bookingPushUrl(booking.id, "MASTER"),
+    pushUrl: bookingPushUrl(booking.id, "CLIENT"),
     telegramText: buildTelegramText(title, body),
   });
 }

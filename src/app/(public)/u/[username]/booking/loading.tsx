@@ -4,7 +4,7 @@ export default function BookingLoading() {
       <div className="space-y-4">
         {/* Hero band */}
         <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
-          <div className="h-28 animate-pulse bg-muted/60 sm:h-32" />
+          <div className="aspect-[16/9] animate-pulse bg-muted/60 sm:aspect-auto sm:h-60" />
           <div className="flex gap-4 p-5">
             <div className="-mt-14 h-20 w-20 animate-pulse rounded-2xl border-4 border-bg-card bg-muted/60" />
             <div className="flex-1 space-y-2">

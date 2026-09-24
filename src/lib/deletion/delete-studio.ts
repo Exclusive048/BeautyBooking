@@ -137,6 +137,8 @@ export async function deleteStudioCabinet(userId: string, options: CabinetDeleti
       tx.clientCard.deleteMany({ where: { providerId: studio.providerId } }),
       // DELETION-03: объявлены в карте диспозиций как DELETED, но не удалялись.
       tx.servicePackage.deleteMany({ where: { masterId: studio.providerId } }),
+      // STUDIO-PORTFOLIO-FEED: работы студии в ленте (строки к её фото).
+      tx.portfolioItem.deleteMany({ where: { masterId: studio.providerId } }),
       tx.hotSlot.deleteMany({ where: { providerId: studio.providerId } }),
       tx.modelOffer.deleteMany({ where: { masterId: studio.providerId } }),
       tx.scheduleOverride.deleteMany({ where: { providerId: studio.providerId } }),

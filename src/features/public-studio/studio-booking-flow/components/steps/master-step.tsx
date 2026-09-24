@@ -4,6 +4,7 @@ import { ArrowLeft, Sparkles, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioMaster, SlotItem } from "@/features/booking/lib/studio-booking";
+import { MasterAvatar } from "../master-avatar";
 
 export const ANY_MASTER_ID = "__any__";
 
@@ -96,9 +97,12 @@ export function MasterStep({
                   aria-pressed={isSelected}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-primary text-sm font-semibold text-white" aria-hidden>
-                      {master.name.charAt(0).toUpperCase()}
-                    </span>
+                    <MasterAvatar
+                      name={master.name}
+                      avatarUrl={master.avatarUrl}
+                      sizePx={40}
+                      className="h-10 w-10 text-sm"
+                    />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold">{master.name}</div>
                       {availabilityByMaster[master.id]?.slots[0] ? (

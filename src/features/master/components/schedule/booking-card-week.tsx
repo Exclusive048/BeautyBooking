@@ -114,6 +114,7 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
         bookingId={booking.id}
         rawStatus={booking.rawStatus}
         startAtUtc={booking.startAtUtc.toISOString()}
+        endAtUtc={booking.endAtUtc.toISOString()}
         durationMin={booking.durationMin}
         actionRequiredBy={booking.actionRequiredBy ?? null}
       />

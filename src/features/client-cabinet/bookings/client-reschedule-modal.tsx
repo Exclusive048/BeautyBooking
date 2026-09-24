@@ -10,7 +10,17 @@ import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
-import type { ClientBookingDTO } from "@/lib/client-cabinet/bookings.service";
+
+/**
+ * Что модалке нужно знать о записи. `ClientBookingDTO` подходит структурно;
+ * GUEST-MANAGE-LINK передаёт то же из страницы управления по ссылке.
+ */
+export type RescheduleTarget = {
+  id: string;
+  startAtUtc: string | null;
+  service: { id: string; name: string };
+  provider: { id: string; name: string; timezone: string };
+};
 
 const T = UI_TEXT.clientCabinet.booking;
 
@@ -38,12 +48,18 @@ function todayDateKey(): string {
 }
 
 type Props = {
-  booking: ClientBookingDTO;
+  booking: RescheduleTarget;
+  /**
+   * GUEST-MANAGE-LINK: гость без сессии — право доказывает подписанная ссылка.
+   * Окошки берутся с `?manageToken=`, перенос уходит в
+   * `/api/public/bookings/manage/{token}/reschedule`.
+   */
+  manageToken?: string;
   onClose: () => void;
   onSuccess: () => void;
 };
 
-export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
+export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess }: Props) {
   const [date, setDate] = useState<string>(() => todayDateKey());
   const [slotIso, setSlotIso] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +76,9 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
   const slotsUrl = date
     ? `/api/public/providers/${booking.provider.id}/slots?serviceId=${
         booking.service.id
-      }&from=${date}&to=${date}&excludeBookingId=${encodeURIComponent(booking.id)}`
+      }&from=${date}&to=${date}&excludeBookingId=${encodeURIComponent(booking.id)}${
+        manageToken ? `&manageToken=${encodeURIComponent(manageToken)}` : ""
+      }`
     : null;
 
   const { data: slotsData, isLoading: slotsLoading } = useSWR<SlotsApiResponse>(
@@ -99,7 +117,10 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
     setError(null);
     try {
       const time = formatLocalHm(new Date(slot.startAtUtc), salonTz);
-      const res = await fetch(`/api/bookings/${booking.id}/reschedule`, {
+      const url = manageToken
+        ? `/api/public/bookings/manage/${encodeURIComponent(manageToken)}/reschedule`
+        : `/api/bookings/${booking.id}/reschedule`;
+      const res = await fetch(url, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -107,6 +128,7 @@ export function ClientRescheduleModal({ booking, onClose, onSuccess }: Props) {
           startAtUtc: slot.startAtUtc,
           endAtUtc: slot.endAtUtc,
           slotLabel: time,
+          ...(manageToken ? { bookingId: booking.id } : {}),
         }),
       });
       const json = await res.json().catch(() => null);

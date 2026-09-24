@@ -25,6 +25,8 @@ export type ProfileContacts = {
    * телефон — заявка без OTP-доказательства (см. lib/auth/phone-claim.ts).
    * Telegram/VK по-прежнему только из OAuth-линка. */
   phone: string | null;
+  /** PHONE-OAUTH-PROOF-01: номер подтверждён (phone-OTP либо VK ID / Яндекс ID). */
+  phoneVerified: boolean;
   email: string | null;
   telegramUsername: string | null;
   /** True when the user has a TelegramLink row (i.e. logged in via TG). */
@@ -119,6 +121,7 @@ export async function getMasterProfileView(input: {
       where: { id: input.userId },
       select: {
         phone: true,
+        phoneVerifiedAt: true,
         email: true,
         telegramUsername: true,
         // FIX-LINK-STATE-CONSISTENCY-01: select the identity id (chatId is
@@ -150,6 +153,7 @@ function composeView(input: {
   };
   user: {
     phone: string | null;
+    phoneVerifiedAt: Date | null;
     email: string | null;
     telegramUsername: string | null;
     telegramLink: { chatId: string | null } | null;
@@ -178,6 +182,7 @@ function composeView(input: {
 
   const contacts: ProfileContacts = {
     phone: user?.phone ?? null,
+    phoneVerified: Boolean(user?.phone && user.phoneVerifiedAt),
     email: user?.email ?? null,
     telegramUsername: user?.telegramUsername ?? null,
     // FIX-LINK-STATE-CONSISTENCY-01: both mean isLinked (identity) via the single

@@ -39,10 +39,10 @@ const BOOKING_MASTER_HREF_TYPES = new Set<string>([
   "BOOKING_REQUEST",
   "BOOKING_CANCELLED_BY_CLIENT",
   "BOOKING_RESCHEDULE_REQUESTED",
-  "BOOKING_NO_SHOW",
+  // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: адресат — сторона провайдера.
+  "BOOKING_CANCELLED",
 ]);
 const BOOKING_CLIENT_HREF_TYPES = new Set<string>([
-  "BOOKING_CANCELLED",
   "BOOKING_CANCELLED_BY_MASTER",
   "BOOKING_RESCHEDULED",
   "BOOKING_CONFIRMED",
@@ -51,6 +51,9 @@ const BOOKING_CLIENT_HREF_TYPES = new Set<string>([
   "BOOKING_REMINDER_24H",
   "BOOKING_REMINDER_2H",
   "BOOKING_COMPLETED_REVIEW",
+  // NO-SHOW-UI: адресат — клиент. Старые уведомления мастеру (до 2026-09-24)
+  // центр по-прежнему ведёт в кабинет — по каналу получателя (`providerSide`).
+  "BOOKING_NO_SHOW",
 ]);
 
 export function getNotificationPresentation(type: string): NotificationPresentation {

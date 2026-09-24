@@ -2,7 +2,9 @@ import Link from "next/link";
 import { BadgeCheck, Phone, Send, User } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ProfileContacts } from "@/lib/master/profile-view.service";
-import { isTelegramEnabled } from "@/lib/env";
+import { isTelegramEnabled, isVkAuthEnabled, isYandexAuthEnabled } from "@/lib/env";
+import { PhoneVerifyActions } from "@/features/cabinet/components/phone-verify-actions";
+import { PhoneVerifyNotice } from "@/features/cabinet/components/phone-verify-notice";
 import { UI_TEXT } from "@/lib/ui/text";
 import { EditableFieldRow } from "../editable/editable-field-row";
 import { SectionShell } from "./section-shell";
@@ -39,6 +41,7 @@ type Props = {
 export function ContactsSection({ data }: Props) {
   return (
     <SectionShell anchor="contacts" icon={Phone} title={T.title} subtitle={T.subtitle}>
+      <PhoneVerifyNotice className="mb-3" />
       <ul className="divide-y divide-border-subtle">
         <li>
           {/* `mask` — сериализуемый id, не функции: эта секция — RSC (§13). */}
@@ -51,6 +54,19 @@ export function ContactsSection({ data }: Props) {
             maxLength={18}
             mask="phone"
           />
+          {/* PHONE-OAUTH-PROOF-01: SMS в проде нет — номер подтверждается через
+              аккаунт ВКонтакте / Яндекс ID, к которому он привязан. */}
+          {data.phoneVerified ? (
+            <p className="flex items-center gap-1.5 pb-3 text-xs text-success-text">
+              <BadgeCheck className="h-3.5 w-3.5" aria-hidden />
+              {T.phoneVerifiedLabel}
+            </p>
+          ) : (
+            <PhoneVerifyActions
+              providers={{ vk: isVkAuthEnabled, yandex: isYandexAuthEnabled }}
+              className="pb-3"
+            />
+          )}
         </li>
         <li>
           <EditableFieldRow

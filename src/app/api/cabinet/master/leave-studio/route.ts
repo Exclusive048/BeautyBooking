@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       },
     });
 
-    const result = await transferMasterOutOfStudio(masterId, master.studioId, body.transferServices);
+    const result = await transferMasterOutOfStudio(masterId, master.studioId, body.transferServices, "MASTER");
 
     if (result.revokedInviteIds.length > 0) {
       for (const inviteId of result.revokedInviteIds) {

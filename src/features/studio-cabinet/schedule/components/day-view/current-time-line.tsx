@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { offsetPxFromMinute, salonMinuteOfDay } from "../../lib/time-grid";
+import {
+  gridHeightPx,
+  offsetPxFromMinute,
+  salonMinuteOfDay,
+  type GridWindow,
+} from "../../lib/time-grid";
 
 /**
  * FIX-STUDIO-CALENDAR-SALON-TZ: the "now" marker is positioned by the
@@ -14,9 +19,11 @@ import { offsetPxFromMinute, salonMinuteOfDay } from "../../lib/time-grid";
 export function CurrentTimeLine({
   dateKey,
   timezone,
+  gridWindow,
 }: {
   dateKey: string;
   timezone: string;
+  gridWindow: GridWindow;
 }) {
   const [now, setNow] = useState<Date | null>(null);
 
@@ -28,8 +35,8 @@ export function CurrentTimeLine({
   }, []);
 
   if (!now || toLocalDateKey(now, timezone) !== dateKey) return null;
-  const top = offsetPxFromMinute(salonMinuteOfDay(now, timezone));
-  if (top < 0) return null;
+  const top = offsetPxFromMinute(salonMinuteOfDay(now, timezone), gridWindow);
+  if (top < 0 || top > gridHeightPx(gridWindow)) return null;
 
   return (
     <div

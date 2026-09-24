@@ -10,12 +10,18 @@ import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
 import { toAppError } from "@/lib/api/errors";
+import { stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 // EXP-025: `minBookingHoursAhead` is required so the shared bookable-window
 // primitive can drop too-soon slots — the cutoff this endpoint previously
 // skipped (vs `/slots`).
-const PROVIDER_SELECT = { id: true, timezone: true, minBookingHoursAhead: true } as const;
+const PROVIDER_SELECT = {
+  id: true,
+  timezone: true,
+  minBookingHoursAhead: true,
+  maxBookingDaysAhead: true,
+} as const;
 
 /**
  * SEC-05 — расписание неопубликованного кабинета видно только своей стороне.
@@ -68,7 +74,12 @@ async function loadStudioActiveMaster(providerKey: string) {
     select: { isPublished: true },
   });
   if (!studio?.isPublished) return null;
-  return { id: master.id, timezone: master.timezone, minBookingHoursAhead: master.minBookingHoursAhead };
+  return {
+    id: master.id,
+    timezone: master.timezone,
+    minBookingHoursAhead: master.minBookingHoursAhead,
+    maxBookingDaysAhead: master.maxBookingDaysAhead,
+  };
 }
 
 export async function GET(
@@ -139,6 +150,15 @@ export async function GET(
     // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
     // applied identically. A slot returned here is one `assertBookingWindow`
     // will accept at submit.
+    // BOOKING-WINDOW-SPLIT: окно записи — владельца услуги (у услуги студии —
+    // студии), ровно то, что проверит `resolveBookingCore` и перенос.
+    const serviceOwner = await prisma.service.findUnique({
+      where: { id: serviceId },
+      select: {
+        provider: { select: { minBookingHoursAhead: true, maxBookingDaysAhead: true } },
+      },
+    });
+
     const bookable = await listBookableSlots({
       provider,
       serviceId,
@@ -149,6 +169,10 @@ export async function GET(
       now: new Date(),
       excludeBookingId: studioMove ? studioMove.excludeBookingId : exclusion?.bookingId,
       operatorWindow: operatorProvider !== null,
+      // BOOKING-WINDOW-STRICTER: более строгое из окон владельца услуги и мастера.
+      windowPolicy: serviceOwner?.provider
+        ? stricterBookingWindow(serviceOwner.provider, provider)
+        : undefined,
     });
     if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
 

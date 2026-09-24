@@ -8,6 +8,8 @@ import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
 export type StudioMaster = {
   id: string;
   name: string;
+  /** Optional for back-compat with older payloads: absent → initials. */
+  avatarUrl?: string | null;
   publicUsername: string | null;
   // EXP-024: enabled MasterService ids — which services this master performs.
   // The booking wizard lists only masters whose `serviceIds` include the
@@ -60,7 +62,7 @@ export type BookingAnswerPayload = {
 };
 
 export type BookingCreateResult =
-  | { ok: true; bookingId: string }
+  | { ok: true; bookingId: string; manageUrl: string | null }
   | { ok: false; error: string; code?: string; status?: number };
 
 export type AvailabilityResult =
@@ -225,14 +227,25 @@ export async function fetchBookingMe() {
   return json.data.user ?? null;
 }
 
-export async function createBooking(input: BookingCreateInput): Promise<BookingCreateResult> {
+export async function createBooking(
+  input: BookingCreateInput,
+  /**
+   * BOOKING-FLOW-AUDIT-RESIDUALS: ключ идемпотентности (инв. #28). Виджет
+   * студии его не слал: повтор после оборванного ответа или двойной клик
+   * создавали вторую запись на то же время.
+   */
+  idempotencyKey?: string,
+): Promise<BookingCreateResult> {
   const res = await fetch("/api/bookings", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {}),
+    },
     body: JSON.stringify(input),
   });
 
-  const json = await safeJson<ApiResponse<{ booking: { id: string } }>>(res);
+  const json = await safeJson<ApiResponse<{ booking: { id: string }; manageUrl?: string | null }>>(res);
   const errorCode = json && json.ok !== true ? json.error?.code : undefined;
 
   if (res.status === 401 && errorCode === "UNAUTHORIZED") {
@@ -266,5 +279,5 @@ export async function createBooking(input: BookingCreateInput): Promise<BookingC
     };
   }
 
-  return { ok: true, bookingId: json.data.booking?.id ?? "ok" };
+  return { ok: true, bookingId: json.data.booking?.id ?? "ok", manageUrl: json.data.manageUrl ?? null };
 }

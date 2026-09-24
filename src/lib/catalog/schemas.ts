@@ -23,6 +23,9 @@ export const catalogSearchQuerySchema = z.object({
   serviceQuery: z.string().trim().optional(),
   district: z.string().trim().optional(),
   date: z.string().trim().optional(),
+  // CATALOG-DATE-TIME-FILTER: время «когда» — часы салона `HH:MM`, `[from, to)`.
+  timeFrom: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  timeTo: z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   priceMin: z.coerce.number().int().min(0).optional(),
   priceMax: z.coerce.number().int().min(0).optional(),
   availableToday: z.coerce.boolean().optional(),
@@ -35,8 +38,9 @@ export const catalogSearchQuerySchema = z.object({
   modelOffers: z.coerce.boolean().optional(),
   view: catalogViewSchema.optional(),
   sort: catalogSortSchema.optional(),
-  lat: z.coerce.number().optional(),
-  lng: z.coerce.number().optional(),
+  // CATALOG-SORT-DISTANCE: точка пользователя для «По расстоянию» и «N км».
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
   bbox: z.string().trim().optional(),
   limit: z.coerce.number().int().min(1).max(40).default(20),
   cursor: z.string().trim().min(1).optional(),

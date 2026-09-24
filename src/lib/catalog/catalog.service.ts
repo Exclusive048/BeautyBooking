@@ -20,6 +20,8 @@ import { loadStudioCardPhotos } from "@/lib/studios/catalog-cover";
 // `providers/queries.ts` и `/api/hot-slots`, которые раньше отдавали сырой id.
 import { encodeCursor, decodeCursor } from "@/lib/pagination/cursor";
 import { decodePublicId } from "@/lib/public-id";
+import { distanceMetersFrom, rankByDistance, type GeoPoint } from "@/lib/catalog/distance-ranking";
+import { freeSlotKeysForWhen } from "@/lib/schedule/free-slot-keys-shared";
 import {
   catalogVisibleProviderWhere,
   NO_OWN_SERVICES_WHERE,
@@ -125,6 +127,9 @@ type CatalogSearchInput = {
   // same semantics as `/models`.
   cityId?: string;
   date?: string;
+  /** CATALOG-DATE-TIME-FILTER: часы салона `HH:MM` — есть свободное окошко в `[timeFrom, timeTo)`. */
+  timeFrom?: string;
+  timeTo?: string;
   priceMin?: number;
   priceMax?: number;
   availableToday?: boolean;
@@ -253,6 +258,26 @@ function sliceRankedPageIds<T extends { id: string }>(ranked: T[], args: PageWin
  * not scale indefinitely; the scale answer is a precomputed score column, i.e.
  * a schema change, deliberately out of scope.
  */
+/**
+ * CATALOG-SORT-DISTANCE (2026-09-24) — «По расстоянию» до точки пользователя.
+ * Раньше пункт меню молча отдавал релевантность. Та же схема, что у прочих
+ * вычисляемых сортировок: ранжируется ВЕСЬ отфильтрованный набор (лёгкие
+ * строки с координатами), потом режется страница. Без координат кабинет
+ * уходит в конец (адрес не указан — расстояния нет), равные — в базовом
+ * порядке каталога (сортировка стабильная).
+ */
+async function resolveDistanceRankedPageIds(args: PageWindow & {
+  where: Prisma.ProviderWhereInput;
+  origin: GeoPoint;
+}): Promise<string[]> {
+  const rows = await prisma.provider.findMany({
+    where: args.where,
+    orderBy: BASE_ORDER,
+    select: { id: true, geoLat: true, geoLng: true },
+  });
+  return sliceRankedPageIds(rankByDistance(rows, args.origin), args);
+}
+
 async function resolveRatingRankedPageIds(args: PageWindow & {
   where: Prisma.ProviderWhereInput;
 }): Promise<string[]> {
@@ -659,6 +684,22 @@ function buildWhere(
     and.push({ availableToday: input.availableToday });
   }
 
+  // CATALOG-DATE-TIME-FILTER: «когда» — по снимку свободного времени
+  // (`Provider.freeSlotKeys`, пишет воркер), без прогона движка на запрос.
+  const whenKeys = freeSlotKeysForWhen({
+    date: input.date,
+    timeFrom: input.timeFrom,
+    timeTo: input.timeTo,
+    now: new Date(),
+  });
+  if (whenKeys) {
+    and.push(
+      whenKeys.length === 1
+        ? { freeSlotKeys: { has: whenKeys[0] } }
+        : { freeSlotKeys: { hasSome: whenKeys } },
+    );
+  }
+
   if (typeof input.ratingMin === "number") {
     and.push({ ratingAvg: { gte: input.ratingMin } });
   }
@@ -923,15 +964,23 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   //              free, and deliberately NOT Bayesian-weighted: «popular» ranks
   //              BY review count, so few-review providers sink on their own —
   //              there is no small-sample distortion to correct.
-  //   distance → falls through to relevance (unchanged: no geo ordering yet).
+  //   distance → haversine до точки пользователя (CATALOG-SORT-DISTANCE); без
+  //              точки — релевантность (браузер не дал геолокацию).
   const pageWindow = { take, pageMode, pageOffset, cursorId };
+  const origin =
+    typeof input.lat === "number" && typeof input.lng === "number"
+      ? { latitude: input.lat, longitude: input.lng }
+      : null;
+  const distanceSort = input.sort === "distance" && origin !== null;
   const relevanceRanked =
-    !input.sort || input.sort === "relevance" || input.sort === "distance"
+    !input.sort || input.sort === "relevance" || (input.sort === "distance" && !distanceSort)
       ? await resolveRelevanceRankedPage({ where, ...pageWindow, smartTag: input.smartTag })
       : null;
   const rankedPageIds =
     relevanceRanked?.pageIds ??
-    (input.sort === "rating"
+    (distanceSort && origin
+      ? await resolveDistanceRankedPageIds({ where, ...pageWindow, origin })
+      : input.sort === "rating"
       ? await resolveRatingRankedPageIds({ where, ...pageWindow })
       : input.sort === "price-asc" || input.sort === "price-desc"
       ? await resolvePriceRankedPageIds({
@@ -1063,7 +1112,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
   //     was sliced out of that global order (`rankedPageIds`), and `providers`
   //     was re-sorted back into it;
   //   - popular → ordered by the query's `orderBy` on a real column;
-  //   - distance → falls through to relevance (no geo ordering yet).
+  //   - distance → ranked by haversine above (CATALOG-SORT-DISTANCE).
   // Re-sorting here would silently undo that: it can only permute the page,
   // which is exactly the per-page mis-ranking this change removes.
   const rankedRows = rows;
@@ -1094,7 +1143,7 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
       avatarUrl: provider.avatarUrl,
       ratingAvg: provider.ratingAvg,
       reviewsCount: provider.reviews,
-      distanceMeters: null,
+      distanceMeters: distanceMetersFrom(origin, provider.geoLat ?? null, provider.geoLng ?? null),
       photos,
       geoLat: provider.geoLat ?? null,
       geoLng: provider.geoLng ?? null,

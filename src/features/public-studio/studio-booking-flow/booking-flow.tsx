@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
@@ -39,6 +39,8 @@ import { WhenStep } from "./components/steps/when-step";
 import { YouStep } from "./components/steps/you-step";
 import { BookingSummary } from "./components/booking-summary";
 import { BookingError } from "./components/booking-error";
+import { mergeAnyMasterSlots } from "./any-master-slots";
+import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 
 type MasterAvailability = {
   serviceAvailable: boolean;
@@ -62,6 +64,12 @@ function formatDateLabel(dateKey: string): string {
   const parsed = new Date(`${dateKey}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return dateKey;
   return parsed.toLocaleDateString("ru-RU", { day: "numeric", month: "short", weekday: "short" });
+}
+
+function newIdempotencyKey(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `bk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey, initialServiceId }: Props) {
@@ -102,6 +110,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [bookingAnswers, setBookingAnswers] = useState<Record<string, string>>({});
 
   const [submitLoading, setSubmitLoading] = useState(false);
+  // Инв. #28: один ключ на попытку записи — повтор той же отправки сервер
+  // узнаёт; после отказа ключ меняется, чтобы новая попытка не считалась дублем.
+  const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null);
   const [success, setSuccess] = useState<null | {
@@ -109,6 +120,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     masterName: string;
     dateLabel: string;
     timeLabel: string;
+    /** GUEST-MANAGE-LINK: ссылка «Управлять записью» — только гостю. */
+    manageUrl: string | null;
   }>(null);
 
   // Scenario: B if a master is locked in (initial param or single-master prefill);
@@ -136,20 +149,32 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     return assignedMasters.filter((master) => availabilityByMaster[master.id]?.serviceAvailable !== false);
   }, [assignedMasters, availabilityByMaster, serviceId]);
 
+  // BOOKING-FLOW-AUDIT-RESIDUALS: «Любой мастер» — ОБЪЕДИНЕНИЕ окошек всех
+  // мастеров услуги. Раньше показывались окошки только первого мастера, у
+  // которого они были, и время, свободное лишь у второго, клиенту не
+  // предлагалось. Окошко помнит мастера (первого по порядку, у кого оно есть) —
+  // запись уходит к нему.
+  const anyMasterSlots = useMemo(
+    () =>
+      masterId === ANY_MASTER_ID && serviceId
+        ? mergeAnyMasterSlots(availableMasters, availabilityByMaster)
+        : null,
+    [availabilityByMaster, availableMasters, masterId, serviceId],
+  );
+
   const resolvedMasterId = useMemo(() => {
     if (masterId && masterId !== ANY_MASTER_ID) return masterId;
-    if (masterId === ANY_MASTER_ID) {
-      if (!serviceId) return "";
-      const withSlots = availableMasters.find((master) => (availabilityByMaster[master.id]?.slots.length ?? 0) > 0);
-      return withSlots?.id ?? "";
+    if (anyMasterSlots) {
+      const owner = slotLabel ? anyMasterSlots.find((entry) => entry.slot.label === slotLabel) : undefined;
+      return owner?.masterId ?? anyMasterSlots[0]?.masterId ?? "";
     }
     return "";
-  }, [availabilityByMaster, availableMasters, masterId, serviceId]);
+  }, [anyMasterSlots, masterId, slotLabel]);
 
-  const slots = useMemo(
-    () => (resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.slots ?? [] : []),
-    [availabilityByMaster, resolvedMasterId],
-  );
+  const slots = useMemo(() => {
+    if (anyMasterSlots) return anyMasterSlots.map((entry) => entry.slot);
+    return resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.slots ?? [] : [];
+  }, [anyMasterSlots, availabilityByMaster, resolvedMasterId]);
   const slotByLabel = useMemo(() => new Map(slots.map((slot) => [slot.label, slot])), [slots]);
   const selectedSlot = slotLabel ? slotByLabel.get(slotLabel) ?? null : null;
 
@@ -504,9 +529,10 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         bookingAnswers: answersPayload,
         // Guests only — the server refuses a guest booking without it.
         consent: isGuest ? consent : undefined,
-      });
+      }, idempotencyKeyRef.current);
 
       if (!result.ok) {
+        idempotencyKeyRef.current = newIdempotencyKey();
         setSubmitError(result.error || UI_TEXT.bookingWidget.errors.generic);
         setSubmitErrorCode(result.code ?? null);
         return;
@@ -533,6 +559,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         timeLabel: `${UI_FMT.timeShort(slot.startAtUtc, { timeZone: salonTz })}${
           successZoneLabel ? ` ${successZoneLabel}` : ""
         }`,
+        manageUrl: result.manageUrl,
       });
     } finally {
       setSubmitLoading(false);
@@ -566,6 +593,11 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
             .replace("{when}", `${success.dateLabel} · ${success.timeLabel}`)}
         </p>
         <p className="mt-2 text-xs text-text-muted">{UI_TEXT.bookingWidget.success.hint}</p>
+        {success.manageUrl ? (
+          <div className="mt-4">
+            <GuestManageLinkCard manageUrl={success.manageUrl} />
+          </div>
+        ) : null}
         <a
           href={studioBackHref}
           className="mt-5 inline-flex rounded-xl bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-muted/70"
@@ -733,7 +765,7 @@ function BookingFlowSkeleton() {
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
       <div className="space-y-4">
-        <div className="h-44 animate-pulse rounded-2xl bg-muted/40" />
+        <div className="aspect-[16/9] animate-pulse rounded-2xl bg-muted/40 sm:aspect-auto sm:h-80" />
         <div className="h-14 animate-pulse rounded-xl bg-muted/40" />
         <div className="h-72 animate-pulse rounded-2xl bg-muted/40" />
       </div>

@@ -10,6 +10,7 @@ import {
   loadBookingWithRelations,
   notifyCancelledByClient,
   notifyCancelledByMaster,
+  notifyProviderSideCancelled,
 } from "@/lib/notifications/booking-notifications";
 import { enqueueSlotFreedJob } from "@/lib/bookings/slot-freed-enqueue";
 
@@ -38,7 +39,13 @@ export async function POST(
         if (cancellation.cancelledBy === "CLIENT") {
           await notifyCancelledByClient(fullBooking);
         } else {
-          await notifyCancelledByMaster(fullBooking);
+          await notifyCancelledByMaster(fullBooking, { actorUserId: user.userId });
+          // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: администратор студии отменил —
+          // узнаёт мастер; мастер отменил — узнают администраторы.
+          await notifyProviderSideCancelled(fullBooking, {
+            actorUserId: user.userId,
+            kind: "CANCELLED",
+          });
         }
         void enqueueSlotFreedJob(fullBooking, userId);
       }

@@ -62,6 +62,7 @@ export async function deleteReview(
       rating: true,
       targetType: true,
       targetId: true,
+      masterId: true,
       reportedAt: true,
       reportReason: true,
       deletedAt: true,
@@ -101,7 +102,7 @@ export async function deleteReview(
         deletedReason: input.reason?.trim() || null,
       },
     });
-    await recalculateTargetRatings(tx, review.targetType, review.targetId);
+    await recalculateTargetRatings(tx, review);
 
     await createAdminAuditLog({
       tx,

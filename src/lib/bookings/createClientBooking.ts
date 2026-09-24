@@ -4,7 +4,8 @@ import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
-import { BookingSource, MediaEntityType, ProviderType, Prisma } from "@prisma/client";
+import { BookingSource, MediaEntityType, ProviderType } from "@prisma/client";
+import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
   buildCreateBookingIdempotencyKey,
@@ -22,19 +23,6 @@ import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { resolveBookingServicePrice } from "@/lib/bookings/hot-slot-pricing";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/booking-extras";
-
-function mapPrismaBookingConflict(error: unknown): AppError | null {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2002" || error.code === "P2034") {
-      return new AppError(
-        "Это время уже занято. Пожалуйста, выберите другое окошко.",
-        409,
-        "BOOKING_CONFLICT"
-      );
-    }
-  }
-  return null;
-}
 
 export async function createClientBooking(
   userId: string,

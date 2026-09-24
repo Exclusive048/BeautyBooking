@@ -6,16 +6,18 @@ import {
 import { prisma } from "@/lib/prisma";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { bookingToneFromStatus } from "../lib/booking-status-display";
 import { mapProposedReschedule } from "../lib/reschedule-decision";
 import {
   DAY_END_HOUR,
   DAY_START_HOUR,
-  addUtcDays,
   parseDateKey,
-  startOfUtcDay,
+  resolveGridWindow,
+  salonMinuteOfDay,
   toDateKey,
 } from "../lib/time-grid";
+import { resolveMasterWorkHours } from "@/lib/schedule/master-work-window";
 import type {
   ScheduleBookingCell,
   ScheduleBreakCell,
@@ -70,13 +72,26 @@ function resolveBookingPriceKopeks(input: {
   return Math.max(0, input.service?.price ?? 0);
 }
 
+/**
+ * BOOKING-FLOW-AUDIT-RESIDUALS · rule 17 (salon-tz) — границы дня календаря
+ * студии — сутки САЛОНА, а не UTC. Раньше день запрашивался UTC-сутками:
+ * у студии в GMT+10 записи с 00:00 до 10:00 по салону попадали в предыдущий
+ * день календаря, а в выбранный — не попадали вовсе.
+ */
+function salonDayBounds(dateKey: string, timeZone: string): { start: Date; end: Date } {
+  return {
+    start: dateFromLocalDateKey(dateKey, timeZone, 0, 0),
+    end: dateFromLocalDateKey(addDaysToDateKey(dateKey, 1), timeZone, 0, 0),
+  };
+}
+
 async function buildDayData(
   studioId: string,
   providerId: string,
   dateKey: string,
+  timeZone: string,
 ): Promise<ScheduleDayData> {
-  const dayStart = startOfUtcDay(parseDateKey(dateKey));
-  const dayEnd = addUtcDays(dayStart, 1);
+  const { start: dayStart, end: dayEnd } = salonDayBounds(dateKey, timeZone);
 
   const [masters, bookings, blocks] = await Promise.all([
     prisma.provider.findMany({
@@ -258,9 +273,36 @@ async function buildDayData(
     note: block.note,
   }));
 
+  // BOOKING-FLOW-AUDIT-RESIDUALS: сетка дня раздвигается под часы активных
+  // мастеров, записи и перерывы этого дня (минимум — 09–21). Интервал через
+  // полночь салона прижимается к краю суток.
+  const minuteOfSalonDay = (instant: Date): number => {
+    if (instant.getTime() <= dayStart.getTime()) return 0;
+    if (instant.getTime() >= dayEnd.getTime()) return 24 * 60;
+    return salonMinuteOfDay(instant, timeZone);
+  };
+  const jsWeekday = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
+  const workHours = await Promise.all(
+    masters
+      .filter((master) => isStudioMasterActive(master))
+      .map((master) => resolveMasterWorkHours(master.id, jsWeekday, dateKey)),
+  );
+  const gridMinutes: number[] = [];
+  for (const hours of workHours) {
+    if (!hours.isActive || hours.startMinutes === null || hours.endMinutes === null) continue;
+    gridMinutes.push(hours.startMinutes, hours.endMinutes);
+  }
+  for (const cell of [...bookingCells, ...breakCells]) {
+    gridMinutes.push(
+      minuteOfSalonDay(new Date(cell.startAtUtc)),
+      minuteOfSalonDay(new Date(cell.endAtUtc)),
+    );
+  }
+
   return {
     dateKey,
     dayStartIso: dayStart.toISOString(),
+    gridWindow: resolveGridWindow(gridMinutes),
     columns,
     bookings: bookingCells,
     breaks: breakCells,
@@ -315,10 +357,12 @@ async function buildWeekData(
   // calendar day — so the highlighted column matches the master/client cabinets
   // (which all key "today" off `toLocalDateKey(now, entityTz)`).
   studioTodayKey: string,
+  timeZone: string,
 ): Promise<ScheduleWeekData> {
-  const target = parseDateKey(dateKey);
-  const weekStart = startOfUtcWeekMonday(target);
-  const weekEnd = addUtcDays(weekStart, 7);
+  // Неделя — календарная арифметика над ключами дат, границы — в поясе салона.
+  const weekStartKey = toDateKey(startOfUtcWeekMonday(parseDateKey(dateKey)));
+  const weekStart = salonDayBounds(weekStartKey, timeZone).start;
+  const weekEnd = salonDayBounds(addDaysToDateKey(weekStartKey, 6), timeZone).end;
 
   const [masters, bookings] = await Promise.all([
     prisma.provider.findMany({
@@ -353,24 +397,22 @@ async function buildWeekData(
   ]);
 
   const days: ScheduleWeekDay[] = Array.from({ length: 7 }, (_, index) => {
-    const date = addUtcDays(weekStart, index);
+    const key = addDaysToDateKey(weekStartKey, index);
     return {
-      dateKey: toDateKey(date),
+      dateKey: key,
       weekdayLabel: WEEKDAY_SHORT_RU[index],
-      dayNumber: date.getUTCDate(),
-      isToday: toDateKey(date) === studioTodayKey,
+      dayNumber: Number(key.slice(8, 10)),
+      isToday: key === studioTodayKey,
     };
   });
+  const weekDayKeys = new Set(days.map((day) => day.dateKey));
 
   const countsByMasterAndDay = new Map<string, Map<string, number>>();
   for (const booking of bookings) {
     if (!booking.startAtUtc) continue;
-    const offset = Math.floor(
-      (booking.startAtUtc.getTime() - weekStart.getTime()) /
-        (24 * 60 * 60 * 1000),
-    );
-    if (offset < 0 || offset > 6) continue;
-    const dayKey = days[offset]!.dateKey;
+    // День записи — по салону (rule 17), а не смещение в UTC-сутках.
+    const dayKey = toLocalDateKey(booking.startAtUtc, timeZone);
+    if (!weekDayKeys.has(dayKey)) continue;
     const masterId = booking.masterProviderId ?? booking.providerId;
     const byDay = countsByMasterAndDay.get(masterId) ?? new Map<string, number>();
     byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + 1);
@@ -473,10 +515,10 @@ export async function loadStudioScheduleData(input: {
   const effectiveDateKey = input.dateKey ?? studioTodayKey;
 
   const [day, services, week] = await Promise.all([
-    buildDayData(studio.id, studio.providerId, effectiveDateKey),
+    buildDayData(studio.id, studio.providerId, effectiveDateKey, studioTimezone),
     loadServices(studio.id, studio.providerId),
     input.view === "week"
-      ? buildWeekData(studio.id, studio.providerId, effectiveDateKey, studioTodayKey)
+      ? buildWeekData(studio.id, studio.providerId, effectiveDateKey, studioTodayKey, studioTimezone)
       : Promise.resolve(null),
   ]);
 

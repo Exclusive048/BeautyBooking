@@ -55,9 +55,18 @@ export type MasterReviewItem = ReviewDto & {
 
 const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * STUDIO-REVIEW-MASTER-RATING: отзыв о визите в студию входит в рейтинг и
+ * список мастера, но ответ на него — дело студии. «Без ответа», «новый» и
+ * метрики ответа считаются только по отзывам, на которые мастер отвечает сам.
+ */
+function isOwnReply(review: ReviewDto): boolean {
+  return review.targetType === "provider";
+}
+
 function applyFilter(reviews: ReviewDto[], filter: ReviewsFilterId): ReviewDto[] {
   if (filter === "all") return reviews;
-  if (filter === "unanswered") return reviews.filter((r) => !r.replyText);
+  if (filter === "unanswered") return reviews.filter((r) => isOwnReply(r) && !r.replyText);
   if (filter === "good") return reviews.filter((r) => r.rating >= 4);
   return reviews.filter((r) => r.rating <= 3);
 }
@@ -66,7 +75,7 @@ function decorate(reviews: ReviewDto[], now: Date): MasterReviewItem[] {
   const cutoff = now.getTime() - NEW_WINDOW_MS;
   return reviews.map((review) => ({
     ...review,
-    isNew: !review.replyText && new Date(review.createdAt).getTime() >= cutoff,
+    isNew: isOwnReply(review) && !review.replyText && new Date(review.createdAt).getTime() >= cutoff,
   }));
 }
 
@@ -87,11 +96,18 @@ export async function getMasterReviewsView(input: {
     currentUser: { id: input.currentUserId, roles: input.currentUserRoles },
   });
 
-  const stats = computeReviewStats(reviews, now);
+  const allStats = computeReviewStats(reviews, now);
+  const ownStats = computeReviewStats(reviews.filter(isOwnReply), now);
+  const stats: ReviewStats = {
+    ...allStats,
+    responseRate: ownStats.responseRate,
+    unansweredCount: ownStats.unansweredCount,
+    avgResponseMs: ownStats.avgResponseMs,
+  };
 
   const filterCounts: Record<ReviewsFilterId, number> = {
     all: reviews.length,
-    unanswered: reviews.filter((r) => !r.replyText).length,
+    unanswered: reviews.filter((r) => isOwnReply(r) && !r.replyText).length,
     good: reviews.filter((r) => r.rating >= 4).length,
     bad: reviews.filter((r) => r.rating <= 3).length,
   };

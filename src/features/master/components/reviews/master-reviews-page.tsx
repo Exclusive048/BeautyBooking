@@ -8,6 +8,7 @@ import {
   parseFilter,
 } from "@/lib/master/reviews-view.service";
 import { prisma } from "@/lib/prisma";
+import { decodePublicId, encodePublicId } from "@/lib/public-id";
 import { UI_TEXT } from "@/lib/ui/text";
 import { ReviewsFilterChips } from "./reviews-filter-chips";
 import { ReviewsDistribution } from "./reviews-distribution";
@@ -57,6 +58,22 @@ export async function MasterReviewsPage({ searchParams }: Props) {
 
   const params = (await searchParams) ?? {};
   const filter = parseFilter(readString(params.filter));
+
+  // BOOKING-FLOW-AUDIT-RESIDUALS: карточки отзывов несут публичный токен
+  // (`ReviewDto.id` = `encodePublicId`, rule 12), а уведомления «новый отзыв» /
+  // «ответ на отзыв» ведут сюда с сырым id — подсветка не находила карточку.
+  // Сырой id переписывается в токен здесь, поэтому работают и уже отправленные
+  // уведомления.
+  const focus = readString(params.focus);
+  if (focus && decodePublicId(focus) === focus) {
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      const single = readString(value);
+      if (single !== null && key !== "focus") next.set(key, single);
+    }
+    next.set("focus", encodePublicId(focus));
+    redirect(`/cabinet/master/reviews?${next.toString()}`);
+  }
 
   const data = await getMasterReviewsView({
     masterProviderId: provider.id,

@@ -5,6 +5,8 @@ import { parseBody } from "@/lib/validation";
 import { publicBookingCreateSchema } from "@/lib/validation/public-bookings";
 import { findOrCreateGuestUserByPhone } from "@/lib/users/find-or-create-guest";
 import { createBooking } from "@/lib/bookings/createBooking";
+import { isIdempotentReplay } from "@/lib/bookings/idempotency";
+import { issueGuestManagePath } from "@/lib/bookings/guest-manage";
 import { getSessionUserFromRequest } from "@/lib/auth/session";
 import {
   loadBookingWithRelations,
@@ -151,7 +153,8 @@ export async function POST(req: Request) {
     });
 
     try {
-      const full = await loadBookingWithRelations(created.id);
+      // Повтор по ключу — та же бронь: уведомления о ней уже ушли.
+      const full = isIdempotentReplay(created) ? null : await loadBookingWithRelations(created.id);
       if (full) {
         await notifyBookingCreated(full);
         if (full.status === "CONFIRMED") {
@@ -173,6 +176,9 @@ export async function POST(req: Request) {
     });
     void invalidateRecentMastersCache(clientUserId);
 
+    // GUEST-MANAGE-LINK: гостю — ссылка «Управлять записью» (отмена/перенос без аккаунта).
+    const manageUrl = session ? null : await issueGuestManagePath(created.id, clientUserId);
+
     return jsonOk(
       {
         booking: {
@@ -180,6 +186,7 @@ export async function POST(req: Request) {
           status: created.status,
           slotLabel: created.slotLabel,
         },
+        manageUrl,
       },
       { status: 201 },
     );

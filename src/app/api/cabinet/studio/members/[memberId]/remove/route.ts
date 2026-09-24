@@ -62,7 +62,8 @@ export async function POST(req: Request, ctx: RouteContext) {
     const result = await transferMasterOutOfStudio(
       params.memberId.trim(),
       studio.providerId,
-      body.transferServices
+      body.transferServices,
+      "STUDIO"
     );
 
     if (result.revokedInviteIds.length > 0) {

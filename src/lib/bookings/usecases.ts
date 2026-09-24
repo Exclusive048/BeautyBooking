@@ -13,12 +13,14 @@ import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/booking
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import {
   assertBookingWindow,
+  stricterBookingWindow,
   assertWithinMasterWorkHours,
   resolveSalonLocalParts,
 } from "@/lib/bookings/policy-enforcement";
 import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { resolveBookingDurationMin } from "@/lib/bookings/booking-duration";
 import { AppError } from "@/lib/api/errors";
+import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
@@ -175,7 +177,10 @@ export async function rescheduleBooking(input: {
       // LOGIC-03: длительность выводится на сервере, а не принимается от
       // клиента; снапшоты — авторитетный источник (окно брони могло уже
       // разойтись с ними). Tz исполнителя нужен guard'у рабочих часов.
-      masterProvider: { select: { timezone: true } },
+      // BOOKING-WINDOW-STRICTER: окно записи исполнителя — наравне с окном провайдера.
+      masterProvider: {
+        select: { timezone: true, minBookingHoursAhead: true, maxBookingDaysAhead: true },
+      },
       serviceItems: { select: { durationSnapshotMin: true } },
     },
   });
@@ -244,7 +249,12 @@ export async function rescheduleBooking(input: {
   // helper to `createBooking`. Defends against direct-API callers
   // bypassing the slot-picker UI on the master/client/cabinet sides.
   try {
-    assertBookingWindow(input.startAtUtc, booking.provider, new Date());
+    // BOOKING-WINDOW-STRICTER: у студийной записи — более строгое из окон студии и мастера.
+    assertBookingWindow(
+      input.startAtUtc,
+      stricterBookingWindow(booking.provider, booking.masterProvider),
+      new Date(),
+    );
   } catch (error) {
     if (error instanceof AppError) {
       // `assertBookingWindow` only throws 400 (BOOKING_TOO_SOON /
@@ -319,6 +329,23 @@ export async function rescheduleBooking(input: {
   );
   if (!conflict.ok) return conflict;
 
+  // BOOKING-FLOW-AUDIT-RESIDUALS: закрытое время (перерыв, блокировка) — та же
+  // проверка, что при создании и при подтверждении переноса. Без неё прямой
+  // запрос предлагал перенос в закрытое окно, и отказ всплывал только у другой
+  // стороны при подтверждении.
+  try {
+    await assertNoTimeBlockConflict(prisma, {
+      masterProviderId: booking.masterProviderId ?? booking.providerId,
+      startAtUtc: input.startAtUtc,
+      endAtUtc,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { ok: false, status: 409, message: error.message, code: error.code };
+    }
+    throw error;
+  }
+
   if (input.actor === "CLIENT" && booking.clientChangeRequestsCount >= BOOKING_CHANGE_REQUEST_LIMIT) {
     return {
       ok: false,
@@ -353,6 +380,8 @@ export async function rescheduleBooking(input: {
     expectedStatus: booking.status,
     data: {
       status: "CHANGE_REQUESTED",
+      // RESCHEDULE-DECLINE-RESTORE-STATUS: отказ от переноса вернёт этот статус.
+      statusBeforeChange: booking.status,
       proposedStartAt: input.startAtUtc,
       proposedEndAt: endAtUtc,
       requestedBy: input.actor,

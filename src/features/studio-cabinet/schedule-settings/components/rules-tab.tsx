@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Switch } from "@/components/ui/switch";
-import type {
-  BookingRulesDto,
-  ScheduleEditorSnapshot,
+import {
+  BOOKING_RULE_LIMITS,
+  type BookingRulesDto,
+  type ScheduleEditorSnapshot,
 } from "@/lib/schedule/editor-shared";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -85,27 +86,25 @@ export function RulesTab({ studioId, masterId, initialSnapshot }: Props) {
     <div className="space-y-4">
       <div className="space-y-3 rounded-2xl border border-border-subtle bg-bg-card p-5">
         <Row title={T.minHoursTitle} hint={T.minHoursHint}>
-          <Input
-            type="number"
-            min={0}
-            max={168}
+          <NumberInput
+            min={BOOKING_RULE_LIMITS.minHoursAhead.min}
+            max={BOOKING_RULE_LIMITS.minHoursAhead.max}
+            fallback={BOOKING_RULE_LIMITS.minHoursAhead.fallback}
             value={rules.minHoursAhead}
-            onChange={(e) =>
-              update({ minHoursAhead: Math.max(0, Number(e.target.value) || 0) })
-            }
+            onValueChange={(next) => update({ minHoursAhead: next })}
+            aria-label={T.minHoursTitle}
             className="w-24"
           />
         </Row>
 
         <Row title={T.maxDaysTitle} hint={T.maxDaysHint}>
-          <Input
-            type="number"
-            min={1}
-            max={365}
+          <NumberInput
+            min={BOOKING_RULE_LIMITS.maxDaysAhead.min}
+            max={BOOKING_RULE_LIMITS.maxDaysAhead.max}
+            fallback={BOOKING_RULE_LIMITS.maxDaysAhead.fallback}
             value={rules.maxDaysAhead}
-            onChange={(e) =>
-              update({ maxDaysAhead: Math.max(1, Number(e.target.value) || 1) })
-            }
+            onValueChange={(next) => update({ maxDaysAhead: next })}
+            aria-label={T.maxDaysTitle}
             className="w-24"
           />
         </Row>
@@ -124,21 +123,22 @@ export function RulesTab({ studioId, masterId, initialSnapshot }: Props) {
               size="sm"
               checked={rules.freeCancelHours !== null}
               onCheckedChange={(next) =>
-                update({ freeCancelHours: next ? 24 : null })
+                update({
+                  freeCancelHours: next
+                    ? BOOKING_RULE_LIMITS.freeCancelHours.fallback
+                    : null,
+                })
               }
               aria-label={T.freeCancelToggleAria}
             />
             {rules.freeCancelHours !== null ? (
-              <Input
-                type="number"
+              <NumberInput
                 min={1}
-                max={168}
+                max={BOOKING_RULE_LIMITS.freeCancelHours.max}
+                fallback={BOOKING_RULE_LIMITS.freeCancelHours.fallback}
                 value={rules.freeCancelHours}
-                onChange={(e) =>
-                  update({
-                    freeCancelHours: Math.max(1, Number(e.target.value) || 1),
-                  })
-                }
+                onValueChange={(next) => update({ freeCancelHours: next })}
+                aria-label={T.freeCancelTitle}
                 className="w-20"
               />
             ) : null}

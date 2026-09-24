@@ -15,10 +15,15 @@ import {
   Calendar,
   Check,
   MoreVertical,
+  UserX,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { useMarkNoShow } from "@/features/master/components/bookings/use-mark-no-show";
+import { useMasterBookingCancel } from "@/features/master/components/bookings/use-master-booking-cancel";
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
+import type { BookingStatus } from "@prisma/client";
+import { canMarkNoShow } from "@/lib/bookings/flow";
 import { usePrompt } from "@/hooks/use-prompt";
 import {
   isBookingPastConfirmWindow,
@@ -34,8 +39,10 @@ const T = UI_TEXT.cabinetMaster.schedule.bookingCard;
 
 type Props = {
   bookingId: string;
-  rawStatus: string;
+  rawStatus: BookingStatus;
   startAtUtc: string;
+  /** NO-SHOW-UI: конец приёма — окно неявки считается от него. */
+  endAtUtc: string;
   durationMin: number;
   /**
    * MASTER-BOOKING-UI-FIX-A: when `rawStatus === "CHANGE_REQUESTED"`
@@ -66,11 +73,14 @@ export function BookingCardActionsMenu({
   bookingId,
   rawStatus,
   startAtUtc,
+  endAtUtc,
   durationMin,
   actionRequiredBy = null,
 }: Props) {
   const router = useRouter();
   const { prompt, modal: promptModal } = usePrompt();
+  const noShow = useMarkNoShow(bookingId);
+  const { cancelBooking, modal: packageModal } = useMasterBookingCancel();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<ActionId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -180,11 +190,26 @@ export function BookingCardActionsMenu({
       variant: "danger",
     });
     if (!comment) return;
-    void patchStatus("cancel", "CANCELLED", comment);
+    // BOOKING-FLOW-AUDIT-RESIDUALS: компонент пакета — с предложением
+    // отменить весь пакет (`useMasterBookingCancel`).
+    setBusy("cancel");
+    setError(null);
+    try {
+      const cancelled = await cancelBooking(bookingId, comment);
+      if (cancelled) startTransition(() => router.refresh());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : T.actionError);
+    } finally {
+      setBusy(null);
+    }
   };
   const handleReschedule = () => {
     setOpen(false);
     setRescheduleOpen(true);
+  };
+  const handleNoShow = () => {
+    setOpen(false);
+    void noShow.markNoShow();
   };
 
   // MASTER-RESCHEDULE-FIX-A: split PENDING vs CHANGE_REQUESTED so the
@@ -215,6 +240,12 @@ export function BookingCardActionsMenu({
   const startDate = new Date(startAtUtc);
   const isPastModifyWindow = isBookingPastModifyWindow(startDate);
   const isPastConfirmWindow = isBookingPastConfirmWindow(startDate);
+  // NO-SHOW-UI: то же правило, что проверяет сервер (`canMarkNoShow`).
+  const canNoShow = canMarkNoShow({
+    status: rawStatus,
+    startAtUtc: startDate,
+    endAtUtc: new Date(endAtUtc),
+  });
   const modifyTooltip = UI_TEXT.cabinetMaster.dashboard.bookings.modifyWindowExpiredTooltip;
   const confirmTooltip = UI_TEXT.cabinetMaster.dashboard.bookings.confirmWindowExpiredTooltip;
 
@@ -273,6 +304,11 @@ export function BookingCardActionsMenu({
             {T.cancel}
           </MenuItem>
         ) : null}
+        {canNoShow ? (
+          <MenuItem icon={UserX} onClick={handleNoShow} disabled={busy !== null || noShow.busy}>
+            {UI_TEXT.cabinetMaster.bookings.card.noShow}
+          </MenuItem>
+        ) : null}
         {error ? (
           <p className="border-t border-border-subtle px-3 py-2 text-[11px] text-red-600">
             {error}
@@ -310,6 +346,14 @@ export function BookingCardActionsMenu({
       />
 
       {promptModal}
+      {noShow.modal}
+      {packageModal}
+      {noShow.error ? (
+        // Меню к моменту ответа уже закрыто — отказ показывается на карточке.
+        <p role="alert" className="absolute inset-x-1 bottom-1 rounded bg-bg-card/95 px-1.5 py-1 text-[10px] leading-tight text-danger-text">
+          {noShow.error}
+        </p>
+      ) : null}
     </>
   );
 }

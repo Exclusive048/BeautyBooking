@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { isValidTimeZone } from "@/lib/schedule/timezone";
 
 export const masterDayQuerySchema = z.object({
@@ -14,7 +15,23 @@ export const createMasterBookingSchema = z.object({
   startAt: z.string().datetime(),
   serviceId: z.string().trim().min(1),
   clientName: z.string().trim().min(1).max(120),
-  clientPhone: z.string().trim().max(32).optional(),
+  // BOOKING-FLOW-AUDIT-RESIDUALS: телефон — единым нормализатором, как у
+  // гостевой и студийной записи. Раньше он сохранялся как ввели («8 (999)…»),
+  // и CRM-карточка и склейка гостевых броней клиента не находили.
+  clientPhone: z
+    .string()
+    .trim()
+    .max(32)
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const normalized = normalizeRussianPhone(value);
+      if (!normalized) {
+        ctx.addIssue({ code: "custom", message: "Проверьте номер телефона." });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
   notes: z.string().trim().max(1000).optional(),
 });
 

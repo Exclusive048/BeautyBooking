@@ -1,3 +1,5 @@
+import type { CropArea } from "@/lib/media/crop-geometry";
+
 export type ProviderTypeDto = "MASTER" | "STUDIO";
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -60,6 +62,8 @@ export type ProviderProfileDto = {
   name: string;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  /** Область кадра баннера (доли исходника); `null` — кадр не выбирали. */
+  bannerCrop: CropArea | null;
   tagline: string;
   description: string | null;
   publicUsername: string | null;

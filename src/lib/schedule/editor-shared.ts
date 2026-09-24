@@ -157,12 +157,37 @@ export const WEEK_TEMPLATE_OPTIONS: WeekTemplateDto[] = [
   { id: "2x2", label: "2 через 2" },
 ];
 
-const BUFFER_OPTIONS = [0, 5, 10, 15, 20, 30] as const;
-export type BufferMin = (typeof BUFFER_OPTIONS)[number];
+/**
+ * SCHEDULE-RULES-FREE-INPUT (2026-09-24) — числовые правила записи принимают
+ * ЛЮБОЕ целое в диапазоне, а не значение из фиксированного списка.
+ *
+ * Раньше нормализаторы сверяли значение с набором кнопок кабинета мастера
+ * (0/1/2/4/6/12/24/48 ч и т.п.), а кабинет студии даёт свободный ввод числом:
+ * «13 часов» или «45 дней» молча заменялись прежним значением, а буфер вне
+ * списка — нулём. Кнопки мастера — подмножество диапазона, их это не задевает.
+ *
+ * Границы — те же, что у `PATCH /api/studios/[id]` («Правила студии»), и у
+ * буфера — CHECK-констрейнт БД (`BETWEEN 0 AND 30`, LOGIC-20). `fallback` —
+ * дефолт колонки в `prisma/schema/provider.prisma`: его подставляет поле, которое
+ * оставили пустым (пин — `editor-shared-limits.test.ts`).
+ */
+export const BOOKING_RULE_LIMITS = {
+  minHoursAhead: { min: 0, max: 168, fallback: 2 },
+  maxDaysAhead: { min: 1, max: 365, fallback: 90 },
+  freeCancelHours: { min: 0, max: 168, fallback: 24 },
+  visibleSlotDays: { min: 1, max: 90, fallback: 30 },
+  bufferMin: { min: 0, max: 30, fallback: 0 },
+} as const;
 
-export function normalizeBufferMin(value: unknown): BufferMin {
-  if (typeof value !== "number" || !Number.isInteger(value)) return 0;
-  return (BUFFER_OPTIONS as readonly number[]).includes(value) ? (value as BufferMin) : 0;
+type RangeLimit = { readonly min: number; readonly max: number };
+
+function clampToRange(value: unknown, limit: RangeLimit, fallback: number): number {
+  if (typeof value !== "number" || !Number.isInteger(value)) return fallback;
+  return Math.min(limit.max, Math.max(limit.min, value));
+}
+
+export function normalizeBufferMin(value: unknown): number {
+  return clampToRange(value, BOOKING_RULE_LIMITS.bufferMin, 0);
 }
 
 export const SLOT_STEP_OPTIONS = [15, 30, 60] as const;
@@ -183,31 +208,21 @@ const HOT_SLOT_APPLY_MODES: readonly HotSlotApplyMode[] = [
   "MANUAL",
 ];
 
-const MIN_HOURS_AHEAD_OPTIONS = [0, 1, 2, 4, 6, 12, 24, 48] as const;
-const MAX_DAYS_AHEAD_OPTIONS = [7, 14, 30, 60, 90, 180] as const;
-const FREE_CANCEL_HOURS_OPTIONS = [1, 2, 4, 12, 24, 48] as const;
-const VISIBLE_SLOT_DAY_OPTIONS = [3, 7, 14, 30, 60] as const;
-
-function clampToSet<T extends number>(value: unknown, options: readonly T[], fallback: T): T {
-  if (typeof value !== "number" || !Number.isInteger(value)) return fallback;
-  return options.includes(value as T) ? (value as T) : fallback;
-}
-
 export function normalizeBookingRules(
   value: unknown,
   defaults: BookingRulesDto
 ): BookingRulesDto {
   if (!value || typeof value !== "object") return defaults;
   const record = value as Record<string, unknown>;
-  const minHoursAhead = clampToSet(
+  const minHoursAhead = clampToRange(
     record.minHoursAhead,
-    MIN_HOURS_AHEAD_OPTIONS,
-    defaults.minHoursAhead as 0 | 1 | 2 | 4 | 6 | 12 | 24 | 48
+    BOOKING_RULE_LIMITS.minHoursAhead,
+    defaults.minHoursAhead
   );
-  const maxDaysAhead = clampToSet(
+  const maxDaysAhead = clampToRange(
     record.maxDaysAhead,
-    MAX_DAYS_AHEAD_OPTIONS,
-    defaults.maxDaysAhead as 7 | 14 | 30 | 60 | 90 | 180
+    BOOKING_RULE_LIMITS.maxDaysAhead,
+    defaults.maxDaysAhead
   );
   const autoConfirm =
     typeof record.autoConfirm === "boolean" ? record.autoConfirm : defaults.autoConfirm;
@@ -225,11 +240,11 @@ export function normalizeBookingRules(
     typeof record.freeCancelHours === "number" &&
     Number.isInteger(record.freeCancelHours)
   ) {
-    freeCancelHours = (FREE_CANCEL_HOURS_OPTIONS as readonly number[]).includes(
-      record.freeCancelHours
-    )
-      ? record.freeCancelHours
-      : defaults.freeCancelHours;
+    freeCancelHours = clampToRange(
+      record.freeCancelHours,
+      BOOKING_RULE_LIMITS.freeCancelHours,
+      BOOKING_RULE_LIMITS.freeCancelHours.fallback
+    );
   }
 
   return { minHoursAhead, maxDaysAhead, autoConfirm, freeCancelHours, lateCancelAction };
@@ -252,10 +267,10 @@ export function normalizeVisibility(
     typeof precisionRaw === "string" && SLOT_PRECISIONS.includes(precisionRaw as SlotPrecision)
       ? (precisionRaw as SlotPrecision)
       : defaults.slotPrecision;
-  const visibleSlotDays = clampToSet(
+  const visibleSlotDays = clampToRange(
     record.visibleSlotDays,
-    VISIBLE_SLOT_DAY_OPTIONS,
-    defaults.visibleSlotDays as 3 | 7 | 14 | 30 | 60
+    BOOKING_RULE_LIMITS.visibleSlotDays,
+    defaults.visibleSlotDays
   );
 
   return { isPublished, slotPrecision, visibleSlotDays, acceptNewClients };

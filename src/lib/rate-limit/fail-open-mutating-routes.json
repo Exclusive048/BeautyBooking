@@ -70,6 +70,8 @@
   "/api/providers/me",
   "/api/providers/me/settings",
   "/api/public/bookings",
+  "/api/public/bookings/manage/[token]/cancel",
+  "/api/public/bookings/manage/[token]/reschedule",
   "/api/public/packages/[id]/book",
   "/api/public/packages/[id]/propose",
   "/api/public/packages/[id]/studio/book",

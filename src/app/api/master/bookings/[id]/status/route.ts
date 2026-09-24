@@ -12,6 +12,7 @@ import {
   notifyBookingNoShow,
   notifyBookingRejected,
   notifyCancelledByMaster,
+  notifyProviderSideCancelled,
   notifyRescheduleDeclinedByMaster,
 } from "@/lib/notifications/booking-notifications";
 
@@ -52,9 +53,13 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         } else if (body.status === "NO_SHOW") {
           await notifyBookingNoShow(fullBooking);
         } else if (body.status === "CANCELLED") {
-          await notifyCancelledByMaster(fullBooking);
+          await notifyCancelledByMaster(fullBooking, { actorUserId: user.id });
+          // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: студийную запись отменил
+          // мастер — узнают администраторы студии.
+          await notifyProviderSideCancelled(fullBooking, { actorUserId: user.id, kind: "CANCELLED" });
         } else {
           await notifyBookingRejected(fullBooking);
+          await notifyProviderSideCancelled(fullBooking, { actorUserId: user.id, kind: "REJECTED" });
         }
       }
     } catch (error) {

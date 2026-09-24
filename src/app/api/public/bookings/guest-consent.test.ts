@@ -22,10 +22,14 @@ const spies = vi.hoisted(() => ({
   recordGuestConsents: vi.fn(async () => undefined),
   createBooking: vi.fn(async () => ({ id: "bk-1", status: "PENDING", slotLabel: "10:00" })),
   createClientBooking: vi.fn(async () => ({ id: "bk-legacy" })),
-  createSoloPackageBooking: vi.fn(async () => ({ packageId: "pkg-1", bookings: [] })),
-  createStudioPackageBooking: vi.fn(async () => ({ packageId: "pkg-2", bookings: [] })),
+  createSoloPackageBooking: vi.fn(async () => ({ bookingPackageId: "pkg-1", bookingIds: ["bk-p1"], totalKopeks: 0 })),
+  createStudioPackageBooking: vi.fn(async () => ({ bookingPackageId: "pkg-2", bookingIds: ["bk-p2"], totalKopeks: 0 })),
   checkRateLimit: vi.fn(async () => true),
+  issueGuestManagePath: vi.fn(async (bookingId: string) => `/booking/manage/tok-${bookingId}`),
 }));
+
+// GUEST-MANAGE-LINK: ссылка «Управлять записью» — только гостю.
+vi.mock("@/lib/bookings/guest-manage", () => ({ issueGuestManagePath: spies.issueGuestManagePath }));
 
 vi.mock("@/lib/users/find-or-create-guest", () => ({
   findOrCreateGuestUserByPhone: spies.findOrCreateGuest,
@@ -169,6 +173,10 @@ describe("POST /api/public/bookings (solo widget)", () => {
     expect(spies.recordGuestConsents).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "guest-1", wasCreated: true, flags: GRANTED, userAgent: "vitest" }),
     );
+    // GUEST-MANAGE-LINK: гость получает ссылку на свою запись.
+    const json = (await res.json()) as { data: { manageUrl: string | null } };
+    expect(json.data.manageUrl).toBe("/booking/manage/tok-bk-1");
+    expect(spies.issueGuestManagePath).toHaveBeenCalledWith("bk-1", "guest-1");
   });
 
   it("marketing is optional and carried through when ticked", async () => {
@@ -282,6 +290,10 @@ describe("POST /api/public/packages/{id}/book (solo package wizard)", () => {
 
     expect(res.status).toBe(200);
     expect(spies.recordGuestConsents).not.toHaveBeenCalled();
+    // GUEST-MANAGE-LINK: у клиента с аккаунтом записи — в кабинете, ссылки нет.
+    const json = (await res.json()) as { data: { manageUrl: string | null } };
+    expect(json.data.manageUrl).toBeNull();
+    expect(spies.issueGuestManagePath).not.toHaveBeenCalled();
   });
 });
 

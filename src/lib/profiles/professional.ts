@@ -2,7 +2,7 @@ import { AccountType, MembershipStatus, ProviderType, StudioRole, SubscriptionSc
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { addRoleToUser } from "@/lib/auth/roles";
-import { ensureUniqueUsername, generateDefaultUsername } from "@/lib/publicUsername";
+import { ensureUniqueUsername, generateDefaultUsername, generateUniqueMasterUsername } from "@/lib/publicUsername";
 import { ensureFreeSubscription } from "@/lib/billing/ensure-free-subscription";
 import { ensureFreeOrTrialSubscription } from "@/lib/billing/trial";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -124,13 +124,10 @@ export async function createMasterProfile(
 
   if (!provider) {
     const usernameStartedAt = Date.now();
-    const baseUsername = generateDefaultUsername({
-      providerType: ProviderType.MASTER,
-      firstName: userProfile?.firstName ?? null,
-      lastName: userProfile?.lastName ?? null,
-      allowLastName: false,
+    const uniqueUsername = await generateUniqueMasterUsername(prisma, {
+      firstName: userProfile?.firstName,
+      lastName: userProfile?.lastName,
     });
-    const uniqueUsername = await ensureUniqueUsername(prisma, baseUsername);
     logInfo("createMasterProfile: ensureUniqueUsername", { userId: input.userId, ms: Date.now() - usernameStartedAt });
 
     const providerCreateStartedAt = Date.now();

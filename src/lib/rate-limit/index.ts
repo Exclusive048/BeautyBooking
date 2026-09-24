@@ -129,6 +129,8 @@ const SENSITIVE_KEY_PREFIXES = [
   "rate:publicBooking:",
   "rate:packageBook:",
   "rate:studioPackageBook:",
+  // GUEST-MANAGE-LINK: отмена и перенос записи гостем по ссылке — тоже гостевая запись.
+  "rate:guestManage:",
   "rl:categories:propose:",
   "rl:/api/me/delete",
   "rl:/api/cabinet/master/delete",

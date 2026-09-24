@@ -63,7 +63,7 @@ export async function StudioHeroSection({ studioId }: Props) {
     url: item.url,
   }));
   const bannerItem = studio.bannerUrl
-    ? { url: studio.bannerUrl }
+    ? { url: studio.bannerUrl, crop: studio.bannerCrop }
     : null;
   const imageItems = bannerItem
     ? [bannerItem, ...portfolioItems.filter((item) => item.url !== studio.bannerUrl)]

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { DistrictSuggestInput } from "@/features/catalog/components/district-suggest-input";
 import { HistogramSlider } from "@/features/catalog/components/histogram-slider";
+import { WhenFilter, type WhenTimePreset } from "@/features/catalog/components/when-filter";
 import { useTopCategories, type CatalogCategory } from "@/features/catalog/lib/use-top-categories";
 import { useDeferredCommit } from "@/hooks/use-deferred-commit";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
@@ -22,6 +23,9 @@ export type CatalogFilters = {
   hot: boolean;
   entityType: "all" | "master" | "studio";
   availableToday: boolean;
+  /** CATALOG-DATE-TIME-FILTER: «когда» — день и часы салона. */
+  when: { date: string; timePreset: WhenTimePreset | null; timeFrom: string; timeTo: string };
+  onWhenChange: (updates: Record<string, string | null>) => void;
 };
 
 type Props = CatalogFilters & {
@@ -128,6 +132,8 @@ export function CatalogSidebar({
   hot,
   entityType,
   availableToday,
+  when,
+  onWhenChange,
   onGlobalCategoryChange,
   onDistrictChange,
   onRatingMinChange,
@@ -216,6 +222,19 @@ export function CatalogSidebar({
           ) : null}
         </div>
       ) : null}
+
+      {/* CATALOG-DATE-TIME-FILTER: «Когда» — первым: чаще всего клиент ищет
+          время, а не категорию. */}
+      <section className={sectionClass}>
+        <div className={labelClass}>{UI_TEXT.catalog2.searchBar.whenLabel}</div>
+        <WhenFilter
+          date={when.date}
+          timePreset={when.timePreset}
+          timeFrom={when.timeFrom}
+          timeTo={when.timeTo}
+          onChange={onWhenChange}
+        />
+      </section>
 
       {/* Categories — single-radio top-level. Backend expansion (see
           resolveCategoryFilterIds) automatically pulls in children, so a pick

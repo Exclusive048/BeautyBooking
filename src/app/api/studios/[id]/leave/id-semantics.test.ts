@@ -26,7 +26,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     studio: { findUnique: studioFindUnique },
     studioMembership: { findFirst: membershipFindFirst, update: membershipUpdate },
-    provider: { updateMany: providerUpdateMany },
+    // STUDIO-LEAVE-GUARD: у пользователя нет мастерского кабинета в студии — сторож записей не спрашивает БД.
+    provider: { updateMany: providerUpdateMany, findMany: vi.fn(async () => []) },
     userProfile: { findUnique: userFindUnique },
   },
 }));

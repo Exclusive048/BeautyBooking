@@ -66,6 +66,9 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
       tx.userFavorite.deleteMany({ where: { providerId } }),
       tx.discountRule.deleteMany({ where: { providerId } }),
       tx.portfolioItem.deleteMany({ where: { masterId: providerId } }),
+      // STUDIO-PORTFOLIO-FEED: фото студии, подписанные этим мастером, остаются у
+      // студии — снимается только подпись исполнителя.
+      tx.portfolioItem.updateMany({ where: { performerId: providerId }, data: { performerId: null } }),
       tx.hotSlot.deleteMany({ where: { providerId } }),
       tx.modelOffer.deleteMany({ where: { masterId: providerId } }),
       // LOGIC-19: блоки времени этого мастера. До появления FK связь была

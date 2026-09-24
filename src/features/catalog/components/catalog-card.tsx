@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Heart, Star } from "lucide-react";
+import { Heart, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
@@ -46,7 +46,16 @@ type CatalogCardItem = {
   availableToday?: boolean;
   /** TZ-DISPLAY-SALON-PARITY-01: salon tz for the (dormant) `nextSlot` time. */
   timezone?: string;
+  /** CATALOG-SORT-DISTANCE: расстояние до пользователя, если он поделился геопозицией. */
+  distanceMeters?: number | null;
 };
+
+/** «850 м» → «0,9 км»; до 10 км — с десятой, дальше — целыми. */
+function formatDistanceKm(meters: number): string {
+  const km = meters / 1000;
+  const value = km < 10 ? km.toFixed(1) : String(Math.round(km));
+  return `${value.replace(".", ",")} ${UI_TEXT.catalog2.card.distanceKm}`;
+}
 
 type Props = {
   item: CatalogCardItem;
@@ -278,6 +287,12 @@ export function CatalogCard({
             </div>
             {item.tagline ? (
               <p className="truncate text-xs text-text-sec">{item.tagline}</p>
+            ) : null}
+            {typeof item.distanceMeters === "number" ? (
+              <p className="inline-flex items-center gap-1 text-xs text-text-sec">
+                <MapPin className="h-3 w-3" aria-hidden />
+                <span className="tabular-nums">{formatDistanceKm(item.distanceMeters)}</span>
+              </p>
             ) : null}
           </div>
         </div>

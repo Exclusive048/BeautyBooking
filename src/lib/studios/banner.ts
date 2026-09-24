@@ -1,10 +1,8 @@
 import { MediaEntityType, MediaKind } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
+import { toCropArea, type CropArea } from "@/lib/media/crop-geometry";
 import { prisma } from "@/lib/prisma";
-
-function studioBannerSettingKey(studioProviderId: string): string {
-  return `studioBannerAssetId:${studioProviderId}`;
-}
+import { studioBannerSettingKey } from "@/lib/studios/portfolio-items-sync";
 
 /**
  * Изображение — работа из портфолио ЭТОЙ студии (не удалена). Общая проверка
@@ -39,7 +37,22 @@ export async function getStudioBannerAssetId(studioProviderId: string): Promise<
   return setting?.value ?? null;
 }
 
+export type StudioBanner = {
+  url: string;
+  /**
+   * STUDIO-BOOKING-BANNER (2026-09-24): область 16:9, выбранная в кабинете
+   * (`CropPicker`). Отдаётся отдельно от ссылки: полноразмерный баннер нельзя
+   * резать серверным `/crop/{v}` (он ограничен 640 px), поэтому витрина
+   * показывает исходник и наводит кадр на центр области.
+   */
+  crop: CropArea | null;
+};
+
 export async function getStudioBannerUrl(studioProviderId: string): Promise<string | null> {
+  return (await getStudioBanner(studioProviderId))?.url ?? null;
+}
+
+export async function getStudioBanner(studioProviderId: string): Promise<StudioBanner | null> {
   const assetId = await getStudioBannerAssetId(studioProviderId);
   if (!assetId) return null;
 
@@ -51,6 +64,10 @@ export async function getStudioBannerUrl(studioProviderId: string): Promise<stri
       entityId: true,
       kind: true,
       deletedAt: true,
+      cropX: true,
+      cropY: true,
+      cropWidth: true,
+      cropHeight: true,
     },
   });
   if (
@@ -63,7 +80,10 @@ export async function getStudioBannerUrl(studioProviderId: string): Promise<stri
     return null;
   }
 
-  return `/api/media/file/${asset.id}`;
+  return {
+    url: `/api/media/file/${asset.id}`,
+    crop: toCropArea(asset.cropX, asset.cropY, asset.cropWidth, asset.cropHeight),
+  };
 }
 
 export async function setStudioBannerAssetId(studioProviderId: string, assetId: string | null): Promise<void> {

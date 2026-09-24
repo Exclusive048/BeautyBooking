@@ -5,6 +5,7 @@ import {
   STUDIO_CABINET_PATH,
 } from "@/lib/auth/cabinet-paths";
 import { prisma } from "@/lib/prisma";
+import { invalidateMeIdentityCache } from "@/lib/users/me";
 
 const ALLOWED_ROLE_ADDITIONS: ReadonlySet<AccountType> = new Set([
   AccountType.MASTER,
@@ -39,6 +40,22 @@ export function accountTypeRedirect(type: AccountType): string {
   return "/";
 }
 
+/**
+ * INVITE-ROLE-REFRESH (2026-09-24) — единственная запись `UserProfile.roles`.
+ *
+ * `/api/me` кэширует роли на 30 с (`me.ts`), а нижняя навигация и меню кабинетов
+ * строятся из этого ответа. Пока запись ролей кэш не сбрасывала, мастер, только
+ * что принявший приглашение в студию, ещё полминуты видел «Стать мастером» даже
+ * после перезагрузки — хотя кабинет мастера уже существовал.
+ */
+async function writeRoles(userId: string, nextRoles: AccountType[]): Promise<void> {
+  await prisma.userProfile.update({
+    where: { id: userId },
+    data: { roles: { set: nextRoles } },
+  });
+  await invalidateMeIdentityCache(userId);
+}
+
 function ensureClientRole(roles: AccountType[]): AccountType[] {
   return Array.from(new Set([...roles, AccountType.CLIENT]));
 }
@@ -49,10 +66,7 @@ export async function addRoleToUser(
   role: AccountType
 ): Promise<AccountType[]> {
   const nextRoles = ensureClientRole([...roles, role]);
-  await prisma.userProfile.update({
-    where: { id: userId },
-    data: { roles: { set: nextRoles } },
-  });
+  await writeRoles(userId, nextRoles);
   return nextRoles;
 }
 
@@ -90,10 +104,7 @@ export async function removeProfessionalRoles(
   const nextRoles = ensureClientRole(profile.roles.filter((role) => !toRemove.has(role)));
   if (nextRoles.length === profile.roles.length) return profile.roles;
 
-  await prisma.userProfile.update({
-    where: { id: userId },
-    data: { roles: { set: nextRoles } },
-  });
+  await writeRoles(userId, nextRoles);
   return nextRoles;
 }
 
@@ -122,10 +133,7 @@ export async function setAccountTypeRoles(
   type: AccountType
 ): Promise<AccountType[]> {
   const nextRoles = ensureClientRole([...roles, type]);
-  await prisma.userProfile.update({
-    where: { id: userId },
-    data: { roles: { set: nextRoles } },
-  });
+  await writeRoles(userId, nextRoles);
   return nextRoles;
 }
 
@@ -135,10 +143,7 @@ export async function ensureClientRoleForUser(
 ): Promise<AccountType[]> {
   if (roles.includes(AccountType.CLIENT)) return roles;
   const nextRoles = ensureClientRole(roles);
-  await prisma.userProfile.update({
-    where: { id: userId },
-    data: { roles: { set: nextRoles } },
-  });
+  await writeRoles(userId, nextRoles);
   return nextRoles;
 }
 

@@ -2,6 +2,11 @@ import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
 import { hasFreeSlotToday, providerHasFreeSlotToday } from "@/lib/schedule/available-today";
+import {
+  computeFreeSlotKeys,
+  sameFreeSlotKeys,
+  type FreeSlotProbeProvider,
+} from "@/lib/schedule/free-slot-keys";
 
 /**
  * CATALOG-AVAILABLE-TODAY — Phase 2: the recompute sweep.
@@ -34,7 +39,33 @@ export type RecomputeAvailableTodaySummary = {
   changed: number;
   errored: number;
   erroredIds: string[];
+  /** CATALOG-DATE-TIME-FILTER: сколько снимков свободного времени переписано. */
+  freeSlotKeysChanged?: number;
 };
+
+/**
+ * CATALOG-DATE-TIME-FILTER — снимок свободного времени пересчитывается тем же
+ * проходом, что и `availableToday`, и так же устойчив: сбой одного провайдера
+ * оставляет ему прежний снимок (не пустой — пустой спрятал бы его из фильтра
+ * «когда») и не прерывает проход. Пишется только изменившийся снимок.
+ */
+async function refreshFreeSlotKeys(
+  provider: FreeSlotProbeProvider & { type: ProviderType; freeSlotKeys: string[] },
+  now: Date,
+  summary: RecomputeAvailableTodaySummary,
+): Promise<void> {
+  try {
+    const keys = await computeFreeSlotKeys(provider, now);
+    if (sameFreeSlotKeys(keys, provider.freeSlotKeys)) return;
+    await prisma.provider.update({ where: { id: provider.id }, data: { freeSlotKeys: keys } });
+    summary.freeSlotKeysChanged = (summary.freeSlotKeysChanged ?? 0) + 1;
+  } catch (error) {
+    logError("freeSlotKeys.recompute.provider-failed", {
+      providerId: provider.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 export async function recomputeAvailableToday(
   now: Date = new Date(),
@@ -51,9 +82,19 @@ export async function recomputeAvailableToday(
       slotStepMin: true,
       minBookingHoursAhead: true,
       bufferBetweenBookingsMin: true,
+      // CATALOG-DATE-TIME-FILTER: поля снимка свободного времени.
+      maxBookingDaysAhead: true,
+      visibleSlotDays: true,
+      freeSlotKeys: true,
     },
   });
 
+  const freeSlotSummary: RecomputeAvailableTodaySummary = {
+    total: 0,
+    changed: 0,
+    errored: 0,
+    erroredIds: [],
+  };
   const flipToTrue: string[] = [];
   const flipToFalse: string[] = [];
   const erroredIds: string[] = [];
@@ -72,9 +113,11 @@ export async function recomputeAvailableToday(
         providerId: provider.id,
         error: error instanceof Error ? error.message : String(error),
       });
+      await refreshFreeSlotKeys(provider, now, freeSlotSummary);
       continue; // keep the previous stored value
     }
 
+    await refreshFreeSlotKeys(provider, now, freeSlotSummary);
     if (free === provider.availableToday) continue; // no-op — minimal write
     (free ? flipToTrue : flipToFalse).push(provider.id);
   }
@@ -97,6 +140,7 @@ export async function recomputeAvailableToday(
     changed: flipToTrue.length + flipToFalse.length,
     errored: erroredIds.length,
     erroredIds,
+    freeSlotKeysChanged: freeSlotSummary.freeSlotKeysChanged ?? 0,
   };
 }
 
@@ -134,10 +178,15 @@ async function recomputeOneProvider(
       slotStepMin: true,
       minBookingHoursAhead: true,
       bufferBetweenBookingsMin: true,
+      // CATALOG-DATE-TIME-FILTER: поля снимка свободного времени.
+      maxBookingDaysAhead: true,
+      visibleSlotDays: true,
+      freeSlotKeys: true,
     },
   });
   if (!provider) return null;
   summary.total += 1;
+  await refreshFreeSlotKeys(provider, now, summary);
 
   const free =
     provider.type === ProviderType.MASTER

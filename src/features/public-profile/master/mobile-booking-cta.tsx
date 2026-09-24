@@ -17,12 +17,15 @@ export function MobileBookingCta() {
     }
   }
 
+  // PUBLIC-PROFILE-FIXED-CTA-UNDER-BOTTOM-NAV (2026-09-24): кнопка стоит НАД
+  // глобальной нижней навигацией (`--bottom-nav-h` публикует `BottomTabBar`),
+  // а не под ней: навигация — `z-40`, и раньше перекрывала половину кнопки, так
+  // что тап по её центру попадал во вкладку. Запасное значение — та же формула
+  // высоты панели, что у `BottomTabBarSpacer`: до гидратации кнопка не прыгает.
+  // Safe-area забирает сама панель, поэтому своего отступа здесь нет.
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-30 lg:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
-      <div className="mx-4 mb-4">
+    <div className="fixed inset-x-0 bottom-[var(--bottom-nav-h,calc(3rem+max(0px,calc(env(safe-area-inset-bottom,0px)-10px))))] z-30 lg:hidden">
+      <div className="mx-4 mb-3">
         <button
           type="button"
           onClick={handleClick}

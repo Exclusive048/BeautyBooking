@@ -45,7 +45,7 @@ const API_STATIC_SEGMENTS: ReadonlySet<string> = new Set([
   "global-categories", "health", "heatmap", "home", "hot-slots",
   "ics", "integrations", "invites", "kpis", "lead-time",
   "leave", "leave-studio", "link", "log-error", "login",
-  "login-init", "ltv", "marketing", "master", "masters",
+  "login-init", "ltv", "manage", "marketing", "master", "masters",
   "me", "media", "members", "merge", "messages",
   "model-applications", "model-offers", "move", "mrr", "my",
   "my-proposals", "new-vs-returning", "notifications", "og", "onboarding",

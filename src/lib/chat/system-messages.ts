@@ -1,5 +1,6 @@
 import { ChatSenderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 
 /**
  * System messages live in the regular ChatMessage stream with
@@ -34,6 +35,11 @@ async function ensureBookingChatId(bookingId: string): Promise<string> {
 export async function emitBookingSystemMessage(args: {
   bookingId: string;
   eventKey: SystemEventKey;
+  /**
+   * Уточнение ключа для событий, которые у одной записи бывают несколько раз
+   * (перенос): в БД пишется `EVENT:<уточнение>`, уникальность — по нему.
+   */
+  eventQualifier?: string;
   body: string;
 }): Promise<{ created: boolean }> {
   const chatId = await ensureBookingChatId(args.bookingId);
@@ -46,7 +52,7 @@ export async function emitBookingSystemMessage(args: {
         senderName: SYSTEM_SENDER_NAME,
         body: args.body,
         referencedBookingId: args.bookingId,
-        systemEventKey: args.eventKey,
+        systemEventKey: args.eventQualifier ? `${args.eventKey}:${args.eventQualifier}` : args.eventKey,
       },
       select: { id: true },
     });
@@ -65,19 +71,9 @@ export async function emitBookingSystemMessage(args: {
   }
 }
 
+// Rule 17: время записи — salon-tz с меткой зоны, как во всех уведомлениях.
 function formatLocal(date: Date | null, timezone: string): string {
-  if (!date) return "—";
-  try {
-    return new Intl.DateTimeFormat("ru-RU", {
-      timeZone: timezone,
-      day: "numeric",
-      month: "long",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  } catch {
-    return date.toISOString();
-  }
+  return formatBookingWhenLabel(date, timezone) ?? "—";
 }
 
 export async function emitBookingCreatedSystemMessage(
@@ -111,6 +107,10 @@ export async function emitBookingRescheduledSystemMessage(args: {
   await emitBookingSystemMessage({
     bookingId: args.bookingId,
     eventKey: "BOOKING_RESCHEDULED",
+    // BOOKING-FLOW-AUDIT-RESIDUALS: ключ «один раз на запись» пропускал все
+    // переносы, кроме первого — в чате оставалась устаревшая дата. Уточнение —
+    // новое время: повтор того же события (ретрай) по-прежнему пишется один раз.
+    eventQualifier: args.newStart ? args.newStart.toISOString() : "none",
     body: `Запись перенесена с ${oldLabel} на ${newLabel}`,
   });
 }

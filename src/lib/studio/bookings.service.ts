@@ -10,7 +10,11 @@ import {
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
-import { ensureBookingActionWindow, resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import {
+  canMarkNoShow,
+  ensureBookingActionWindow,
+  resolveBookingRuntimeStatus,
+} from "@/lib/bookings/flow";
 import {
   assertMasterPerformsService,
   assertWithinMasterWorkHours,
@@ -75,9 +79,12 @@ export async function createStudioBooking(input: {
       basePrice: true,
       baseDurationMin: true,
       isActive: true,
+      isEnabled: true,
     },
   });
-  if (!service || !service.isActive) {
+  // BOOKING-FLOW-AUDIT-RESIDUALS: выключенная услуга не записывается и из
+  // кабинета студии — то же правило, что у `resolveBookingCore`.
+  if (!service || !service.isActive || !service.isEnabled) {
     throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
   }
 
@@ -504,6 +511,36 @@ export async function moveStudioBooking(input: {
           endAtUtc: newEnd,
         });
 
+        // BOOKING-FLOW-AUDIT-RESIDUALS: компонент пакета не ложится поверх
+        // другого компонента того же пакета. Скоуп конфликта выше — мастер
+        // (инв. #11), а у компонентов студийного пакета мастера разные, поэтому
+        // пересечение по КЛИЕНТУ (то же, что `intraPackageOverlapMultiMaster`
+        // проверяет при создании пакета) перенос пропускал.
+        if (booking.bookingPackageId) {
+          const siblings = await tx.booking.findMany({
+            where: {
+              bookingPackageId: booking.bookingPackageId,
+              id: { not: booking.id },
+              status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+            },
+            select: { startAtUtc: true, endAtUtc: true },
+          });
+          const overlapsSibling = siblings.some(
+            (row) =>
+              row.startAtUtc !== null &&
+              row.endAtUtc !== null &&
+              newStart < row.endAtUtc &&
+              newEnd > row.startAtUtc,
+          );
+          if (overlapsSibling) {
+            throw new AppError(
+              "В это время у клиента другая услуга из того же пакета. Выберите другое время.",
+              409,
+              "SLOT_CONFLICT",
+            );
+          }
+        }
+
         // STUDIO-MOVE-GUARDS-01: администратор студии переносит напрямую (инв.
         // #22), то есть висящий запрос переноса этим решён. Прежде предложение
         // оставалось: календарь продолжал показывать «Принять», клиент — старое
@@ -702,6 +739,24 @@ export async function updateMasterBookingStatus(input: {
   if (isNoShowAction) {
     if (runtimeStatus === "PENDING" || runtimeStatus === "CONFIRMED" || runtimeStatus === "CHANGE_REQUESTED") {
       throw new AppError("Приём ещё не начался — отметить неявку нельзя.", 409, "CONFLICT");
+    }
+    // NO-SHOW-UI: окно неявки закрывается вместе с открытием окна отзыва —
+    // иначе мастер мог отметить неявку через неделю и отнять у клиента отзыв.
+    if (runtimeStatus === "FINISHED") {
+      throw new AppError(
+        "Отметить неявку можно только в течение часа после окончания приёма.",
+        409,
+        "CONFLICT",
+      );
+    }
+    if (
+      !canMarkNoShow({
+        status: booking.status,
+        startAtUtc: booking.startAtUtc,
+        endAtUtc: booking.endAtUtc,
+      })
+    ) {
+      throw new AppError("Запись не была подтверждена — отметить неявку нельзя.", 409, "CONFLICT");
     }
   } else if (runtimeStatus === "IN_PROGRESS" || runtimeStatus === "FINISHED") {
     throw new AppError("Запись уже началась.", 409, "CONFLICT");

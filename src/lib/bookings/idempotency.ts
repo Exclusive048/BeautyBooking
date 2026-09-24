@@ -116,6 +116,19 @@ export async function resolveIdempotency<T>(input: {
   return { result: null, lockAcquired: true };
 }
 
+/**
+ * BOOKING-FLOW-AUDIT-RESIDUALS — повтор по ключу идемпотентности возвращает
+ * уже созданную бронь, а роуты после `createBooking` рассылали «новая запись»
+ * и «запись подтверждена» ещё раз: мастер получал дубль на каждый повтор.
+ * Отметка ставится на сам возвращённый объект (форма ответа не меняется) и
+ * проверяется роутом перед рассылкой — `isIdempotentReplay`.
+ */
+const replayedBookings = new WeakSet<object>();
+
+export function isIdempotentReplay(booking: object): boolean {
+  return replayedBookings.has(booking);
+}
+
 export async function resolveBookingIdempotency(input: {
   key: string;
   ttlSeconds: number;
@@ -127,6 +140,7 @@ export async function resolveBookingIdempotency(input: {
     ttlSeconds: input.ttlSeconds,
     load: (bookingId) => loadBookingForIdempotency(input.userId, bookingId),
   });
+  if (resolved.result) replayedBookings.add(resolved.result);
   return { booking: resolved.result, lockAcquired: resolved.lockAcquired };
 }
 

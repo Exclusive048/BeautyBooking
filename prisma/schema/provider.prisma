@@ -33,6 +33,14 @@ model Provider {
 
   availableToday Boolean @default(false)
 
+  // CATALOG-DATE-TIME-FILTER (2026-09-24) — снимок свободного времени на
+  // ближайшие дни для фильтра каталога «когда»: ключи дня салона
+  // `YYYY-MM-DD` (есть свободное окошко в этот день) и часа `YYYY-MM-DDTHH`
+  // (окошко начинается в этот час). Пишет только воркер
+  // (`schedule/free-slot-keys.ts`, вместе с `availableToday`); каталог
+  // фильтрует по нему `has`/`hasSome`, не запуская движок расписания.
+  freeSlotKeys String[] @default([])
+
   // FIX-R2-02-A — platform default aligned with City.timezone default +
   // env.DEFAULT_TIMEZONE (resolves the long-standing T4 Asia/Almaty mismatch).
   // The working tz is re-derived from the provider's City on address-save.
@@ -147,7 +155,9 @@ model Provider {
 
   reviewsAbout Review[]
 
-  portfolioItems PortfolioItem[]
+  portfolioItems PortfolioItem[] @relation("PortfolioItemOwner")
+
+  performedPortfolioItems PortfolioItem[] @relation("PortfolioItemPerformer")
 
   publicUsernameAliases PublicUsernameAlias[]
 

@@ -4,8 +4,11 @@ import { useState } from "react";
 import { Coffee } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
+import { NumberInput } from "@/components/ui/number-input";
+import {
+  BOOKING_RULE_LIMITS,
+  type ScheduleEditorSnapshot,
+} from "@/lib/schedule/editor-shared";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -81,15 +84,16 @@ export function BreaksTab({ studioId, masterId, initialSnapshot }: Props) {
             <p className="mt-0.5 text-xs text-text-sec">{T.bufferHint}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Input
-              type="number"
-              min={0}
-              max={120}
+            <NumberInput
+              min={BOOKING_RULE_LIMITS.bufferMin.min}
+              max={BOOKING_RULE_LIMITS.bufferMin.max}
+              fallback={BOOKING_RULE_LIMITS.bufferMin.fallback}
               value={draft}
-              onChange={(e) => {
-                setDraft(Math.max(0, Number(e.target.value) || 0));
+              onValueChange={(next) => {
+                setDraft(next);
                 setSavedAt(null);
               }}
+              aria-label={T.bufferTitle}
               className="w-24"
             />
             <span className="text-sm text-text-sec">{T.minutesSuffix}</span>

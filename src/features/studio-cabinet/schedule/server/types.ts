@@ -1,5 +1,6 @@
 import type { BookingStatus, TimeBlockType } from "@prisma/client";
 import type { BookingStatusTone } from "../lib/booking-status-display";
+import type { GridWindow } from "../lib/time-grid";
 
 export type ScheduleMasterColumn = {
   id: string;
@@ -61,8 +62,10 @@ export type ScheduleBreakCell = {
 
 export type ScheduleDayData = {
   dateKey: string;
-  /** UTC day start anchor for client-side `top` math. */
+  /** Начало дня САЛОНА (полночь в его поясе) — якорь даты для диалогов и метки зоны. */
   dayStartIso: string;
+  /** Окно сетки дня в часах салона: 09–21 и шире под часы мастеров и записи. */
+  gridWindow: GridWindow;
   columns: ScheduleMasterColumn[];
   bookings: ScheduleBookingCell[];
   breaks: ScheduleBreakCell[];

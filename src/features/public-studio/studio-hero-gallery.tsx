@@ -8,6 +8,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { withQuery } from "@/lib/public-urls";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import type { CropArea } from "@/lib/media/crop-geometry";
 
 type StudioHeroData = {
   name: string;
@@ -20,6 +21,8 @@ type StudioHeroData = {
 
 type HeroImageItem = {
   url: string;
+  /** Баннер несёт выбранную в кабинете область — кадр наводится на её центр. */
+  crop?: CropArea | null;
 };
 
 type Props = {
@@ -60,6 +63,10 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref, hideBooking
               alt={studio.name}
               sizes="(max-width: 768px) 100vw, 66vw"
               priority
+              cropX={primary.crop?.x}
+              cropY={primary.crop?.y}
+              cropWidth={primary.crop?.width}
+              cropHeight={primary.crop?.height}
               className="object-cover"
             />
           ) : (

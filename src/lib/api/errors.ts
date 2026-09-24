@@ -55,6 +55,9 @@ const ERROR_CODES = [
   "FEATURE_GATE",
   "FORBIDDEN",
   "FORBIDDEN_ROLE",
+  // GUEST-MANAGE-LINK: ссылка «Управлять записью» подделана/устарела либо запись уже в аккаунте.
+  "GUEST_MANAGE_ACCOUNT_REQUIRED",
+  "GUEST_MANAGE_LINK_INVALID",
   "INTERNAL_ERROR",
   "INVALID_BODY",
   "INVALID_HASH",
@@ -64,6 +67,8 @@ const ERROR_CODES = [
   // LAUNCH-PROMO-01: до 1 ноября платный тариф не продаётся — у всех PREMIUM по акции.
   "LAUNCH_PROMO_ACTIVE",
   "MASTER_ALREADY_ASSIGNED",
+  // STUDIO-LEAVE-GUARD: у мастера есть живые записи студии — уход/исключение запрещены.
+  "MASTER_HAS_STUDIO_BOOKINGS",
   "MASTER_IN_STUDIO",
   "MASTER_NOT_ACTIVE",
   "MASTER_NOT_FOUND",

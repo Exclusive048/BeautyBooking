@@ -50,10 +50,17 @@ function ReviewCard({
 }) {
   // RULE-12-REVIEWS (FIX-18): own-review check via server-computed flag (no authorId leak).
   const canReport = currentUserId && !review.isOwnReview && !review.reportedAt;
+  // STUDIO-REVIEW-MASTER-RATING: отзыв о визите в студию — на ней и ответ студии.
+  const isStudioVisit = review.targetType === "studio";
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-input/70 p-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-medium">{review.authorName}</div>
+        <div className="min-w-0 text-sm font-medium">
+          {review.authorName}
+          {isStudioVisit ? (
+            <span className="ml-1.5 text-xs font-normal text-text-sec">· {reviewCardText.studioVisit}</span>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           <StarsDisplay rating={review.rating} size="sm" />
           {canReport ? (
@@ -87,7 +94,9 @@ function ReviewCard({
       ) : null}
       {review.replyText ? (
         <div className="mt-2 rounded-xl border border-border-subtle bg-bg-card p-2 text-sm text-text-main">
-          <div className="text-xs uppercase text-text-sec">{reviewCardText.masterReply}</div>
+          <div className="text-xs uppercase text-text-sec">
+            {isStudioVisit ? reviewCardText.studioReply : reviewCardText.masterReply}
+          </div>
           <div className="mt-1">{review.replyText}</div>
         </div>
       ) : null}

@@ -7,6 +7,7 @@ import {
   earliestBookableUtc,
   isWithinBookableWindow,
   latestBookableUtc,
+  stricterBookingWindow,
 } from "./policy-enforcement";
 
 const NOW = new Date("2026-05-20T10:00:00Z");
@@ -137,5 +138,36 @@ describe("policy-enforcement / clampVisibleSlotsHorizon", () => {
     expect(
       clampVisibleSlotsHorizon(null, { visibleSlotDays: 7 }, NOW_EVENING, "Europe/Moscow"),
     ).toBe("2026-05-26");
+  });
+});
+
+/**
+ * BOOKING-WINDOW-STRICTER (решение владельца 2026-09-24): окно записи на услугу
+ * студии — более строгое из окон студии и мастера.
+ *
+ * @probe 2026-09-24 — в `stricterBookingWindow` `Math.max` для минимума заменён
+ * на `Math.min`: красный «больший минимум, меньший максимум».
+ */
+describe("stricterBookingWindow", () => {
+  it("больший минимум, меньший максимум", () => {
+    expect(
+      stricterBookingWindow(
+        { minBookingHoursAhead: 0, maxBookingDaysAhead: 90 },
+        { minBookingHoursAhead: 2, maxBookingDaysAhead: 30 },
+      ),
+    ).toEqual({ minBookingHoursAhead: 2, maxBookingDaysAhead: 30 });
+    expect(
+      stricterBookingWindow(
+        { minBookingHoursAhead: 6, maxBookingDaysAhead: 14 },
+        { minBookingHoursAhead: 2, maxBookingDaysAhead: 30 },
+      ),
+    ).toEqual({ minBookingHoursAhead: 6, maxBookingDaysAhead: 14 });
+  });
+
+  it("без второго окна — первое как есть", () => {
+    expect(stricterBookingWindow({ minBookingHoursAhead: 3, maxBookingDaysAhead: 20 }, null)).toEqual({
+      minBookingHoursAhead: 3,
+      maxBookingDaysAhead: 20,
+    });
   });
 });

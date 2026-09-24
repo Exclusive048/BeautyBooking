@@ -92,7 +92,11 @@ const nextConfig = {
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
         key: "Permissions-Policy",
-        value: "geolocation=(), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()",
+        // CATALOG-SORT-DISTANCE (2026-09-24): `geolocation=(self)`, а не `()`.
+        // Пустой список запрещал геопозицию и собственному origin — кнопка карты
+        // «Показать, где я» и сортировка «По расстоянию» получали отказ, не
+        // спросив пользователя. Сторонним фреймам по-прежнему запрещено.
+        value: "geolocation=(self), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()",
       },
       ...(isProd
         ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]

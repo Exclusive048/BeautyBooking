@@ -4,6 +4,13 @@ import { AppError } from "@/lib/api/errors";
 export const BOOKING_ACTION_WINDOW_MINUTES = 60;
 export const BOOKING_FINISH_GRACE_MINUTES = 60;
 export const BOOKING_CHANGE_REQUEST_LIMIT = 3;
+/**
+ * PENDING-EXPIRY (решение владельца 2026-09-24): неподтверждённая запись
+ * (`NEW`/`PENDING`) отменяется автоматически через столько часов после создания
+ * — или к началу визита, если оно раньше. Отменяет задача воркера
+ * `expirePendingBookings` (`bookings/expire-pending.ts`).
+ */
+export const PENDING_EXPIRY_HOURS = 24;
 
 // AUDIT (booking flow):
 // - auto IN_PROGRESS/FINISHED: реализовано через resolveBookingRuntimeStatus (runtime-вычисление).
@@ -56,6 +63,38 @@ export function resolveBookingRuntimeStatus(input: {
   if (nowMs >= finishedAtMs) return "FINISHED";
   if (nowMs >= startMs) return "IN_PROGRESS";
   return normalized;
+}
+
+/**
+ * NO-SHOW-UI (2026-09-24): из каких сохранённых статусов запись может стать
+ * неявкой. Неподтверждённая (`NEW`/`PENDING`) — нет: визит клиенту не был
+ * обещан. `CHANGE_REQUESTED` — да: согласуемый перенос визит на прежнем
+ * времени не отменяет (напоминание о нём уходит, REMINDER-STATUSES-01).
+ */
+export const NO_SHOW_ELIGIBLE_STATUSES: readonly BookingStatus[] = [
+  "CONFIRMED",
+  "PREPAID",
+  "STARTED",
+  "IN_PROGRESS",
+  "CHANGE_REQUESTED",
+];
+
+/**
+ * Можно ли сейчас отметить «клиент не пришёл». Окно — пока запись «в работе»:
+ * от начала приёма до конца + `BOOKING_FINISH_GRACE_MINUTES`. В этот же момент
+ * открывается окно отзыва (`reviewWindowFor`, `REVIEW_GRACE_MINUTES`), поэтому
+ * неявка не может закрыть клиенту уже открытое окно отзыва — раньше `NO_SHOW`
+ * ставился без ограничения по времени. Одно правило на сервер и на все три
+ * поверхности кабинета мастера (канбан, расписание, дашборд).
+ */
+export function canMarkNoShow(input: {
+  status: BookingStatus;
+  startAtUtc: Date | null;
+  endAtUtc: Date | null;
+  now?: Date;
+}): boolean {
+  if (!NO_SHOW_ELIGIBLE_STATUSES.includes(input.status)) return false;
+  return resolveBookingRuntimeStatus(input) === "IN_PROGRESS";
 }
 
 export function minutesUntilStart(startAtUtc: Date | null, now: Date = new Date()): number | null {

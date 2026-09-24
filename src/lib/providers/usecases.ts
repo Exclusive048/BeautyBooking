@@ -4,7 +4,7 @@ import { listProviderCards } from "@/lib/providers/queries";
 import { mapProviderProfile, mapProviderService } from "@/lib/providers/mappers";
 import type { ProviderCardDto, ProviderProfileDto } from "@/lib/providers/dto";
 import { ProviderType } from "@prisma/client";
-import { getStudioBannerUrl } from "@/lib/studios/banner";
+import { getStudioBanner } from "@/lib/studios/banner";
 import { getProviderSuperpowerBadges } from "@/lib/reviews/badges";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { studioAcceptsBookings } from "@/lib/studio/accepts-bookings";
@@ -75,7 +75,9 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
   const profile = mapProviderProfile(provider);
   profile.hotSlotsEnabled = provider.discountRule?.isEnabled ?? false;
   if (provider.type === ProviderType.STUDIO) {
-    profile.bannerUrl = await getStudioBannerUrl(provider.id);
+    const banner = await getStudioBanner(provider.id);
+    profile.bannerUrl = banner?.url ?? null;
+    profile.bannerCrop = banner?.crop ?? null;
     return profile;
   }
 

@@ -4,6 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
+import { syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
 import { getStudioCatalogCoverAssetId, setStudioCatalogCoverAssetId } from "@/lib/studios/catalog-cover";
 import {
   applyProviderBookingPolicy,
@@ -263,6 +264,9 @@ export async function updateStudioProviderProfile(
 
   if (input.bannerAssetId !== undefined) {
     await setStudioBannerAssetId(provider.id, input.bannerAssetId);
+    // STUDIO-PORTFOLIO-FEED: баннер — обложка страницы, а не работа. Новый
+    // баннер уходит из ленты, снятый с этой роли снова в ней.
+    await syncStudioPortfolioItemsSafe(provider.id);
   }
 
   if (input.catalogCoverAssetId !== undefined) {

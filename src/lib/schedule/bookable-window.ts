@@ -7,7 +7,11 @@ import {
 import { dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { SCHEDULE_OVERRIDE_RANGE_ORDER } from "@/lib/schedule/override-order";
-import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
+import {
+  earliestBookableUtc,
+  latestBookableUtc,
+  type ProviderPolicy,
+} from "@/lib/bookings/policy-enforcement";
 
 /**
  * EXP-025 / EXP-026 — single source of truth for the bookable-slot window.
@@ -109,6 +113,16 @@ export async function listBookableSlots(input: {
    * окошки. Решает роут и только для своей стороны кабинета.
    */
   operatorWindow?: boolean;
+  /**
+   * BOOKING-WINDOW-SPLIT (2026-09-24): окно записи ВЛАДЕЛЬЦА услуги, если он не
+   * `provider`. Запись на услугу студии проверяет окно СТУДИИ
+   * (`resolveBookingCore` → `assertBookingWindow(provider = студия)`), а окошки
+   * считаются по мастеру — без этого виджет студии показывал окошки по правилам
+   * мастера, и сервер отвечал `BOOKING_TOO_SOON`. Когда задано, применяются и
+   * минимум, и максимум этого окна (перенос проверяет то же окно). Для
+   * операторского окна не действует.
+   */
+  windowPolicy?: Pick<ProviderPolicy, "minBookingHoursAhead" | "maxBookingDaysAhead">;
 }): Promise<BookableSlotsResult> {
   const { provider, serviceId, durationMinutes, fromKey, toKeyExclusive, limit, now } = input;
 
@@ -213,12 +227,17 @@ export async function listBookableSlots(input: {
 
   // EXP-025: anything before `now + minBookingHoursAhead` is non-bookable.
   // This is the cutoff `/slots` already applied and `/availability` lacked.
-  const earliestBookable = input.operatorWindow ? now : earliestBookableUtc(provider, now);
+  const earliestBookable = input.operatorWindow
+    ? now
+    : earliestBookableUtc(input.windowPolicy ?? provider, now);
+  const latestBookable =
+    !input.operatorWindow && input.windowPolicy ? latestBookableUtc(input.windowPolicy, now) : null;
 
   const slots = result.data.slots.filter((slot) => {
     const startsAt = toDate(slot.startAtUtc);
     if (!startsAt) return false;
     if (startsAt.getTime() < earliestBookable.getTime()) return false;
+    if (latestBookable && startsAt.getTime() > latestBookable.getTime()) return false;
 
     const dateKey = toLocalDateKey(startsAt, provider.timezone);
     const effective = getEffective(dateKey);

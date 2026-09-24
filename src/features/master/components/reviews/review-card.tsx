@@ -39,6 +39,9 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
   const isAnswered = Boolean(review.replyText);
   const dateLabel = formatRelativeDate(review.createdAt, now);
   const serviceLabel = serviceName?.trim() || NO_SERVICE;
+  // STUDIO-REVIEW-MASTER-RATING: отзыв о визите в студию входит в рейтинг
+  // мастера, но отвечает на него студия — у мастера он только для чтения.
+  const isStudioVisit = review.targetType === "studio";
 
   return (
     <article data-focus-id={review.id} data-testid="review-row" className="rounded-2xl border border-border-subtle bg-bg-card p-5">
@@ -62,6 +65,7 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
             </div>
             <p className="mt-0.5 truncate text-xs text-text-sec">
               {dateLabel} · {serviceLabel}
+              {isStudioVisit ? ` · ${T.studioVisit}` : ""}
             </p>
           </div>
         </div>
@@ -79,19 +83,21 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
         </p>
       ) : null}
 
-      <ReviewActionsIsland
-        reviewId={review.id}
-        hasReply={isAnswered}
-        initialReplyText={review.replyText ?? null}
-        isReported={Boolean(review.reportedAt)}
-      />
+      {isStudioVisit ? null : (
+        <ReviewActionsIsland
+          reviewId={review.id}
+          hasReply={isAnswered}
+          initialReplyText={review.replyText ?? null}
+          isReported={Boolean(review.reportedAt)}
+        />
+      )}
 
       {isAnswered && review.replyText && review.repliedAt ? (
         <ReviewExistingReply
           text={review.replyText}
           repliedAt={review.repliedAt}
-          authorName={masterName}
-          authorSeed={masterSeed}
+          authorName={isStudioVisit ? T.studioReplyAuthor : masterName}
+          authorSeed={isStudioVisit ? T.studioReplyAuthor : masterSeed}
           now={now}
         />
       ) : null}

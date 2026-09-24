@@ -2,6 +2,7 @@ import { MembershipStatus, Prisma, ProviderType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { normalizeInviteEmail } from "@/lib/invites/access";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
+import { findStudioLeaveBlock, type StudioLeaveActor } from "@/lib/studio/leave-guard";
 import { prismaDirect } from "@/lib/prisma-direct";
 
 function uniqueStringIds(input: string[]): string[] {
@@ -37,7 +38,8 @@ function buildPhoneCandidates(phone: string): string[] {
 export async function transferMasterOutOfStudio(
   masterId: string,
   studioProviderId: string,
-  transferServices: boolean
+  transferServices: boolean,
+  actor: StudioLeaveActor
 ): Promise<{ transferredServices: number; revokedInviteIds: string[] }> {
   return prismaDirect.$transaction(
     async (tx) => {
@@ -69,6 +71,14 @@ export async function transferMasterOutOfStudio(
       if (!studio) {
         throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
       }
+
+      // STUDIO-LEAVE-GUARD: живые записи студии сначала переносятся или отменяются.
+      const block = await findStudioLeaveBlock(tx, {
+        studioProviderId,
+        masterProviderIds: [master.id],
+        actor,
+      });
+      if (block) throw block;
 
       const masterServices = await tx.masterService.findMany({
         where: { masterProviderId: masterId, studioId: studio.id },

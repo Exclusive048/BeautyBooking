@@ -18,6 +18,12 @@ import {
 import { CatalogSidebar } from "@/features/catalog/components/catalog-sidebar";
 import { CatalogPagination } from "@/features/catalog/components/catalog-pagination";
 import { SortMenu } from "@/features/catalog/components/sort-menu";
+import {
+  WHEN_TIME_PRESET_RANGES,
+  viewerDateKey,
+  whenFilterLabel,
+  type WhenTimePreset,
+} from "@/features/catalog/components/when-filter";
 import { MobileFilterDrawer } from "@/features/catalog/components/mobile-filter-drawer";
 import { LoginRequiredModal } from "@/features/auth/components/login-required-modal";
 import type { CatalogMapPoint } from "@/features/catalog/types";
@@ -61,7 +67,6 @@ const VisualSearchModal = dynamic(
 
 type EntityType = "all" | "master" | "studio";
 type ViewMode = "list" | "map";
-type TimePresetValue = "morning" | "day" | "evening";
 
 type CatalogSearchItem = {
   type: "master" | "studio";
@@ -84,6 +89,8 @@ type CatalogSearchItem = {
   } | null;
   nextSlot: { startAt: string } | null;
   todaySlotsCount?: number;
+  /** CATALOG-SORT-DISTANCE: до точки пользователя, если она передана. */
+  distanceMeters?: number | null;
 };
 
 type CatalogSearchData = {
@@ -110,12 +117,6 @@ const TIME_SEARCH_DEBOUNCE_MS = 200;
 /** Раскладка без сайдбара (< `lg`): карта здесь — полноэкранный слой. */
 const MOBILE_LAYOUT_QUERY = "(max-width: 1023px)";
 
-const TIME_PRESET_RANGES: Record<TimePresetValue, { from: string; to: string }> = {
-  morning: { from: "09:00", to: "12:00" },
-  day: { from: "12:00", to: "18:00" },
-  evening: { from: "18:00", to: "22:00" },
-};
-
 const TH = UI_TEXT.catalog2.resultsHeader;
 
 function parseEntityType(value: string | null): EntityType {
@@ -127,8 +128,8 @@ function parseViewMode(value: string | null): ViewMode {
   return value === "map" ? "map" : "list";
 }
 
-function parseTimePreset(value: string | null): TimePresetValue | null {
-  if (value === "morning" || value === "day" || value === "evening") return value;
+function parseTimePreset(value: string | null): WhenTimePreset | null {
+  if (value === "morning" || value === "day" || value === "evening" || value === "custom") return value;
   return null;
 }
 
@@ -259,7 +260,10 @@ export default function CatalogPageClient({
   const view = parseViewMode(searchParams.get("view"));
   const sort = parseSort(searchParams.get("sort"));
   const page = parsePage(searchParams.get("page"));
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // CATALOG-DATE-TIME-FILTER · rule 17: «сегодня» — по часам зрителя (как у
+  // чипов «Когда»), а не UTC-сутки: около полуночи UTC-дата расходилась с
+  // календарной датой пользователя.
+  const todayIso = viewerDateKey(new Date());
   // `date=<сегодня>` — прежняя форма фильтра «сегодня» (ссылки со снятого
   // блока «Когда»); читается как «Свободно сегодня».
   const isTodaySelected = date === todayIso;
@@ -268,7 +272,8 @@ export default function CatalogPageClient({
   // `serviceId` + датой + диапазоном. Неполный набор параметров просто не
   // включает этот режим — раньше он показывал «Сначала выберите услугу», а
   // выбрать услугу на странице было негде.
-  const presetRange = timePresetRaw ? TIME_PRESET_RANGES[timePresetRaw] : null;
+  const presetRange =
+    timePresetRaw && timePresetRaw !== "custom" ? WHEN_TIME_PRESET_RANGES[timePresetRaw] : null;
   const effectiveTimeFrom = timeFrom || presetRange?.from || "";
   const effectiveTimeTo = timeTo || presetRange?.to || "";
   const timeModeActive = Boolean(effectiveTimeFrom && effectiveTimeTo && serviceId && date);
@@ -283,8 +288,23 @@ export default function CatalogPageClient({
     if (hot) count++;
     if (entityType !== "all") count++;
     if (effectiveAvailableToday) count++;
+    if (date && !isTodaySelected) count++;
+    if (effectiveTimeFrom && effectiveTimeTo) count++;
     return count;
-  }, [globalCategoryId, district, ratingMin, priceMin, priceMax, hot, entityType, effectiveAvailableToday]);
+  }, [
+    globalCategoryId,
+    district,
+    ratingMin,
+    priceMin,
+    priceMax,
+    hot,
+    entityType,
+    effectiveAvailableToday,
+    date,
+    isTodaySelected,
+    effectiveTimeFrom,
+    effectiveTimeTo,
+  ]);
 
   const [draftServiceQuery, setDraftServiceQuery] = useState(serviceQuery);
   const [loading, setLoading] = useState(true);
@@ -296,6 +316,12 @@ export default function CatalogPageClient({
   // we don't try to keep this set in sync after mount.
   const favoriteSet = useMemo(() => new Set(favoriteUsernames), [favoriteUsernames]);
   const [mapSearch, setMapSearch] = useState<MapSearchState>(null);
+  // CATALOG-SORT-DISTANCE: точка пользователя — только по его выбору
+  // «По расстоянию» и только в памяти страницы (на сервер уходит лишь с этой
+  // сортировкой). Отказ браузера — сортировка по релевантности и подсказка.
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [geoNotice, setGeoNotice] = useState<string | null>(null);
   const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
   const [visualSearchOpen, setVisualSearchOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -350,6 +376,9 @@ export default function CatalogPageClient({
       entityType: null,
       availableToday: null,
       date: null,
+      timePreset: null,
+      timeFrom: null,
+      timeTo: null,
     });
   }, [applyFilters]);
 
@@ -390,6 +419,12 @@ export default function CatalogPageClient({
       if (serviceQuery) params.set("serviceQuery", serviceQuery);
       if (district) params.set("district", district);
       if (date) params.set("date", date);
+      // CATALOG-DATE-TIME-FILTER: время «когда» фильтрует каталог по снимку
+      // свободного времени (без выбранной услуги; с услугой — поиск по окошкам).
+      if (effectiveTimeFrom && effectiveTimeTo) {
+        params.set("timeFrom", effectiveTimeFrom);
+        params.set("timeTo", effectiveTimeTo);
+      }
       if (priceMin) params.set("priceMin", priceMin);
       if (priceMax) params.set("priceMax", priceMax);
       if (globalCategoryId) params.set("globalCategoryId", globalCategoryId);
@@ -401,6 +436,9 @@ export default function CatalogPageClient({
         params.set("lat", String(activeMapSearch.center.lat));
         params.set("lng", String(activeMapSearch.center.lng));
         params.set("bbox", activeMapSearch.bbox);
+      } else if (sort === "distance" && userLocation) {
+        params.set("lat", String(userLocation.lat));
+        params.set("lng", String(userLocation.lng));
       }
 
       const res = await fetch(`/api/catalog/search?${params.toString()}`, { cache: "no-store" });
@@ -414,6 +452,8 @@ export default function CatalogPageClient({
       date,
       district,
       effectiveAvailableToday,
+      effectiveTimeFrom,
+      effectiveTimeTo,
       entityType,
       hot,
       globalCategoryId,
@@ -424,8 +464,61 @@ export default function CatalogPageClient({
       ratingMin,
       serviceQuery,
       sort,
+      userLocation,
     ]
   );
+
+  const requestUserLocation = useCallback(
+    () =>
+      new Promise<{ lat: number; lng: number } | null>((resolve) => {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: false, timeout: 10_000, maximumAge: 10 * 60_000 },
+        );
+      }),
+    [],
+  );
+
+  const onSortChange = useCallback(
+    async (next: CatalogSort) => {
+      setGeoNotice(null);
+      if (next === "distance" && !userLocation && !mapSearch) {
+        setLocating(true);
+        const location = await requestUserLocation();
+        setLocating(false);
+        if (!location) {
+          setGeoNotice(UI_TEXT.catalog2.sort.distanceDenied);
+          updateParams({ sort: null, page: null });
+          return;
+        }
+        setUserLocation(location);
+      }
+      updateParams({ sort: next === "relevance" ? null : next, page: null });
+    },
+    [mapSearch, requestUserLocation, updateParams, userLocation],
+  );
+
+  // Ссылка с `?sort=distance` без точки: спросить геопозицию один раз; отказ —
+  // подсказка (сервер без точки отдаёт релевантность).
+  const askedLocationRef = useRef(false);
+  useEffect(() => {
+    if (sort !== "distance" || userLocation || mapSearch || askedLocationRef.current) return;
+    askedLocationRef.current = true;
+    let cancelled = false;
+    void requestUserLocation().then((location) => {
+      if (cancelled) return;
+      if (location) setUserLocation(location);
+      else setGeoNotice(UI_TEXT.catalog2.sort.distanceDenied);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mapSearch, requestUserLocation, sort, userLocation]);
 
   const requestAvailability = useCallback(
     async (signal?: AbortSignal): Promise<AvailabilitySearchData> => {
@@ -602,6 +695,8 @@ export default function CatalogPageClient({
     hot,
     entityType,
     availableToday: effectiveAvailableToday,
+    when: { date, timePreset: timePresetRaw, timeFrom, timeTo },
+    onWhenChange: applyFilters,
     onGlobalCategoryChange: (value: string | null) => {
       applyFilters({ globalCategoryId: value });
     },
@@ -723,6 +818,14 @@ export default function CatalogPageClient({
         priceMin={priceMin}
         priceMax={priceMax}
         district={district}
+        whenLabel={whenFilterLabel({
+          // «сегодня» без времени уже показывает чип «Свободно сегодня»
+          date: isTodaySelected && !(effectiveTimeFrom && effectiveTimeTo) ? "" : date,
+          timePreset: timePresetRaw,
+          timeFrom,
+          timeTo,
+          now: new Date(),
+        })}
         onChange={applyFilters}
       />
     </div>
@@ -766,9 +869,14 @@ export default function CatalogPageClient({
 
         {/* Content area */}
         <div className="min-w-0 flex-1">
-          {/* Заголовок выдачи. На телефоне — одна строка «N мастеров рядом» +
-              сортировка; редакционная подводка и крупный кегль — с `lg`. */}
-          <header className="mb-3 flex items-center justify-between gap-3 lg:mb-6 lg:items-end">
+          {/* Заголовок выдачи. На телефоне — «N мастеров рядом» + сортировка;
+              редакционная подводка и крупный кегль — с `lg`.
+              CATALOG-TITLE-FIT (2026-09-24): заголовок не обрезается многоточием.
+              Раньше `truncate` делил строку с сортировкой (на ПК — ещё и с
+              «Сетка/Карта»), и «29 мастеров р…» выходило и на 375 px, и на 1280.
+              Теперь строка переносится: не помещаются — элементы управления
+              уходят ниже и прижимаются вправо (`ml-auto`). */}
+          <header className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 lg:mb-6 lg:items-end">
             <div className="min-w-0">
               <p className="mb-1.5 hidden font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text lg:block">
                 {TH.eyebrow}
@@ -776,24 +884,24 @@ export default function CatalogPageClient({
               {countPending ? (
                 <Skeleton className="h-7 w-44 lg:h-12 lg:w-72" />
               ) : (
-                <h1 className="truncate font-display text-xl leading-tight text-text-main sm:text-2xl lg:text-5xl lg:leading-[1.1]">
+                <h1 className="font-display text-xl leading-tight text-text-main sm:text-2xl lg:text-5xl lg:leading-[1.1]">
                   {resultsTitle(resultCount)}
                 </h1>
               )}
               <p className="mt-1 hidden text-sm text-text-sec lg:block">{TH.subtitleAvailable}</p>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="ml-auto flex shrink-0 items-center gap-3">
               <div className="lg:hidden">
                 <SortMenu
                   compact
                   value={sort}
-                  onChange={(next) => updateParams({ sort: next === "relevance" ? null : next, page: null })}
+                  onChange={(next) => void onSortChange(next)}
                 />
               </div>
               <div className="hidden lg:block">
                 <SortMenu
                   value={sort}
-                  onChange={(next) => updateParams({ sort: next === "relevance" ? null : next, page: null })}
+                  onChange={(next) => void onSortChange(next)}
                 />
               </div>
               <div className="hidden rounded-full border border-border-subtle bg-bg-card p-1 lg:inline-flex">
@@ -816,6 +924,12 @@ export default function CatalogPageClient({
               </div>
             </div>
           </header>
+
+          {locating || geoNotice ? (
+            <p role="status" className="mb-3 text-sm text-text-sec">
+              {locating ? UI_TEXT.catalog2.sort.distanceLocating : geoNotice}
+            </p>
+          ) : null}
 
           {currentLoading && view === "list" ? <CatalogSkeletonGrid /> : null}
 

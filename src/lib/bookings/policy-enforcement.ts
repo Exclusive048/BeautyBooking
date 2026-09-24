@@ -50,6 +50,25 @@ export function latestBookableUtc(policy: Pick<ProviderPolicy, "maxBookingDaysAh
   return new Date(now.getTime() + days * MS_PER_DAY);
 }
 
+type BookingWindowPolicy = Pick<ProviderPolicy, "minBookingHoursAhead" | "maxBookingDaysAhead">;
+
+/**
+ * BOOKING-WINDOW-STRICTER (2026-09-24, решение владельца) — окно записи на
+ * услугу студии у её мастера — более строгое из двух: больший «минимум за» и
+ * меньший «максимум за». Раньше сервер проверял только окно студии, а окошки
+ * считались по мастеру; теперь обе стороны правил соблюдаются всегда.
+ */
+export function stricterBookingWindow(
+  a: BookingWindowPolicy,
+  b: BookingWindowPolicy | null | undefined,
+): BookingWindowPolicy {
+  if (!b) return { minBookingHoursAhead: a.minBookingHoursAhead, maxBookingDaysAhead: a.maxBookingDaysAhead };
+  return {
+    minBookingHoursAhead: Math.max(a.minBookingHoursAhead, b.minBookingHoursAhead),
+    maxBookingDaysAhead: Math.min(a.maxBookingDaysAhead, b.maxBookingDaysAhead),
+  };
+}
+
 /** True iff `startAtUtc` falls inside the bookable window. */
 export function isWithinBookableWindow(
   startAtUtc: Date,
@@ -164,6 +183,13 @@ export type MasterWorkWindow = {
   /** Minutes-from-midnight, inclusive. Null when the day is off. */
   startMinutes: number | null;
   endMinutes: number | null;
+  /**
+   * BOOKING-FLOW-AUDIT-RESIDUALS: перерывы дня (минуты от полуночи салона,
+   * `[start, end)`), те же, что вырезает из окошек движок расписания. Раньше
+   * guard видел только границы дня — запись из кабинета студии и перенос
+   * ложились поверх обеда мастера.
+   */
+  breaks?: ReadonlyArray<{ startMinutes: number; endMinutes: number }>;
 };
 
 export function assertMasterPerformsService(input: {
@@ -206,6 +232,16 @@ export function assertWithinMasterWorkHours(input: {
   ) {
     throw new AppError(
       "Выбранное время вне рабочих часов мастера.",
+      422,
+      "OUTSIDE_WORK_HOURS",
+    );
+  }
+  const onBreak = (input.window.breaks ?? []).some(
+    (item) => input.bookingStartMinutes < item.endMinutes && input.bookingEndMinutes > item.startMinutes,
+  );
+  if (onBreak) {
+    throw new AppError(
+      "Выбранное время попадает на перерыв мастера.",
       422,
       "OUTSIDE_WORK_HOURS",
     );

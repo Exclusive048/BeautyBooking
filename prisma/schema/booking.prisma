@@ -81,6 +81,14 @@ model Booking {
 
   proposedEndAt DateTime?
 
+  // RESCHEDULE-DECLINE-RESTORE-STATUS (2026-09-24, решение владельца): статус
+  // записи до входа в CHANGE_REQUESTED. Отказ от переноса возвращает ровно его —
+  // неподтверждённая запись не становится «подтверждённой» только потому, что
+  // перенос отклонили. Пишет `rescheduleBooking` при входе в перенос, читает и
+  // очищает `declineClientRescheduleRequest`; `null` (строки до миграции) —
+  // прежнее поведение, CONFIRMED.
+  statusBeforeChange BookingStatus?
+
   requestedBy BookingRequestedBy?
 
   changeComment String?

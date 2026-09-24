@@ -44,6 +44,12 @@ export type PortfolioFeedItem = {
   masterAvatarUrl: string | null;
   masterRatingAvg: number;
   studioName: string | null;
+  /**
+   * STUDIO-PORTFOLIO-FEED: мастер студии, выполнивший работу, — у фото из
+   * портфолио СТУДИИ (автор — студия). У работы мастера `null`: исполнитель —
+   * сам автор. Вместе с `primaryServiceTitle` — подпись «мастер · услуга».
+   */
+  performerName: string | null;
   // `serviceIds` removed (rule 12) — unused publicly; the booking deep-link
   // uses `serviceOptions[].serviceId` (booking-flow exception) on the detail.
   primaryServiceTitle: string | null;
@@ -254,13 +260,16 @@ function buildPortfolioSnapshot(input: {
 function collectMasterServicePairs(
   rows: Array<{
     master: { id: string };
+    performerId: string | null;
     services: Array<{ service: { id: string } }>;
   }>,
 ): Array<{ masterProviderId: string; serviceId: string }> {
   const pairs: Array<{ masterProviderId: string; serviceId: string }> = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    const masterId = row.master.id;
+    // STUDIO-PORTFOLIO-FEED: у фото студии цена и длительность — исполнителя
+    // (его `MasterService`-переопределения), а не базовые студийные.
+    const masterId = row.performerId ?? row.master.id;
     for (const link of row.services) {
       const serviceId = link.service.id;
       const key = overrideMapKey(masterId, serviceId);
@@ -336,6 +345,7 @@ export async function listPortfolioFeed(input: {
             studio: { select: { name: true } },
           },
         },
+        performer: { select: { name: true } },
         services: {
           include: {
             service: {
@@ -384,7 +394,7 @@ export async function listPortfolioFeed(input: {
 
   const items = pageRows.map((row) => {
     const snapshot = buildPortfolioSnapshot({
-      masterId: row.master.id,
+      masterId: row.performerId ?? row.master.id,
       services: row.services,
       overrides,
     });
@@ -400,6 +410,7 @@ export async function listPortfolioFeed(input: {
       masterAvatarUrl: row.master.avatarUrl ?? null,
       masterRatingAvg: row.master.ratingAvg,
       studioName: row.master.studio?.name ?? null,
+      performerName: row.performer?.name ?? null,
       primaryServiceTitle: snapshot.primaryServiceTitle,
       totalDurationMin: snapshot.totalDurationMin,
       totalPrice: snapshot.totalPrice,
@@ -458,6 +469,7 @@ export async function listHomePortfolioFeed(input: {
             studio: { select: { name: true } },
           },
         },
+        performer: { select: { name: true } },
         services: {
           include: {
             service: {
@@ -506,7 +518,7 @@ export async function listHomePortfolioFeed(input: {
 
   const items = pageRows.map((row) => {
     const snapshot = buildPortfolioSnapshot({
-      masterId: row.master.id,
+      masterId: row.performerId ?? row.master.id,
       services: row.services,
       overrides,
     });
@@ -522,6 +534,7 @@ export async function listHomePortfolioFeed(input: {
       masterAvatarUrl: row.master.avatarUrl ?? null,
       masterRatingAvg: row.master.ratingAvg,
       studioName: row.master.studio?.name ?? null,
+      performerName: row.performer?.name ?? null,
       primaryServiceTitle: snapshot.primaryServiceTitle,
       totalDurationMin: snapshot.totalDurationMin,
       totalPrice: snapshot.totalPrice,
@@ -556,6 +569,7 @@ export async function getPortfolioDetail(
           studio: { select: { name: true } },
         },
       },
+      performer: { select: { name: true } },
       services: {
         include: {
           service: {
@@ -588,7 +602,7 @@ export async function getPortfolioDetail(
   // FEED-PORTFOLIO-N1-FIX-A: single batched lookup for the main item's services.
   const mainOverrides = await loadMasterServiceOverridesMap(collectMasterServicePairs([item]));
   const snapshot = buildPortfolioSnapshot({
-    masterId: item.master.id,
+    masterId: item.performerId ?? item.master.id,
     services: item.services,
     overrides: mainOverrides,
   });
@@ -639,7 +653,7 @@ export async function getPortfolioDetail(
 
   const similarItems = similarRows.map((similar) => {
     const similarSnapshot = buildPortfolioSnapshot({
-      masterId: similar.master.id,
+      masterId: similar.performerId ?? similar.master.id,
       services: similar.services,
       overrides: similarOverrides,
     });
@@ -663,6 +677,7 @@ export async function getPortfolioDetail(
     masterAvatarUrl: item.master.avatarUrl ?? null,
     masterRatingAvg: item.master.ratingAvg,
     studioName: item.master.studio?.name ?? null,
+    performerName: item.performer?.name ?? null,
     primaryServiceTitle: snapshot.primaryServiceTitle,
     totalDurationMin: snapshot.totalDurationMin,
     totalPrice: snapshot.totalPrice,

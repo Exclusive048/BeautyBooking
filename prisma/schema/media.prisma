@@ -88,9 +88,18 @@ model PortfolioItem {
 
   studio Studio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
 
+  /// Владелец работы: кабинет мастера ЛИБО студии. У фото из портфолио студии
+  /// (STUDIO-PORTFOLIO-FEED, 2026-09-24) здесь Provider студии — так работа
+  /// попадает в ленту и истории от имени студии.
   masterId String
 
-  master Provider @relation(fields: [masterId], references: [id], onDelete: Cascade)
+  master Provider @relation("PortfolioItemOwner", fields: [masterId], references: [id], onDelete: Cascade)
+
+  /// STUDIO-PORTFOLIO-FEED: мастер студии, выполнивший работу (подпись «мастер ·
+  /// услуга» на фото). Только у фото студии; у работы мастера исполнитель — он сам.
+  performerId String?
+
+  performer Provider? @relation("PortfolioItemPerformer", fields: [performerId], references: [id], onDelete: SetNull)
 
   mediaUrl String
 
@@ -124,6 +133,7 @@ model PortfolioItem {
 
   @@index([masterId, createdAt])
   @@index([masterId, sortOrder])
+  @@index([performerId])
   @@index([studioId, createdAt])
   @@index([globalCategoryId, inSearch])
   @@index([isPublic, createdAt(sort: Desc), id(sort: Desc)])

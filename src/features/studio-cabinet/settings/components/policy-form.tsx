@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
+import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { StudioPolicyData } from "../lib/types";
 
@@ -75,6 +76,16 @@ export function PolicyForm({ providerId, data }: Props) {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
+  // SCHEDULE-RULES-FREE-INPUT: стёртое и оставленное пустым поле окна записи
+  // возвращает значение по умолчанию, а не висит ошибкой до «Сохранить».
+  // Пустой срок отмены — законное «не задано», его не трогаем.
+  const restoreIfEmpty = (
+    key: "minBookingHoursAhead" | "maxBookingDaysAhead",
+    fallback: number,
+  ) => {
+    if (draft[key].trim() === "") patch(key, String(fallback));
+  };
+
   const handleSubmit = async () => {
     if (!dirty || submitting) return;
 
@@ -134,6 +145,12 @@ export function PolicyForm({ providerId, data }: Props) {
             <Input
               value={draft.minBookingHoursAhead}
               onChange={(e) => patch("minBookingHoursAhead", e.target.value)}
+              onBlur={() =>
+                restoreIfEmpty(
+                  "minBookingHoursAhead",
+                  BOOKING_RULE_LIMITS.minHoursAhead.fallback,
+                )
+              }
               disabled={submitting}
               inputMode="numeric"
               type="number"
@@ -149,6 +166,12 @@ export function PolicyForm({ providerId, data }: Props) {
             <Input
               value={draft.maxBookingDaysAhead}
               onChange={(e) => patch("maxBookingDaysAhead", e.target.value)}
+              onBlur={() =>
+                restoreIfEmpty(
+                  "maxBookingDaysAhead",
+                  BOOKING_RULE_LIMITS.maxDaysAhead.fallback,
+                )
+              }
               disabled={submitting}
               inputMode="numeric"
               type="number"

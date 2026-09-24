@@ -310,7 +310,16 @@ export const openApiSpec = {
           { $ref: "#/components/schemas/ProviderCard" },
           {
             type: "object",
-            required: ["services", "studioId", "bannerUrl", "description", "geoLat", "geoLng", "timezone"],
+            required: [
+              "services",
+              "studioId",
+              "bannerUrl",
+              "bannerCrop",
+              "description",
+              "geoLat",
+              "geoLng",
+              "timezone",
+            ],
             properties: {
               services: {
                 type: "array",
@@ -318,6 +327,17 @@ export const openApiSpec = {
               },
               studioId: { type: "string", nullable: true },
               bannerUrl: { type: "string", nullable: true },
+              bannerCrop: {
+                type: "object",
+                nullable: true,
+                required: ["x", "y", "width", "height"],
+                properties: {
+                  x: { type: "number" },
+                  y: { type: "number" },
+                  width: { type: "number" },
+                  height: { type: "number" },
+                },
+              },
               description: { type: "string", nullable: true },
               timezone: { type: "string" },
               geoLat: { type: "number", nullable: true },
@@ -367,6 +387,45 @@ export const openApiSpec = {
           bufferBetweenBookingsMin: { type: "integer" },
           bannerAssetId: { type: "string", nullable: true },
           bannerUrl: { type: "string", nullable: true },
+        },
+      },
+      StudioPortfolioAttributionItem: {
+        type: "object",
+        required: ["assetId", "performerId", "serviceId"],
+        properties: {
+          assetId: { type: "string" },
+          performerId: { type: "string", nullable: true },
+          serviceId: { type: "string", nullable: true },
+        },
+      },
+      StudioPortfolioAttributionData: {
+        type: "object",
+        required: ["items", "masters", "services"],
+        properties: {
+          items: {
+            type: "array",
+            items: { $ref: "#/components/schemas/StudioPortfolioAttributionItem" },
+          },
+          masters: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["id", "name", "serviceIds"],
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                serviceIds: { type: "array", items: { type: "string" } },
+              },
+            },
+          },
+          services: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["id", "title"],
+              properties: { id: { type: "string" }, title: { type: "string" } },
+            },
+          },
         },
       },
       StudioPrivateProfileData: {
@@ -2067,6 +2126,9 @@ export const openApiSpec = {
           { name: "serviceQuery", in: "query", required: false, schema: { type: "string" } },
           { name: "district", in: "query", required: false, schema: { type: "string" } },
           { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
+          // CATALOG-DATE-TIME-FILTER: часы салона `HH:MM`, окошко в `[timeFrom, timeTo)`.
+          { name: "timeFrom", in: "query", required: false, schema: { type: "string", maxLength: 5, description: "HH:MM, часы салона" } },
+          { name: "timeTo", in: "query", required: false, schema: { type: "string", maxLength: 5, description: "HH:MM, часы салона" } },
             { name: "priceMin", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
             { name: "priceMax", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
             { name: "availableToday", in: "query", required: false, schema: { type: "boolean" } },
@@ -2074,8 +2136,9 @@ export const openApiSpec = {
           { name: "ratingMin", in: "query", required: false, schema: { type: "number", minimum: 0, maximum: 5 } },
           { name: "entityType", in: "query", required: false, schema: { type: "string", enum: ["all", "master", "studio"] } },
           { name: "view", in: "query", required: false, schema: { type: "string", enum: ["list", "map"] } },
-          { name: "lat", in: "query", required: false, schema: { type: "number" } },
-          { name: "lng", in: "query", required: false, schema: { type: "number" } },
+          { name: "sort", in: "query", required: false, schema: { type: "string", enum: ["relevance", "rating", "price-asc", "price-desc", "distance", "popular"] } },
+          { name: "lat", in: "query", required: false, schema: { type: "number", minimum: -90, maximum: 90 } },
+          { name: "lng", in: "query", required: false, schema: { type: "number", minimum: -180, maximum: 180 } },
           { name: "bbox", in: "query", required: false, schema: { type: "string" } },
           { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 40 } },
           { name: "cursor", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
@@ -2146,6 +2209,122 @@ export const openApiSpec = {
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studios/{id}/portfolio": {
+      get: {
+        summary: "Studio portfolio photo captions (performer + service) and pickers",
+        tags: ["studio"],
+        parameters: [providerIdParam],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPortfolioAttributionData" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Studio not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/studios/{id}/portfolio/{assetId}": {
+      patch: {
+        summary: "Set performer and service caption of a studio portfolio photo",
+        tags: ["studio"],
+        parameters: [
+          providerIdParam,
+          { name: "assetId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["performerId", "serviceId"],
+                properties: {
+                  performerId: { type: "string", nullable: true },
+                  serviceId: { type: "string", nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["item"],
+            properties: { item: { $ref: "#/components/schemas/StudioPortfolioAttributionItem" } },
+          }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("Photo, master or service not found"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    // GUEST-MANAGE-LINK (2026-09-24): управление гостевой записью по подписанной ссылке.
+    "/api/public/bookings/manage/{token}/cancel": {
+      post: {
+        summary: "Cancel a guest booking (whole package) by its signed manage link",
+        tags: ["bookings"],
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["cancelled"],
+            properties: { cancelled: { type: "integer" } },
+          }),
+          "403": errorResponse("Booking belongs to an account — manage it from the cabinet"),
+          "404": errorResponse("Link is invalid or expired"),
+          "409": errorResponse("Booking can no longer be cancelled"),
+          "429": errorResponse("Rate limited"),
+          "503": errorResponse("Rate limiter unavailable"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/bookings/manage/{token}/reschedule": {
+      post: {
+        summary: "Request a reschedule of a guest booking by its signed manage link",
+        tags: ["bookings"],
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["bookingId", "startAtUtc", "endAtUtc", "slotLabel"],
+                properties: {
+                  bookingId: { type: "string" },
+                  startAtUtc: { type: "string", format: "date-time" },
+                  endAtUtc: { type: "string", format: "date-time" },
+                  slotLabel: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["booking"],
+            properties: {
+              booking: {
+                type: "object",
+                required: ["id", "status"],
+                properties: { id: { type: "string" }, status: { type: "string" } },
+              },
+            },
+          }),
+          "400": errorResponse("Validation error"),
+          "403": errorResponse("Booking belongs to an account — manage it from the cabinet"),
+          "404": errorResponse("Link is invalid or expired"),
+          "409": errorResponse("Booking can no longer be rescheduled"),
+          "429": errorResponse("Rate limited"),
+          "503": errorResponse("Rate limiter unavailable"),
           "500": errorResponse("Internal error"),
         },
       },

@@ -223,6 +223,8 @@ describe("LOGIC-02 · шестой переход не пройдёт молча
       "src/lib/bookings/package-booking.ts",
       // седьмой — задача воркера: подтверждённый визит → FINISHED (BOOKING-FINALIZE-01)
       "src/lib/bookings/finalize-past.ts",
+      // восьмой — задача воркера: неподтверждённая вовремя запись → REJECTED (PENDING-EXPIRY)
+      "src/lib/bookings/expire-pending.ts",
     ]) {
       const source = readFileSync(resolve(PROJECT_ROOT, rel), "utf8");
       expect(source, rel).toContain("applyBookingTransition");

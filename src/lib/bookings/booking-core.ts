@@ -7,6 +7,7 @@ import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone"
 import {
   assertAcceptsNewClient,
   assertBookingWindow,
+  stricterBookingWindow,
 } from "@/lib/bookings/policy-enforcement";
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
@@ -348,6 +349,9 @@ export async function resolveBookingCore(input: {
             timezone: true,
             bufferBetweenBookingsMin: true,
             autoConfirmBookings: true,
+            // BOOKING-WINDOW-STRICTER: окно записи мастера участвует наравне со студийным.
+            minBookingHoursAhead: true,
+            maxBookingDaysAhead: true,
           },
         })
       : null;
@@ -443,7 +447,17 @@ export async function resolveBookingCore(input: {
   // on the common path. Counted bookings exclude REJECTED/CANCELLED/
   // NO_SHOW since those don't represent an existing relationship.
   const now = new Date();
-  assertBookingWindow(startAtUtc, provider, now);
+  // BOOKING-WINDOW-STRICTER (решение владельца 2026-09-24): на услугу студии —
+  // более строгое из окон студии и мастера. Со страницы студии мастер загружен
+  // выше; со страницы мастера студийная услуга берёт окно самой студии.
+  const studioOfMasterWindow =
+    !master && needsOverride && provider.type === ProviderType.MASTER && provider.studioId
+      ? await prisma.provider.findUnique({
+          where: { id: provider.studioId },
+          select: { minBookingHoursAhead: true, maxBookingDaysAhead: true },
+        })
+      : null;
+  assertBookingWindow(startAtUtc, stricterBookingWindow(provider, master ?? studioOfMasterWindow), now);
   if (!provider.acceptNewClients) {
     // BOOKING-WIDGET-FOUNDATION-A: guests (clientUserId === null) are
     // treated as new clients with zero priors — `acceptNewClients=false`

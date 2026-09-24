@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { MembershipStatus, ProviderType, StudioRole } from "@prisma/client";
 import { notifyStudioMemberLeft } from "@/lib/notifications/studio-notifications";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { findStudioLeaveBlock } from "@/lib/studio/leave-guard";
 
 function resolveUserName(input: {
   displayName?: string | null;
@@ -76,6 +77,18 @@ export async function POST(
   if (!canLeave) {
     return fail("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
+
+  // STUDIO-LEAVE-GUARD: живые записи студии сначала переносятся или отменяются.
+  const masterProviders = await prisma.provider.findMany({
+    where: { ownerUserId: auth.user.id, type: ProviderType.MASTER, studioId: studio.providerId },
+    select: { id: true },
+  });
+  const block = await findStudioLeaveBlock(prisma, {
+    studioProviderId: studio.providerId,
+    masterProviderIds: masterProviders.map((provider) => provider.id),
+    actor: "MASTER",
+  });
+  if (block) return fail(block.message, block.status, block.code);
 
   await prisma.studioMembership.update({
     where: { id: membership.id },

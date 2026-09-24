@@ -40,11 +40,18 @@ function resolveMessage(
   minHours: number | null | undefined,
   maxDays: number | null | undefined,
 ): string {
+  // BOOKING-FLOW-AUDIT-RESIDUALS: без чисел политики — строка сервера. Она
+  // несёт настоящее окно (`assertBookingWindow`), а прежний запасной «2 ч» /
+  // «30 дней» был выдумкой: виджет студии чисел не передаёт вовсе.
   switch (code) {
     case "BOOKING_TOO_SOON":
-      return UI_TEXT.bookingWidget.errors.tooSoon.replace("{hours}", String(minHours ?? 2));
+      return minHours != null
+        ? UI_TEXT.bookingWidget.errors.tooSoon.replace("{hours}", String(minHours))
+        : fallback?.trim() || UI_TEXT.bookingWidget.errors.generic;
     case "BOOKING_TOO_FAR":
-      return UI_TEXT.bookingWidget.errors.tooFar.replace("{days}", String(maxDays ?? 30));
+      return maxDays != null
+        ? UI_TEXT.bookingWidget.errors.tooFar.replace("{days}", String(maxDays))
+        : fallback?.trim() || UI_TEXT.bookingWidget.errors.generic;
     case "NEW_CLIENTS_CLOSED":
       return UI_TEXT.bookingWidget.errors.newClientsClosed;
     case "SLOT_CONFLICT":

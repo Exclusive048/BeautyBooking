@@ -349,6 +349,10 @@ async function buildAttentionItems(
         where: {
           OR: [{ studioId: ctx.studioId }, { providerId: ctx.providerId }],
           status: { in: PENDING_BOOKING_STATUSES },
+          // BOOKING-FLOW-AUDIT-RESIDUALS: подтвердить можно только до начала
+          // (`isBookingPastConfirmWindow`) — прошедшие неподтверждённые записи
+          // счётчик «ждут ответа» раздували навсегда.
+          startAtUtc: { gt: new Date() },
         },
       }),
       prisma.review.count({

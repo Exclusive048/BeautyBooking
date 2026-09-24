@@ -1,5 +1,5 @@
 import { normalizeCityName } from "@/lib/cities/normalize";
-import { haversineKm } from "@/features/admin-cabinet/cities/lib/haversine";
+import { haversineKm } from "@/lib/geo/haversine";
 import { getCityTag } from "@/features/admin-cabinet/cities/lib/city-tags";
 import type {
   AdminDuplicateGroup,

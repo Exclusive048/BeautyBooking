@@ -159,6 +159,7 @@ function routeEntry(route: string): string | null {
  */
 const SENSITIVE_KEY_PREFIXES = [
   "rate:createBooking:", "rate:publicBooking:", "rate:packageBook:", "rate:studioPackageBook:",
+  "rate:guestManage:",
   "rl:categories:propose:", "rl:/api/me/delete", "rl:/api/cabinet/master/delete",
   "rl:/api/cabinet/studio/delete", "rl:/api/bookings", "rl:/api/master/portfolio",
   "rl:/api/studio", "rl:/api/studios", "rl:/api/reviews",

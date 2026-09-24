@@ -11,6 +11,7 @@ import {
   loadBookingWithRelations,
   notifyCancelledByClient,
   notifyCancelledByMaster,
+  notifyProviderSideCancelled,
 } from "@/lib/notifications/booking-notifications";
 
 /**
@@ -59,7 +60,26 @@ export async function POST(
           if (access.cancelledBy === "CLIENT") {
             await notifyCancelledByClient(fullBooking);
           } else {
-            await notifyCancelledByMaster(fullBooking);
+            await notifyCancelledByMaster(fullBooking, { actorUserId: userId });
+            // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: в студийном пакете у
+            // компонентов бывают разные мастера — каждый узнаёт о своём;
+            // администраторы получают одно уведомление на пакет.
+            const notified = new Set<string>();
+            const seenMasters = new Set<string>();
+            for (const bookingId of result.cancelledBookingIds) {
+              const component =
+                bookingId === fullBooking.id ? fullBooking : await loadBookingWithRelations(bookingId);
+              if (!component) continue;
+              const masterKey = component.masterProviderId ?? component.providerId;
+              if (seenMasters.has(masterKey)) continue;
+              seenMasters.add(masterKey);
+              const sent = await notifyProviderSideCancelled(component, {
+                actorUserId: user.userId,
+                kind: "CANCELLED",
+                excludeUserIds: notified,
+              });
+              sent.forEach((id) => notified.add(id));
+            }
           }
         }
       } catch (error) {

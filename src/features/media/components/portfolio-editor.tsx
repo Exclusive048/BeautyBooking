@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { Pencil, Star, Trash2 } from "lucide-react";
+import { Pencil, Star, Tag, Trash2 } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
 import type { ApiResponse } from "@/lib/types/api";
@@ -9,8 +9,15 @@ import type { MediaAssetDto } from "@/lib/media/types";
 import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { UI_TEXT } from "@/lib/ui/text";
+import type { StudioPortfolioAttributionData } from "@/lib/studios/portfolio-items";
+import { formatWorkCaption } from "@/lib/feed/work-caption";
+import {
+  PortfolioCaptionDialog,
+  type PortfolioCaptionValue,
+} from "./portfolio-caption-dialog";
 
 type Props = {
   entityType: MediaEntityType;
@@ -59,6 +66,11 @@ export function PortfolioEditor({
   const [error, setError] = useState<string | null>(null);
   const coverEnabled = initialCatalogCoverAssetId !== undefined && entityType === "STUDIO";
   const [coverId, setCoverId] = useState<string | null>(initialCatalogCoverAssetId ?? null);
+  // STUDIO-PORTFOLIO-FEED: фото студии — работы в ленте и историях с подписью
+  // «мастер · услуга». Подпись правит администратор студии.
+  const captionsEnabled = entityType === "STUDIO" && canEdit;
+  const [attribution, setAttribution] = useState<StudioPortfolioAttributionData | null>(null);
+  const [captionAssetId, setCaptionAssetId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const plan = usePlanFeatures(entityType === "STUDIO" ? "STUDIO" : "MASTER");
   const portfolioText = UI_TEXT.master.profile.portfolio;
@@ -75,6 +87,22 @@ export function PortfolioEditor({
   const limitLabel =
     portfolioLimit === null ? UI_TEXT.common.noLimit : `${assets.length} / ${portfolioLimit}`;
 
+  const loadAttribution = useCallback(async () => {
+    if (!captionsEnabled) return;
+    try {
+      const res = await fetch(`/api/studios/${encodeURIComponent(entityId)}/portfolio`, {
+        cache: "no-store",
+      });
+      const json = (await res.json().catch(() => null)) as ApiResponse<StudioPortfolioAttributionData> | null;
+      if (!res.ok || !json || !json.ok) {
+        throw new Error(json && !json.ok ? json.error.message : mediaText.captionLoadFailed);
+      }
+      setAttribution(json.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : mediaText.captionLoadFailed);
+    }
+  }, [captionsEnabled, entityId, mediaText.captionLoadFailed]);
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -86,8 +114,10 @@ export function PortfolioEditor({
       setAssets(json.data.assets);
     } catch (e) {
       setError(e instanceof Error ? e.message : mediaText.loadFailed);
+      return;
     }
-  }, [entityType, entityId, mediaText.loadFailed]);
+    await loadAttribution();
+  }, [entityType, entityId, mediaText.loadFailed, loadAttribution]);
 
   useEffect(() => {
     void load();
@@ -115,13 +145,50 @@ export function PortfolioEditor({
           throw new Error(json && !json.ok ? json.error.message : mediaText.uploadFailed);
         }
         await load();
+        // Новое фото студии — сразу спросить, кто и что делал (замена
+        // сохраняет прежнюю подпись, поэтому для неё не спрашиваем).
+        if (captionsEnabled && !replaceAssetId) {
+          setCaptionAssetId(json.data.asset.id);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : mediaText.uploadFailed);
       } finally {
         setBusy(false);
       }
     },
-    [entityType, entityId, limitReached, load, mediaText.uploadFailed]
+    [captionsEnabled, entityType, entityId, limitReached, load, mediaText.uploadFailed]
+  );
+
+  const saveCaption = useCallback(
+    async (assetId: string, value: PortfolioCaptionValue) => {
+      const res = await fetch(
+        `/api/studios/${encodeURIComponent(entityId)}/portfolio/${encodeURIComponent(assetId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(value),
+        },
+      );
+      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
+      if (!res.ok || !json || !json.ok) {
+        // FormDialog покажет сообщение и оставит диалог открытым.
+        throw new Error(json && !json.ok ? json.error.message : mediaText.captionSaveFailed);
+      }
+      setCaptionAssetId(null);
+      await loadAttribution();
+    },
+    [entityId, loadAttribution, mediaText.captionSaveFailed]
+  );
+
+  const captionFor = useCallback(
+    (assetId: string): { value: PortfolioCaptionValue; label: string | null } => {
+      const item = attribution?.items.find((entry) => entry.assetId === assetId);
+      const value = { performerId: item?.performerId ?? null, serviceId: item?.serviceId ?? null };
+      const performerName = attribution?.masters.find((m) => m.id === value.performerId)?.name ?? null;
+      const serviceTitle = attribution?.services.find((s) => s.id === value.serviceId)?.title ?? null;
+      return { value, label: formatWorkCaption(performerName, serviceTitle) };
+    },
+    [attribution]
   );
 
   const remove = useCallback(
@@ -282,10 +349,30 @@ export function PortfolioEditor({
                 onClick={() => void makeCover(asset.id)}
                 disabled={busy}
                 aria-label={`${mediaText.makeCover}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
-                className="absolute bottom-2 left-2 inline-flex h-7 items-center gap-1 rounded-full border border-border-subtle bg-bg-card/90 px-2.5 text-[11px] font-medium text-text-main opacity-0 shadow-card transition hover:bg-bg-input focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+                className={cn(
+                  "absolute left-2 inline-flex h-7 items-center gap-1 rounded-full border border-border-subtle bg-bg-card/90 px-2.5 text-[11px] font-medium text-text-main opacity-0 shadow-card transition hover:bg-bg-input focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
+                  // Над полосой подписи работы (STUDIO-PORTFOLIO-FEED), а не под ней.
+                  captionsEnabled ? "bottom-12" : "bottom-2",
+                )}
               >
                 <Star className="h-3.5 w-3.5" aria-hidden />
                 {mediaText.makeCover}
+              </Button>
+            ) : null}
+
+            {/* Подписывается только работа: текущий баннер студии — обложка
+                страницы, в ленту не идёт, и строки работы у него нет. */}
+            {captionsEnabled && attribution?.items.some((item) => item.assetId === asset.id) ? (
+              <Button
+                variant="wrapper"
+                size="none"
+                onClick={() => setCaptionAssetId(asset.id)}
+                disabled={busy}
+                aria-label={`${mediaText.captionEditAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
+                className="absolute inset-x-0 bottom-0 flex min-h-[44px] items-end gap-1 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-1.5 pt-6 text-left text-[11px] font-medium text-white/90 hover:text-white"
+              >
+                <Tag className="mb-0.5 h-3 w-3 shrink-0" aria-hidden />
+                <span className="truncate">{captionFor(asset.id).label ?? mediaText.captionAdd}</span>
               </Button>
             ) : null}
 
@@ -321,6 +408,18 @@ export function PortfolioEditor({
       </div>
 
       {error ? <div className="text-xs text-red-600">{error}</div> : null}
+
+      {captionsEnabled && attribution && captionAssetId ? (
+        <PortfolioCaptionDialog
+          key={captionAssetId}
+          open
+          onClose={() => setCaptionAssetId(null)}
+          masters={attribution.masters}
+          services={attribution.services}
+          initial={captionFor(captionAssetId).value}
+          onSave={(value) => saveCaption(captionAssetId, value)}
+        />
+      ) : null}
 
       {previewUrl ? (
         <div

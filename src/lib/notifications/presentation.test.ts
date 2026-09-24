@@ -41,6 +41,31 @@ describe("resolveNotificationOpenHref — канал получателя (RESCH
   });
 });
 
+/**
+ * NO-SHOW-UI: уведомление о неявке теперь адресовано клиенту — ссылка ведёт в
+ * его записи; старые уведомления мастеру (до 2026-09-24) по каналу получателя
+ * по-прежнему открывают кабинет.
+ *
+ * @probe `BOOKING_NO_SHOW` возвращён в мастерский набор → первый кейс красный
+ * (клиент уходил на `/cabinet/master/dashboard`).
+ */
+describe("resolveNotificationOpenHref — неявка (NO-SHOW-UI)", () => {
+  const payload = { bookingId: "bk-7", providerType: "MASTER" };
+
+  it("клиенту — его записи", () => {
+    expect(resolveNotificationOpenHref("BOOKING_NO_SHOW", payload)).toBe("/cabinet/bookings?focus=bk-7");
+    expect(resolveNotificationOpenHref("BOOKING_NO_SHOW", payload, "SYSTEM")).toBe(
+      "/cabinet/bookings?focus=bk-7",
+    );
+  });
+
+  it("старое уведомление мастеру — кабинет мастера", () => {
+    expect(resolveNotificationOpenHref("BOOKING_NO_SHOW", payload, "MASTER")).toBe(
+      "/cabinet/master/dashboard?focus=bk-7",
+    );
+  });
+});
+
 describe("resolveNotificationOpenHref — studio booking deep-link", () => {
   it("lands on the exact booking's calendar day, computed in SALON tz", () => {
     // BOOKING-STUDIO-RESCHEDULE-PARITY-01 + timezone-correctness anchor:
