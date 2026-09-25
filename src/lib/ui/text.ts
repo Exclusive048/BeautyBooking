@@ -1948,6 +1948,12 @@ export const UI_TEXT = {
     card: {
       priceFrom: "от",
       ratingLabel: "рейтинг",
+      // HOME-FEED-COLLAGE: плитка-карусель работ одного автора (48 часов).
+      worksCounter: "{current} / {total}",
+      previousWork: "Предыдущая работа",
+      nextWork: "Следующая работа",
+      carouselAria: "Работы — {author}",
+      slideAria: "Работа {current} из {total}",
     },
     stories: {
       railAria: "Сторис мастеров",

@@ -264,8 +264,8 @@ function FavMasterCard({
     : "/catalog";
   const profileHref = data.publicUsername ? `/u/${data.publicUsername}` : "/catalog";
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition hover:shadow-card">
-      <PhotoBlock photoUrl={data.photoUrl} hue={data.hue} label={data.tagline} />
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition hover:shadow-card">
+      <PhotoBlock photoUrl={data.photoUrl} hue={data.hue} label={data.tagline} kind="master" />
 
       <UnfavoriteButton onClick={onUnfavorite} />
       {data.isPremium ? <PremiumBadge /> : null}
@@ -330,8 +330,8 @@ function FavStudioCard({
 }) {
   const profileHref = data.publicUsername ? `/u/${data.publicUsername}` : "/catalog";
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition hover:shadow-card">
-      <PhotoBlock photoUrl={data.photoUrl} hue={data.hue} label={data.name} />
+    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition hover:shadow-card">
+      <PhotoBlock photoUrl={data.photoUrl} hue={data.hue} label={data.name} kind="studio" />
 
       <UnfavoriteButton onClick={onUnfavorite} />
       {data.isPremium ? <PremiumBadge /> : null}
@@ -386,31 +386,46 @@ function FavStudioCard({
 
 /* -------------------------------------------------------------------------- */
 
+/**
+ * FAVORITES-PHOTO-FIT (2026-09-25): фото карточки — в пропорции, а не в полосе
+ * `h-40` на всю ширину. У мастера это первое фото портфолио (почти всегда
+ * вертикальное, с телефона), у студии — аватар (квадратный вырез): в полосе
+ * ~2.2:1 от первого оставалась треть кадра, от второго — половина логотипа.
+ * Отсюда и пропорции: 4:5 для работы мастера, квадрат для аватара студии.
+ * Картинка заполняет бокс (`fill` + `sizes` по сетке), а не запрашивается
+ * фиксированными 400×160 — на широкой карточке это было ещё и мыло.
+ */
+const PHOTO_BOX_CLASS: Record<"master" | "studio", string> = {
+  master: "aspect-[4/5]",
+  studio: "aspect-square",
+};
+
 function PhotoBlock({
   photoUrl,
   hue,
   label,
+  kind,
 }: {
   photoUrl: string | null;
   hue: number;
   label: string | null;
+  kind: "master" | "studio";
 }) {
   if (photoUrl) {
     return (
-      <div className="relative h-40 w-full overflow-hidden">
+      <div className={`relative w-full overflow-hidden bg-bg-input ${PHOTO_BOX_CLASS[kind]}`}>
         <ResilientImage
           src={photoUrl}
           alt={label ?? ""}
-          width={400}
-          height={160}
-          className="h-full w-full object-cover"
+          sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+          className="object-cover"
         />
       </div>
     );
   }
   return (
     <div
-      className="relative flex h-40 w-full items-center justify-center"
+      className={`relative flex w-full items-center justify-center ${PHOTO_BOX_CLASS[kind]}`}
       style={{
         background: `linear-gradient(135deg, hsl(${hue}, 60%, 92%), hsl(${hue}, 50%, 78%))`,
       }}

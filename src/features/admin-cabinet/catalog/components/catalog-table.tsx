@@ -13,6 +13,7 @@ import {
 } from "@/features/admin-cabinet/catalog/components/create-category-dialog";
 import { RejectConfirmDialog } from "@/features/admin-cabinet/catalog/components/reject-confirm-dialog";
 import { cn } from "@/lib/cn";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { UI_TEXT } from "@/lib/ui/text";
 import type {
   AdminCategoryCounts,
@@ -72,16 +73,14 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
     const prevStatus = row.status;
     patchRow(row.id, { status: "APPROVED" });
     try {
-      const res = await fetch(
-        `/api/admin/catalog/categories/${row.id}/approve`,
-        { method: "POST" },
-      );
-      if (!res.ok) throw new Error("approve failed");
+      await fetchJson(`/api/admin/catalog/categories/${row.id}/approve`, {
+        method: "POST",
+      });
       showToast(T.toasts.approved);
       router.refresh();
-    } catch {
+    } catch (error) {
       patchRow(row.id, { status: prevStatus });
-      showToast(T.toasts.errorGeneric, "error");
+      showToast(serverMessageOr(error, T.toasts.errorGeneric), "error");
     } finally {
       setBusyId(null);
     }
@@ -92,21 +91,19 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
     const prevStatus = row.status;
     patchRow(row.id, { status: "REJECTED" });
     try {
-      const res = await fetch(
-        `/api/admin/catalog/categories/${row.id}/reject`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason }),
-        },
-      );
-      if (!res.ok) throw new Error("reject failed");
+      await fetchJson(`/api/admin/catalog/categories/${row.id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
       setRejectTarget(null);
       showToast(T.toasts.rejected);
       router.refresh();
-    } catch {
+    } catch (error) {
+      // Причину отказа (например, «Категория уже отклонена. Обновите страницу.»)
+      // показываем дословно — на неё администратор может отреагировать (FIX-C8).
       patchRow(row.id, { status: prevStatus });
-      showToast(T.toasts.errorGeneric, "error");
+      showToast(serverMessageOr(error, T.toasts.errorGeneric), "error");
     } finally {
       setBusyId(null);
     }

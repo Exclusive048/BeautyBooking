@@ -20,7 +20,7 @@ import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility"
 // виден в каталоге (есть город и расписание). Сама карточка работы по ссылке
 // проверяет только публикацию (`getPortfolioDetail`), как и отдача медиа, —
 // «найти» ⊂ «открыть», поэтому фото у найденной работы всегда отдаётся.
-const PUBLISHED_MASTER_WHERE = { master: catalogVisibleProviderWhere() };
+export const PUBLISHED_MASTER_WHERE = { master: catalogVisibleProviderWhere() };
 
 type PortfolioServiceOption = {
   serviceId: string;
@@ -211,7 +211,7 @@ async function buildVisualSearchReadyMapByUrl(mediaUrls: string[]): Promise<Map<
   return readyByUrl;
 }
 
-function buildPortfolioSnapshot(input: {
+export function buildPortfolioSnapshot(input: {
   masterId: string;
   services: Array<{
     service: {
@@ -257,7 +257,7 @@ function buildPortfolioSnapshot(input: {
  * Shared between `listPortfolioFeed`, `listHomePortfolioFeed`, and the two
  * sub-queries in `getPortfolioDetail`.
  */
-function collectMasterServicePairs(
+export function collectMasterServicePairs(
   rows: Array<{
     master: { id: string };
     performerId: string | null;

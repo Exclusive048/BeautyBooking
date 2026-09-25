@@ -10,3 +10,9 @@ export const portfolioFeedQuerySchema = z.object({
   near: z.string().trim().optional(),
   masterId: z.string().trim().optional(),
 });
+
+/** HOME-FEED-COLLAGE: страница ленты главной — в ГРУППАХ (плитках), не в работах. */
+export const homeFeedQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(30).default(12),
+  cursor: z.string().trim().max(200).optional(),
+});

@@ -5,46 +5,54 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
 import { Button } from "@/components/ui/button";
-import { FeedCard } from "@/features/home/components/feed-card";
-import {
-  FEED_GRID_CLASS,
-  FeedSkeleton,
-  FeedSkeletonGrid,
-} from "@/features/home/components/feed-skeleton";
+import { FeedCollage, useCollageColumns } from "@/features/home/components/feed-collage";
+import { FeedCollageSkeleton } from "@/features/home/components/feed-skeleton";
 import { RecentMastersSection } from "@/features/home/components/recent-masters-section";
 import { StoriesRail } from "@/features/home/components/stories-rail";
 import { StoriesViewerOverlayLazy } from "@/features/home/components/stories-viewer-overlay-lazy";
 import { StoriesViewerProvider } from "@/features/home/stories-viewer-context";
 import { fetchJson } from "@/lib/http/client";
-import type { PortfolioFeedItem } from "@/lib/feed/portfolio.service";
+import type { HomeFeedGroup, HomeFeedPage } from "@/lib/feed/home-feed.service";
 import { UI_TEXT } from "@/lib/ui/text";
 
-type FeedPage = {
-  items: PortfolioFeedItem[];
-  nextCursor: string | null;
-};
+type FeedPage = HomeFeedPage;
 
 type HomeFeedProps = {
-  // Both props are accepted for compatibility with <HomePage>, but the
-  // authenticated grid does not render auth-specific content (greeting was
-  // intentionally removed). The parent already gates rendering by auth state.
+  // `isAuthenticated` решает, что делает сердце на плитке (гостя — на вход).
+  // `userName` принимается для совместимости с <HomePage>: приветствие убрано.
   isAuthenticated: boolean;
   userName?: string | null;
 };
 
-const FEED_LIMIT = 24;
+/** HOME-FEED-COLLAGE: страница — в плитках-группах (6 колонок × 3 ряда на ПК). */
+const FEED_LIMIT = 18;
 
 const getKey = (pageIndex: number, previousPageData: FeedPage | null) => {
   if (previousPageData && !previousPageData.nextCursor) return null;
-  if (pageIndex === 0) return `/api/feed/portfolio?limit=${FEED_LIMIT}`;
-  return `/api/feed/portfolio?limit=${FEED_LIMIT}&cursor=${previousPageData!.nextCursor}`;
+  if (pageIndex === 0) return `/api/feed/home?limit=${FEED_LIMIT}`;
+  return `/api/feed/home?limit=${FEED_LIMIT}&cursor=${encodeURIComponent(previousPageData!.nextCursor!)}`;
 };
+
+/** Группа не должна прийти дважды, но ключ — страховка от повтора плитки. */
+function uniqueGroups(pages: FeedPage[] | undefined): HomeFeedGroup[] {
+  if (!pages) return [];
+  const seen = new Set<string>();
+  const out: HomeFeedGroup[] = [];
+  for (const page of pages) {
+    for (const group of page.groups) {
+      if (seen.has(group.key)) continue;
+      seen.add(group.key);
+      out.push(group);
+    }
+  }
+  return out;
+}
 
 const fetcher = (url: string) => fetchJson<FeedPage>(url);
 
-export function HomeFeed(props: HomeFeedProps) {
-  void props; // accepted for backward compat; see HomeFeedProps comment above
+export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
   const router = useRouter();
+  const columns = useCollageColumns();
   const searchParams = useSearchParams();
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -60,7 +68,7 @@ export function HomeFeed(props: HomeFeedProps) {
     },
   );
 
-  const items = data?.flatMap((p) => p.items) ?? [];
+  const groups = uniqueGroups(data);
   const lastPage = data && data.length > 0 ? data[data.length - 1] : null;
   const isReachingEnd = Boolean(lastPage && lastPage.nextCursor === null);
   const isLoadingMore =
@@ -98,7 +106,7 @@ export function HomeFeed(props: HomeFeedProps) {
   }, [isLoadingMore, isReachingEnd, setSize]);
 
   const isInitialLoading = isLoading && !data;
-  const isEmpty = !isInitialLoading && !error && items.length === 0;
+  const isEmpty = !isInitialLoading && !error && groups.length === 0;
 
   const T = UI_TEXT.homeFeed;
 
@@ -134,7 +142,7 @@ export function HomeFeed(props: HomeFeedProps) {
         </div>
       ) : null}
 
-      {isInitialLoading ? <FeedSkeletonGrid count={12} /> : null}
+      {isInitialLoading ? <FeedCollageSkeleton count={columns * 3} columns={columns} /> : null}
 
       {isEmpty ? (
         <div className="mx-auto max-w-md py-20 text-center">
@@ -148,22 +156,14 @@ export function HomeFeed(props: HomeFeedProps) {
         </div>
       ) : null}
 
-      {!isInitialLoading && items.length > 0 ? (
-        // HOME-FEED-DENSE: 3 в ряд на телефоне, 6 на ПК (решение владельца).
-        <div className={FEED_GRID_CLASS}>
-          {items.map((item, index) => (
-            <FeedCard key={item.id} item={item} index={index} />
-          ))}
-        </div>
+      {!isInitialLoading && groups.length > 0 ? (
+        // HOME-FEED-COLLAGE: коллаж плиток-групп; 3 колонки на телефоне, 6 на ПК.
+        <FeedCollage groups={groups} columns={columns} isAuthenticated={isAuthenticated} />
       ) : null}
 
       {/* Loading next page — one row of skeletons */}
       {!isInitialLoading && isLoadingMore && !isReachingEnd ? (
-        <div className={FEED_GRID_CLASS}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <FeedSkeleton key={`more-${i}`} />
-          ))}
-        </div>
+        <FeedCollageSkeleton count={columns} columns={columns} />
       ) : null}
 
       {/* Sentinel — only when there's more to load */}
@@ -172,7 +172,7 @@ export function HomeFeed(props: HomeFeedProps) {
       ) : null}
 
       {/* End of feed */}
-      {isReachingEnd && items.length > 0 ? (
+      {isReachingEnd && groups.length > 0 ? (
         <p className="py-12 text-center font-display text-lg italic text-text-sec">
           {T.end}
         </p>

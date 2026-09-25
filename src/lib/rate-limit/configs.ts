@@ -51,4 +51,5 @@ export const RATE_LIMITS = {
   // Feed
   feedPortfolio: { windowSeconds: 60, maxRequests: 60 },
   feedStories: { windowSeconds: 60, maxRequests: 30 },
+  feedHome: { windowSeconds: 60, maxRequests: 60 },
 } satisfies Record<string, RateLimitConfig>;

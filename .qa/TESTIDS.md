@@ -49,6 +49,7 @@
 | `catalog-list` | catalog results grid — `features/catalog/pages/catalog-page-client.tsx` (default list view) |
 | `catalog-card` | each provider card — `features/catalog/components/catalog-card.tsx` |
 | `stories-rail` | home stories rail container (holds the story-ring buttons) — `features/home/components/stories-rail.tsx` (on both the loaded `<section>` and the loading skeleton) |
+| `home-feed-tile` | each tile of the home collage feed — `features/home/components/feed-group-tile.tsx` (HOME-FEED-COLLAGE). Carries `data-works` (number of works in the author's 48-hour upload group; `>1` = carousel, `aria-roledescription="carousel"`) |
 | `notifications-center` | the shared `/notifications` page root — `features/notifications/components/notifications-center-page.tsx` |
 | `notifications-list` | notifications feed container — same file. Absent when the feed is empty (the empty state renders instead) |
 | `notification-row` | each notification card — same file. Carries `data-group` (bookings/reminders/reviews/promo/billing/studio/models/system) and `data-unread` ("true"/"false") so a pass can assert filtering + read state without reading Russian copy |

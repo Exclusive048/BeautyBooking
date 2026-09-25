@@ -43,16 +43,22 @@ export async function POST(req: Request, ctx: RouteContext) {
     if (!category) {
       return fail("Ничего не найдено.", 404, "NOT_FOUND");
     }
-    if (category.status !== CategoryStatus.PENDING) {
-      return fail("Категория не находится на модерации.", 409, "CONFLICT");
+    // ADMIN-CATALOG-UNPUBLISH: отклонить можно и категорию на модерации, и уже
+    // опубликованную (снять с публикации) — ровно так кнопку показывает админка
+    // (`catalog-row-actions.tsx`) и так же статус меняет PATCH этой категории.
+    // Раньше роут принимал только PENDING, и крестик у опубликованной категории
+    // отвечал 409 — в админке это выглядело как ошибка без причины.
+    if (category.status === CategoryStatus.REJECTED) {
+      return fail("Категория уже отклонена. Обновите страницу.", 409, "CONFLICT");
     }
+    const wasPublished = category.status === CategoryStatus.APPROVED;
 
     const updated = await prisma.$transaction(async (tx) => {
       const row = await tx.globalCategory.update({
         where: { id },
         // FIX-R2-05-A: explicit lockstep — a rejected category is hidden (mirrors
-        // approve setting visibleToAll=true). Reject only acts on PENDING (already
-        // visibleToAll=false), so this is defensive symmetry for the invariant.
+        // approve setting visibleToAll=true). For a published category this is
+        // the actual unpublish, not defensive symmetry.
         data: { status: "REJECTED", reviewedAt: new Date(), visibleToAll: false },
         select: { id: true, status: true },
       });
@@ -68,7 +74,11 @@ export async function POST(req: Request, ctx: RouteContext) {
         action: "CATEGORY_REJECTED",
         targetType: "category",
         targetId: id,
-        details: { categorySlug: category.slug, name: category.name },
+        details: {
+          categorySlug: category.slug,
+          name: category.name,
+          previousStatus: category.status,
+        },
         reason: reason ?? null,
         context: getAdminAuditContext(req),
       });
@@ -94,10 +104,14 @@ export async function POST(req: Request, ctx: RouteContext) {
       await deliverNotification({
         userId: category.proposedBy,
         type: NotificationType.CATEGORY_REJECTED,
-        title: "Категория отклонена",
-        body: reason
-          ? `Категория «${category.name}» не была одобрена. Причина: ${reason}`
-          : `Категория «${category.name}» не была одобрена.`,
+        title: wasPublished ? "Категория снята с публикации" : "Категория отклонена",
+        body: wasPublished
+          ? reason
+            ? `Категория «${category.name}» снята с публикации. Причина: ${reason}`
+            : `Категория «${category.name}» снята с публикации.`
+          : reason
+            ? `Категория «${category.name}» не была одобрена. Причина: ${reason}`
+            : `Категория «${category.name}» не была одобрена.`,
         payloadJson: {
           categoryId: category.id,
           status: "REJECTED",

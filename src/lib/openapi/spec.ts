@@ -2008,6 +2008,38 @@ export const openApiSpec = {
           nextCursor: { type: "string", nullable: true },
         },
       },
+      HomeFeedWork: {
+        type: "object",
+        required: ["id", "mediaUrl", "caption", "performerName", "primaryServiceTitle", "totalPrice"],
+        properties: {
+          id: { type: "string" },
+          mediaUrl: { type: "string" },
+          caption: { type: "string", nullable: true },
+          performerName: { type: "string", nullable: true },
+          primaryServiceTitle: { type: "string", nullable: true },
+          totalPrice: { type: "integer" },
+        },
+      },
+      HomeFeedGroup: {
+        type: "object",
+        required: ["key", "authorName", "authorPublicUsername", "authorRatingAvg", "authorFavorited", "works"],
+        properties: {
+          key: { type: "string" },
+          authorName: { type: "string" },
+          authorPublicUsername: { type: "string", nullable: true },
+          authorRatingAvg: { type: "number" },
+          authorFavorited: { type: "boolean" },
+          works: { type: "array", items: { $ref: "#/components/schemas/HomeFeedWork" } },
+        },
+      },
+      HomeFeedData: {
+        type: "object",
+        required: ["groups", "nextCursor"],
+        properties: {
+          groups: { type: "array", items: { $ref: "#/components/schemas/HomeFeedGroup" } },
+          nextCursor: { type: "string", nullable: true },
+        },
+      },
       PortfolioDetailData: {
         type: "object",
         required: ["item"],
@@ -3954,6 +3986,22 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/PortfolioFeedData" }),
           "400": errorResponse("Validation error"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/feed/home": {
+      get: {
+        summary: "Home collage feed: one tile per author upload group (48h window)",
+        tags: ["portfolio", "feed"],
+        parameters: [
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 30 } },
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/HomeFeedData" }),
+          "400": errorResponse("Validation error"),
+          "429": errorResponse("Rate limited"),
           "500": errorResponse("Internal error"),
         },
       },
