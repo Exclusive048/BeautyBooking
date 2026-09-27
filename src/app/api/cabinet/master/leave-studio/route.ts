@@ -3,7 +3,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { requireAuth } from "@/lib/auth/guards";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getMasterWorkProfiles } from "@/lib/master/access";
 import {
   loadInviteWithRelations,
   notifyStudioInviteRevoked,
@@ -25,7 +25,10 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response;
 
     const body = await parseBody(req, bodySchema);
-    const masterId = await getCurrentMasterProviderId(auth.user.id);
+    // STUDIO-MASTER-PROFILES (этап 4): из студии уходит профиль мастера В
+    // СТУДИИ; до разделения студийную работу несёт сам личный профиль.
+    const workProfiles = await getMasterWorkProfiles(auth.user.id);
+    const masterId = workProfiles.studioProfiles[0]?.id ?? workProfiles.personalId;
     const master = await prisma.provider.findUnique({
       where: { id: masterId },
       select: { studioId: true, name: true },

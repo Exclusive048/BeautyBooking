@@ -15,14 +15,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
  * неположительную, увидит пустой список и уйдёт в `priceFrom`, то есть тихо
  * вернёт ДРУГУЮ цену. Ради этой связки тест и существует.
  *
- * CATALOG-CARD-STUDIO-MASTER-SERVICES (2026-09-23): связка сохранена для
- * СОБСТВЕННЫХ услуг (их у студии сотни). Студийные связи мастера (`MasterService`)
- * читаются без `take`: цена карточки — `priceOverride ?? service.price`, и её
- * минимум порядком по `service.price` не выразить, а связей у мастера десятки
- * (у провайдера-студии — ни одной). Развилку «свои есть → только свои» держит
- * фильтрованный `_count.services`, а не `services.length`: у мастера, чьи свои
- * услуги все бесплатные, `take: 1` с `price > 0` вернул бы пусто, и ранкер
- * ушёл бы в студийные связи, которые карточка не показывает.
+ * STUDIO-MASTER-PROFILES (решение владельца 2026-09-27): карточка профиля
+ * показывает только СВОИ услуги (услуги профилей не смешиваются), поэтому и
+ * ранжирование читает только их — студийных связей мастера (`MasterService`)
+ * в запросе ранкера больше нет вовсе (прежняя развилка
+ * CATALOG-CARD-STUDIO-MASTER-SERVICES удалена).
  */
 
 const providerFindMany = vi.hoisted(() => vi.fn());
@@ -49,8 +46,7 @@ type RelationArgs = {
 
 async function captureRankerSelect(sort: "price-asc" | "price-desc"): Promise<{
   services: RelationArgs;
-  masterServices: RelationArgs;
-  _count: { select: { services: { where: Record<string, unknown> } } };
+  masterServices?: RelationArgs;
 }> {
   providerFindMany.mockResolvedValue([]);
   await searchCatalog({ sort, limit: 20 } as Parameters<typeof searchCatalog>[0]);
@@ -62,8 +58,7 @@ async function captureRankerSelect(sort: "price-asc" | "price-desc"): Promise<{
 
   const select = rankerCall![0].select as {
     services: RelationArgs;
-    masterServices: RelationArgs;
-    _count: { select: { services: { where: Record<string, unknown> } } };
+    masterServices?: RelationArgs;
   };
   return select;
 }
@@ -87,20 +82,10 @@ describe("PERF-05 · ранжирование по цене не тянет вс
     });
   });
 
-  it("услуги через MasterService: включённые связи с переопределением цены", async () => {
+  it("студийные связи мастера ранкер не читает — цена карточки только из своих услуг", async () => {
     const select = await captureRankerSelect("price-desc");
 
-    expect(select.masterServices.where).toMatchObject({
-      isEnabled: true,
-      service: { isEnabled: true, isActive: true },
-    });
-    expect(select.masterServices.select).toMatchObject({ priceOverride: true });
-  });
-
-  it("развилка «свои есть» — по счётчику ВСЕХ включённых своих услуг, не по цене", async () => {
-    const select = await captureRankerSelect("price-asc");
-
-    expect(select._count.select.services.where).toEqual({ isEnabled: true, isActive: true });
+    expect(select.masterServices).toBeUndefined();
   });
 
   it("направление сортировки не влияет на отбор — обе стороны берут МИНИМУМ", async () => {
@@ -113,6 +98,6 @@ describe("PERF-05 · ранжирование по цене не тянет вс
     const desc = await captureRankerSelect("price-desc");
 
     expect(desc.services.orderBy).toEqual(asc.services.orderBy);
-    expect(desc.masterServices).toEqual(asc.masterServices);
+    expect(desc.services.where).toEqual(asc.services.where);
   });
 });

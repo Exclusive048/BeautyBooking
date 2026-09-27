@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { hasAnyRole, requireAuthFromRequest } from "@/lib/auth/guards";
 
+import { personalMasterProviderWhere } from "@/lib/master/access";
 export type SessionUser = {
   userId: string;
   role: AccountType;
@@ -45,7 +46,7 @@ async function resolveProviderIds(
 ): Promise<{ providerId: string | null; studioId: string | null }> {
   if (role === AccountType.MASTER) {
     const provider = await prisma.provider.findFirst({
-      where: { ownerUserId: userId, type: ProviderType.MASTER },
+      where: personalMasterProviderWhere(userId),
       select: { id: true },
     });
     return { providerId: provider?.id ?? null, studioId: null };

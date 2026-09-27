@@ -4,13 +4,14 @@ import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { getClientCardData, upsertClientCard } from "@/lib/crm/card-service";
 import { ensureClientCardAccess } from "@/lib/crm/guards";
 import { clientCardPatchSchema } from "@/lib/crm/schemas";
 import { validateClientTags } from "@/lib/crm/tags";
 import { parseBody } from "@/lib/validation";
+import { masterClientBookingsScope } from "@/lib/master/clients-view.service";
 
 type RouteContext = {
   params: Promise<{ clientKey: string }>;
@@ -27,6 +28,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     if (!params.clientKey) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
     const providerId = await getCurrentMasterProviderId(user.id);
+    const workProfiles = await getMasterWorkProfiles(user.id);
     const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
     ensureClientCardAccess(plan.features);
 
@@ -39,7 +41,8 @@ export async function GET(req: Request, ctx: RouteContext) {
     const data = await getClientCardData({
       providerId,
       timeZone: provider.timezone,
-      bookingWhere: { OR: [{ providerId }, { masterProviderId: providerId }] },
+      // STUDIO-MASTER-PROFILES (этап 4): история клиента — по всем профилям мастера.
+      bookingWhere: masterClientBookingsScope(workProfiles.allIds),
       clientKey: params.clientKey,
     });
     return jsonOk(data);

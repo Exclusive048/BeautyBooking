@@ -21,11 +21,18 @@ type Props = {
   totalTodayCount: number;
   /** Salon (master) tz — EXP-017: booking times shown in salon-tz, matching the kanban. */
   timezone: string;
+  /** STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» на строках. */
+  showWorkContext?: boolean;
 };
 
 const VISIBLE_LIMIT = 3;
 
-export function UpcomingBookingsSection({ upcoming, totalTodayCount, timezone }: Props) {
+export function UpcomingBookingsSection({
+  upcoming,
+  totalTodayCount,
+  timezone,
+  showWorkContext = false,
+}: Props) {
   const visible = upcoming.slice(0, VISIBLE_LIMIT);
   const subtitle = T.subtitleTemplate
     .replace("{count}", String(upcoming.length))
@@ -51,7 +58,12 @@ export function UpcomingBookingsSection({ upcoming, totalTodayCount, timezone }:
       {visible.length > 0 ? (
         <div className="divide-y divide-border-subtle">
           {visible.map((booking) => (
-            <BookingRow key={booking.id} booking={booking} timezone={timezone} />
+            <BookingRow
+              key={booking.id}
+              booking={booking}
+              timezone={timezone}
+              showWorkContext={showWorkContext}
+            />
           ))}
         </div>
       ) : (

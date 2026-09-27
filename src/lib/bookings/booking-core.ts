@@ -11,9 +11,10 @@ import {
 } from "@/lib/bookings/policy-enforcement";
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
+import { normalizeOccupancyIds, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import type { BookingTx } from "@/lib/bookings/booking-transaction";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
-import { assertStudioAcceptsBookings, studioAcceptsBookings, STUDIO_NOT_ACCEPTING_MESSAGE } from "@/lib/studio/accepts-bookings";
+import { studioAcceptsBookings, STUDIO_NOT_ACCEPTING_MESSAGE } from "@/lib/studio/accepts-bookings";
 
 /**
  * FIX-C6 (инв. #31) — клиент, которому позволено спрашивать про конфликт.
@@ -134,22 +135,44 @@ export function normalizeBufferMinutes(value: number | null | undefined): number
  * кабинет целиком) прежний широкий клоз `{ providerId }` сохранён: он ловил
  * пересечение с любой бронью студии, и сузить его — отдельное продуктовое
  * решение, а не побочный эффект фикса скоупа.
+ *
+ * STUDIO-MASTER-PROFILES (этап 1): «время мастера» — это время ЧЕЛОВЕКА, а не
+ * одного профиля. У мастера может быть личный профиль и профиль в студии, и
+ * занятое в одном недоступно в другом. Поэтому скоуп строится по набору
+ * профилей человека (`occupancyIds`, `schedule/occupancy.ts`), и набор —
+ * обязательный параметр: вызывающий, который про него забудет, не
+ * скомпилируется. Набор получают `resolveConflictOccupancyIds` (ниже) или
+ * `resolveOccupancyProviderIds` тем же клиентом, что и сама проверка.
  */
 export function buildConflictScopeWhere(input: {
   providerId: string;
   masterProviderId: string | null;
+  occupancyIds: readonly string[];
 }) {
   const masterKey = input.masterProviderId ?? input.providerId;
+  const keys = normalizeOccupancyIds([masterKey, ...input.occupancyIds]);
   const orClauses: Array<Record<string, unknown>> = [
-    // исполнитель — независимо от того, под каким providerId создана бронь
-    { masterProviderId: masterKey },
-    // бронь без назначенного мастера: занят сам провайдер
-    { masterProviderId: null, providerId: masterKey },
+    // исполнитель — любой профиль этого человека, под каким бы providerId ни была бронь
+    { masterProviderId: { in: keys } },
+    // бронь без назначенного мастера: занят сам профиль
+    { masterProviderId: null, providerId: { in: keys } },
   ];
   if (!input.masterProviderId) {
     orClauses.push({ providerId: input.providerId });
   }
   return { OR: orClauses };
+}
+
+/**
+ * Набор профилей с общей занятостью для проверки пересечений: профили человека,
+ * который ИСПОЛНЯЕТ запись (`masterProviderId ?? providerId`). Читает тем же
+ * клиентом, что и проверка, — внутри транзакции это часть её набора чтения.
+ */
+export function resolveConflictOccupancyIds(
+  db: ConflictCheckClient,
+  input: { providerId: string; masterProviderId: string | null },
+): Promise<string[]> {
+  return resolveOccupancyProviderIds(db, input.masterProviderId ?? input.providerId);
 }
 
 /**
@@ -194,9 +217,10 @@ export async function ensureNoConflicts(
     bufferMin: number;
   }
 ): Promise<void> {
+  const occupancyIds = await resolveConflictOccupancyIds(db, input);
   const conflicts = await db.booking.findMany({
     where: {
-      ...buildConflictScopeWhere(input),
+      ...buildConflictScopeWhere({ ...input, occupancyIds }),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       ...buildConflictWindowWhere(input),
     },
@@ -325,11 +349,21 @@ export async function resolveBookingCore(input: {
     throw new AppError("Нельзя записаться на собственную услугу.", 400, "FORBIDDEN");
   }
 
-  const providerServiceMismatch =
-    provider.type === ProviderType.MASTER
-      ? service.providerId !== provider.id && service.providerId !== provider.studioId
-      : service.providerId !== provider.id;
-  if (providerServiceMismatch) {
+  // STUDIO-MASTER-PROFILES (этап 2, решение владельца 2026-09-27): услуги
+  // профилей не смешиваются. Запись оформляется только в профиле, которому
+  // принадлежит услуга: студийная — через студию (запись студии), своя — через
+  // личный профиль мастера (личная запись). Раньше профиль мастера студии
+  // принимал и студийные услуги (FIX-D1: личная страница без своих услуг
+  // продавала студийные), и такая запись становилась ЛИЧНОЙ — без `studioId`,
+  // невидимой журналу, выручке и клиентам студии.
+  if (service.providerId !== provider.id) {
+    if (provider.type === ProviderType.MASTER && provider.studioId && service.providerId === provider.studioId) {
+      throw new AppError(
+        "Эта услуга оказывается в студии — запишитесь на странице студии.",
+        400,
+        "SERVICE_NOT_BELONGS_TO_PROVIDER",
+      );
+    }
     throw new AppError("Этот мастер не оказывает выбранную услугу. Выберите другую.", 400, "SERVICE_NOT_BELONGS_TO_PROVIDER");
   }
 
@@ -365,24 +399,16 @@ export async function resolveBookingCore(input: {
   }
 
   // STUDIO-MASTER-OWN-BOOKINGS-01: связь `MasterService` (и её цена/длительность)
-  // нужна только для услуги СТУДИИ. Собственная услуга мастера студии
-  // (`service.providerId === provider.id`) бронируется как у соло-мастера.
-  const needsOverride =
-    provider.type === ProviderType.STUDIO ||
-    (Boolean(provider.studioId) && service.providerId !== provider.id);
+  // нужна только для услуги СТУДИИ. После проверки выше услуга студии бывает
+  // только на поверхности самой студии; своя услуга мастера бронируется как у
+  // соло-мастера.
+  const needsOverride = provider.type === ProviderType.STUDIO;
 
   // STUDIO-HIDDEN-MASTER-SERVICES: услуга СТУДИИ бронируется, только пока
-  // студия принимает записи — и со страницы студии, и со страницы её мастера.
-  // Скрытая студия записей не принимает; её мастер — только личные на свои
-  // услуги (ветка выше их не задевает: у своей услуги `needsOverride` ложно).
-  if (needsOverride) {
-    if (provider.type === ProviderType.STUDIO) {
-      if (!studioAcceptsBookings(provider)) {
-        throw new AppError(STUDIO_NOT_ACCEPTING_MESSAGE, 409, "STUDIO_NOT_ACCEPTING_BOOKINGS");
-      }
-    } else if (provider.studioId) {
-      await assertStudioAcceptsBookings(provider.studioId);
-    }
+  // студия принимает записи. Скрытая студия записей не принимает; её мастер —
+  // только личные на свои услуги.
+  if (needsOverride && !studioAcceptsBookings(provider)) {
+    throw new AppError(STUDIO_NOT_ACCEPTING_MESSAGE, 409, "STUDIO_NOT_ACCEPTING_BOOKINGS");
   }
   const override =
     resolvedMasterProviderId && needsOverride
@@ -448,16 +474,9 @@ export async function resolveBookingCore(input: {
   // NO_SHOW since those don't represent an existing relationship.
   const now = new Date();
   // BOOKING-WINDOW-STRICTER (решение владельца 2026-09-24): на услугу студии —
-  // более строгое из окон студии и мастера. Со страницы студии мастер загружен
-  // выше; со страницы мастера студийная услуга берёт окно самой студии.
-  const studioOfMasterWindow =
-    !master && needsOverride && provider.type === ProviderType.MASTER && provider.studioId
-      ? await prisma.provider.findUnique({
-          where: { id: provider.studioId },
-          select: { minBookingHoursAhead: true, maxBookingDaysAhead: true },
-        })
-      : null;
-  assertBookingWindow(startAtUtc, stricterBookingWindow(provider, master ?? studioOfMasterWindow), now);
+  // более строгое из окон студии и мастера (мастер загружен выше). Своя услуга
+  // мастера — окно его профиля.
+  assertBookingWindow(startAtUtc, stricterBookingWindow(provider, master), now);
   if (!provider.acceptNewClients) {
     // BOOKING-WIDGET-FOUNDATION-A: guests (clientUserId === null) are
     // treated as new clients with zero priors — `acceptNewClients=false`

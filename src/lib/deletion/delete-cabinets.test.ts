@@ -113,6 +113,26 @@ describe("deleteMasterCabinet", () => {
     expect(callsOf("studioMember", "deleteMany")).toEqual([{ where: { userId: USER, role: "MASTER" } }]);
   });
 
+  // STUDIO-MASTER-PROFILES (этап 4): у мастера может быть профиль в студии —
+  // та же строка владельца без `MasterProfile`. Удаление кабинета мастера
+  // закрывает и его.
+  it("живая запись профиля мастера в студии тоже блокирует удаление", async () => {
+    h.answers.set("provider.findMany", () => [{ id: "prov-s" }]);
+    h.answers.set("booking.count", (args) => (JSON.stringify(args).includes("prov-s") ? 1 : 0));
+    await expect(deleteMasterCabinet(USER)).rejects.toMatchObject({ code: "ACTIVE_BOOKINGS" });
+    expect(h.calls.some((c) => c.method === "deleteMany" || c.method === "delete")).toBe(false);
+  });
+
+  it("профиль мастера в студии отвязывается от владельца и студии, его связи с услугами студии уходят", async () => {
+    h.answers.set("provider.findMany", () => [{ id: "prov-s" }]);
+    await deleteMasterCabinet(USER);
+
+    const studioUpdate = (callsOf("provider", "update") as Array<{ where: { id: string }; data: Record<string, unknown> }>)
+      .find((call) => call.where.id === "prov-s");
+    expect(studioUpdate?.data).toMatchObject({ ownerUserId: null, studioId: null, isPublished: false });
+    expect(callsOf("masterService", "deleteMany")).toContainEqual({ where: { masterProviderId: "prov-s" } });
+  });
+
   it("отзывы, написанные пользователем как клиентом, не трогаются", async () => {
     await deleteMasterCabinet(USER);
     expect(callsOf("review", "deleteMany")).toEqual([]);

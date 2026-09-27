@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
-import type { StudioMaster } from "@/features/booking/lib/studio-booking";
+import { servicesPerformedBy, type StudioMaster } from "@/features/booking/lib/studio-booking";
 import { groupServicesByCategory } from "@/lib/providers/group-services";
 
 type ServiceItem = ProviderProfileDto["services"][number];
@@ -25,14 +25,8 @@ type Props = {
 
 export function ServiceStep({ services, masters, selectedServiceId, prefilledMaster, onPick }: Props) {
   const [query, setQuery] = useState("");
-  const baseServices = useMemo(() => {
-    if (!prefilledMaster) return services;
-    // Scenario B already came in with prefilledMaster; service list is studio-scope.
-    // FOUNDATION-A's per-master availability check ensures only services this master
-    // can do are bookable at the next step. We could pre-filter here too but trust
-    // the server's `SERVICE_INVALID` guard for correctness.
-    return services;
-  }, [services, prefilledMaster]);
+  // Сценарий «к мастеру»: только его услуги (сценарий студии — все).
+  const baseServices = useMemo(() => servicesPerformedBy(services, prefilledMaster), [services, prefilledMaster]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -128,7 +122,11 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
 
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
-          {query ? UI_TEXT.bookingWidget.serviceStep.searchEmpty : UI_TEXT.bookingWidget.serviceStep.noServices}
+          {query
+            ? UI_TEXT.bookingWidget.serviceStep.searchEmpty
+            : prefilledMaster
+              ? UI_TEXT.bookingWidget.serviceStep.noServicesMaster
+              : UI_TEXT.bookingWidget.serviceStep.noServices}
         </div>
       ) : (
         <div className="space-y-6">

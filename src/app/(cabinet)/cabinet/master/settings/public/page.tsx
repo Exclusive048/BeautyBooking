@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { ProviderType } from "@prisma/client";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { PublicSettingsClient } from "@/features/billing/components/public-settings-client";
 import { UI_TEXT } from "@/lib/ui/text";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export default async function MasterSettingsPublicPage() {
   if (!user) redirect("/login");
 
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: user.id, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(user.id),
     select: {
       name: true,
       tagline: true,

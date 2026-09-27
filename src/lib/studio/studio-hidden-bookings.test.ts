@@ -72,11 +72,14 @@ function core(input: { providerId: string; serviceId: string; masterProviderId: 
 }
 
 describe("скрытая студия записей не принимает", () => {
+  // STUDIO-MASTER-PROFILES (решение владельца 2026-09-27): со страницы мастера
+  // студийная услуга не оформляется НИКОГДА — отказ раньше проверки видимости
+  // студии (услуги профилей не смешиваются).
   it("студийная услуга скрытой студии со страницы мастера — отказ", async () => {
     serviceFindUnique.mockResolvedValue(STUDIO_SERVICE);
     await expect(core({ providerId: "m1", serviceId: "svc-studio", masterProviderId: null })).rejects.toMatchObject({
-      status: 409,
-      code: "STUDIO_NOT_ACCEPTING_BOOKINGS",
+      status: 400,
+      code: "SERVICE_NOT_BELONGS_TO_PROVIDER",
     });
   });
 

@@ -254,10 +254,19 @@ export async function generateUniqueMasterUsername(
  * Пост-деплой: адрес тем кабинетам мастера, что уже приняли приглашение на
  * заготовку и остались без него (идемпотентно — второй проход находит ноль).
  * Заготовки без владельца не трогаем: их страница не публична.
+ *
+ * STUDIO-MASTER-PROFILES: адрес — только ЛИЧНОМУ профилю (у него есть
+ * `MasterProfile`). Профиль мастера в студии страницы не имеет: его находят
+ * через студию.
  */
 export async function backfillMissingMasterUsernames(db: PrismaClient): Promise<{ assigned: number }> {
   const providers = await db.provider.findMany({
-    where: { type: ProviderType.MASTER, ownerUserId: { not: null }, publicUsername: null },
+    where: {
+      type: ProviderType.MASTER,
+      ownerUserId: { not: null },
+      publicUsername: null,
+      masterProfile: { isNot: null },
+    },
     select: { id: true, categories: true, owner: { select: { firstName: true, lastName: true } } },
   });
   let assigned = 0;

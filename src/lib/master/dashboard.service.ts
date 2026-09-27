@@ -6,6 +6,15 @@ import { getPendingBookingsForMaster, type PendingBookingRow } from "@/lib/booki
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { getUnansweredReviewsForMaster, type UnansweredReviewRow } from "@/lib/reviews/unanswered-list";
 import { getDayOfWeek } from "@/lib/schedule/timezone";
+import {
+  BOOKING_WORK_CONTEXT_SELECT,
+  resolveBookingWorkContext,
+  shouldShowWorkContext,
+  splitRevenueByWorkContext,
+  type BookingWorkContext,
+  type RevenueSplit,
+} from "@/lib/bookings/work-context";
+import type { MasterWorkProfiles } from "@/lib/master/access";
 
 export type DashboardBooking = {
   id: string;
@@ -35,6 +44,8 @@ export type DashboardBooking = {
    * «Ожидаем ответа» instead of buttons that the backend will reject.
    */
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /** STUDIO-MASTER-PROFILES (этап 3): личная запись или запись студии. */
+  workContext: BookingWorkContext;
 };
 
 export type DashboardServiceLite = {
@@ -69,11 +80,15 @@ export type DashboardData = {
     /** QA-115 (FIX-06): studio affiliation; `null` for independent masters. */
     studio: { name: string } | null;
   };
+  /** STUDIO-MASTER-PROFILES (этап 3): показывать ли пометку «Личная / Студия». */
+  showWorkContext: boolean;
   kpis: {
     todayRevenue: number;
+    todayRevenueSplit: RevenueSplit;
     todayBookingsCount: number;
     todayCapacityHours: number;
     weekRevenue: number;
+    weekRevenueSplit: RevenueSplit;
     newClientsCount: number;
     returningClientsCount: number;
   };
@@ -216,7 +231,16 @@ async function resolveTodayWorkingWindow(args: {
  * `React.cache` so re-calls inside the same RSC render are free.
  */
 export const getMasterDashboardData = cache(
-  async (input: { masterId: string; now?: Date }): Promise<DashboardData> => {
+  async (input: {
+    masterId: string;
+    /**
+     * STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера (личный и
+     * в студиях) — записи, выручка и запросы берутся по всем. Без него —
+     * только `masterId`.
+     */
+    workProfiles?: MasterWorkProfiles;
+    now?: Date;
+  }): Promise<DashboardData> => {
     const now = input.now ?? new Date();
     const todayStart = startOfTodayUtc(now);
     const todayEnd = endOfTodayUtc(now);
@@ -240,6 +264,18 @@ export const getMasterDashboardData = cache(
       throw new Error(`Master not found: ${input.masterId}`);
     }
     const isSolo = master.studioId === null;
+    const workProfileIds = input.workProfiles?.allIds ?? [input.masterId];
+    const worksInStudio = input.workProfiles?.worksInStudio ?? !isSolo;
+    // Бейдж студии: пока студийную работу несёт сам личный профиль — его студия;
+    // после разделения профилей — студия профиля мастера в студии.
+    const studioForChip =
+      master.studio ??
+      (input.workProfiles?.studioProfiles[0]
+        ? await prisma.provider.findUnique({
+            where: { id: input.workProfiles.studioProfiles[0].studioProviderId },
+            select: { name: true },
+          })
+        : null);
 
     // Parallelise everything — none of these queries depend on each other.
     const [
@@ -253,7 +289,7 @@ export const getMasterDashboardData = cache(
       prisma.booking.findMany({
         where: {
           // F1: performer predicate — see master-booking-scope.ts.
-          ...masterPerformedBookingWhere(input.masterId),
+          ...masterPerformedBookingWhere(workProfileIds),
           startAtUtc: { gte: todayStart, lt: todayEnd },
           status: { notIn: [BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.NO_SHOW] },
         },
@@ -273,11 +309,12 @@ export const getMasterDashboardData = cache(
             select: { name: true, title: true, durationMin: true, price: true },
           },
           serviceItems: { select: { priceSnapshot: true } },
+          ...BOOKING_WORK_CONTEXT_SELECT,
         },
       }),
       prisma.booking.findMany({
         where: {
-          ...masterPerformedBookingWhere(input.masterId),
+          ...masterPerformedBookingWhere(workProfileIds),
           startAtUtc: { gte: weekStart, lt: todayEnd },
           status: { in: REVENUE_STATUSES },
         },
@@ -287,6 +324,7 @@ export const getMasterDashboardData = cache(
           createdAt: true,
           service: { select: { price: true } },
           serviceItems: { select: { priceSnapshot: true } },
+          ...BOOKING_WORK_CONTEXT_SELECT,
         },
       }),
       prisma.service.findMany({
@@ -294,7 +332,7 @@ export const getMasterDashboardData = cache(
         orderBy: { sortOrder: "asc" },
         select: { id: true, name: true, title: true, durationMin: true, price: true },
       }),
-      getPendingBookingsForMaster(input.masterId, 3),
+      getPendingBookingsForMaster(workProfileIds, 3),
       getUnansweredReviewsForMaster(input.masterId, 2),
       resolveTodayWorkingWindow({ providerId: input.masterId, timezone: master.timezone, now }),
     ]);
@@ -339,6 +377,7 @@ export const getMasterDashboardData = cache(
         isNext: false,
         changeComment: row.changeComment,
         actionRequiredBy: row.actionRequiredBy ?? null,
+        workContext: resolveBookingWorkContext(row),
       };
     });
 
@@ -350,13 +389,20 @@ export const getMasterDashboardData = cache(
     const upcomingBookings = todayBookings.filter((b) => b.endAtUtc > now);
 
     // Today revenue: only revenue-positive statuses count.
-    const todayRevenue = todayRows
-      .filter((row) => REVENUE_STATUSES.includes(row.status))
-      .reduce((sum, row) => sum + bookingPriceFromItems(row), 0);
+    const todayRevenueRows = todayRows.filter((row) => REVENUE_STATUSES.includes(row.status));
+    const todayRevenue = todayRevenueRows.reduce((sum, row) => sum + bookingPriceFromItems(row), 0);
 
     const weekRevenue = weekRows.reduce(
       (sum, row) => sum + bookingPriceFromItems(row),
       0,
+    );
+    // STUDIO-MASTER-PROFILES (этап 3): студийная выручка — оборот студии по
+    // записям мастера, а не его доход; показывается отдельно от личной.
+    const todayRevenueSplit = splitRevenueByWorkContext(
+      todayRevenueRows.map((row) => ({ context: resolveBookingWorkContext(row), amount: bookingPriceFromItems(row) })),
+    );
+    const weekRevenueSplit = splitRevenueByWorkContext(
+      weekRows.map((row) => ({ context: resolveBookingWorkContext(row), amount: bookingPriceFromItems(row) })),
     );
 
     // New clients in the last 7 days = distinct clientUserId whose earliest
@@ -377,7 +423,7 @@ export const getMasterDashboardData = cache(
     const earlierBookings = clientIds.length
       ? await prisma.booking.findMany({
           where: {
-            ...masterPerformedBookingWhere(input.masterId),
+            ...masterPerformedBookingWhere(workProfileIds),
             clientUserId: { in: clientIds },
             startAtUtc: { lt: weekStart },
             status: { in: REVENUE_STATUSES },
@@ -418,19 +464,28 @@ export const getMasterDashboardData = cache(
       upcomingBookings,
       services,
       isSolo,
+      showWorkContext: shouldShowWorkContext({
+        masterInStudio: worksInStudio,
+        contexts: [
+          ...todayBookings.map((b) => b.workContext),
+          ...pendingBookings.map((b) => b.workContext),
+        ],
+      }),
       master: {
         id: master.id,
         name: master.name,
         avatarUrl: master.avatarUrl,
         publicUsername: master.publicUsername,
         timezone: master.timezone,
-        studio: master.studio ? { name: master.studio.name } : null,
+        studio: studioForChip ? { name: studioForChip.name } : null,
       },
       kpis: {
         todayRevenue,
+        todayRevenueSplit,
         todayBookingsCount,
         todayCapacityHours,
         weekRevenue,
+        weekRevenueSplit,
         newClientsCount,
         returningClientsCount,
       },

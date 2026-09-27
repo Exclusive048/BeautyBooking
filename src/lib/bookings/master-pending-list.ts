@@ -1,9 +1,16 @@
 import { BookingActionRequiredBy, BookingStatus } from "@prisma/client";
+import {
+  BOOKING_WORK_CONTEXT_SELECT,
+  resolveBookingWorkContext,
+  type BookingWorkContext,
+} from "@/lib/bookings/work-context";
 import { cache } from "react";
 import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
 
 export type PendingBookingRow = {
+  /** STUDIO-MASTER-PROFILES (этап 3): личная запись или запись студии. */
+  workContext: BookingWorkContext;
   id: string;
   clientName: string;
   startAtUtc: Date | null;
@@ -20,7 +27,8 @@ export type PendingBookingRow = {
  * this fetches the actual rows for inline display.
  */
 export const getPendingBookingsForMaster = cache(
-  async (masterProviderId: string, limit = 3): Promise<PendingBookingRow[]> => {
+  // STUDIO-MASTER-PROFILES (этап 4): записи всех рабочих профилей мастера.
+  async (masterProviderId: string | readonly string[], limit = 3): Promise<PendingBookingRow[]> => {
     // MASTER-DASHBOARD-FIX-A #1а: exclude bookings whose start time
     // has already passed — confirm/decline is no longer meaningful
     // once the booking moment has arrived. The dashboard attention
@@ -58,6 +66,7 @@ export const getPendingBookingsForMaster = cache(
         proposedStartAt: true,
         changeComment: true,
         service: { select: { name: true, title: true } },
+        ...BOOKING_WORK_CONTEXT_SELECT,
       },
     });
     return rows.map((row) => ({
@@ -68,6 +77,7 @@ export const getPendingBookingsForMaster = cache(
       isRescheduleRequest: row.status === BookingStatus.CHANGE_REQUESTED,
       serviceTitle: row.service.title?.trim() || row.service.name,
       changeComment: row.changeComment,
+      workContext: resolveBookingWorkContext(row),
     }));
   },
 );

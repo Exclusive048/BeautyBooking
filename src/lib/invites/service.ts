@@ -9,9 +9,9 @@ import { collectProviderMedia } from "@/lib/media/purge";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
 import { createMasterProfile } from "@/lib/profiles/professional";
-import { generateUniqueMasterUsername } from "@/lib/publicUsername";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { attachMasterToStudio } from "@/lib/studios/masters";
+import { claimStagedStudioProfileTx, createStudioMasterProfileTx } from "@/lib/studios/master-profile-split";
 
 type InviteAcceptResult = {
   inviteId: string;
@@ -154,83 +154,91 @@ export async function acceptStudioInvite(
     };
   }
 
+  // STUDIO-MASTER-PROFILES (этап 4, решение владельца 2026-09-27): мастер —
+  // это профиль для записи. Принявший приглашение получает ОТДЕЛЬНЫЙ профиль в
+  // студии; его личный профиль (кабинет мастера, своя страница и услуги) в
+  // студию не привязывается. Раньше привязывался сам личный профиль, и одно
+  // расписание, одни правила и одни услуги обслуживали обе работы.
+  //
+  // 1. Личный профиль: есть — остаётся как есть; нет — создаётся обычным путём
+  //    (кабинет мастера держится на нём: страница, свои услуги, настройки).
   const existingMasterProfile = await prisma.masterProfile.findUnique({
     where: { userId: user.id },
     select: { id: true, providerId: true },
   });
+  const personalProviderId = existingMasterProfile
+    ? existingMasterProfile.providerId
+    : (await createMasterProfile({ userId: user.id, roles: user.roles })).providerId;
 
-  let masterProviderId: string;
-  // Заготовка уходит только ПОСЛЕ успешного принятия: откажи привязка (мастер
-  // уже в другой студии — 409), приглашение осталось бы висеть, а у студии не
-  // было бы строки, по которой его отозвать.
-  let stagedToDiscard: string | null = null;
-  if (existingMasterProfile) {
-    masterProviderId = existingMasterProfile.providerId;
-    if (stagedMaster && stagedMaster.id !== masterProviderId) {
-      stagedToDiscard = stagedMaster.id;
-    }
-  } else if (stagedMaster) {
-    // STAGED-MASTER-USERNAME: заготовку студия создаёт без адреса страницы.
-    // Принявший приглашение получает адрес так же, как при обычном создании
-    // кабинета (`generateUniqueMasterUsername` — из СВОЕГО имени), иначе его
-    // личная страница недостижима, а «Записаться» ведёт на общую запись студии.
-    const usernameData = stagedMaster.publicUsername
-      ? {}
-      : await (async () => {
-          const owner = await prisma.userProfile.findUnique({
-            where: { id: user.id },
-            select: { firstName: true, lastName: true },
-          });
-          return {
-            publicUsername: await generateUniqueMasterUsername(prisma, {
-              firstName: owner?.firstName,
-              lastName: owner?.lastName,
-              serviceCategory: stagedMaster.categories[0] ?? null,
-            }),
-            publicUsernameUpdatedAt: new Date(),
-          };
-        })();
-    if (
-      !stagedMaster.ownerUserId ||
-      !stagedMaster.isPublished ||
-      stagedMaster.studioPaused ||
-      !stagedMaster.publicUsername
-    ) {
-      await prisma.provider.update({
-        where: { id: stagedMaster.id },
-        data: {
-          ownerUserId: user.id,
-          // STUDIO-PAUSE-SPLIT-01: личная страница — по умолчанию видима (как у
-          // нового кабинета), в студии — активен.
-          isPublished: true,
-          studioPaused: false,
-          ...usernameData,
-          ...contactWhere,
-        },
-        select: { id: true },
-      });
-    }
-
-    const createdProfile = await prisma.masterProfile.create({
-      data: { userId: user.id, providerId: stagedMaster.id },
-      select: { providerId: true },
-    });
-    masterProviderId = createdProfile.providerId;
-  } else {
-    const masterProfile = await createMasterProfile({
-      userId: user.id,
-      roles: user.roles,
-    });
-    masterProviderId = masterProfile.providerId;
-  }
-
-  // Роль — вместе с кабинетом мастера, ДО привязки к студии: откажи привязка
-  // (мастер уже в другой студии — 409), у пользователя остался бы кабинет без
-  // роли, и меню навсегда предлагало бы «Стать мастером».
+  // Роль — вместе с кабинетом мастера, ДО привязки к студии.
   if (!user.roles.includes(AccountType.MASTER)) {
     await addRoleToUser(user.id, user.roles, AccountType.MASTER);
   }
 
+  // 2. Мастер работает в одной студии: активный профиль в ДРУГОЙ студии —
+  //    отказ (как раньше «Мастер уже состоит в студии»).
+  const otherStudioProfile = await prisma.provider.findFirst({
+    where: {
+      ownerUserId: user.id,
+      type: ProviderType.MASTER,
+      masterProfile: { is: null },
+      studioId: { not: null, notIn: [invite.studio.providerId] },
+    },
+    select: { id: true },
+  });
+  if (otherStudioProfile) {
+    return { ok: false, status: 409, message: "Мастер уже состоит в студии.", code: "MASTER_ALREADY_ASSIGNED" };
+  }
+
+  // 3. Профиль в этой студии: уже был (вернулся после ухода) → он же; иначе
+  //    заготовка студии под приглашение; иначе — копия личного.
+  const ownStudioProfile = await prisma.provider.findFirst({
+    where: {
+      ownerUserId: user.id,
+      type: ProviderType.MASTER,
+      masterProfile: { is: null },
+      studioId: invite.studio.providerId,
+    },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  let masterProviderId: string;
+  // Заготовка уходит только ПОСЛЕ успешного принятия.
+  let stagedToDiscard: string | null = null;
+  if (ownStudioProfile) {
+    masterProviderId = ownStudioProfile.id;
+    await prisma.provider.update({
+      where: { id: ownStudioProfile.id },
+      data: { studioPaused: false },
+      select: { id: true },
+    });
+    if (stagedMaster && stagedMaster.id !== ownStudioProfile.id && !stagedMaster.ownerUserId) {
+      stagedToDiscard = stagedMaster.id;
+    }
+  } else if (stagedMaster) {
+    masterProviderId = stagedMaster.id;
+    await prisma.$transaction((tx) =>
+      claimStagedStudioProfileTx(tx, {
+        stagedId: stagedMaster.id,
+        personalId: personalProviderId,
+        ownerUserId: user.id,
+      }),
+    );
+  } else {
+    const created = await prisma.$transaction((tx) =>
+      createStudioMasterProfileTx(tx, {
+        personalId: personalProviderId,
+        studioProviderId: invite.studio.providerId,
+      }),
+    );
+    if (!created) {
+      return { ok: false, status: 404, message: "Студия не найдена.", code: "STUDIO_NOT_FOUND" };
+    }
+    masterProviderId = created;
+  }
+
+  // Пояс и место профиля в студии — студии (`attachMasterToStudio` для уже
+  // привязанного профиля только синхронизирует их).
   const attached = await attachMasterToStudio(invite.studio.providerId, masterProviderId);
   if (!attached.ok) {
     return { ok: false, status: attached.status, message: attached.message, code: attached.code };

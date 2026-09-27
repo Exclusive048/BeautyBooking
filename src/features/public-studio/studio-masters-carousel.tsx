@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { providerPublicUrl, studioBookingUrl } from "@/lib/public-urls";
@@ -13,6 +12,12 @@ export type StudioMasterCard = {
   id: string;
   name: string;
   publicUsername: string | null;
+  /** STUDIO-MASTER-PROFILES (этап 4): лицо и рейтинг приходят со списком команды. */
+  avatarUrl?: string | null;
+  tagline?: string | null;
+  ratingAvg?: number;
+  ratingCount?: number;
+  portfolioProviderId?: string | null;
 };
 
 type PortfolioFeedItem = {
@@ -47,29 +52,28 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
     let cancelled = false;
 
     async function load() {
+      // STUDIO-MASTER-PROFILES (этап 4): лицо, описание и рейтинг профиля в
+      // студии приходят со списком команды — отдельный запрос профиля отдавал
+      // бы 404 (у профиля в студии нет публичной страницы). Миниатюры — работы
+      // с личной страницы мастера, если она открыта.
       const entries = await Promise.all(
         masters.map(async (master) => {
-          const [profileRes, portfolioRes] = await Promise.all([
-            fetch(`/api/providers/${master.id}`, { cache: "no-store" }),
-            fetch(`/api/feed/portfolio?masterId=${encodeURIComponent(master.id)}&limit=3`, {
-              cache: "no-store",
-            }),
-          ]);
-
-          const profileJson = (await profileRes.json().catch(() => null)) as ApiResponse<{
-            provider: ProviderProfileDto | null;
-          }> | null;
-          const portfolioJson = (await portfolioRes.json().catch(() => null)) as ApiResponse<{
-            items: PortfolioFeedItem[];
-          }> | null;
-
-          const provider = profileRes.ok && profileJson && profileJson.ok ? profileJson.data.provider : null;
-          const portfolio = portfolioRes.ok && portfolioJson && portfolioJson.ok ? portfolioJson.data.items : [];
+          const portfolioOwner = master.portfolioProviderId ?? null;
+          const portfolioRes = portfolioOwner
+            ? await fetch(`/api/feed/portfolio?masterId=${encodeURIComponent(portfolioOwner)}&limit=3`, {
+                cache: "no-store",
+              })
+            : null;
+          const portfolioJson = portfolioRes
+            ? ((await portfolioRes.json().catch(() => null)) as ApiResponse<{ items: PortfolioFeedItem[] }> | null)
+            : null;
+          const portfolio =
+            portfolioRes?.ok && portfolioJson && portfolioJson.ok ? portfolioJson.data.items : [];
 
           const value: MasterExtra = {
-            avatarUrl: provider?.avatarUrl ?? null,
-            specialization: provider?.tagline?.trim() || null,
-            grade: gradeLabel(provider?.rating ?? 0, provider?.reviews ?? 0),
+            avatarUrl: master.avatarUrl ?? null,
+            specialization: master.tagline?.trim() || null,
+            grade: gradeLabel(master.ratingAvg ?? 0, master.ratingCount ?? 0),
             portfolioThumbs: portfolio.slice(0, 3).map((item) => item.mediaUrl),
           };
 

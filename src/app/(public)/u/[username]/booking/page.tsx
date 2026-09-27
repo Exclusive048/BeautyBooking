@@ -155,14 +155,29 @@ export default async function PublicUsernameBookingPage({ params, searchParams }
 
     const master = await resolveProviderBySlugOrId({
       key,
-      select: { id: true, publicUsername: true, type: true, studioId: true },
+      select: { id: true, publicUsername: true, type: true, studioId: true, ownerUserId: true },
     });
 
-    if (!master || master.type !== "MASTER" || master.studioId !== studioId) {
-      return null;
-    }
+    if (!master || master.type !== "MASTER") return null;
+    if (master.studioId === studioId) return master;
 
-    return master;
+    // STUDIO-MASTER-PROFILES (этап 4): адрес мастера — адрес его ЛИЧНОГО
+    // профиля, а в студии он работает профилем в студии того же владельца
+    // (своего адреса у него нет). Ссылка «Записаться» из команды студии
+    // приходит именно с личным адресом.
+    if (!master.ownerUserId) return null;
+    const studioProfile = await prisma.provider.findFirst({
+      where: {
+        ownerUserId: master.ownerUserId,
+        type: "MASTER",
+        studioId,
+        masterProfile: { is: null },
+      },
+      select: { id: true },
+    });
+    return studioProfile
+      ? { id: studioProfile.id, publicUsername: master.publicUsername, type: master.type, studioId }
+      : null;
   }
 
   if (looksLikeProviderId(username)) {

@@ -42,11 +42,16 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
     provider.type === "MASTER" && provider.studioId
       ? studioBookingUrl(
           { id: provider.studioId, publicUsername: studioPublicUsername },
-          {
-            master: masterKey || undefined,
-            masterId: masterKey ? undefined : provider.id,
-            serviceId: selectedServices[0]?.id,
-          },
+          // STUDIO-MASTER-PROFILES (этап 4): у разделённого мастера в студии
+          // работает его профиль в студии — выбираем его по id; до разделения
+          // мастер в студии — сам личный профиль (по адресу страницы).
+          provider.studioMasterProfileId
+            ? { masterId: provider.studioMasterProfileId, serviceId: selectedServices[0]?.id }
+            : {
+                master: masterKey || undefined,
+                masterId: masterKey ? undefined : provider.id,
+                serviceId: selectedServices[0]?.id,
+              },
           "master-studio-booking"
         )
       : null;

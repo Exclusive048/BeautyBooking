@@ -1,6 +1,5 @@
 import { Prisma, ProviderType } from "@prisma/client";
 import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
-import { STUDIO_ACCEPTS_BOOKINGS_WHERE, studioAcceptsBookings } from "@/lib/studio/accepts-bookings";
 
 /**
  * VISIBILITY-DEFAULT-01 — кого показывать там, где клиент НАХОДИТ провайдера
@@ -59,40 +58,14 @@ export const CATALOG_PRESENCE_CONDITIONS = {
 } satisfies Record<CatalogPresenceGap, Prisma.ProviderWhereInput>;
 
 /**
- * CATALOG-CARD-STUDIO-MASTER-SERVICES (2026-09-23) — у провайдера нет ни одной
- * своей продаваемой услуги. Студийные связи (`MasterService`) продают только в
- * этом случае: мастер студии со СВОИМИ услугами продаёт на личной странице их
- * (`getProviderProfile` → `sellsOwnServices`), и всякая поверхность, где его
- * находят по услуге (карточка каталога, фильтры, поиск по времени), обязана
- * показывать то же самое. Живёт рядом с предикатом видимости, потому что у
- * правила несколько потребителей, а копия разошлась бы со страницей.
+ * STUDIO-MASTER-PROFILES (этап 2, решение владельца 2026-09-27): профиль мастера
+ * продаёт ТОЛЬКО свои услуги — услуги профилей не смешиваются. Прежнее правило
+ * CATALOG-CARD-STUDIO-MASTER-SERVICES («мастер студии без своих услуг продаёт
+ * студийные», `NO_OWN_SERVICES_WHERE` / `sellsStudioServices`) удалено вместе с
+ * ветками карточки, фильтров, ранжирования по цене и поиска по времени: запись
+ * на студийную услугу идёт только через студию, иначе она становилась ЛИЧНОЙ
+ * записью мастера (`booking-core` теперь такую запись отклоняет).
  */
-export const NO_OWN_SERVICES_WHERE = {
-  services: { none: { isEnabled: true, isActive: true } },
-  // STUDIO-PAUSE-SPLIT-01: мастер на паузе в студии студийных услуг не продаёт
-  // (`booking-core` откажет `MASTER_NOT_ACTIVE`), даже если его личная страница
-  // открыта.
-  studioPaused: false,
-  // STUDIO-HIDDEN-MASTER-SERVICES: скрытая студия записей не принимает — её
-  // услуги через мастеров не продаются (`booking-core` откажет).
-  studio: { is: STUDIO_ACCEPTS_BOOKINGS_WHERE },
-} satisfies Prisma.ProviderWhereInput;
-
-/**
- * То же правило в памяти — для витрины, собранной из уже прочитанных строк
- * (карточка каталога, ранжирование по цене, личная страница мастера): мастер
- * продаёт студийные услуги, только если своих нет, он не на паузе в студии и
- * студия принимает записи. Одна функция на три поверхности — иначе карточка,
- * сортировка и страница снова разойдутся.
- */
-export function sellsStudioServices(master: {
-  ownServiceCount: number;
-  studioPaused: boolean;
-  studio: { isPublished: boolean } | null | undefined;
-}): boolean {
-  return master.ownServiceCount === 0 && !master.studioPaused && studioAcceptsBookings(master.studio);
-}
-
 export function catalogVisibleProviderWhere(): Prisma.ProviderWhereInput {
   return {
     ...CATALOG_PRESENCE_CONDITIONS.hidden,

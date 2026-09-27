@@ -1,32 +1,23 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 /**
- * FIX-D1 (F7) — у мастера СТУДИИ страница должна уметь продавать.
+ * Личная страница мастера студии — что она продаёт.
  *
- * ## Названная причина (замер, а не догадка)
+ * STUDIO-MASTER-PROFILES (этап 2, решение владельца 2026-09-27): услуги
+ * профилей не смешиваются. Страница продаёт ТОЛЬКО свои услуги мастера; своих
+ * нет — секция «Услуги» пуста, а запись ведёт в студию (карточка «Запись через
+ * студию», `sellsOwnServices = false`). Прежнее поведение FIX-D1 («без своих
+ * услуг показываем студийные через `MasterService`») отменено: запись на такую
+ * услугу становилась ЛИЧНОЙ записью мастера — без `studioId`, мимо журнала,
+ * выручки и клиентов студии (разбор — `docs/audits/STUDIO-MASTER-SPLIT-01.md`,
+ * B1). Ядро записи теперь такую запись отклоняет.
  *
- * `getProviderProfile` читал только ПРЯМОЕ владение — `Provider.services`
- * (`Service.providerId = provider.id`). У мастера студии услуги принадлежат
- * провайдеру студии, а связь идёт через `MasterService`. Замер на seed-данных:
- * у Марины `Service.providerId = master` → **0**, `MasterService` → **8**, и все
- * восемь услуг принадлежат студийному провайдеру; у соло-мастера ровно наоборот
- * (5 собственных, 0 связей).
+ * ⚠️ Рендер здесь недоказуем (`environment: "node"`); проверен живым прогоном.
  *
- * То есть дефект был в **области запроса**, а не в условии рендера: секция
- * честно рисовала пустой массив, и потому не появлялся CTA записи.
- *
- * ## Чего этот файл НЕ проверяет
- *
- * ⚠️ Рендер. В проекте `environment: "node"` и DOM-окружения нет, поэтому
- * «карточки на странице» здесь недоказуемы. Рендер проверен ЖИВЫМ замером
- * (FIX-D1: секция 716×86 px / 0 карточек → 716×870 px / **8 карточек**, CTA
- * «Записаться» активен, обе темы) и записан в отчёте как измеренный, а не
- * покрытый CI. Здесь — слой, где дефект жил.
- *
- * @probe   что сломать: снять ветку `if (provider.studioId)` в
- *          `getProviderProfile` (вернуть чтение только прямого владения).
- *          наблюдалось: «мастер студии обязан отдавать услуги … получено 0» →
- *          красный. Восстановлено, зелено.
+ * @probe   2026-09-27 — в `getProviderProfile` возвращена ветка FIX-D1
+ *          (`else profile.services = await loadStudioMasterServices(...)`):
+ *          краснеет «своих услуг нет — студийные НЕ подставляются» (получено
+ *          1 вместо 0). Возвращено — зелёный.
  */
 
 const findMany = vi.hoisted(() => vi.fn());
@@ -68,74 +59,38 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("FIX-D1 · услуги мастера студии доходят до профиля", () => {
-  it("🔴 мастер студии: услуги берутся через MasterService", async () => {
+describe("личная страница мастера студии продаёт только свои услуги", () => {
+  it("🔴 своих услуг нет — студийные НЕ подставляются, запись ведёт в студию", async () => {
     resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: true }, services: [] });
     findMany.mockResolvedValue([
       {
         priceOverride: null,
         durationOverrideMin: null,
-        service: {
-          id: "svc_1",
-          name: "Маникюр классический",
-          durationMin: 60,
-          price: 220000,
-          globalCategory: { name: "Маникюр", orderIndex: 1 },
-        },
+        service: { id: "svc_1", name: "Маникюр классический", durationMin: 60, price: 220000, globalCategory: null },
       },
     ]);
 
     const profile = await getProviderProfile("marina");
 
-    expect(
-      profile.services.length,
-      "мастер студии обязан отдавать услуги: у него их 0 в собственности и N по связи",
-    ).toBe(1);
-    expect(profile.services[0]).toMatchObject({
-      id: "svc_1",
-      name: "Маникюр классический",
-      price: 220000,
-      durationMin: 60,
-      categoryName: "Маникюр",
+    expect(profile.services, "студийная услуга на личной странице стала бы ЛИЧНОЙ записью").toEqual([]);
+    expect(profile.sellsOwnServices).toBe(false);
+    expect(profile.studioId, "карточка «Запись через студию» нужна ссылка на студию").toBe("studio_provider");
+    expect(findMany, "студийные связи странице больше не нужны").not.toHaveBeenCalled();
+  });
+
+  it("свои услуги есть — страница продаёт их, студийные не подмешиваются", async () => {
+    resolveProvider.mockResolvedValue({
+      ...BASE,
+      studioId: "studio_provider",
+      studio: { isPublished: true },
+      services: [{ id: "own_1", name: "Маникюр на дому", durationMin: 60, price: 150000, globalCategory: null }],
     });
-  });
-
-  it("персональные переопределения перебивают студийные значения", async () => {
-    // Показывать студийную цену там, где мастер берёт свою, значит обещать не ту
-    // сумму — а цена с карточки уезжает прямо в экран подтверждения записи.
-    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: true }, services: [] });
-    findMany.mockResolvedValue([
-      {
-        priceOverride: 300000,
-        durationOverrideMin: 90,
-        service: {
-          id: "svc_1",
-          name: "Маникюр",
-          durationMin: 60,
-          price: 220000,
-          globalCategory: null,
-        },
-      },
-    ]);
 
     const profile = await getProviderProfile("marina");
-    expect(profile.services[0]).toMatchObject({ price: 300000, durationMin: 90 });
-  });
 
-  it("предикат тот же, что у каталога — иначе профиль и каталог разойдутся", async () => {
-    resolveProvider.mockResolvedValue({ ...BASE, studioId: "studio_provider", studio: { isPublished: true }, services: [] });
-    findMany.mockResolvedValue([]);
-    await getProviderProfile("marina");
-
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          masterProviderId: "prov_master",
-          isEnabled: true,
-          service: { isEnabled: true, isActive: true },
-        },
-      }),
-    );
+    expect(profile.services.map((s) => s.id)).toEqual(["own_1"]);
+    expect(profile.sellsOwnServices).toBe(true);
+    expect(findMany).not.toHaveBeenCalled();
   });
 
   it("🔴 соло-мастер: лишнего запроса НЕТ, услуги остаются собственными", async () => {

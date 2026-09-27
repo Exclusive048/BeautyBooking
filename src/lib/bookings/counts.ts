@@ -9,7 +9,8 @@ import { prisma } from "@/lib/prisma";
  * sidebar badge in the master cabinet shell.
  */
 export const getPendingBookingsCountForMaster = cache(
-  async (masterProviderId: string): Promise<number> => {
+  // STUDIO-MASTER-PROFILES (этап 4): записи всех рабочих профилей мастера.
+  async (masterProviderId: string | readonly string[]): Promise<number> => {
     return prisma.booking.count({
       where: {
         // F1: performer predicate (studio bookings carry providerId=STUDIO).

@@ -1,7 +1,8 @@
-import { CategoryStatus, ProviderType } from "@prisma/client";
+import { CategoryStatus } from "@prisma/client";
 import { getMasterContext } from "@/lib/master/profile.service";
 import { findCatalogCoverId, PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { prisma } from "@/lib/prisma";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 /**
  * Server aggregator for `/cabinet/master/portfolio` (31b).
@@ -118,7 +119,7 @@ export async function getMasterPortfolioView(input: {
   categoryId: string | null;
 }): Promise<MasterPortfolioViewData | null> {
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: input.userId, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(input.userId),
     select: { id: true, ownerUserId: true },
     orderBy: { createdAt: "asc" },
   });

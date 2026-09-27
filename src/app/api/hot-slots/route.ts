@@ -11,7 +11,6 @@ import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { toLocalDateKey, toLocalDateKeyExclusive } from "@/lib/schedule/timezone";
 import { prisma } from "@/lib/prisma";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
-import { STUDIO_ACCEPTS_BOOKINGS_WHERE } from "@/lib/studio/accepts-bookings";
 import { encodeCursor } from "@/lib/pagination/cursor";
 import * as cache from "@/lib/cache/cache";
 import { getClientIp } from "@/lib/http/ip";
@@ -112,16 +111,12 @@ async function buildHotSlotFeed(from: Date, to: Date, category: string | undefin
           // поэтому предикат каталога (видимость + город + расписание), а не
           // один переключатель.
           catalogVisibleProviderWhere(),
-          // STUDIO-HIDDEN-MASTER-SERVICES: горящие окошки мастера студии —
-          // по услугам студии (`hot-slots/service.ts`), а скрытая студия
-          // записей не принимает.
-          { OR: [{ studioId: null }, { studio: { is: STUDIO_ACCEPTS_BOOKINGS_WHERE } }] },
           {
             type: "MASTER",
-            // STUDIO-PAUSE-SPLIT-01: у мастера студии горящие окошки — по услугам
-            // студии, а на паузе в студии их не забронировать (MASTER_NOT_ACTIVE).
-            // У соло-мастера `studioPaused` всегда false.
-            studioPaused: false,
+            // STUDIO-MASTER-PROFILES (решение владельца 2026-09-27): горящие
+            // окошки профиля — по его СВОИМ услугам (`hot-slots/service.ts`),
+            // поэтому пауза мастера в студии и видимость студии на них не
+            // влияют: личные записи от студии не зависят.
             publicUsername: { not: null },
             ...(category ? { categories: { has: category } } : {}),
           },

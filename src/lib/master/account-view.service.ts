@@ -1,6 +1,7 @@
-import { ProviderType, SubscriptionScope } from "@prisma/client";
+import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan, type CurrentPlanInfo } from "@/lib/billing/get-current-plan";
 import { prisma } from "@/lib/prisma";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 /**
  * Server aggregator for `/cabinet/master/account` (31-final).
@@ -71,7 +72,7 @@ export async function getMasterAccountView(input: {
   userId: string;
 }): Promise<MasterAccountViewData | null> {
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: input.userId, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(input.userId),
     select: { id: true },
     orderBy: { createdAt: "asc" },
   });

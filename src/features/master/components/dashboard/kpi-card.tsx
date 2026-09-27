@@ -1,11 +1,12 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { StatTile } from "@/components/ui/stat-tile";
 
 type Props = {
   icon: LucideIcon;
   label: string;
   value: string;
-  sublabel?: string;
+  sublabel?: ReactNode;
   /** PWA-UX-BATCH-01: плотная плитка для сетки 4-в-ряд на телефоне (см. StatTile). */
   compact?: boolean;
   labelCompact?: string;

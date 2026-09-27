@@ -59,6 +59,12 @@ export type ProviderProfileDto = {
   id: string;
   type: ProviderTypeDto;
   studioId: string | null;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 4): у личной страницы мастера — `Provider.id`
+   * его профиля в студии (им запись в студию выбирает мастера); `null`, если
+   * мастер в студии не работает или его профиль там неактивен.
+   */
+  studioMasterProfileId: string | null;
   name: string;
   avatarUrl: string | null;
   bannerUrl: string | null;

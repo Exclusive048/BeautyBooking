@@ -113,8 +113,15 @@ export async function createMasterProfile(
 
   const [, existingProvider] = await Promise.all([
     rolePromise,
+    // STUDIO-MASTER-PROFILES: личный кабинет не привязывается к профилю мастера
+    // в студии — только к профилю вне студии (и ни к чьему `MasterProfile`).
     prisma.provider.findFirst({
-      where: { ownerUserId: input.userId, type: ProviderType.MASTER },
+      where: {
+        ownerUserId: input.userId,
+        type: ProviderType.MASTER,
+        studioId: null,
+        masterProfile: { is: null },
+      },
       select: { id: true },
     }),
   ]);

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ProviderType } from "@prisma/client";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
 import { getMasterModelOffersView } from "@/lib/master/model-offers-view.service";
@@ -9,6 +8,7 @@ import { ActiveOffersSection } from "./active-offers-section";
 import { ArchiveSection } from "./archive-section";
 import { OffersKpiCards } from "./offers-kpi-cards";
 import { PendingApplicationsSection } from "./pending-applications-section";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -45,7 +45,7 @@ export async function MasterModelOffersPage({ searchParams }: Props) {
   if (!user) redirect("/login");
 
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: user.id, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(user.id),
     select: { id: true },
   });
   if (!provider) redirect("/403");

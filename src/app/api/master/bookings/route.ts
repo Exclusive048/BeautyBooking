@@ -3,12 +3,13 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { createSoloMasterBooking } from "@/lib/master/day.service";
 import { createMasterBookingSchema } from "@/lib/master/schemas";
 import { parseBody, parseQuery } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 
 export const runtime = "nodejs";
 
@@ -41,7 +42,6 @@ export async function GET(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
-    const masterId = await getCurrentMasterProviderId(user.id);
     const query = parseQuery(new URL(req.url), listQuerySchema);
     const now = new Date();
 
@@ -68,12 +68,11 @@ export async function GET(req: Request) {
         ? { status: { in: ["NEW" as const, "PENDING" as const, "CONFIRMED" as const, "PREPAID" as const, "CHANGE_REQUESTED" as const] } }
         : {};
 
+    // STUDIO-MASTER-PROFILES (этап 4): записи всех рабочих профилей мастера.
+    const workProfileIds = (await getMasterWorkProfiles(user.id)).allIds;
     const bookings = await prisma.booking.findMany({
       where: {
-        OR: [
-          { masterProviderId: masterId },
-          { masterProviderId: null, providerId: masterId },
-        ],
+        ...masterPerformedBookingWhere(workProfileIds),
         ...(startFrom ? { startAtUtc: { gte: startFrom, ...(startBefore ? { lte: startBefore } : {}) } } : {}),
         ...dbStatusFilter,
       },

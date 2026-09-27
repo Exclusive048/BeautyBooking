@@ -1,12 +1,14 @@
+import { Building2, UserRound } from "lucide-react";
 import { UI_TEXT } from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.legend;
+const TC = UI_TEXT.cabinetMaster.workContext;
 
 /**
  * Visual legend for the four card variants used in the week grid. Static
  * server-rendered swatches — no interactivity, just key.
  */
-export function ScheduleLegend() {
+export function ScheduleLegend({ showWorkContext = false }: { showWorkContext?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-4 text-xs text-text-sec">
       <span className="inline-flex items-center gap-2">
@@ -38,6 +40,19 @@ export function ScheduleLegend() {
         />
         {T.blocked}
       </span>
+      {/* STUDIO-MASTER-PROFILES (этап 3): те же иконки, что в строке времени карточки. */}
+      {showWorkContext ? (
+        <>
+          <span className="inline-flex items-center gap-2">
+            <UserRound aria-hidden className="h-3 w-3" />
+            {TC.legendPersonal}
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <Building2 aria-hidden className="h-3 w-3" />
+            {TC.legendStudio}
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }

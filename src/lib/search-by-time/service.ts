@@ -12,7 +12,7 @@ import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { CARD_PHOTO_LIMIT, composeCardPhotos } from "@/lib/catalog/card-photos";
 import { PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { loadStudioCardPhotos } from "@/lib/studios/catalog-cover";
-import { catalogVisibleProviderWhere, NO_OWN_SERVICES_WHERE } from "@/lib/providers/catalog-visibility";
+import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 const DEFAULT_SEARCH_TIMEZONE = env.DEFAULT_TIMEZONE;
 const MAX_SLOTS_PER_PROVIDER = 12;
@@ -93,32 +93,16 @@ function buildWhere(
     // НАХОДЯТ, значит тот же предикат, что у каталога (город + расписание).
     catalogVisibleProviderWhere(),
     { publicUsername: { not: null } },
+    // STUDIO-MASTER-PROFILES: профиль продаёт только свои услуги — результат
+    // ведёт на страницу, где искомая услуга есть и записывается в этот профиль.
     {
-      OR: [
-        {
-          services: {
-            some: {
-              id: serviceId,
-              isEnabled: true,
-              isActive: true,
-            },
-          },
+      services: {
+        some: {
+          id: serviceId,
+          isEnabled: true,
+          isActive: true,
         },
-        {
-          // Студийная услуга продаётся с личной страницы только у мастера без
-          // своих услуг и не на паузе в студии — та же развилка, что у карточки
-          // каталога и страницы (иначе результат вёл бы на страницу, где
-          // искомой услуги нет).
-          ...NO_OWN_SERVICES_WHERE,
-          masterServices: {
-            some: {
-              serviceId,
-              isEnabled: true,
-              service: { isEnabled: true, isActive: true },
-            },
-          },
-        },
-      ],
+      },
     },
   ];
 
@@ -262,24 +246,6 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
           isActive: true,
         },
       },
-      masterServices: {
-        where: { serviceId, isEnabled: true },
-        select: {
-          priceOverride: true,
-          durationOverrideMin: true,
-          service: {
-            select: {
-              id: true,
-              name: true,
-              title: true,
-              price: true,
-              durationMin: true,
-              isEnabled: true,
-              isActive: true,
-            },
-          },
-        },
-      },
       portfolioItems: {
         where: { isPublic: true },
         orderBy: PORTFOLIO_DISPLAY_ORDER,
@@ -313,14 +279,12 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): 
       const username = provider.publicUsername;
       if (!username) return;
 
-      const directService = provider.services[0] ?? null;
-      const masterService = provider.masterServices[0] ?? null;
-      const baseService = masterService?.service ?? directService;
+      const baseService = provider.services[0] ?? null;
       if (!baseService || !baseService.isEnabled || !baseService.isActive) return;
 
       const serviceTitle = baseService.title?.trim() || baseService.name;
-      const durationMin = masterService?.durationOverrideMin ?? baseService.durationMin;
-      const servicePrice = masterService?.priceOverride ?? baseService.price;
+      const durationMin = baseService.durationMin;
+      const servicePrice = baseService.price;
       const providerTimezone = resolveProviderTimezone(provider.timezone);
 
       const result = await listAvailabilitySlotsPaginated(provider.id, baseService.id, durationMin, {

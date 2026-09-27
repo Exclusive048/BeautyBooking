@@ -4,6 +4,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { BookingCardActions } from "@/features/master/components/bookings/booking-card-actions";
 import { BookingManageActions } from "@/features/master/components/bookings/booking-manage-actions";
 import { BookingNoShowAction } from "@/features/master/components/bookings/booking-no-show-action";
+import { WorkContextBadge } from "@/features/master/components/work-context-badge";
 import { canMarkNoShow } from "@/lib/bookings/flow";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -23,6 +24,8 @@ function initialsOf(name: string): string {
 type Props = {
   booking: KanbanBookingItem;
   column: ColumnId;
+  /** STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» под услугой. */
+  showWorkContext?: boolean;
 };
 
 /**
@@ -31,7 +34,7 @@ type Props = {
  * CONFIRMED/REJECTED transitions exist on the API surface, runtime status
  * machine handles IN_PROGRESS/FINISHED automatically).
  */
-export function BookingCard({ booking, column }: Props) {
+export function BookingCard({ booking, column, showWorkContext = false }: Props) {
   return (
     <article data-focus-id={booking.id} data-testid="booking-row" className="rounded-xl border border-border-subtle bg-bg-card p-3">
       <header className="mb-2 flex items-start gap-2">
@@ -80,6 +83,11 @@ export function BookingCard({ booking, column }: Props) {
       </header>
 
       <p className="mb-2 text-sm text-text-main">{booking.serviceTitle}</p>
+      {showWorkContext ? (
+        <div className="mb-2 flex min-w-0">
+          <WorkContextBadge context={booking.workContext} />
+        </div>
+      ) : null}
 
       <div className="mb-2 flex items-center justify-between gap-2 text-xs">
         <span className="inline-flex items-center gap-1 text-text-sec">

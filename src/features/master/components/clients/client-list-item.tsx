@@ -1,6 +1,7 @@
 "use client";
 
 import { Crown } from "lucide-react";
+import { WorkContextBadge } from "@/features/master/components/work-context-badge";
 import { cn } from "@/lib/cn";
 import type { ClientListItemView } from "@/lib/master/clients-view.service";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -71,6 +72,15 @@ export function ClientListItem({ client, selected, onSelect, now }: Props) {
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-medium text-text-main">{client.displayName}</p>
           {isVip ? <Crown className="h-3 w-3 shrink-0 text-amber-500" aria-hidden /> : null}
+          {/* STUDIO-MASTER-PROFILES (этап 3): откуда клиент — личные записи и/или студия. */}
+          {client.workContexts.map((context) => (
+            <span
+              key={context.kind === "STUDIO" ? `studio:${context.studioName}` : "personal"}
+              className="shrink-0 text-text-sec"
+            >
+              <WorkContextBadge context={context} variant="inline" showLabel={false} />
+            </span>
+          ))}
         </div>
         <p className="mt-0.5 truncate text-xs text-text-sec">{subtitle}</p>
       </div>

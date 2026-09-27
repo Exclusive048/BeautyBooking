@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { buildOccupancyBookingWhere, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import type { Prisma } from "@prisma/client";
 import { isProduction } from "@/lib/env";
 import type { Result } from "@/lib/domain/result";
@@ -389,12 +390,11 @@ export async function listAvailabilitySlotsPaginated(
       const rangeFromUtc = dateFromLocalDateKey(computeFromKey, timezone, 0, 0);
       const rangeToExclusiveUtc = dateFromLocalDateKey(computeToKeyExclusive, timezone, 0, 0);
 
+      // STUDIO-MASTER-PROFILES: занятость — по всем профилям человека.
+      const occupancyIds = await resolveOccupancyProviderIds(prisma, providerId);
       const bookings = await prisma.booking.findMany({
         where: {
-          OR: [
-            { masterProviderId: providerId },
-            { masterProviderId: null, providerId },
-          ],
+          ...buildOccupancyBookingWhere(occupancyIds),
           status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
           ...(excludeBookingId ? { id: { not: excludeBookingId } } : {}),
           ...buildBookingOverlapWhere(rangeFromUtc, rangeToExclusiveUtc),
@@ -561,10 +561,8 @@ export async function listAvailabilitySlots(
 
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [
-        { masterProviderId: providerId },
-        { masterProviderId: null, providerId },
-      ],
+      // STUDIO-MASTER-PROFILES: занятость — по всем профилям человека.
+      ...buildOccupancyBookingWhere(await resolveOccupancyProviderIds(prisma, providerId)),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       ...buildBookingOverlapWhere(from, to),
     },

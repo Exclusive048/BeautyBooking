@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { buildOccupancyBookingWhere, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import type { AvailabilitySlot } from "@/lib/domain/schedule";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
@@ -121,10 +122,8 @@ export async function providerHasFreeSlotToday(
   );
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [
-        { masterProviderId: provider.id },
-        { masterProviderId: null, providerId: provider.id },
-      ],
+      // STUDIO-MASTER-PROFILES: занятость — по всем профилям человека.
+      ...buildOccupancyBookingWhere(await resolveOccupancyProviderIds(prisma, provider.id)),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       ...buildBookingOverlapWhere(dayStartUtc, dayEndUtc),
     },

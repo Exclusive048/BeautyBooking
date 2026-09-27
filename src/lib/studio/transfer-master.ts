@@ -80,6 +80,18 @@ export async function transferMasterOutOfStudio(
       });
       if (block) throw block;
 
+      // STUDIO-MASTER-PROFILES (этап 4): «забрать услуги себе» — на ЛИЧНЫЙ
+      // профиль мастера. После разделения из студии уходит профиль мастера в
+      // студии, а свои услуги, страница и кабинет — у личного. До разделения
+      // это один и тот же профиль.
+      const personalProfile = master.ownerUserId
+        ? await tx.masterProfile.findUnique({
+            where: { userId: master.ownerUserId },
+            select: { providerId: true },
+          })
+        : null;
+      const ownServicesProviderId = personalProfile?.providerId ?? masterId;
+
       const masterServices = await tx.masterService.findMany({
         where: { masterProviderId: masterId, studioId: studio.id },
         select: {
@@ -110,7 +122,7 @@ export async function transferMasterOutOfStudio(
 
       let nextSortOrder =
         ((await tx.service.findFirst({
-          where: { providerId: masterId },
+          where: { providerId: ownServicesProviderId },
           orderBy: { sortOrder: "desc" },
           select: { sortOrder: true },
         }))?.sortOrder ?? -1) + 1;
@@ -127,7 +139,7 @@ export async function transferMasterOutOfStudio(
 
         const existing = await tx.service.findFirst({
           where: {
-            providerId: masterId,
+            providerId: ownServicesProviderId,
             OR: [
               { title: { equals: normalizedTitle, mode: "insensitive" } },
               { name: { equals: normalizedName, mode: "insensitive" } },
@@ -146,7 +158,7 @@ export async function transferMasterOutOfStudio(
 
         const created = await tx.service.create({
           data: {
-            providerId: masterId,
+            providerId: ownServicesProviderId,
             title: normalizedTitle,
             name: normalizedName,
             price: effectivePrice,
@@ -184,6 +196,8 @@ export async function transferMasterOutOfStudio(
           await tx.modelOffer.update({
             where: { id: offer.id },
             data: {
+              // Оффер на перенесённую услугу — личный, на личном профиле.
+              ...(targetServiceId ? { masterId: ownServicesProviderId } : {}),
               masterServiceId: null,
               serviceId: targetServiceId,
               serviceIds: targetServiceId

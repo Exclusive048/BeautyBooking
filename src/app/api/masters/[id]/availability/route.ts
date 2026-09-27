@@ -2,7 +2,6 @@ import { ok, fail } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/access";
 import { requireProviderOwner } from "@/lib/auth/ownership";
 import { prisma } from "@/lib/prisma";
-import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
@@ -12,6 +11,7 @@ import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
 import { toAppError } from "@/lib/api/errors";
 import { stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { isActiveMasterOfPublishedStudio } from "@/lib/studio/active-studio-master";
 
 // EXP-025: `minBookingHoursAhead` is required so the shared bookable-window
 // primitive can drop too-soon slots — the cutoff this endpoint previously
@@ -62,18 +62,8 @@ async function loadProviderForOwnSide(req: Request, providerKey: string) {
  * это было одно поле, поэтому публичного резолва хватало.
  */
 async function loadStudioActiveMaster(providerKey: string) {
-  const master = await resolveProviderBySlugOrId({
-    key: providerKey,
-    select: { ...PROVIDER_SELECT, type: true, studioId: true, ownerUserId: true, studioPaused: true },
-  });
-  if (!master || master.type !== "MASTER" || !master.studioId || !isStudioMasterActive(master)) {
-    return null;
-  }
-  const studio = await prisma.provider.findUnique({
-    where: { id: master.studioId },
-    select: { isPublished: true },
-  });
-  if (!studio?.isPublished) return null;
+  const master = await resolveProviderBySlugOrId({ key: providerKey, select: PROVIDER_SELECT });
+  if (!master || !(await isActiveMasterOfPublishedStudio(master.id))) return null;
   return {
     id: master.id,
     timezone: master.timezone,

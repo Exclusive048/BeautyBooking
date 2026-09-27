@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ProviderType } from "@prisma/client";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { getSessionUser } from "@/lib/auth/session";
@@ -15,6 +14,7 @@ import { ReviewsDistribution } from "./reviews-distribution";
 import { ReviewsFeed } from "./reviews-feed";
 import { ReviewsHeroCard } from "./reviews-hero-card";
 import { ReviewsKpiTiles } from "./reviews-kpi-tiles";
+import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -51,7 +51,7 @@ export async function MasterReviewsPage({ searchParams }: Props) {
   if (!user) redirect("/login");
 
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: user.id, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(user.id),
     select: { id: true, name: true },
   });
   if (!provider) redirect("/403");
@@ -77,6 +77,8 @@ export async function MasterReviewsPage({ searchParams }: Props) {
 
   const data = await getMasterReviewsView({
     masterProviderId: provider.id,
+    // STUDIO-MASTER-PROFILES (этап 4): отзывы личного профиля и профилей в студиях.
+    workProfileIds: (await getMasterWorkProfiles(user.id)).allIds,
     currentUserId: user.id,
     currentUserRoles: user.roles,
     filter,

@@ -19,6 +19,7 @@ type Props = {
   title: string;
   hint: string;
   bookings: KanbanBookingItem[];
+  showWorkContext?: boolean;
 };
 
 /**
@@ -40,7 +41,7 @@ type Props = {
  * 136px: заголовок + счётчик «0», подсказка и сумма скрыты ниже `lg`.
  * Десктоп не менялся.
  */
-export function KanbanColumn({ id, title, hint, bookings }: Props) {
+export function KanbanColumn({ id, title, hint, bookings, showWorkContext = false }: Props) {
   const sum = bookings.reduce((s, b) => s + b.price, 0);
   const collapsed = bookings.length === 0;
   return (
@@ -76,7 +77,7 @@ export function KanbanColumn({ id, title, hint, bookings }: Props) {
       <div className="flex-1 space-y-3 overflow-y-auto rounded-b-2xl border-x border-b border-border-subtle bg-bg-card/40 p-3">
         {bookings.length > 0 ? (
           bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} column={id} />
+            <BookingCard key={booking.id} booking={booking} column={id} showWorkContext={showWorkContext} />
           ))
         ) : (
           <EmptyColumn />

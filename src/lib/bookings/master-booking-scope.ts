@@ -32,12 +32,26 @@ import type { Prisma } from "@prisma/client";
  * unassigned studio booking NOT visible).
  */
 export function masterPerformedBookingWhere(
-  masterProviderId: string,
+  masterProviderIds: string | readonly string[],
 ): Prisma.BookingWhereInput {
+  // STUDIO-MASTER-PROFILES (этап 4): у мастера может быть личный профиль и
+  // профиль в студии — кабинет показывает записи ВСЕХ его профилей. Для одного
+  // профиля форма прежняя дословно (её пинят тест и сырые SQL-копии аналитики).
+  const ids =
+    typeof masterProviderIds === "string" ? [masterProviderIds] : Array.from(new Set(masterProviderIds));
+  if (ids.length === 1) {
+    const masterProviderId = ids[0]!;
+    return {
+      OR: [
+        { masterProviderId },
+        { masterProviderId: null, providerId: masterProviderId },
+      ],
+    };
+  }
   return {
     OR: [
-      { masterProviderId },
-      { masterProviderId: null, providerId: masterProviderId },
+      { masterProviderId: { in: ids } },
+      { masterProviderId: null, providerId: { in: ids } },
     ],
   };
 }

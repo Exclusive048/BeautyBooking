@@ -6,12 +6,21 @@ import { ScheduleEngine } from "@/lib/schedule/engine";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
+  BOOKING_WORK_CONTEXT_SELECT,
+  resolveBookingWorkContext,
+  shouldShowWorkContext,
+  splitRevenueByWorkContext,
+  type BookingWorkContext,
+  type RevenueSplit,
+} from "@/lib/bookings/work-context";
+import {
   addWeeks,
   getWeekDays,
   hhmmToMinutes,
   toIsoDateKey,
   type WeekDay,
 } from "@/lib/master/schedule-utils";
+import type { MasterWorkProfiles } from "@/lib/master/access";
 
 const HOUR_PADDING = 1;
 const FALLBACK_HOUR_START = 9;
@@ -43,6 +52,8 @@ export type ScheduleBookingItem = {
    * from another side» 409.
    */
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /** STUDIO-MASTER-PROFILES (этап 3): личная запись или запись студии. */
+  workContext: BookingWorkContext;
 };
 
 export type ScheduleTimeBlockItem = {
@@ -67,6 +78,8 @@ export type ScheduleDay = {
 export type ScheduleKpi = {
   weekBookingsCount: number;
   weekRevenue: number;
+  /** STUDIO-MASTER-PROFILES: выручка недели по контекстам (личные / студия). */
+  weekRevenueSplit: RevenueSplit;
   loadPct: number;
   totalWorkingHours: number;
   freeSlotsToday: number;
@@ -83,6 +96,11 @@ export type ScheduleWeekData = {
   fetchedAt: Date;
   /** EXP-019: master (salon) tz — booking-card labels + footer time render in it, matching the grid. */
   timezone: string;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 3): показывать ли пометку «Личная / Студия»
+   * (`shouldShowWorkContext` — мастер работает и в студии либо есть студийные записи).
+   */
+  showWorkContext: boolean;
 };
 
 const REVENUE_STATUSES: BookingStatus[] = [
@@ -216,13 +234,19 @@ function computeFreeSlotsToday(input: {
  * `React.cache` so any sibling server component can call again for free.
  */
 export const getMasterScheduleWeek = cache(
-  async (input: { masterId: string; weekStart: Date; now?: Date }): Promise<ScheduleWeekData> => {
+  async (input: {
+    masterId: string;
+    weekStart: Date;
+    /** STUDIO-MASTER-PROFILES (этап 4): записи всех рабочих профилей мастера. */
+    workProfiles?: MasterWorkProfiles;
+    now?: Date;
+  }): Promise<ScheduleWeekData> => {
     const now = input.now ?? new Date();
     const weekEnd = addWeeks(input.weekStart, 1);
 
     const master = await prisma.provider.findUnique({
       where: { id: input.masterId },
-      select: { id: true, timezone: true },
+      select: { id: true, timezone: true, studioId: true },
     });
     if (!master) {
       throw new Error(`Master not found: ${input.masterId}`);
@@ -251,7 +275,7 @@ export const getMasterScheduleWeek = cache(
       prisma.booking.findMany({
         where: {
           // F1: performer predicate — see master-booking-scope.ts.
-          ...masterPerformedBookingWhere(master.id),
+          ...masterPerformedBookingWhere(input.workProfiles?.allIds ?? master.id),
           startAtUtc: { gte: input.weekStart, lt: weekEnd },
           status: {
             notIn: [BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.NO_SHOW],
@@ -270,6 +294,8 @@ export const getMasterScheduleWeek = cache(
           actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true, durationMin: true } },
           serviceItems: { select: { priceSnapshot: true } },
+          // STUDIO-MASTER-PROFILES (этап 3): где записали — лично или в студии.
+          ...BOOKING_WORK_CONTEXT_SELECT,
         },
       }),
       prisma.timeBlock.findMany({
@@ -299,7 +325,7 @@ export const getMasterScheduleWeek = cache(
       ? await prisma.booking.groupBy({
           by: ["clientUserId"],
           where: {
-            ...masterPerformedBookingWhere(master.id),
+            ...masterPerformedBookingWhere(input.workProfiles?.allIds ?? master.id),
             clientUserId: { in: clientUserIds },
             status: BookingStatus.FINISHED,
           },
@@ -341,6 +367,7 @@ export const getMasterScheduleWeek = cache(
         endMinuteOfDay: minuteOfDay(row.endAtUtc, master.timezone),
         price: bookingPrice(row),
         actionRequiredBy: row.actionRequiredBy ?? null,
+        workContext: resolveBookingWorkContext(row),
       };
       const list = bookingsByDay.get(iso) ?? [];
       list.push(item);
@@ -388,9 +415,15 @@ export const getMasterScheduleWeek = cache(
     });
 
     const totalBookings = allBookings.length;
-    const weekRevenue = allBookings
-      .filter((b) => REVENUE_STATUSES.includes(b.rawStatus))
-      .reduce((sum, b) => sum + b.price, 0);
+    const revenueBookings = allBookings.filter((b) => REVENUE_STATUSES.includes(b.rawStatus));
+    const weekRevenue = revenueBookings.reduce((sum, b) => sum + b.price, 0);
+    const weekRevenueSplit = splitRevenueByWorkContext(
+      revenueBookings.map((b) => ({ context: b.workContext, amount: b.price })),
+    );
+    const showWorkContext = shouldShowWorkContext({
+      masterInStudio: input.workProfiles?.worksInStudio ?? master.studioId !== null,
+      contexts: allBookings.map((b) => b.workContext),
+    });
 
     const totalWorkingMinutes = allWorkingIntervals.reduce(
       (sum, w) => sum + (w.endMin - w.startMin),
@@ -419,6 +452,7 @@ export const getMasterScheduleWeek = cache(
       kpi: {
         weekBookingsCount: totalBookings,
         weekRevenue,
+        weekRevenueSplit,
         loadPct,
         totalWorkingHours,
         freeSlotsToday,
@@ -427,6 +461,7 @@ export const getMasterScheduleWeek = cache(
       hourRange,
       fetchedAt: now,
       timezone: master.timezone,
+      showWorkContext,
     };
   },
 );

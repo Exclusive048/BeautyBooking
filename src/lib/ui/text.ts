@@ -2224,6 +2224,19 @@ export const UI_TEXT = {
     },
   },
   cabinetMaster: {
+    // STUDIO-MASTER-PROFILES (этап 3, решение владельца 2026-09-27): пометка
+    // контекста записи — личная или студии. Видит её только мастер, который
+    // работает и лично, и в студии (соло-мастеру пометка — шум).
+    workContext: {
+      personal: "Личная запись",
+      studioTemplate: "Студия «{name}»",
+      studioShort: "Студия",
+      legendPersonal: "Личные записи",
+      legendStudio: "Записи студии",
+      revenueSplitTemplate: "личные {personal} · студия {studio}",
+      schedulePersonal: "Личное расписание",
+      scheduleStudioTemplate: "В студии «{name}»",
+    },
     brand: {
       title: "МастерРядом",
       subtitle: "Кабинет мастера",
@@ -8176,6 +8189,7 @@ export const UI_TEXT = {
       categoryOther: "Другие услуги",
       pick: "Выбрать",
       noServices: "Услуги пока не добавлены",
+      noServicesMaster: "У мастера пока нет услуг в этой студии",
       priceOnRequest: "Цена по запросу",
       duration: "{min} мин",
       durationHours: "{h} ч",

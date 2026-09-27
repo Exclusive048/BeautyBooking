@@ -49,38 +49,14 @@ async function loadProvider(providerId: string): Promise<ProviderForHotSlots> {
   return provider;
 }
 
+/**
+ * STUDIO-MASTER-PROFILES (этап 2, решение владельца 2026-09-27): горящие окошки
+ * профиля — по ЕГО услугам. Раньше у мастера студии они строились по студийным
+ * услугам (`MasterService`) и вели на его личную страницу — то есть продавали
+ * студийную услугу личной записью. Услуги профилей не смешиваются: у мастера
+ * студии — свои услуги, у студии — её услуги.
+ */
 async function loadServicesForProvider(provider: ProviderForHotSlots): Promise<HotSlotServiceCandidate[]> {
-  if (provider.type === ProviderType.MASTER && provider.studioId) {
-    const masterServices = await prisma.masterService.findMany({
-      where: { masterProviderId: provider.id, isEnabled: true, service: { isActive: true, isEnabled: true } },
-      select: {
-        serviceId: true,
-        durationOverrideMin: true,
-        priceOverride: true,
-        service: { select: { id: true, name: true, title: true, durationMin: true, price: true } },
-      },
-    });
-    return masterServices.map((item) => ({
-      id: item.serviceId,
-      title: item.service.title?.trim() || item.service.name,
-      price: item.priceOverride ?? item.service.price,
-      durationMin: item.durationOverrideMin ?? item.service.durationMin,
-    }));
-  }
-
-  if (provider.type === ProviderType.STUDIO) {
-    const services = await prisma.service.findMany({
-      where: { providerId: provider.id, isActive: true, isEnabled: true },
-      select: { id: true, name: true, title: true, durationMin: true, price: true },
-    });
-    return services.map((service) => ({
-      id: service.id,
-      title: service.title?.trim() || service.name,
-      price: service.price,
-      durationMin: service.durationMin,
-    }));
-  }
-
   const services = await prisma.service.findMany({
     where: { providerId: provider.id, isActive: true, isEnabled: true },
     select: { id: true, name: true, title: true, durationMin: true, price: true },

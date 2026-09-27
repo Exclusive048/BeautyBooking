@@ -7,6 +7,7 @@ import { UI_TEXT } from "@/lib/ui/text";
 import { BufferSection } from "./breaks/buffer-section";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
+import { useScheduleEndpoint } from "./schedule-endpoint-context";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
@@ -38,11 +39,13 @@ export function BreaksTab({ initialSnapshot }: Props) {
 
   const { setStatus, setErrorMessage } = useSaveStatus();
 
+  // STUDIO-MASTER-PROFILES: личное расписание или профиля в студии.
+  const endpoint = useScheduleEndpoint();
   useAutoSave({
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch("/api/cabinet/master/schedule", {
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bufferBetweenBookingsMin: value }),

@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 export type ScheduleProviderContext = {
   id: string;
@@ -34,7 +35,7 @@ export async function resolveScheduleProvider(input: {
   }
 
   const master = await prisma.provider.findFirst({
-    where: { ownerUserId: input.userId, type: "MASTER" },
+    where: personalMasterProviderWhere(input.userId),
     select: { id: true, type: true, studioId: true, ownerUserId: true },
     orderBy: { createdAt: "asc" },
   });

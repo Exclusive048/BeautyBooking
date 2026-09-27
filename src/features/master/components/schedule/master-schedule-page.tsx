@@ -12,7 +12,7 @@ import { NewBookingButton } from "@/features/master/components/manual-booking/ne
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { ScheduleSettingsLink } from "@/features/master/components/schedule/schedule-settings-link";
 import { getSessionUserId } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterScheduleWeek } from "@/lib/master/schedule.service";
 import { resolveDefaultScheduleView } from "@/lib/master/schedule-view";
 import {
@@ -54,9 +54,12 @@ export async function MasterSchedulePage({ searchParams }: Props) {
 
   const weekStart = parseWeekStart(searchParams.weekStart);
   const masterId = await getCurrentMasterProviderId(userId);
+  // STUDIO-MASTER-PROFILES (этап 4): записи в сетке — всех профилей мастера;
+  // рабочие часы и перерывы — личного профиля (расписания у профилей раздельные).
+  const workProfiles = await getMasterWorkProfiles(userId);
   // PWA-UX-BATCH-01: вид — из `?view=`, иначе по устройству (телефон → день).
   const [data, view] = await Promise.all([
-    getMasterScheduleWeek({ masterId, weekStart }),
+    getMasterScheduleWeek({ masterId, weekStart, workProfiles }),
     Promise.resolve(parseScheduleView(searchParams.view) ?? resolveDefaultScheduleView()),
   ]);
   // «Сегодня» — в зоне мастера (rule 17, salon-tz), не хоста и не браузера.
@@ -91,8 +94,8 @@ export async function MasterSchedulePage({ searchParams }: Props) {
 
       <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
         <ScheduleControls weekStartIso={weekStartIso} todayIso={todayIso} view={view} />
-        <ScheduleKpiCards stats={data.kpi} />
-        <ScheduleLegend />
+        <ScheduleKpiCards stats={data.kpi} showWorkContext={data.showWorkContext} />
+        <ScheduleLegend showWorkContext={data.showWorkContext} />
         {view === "day" ? (
           <DayView
             weekStartIso={weekStartIso}
@@ -120,12 +123,19 @@ export async function MasterSchedulePage({ searchParams }: Props) {
                   hourEnd={data.hourRange.end}
                   hourPx={HOUR_PX}
                   timezone={data.timezone}
+                  showWorkContext={data.showWorkContext}
+                  wideCards
                 />,
               ]),
             )}
           />
         ) : (
-          <WeekGrid days={data.days} hourRange={data.hourRange} timezone={data.timezone} />
+          <WeekGrid
+            days={data.days}
+            hourRange={data.hourRange}
+            timezone={data.timezone}
+            showWorkContext={data.showWorkContext}
+          />
         )}
         <FooterHint fetchedAt={data.fetchedAt} timezone={data.timezone} />
       </div>

@@ -77,31 +77,53 @@ export async function GET(_req: Request, ctx: RouteContext) {
         avatarUrl: true,
         publicUsername: true,
         isPublished: true,
+        tagline: true,
+        ratingAvg: true,
+        ratingCount: true,
         bufferBetweenBookingsMin: true,
         masterServices: {
           where: { isEnabled: true },
           select: { serviceId: true },
+        },
+        // STUDIO-MASTER-PROFILES (этап 4): у профиля мастера в студии своей
+        // страницы нет — карточка ведёт на ЛИЧНУЮ страницу того же человека,
+        // если она открыта.
+        owner: {
+          select: {
+            masterProfile: {
+              select: { provider: { select: { id: true, publicUsername: true, isPublished: true } } },
+            },
+          },
         },
       },
       orderBy: { createdAt: "asc" },
     });
 
     return ok({
-      masters: masters.map((m) => ({
-        id: m.id,
-        name: m.name,
-        // STUDIO-BOOKING-BANNER: аватар мастера в шапке и на шаге выбора мастера
-        // (вырезан сервером по сохранённой области — CROP-PUBLIC-01).
-        avatarUrl: m.avatarUrl,
-        // Ссылка на личную страницу — только если мастер её не скрыл: иначе
-        // карточка команды вела бы на 404.
-        publicUsername: m.isPublished ? m.publicUsername : null,
-        serviceIds: m.masterServices.map((s) => s.serviceId),
-        // PACKAGE-STUDIO-SAME-MASTER-BUFFER: the same normalization the
-        // create-side `resolveBookingCore` applies — the package wizard's
-        // same-master cursor must match the validator exactly.
-        bufferMin: normalizeBufferMinutes(m.bufferBetweenBookingsMin),
-      })),
+      masters: masters.map((m) => {
+        const personal = m.owner?.masterProfile?.provider ?? null;
+        const personalOpen = personal && personal.id !== m.id && personal.isPublished ? personal : null;
+        return {
+          id: m.id,
+          name: m.name,
+          // STUDIO-BOOKING-BANNER: аватар мастера в шапке и на шаге выбора мастера
+          // (вырезан сервером по сохранённой области — CROP-PUBLIC-01).
+          avatarUrl: m.avatarUrl,
+          // Ссылка на личную страницу — только если мастер её не скрыл: иначе
+          // карточка команды вела бы на 404. STUDIO-MASTER-PROFILES: у профиля в
+          // студии страницы нет — ссылка на личную страницу того же человека.
+          publicUsername: m.isPublished ? m.publicUsername : personalOpen?.publicUsername ?? null,
+          tagline: m.tagline,
+          ratingAvg: m.ratingAvg,
+          ratingCount: m.ratingCount,
+          portfolioProviderId: m.isPublished ? m.id : personalOpen?.id ?? null,
+          serviceIds: m.masterServices.map((s) => s.serviceId),
+          // PACKAGE-STUDIO-SAME-MASTER-BUFFER: the same normalization the
+          // create-side `resolveBookingCore` applies — the package wizard's
+          // same-master cursor must match the validator exactly.
+          bufferMin: normalizeBufferMinutes(m.bufferBetweenBookingsMin),
+        };
+      }),
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";

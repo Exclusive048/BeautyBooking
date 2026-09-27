@@ -1,6 +1,7 @@
 import { Calendar, LineChart, Sparkles, Wallet } from "lucide-react";
 import { StatTileGrid } from "@/components/ui/stat-tile";
 import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
+import { WorkContextRevenueSplit } from "@/features/master/components/work-context-revenue";
 import type { ScheduleKpi } from "@/lib/master/schedule.service";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -19,6 +20,8 @@ function pluralizeSlots(n: number): string {
 
 type Props = {
   stats: ScheduleKpi;
+  /** STUDIO-MASTER-PROFILES (этап 3): доход недели — раздельно «личные / студия». */
+  showWorkContext?: boolean;
 };
 
 /**
@@ -31,7 +34,7 @@ type Props = {
  * compact-форме короче (`labelCompact` / `valueCompact`): в плитку ~85px
  * «Записей на неделе» и «20 окошек» не помещались и обрезались многоточием.
  */
-export function ScheduleKpiCards({ stats }: Props) {
+export function ScheduleKpiCards({ stats, showWorkContext = false }: Props) {
   const freeLabel =
     stats.freeSlotsToday === 0
       ? T.freeTodayNone
@@ -53,6 +56,7 @@ export function ScheduleKpiCards({ stats }: Props) {
         icon={Wallet}
         label={T.weekRevenue}
         value={formatRub(stats.weekRevenue)}
+        sublabel={showWorkContext ? <WorkContextRevenueSplit split={stats.weekRevenueSplit} /> : undefined}
         compact
       />
       <KpiCard

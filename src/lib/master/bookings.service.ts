@@ -1,4 +1,10 @@
 import { BookingStatus, ReviewTargetType, type Prisma } from "@prisma/client";
+import {
+  BOOKING_WORK_CONTEXT_SELECT,
+  resolveBookingWorkContext,
+  shouldShowWorkContext,
+  type BookingWorkContext,
+} from "@/lib/bookings/work-context";
 import { cache } from "react";
 import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { prisma } from "@/lib/prisma";
@@ -7,6 +13,7 @@ import { parseClientKeyIdentity } from "@/lib/crm/card-service";
 import { buildPhoneVariants } from "@/lib/crm/card-utils";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { getDayOfWeek, getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
+import type { MasterWorkProfiles } from "@/lib/master/access";
 
 const DEFAULT_DISPLAY_TIMEZONE = "Europe/Moscow";
 
@@ -44,6 +51,8 @@ export type KanbanBookingItem = {
    * backend would reject.
    */
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /** STUDIO-MASTER-PROFILES (этап 3): личная запись или запись студии. */
+  workContext: BookingWorkContext;
 };
 
 export type KanbanFilters = {
@@ -61,6 +70,8 @@ export type KanbanFilters = {
 
 export type KanbanData = {
   columns: Record<ColumnId, KanbanBookingItem[]>;
+  /** STUDIO-MASTER-PROFILES (этап 3): показывать ли пометку «Личная / Студия». */
+  showWorkContext: boolean;
   stats: {
     total: number;
     pendingSum: number;
@@ -140,7 +151,13 @@ function pluralizeVisit(n: number): string {
  * share one query without manual deduplication.
  */
 export const getMasterBookingsForKanban = cache(
-  async (input: { masterId: string; filters?: KanbanFilters; now?: Date }): Promise<KanbanData> => {
+  async (input: {
+    masterId: string;
+    filters?: KanbanFilters;
+    /** STUDIO-MASTER-PROFILES (этап 4): записи всех рабочих профилей мастера. */
+    workProfiles?: MasterWorkProfiles;
+    now?: Date;
+  }): Promise<KanbanData> => {
     const now = input.now ?? new Date();
     const filters = input.filters ?? {};
     const search = filters.search?.trim().toLowerCase() ?? "";
@@ -187,7 +204,7 @@ export const getMasterBookingsForKanban = cache(
           // `providerId: input.masterId` filter could never match. Wrapped in
           // AND because this query carries its own OR (the time window).
           AND: [
-            masterPerformedBookingWhere(input.masterId),
+            masterPerformedBookingWhere(input.workProfiles?.allIds ?? input.masterId),
             ...(clientFilter ? [clientFilter] : []),
           ],
           status: {
@@ -215,12 +232,13 @@ export const getMasterBookingsForKanban = cache(
           actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true } },
           serviceItems: { select: { priceSnapshot: true } },
+          ...BOOKING_WORK_CONTEXT_SELECT,
         },
       }),
       prisma.booking.findMany({
         where: {
           AND: [
-            masterPerformedBookingWhere(input.masterId),
+            masterPerformedBookingWhere(input.workProfiles?.allIds ?? input.masterId),
             ...(clientFilter ? [clientFilter] : []),
           ],
           status: {
@@ -245,12 +263,13 @@ export const getMasterBookingsForKanban = cache(
           actionRequiredBy: true,
           service: { select: { name: true, title: true, price: true } },
           serviceItems: { select: { priceSnapshot: true } },
+          ...BOOKING_WORK_CONTEXT_SELECT,
         },
       }),
       // FIX-04 (QA-113): booking labels render in the master's own timezone.
       prisma.provider.findUnique({
         where: { id: input.masterId },
-        select: { timezone: true },
+        select: { timezone: true, studioId: true },
       }),
     ]);
 
@@ -270,7 +289,7 @@ export const getMasterBookingsForKanban = cache(
         ? prisma.booking.groupBy({
             by: ["clientUserId"],
             where: {
-              ...masterPerformedBookingWhere(input.masterId),
+              ...masterPerformedBookingWhere(input.workProfiles?.allIds ?? input.masterId),
               clientUserId: { in: clientUserIds },
               status: BookingStatus.FINISHED,
             },
@@ -348,6 +367,7 @@ export const getMasterBookingsForKanban = cache(
         changeComment: row.changeComment,
         reviewRating,
         actionRequiredBy: row.actionRequiredBy ?? null,
+        workContext: resolveBookingWorkContext(row),
       };
     });
 
@@ -394,6 +414,10 @@ export const getMasterBookingsForKanban = cache(
 
     return {
       columns,
+      showWorkContext: shouldShowWorkContext({
+        masterInStudio: input.workProfiles?.worksInStudio ?? Boolean(providerTz?.studioId),
+        contexts: items.map((item) => item.workContext),
+      }),
       stats: { total, pendingSum, confirmedSum },
     };
   },

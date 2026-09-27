@@ -112,6 +112,9 @@ async function buildDayData(
           where: { isEnabled: true },
           select: { serviceId: true },
         },
+        // STUDIO-MASTER-PROFILES (этап 4): другие профили того же человека —
+        // его личная занятость рисуется в колонке профиля в студии.
+        owner: { select: { providers: { where: { type: ProviderType.MASTER }, select: { id: true } } } },
       },
       orderBy: { name: "asc" },
     }),
@@ -120,6 +123,23 @@ async function buildDayData(
         OR: [
           { studioId },
           { providerId },
+          // STUDIO-MASTER-PROFILES (этап 4): после разделения личная запись
+          // мастера — на его ЛИЧНОМ профиле (`studioId = null`), и клоз ниже
+          // её уже не видит. Занятость человека общая, поэтому студия видит
+          // её по связи «исполнитель — человек, у которого есть профиль в
+          // этой студии».
+          {
+            masterProvider: {
+              owner: { providers: { some: { type: ProviderType.MASTER, studioId: providerId } } },
+            },
+          },
+          {
+            masterProviderId: null,
+            provider: {
+              type: ProviderType.MASTER,
+              owner: { providers: { some: { type: ProviderType.MASTER, studioId: providerId } } },
+            },
+          },
           // LOGIC-01: бронь того же мастера, созданная через его ЛИЧНЫЙ профиль,
           // имеет `studioId = null` и `providerId = мастер` — ни один из двух
           // прежних клозов её не матчил, и календарь показывал слот свободным.
@@ -205,6 +225,13 @@ async function buildDayData(
   // STUDIO-BUGS-FIX-A bug #5: INVITED masters (no ownerUserId) render as
   // disabled columns — they cannot accept bookings until the invite is
   // accepted. `isStudioMasterActive` covers both ownership + studio pause.
+  // Профиль человека → колонка его профиля в этой студии.
+  const columnByProfile = new Map<string, string>();
+  for (const master of masters) {
+    for (const sibling of master.owner?.providers ?? []) columnByProfile.set(sibling.id, master.id);
+    columnByProfile.set(master.id, master.id);
+  }
+
   const columns: ScheduleMasterColumn[] = masters.map((master) => ({
     id: master.id,
     name: master.name,
@@ -218,7 +245,8 @@ async function buildDayData(
   const bookingCells: ScheduleBookingCell[] = bookings
     .filter((b) => b.startAtUtc && b.endAtUtc)
     .map((b) => {
-      const masterId = b.masterProviderId ?? b.providerId;
+      const performerId = b.masterProviderId ?? b.providerId;
+      const masterId = columnByProfile.get(performerId) ?? performerId;
       if (isPersonalBooking(b)) {
         // Только занятость: ни имени и телефона клиента, ни услуги с ценой,
         // ни предложения переноса — студия этой записью не управляет.

@@ -1,6 +1,7 @@
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BookingCardActionsMenu } from "@/features/master/components/schedule/booking-card-actions-menu";
+import { WorkContextBadge } from "@/features/master/components/work-context-badge";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { laneStyle, type LanePlacement } from "@/lib/calendar/lane-layout";
 import type { ScheduleBookingItem } from "@/lib/master/schedule.service";
@@ -26,6 +27,13 @@ type Props = {
    * — else the label and the slot it's drawn in disagree by the tz offset.
    */
   timezone: string;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» в строке
+   * времени. В узкой колонке недели — только иконка (с подсказкой и именем
+   * для экранных читалок), в широкой карточке дня — иконка с подписью.
+   */
+  showWorkContext?: boolean;
+  wide?: boolean;
 };
 
 /**
@@ -47,7 +55,15 @@ type Props = {
  * All information stays present on cards tall enough to hold it; nothing
  * renders half-cut.
  */
-export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone }: Props) {
+export function BookingCardWeek({
+  booking,
+  topPx,
+  heightPx,
+  placement,
+  timezone,
+  showWorkContext = false,
+  wide = false,
+}: Props) {
   const { left, width } = laneStyle(placement);
   const isPending = booking.runtimeStatus === "PENDING" || booking.runtimeStatus === "CHANGE_REQUESTED";
   const isNewClient = booking.isNewClient;
@@ -80,8 +96,13 @@ export function BookingCardWeek({ booking, topPx, heightPx, placement, timezone 
       }}
     >
       <div className="flex items-center justify-between gap-2 font-mono text-[10px] leading-none tabular-nums opacity-90">
-        <span className="truncate">
-          {formatLocalHm(booking.startAtUtc, timezone)}–{formatLocalHm(booking.endAtUtc, timezone)}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate">
+            {formatLocalHm(booking.startAtUtc, timezone)}–{formatLocalHm(booking.endAtUtc, timezone)}
+          </span>
+          {showWorkContext ? (
+            <WorkContextBadge context={booking.workContext} variant="inline" showLabel={wide} />
+          ) : null}
         </span>
         {isPending ? (
           <Clock className="h-3 w-3 shrink-0 opacity-80" aria-hidden />

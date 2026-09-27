@@ -255,6 +255,34 @@ async function enforceUserStorageQuota(userId: string, incomingBytes: number): P
  * absolute, so we match on `contains: <assetId>` — the asset id is a cuid,
  * globally unique, so this cannot false-match another item.
  */
+/**
+ * Единственная запись ссылки аватара кабинета в `Provider.avatarUrl`.
+ *
+ * STUDIO-MASTER-PROFILES (этап 4): у мастера может быть профиль в студии, и
+ * своего аватара у него обычно нет — он показывает аватар ЛИЧНОГО профиля
+ * (миграция и приём приглашения ставят ему ту же ссылку). Смена личного
+ * аватара удаляет прежний файл, поэтому ссылка переносится на профили в
+ * студиях, которые показывали прежний (или никакой). Профиль, которому студия
+ * поставила свой аватар, не трогается.
+ */
+async function writeProviderAvatarUrl(providerId: string, nextUrl: string | null): Promise<void> {
+  const previous = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: { avatarUrl: true, ownerUserId: true, masterProfile: { select: { id: true } } },
+  });
+  await prisma.provider.update({ where: { id: providerId }, data: { avatarUrl: nextUrl } });
+  if (!previous?.masterProfile || !previous.ownerUserId) return;
+  await prisma.provider.updateMany({
+    where: {
+      ownerUserId: previous.ownerUserId,
+      type: "MASTER",
+      masterProfile: { is: null },
+      OR: [{ avatarUrl: null }, ...(previous.avatarUrl ? [{ avatarUrl: previous.avatarUrl }] : [])],
+    },
+    data: { avatarUrl: nextUrl },
+  });
+}
+
 /** CROP-PUBLIC-01 — всё, что нужно `buildAvatarDisplayUrl`. */
 const AVATAR_URL_SELECT = {
   id: true,
@@ -513,10 +541,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     input.kind === MediaKind.AVATAR &&
     (input.entityType === MediaEntityType.MASTER || input.entityType === MediaEntityType.STUDIO)
   ) {
-    await prisma.provider.update({
-      where: { id: entityId },
-      data: { avatarUrl: buildAvatarDisplayUrl(readyAsset) },
-    });
+    await writeProviderAvatarUrl(entityId, buildAvatarDisplayUrl(readyAsset));
   }
 
 
@@ -765,12 +790,7 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
       orderBy: { createdAt: "desc" },
       select: AVATAR_URL_SELECT,
     });
-    await prisma.provider.update({
-      where: { id: asset.entityId },
-      data: {
-        avatarUrl: nextAvatar ? buildAvatarDisplayUrl(nextAvatar) : null,
-      },
-    });
+    await writeProviderAvatarUrl(asset.entityId, nextAvatar ? buildAvatarDisplayUrl(nextAvatar) : null);
   }
 
   if (
@@ -832,10 +852,7 @@ export async function updateMediaCrop(
       select: { id: true },
     });
     if (current?.id === updated.id) {
-      await prisma.provider.update({
-        where: { id: updated.entityId },
-        data: { avatarUrl: buildAvatarDisplayUrl(updated) },
-      });
+      await writeProviderAvatarUrl(updated.entityId, buildAvatarDisplayUrl(updated));
     }
   }
 

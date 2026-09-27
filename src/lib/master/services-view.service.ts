@@ -1,5 +1,6 @@
-import { CategoryStatus, DiscountType, ProviderType } from "@prisma/client";
+import { CategoryStatus, DiscountType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 /**
  * Server aggregator for `/cabinet/master/services` (31c).
@@ -127,7 +128,7 @@ export async function getMasterServicesView(input: {
   filter: ServicesFilterId;
 }): Promise<MasterServicesViewData | null> {
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: input.userId, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(input.userId),
     select: { id: true, ownerUserId: true },
     orderBy: { createdAt: "asc" },
   });

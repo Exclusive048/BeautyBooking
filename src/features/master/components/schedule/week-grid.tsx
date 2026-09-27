@@ -20,6 +20,8 @@ type Props = {
   hourRange: { start: number; end: number };
   /** EXP-019: master (salon) tz threaded to the booking-card label formatter. */
   timezone: string;
+  /** STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» на карточках. */
+  showWorkContext?: boolean;
 };
 
 /**
@@ -28,7 +30,7 @@ type Props = {
  * uses `minmax(168px, 1fr)` so columns expand on desktop but force a
  * horizontal scroll on narrow viewports (mobile day-view comes in 25b).
  */
-export function WeekGrid({ days, hourRange, timezone }: Props) {
+export function WeekGrid({ days, hourRange, timezone, showWorkContext = false }: Props) {
   const gridTemplate = `64px repeat(7, minmax(${MIN_COL_PX}px, 1fr))`;
   return (
     <HScrollShadow wrapperClassName="rounded-2xl border border-border-subtle bg-bg-card">
@@ -53,6 +55,7 @@ export function WeekGrid({ days, hourRange, timezone }: Props) {
               hourEnd={hourRange.end}
               hourPx={HOUR_PX}
               timezone={timezone}
+              showWorkContext={showWorkContext}
             />
           ))}
         </div>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PdAccessActorType } from "@prisma/client";
 import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import type { Prisma } from "@prisma/client";
+import { masterClientBookingsScope } from "@/lib/master/clients-view.service";
 
 export type ClientCardSummary = {
   id: string;
@@ -28,6 +29,8 @@ export type MasterClientListItem = {
 
 export type ClientsPageInput = {
   providerId: string;
+  /** STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера. */
+  workProfileIds?: readonly string[];
   sort?: "recent" | "visits" | "alpha";
   includeCardSummary?: boolean;
   cursor?: string;
@@ -114,7 +117,7 @@ export async function getMasterClients(input: ClientsPageInput): Promise<MasterC
 
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }],
+      ...masterClientBookingsScope(input.workProfileIds ?? [input.providerId]),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
     },
     select: {

@@ -24,10 +24,7 @@ import { distanceMetersFrom, rankByDistance, type GeoPoint } from "@/lib/catalog
 import { freeSlotKeysForWhen } from "@/lib/schedule/free-slot-keys-shared";
 import {
   catalogVisibleProviderWhere,
-  NO_OWN_SERVICES_WHERE,
-  sellsStudioServices,
 } from "@/lib/providers/catalog-visibility";
-import { STUDIO_ACCEPTS_BOOKINGS_WHERE } from "@/lib/studio/accepts-bookings";
 
 // AUDIT (section 6):
 // - Search supports smart tag presets via soft ranking.
@@ -394,34 +391,19 @@ async function resolvePriceRankedPageIds(args: PageWindow & {
   // строку, которую раньше выбирал `Math.min`. Отбор идентичен: минимум
   // положительных = первый по возрастанию среди положительных.
   //
-  // CATALOG-CARD-STUDIO-MASTER-SERVICES (2026-09-23): цена ранжирования —
-  // та же, что печатает карточка (`resolveCardServices`): свои услуги мастера,
-  // а без них — студийные связи с `MasterService.priceOverride`. Раньше здесь
-  // брался `service.price` связи, и сортировка по цене расходилась с ценой на
-  // карточке у каждого мастера студии с персональной ценой. Связи читаются без
-  // `take: 1`: минимум переопределения порядком по `service.price` не выразить,
-  // а связей у мастера — десятки, не сотни (у провайдера-студии их нет вовсе).
+  // STUDIO-MASTER-PROFILES: цена ранжирования — та же, что печатает карточка
+  // (`resolveCardServices`): только свои услуги профиля.
   const rows = await prisma.provider.findMany({
     where: args.where,
     orderBy: BASE_ORDER,
     select: {
       id: true,
       priceFrom: true,
-      studioPaused: true,
-      studio: { select: { isPublished: true } },
       services: {
         where: { isEnabled: true, isActive: true, price: { gt: 0 } },
         orderBy: { price: "asc" },
         take: 1,
         select: { price: true },
-      },
-      _count: { select: { services: { where: { isEnabled: true, isActive: true } } } },
-      masterServices: {
-        where: {
-          isEnabled: true,
-          service: { isEnabled: true, isActive: true },
-        },
-        select: { priceOverride: true, service: { select: { price: true } } },
       },
     },
   });
@@ -429,11 +411,9 @@ async function resolvePriceRankedPageIds(args: PageWindow & {
   // Same rule as the page-local version it replaces: cheapest enabled service,
   // else `priceFrom`, else last (Infinity).
   const pickPrice = (row: (typeof rows)[number]) => {
-    const prices = (
-      !sellsStudioServices({ ownServiceCount: row._count.services, studioPaused: row.studioPaused, studio: row.studio })
-        ? row.services.map((s) => s.price)
-        : row.masterServices.map((m) => m.priceOverride ?? m.service.price)
-    ).filter((v): v is number => typeof v === "number" && v > 0);
+    const prices = row.services
+      .map((s) => s.price)
+      .filter((v): v is number => typeof v === "number" && v > 0);
     if (prices.length > 0) return Math.min(...prices);
     return row.priceFrom > 0 ? row.priceFrom : Number.POSITIVE_INFINITY;
   };
@@ -585,38 +565,12 @@ type CardServiceRow = Parameters<typeof toServiceLite>[0];
 
 /**
  * Услуги карточки — та же развилка, что у страницы (`providers/usecases.ts`):
- * свои услуги есть → только они; нет → студийные с персональными
- * переопределениями цены и длительности. Раньше карточка сливала оба набора и
- * печатала студийную цену там, где у мастера своя.
+ * только свои услуги профиля. STUDIO-MASTER-PROFILES (решение владельца
+ * 2026-09-27): услуги профилей не смешиваются, поэтому студийные связи мастера
+ * (`MasterService`) на его карточке не показываются — их продаёт студия.
  */
-export function resolveCardServices(provider: {
-  studioPaused: boolean;
-  studio: { isPublished: boolean } | null;
-  services: CardServiceRow[];
-  masterServices: Array<{
-    priceOverride: number | null;
-    durationOverrideMin: number | null;
-    service: CardServiceRow;
-  }>;
-}): ServiceLite[] {
-  if (
-    !sellsStudioServices({
-      ownServiceCount: provider.services.length,
-      studioPaused: provider.studioPaused,
-      studio: provider.studio,
-    })
-  ) {
-    return dedupeServices(provider.services.map(toServiceLite));
-  }
-  return dedupeServices(
-    provider.masterServices.map((link) =>
-      toServiceLite({
-        ...link.service,
-        price: link.priceOverride ?? link.service.price,
-        durationMin: link.durationOverrideMin ?? link.service.durationMin,
-      }),
-    ),
-  );
+export function resolveCardServices(provider: { services: CardServiceRow[] }): ServiceLite[] {
+  return dedupeServices(provider.services.map(toServiceLite));
 }
 
 function buildWhere(
@@ -631,32 +585,15 @@ function buildWhere(
   // VISIBILITY-DEFAULT-01: найти можно только видимого, с городом и расписанием.
   and.push(catalogVisibleProviderWhere());
 
+  // STUDIO-MASTER-PROFILES: в каталоге — профили, которым есть что продать
+  // СВОЕГО. Мастер студии без своих услуг находится через студию.
   and.push({
-    OR: [
-      {
-        services: {
-          some: {
-            isEnabled: true,
-            isActive: true,
-          },
-        },
+    services: {
+      some: {
+        isEnabled: true,
+        isActive: true,
       },
-      {
-        // STUDIO-PAUSE-SPLIT-01: студийные связи мастера на паузе не продают.
-        studioPaused: false,
-        // STUDIO-HIDDEN-MASTER-SERVICES: и связи со скрытой студией тоже.
-        studio: { is: STUDIO_ACCEPTS_BOOKINGS_WHERE },
-        masterServices: {
-          some: {
-            isEnabled: true,
-            service: {
-              isEnabled: true,
-              isActive: true,
-            },
-          },
-        },
-      },
-    ],
+    },
   });
 
   if (input.entityType === "master") {
@@ -729,21 +666,6 @@ function buildWhere(
           },
         },
         {
-          // CATALOG-CARD-STUDIO-MASTER-SERVICES: студийная связь продаёт только
-          // у мастера без своих услуг — та же развилка, что у карточки.
-          ...NO_OWN_SERVICES_WHERE,
-          masterServices: {
-            some: {
-              isEnabled: true,
-              service: {
-                isEnabled: true,
-                isActive: true,
-                globalCategoryId: { in: categoryIds },
-              },
-            },
-          },
-        },
-        {
           portfolioItems: {
             some: {
               isPublic: true,
@@ -788,21 +710,7 @@ function buildWhere(
         { category: { is: { title: { contains: serviceQuery, mode: "insensitive" } } } },
       ],
     };
-    and.push({
-      OR: [
-        { services: { some: serviceFilters } },
-        {
-          // CATALOG-CARD-STUDIO-MASTER-SERVICES: см. фильтр категорий выше.
-          ...NO_OWN_SERVICES_WHERE,
-          masterServices: {
-            some: {
-              isEnabled: true,
-              service: serviceFilters,
-            },
-          },
-        },
-      ],
-    });
+    and.push({ services: { some: serviceFilters } });
   }
 
   if (and.length === 0) return {};
@@ -1041,23 +949,6 @@ export async function searchCatalog(input: CatalogSearchInput): Promise<CatalogS
           price: true,
           durationMin: true,
           category: { select: { title: true } },
-        },
-      },
-      masterServices: {
-        where: { isEnabled: true, service: { isEnabled: true, isActive: true } },
-        select: {
-          priceOverride: true,
-          durationOverrideMin: true,
-          service: {
-            select: {
-              id: true,
-              name: true,
-              title: true,
-              price: true,
-              durationMin: true,
-              category: { select: { title: true } },
-            },
-          },
         },
       },
       portfolioItems: {

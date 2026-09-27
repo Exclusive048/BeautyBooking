@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
+import { buildOccupancyBookingWhere, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
@@ -50,7 +51,8 @@ export async function GET(req: Request) {
     const [bookings, services] = await Promise.all([
       prisma.booking.findMany({
         where: {
-          OR: [{ masterProviderId: masterId }, { masterProviderId: null, providerId: masterId }],
+          // STUDIO-MASTER-PROFILES: занятость — по всем профилям человека.
+          ...buildOccupancyBookingWhere(await resolveOccupancyProviderIds(prisma, masterId)),
           startAtUtc: { gte: dayStartUtc, lt: dayEndUtc },
           status: { in: ["PENDING", "CONFIRMED"] },
         },

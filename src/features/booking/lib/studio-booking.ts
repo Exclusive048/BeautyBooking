@@ -11,6 +11,19 @@ export type StudioMaster = {
   /** Optional for back-compat with older payloads: absent → initials. */
   avatarUrl?: string | null;
   publicUsername: string | null;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 4): описание и рейтинг профиля мастера В
+   * СТУДИИ — карточка команды берёт их отсюда, а не запросом профиля (у
+   * профиля в студии нет публичной страницы). Необязательны для совместимости.
+   */
+  tagline?: string | null;
+  ratingAvg?: number;
+  ratingCount?: number;
+  /**
+   * `Provider.id`, чьи работы показывать миниатюрами в карточке: личный
+   * профиль мастера, если его страница открыта (портфолио — личное).
+   */
+  portfolioProviderId?: string | null;
   // EXP-024: enabled MasterService ids — which services this master performs.
   // The booking wizard lists only masters whose `serviceIds` include the
   // chosen service, so it never offers (or probes `/availability` for) a
@@ -25,6 +38,23 @@ export type StudioMaster = {
   // for different-master pairs).
   bufferMin?: number;
 };
+
+/**
+ * Виджет студии в режиме «к мастеру» (мастер выбран ссылкой): только услуги,
+ * которые этот мастер оказывает, — ровно то, что обещает подзаголовок «Только
+ * то, что делает мастер». Раньше список был студийным целиком, и чужая услуга
+ * вела в шаг «Когда» без единого окошка. `serviceIds` — те же включённые связи
+ * мастера с услугами, по которым сервер принимает запись. Нет поля (старый
+ * ответ) — вся студия, как было.
+ */
+export function servicesPerformedBy<T extends { id: string }>(
+  services: T[],
+  master: Pick<StudioMaster, "serviceIds"> | null,
+): T[] {
+  if (!master?.serviceIds) return services;
+  const performed = new Set(master.serviceIds);
+  return services.filter((service) => performed.has(service.id));
+}
 export type SlotItem = { startAtUtc: string; endAtUtc: string; label: string };
 export type BookingUser = {
   id: string;

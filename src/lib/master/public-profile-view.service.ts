@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { DiscountType, SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { buildOccupancyBookingWhere, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import { getProviderProfile } from "@/lib/providers/usecases";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
@@ -16,6 +17,7 @@ import { loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
 import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { logError } from "@/lib/logging/logger";
+import { ACTIVE_STUDIO_PROFILE_SELECT, pickActiveStudioProfile } from "@/lib/providers/studio-profile";
 
 /**
  * Aggregator for `/u/[username]` master public profile (32a).
@@ -108,6 +110,9 @@ export const getMasterPublicProfileView = cache(
           bufferBetweenBookingsMin: true,
           // QA-115: studio affiliation (studioId references the studio's provider row).
           studio: { select: { name: true, publicUsername: true, isPublished: true } },
+          // STUDIO-MASTER-PROFILES (этап 4): после разделения студия — у профиля
+          // мастера в студии; тем же запросом.
+          ...ACTIVE_STUDIO_PROFILE_SELECT,
         },
       }),
       prisma.servicePackage.findMany({
@@ -236,12 +241,17 @@ export const getMasterPublicProfileView = cache(
     // QA-115: only expose a public link when the studio is published + has a
     // public username; otherwise show the name without a link (no CUID leak).
     const studioRow = ownerMeta?.studio ?? null;
+    // STUDIO-MASTER-PROFILES (этап 4): после разделения студия — у профиля
+    // мастера в студии, а не у личного.
+    const studioProfile = studioRow ? null : pickActiveStudioProfile(ownerMeta);
     const studio = studioRow
       ? {
           name: studioRow.name,
           publicUsername: studioRow.isPublished ? studioRow.publicUsername : null,
         }
-      : null;
+      : studioProfile
+        ? { name: studioProfile.studioName, publicUsername: studioProfile.studioPublicUsername }
+        : null;
 
     return {
       provider,
@@ -298,10 +308,8 @@ async function computeAvailabilityHint(
     const probeWindowEndUtc = localDayRangeUtc(lastProbeDayKey, timezone).endExclusiveUtc;
     const bookingRows = await prisma.booking.findMany({
       where: {
-        OR: [
-          { masterProviderId: providerId },
-          { masterProviderId: null, providerId },
-        ],
+        // STUDIO-MASTER-PROFILES: занятость — по всем профилям человека.
+        ...buildOccupancyBookingWhere(await resolveOccupancyProviderIds(prisma, providerId)),
         status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
         ...buildBookingOverlapWhere(probeWindowStartUtc, probeWindowEndUtc),
       },

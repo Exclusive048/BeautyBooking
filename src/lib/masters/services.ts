@@ -1,10 +1,13 @@
-import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 export async function resolveGlobalMasterProvider(userId: string): Promise<Result<{ id: string }>> {
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: userId, type: ProviderType.MASTER, studioId: null },
+    // STUDIO-MASTER-PROFILES: личный профиль — через `MasterProfile`, а не
+    // «любой профиль без студии» (им мог оказаться профиль, оставшийся после
+    // ухода из студии).
+    where: { ...personalMasterProviderWhere(userId), studioId: null },
     select: { id: true },
   });
 

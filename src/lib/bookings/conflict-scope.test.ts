@@ -48,9 +48,15 @@ type ScopeWhere = { OR: Array<Record<string, unknown>> };
 
 const MASTER = "provider-master";
 const STUDIO = "provider-studio";
+/** STUDIO-MASTER-PROFILES: профиль того же человека в студии. */
+const MASTER_IN_STUDIO = "provider-master-in-studio";
 
 function clauses(where: ScopeWhere): string[] {
   return where.OR.map((clause) => JSON.stringify(clause));
+}
+
+function performerClause(...ids: string[]): string {
+  return JSON.stringify({ masterProviderId: { in: [...ids].sort() } });
 }
 
 describe("buildConflictScopeWhere — LOGIC-01", () => {
@@ -58,29 +64,33 @@ describe("buildConflictScopeWhere — LOGIC-01", () => {
     const where = buildConflictScopeWhere({
       providerId: STUDIO,
       masterProviderId: MASTER,
+      occupancyIds: [MASTER],
     }) as ScopeWhere;
 
     // ключ — исполнитель, а не пара; личная бронь имеет тот же masterProviderId
-    expect(clauses(where)).toContain(JSON.stringify({ masterProviderId: MASTER }));
+    expect(clauses(where)).toContain(performerClause(MASTER));
   });
 
   it("бронь с личного профиля видит брони того же мастера в студии", () => {
     const where = buildConflictScopeWhere({
       providerId: MASTER,
       masterProviderId: MASTER,
+      occupancyIds: [MASTER],
     }) as ScopeWhere;
 
-    expect(clauses(where)).toContain(JSON.stringify({ masterProviderId: MASTER }));
+    expect(clauses(where)).toContain(performerClause(MASTER));
   });
 
   it("скоуп больше не привязан к providerId, под которым создана бронь", () => {
     const fromStudio = buildConflictScopeWhere({
       providerId: STUDIO,
       masterProviderId: MASTER,
+      occupancyIds: [MASTER],
     }) as ScopeWhere;
     const fromPersonal = buildConflictScopeWhere({
       providerId: MASTER,
       masterProviderId: MASTER,
+      occupancyIds: [MASTER],
     }) as ScopeWhere;
 
     // обе стороны спрашивают об ОДНОМ ресурсе — времени мастера
@@ -92,11 +102,12 @@ describe("buildConflictScopeWhere — LOGIC-01", () => {
     const where = buildConflictScopeWhere({
       providerId: STUDIO,
       masterProviderId: null,
+      occupancyIds: [STUDIO],
     }) as ScopeWhere;
 
     expect(clauses(where)).toContain(JSON.stringify({ providerId: STUDIO }));
     expect(clauses(where)).toContain(
-      JSON.stringify({ masterProviderId: null, providerId: STUDIO }),
+      JSON.stringify({ masterProviderId: null, providerId: { in: [STUDIO] } }),
     );
   });
 
@@ -104,12 +115,72 @@ describe("buildConflictScopeWhere — LOGIC-01", () => {
     const where = buildConflictScopeWhere({
       providerId: STUDIO,
       masterProviderId: MASTER,
+      occupancyIds: [MASTER],
     }) as ScopeWhere;
 
     const serialized = JSON.stringify(where);
     expect(serialized).not.toContain("provider-other");
     // и не превращается в «все брони студии»
     expect(clauses(where)).not.toContain(JSON.stringify({ providerId: STUDIO }));
+  });
+
+  it("исполнитель входит в скоуп, даже если набор профилей его не назвал", () => {
+    // набор приходит из БД; профиль без владельца резолвится в [себя], но
+    // билдер не должен полагаться на то, что вызывающий это соблюл
+    const where = buildConflictScopeWhere({
+      providerId: STUDIO,
+      masterProviderId: MASTER,
+      occupancyIds: [],
+    }) as ScopeWhere;
+
+    expect(clauses(where)).toContain(performerClause(MASTER));
+  });
+});
+
+/**
+ * STUDIO-MASTER-PROFILES (решение владельца 2026-09-27): у мастера может быть
+ * личный профиль и профиль в студии — две единицы записи, но время у человека
+ * одно. Занятое в одном профиле обязано быть недоступно в другом.
+ */
+describe("buildConflictScopeWhere — профили одного человека", () => {
+  it("запись в студийный профиль видит записи личного профиля", () => {
+    const where = buildConflictScopeWhere({
+      providerId: STUDIO,
+      masterProviderId: MASTER_IN_STUDIO,
+      occupancyIds: [MASTER, MASTER_IN_STUDIO],
+    }) as ScopeWhere;
+
+    expect(clauses(where)).toContain(performerClause(MASTER, MASTER_IN_STUDIO));
+    // и соло-форму личного профиля (запись без назначенного мастера)
+    expect(clauses(where)).toContain(
+      JSON.stringify({ masterProviderId: null, providerId: { in: [MASTER, MASTER_IN_STUDIO].sort() } }),
+    );
+  });
+
+  it("личная запись видит студийные записи того же человека", () => {
+    const where = buildConflictScopeWhere({
+      providerId: MASTER,
+      masterProviderId: MASTER,
+      occupancyIds: [MASTER, MASTER_IN_STUDIO],
+    }) as ScopeWhere;
+
+    expect(clauses(where)).toContain(performerClause(MASTER, MASTER_IN_STUDIO));
+  });
+
+  it("с какой стороны ни спросить — ресурс один и тот же", () => {
+    const people = [MASTER, MASTER_IN_STUDIO];
+    const fromStudio = buildConflictScopeWhere({
+      providerId: STUDIO,
+      masterProviderId: MASTER_IN_STUDIO,
+      occupancyIds: people,
+    }) as ScopeWhere;
+    const fromPersonal = buildConflictScopeWhere({
+      providerId: MASTER,
+      masterProviderId: MASTER,
+      occupancyIds: people,
+    }) as ScopeWhere;
+
+    expect(clauses(fromStudio)).toEqual(clauses(fromPersonal));
   });
 });
 

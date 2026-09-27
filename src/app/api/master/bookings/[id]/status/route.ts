@@ -2,7 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { masterBookingStatusSchema } from "@/lib/master/schemas";
 import { updateMasterBookingStatus } from "@/lib/studio/bookings.service";
 import { parseBody } from "@/lib/validation";
@@ -37,6 +37,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     const result = await updateMasterBookingStatus({
       bookingId: id,
       masterId,
+      masterIds: (await getMasterWorkProfiles(user.id)).allIds,
       status: body.status,
       comment: body.comment,
     });

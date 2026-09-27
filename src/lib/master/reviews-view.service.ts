@@ -81,6 +81,13 @@ function decorate(reviews: ReviewDto[], now: Date): MasterReviewItem[] {
 
 export async function getMasterReviewsView(input: {
   masterProviderId: string;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера. Отзывы каждого
+   * берутся тем же правилом, что у публичной страницы (`listReviews` →
+   * `targetReviewsWhere`), и сливаются: у личного — личные отзывы, у профиля в
+   * студии — отзывы о визитах в студию (отвечает на них студия).
+   */
+  workProfileIds?: readonly string[];
   currentUserId: string;
   currentUserRoles: import("@prisma/client").AccountType[];
   filter: ReviewsFilterId;
@@ -88,13 +95,24 @@ export async function getMasterReviewsView(input: {
 }): Promise<MasterReviewsViewData> {
   const now = input.now ?? new Date();
 
-  const reviews = await listReviews({
-    targetType: "provider",
-    targetId: input.masterProviderId,
-    limit: 100,
-    offset: 0,
-    currentUser: { id: input.currentUserId, roles: input.currentUserRoles },
-  });
+  const profileIds = Array.from(new Set(input.workProfileIds ?? [input.masterProviderId]));
+  const lists = await Promise.all(
+    profileIds.map((targetId) =>
+      listReviews({
+        targetType: "provider",
+        targetId,
+        limit: 100,
+        offset: 0,
+        currentUser: { id: input.currentUserId, roles: input.currentUserRoles },
+      }),
+    ),
+  );
+  const seen = new Set<string>();
+  const reviews = lists
+    .flat()
+    .filter((review) => (seen.has(review.id) ? false : (seen.add(review.id), true)))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 100);
 
   const allStats = computeReviewStats(reviews, now);
   const ownStats = computeReviewStats(reviews.filter(isOwnReply), now);

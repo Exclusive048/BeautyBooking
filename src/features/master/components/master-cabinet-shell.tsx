@@ -1,4 +1,4 @@
-import { ProviderType, SubscriptionScope } from "@prisma/client";
+import { SubscriptionScope } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { ManualBookingProvider } from "@/features/master/components/manual-booking/manual-booking-provider";
 import { MasterSidebar } from "@/features/master/components/master-sidebar";
@@ -17,6 +17,7 @@ import { getUnansweredReviewsCountForMaster } from "@/lib/reviews/counts";
 import { countUnreadChatMessages } from "@/lib/chat/conversation-aggregator";
 import { prisma } from "@/lib/prisma";
 import { UI_TEXT } from "@/lib/ui/text";
+import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
 
 /**
  * The master cabinet shell — sidebar (desktop) + full-width main slot +
@@ -41,7 +42,7 @@ export async function MasterCabinetShell({
   const [sessionUser, master] = await Promise.all([
     getSessionUser(),
     prisma.provider.findFirst({
-      where: { ownerUserId: userId, type: ProviderType.MASTER },
+      where: personalMasterProviderWhere(userId),
       select: {
         id: true,
         avatarUrl: true,
@@ -52,6 +53,8 @@ export async function MasterCabinetShell({
     }),
   ]);
   if (!master || !master.masterProfile) redirect("/403");
+  // STUDIO-MASTER-PROFILES (этап 4): бейдж «Записи» — по всем профилям мастера.
+  const workProfiles = await getMasterWorkProfiles(userId);
 
   const [
     subscription,
@@ -62,7 +65,7 @@ export async function MasterCabinetShell({
     unreadMessages,
   ] = await Promise.all([
     getCurrentSubscriptionRow(userId, SubscriptionScope.MASTER),
-    getPendingBookingsCountForMaster(master.id),
+    getPendingBookingsCountForMaster(workProfiles.allIds),
     getUnreadBadgeCount({ userId, phone: sessionUser?.phone ?? null, context: "master" }),
     getUnansweredReviewsCountForMaster(master.id),
     getMasterManualBookingData(userId),

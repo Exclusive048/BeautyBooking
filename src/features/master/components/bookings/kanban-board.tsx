@@ -14,6 +14,8 @@ const COLUMN_ORDER: Array<{ id: ColumnId; title: string; hint: string }> = [
 
 type Props = {
   columns: KanbanData["columns"];
+  /** STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» на карточках. */
+  showWorkContext?: boolean;
 };
 
 /**
@@ -22,7 +24,7 @@ type Props = {
  * Negative inline margins on small screens let the first/last column hug
  * the viewport edge so swipe feels natural without an extra padding ring.
  */
-export function KanbanBoard({ columns }: Props) {
+export function KanbanBoard({ columns, showWorkContext = false }: Props) {
   return (
     <div className="-mx-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0">
       {/* FIX-VISUAL-POLISH G6: `items-start` so each column sizes to its own
@@ -39,6 +41,7 @@ export function KanbanBoard({ columns }: Props) {
             title={col.title}
             hint={col.hint}
             bookings={columns[col.id]}
+            showWorkContext={showWorkContext}
           />
         ))}
       </div>

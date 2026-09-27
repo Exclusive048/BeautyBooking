@@ -97,6 +97,8 @@ const getPushEnabled = cache(async (userId: string): Promise<boolean> => {
 export async function getMasterNotificationsData(input: {
   userId: string;
   masterId: string;
+  /** STUDIO-MASTER-PROFILES (этап 4): рабочие профили мастера — для счётчика записей. */
+  workProfileIds?: readonly string[];
   phone: string | null;
   activeTab: NotificationTabId;
   sort: NotificationSort;
@@ -106,7 +108,7 @@ export async function getMasterNotificationsData(input: {
 
   const [center, pendingBookings, unansweredReviews, pushEnabled, providerTz] = await Promise.all([
     getNotificationCenterData({ userId: input.userId, phone: input.phone }),
-    getPendingBookingsCountForMaster(input.masterId),
+    getPendingBookingsCountForMaster(input.workProfileIds ?? input.masterId),
     getUnansweredReviewsCountForMaster(input.masterId),
     getPushEnabled(input.userId),
     prisma.provider.findUnique({ where: { id: input.masterId }, select: { timezone: true } }),

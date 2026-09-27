@@ -4,7 +4,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterClients } from "@/lib/master/clients.service";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { canAccessClientCards } from "@/lib/crm/guards";
@@ -35,6 +35,7 @@ export async function GET(req: Request) {
 
     const data = await getMasterClients({
       providerId,
+      workProfileIds: (await getMasterWorkProfiles(user.id)).allIds,
       sort: query.sort,
       includeCardSummary: canAccessClientCards(plan.features),
       cursor: query.cursor,

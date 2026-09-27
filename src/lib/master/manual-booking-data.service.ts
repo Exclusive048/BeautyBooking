@@ -1,7 +1,7 @@
 import { cache } from "react";
-import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 /**
  * Lightweight per-request fetcher for the manual-booking modal data
@@ -42,7 +42,7 @@ export type ManualBookingData = {
 export const getMasterManualBookingData = cache(
   async (userId: string): Promise<ManualBookingData | null> => {
     const master = await prisma.provider.findFirst({
-      where: { ownerUserId: userId, type: ProviderType.MASTER },
+      where: personalMasterProviderWhere(userId),
       select: { id: true, studioId: true, timezone: true },
       orderBy: { createdAt: "asc" },
     });

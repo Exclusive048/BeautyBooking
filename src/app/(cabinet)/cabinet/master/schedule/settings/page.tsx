@@ -7,6 +7,14 @@ import { ScheduleSettingsPage } from "@/features/master/components/schedule-sett
  * placeholders. The legacy editor lives on for the studio-cabinet calendar
  * until that flow gets its own rebuild.
  */
-export default async function MasterScheduleSettingsRoute() {
-  return <ScheduleSettingsPage />;
+export default async function MasterScheduleSettingsRoute({
+  searchParams,
+}: {
+  searchParams: Promise<{ profile?: string | string[] }>;
+}) {
+  // STUDIO-MASTER-PROFILES (этап 4): `?profile=<id профиля в студии>` —
+  // расписание работы в студии (через заявку студии); без него — личное.
+  const params = await searchParams;
+  const profile = typeof params.profile === "string" ? params.profile : null;
+  return <ScheduleSettingsPage profile={profile} />;
 }

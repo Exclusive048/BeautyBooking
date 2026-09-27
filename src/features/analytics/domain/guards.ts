@@ -14,6 +14,7 @@ import {
   type PlanTier,
 } from "@/lib/billing/features";
 import { isSubscriptionActive } from "@/lib/billing/subscription-active";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 export type AnalyticsScope = SubscriptionScope;
 
@@ -169,13 +170,11 @@ export async function resolveAnalyticsContext(input: {
   masterId?: string | null;
 }): Promise<AnalyticsContext> {
   if (input.scope === "MASTER") {
+    // STUDIO-MASTER-PROFILES: аналитика мастера — его ЛИЧНОГО профиля (работу в
+    // студии считает студия; после разделения профилей она на студийном профиле).
     const provider = await prisma.provider.findFirst({
-      where: {
-        ownerUserId: input.userId,
-        type: ProviderType.MASTER,
-      },
+      where: personalMasterProviderWhere(input.userId),
       select: { id: true, timezone: true },
-      orderBy: { createdAt: "asc" },
     });
 
     if (!provider) {

@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ProviderType } from "@prisma/client";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
 import {
@@ -16,6 +15,7 @@ import { ClientsPaneClient } from "./clients-pane-client";
 import { ClientsSearchInput } from "./search-input";
 import { ClientsSortSelect } from "./sort-select";
 import { ClientsTabs } from "./clients-tabs";
+import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -45,7 +45,7 @@ export async function MasterClientsPage({ searchParams }: Props) {
   if (!user) redirect("/login");
 
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: user.id, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(user.id),
     select: { id: true, timezone: true },
   });
   if (!provider) redirect("/403");
@@ -57,6 +57,8 @@ export async function MasterClientsPage({ searchParams }: Props) {
 
   const data = await getMasterClientsView({
     providerId: provider.id,
+    // STUDIO-MASTER-PROFILES (этап 4): клиенты всех профилей мастера.
+    workProfiles: await getMasterWorkProfiles(user.id),
     timezone: provider.timezone,
     activeTab: tab,
     sort,

@@ -22,6 +22,7 @@ import {
 } from "./hours/lib/day-copy";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
+import { useScheduleEndpoint } from "./schedule-endpoint-context";
 import { WeekPreview } from "./week-preview";
 import { WeekdayRow } from "./weekday-row";
 
@@ -74,11 +75,13 @@ export function HoursTab({ initialSnapshot }: Props) {
     return workday?.scheduleMode ?? "FLEXIBLE";
   }, [draft.weekSchedule]);
 
+  // STUDIO-MASTER-PROFILES: личное расписание или профиля в студии.
+  const endpoint = useScheduleEndpoint();
   useAutoSave({
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch("/api/cabinet/master/schedule", {
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

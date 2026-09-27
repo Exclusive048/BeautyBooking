@@ -2,7 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterClientDetail } from "@/lib/master/clients-view.service";
 import { prisma } from "@/lib/prisma";
 
@@ -41,6 +41,8 @@ export async function GET(req: Request, ctx: RouteContext) {
 
     const detail = await getMasterClientDetail({
       providerId,
+      // STUDIO-MASTER-PROFILES (этап 4): история клиента — по всем профилям мастера.
+      workProfileIds: (await getMasterWorkProfiles(user.id)).allIds,
       timezone: provider.timezone,
       clientKey,
     });

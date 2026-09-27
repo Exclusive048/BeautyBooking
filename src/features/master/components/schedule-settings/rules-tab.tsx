@@ -14,6 +14,7 @@ import { ConfirmationSection } from "./rules/confirmation-section";
 import { HotSlotsSection } from "./rules/hot-slots-section";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
+import { useScheduleEndpoint } from "./schedule-endpoint-context";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
@@ -48,11 +49,13 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
 
   const { setStatus, setErrorMessage } = useSaveStatus();
 
+  // STUDIO-MASTER-PROFILES: личное расписание или профиля в студии.
+  const endpoint = useScheduleEndpoint();
   useAutoSave({
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch("/api/cabinet/master/schedule", {
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

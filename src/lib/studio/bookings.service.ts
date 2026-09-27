@@ -5,6 +5,7 @@ import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import {
   buildConflictScopeWhere,
   buildConflictWindowWhere,
+  resolveConflictOccupancyIds,
   normalizeBufferMinutes,
 } from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
@@ -191,6 +192,10 @@ export async function createStudioBooking(input: {
             ...buildConflictScopeWhere({
               providerId: studio.providerId,
               masterProviderId: master.id,
+              occupancyIds: await resolveConflictOccupancyIds(tx, {
+                providerId: studio.providerId,
+                masterProviderId: master.id,
+              }),
             }),
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
             ...buildConflictWindowWhere({
@@ -472,6 +477,10 @@ export async function moveStudioBooking(input: {
             ...buildConflictScopeWhere({
               providerId: booking.providerId,
               masterProviderId: input.targetMasterId,
+              occupancyIds: await resolveConflictOccupancyIds(tx, {
+                providerId: booking.providerId,
+                masterProviderId: input.targetMasterId,
+              }),
             }),
             id: { not: booking.id },
             status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
@@ -666,6 +675,11 @@ export type StudioMoveResult = {
 export async function updateMasterBookingStatus(input: {
   bookingId: string;
   masterId: string;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера (личный и в
+   * студиях) — мастер действует на записях любого из них из своего кабинета.
+   */
+  masterIds?: readonly string[];
   status: "CONFIRMED" | "REJECTED" | "CANCELLED" | "NO_SHOW";
   comment?: string;
 }): Promise<{
@@ -703,9 +717,10 @@ export async function updateMasterBookingStatus(input: {
   if (!booking) {
     throw new AppError("Запись не найдена.", 404, "BOOKING_NOT_FOUND");
   }
+  const masterIds = input.masterIds ?? [input.masterId];
   const belongsToMaster =
-    booking.masterProviderId === input.masterId ||
-    (booking.masterProviderId === null && booking.providerId === input.masterId);
+    (booking.masterProviderId !== null && masterIds.includes(booking.masterProviderId)) ||
+    (booking.masterProviderId === null && masterIds.includes(booking.providerId));
   if (!belongsToMaster) {
     throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }

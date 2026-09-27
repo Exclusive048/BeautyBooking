@@ -2,7 +2,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getMasterWorkProfiles } from "@/lib/master/access";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import { prisma } from "@/lib/prisma";
 
@@ -41,12 +41,13 @@ export async function GET(req: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
     if (!id) return jsonFail(400, "Проверьте правильность заполнения полей.", "VALIDATION_ERROR");
 
-    const masterProviderId = await getCurrentMasterProviderId(user.id);
+    // STUDIO-MASTER-PROFILES (этап 4): запись любого рабочего профиля мастера.
+    const { allIds } = await getMasterWorkProfiles(user.id);
 
     const booking = await prisma.booking.findFirst({
       where: {
         id,
-        OR: [{ masterProviderId }, { providerId: masterProviderId }],
+        OR: [{ masterProviderId: { in: allIds } }, { providerId: { in: allIds } }],
       },
       select: {
         id: true,

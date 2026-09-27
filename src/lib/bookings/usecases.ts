@@ -9,7 +9,7 @@ import {
   resolveBookingRuntimeStatus,
   type BookingActor,
 } from "@/lib/bookings/flow";
-import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/bookings/booking-core";
+import { buildConflictScopeWhere, buildConflictWindowWhere, resolveConflictOccupancyIds } from "@/lib/bookings/booking-core";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import {
   assertBookingWindow,
@@ -69,7 +69,11 @@ async function ensureNoConflictsExcluding(
   // предложения и всплывал 409-м у противоположной стороны при подтверждении.
   const conflicts = await prisma.booking.findMany({
     where: {
-      ...buildConflictScopeWhere({ providerId, masterProviderId }),
+      ...buildConflictScopeWhere({
+        providerId,
+        masterProviderId,
+        occupancyIds: await resolveConflictOccupancyIds(prisma, { providerId, masterProviderId }),
+      }),
       ...buildConflictWindowWhere({ startAtUtc, endAtUtc, bufferMin }),
       id: { not: bookingId },
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },

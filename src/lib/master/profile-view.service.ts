@@ -1,4 +1,3 @@
-import { ProviderType } from "@prisma/client";
 import { resolveLinkState } from "@/lib/auth/link-state";
 import { getMasterProfileData, type MasterProfileData } from "@/lib/master/profile.service";
 import {
@@ -6,6 +5,7 @@ import {
   type ProfileCompletion,
 } from "@/lib/master/profile-completion";
 import { prisma } from "@/lib/prisma";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 /**
  * Server aggregator for `/cabinet/master/profile` (31a).
@@ -103,7 +103,7 @@ export async function getMasterProfileView(input: {
   // helper — the caller decides what to do with `null` (typically a
   // 403/redirect). Keeps this service callable from non-route contexts.
   const provider = await prisma.provider.findFirst({
-    where: { ownerUserId: input.userId, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(input.userId),
     select: {
       id: true,
       publicUsername: true,

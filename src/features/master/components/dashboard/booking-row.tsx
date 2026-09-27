@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { BookingActionButtons } from "@/features/master/components/dashboard/booking-action-buttons";
 import { BookingRowActions } from "@/features/master/components/dashboard/booking-row-actions";
+import { WorkContextBadge } from "@/features/master/components/work-context-badge";
 import { isBookingPastConfirmWindow } from "@/lib/bookings/action-state";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { formatLocalHm } from "@/lib/schedule/timezone";
@@ -22,6 +23,8 @@ type Props = {
   booking: DashboardBooking;
   /** Salon (master) tz — EXP-017: booking times shown in salon-tz, matching the kanban. */
   timezone: string;
+  /** STUDIO-MASTER-PROFILES (этап 3): пометка «Личная / Студия» рядом с услугой. */
+  showWorkContext?: boolean;
 };
 
 /**
@@ -33,7 +36,7 @@ type Props = {
  * (server-resolved in `dashboard.service.ts`). The row no longer
  * needs the master's own provider id.
  */
-export function BookingRow({ booking, timezone }: Props) {
+export function BookingRow({ booking, timezone, showWorkContext = false }: Props) {
   return (
     <div data-focus-id={booking.id} data-testid="booking-row" className="flex gap-4 px-4 py-4">
       <div className="w-12 shrink-0 text-center">
@@ -78,7 +81,10 @@ export function BookingRow({ booking, timezone }: Props) {
             {formatRub(booking.price)}
           </p>
         </div>
-        <p className="text-sm text-text-sec">{booking.serviceTitle}</p>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-sm text-text-sec">{booking.serviceTitle}</p>
+          {showWorkContext ? <WorkContextBadge context={booking.workContext} /> : null}
+        </div>
         {booking.changeComment ? (
           <p className="mt-1 line-clamp-1 text-xs text-text-sec">
             {booking.changeComment}

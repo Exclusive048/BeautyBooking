@@ -1,4 +1,11 @@
-import { BookingStatus, BookingSource } from "@prisma/client";
+import { BookingStatus, BookingSource, type Prisma } from "@prisma/client";
+import type { MasterWorkProfiles } from "@/lib/master/access";
+import {
+  BOOKING_WORK_CONTEXT_SELECT,
+  resolveBookingWorkContext,
+  shouldShowWorkContext,
+  type BookingWorkContext,
+} from "@/lib/bookings/work-context";
 import {
   applyProfileNames,
   calculateDaysSinceLastVisit,
@@ -47,6 +54,19 @@ const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
   BookingStatus.PREPAID,
 ];
 
+/**
+ * STUDIO-MASTER-PROFILES (этап 4): записи клиента у мастера — по ВСЕМ его
+ * рабочим профилям (личный и в студиях). Карточка клиента (заметки, теги) —
+ * по-прежнему личного профиля: это собственные заметки мастера.
+ */
+export function masterClientBookingsScope(profileIds: readonly string[]): Prisma.BookingWhereInput {
+  const ids = Array.from(new Set(profileIds));
+  if (ids.length === 1) {
+    return { OR: [{ providerId: ids[0] }, { masterProviderId: ids[0] }] };
+  }
+  return { OR: [{ providerId: { in: ids } }, { masterProviderId: { in: ids } }] };
+}
+
 export type ClientsTabId = "all" | "new" | "regular" | "vip" | "sleeping";
 export type ClientsSortId = "recent" | "alphabetical" | "ltv_desc";
 
@@ -60,6 +80,12 @@ export type ClientListItemView = {
   lastVisitAt: string | null;
   daysSinceLastVisit: number | null;
   statuses: ClientStatus[];
+  /**
+   * STUDIO-MASTER-PROFILES (этап 3): откуда клиент — личные записи, записи
+   * студии или и то и другое. Пусто, если мастер работает в одном контексте
+   * (соло-мастеру пометка не нужна).
+   */
+  workContexts: BookingWorkContext[];
 };
 
 export type ClientDetailView = {
@@ -255,16 +281,17 @@ function compareClients(
 }
 
 async function loadAggregates(
-  providerId: string,
+  profileIds: readonly string[],
   windowStart: Date
 ): Promise<{
   aggregates: Map<string, ClientAggregate>;
   bookings: BookingClientRow[];
   bookingSources: Map<string, BookingSource>;
+  workContextsByKey: Map<string, BookingWorkContext[]>;
 }> {
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [{ providerId }, { masterProviderId: providerId }],
+      ...masterClientBookingsScope(profileIds),
       status: { notIn: [BookingStatus.REJECTED, BookingStatus.NO_SHOW] },
       // PERF-06: окно на входе группировки (см. crm/clients-window.ts).
       // KPI-строка и счётчики вкладок считаются из этого же оконного набора —
@@ -289,26 +316,45 @@ async function loadAggregates(
         select: { titleSnapshot: true, priceSnapshot: true },
         orderBy: { createdAt: "asc" },
       },
+      ...BOOKING_WORK_CONTEXT_SELECT,
     },
     orderBy: [{ startAtUtc: "asc" }, { createdAt: "asc" }],
   });
 
   // First booking per client → source
   const bookingSources = new Map<string, BookingSource>();
+  // STUDIO-MASTER-PROFILES (этап 3): контексты клиента — личные записи и/или
+  // записи студий (по одной пометке на студию).
+  const workContextsByKey = new Map<string, BookingWorkContext[]>();
   for (const booking of bookings) {
     const userId = booking.clientUserId;
     const phone = booking.clientPhoneSnapshot ?? booking.clientPhone;
     const key = userId ? `user:${userId}` : phone ? `phone:${phone}` : null;
     if (!key) continue;
     if (!bookingSources.has(key)) bookingSources.set(key, booking.source);
+    const context = resolveBookingWorkContext(booking);
+    const known = workContextsByKey.get(key) ?? [];
+    const duplicate = known.some((item) =>
+      item.kind === "PERSONAL"
+        ? context.kind === "PERSONAL"
+        : context.kind === "STUDIO" && context.studioName === item.studioName,
+    );
+    if (!duplicate) workContextsByKey.set(key, [...known, context]);
   }
 
   const aggregates = groupBookings(bookings as unknown as BookingClientRow[]);
-  return { aggregates, bookings: bookings as unknown as BookingClientRow[], bookingSources };
+  return {
+    aggregates,
+    bookings: bookings as unknown as BookingClientRow[],
+    bookingSources,
+    workContextsByKey,
+  };
 }
 
 export async function getMasterClientsView(input: {
   providerId: string;
+  /** STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера. */
+  workProfiles?: MasterWorkProfiles;
   timezone: string;
   activeTab: ClientsTabId;
   sort: ClientsSortId;
@@ -316,7 +362,14 @@ export async function getMasterClientsView(input: {
   now?: Date;
 }): Promise<MasterClientsViewData> {
   const now = input.now ?? new Date();
-  const { aggregates } = await loadAggregates(input.providerId, crmClientsWindowStart(now));
+  const [{ aggregates, workContextsByKey }, masterRow] = await Promise.all([
+    loadAggregates(input.workProfiles?.allIds ?? [input.providerId], crmClientsWindowStart(now)),
+    prisma.provider.findUnique({ where: { id: input.providerId }, select: { studioId: true } }),
+  ]);
+  const showWorkContext = shouldShowWorkContext({
+    masterInStudio: input.workProfiles?.worksInStudio ?? Boolean(masterRow?.studioId),
+    contexts: Array.from(workContextsByKey.values()).flat(),
+  });
 
   const userIds = Array.from(
     new Set(
@@ -360,6 +413,7 @@ export async function getMasterClientsView(input: {
       lastVisitAt: agg.lastVisitAt ? agg.lastVisitAt.toISOString() : null,
       daysSinceLastVisit: calculateDaysSinceLastVisit(agg.lastVisitAt, input.timezone),
       statuses,
+      workContexts: showWorkContext ? workContextsByKey.get(agg.key) ?? [] : [],
     };
   });
 
@@ -429,6 +483,8 @@ export async function getMasterClientsView(input: {
  */
 export async function getMasterClientDetail(input: {
   providerId: string;
+  /** STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера. */
+  workProfileIds?: readonly string[];
   timezone: string;
   clientKey: string;
   now?: Date;
@@ -447,7 +503,7 @@ export async function getMasterClientDetail(input: {
   const bookings = await prisma.booking.findMany({
     where: {
       AND: [
-        { OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }] },
+        masterClientBookingsScope(input.workProfileIds ?? [input.providerId]),
         { status: { notIn: [BookingStatus.REJECTED, BookingStatus.NO_SHOW] } },
         clientFilter,
       ],
@@ -492,6 +548,7 @@ export async function getMasterClientDetail(input: {
   return buildSelectedClient({
     aggregate,
     providerId: input.providerId,
+    workProfileIds: input.workProfileIds ?? [input.providerId],
     timezone: input.timezone,
     userContacts,
     statuses: classifyClient(
@@ -509,6 +566,7 @@ export async function getMasterClientDetail(input: {
 async function buildSelectedClient(input: {
   aggregate: ClientAggregate;
   providerId: string;
+  workProfileIds: readonly string[];
   timezone: string;
   userContacts: Map<string, ContactInfo>;
   statuses: ClientStatus[];
@@ -517,9 +575,7 @@ async function buildSelectedClient(input: {
   const cardData = await getClientCardData({
     providerId: input.providerId,
     timeZone: input.timezone,
-    bookingWhere: {
-      OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }],
-    },
+    bookingWhere: masterClientBookingsScope(input.workProfileIds),
     clientKey: aggregate.key,
   });
 
@@ -538,7 +594,7 @@ async function buildSelectedClient(input: {
   const upcoming = await prisma.booking.findFirst({
     where: {
       AND: [
-        { OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }] },
+        masterClientBookingsScope(input.workProfileIds),
         clientFilter,
         { status: { in: ACTIVE_BOOKING_STATUSES } },
         { startAtUtc: { gt: new Date() } },
@@ -552,7 +608,7 @@ async function buildSelectedClient(input: {
   const firstBooking = await prisma.booking.findFirst({
     where: {
       AND: [
-        { OR: [{ providerId: input.providerId }, { masterProviderId: input.providerId }] },
+        masterClientBookingsScope(input.workProfileIds),
         clientFilter,
       ],
     },

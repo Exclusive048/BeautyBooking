@@ -4,6 +4,7 @@ import { AlertCircle, Calendar, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmBookingAction } from "@/features/master/components/dashboard/confirm-booking-action";
 import { TaskRow, type TaskUrgency } from "@/features/master/components/dashboard/task-row";
+import { workContextLabel } from "@/features/master/components/work-context-badge";
 import type { DashboardData } from "@/lib/master/dashboard.service";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -32,6 +33,7 @@ type TaskItem = {
 function buildTasks(
   data: Pick<DashboardData, "pendingBookings" | "unansweredReviews" | "freeSlot">,
   timezone: string,
+  showWorkContext: boolean,
 ): TaskItem[] {
   const tasks: TaskItem[] = [];
 
@@ -46,9 +48,12 @@ function buildTasks(
       key: `pending-${pb.id}`,
       icon: AlertCircle,
       title: pb.isRescheduleRequest ? T.rescheduleRequestTitle : T.confirmBookingTitle,
-      description: whenText
-        ? `${pb.clientName}, ${whenText} — ${pb.serviceTitle}`
-        : `${pb.clientName} — ${pb.serviceTitle}`,
+      description:
+        (whenText
+          ? `${pb.clientName}, ${whenText} — ${pb.serviceTitle}`
+          : `${pb.clientName} — ${pb.serviceTitle}`) +
+        // STUDIO-MASTER-PROFILES (этап 3): чья это запись — личная или студии.
+        (showWorkContext ? ` · ${workContextLabel(pb.workContext)}` : ""),
       // fix-02: replace the broken `/bookings/[id]` link with an inline
       // confirm action — same PATCH endpoint the kanban uses, no
       // navigation away from the dashboard.
@@ -112,6 +117,8 @@ type Props = {
   freeSlot: DashboardData["freeSlot"];
   /** Salon (master) tz — EXP-017: booking/slot times shown in salon-tz, matching the kanban. */
   timezone: string;
+  /** STUDIO-MASTER-PROFILES (этап 3): подписывать ли у запроса «личная / студия». */
+  showWorkContext?: boolean;
 };
 
 /**
@@ -124,8 +131,9 @@ export function AttentionSection({
   unansweredReviews,
   freeSlot,
   timezone,
+  showWorkContext = false,
 }: Props) {
-  const tasks = buildTasks({ pendingBookings, unansweredReviews, freeSlot }, timezone);
+  const tasks = buildTasks({ pendingBookings, unansweredReviews, freeSlot }, timezone, showWorkContext);
   const hasTasks = tasks.length > 0;
 
   return (

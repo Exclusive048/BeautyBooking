@@ -5,7 +5,7 @@ import { NewBookingButton } from "@/features/master/components/manual-booking/ne
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { getSessionUserId } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import {
   getMasterBookingsForKanban,
   type KanbanFilters,
@@ -55,7 +55,9 @@ export async function MasterBookingsPage({ searchParams }: Props) {
     tab: parseTab(searchParams.tab),
     clientKey: clientKey ?? undefined,
   };
-  const data = await getMasterBookingsForKanban({ masterId, filters });
+  // STUDIO-MASTER-PROFILES (этап 4): записи всех профилей мастера.
+  const workProfiles = await getMasterWorkProfiles(userId);
+  const data = await getMasterBookingsForKanban({ masterId, filters, workProfiles });
 
   return (
     <>
@@ -76,7 +78,7 @@ export async function MasterBookingsPage({ searchParams }: Props) {
           initialTab={filters.tab ?? "all"}
           stats={data.stats}
         />
-        <KanbanBoard columns={data.columns} />
+        <KanbanBoard columns={data.columns} showWorkContext={data.showWorkContext} />
       </div>
     </>
   );

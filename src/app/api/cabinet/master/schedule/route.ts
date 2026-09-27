@@ -15,7 +15,7 @@ import {
   type BookingRuntimeStatus,
 } from "@/lib/bookings/flow";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderContext } from "@/lib/master/access";
+import { getCurrentMasterProviderContext, listStudioMasterProfiles } from "@/lib/master/access";
 import {
   loadBookingWithRelations,
   notifyCancelledByMaster,
@@ -279,6 +279,21 @@ async function resolveTargetProvider(req: Request, userId: string): Promise<Acto
   const url = new URL(req.url);
   const studioId = url.searchParams.get("studioId")?.trim() ?? "";
   const masterId = url.searchParams.get("masterId")?.trim() ?? "";
+  const profileId = url.searchParams.get("profile")?.trim() ?? "";
+
+  // STUDIO-MASTER-PROFILES (этап 4): свой профиль в студии — расписание
+  // работы в студии; мастер предлагает его изменения заявкой студии.
+  if (profileId && !studioId && !masterId) {
+    const studioProfile = (await listStudioMasterProfiles(userId)).find((item) => item.id === profileId);
+    if (!studioProfile) {
+      throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
+    }
+    return {
+      mode: "STUDIO_MASTER",
+      providerId: studioProfile.id,
+      studioProviderId: studioProfile.studioProviderId,
+    };
+  }
 
   if (!studioId && !masterId) {
     const ownProvider = await getCurrentMasterProviderContext(userId);

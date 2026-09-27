@@ -6,6 +6,7 @@ import type { ApiResponse } from "@/lib/types/api";
 import { UI_TEXT } from "@/lib/ui/text";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
+import { useScheduleEndpoint } from "./schedule-endpoint-context";
 import { NewClientsSection } from "./visibility/new-clients-section";
 import { SlotVisibilitySection } from "./visibility/slot-visibility-section";
 
@@ -26,11 +27,13 @@ export function VisibilityTab({ initialSnapshot }: Props) {
 
   const { setStatus, setErrorMessage } = useSaveStatus();
 
+  // STUDIO-MASTER-PROFILES: личное расписание или профиля в студии.
+  const endpoint = useScheduleEndpoint();
   useAutoSave({
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch("/api/cabinet/master/schedule", {
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visibility: value }),

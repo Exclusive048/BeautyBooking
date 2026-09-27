@@ -1,6 +1,8 @@
 import { Calendar, LineChart, Users, Wallet } from "lucide-react";
 import { StatTileGrid } from "@/components/ui/stat-tile";
 import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
+import { WorkContextRevenueSplit } from "@/features/master/components/work-context-revenue";
+import type { RevenueSplit } from "@/lib/bookings/work-context";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { UI_TEXT } from "@/lib/ui/text";
 
@@ -13,6 +15,11 @@ type Props = {
   weekRevenue: number;
   newClientsCount: number;
   returningClientsCount: number;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 3): выручка раздельно «личные / студия»
+   * (`null` — мастер работает в одном контексте, подписи прежние).
+   */
+  revenueSplit?: { today: RevenueSplit; week: RevenueSplit } | null;
 };
 
 const T = UI_TEXT.cabinetMaster.dashboard.kpi;
@@ -29,6 +36,7 @@ export function KpiCardsGrid({
   weekRevenue,
   newClientsCount,
   returningClientsCount,
+  revenueSplit = null,
 }: Props) {
   const todayBookingsValue = T.todayBookingsValueTemplate
     .replace("{count}", String(todayBookingsCount))
@@ -48,7 +56,16 @@ export function KpiCardsGrid({
         icon={Wallet}
         label={T.todayRevenue}
         value={formatRub(todayRevenue)}
-        sublabel={T.todayRevenueSub}
+        sublabel={
+          revenueSplit ? (
+            <>
+              <span className="sm:hidden">{T.todayRevenueSub}</span>
+              <WorkContextRevenueSplit split={revenueSplit.today} />
+            </>
+          ) : (
+            T.todayRevenueSub
+          )
+        }
       />
       <KpiCard
         icon={Calendar}
@@ -60,7 +77,16 @@ export function KpiCardsGrid({
         icon={LineChart}
         label={T.weekRevenue}
         value={formatRub(weekRevenue)}
-        sublabel={T.weekRevenueSub}
+        sublabel={
+          revenueSplit ? (
+            <>
+              <span className="sm:hidden">{T.weekRevenueSub}</span>
+              <WorkContextRevenueSplit split={revenueSplit.week} />
+            </>
+          ) : (
+            T.weekRevenueSub
+          )
+        }
       />
       <KpiCard
         icon={Users}

@@ -12,7 +12,7 @@ import { MasterPageHeader } from "@/features/master/components/master-page-heade
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
 import { getDayOfWeek } from "@/lib/schedule/timezone";
 import { UI_TEXT } from "@/lib/ui/text";
@@ -45,7 +45,9 @@ export async function MasterDashboardPage() {
   // global topbar already carries the canonical `NotificationsBell` sitewide —
   // two bells were redundant), so the unread count is no longer fetched here.
   // The sidebar still surfaces it via the layout's own `getUnreadBadgeCount`.
-  const data = await getMasterDashboardData({ masterId });
+  // STUDIO-MASTER-PROFILES (этап 4): рабочие списки — по всем профилям мастера.
+  const workProfiles = await getMasterWorkProfiles(userId);
+  const data = await getMasterDashboardData({ masterId, workProfiles });
 
   const firstName =
     sessionUser.firstName?.trim() ||
@@ -134,6 +136,11 @@ export async function MasterDashboardPage() {
           weekRevenue={data.kpis.weekRevenue}
           newClientsCount={data.kpis.newClientsCount}
           returningClientsCount={data.kpis.returningClientsCount}
+          revenueSplit={
+            data.showWorkContext
+              ? { today: data.kpis.todayRevenueSplit, week: data.kpis.weekRevenueSplit }
+              : null
+          }
         />
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
@@ -141,12 +148,14 @@ export async function MasterDashboardPage() {
             upcoming={data.upcomingBookings}
             totalTodayCount={data.todayBookings.length}
             timezone={data.master.timezone}
+            showWorkContext={data.showWorkContext}
           />
           <AttentionSection
             pendingBookings={data.pendingBookings}
             unansweredReviews={data.unansweredReviews}
             freeSlot={data.freeSlot}
             timezone={data.master.timezone}
+            showWorkContext={data.showWorkContext}
           />
         </div>
 

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ProviderType } from "@prisma/client";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
@@ -20,6 +19,7 @@ import { NotificationsKpiCards } from "./notifications-kpi-cards";
 import { NotificationsNotice } from "./notifications-notice";
 import { NotificationsTabs } from "./notifications-tabs";
 import { SortSelect } from "./sort-select";
+import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -52,7 +52,7 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
   if (!user) redirect("/login");
 
   const master = await prisma.provider.findFirst({
-    where: { ownerUserId: user.id, type: ProviderType.MASTER },
+    where: personalMasterProviderWhere(user.id),
     select: { id: true },
   });
   if (!master) redirect("/403");
@@ -60,6 +60,7 @@ export async function MasterNotificationsPage({ searchParams }: Props) {
   const data = await getMasterNotificationsData({
     userId: user.id,
     masterId: master.id,
+    workProfileIds: (await getMasterWorkProfiles(user.id)).allIds,
     phone: user.phone ?? null,
     activeTab,
     sort,

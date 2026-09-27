@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { invalidateSlotsForBooking } from "@/lib/schedule/slotsCache";
+import { resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 
 type BookingRange = {
   providerId: string;
@@ -20,13 +21,25 @@ async function resolveProviderTimezone(providerId: string): Promise<string | nul
   return provider?.timezone ?? null;
 }
 
+/**
+ * STUDIO-MASTER-PROFILES: запись занимает время ЧЕЛОВЕКА, поэтому окошки
+ * сбрасываются у всех его профилей (личного и в студии), каждый — в своём
+ * поясе. Иначе профиль-сосед до 120 с отдавал бы занятое время из кэша.
+ */
 export async function invalidateSlotsForBookingRange(input: BookingRange): Promise<void> {
-  if (!isValidDate(input.startAtUtc) || !isValidDate(input.endAtUtc)) return;
+  const startAtUtc = input.startAtUtc;
+  const endAtUtc = input.endAtUtc;
+  if (!isValidDate(startAtUtc) || !isValidDate(endAtUtc)) return;
   const masterId = input.masterProviderId ?? input.providerId;
   if (!masterId) return;
-  const timezone = await resolveProviderTimezone(masterId);
-  if (!timezone) return;
-  await invalidateSlotsForBooking(masterId, input.startAtUtc, input.endAtUtc, timezone);
+  const occupancyIds = await resolveOccupancyProviderIds(prisma, masterId);
+  await Promise.all(
+    occupancyIds.map(async (profileId) => {
+      const timezone = await resolveProviderTimezone(profileId);
+      if (!timezone) return;
+      await invalidateSlotsForBooking(profileId, startAtUtc, endAtUtc, timezone);
+    }),
+  );
 }
 
 export async function invalidateSlotsForBookingMove(input: {

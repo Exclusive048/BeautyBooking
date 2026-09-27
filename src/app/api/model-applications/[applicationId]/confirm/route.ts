@@ -15,7 +15,7 @@ import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
-import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { buildConflictScopeWhere, resolveConflictOccupancyIds } from "@/lib/bookings/booking-core";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
@@ -262,6 +262,10 @@ export async function POST(req: Request, ctx: RouteContext) {
         const conflictWhere = buildConflictScopeWhere({
           providerId: offerService.providerId,
           masterProviderId: application.offer.masterId ?? null,
+          occupancyIds: await resolveConflictOccupancyIds(tx, {
+            providerId: offerService.providerId,
+            masterProviderId: application.offer.masterId ?? null,
+          }),
         });
 
         const conflicts = await tx.booking.findMany({

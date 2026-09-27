@@ -55,7 +55,10 @@ vi.mock("@/lib/prisma", () => ({
         provider: { minBookingHoursAhead: 2, maxBookingDaysAhead: 60 },
       })),
     },
-    provider: { findUnique: vi.fn(async () => null) },
+    // STUDIO-MASTER-PROFILES: правило «активный мастер опубликованной студии»
+    // (`studio/active-studio-master.ts`) спрашивает `provider.count`; кабинет
+    // этого теста мастером студии не является.
+    provider: { findUnique: vi.fn(async () => null), count: vi.fn(async () => 0) },
   },
 }));
 

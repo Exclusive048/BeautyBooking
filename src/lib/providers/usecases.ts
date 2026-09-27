@@ -1,13 +1,13 @@
 import { AppError } from "@/lib/api/errors";
-import { prisma } from "@/lib/prisma";
 import { listProviderCards } from "@/lib/providers/queries";
-import { mapProviderProfile, mapProviderService } from "@/lib/providers/mappers";
+import { mapProviderProfile } from "@/lib/providers/mappers";
 import type { ProviderCardDto, ProviderProfileDto } from "@/lib/providers/dto";
 import { ProviderType } from "@prisma/client";
 import { getStudioBanner } from "@/lib/studios/banner";
 import { getProviderSuperpowerBadges } from "@/lib/reviews/badges";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { studioAcceptsBookings } from "@/lib/studio/accepts-bookings";
+import { ACTIVE_STUDIO_PROFILE_SELECT, pickActiveStudioProfile } from "@/lib/providers/studio-profile";
 
 // AUDIT (section 5):
 // - Superpower badges are computed server-side from public review tags.
@@ -31,6 +31,9 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       studioId: true,
       studioPaused: true,
       studio: { select: { isPublished: true } },
+      // STUDIO-MASTER-PROFILES (этап 4): профиль того же мастера в студии —
+      // тем же запросом (связь «Часть студии» / «Запись через студию»).
+      ...ACTIVE_STUDIO_PROFILE_SELECT,
       name: true,
       avatarUrl: true,
       tagline: true,
@@ -107,8 +110,13 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
     // STUDIO-MASTER-OWN-BOOKINGS-01: если у мастера студии есть СОБСТВЕННЫЕ
     // услуги, личная страница продаёт их сама (запись идёт мимо студии,
     // `studioId = null`), а на студийные ведёт ссылка «записаться через
-    // студию». Своих услуг нет — прежнее поведение FIX-D1: показываем
-    // студийные, запись через студию.
+    // студию».
+    //
+    // STUDIO-MASTER-PROFILES (этап 2, решение владельца 2026-09-27): услуги
+    // профилей не смешиваются — личная страница продаёт ТОЛЬКО свои услуги.
+    // Своих нет — секция «Услуги» пуста, а запись ведёт в студию (карточка
+    // «Запись через студию»). Раньше (FIX-D1) страница подставляла студийные
+    // услуги, и запись на них становилась ЛИЧНОЙ записью мастера.
     if (provider.studioId) {
       if (provider.studioPaused || !studioAcceptsBookings(provider.studio)) {
         // STUDIO-PAUSE-SPLIT-01: мастер на паузе в студии. Личная страница
@@ -121,8 +129,17 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
         profile.sellsOwnServices = true;
       } else if (profile.services.length > 0) {
         profile.sellsOwnServices = true;
-      } else {
-        profile.services = await loadStudioMasterServices(provider.id);
+      }
+    } else {
+      // STUDIO-MASTER-PROFILES (этап 4): после разделения студийная работа —
+      // на отдельном профиле мастера в студии. Личная страница показывает
+      // связь с ним: «Часть студии», «Запись через студию» (своих услуг нет)
+      // или ссылку «через студию» под виджетом (свои есть).
+      const studioProfile = pickActiveStudioProfile(provider);
+      if (studioProfile) {
+        profile.studioId = studioProfile.studioProviderId;
+        profile.studioMasterProfileId = studioProfile.studioProfileId;
+        profile.sellsOwnServices = profile.services.length > 0;
       }
     }
     profile.superpowerBadges = await getProviderSuperpowerBadges(provider.id);
@@ -131,43 +148,3 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
   return profile;
 }
 
-/**
- * Услуги мастера студии — через `MasterService`, с персональными
- * переопределениями цены и длительности.
- *
- * Предикат тот же, что у каталога (`catalog.service.ts`): связь включена И сама
- * услуга включена и активна. Расхождение здесь означало бы, что карточка в
- * каталоге и профиль показывают разные наборы.
- */
-async function loadStudioMasterServices(masterProviderId: string) {
-  const links = await prisma.masterService.findMany({
-    where: {
-      masterProviderId,
-      isEnabled: true,
-      service: { isEnabled: true, isActive: true },
-    },
-    select: {
-      priceOverride: true,
-      durationOverrideMin: true,
-      service: {
-        select: {
-          id: true,
-          name: true,
-          durationMin: true,
-          price: true,
-          globalCategory: { select: { name: true, orderIndex: true } },
-        },
-      },
-    },
-  });
-
-  return links.map((link) =>
-    mapProviderService({
-      ...link.service,
-      // Переопределения — это то, что мастер берёт за услугу лично; показывать
-      // студийную цену там, где она перебита, значит обещать не ту сумму.
-      price: link.priceOverride ?? link.service.price,
-      durationMin: link.durationOverrideMin ?? link.service.durationMin,
-    }),
-  );
-}

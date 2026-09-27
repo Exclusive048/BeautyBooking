@@ -82,6 +82,8 @@ const EXEMPT: Record<string, string> = {
     "удаление студии блокируется живыми записями студии (DELETION-03, countBlockingStudioBookings) — это тот же набор для всех мастеров сразу",
   "src/lib/invites/service.ts":
     "отвязывается только ничейная заготовка под приглашение (`ownerUserId: null`) — INVITED записи не принимает (инв. #24)",
+  "src/lib/studios/master-profile-split.ts":
+    "STUDIO-MASTER-PROFILES: из студии выходит ЛИЧНЫЙ профиль, а студийная работа (связи с услугами, живые записи студии) в той же транзакции переходит в профиль мастера в студии — мастер из студии не уходит, записи студии остаются за ней",
 };
 
 function walk(dir: string, out: string[] = []): string[] {

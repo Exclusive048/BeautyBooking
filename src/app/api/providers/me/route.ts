@@ -6,6 +6,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { emptyBodySchema } from "@/lib/providers/schemas";
 import { requireAuth } from "@/lib/auth/guards";
 import { mapProviderProfile } from "@/lib/providers/mappers";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 
 function providerTypeFromRoles(roles: AccountType[]) {
   if (roles.includes(AccountType.MASTER)) return ProviderType.MASTER;
@@ -66,7 +67,7 @@ export async function GET(req: Request) {
 
   if (typeParam === "MASTER") {
     const masterProvider = await prisma.provider.findFirst({
-      where: { ownerUserId: user.id, type: ProviderType.MASTER },
+      where: personalMasterProviderWhere(user.id),
       include: providerWithServicesInclude,
     });
 

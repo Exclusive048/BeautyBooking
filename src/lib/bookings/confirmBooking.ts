@@ -5,7 +5,7 @@ import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
-import { buildConflictScopeWhere } from "@/lib/bookings/booking-core";
+import { buildConflictScopeWhere, resolveConflictOccupancyIds } from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
@@ -141,6 +141,7 @@ export async function confirmBooking(
   const conflictWhere = buildConflictScopeWhere({
     providerId: booking.providerId,
     masterProviderId: booking.masterProviderId,
+    occupancyIds: await resolveConflictOccupancyIds(prisma, booking),
   });
 
   const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;

@@ -1,4 +1,4 @@
-import { AccountType, NotificationType, StudioMemberRole, StudioRole } from "@prisma/client";
+import { AccountType, NotificationType, ProviderType, StudioMemberRole, StudioRole } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { removeProfessionalRoles } from "@/lib/auth/roles";
 import { MediaEntityType } from "@prisma/client";
@@ -50,8 +50,19 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
     }
 
     const providerId = masterProfile.providerId;
+    // STUDIO-MASTER-PROFILES (этап 4): профили мастера в студиях — того же
+    // человека, без `MasterProfile`. Кабинет мастера удаляется целиком: и
+    // личный профиль, и профили в студиях (иначе профиль в студии оставался бы
+    // активным и принимал записи от имени удалённого мастера).
+    const studioProfiles = await tx.provider.findMany({
+      where: { ownerUserId: userId, type: ProviderType.MASTER, masterProfile: { is: null } },
+      select: { id: true },
+    });
     // DELETION-03: общий предикат живой записи (включая CHANGE_REQUESTED/PREPAID/STARTED).
-    const activeCount = await countBlockingMasterBookings(tx, providerId);
+    let activeCount = await countBlockingMasterBookings(tx, providerId);
+    for (const studioProfile of studioProfiles) {
+      activeCount += await countBlockingMasterBookings(tx, studioProfile.id);
+    }
 
     if (activeCount > 0) {
       throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", {
@@ -151,6 +162,41 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
         studioPaused: false,
       },
     });
+
+    // STUDIO-MASTER-PROFILES: профили в студиях — та же чистка, что у личного,
+    // по отношениям, которые у профиля в студии бывают (услуг, пакетов,
+    // портфолио и страницы у него нет); строка остаётся ради истории записей
+    // студии, но без владельца и вне студии.
+    for (const studioProfile of studioProfiles) {
+      const studioProfileId = studioProfile.id;
+      await Promise.all([
+        tx.masterService.deleteMany({ where: { masterProviderId: studioProfileId } }),
+        tx.timeBlock.deleteMany({ where: { masterId: studioProfileId } }),
+        tx.scheduleOverride.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.scheduleBreak.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.weeklyScheduleConfig.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.scheduleTemplate.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.scheduleChangeRequest.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.discountRule.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.hotSlot.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.modelOffer.deleteMany({ where: { masterId: studioProfileId } }),
+        tx.portfolioItem.updateMany({
+          where: { performerId: studioProfileId },
+          data: { performerId: null },
+        }),
+      ]);
+      await tx.provider.update({
+        where: { id: studioProfileId },
+        data: {
+          ownerUserId: null,
+          isPublished: false,
+          avatarUrl: null,
+          description: null,
+          studioId: null,
+          studioPaused: false,
+        },
+      });
+    }
 
     await tx.masterProfile.delete({ where: { id: masterProfile.id } });
 

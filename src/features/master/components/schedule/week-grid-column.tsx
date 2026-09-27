@@ -13,6 +13,13 @@ type Props = {
   hourPx: number;
   /** EXP-019: master (salon) tz for the booking-card time label. */
   timezone: string;
+  /** STUDIO-MASTER-PROFILES (этап 3): рисовать ли на карточках пометку «Личная / Студия». */
+  showWorkContext?: boolean;
+  /**
+   * Колонка во всю ширину (вид «День»): у карточки хватает места на подпись
+   * контекста, а не только на иконку.
+   */
+  wideCards?: boolean;
 };
 
 /**
@@ -26,7 +33,15 @@ type Props = {
  *   6. Bookings (stacking on top so they intercept clicks before the
  *      empty-cells overlay underneath)
  */
-export function WeekGridColumn({ day, hourStart, hourEnd, hourPx, timezone }: Props) {
+export function WeekGridColumn({
+  day,
+  hourStart,
+  hourEnd,
+  hourPx,
+  timezone,
+  showWorkContext = false,
+  wideCards = false,
+}: Props) {
   const totalHours = hourEnd - hourStart;
   const totalMin = totalHours * 60;
   const pxPerMin = hourPx / 60;
@@ -117,6 +132,8 @@ export function WeekGridColumn({ day, hourStart, hourEnd, hourPx, timezone }: Pr
             heightPx={Math.min(totalMin * pxPerMin - Math.max(0, top), height)}
             placement={lanes.get(booking.id)}
             timezone={timezone}
+            showWorkContext={showWorkContext}
+            wide={wideCards}
           />
         );
       })}

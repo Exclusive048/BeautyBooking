@@ -9,6 +9,7 @@ import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { clampVisibleSlotsHorizon } from "@/lib/bookings/policy-enforcement";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
+import { isActiveMasterOfPublishedStudio } from "@/lib/studio/active-studio-master";
 
 function toIso(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -72,19 +73,28 @@ export async function GET(
       return fail("Слишком много дней за раз. Выберите период короче.", 400, "LIMIT_INVALID");
     }
 
-    const provider = await resolveProviderBySlugOrId({
+    const providerSelect = {
+      id: true,
+      type: true,
+      timezone: true,
+      // BOOKING-WIDGET-A: policy fields are needed for the visible-window
+      // clamp + min-hours filter below. Keep selection narrow.
+      minBookingHoursAhead: true,
+      visibleSlotDays: true,
+    } as const;
+    // STUDIO-MASTER-PROFILES (этап 4): у профиля мастера в студии публичной
+    // страницы нет, а окошки ему нужны — перенос студийной записи клиентом
+    // идёт сюда. Мастер, активный в опубликованной студии, отдаёт окошки и без
+    // своей страницы (то же правило, что у `/availability`).
+    let provider = await resolveProviderBySlugOrId({
       key: p.providerId,
-      select: {
-        id: true,
-        type: true,
-        timezone: true,
-        // BOOKING-WIDGET-A: policy fields are needed for the visible-window
-        // clamp + min-hours filter below. Keep selection narrow.
-        minBookingHoursAhead: true,
-        visibleSlotDays: true,
-      },
+      select: providerSelect,
       requirePublished: true,
     });
+    if (!provider) {
+      const candidate = await resolveProviderBySlugOrId({ key: p.providerId, select: providerSelect });
+      if (candidate && (await isActiveMasterOfPublishedStudio(candidate.id))) provider = candidate;
+    }
     if (!provider || provider.type !== "MASTER") {
       return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");
     }

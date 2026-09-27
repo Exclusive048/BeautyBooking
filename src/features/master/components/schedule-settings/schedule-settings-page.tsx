@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
-import { getCurrentMasterProviderId } from "@/lib/master/access";
+import { getMasterWorkProfiles } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { buildScheduleSnapshot } from "@/lib/schedule/editor";
 import { UI_TEXT } from "@/lib/ui/text";
 import { SaveStatusIndicator } from "./save-status-indicator";
 import { SaveStatusProvider } from "./save-status-provider";
 import { ScheduleSettingsBody } from "./schedule-settings-body";
+import { ScheduleEndpointProvider } from "./schedule-endpoint-context";
+import { ScheduleProfileSwitch } from "./schedule-profile-switch";
 
 const T = UI_TEXT.cabinetMaster;
 const S = UI_TEXT.cabinetMaster.scheduleSettings;
@@ -24,11 +26,28 @@ const S = UI_TEXT.cabinetMaster.scheduleSettings;
  * client tabs. The legacy <MasterScheduleEditor> is no longer mounted
  * here — it lives at the studio cabinet until that flow is rebuilt.
  */
-export async function ScheduleSettingsPage() {
+export async function ScheduleSettingsPage({ profile = null }: { profile?: string | null } = {}) {
   const user = await getSessionUser();
   if (!user) redirect("/login");
 
-  const providerId = await getCurrentMasterProviderId(user.id);
+  // STUDIO-MASTER-PROFILES (этап 4): у мастера, работающего и лично, и в
+  // студии, два расписания. Личное правится сразу; расписание профиля в студии
+  // — через заявку студии (тот же поток, что был у мастера студии).
+  const workProfiles = await getMasterWorkProfiles(user.id);
+  const activeStudioProfile = profile
+    ? workProfiles.studioProfiles.find((item) => item.id === profile) ?? null
+    : null;
+  const providerId = activeStudioProfile?.id ?? workProfiles.personalId;
+  const studioNames = workProfiles.studioProfiles.length
+    ? await prisma.provider.findMany({
+        where: { id: { in: workProfiles.studioProfiles.map((item) => item.studioProviderId) } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const profileSwitchItems = workProfiles.studioProfiles.map((item) => ({
+    id: item.id,
+    studioName: studioNames.find((studio) => studio.id === item.studioProviderId)?.name ?? "",
+  }));
   const [snapshot, provider, plan] = await Promise.all([
     buildScheduleSnapshot(providerId),
     prisma.provider.findUnique({
@@ -39,7 +58,8 @@ export async function ScheduleSettingsPage() {
   ]);
 
   const previewHref = provider?.publicUsername ? `/u/${provider.publicUsername}` : null;
-  const hotSlotsAllowed = Boolean(plan.features.hotSlots);
+  // Горящие окошки — личные (по своим услугам); у расписания в студии их нет.
+  const hotSlotsAllowed = !activeStudioProfile && Boolean(plan.features.hotSlots);
 
   // QA-114 (FIX-06): a studio master's schedule edits route to a
   // ScheduleChangeRequest awaiting studio approval — surface that in the editor.
@@ -87,12 +107,21 @@ export async function ScheduleSettingsPage() {
         }
       />
 
-      <div className="px-4 py-6 md:px-6 lg:px-8">
-        <ScheduleSettingsBody
-          initialSnapshot={snapshot}
-          hotSlotsAllowed={hotSlotsAllowed}
-          studioApproval={studioApproval}
-        />
+      <div className="space-y-4 px-4 py-6 md:px-6 lg:px-8">
+        {profileSwitchItems.length > 0 ? (
+          <ScheduleProfileSwitch
+            studioProfiles={profileSwitchItems}
+            activeStudioProfileId={activeStudioProfile?.id ?? null}
+          />
+        ) : null}
+        <ScheduleEndpointProvider studioProfileId={activeStudioProfile?.id ?? null}>
+          <ScheduleSettingsBody
+            key={providerId}
+            initialSnapshot={snapshot}
+            hotSlotsAllowed={hotSlotsAllowed}
+            studioApproval={studioApproval}
+          />
+        </ScheduleEndpointProvider>
       </div>
     </SaveStatusProvider>
   );

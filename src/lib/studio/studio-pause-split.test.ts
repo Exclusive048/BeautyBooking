@@ -103,11 +103,23 @@ async function core(input: { providerId: string; serviceId: string; masterProvid
 }
 
 describe("resolveBookingCore · мастер на паузе в студии", () => {
-  it("со своей страницы — студийная услуга: отказ MASTER_NOT_ACTIVE", async () => {
+  // STUDIO-MASTER-PROFILES (решение владельца 2026-09-27): студийная услуга со
+  // страницы мастера не оформляется вовсе — независимо от паузы (услуги
+  // профилей не смешиваются). Раньше здесь был MASTER_NOT_ACTIVE, а у активного
+  // мастера запись проходила и становилась ЛИЧНОЙ.
+  it("со своей страницы — студийная услуга: отказ, запись только через студию", async () => {
     providerFindUnique.mockResolvedValue(masterRow(true));
     serviceFindUnique.mockResolvedValue(STUDIO_SERVICE);
     await expect(core({ providerId: "m1", serviceId: "svc-studio", masterProviderId: null })).rejects.toMatchObject({
-      code: "MASTER_NOT_ACTIVE",
+      code: "SERVICE_NOT_BELONGS_TO_PROVIDER",
+    });
+  });
+
+  it("активный мастер со своей страницы — студийная услуга тоже отказ", async () => {
+    providerFindUnique.mockResolvedValue(masterRow(false));
+    serviceFindUnique.mockResolvedValue(STUDIO_SERVICE);
+    await expect(core({ providerId: "m1", serviceId: "svc-studio", masterProviderId: null })).rejects.toMatchObject({
+      code: "SERVICE_NOT_BELONGS_TO_PROVIDER",
     });
   });
 
