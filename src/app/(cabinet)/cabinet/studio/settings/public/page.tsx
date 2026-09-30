@@ -4,7 +4,7 @@ import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { PublicSettingsClient } from "@/features/billing/components/public-settings-client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   code: string | null;
@@ -27,7 +27,7 @@ export function BookingError({
   if (!code && !fallback) return null;
   const message = resolveMessage(code, fallback, minBookingHoursAhead, maxBookingDaysAhead);
   return (
-    <div className="flex items-start gap-2 rounded-xl border border-red-200/60 bg-red-50/80 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+    <div className="flex items-start gap-2 rounded-xl border border-danger-border bg-danger-surface px-3 py-2.5 text-sm text-danger-text">
       <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
       <p className="leading-snug">{message}</p>
     </div>

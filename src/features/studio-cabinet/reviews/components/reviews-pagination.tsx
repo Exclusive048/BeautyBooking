@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.pagination;
 
@@ -22,13 +23,9 @@ export function ReviewsPagination({ nextCursor }: Props) {
 
   return (
     <div className="flex justify-center pt-2">
-      <button
-        type="button"
-        onClick={loadMore}
-        className="rounded-full border border-border-subtle bg-bg-card px-4 py-2 text-sm font-medium text-text-main transition-colors hover:bg-bg-input/60"
-      >
+      <Button variant="secondary" size="sm" onClick={loadMore}>
         {T.loadMore}
-      </button>
+      </Button>
     </div>
   );
 }

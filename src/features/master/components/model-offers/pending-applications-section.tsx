@@ -2,7 +2,7 @@ import type {
   ApplicationItem,
   OfferFilterOption,
 } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ApplicationCard } from "./application-card";
 import { ApplicationEmptyState } from "./application-empty-state";
 import { ApplicationOfferFilter } from "./application-offer-filter";

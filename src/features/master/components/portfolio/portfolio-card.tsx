@@ -1,11 +1,15 @@
 "use client";
 
-import { Eye, EyeOff, MoreVertical, Pencil, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, MoreVertical, Pencil, Star, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
+import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { cn } from "@/lib/cn";
 import type {
   PortfolioCategoryOption,
@@ -13,12 +17,44 @@ import type {
   PortfolioServiceOption,
   PortfolioTagOption,
 } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { EditItemModal } from "./modals/edit-item-modal";
-import { ReorderControls } from "./reorder-controls";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.card;
 const M = UI_TEXT.cabinetMaster.portfolioPage.menu;
+const R = UI_TEXT.cabinetMaster.portfolioPage.reorder;
+
+/** Ширина меню «⋮» и отступ от края экрана. */
+const MENU_WIDTH_PX = 224;
+const MENU_EDGE_PX = 8;
+/** Высота пункта меню (`min-h-11`) и вертикальные поля списка. */
+const MENU_ITEM_PX = 44;
+const MENU_PADDING_PX = 8;
+/** Прокрутка страницы, после которой меню у кнопки закрывается. */
+const MENU_SCROLL_CLOSE_PX = 24;
+
+type MenuPosition = { top: number; left: number };
+
+/**
+ * Меню открывается у кнопки, но в границах экрана: шире плитки на телефоне,
+ * поэтому у левой колонки оно не должно уезжать за край, а у нижнего ряда —
+ * под нижнюю навигацию (тогда открывается вверх).
+ */
+function placeMenu(anchor: DOMRect, itemCount: number): MenuPosition {
+  const height = itemCount * MENU_ITEM_PX + MENU_PADDING_PX;
+  const left = Math.min(
+    Math.max(MENU_EDGE_PX, anchor.right - MENU_WIDTH_PX),
+    window.innerWidth - MENU_WIDTH_PX - MENU_EDGE_PX,
+  );
+  // Нижняя навигация телефона закрывает низ экрана (`--bottom-nav-h` ставит
+  // `BottomTabBar`; на ПК — 0).
+  const bottomNav =
+    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bottom-nav-h")) || 0;
+  const below = anchor.bottom + 4;
+  const fitsBelow = below + height <= window.innerHeight - bottomNav - MENU_EDGE_PX;
+  return { left, top: fitsBelow ? below : Math.max(MENU_EDGE_PX, anchor.top - height - 4) };
+}
 
 type Props = {
   item: PortfolioItemView;
@@ -30,13 +66,17 @@ type Props = {
 };
 
 /**
- * Single portfolio tile — image + hidden badge + reorder controls +
- * inline menu. Click anywhere on the tile (outside the controls) opens
- * the edit modal.
+ * Плитка работы: фото, значки «Главное фото» / «скрыта» и кнопки поверх фото.
  *
- * The menu is a tiny popover that toggles via local state. We don't
- * pull in radix-popover for one button — `useState` + outside-click
- * via a backdrop is sufficient.
+ * «Изменить» и «Удалить» видны всегда (снизу справа), остальное — в меню «⋮»
+ * (сверху справа): сделать главным, скрыть/показать, переместить раньше/позже.
+ * Раньше кнопки появлялись только при наведении, а стрелки порядка на телефоне
+ * не появлялись вовсе — действия с работой было не найти. Нажатие на само фото
+ * по-прежнему открывает редактирование.
+ *
+ * Меню — портал с фиксированной позицией у кнопки и прозрачный
+ * слой-«закрыватель»: внутри плитки (`overflow-hidden`) оно обрезалось.
+ * Закрывается по Esc, прокрутке и нажатию мимо.
  */
 export function PortfolioCard({
   item,
@@ -47,72 +87,91 @@ export function PortfolioCard({
   masterTags,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { confirm, modal: confirmModal } = useConfirm();
   const [editOpen, setEditOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<MenuPosition | null>(null);
+  // Портал — только после гидрации (MODAL-SSR-OPEN-HYDRATION).
+  const isHydrated = useIsHydrated();
+  const menuOpen = menuPos !== null;
+  const closeMenu = () => setMenuPos(null);
   const [busy, setBusy] = useState(false);
+  const number = String(item.globalIndex + 1);
+  const canMakeCover = item.isPublic && !item.isCatalogCover;
+  const menuItemCount = 1 + (canMakeCover ? 1 : 0) + (isFirst ? 0 : 1) + (isLast ? 0 : 1);
 
-  const togglePublic = async () => {
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuPos(null);
+    // Меню стоит у кнопки фиксированно — заметная прокрутка страницы его
+    // закрывает. Мелкая (докатывающаяся плавная прокрутка) — нет.
+    const openedAt = window.scrollY;
+    const onScroll = () => {
+      if (Math.abs(window.scrollY - openedAt) > MENU_SCROLL_CLOSE_PX) close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  const runAction = async (action: () => Promise<unknown>, errorMessage: string) => {
     if (busy) return;
     setBusy(true);
-    setMenuOpen(false);
+    closeMenu();
     try {
-      const response = await fetch(`/api/master/portfolio/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPublic: !item.isPublic }),
-      });
-      if (!response.ok) {
-        window.alert(UI_TEXT.cabinetMaster.portfolioPage.edit.errorUpdate);
-        return;
-      }
+      await action();
       router.refresh();
+    } catch (error) {
+      toast.error(serverMessageOr(error, errorMessage));
     } finally {
       setBusy(false);
     }
   };
+
+  const togglePublic = () =>
+    runAction(
+      () =>
+        fetchJsonWithAuth(`/api/master/portfolio/${item.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublic: !item.isPublic }),
+        }),
+      UI_TEXT.cabinetMaster.portfolioPage.edit.errorUpdate,
+    );
 
   // CATALOG-MAIN-PHOTO: главное фото = первая публичная работа, поэтому
   // «Сделать главным» — это перенос в начало портфолио.
-  const makeCover = async () => {
-    if (busy) return;
-    setBusy(true);
-    setMenuOpen(false);
-    try {
-      const response = await fetch("/api/master/portfolio/reorder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, direction: "top" }),
-      });
-      if (!response.ok) {
-        window.alert(M.makeCoverError);
-        return;
-      }
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const move = (direction: "top" | "up" | "down") =>
+    runAction(
+      () =>
+        fetchJsonWithAuth("/api/master/portfolio/reorder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.id, direction }),
+        }),
+      direction === "top" ? M.makeCoverError : R.errorMessage,
+    );
 
   const handleDelete = async () => {
     if (busy) return;
-    setMenuOpen(false);
+    closeMenu();
     const ok = await confirm({
       message: UI_TEXT.cabinetMaster.portfolioPage.edit.confirmDelete,
       variant: "danger",
     });
     if (!ok) return;
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/master/portfolio/${item.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        window.alert(UI_TEXT.cabinetMaster.portfolioPage.edit.errorDelete);
-        return;
-      }
-      router.refresh();
-    } finally {
-      setBusy(false);
-    }
+    await runAction(
+      () => fetchJsonWithAuth(`/api/master/portfolio/${item.id}`, { method: "DELETE" }),
+      UI_TEXT.cabinetMaster.portfolioPage.edit.errorDelete,
+    );
   };
 
   return (
@@ -123,21 +182,27 @@ export function PortfolioCard({
           "hover:shadow-card",
           !item.isPublic && "opacity-95"
         )}
+        data-testid="portfolio-card"
       >
-        <button
+        {/* Нажатие на фото — то же, что «Изменить»; с клавиатуры до правки ведёт
+            кнопка-карандаш, поэтому здесь фокуса нет. */}
+        <Button
           type="button"
+          variant="wrapper"
+          size="none"
+          tabIndex={-1}
+          aria-hidden
           onClick={() => setEditOpen(true)}
-          aria-label={T.editAriaTemplate.replace("{n}", String(item.globalIndex + 1))}
           className="relative block h-full w-full"
         >
           <ResilientImage
             src={item.mediaUrl}
-            alt={T.imageAltTemplate.replace("{n}", String(item.globalIndex + 1))}
+            alt={T.imageAltTemplate.replace("{n}", number)}
             loading="lazy"
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             className="object-cover"
           />
-        </button>
+        </Button>
 
         {item.isCatalogCover ? (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-white shadow-card">
@@ -153,75 +218,75 @@ export function PortfolioCard({
           </span>
         ) : null}
 
-        <ReorderControls itemId={item.id} isFirst={isFirst} isLast={isLast} />
-
-        {/* На тач-экране наведения нет — без `hover:none` меню (и в нём
-            «Сделать главным») было бы невидимым. */}
-        <div className="absolute right-2 top-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
-          <button
-            type="button"
+        <div className="absolute right-0 top-0">
+          <PhotoActionButton
+            label={T.menuAria}
+            expanded={menuOpen}
             onClick={(event) => {
-              event.stopPropagation();
-              setMenuOpen((prev) => !prev);
+              // Координаты — сразу: к вызову функции-обновителя React уже
+              // обнулит `currentTarget`.
+              const anchor = event.currentTarget.getBoundingClientRect();
+              setMenuPos((prev) => (prev ? null : placeMenu(anchor, menuItemCount)));
             }}
-            aria-label={T.menuAria}
             disabled={busy}
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-bg-card/95 text-text-main shadow-card transition-colors hover:bg-bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            data-testid="portfolio-card-menu"
           >
-            <MoreVertical className="h-3.5 w-3.5" aria-hidden />
-          </button>
-          {menuOpen ? (
+            <MoreVertical className="h-4 w-4" aria-hidden />
+          </PhotoActionButton>
+        </div>
+        {isHydrated && menuPos
+          ? createPortal(
             <>
-              <button
+              <Button
                 type="button"
+                variant="wrapper"
+                size="none"
                 aria-label={UI_TEXT.a11y.closeMenu}
-                className="fixed inset-0 z-10 cursor-default"
-                onClick={() => setMenuOpen(false)}
+                className="fixed inset-0 z-popover cursor-default"
+                onClick={() => closeMenu()}
               />
               <ul
-                className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-border-subtle bg-bg-card py-1 shadow-card"
+                className="fixed z-popover rounded-xl border border-border-subtle bg-bg-card py-1 shadow-hover"
+                style={{ top: menuPos.top, left: menuPos.left, width: MENU_WIDTH_PX }}
+                data-testid="portfolio-card-menu-list"
               >
-                <MenuItem
-                  icon={Pencil}
-                  label={M.edit}
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setEditOpen(true);
-                  }}
-                />
-                {item.isPublic && !item.isCatalogCover ? (
-                  <MenuItem icon={Star} label={M.makeCover} onClick={makeCover} />
+                {canMakeCover ? (
+                  <MenuItem icon={Star} label={M.makeCover} onClick={() => void move("top")} />
                 ) : null}
                 <MenuItem
                   icon={item.isPublic ? EyeOff : Eye}
                   label={item.isPublic ? M.hide : M.show}
-                  onClick={togglePublic}
+                  onClick={() => void togglePublic()}
                 />
-                <li className="my-0.5 border-t border-border-subtle" />
-                <MenuItem
-                  icon={Trash2}
-                  label={M.delete}
-                  onClick={handleDelete}
-                  destructive
-                />
+                {!isFirst ? (
+                  <MenuItem icon={ArrowLeft} label={M.moveEarlier} onClick={() => void move("up")} />
+                ) : null}
+                {!isLast ? (
+                  <MenuItem icon={ArrowRight} label={M.moveLater} onClick={() => void move("down")} />
+                ) : null}
               </ul>
-            </>
-          ) : null}
-        </div>
+            </>,
+            document.body,
+          )
+          : null}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center bg-gradient-to-t from-black/40 via-black/0 to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="pointer-events-auto gap-1.5"
-            onClick={(event) => {
-              event.stopPropagation();
-              setEditOpen(true);
-            }}
+        <div className="absolute bottom-0 right-0 flex">
+          <PhotoActionButton
+            label={T.editAriaTemplate.replace("{n}", number)}
+            onClick={() => setEditOpen(true)}
+            disabled={busy}
+            data-testid="portfolio-card-edit"
           >
-            <Pencil className="h-3.5 w-3.5" aria-hidden />
-            {M.edit}
-          </Button>
+            <Pencil className="h-4 w-4" aria-hidden />
+          </PhotoActionButton>
+          <PhotoActionButton
+            label={T.deleteAriaTemplate.replace("{n}", number)}
+            onClick={() => void handleDelete()}
+            disabled={busy}
+            data-testid="portfolio-card-delete"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+          </PhotoActionButton>
         </div>
       </div>
 
@@ -244,26 +309,23 @@ function MenuItem({
   icon: Icon,
   label,
   onClick,
-  destructive,
 }: {
   icon: typeof Pencil;
   label: string;
   onClick: () => void;
-  destructive?: boolean;
 }) {
   return (
     <li>
-      <button
+      <Button
         type="button"
+        variant="wrapper"
+        size="none"
         onClick={onClick}
-        className={cn(
-          "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-bg-input",
-          destructive ? "text-rose-700 dark:text-rose-300" : "text-text-main"
-        )}
+        className="flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-text-main transition-colors hover:bg-bg-input"
       >
-        <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <Icon className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
         {label}
-      </button>
+      </Button>
     </li>
   );
 }

@@ -7,10 +7,10 @@ import { UI_FMT } from "@/lib/ui/fmt";
 const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 
 const ACCENT_DOT: Record<ColumnId, string> = {
-  pending: "bg-amber-500",
-  confirmed: "bg-blue-500",
+  pending: "bg-warning",
+  confirmed: "bg-info",
   today: "bg-primary",
-  done: "bg-emerald-500",
+  done: "bg-success",
   cancelled: "bg-text-sec/50",
 };
 

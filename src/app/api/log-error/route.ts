@@ -2,6 +2,8 @@ import { z } from "zod";
 import { logError } from "@/lib/logging/logger";
 import { ok, fail } from "@/lib/api/response";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 
@@ -21,13 +23,14 @@ const RATE_MAX = 20;
 export async function POST(req: Request) {
   try {
     const ip = getClientIp(req);
-    // The legacy 3-arg checkRateLimit overload returns `true` = ALLOWED. This
-    // previously read the result as `isLimited`, inverting the check: the first
-    // 20 reports/min were rejected and everything past the limit was accepted
-    // (SECURITY-EXPOSURE-AUDIT-01 · Y2). Guard on `!allowed`.
-    const allowed = await checkRateLimit(`log-error:${ip}`, RATE_MAX, RATE_WINDOW);
-    if (!allowed) {
-      return fail("Слишком много запросов. Попробуйте позже.", 429);
+    // SECURITY-EXPOSURE-AUDIT-01 · Y2: здесь читали `true`-«разрешено» legacy-
+    // перегрузки как «ограничено». Перегрузки больше нет (29.09 доработки · 15):
+    // ответ несёт причину, отказ — через общий `resolveRateLimitRefusal`.
+    const refusal = resolveRateLimitRefusal(
+      await checkRateLimit(routeRateLimitKey(req, "ip", ip), { maxRequests: RATE_MAX, windowSeconds: RATE_WINDOW }),
+    );
+    if (refusal) {
+      return fail(refusal.message, refusal.status, refusal.code);
     }
 
     // SEC-16: Zod ограничивает поля только ПОСЛЕ разбора — граница размера

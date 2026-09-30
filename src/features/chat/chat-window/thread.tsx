@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { MessageBubble } from "@/features/chat/chat-window/message-bubble";
 import { DaySeparator } from "@/features/chat/chat-window/day-separator";
 import { SystemMessage } from "@/features/chat/chat-window/system-message";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective, ThreadItemDto } from "@/features/chat/types";
 
 const T = UI_TEXT.chat;

@@ -27,6 +27,6 @@ export function getBookingSourceDisplay(source: BookingSource): SourceDisplay {
 }
 
 export const SOURCE_BADGE_CLASS: Record<SourceTone, string> = {
-  info: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300",
+  info: "border-info-border bg-info-surface text-info-text",
   neutral: "border-border-subtle bg-bg-input text-text-sec",
 };

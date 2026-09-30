@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   addUtcDays,
   parseDateKey,
@@ -21,6 +21,7 @@ import type {
 } from "../server/types";
 import { CreateBookingDialog } from "./dialogs/create-booking-dialog";
 import { ManageBreaksDialog } from "./dialogs/manage-breaks-dialog";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.header;
 const WEEKDAY_LONG_RU = [
@@ -171,59 +172,38 @@ export function ScheduleHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-bg-page p-1">
-            <button
-              type="button"
-              onClick={() => handleViewChange("day")}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                view === "day"
-                  ? "bg-bg-card text-text-main shadow-card"
-                  : "bg-transparent text-text-sec hover:text-text-main",
-              )}
-              aria-pressed={view === "day"}
-            >
-              {T.views.day}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleViewChange("week")}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                view === "week"
-                  ? "bg-bg-card text-text-main shadow-card"
-                  : "bg-transparent text-text-sec hover:text-text-main",
-              )}
-              aria-pressed={view === "week"}
-            >
-              {T.views.week}
-            </button>
-          </div>
+          <SegmentedTabs<StudioScheduleView>
+            ariaLabel={T.viewAria}
+            value={view}
+            onChange={handleViewChange}
+            className="w-44"
+            options={[
+              { value: "day", label: T.views.day },
+              { value: "week", label: T.views.week },
+            ]}
+          />
 
           <div className="inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-bg-card">
-            <button
-              type="button"
+            <Button variant="wrapper"
               onClick={() => handleDateShift(view === "week" ? -7 : -1)}
               className="h-9 w-9 rounded-l-xl text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
               aria-label={T.prev}
             >
               <ChevronLeft className="mx-auto h-4 w-4" aria-hidden />
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="wrapper"
               onClick={handleToday}
               className="px-3 text-sm font-medium text-text-main transition-colors hover:bg-bg-input"
             >
               {T.today}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button variant="wrapper"
               onClick={() => handleDateShift(view === "week" ? 7 : 1)}
               className="h-9 w-9 rounded-r-xl text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
               aria-label={T.next}
             >
               <ChevronRight className="mx-auto h-4 w-4" aria-hidden />
-            </button>
+            </Button>
           </div>
 
           <Button

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
 import { getDayOfWeek, toLocalDateKey } from "@/lib/schedule/timezone";
 import {
@@ -9,14 +9,28 @@ import {
 } from "@/lib/schedule/dateKey";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
 import type { AnalyticsRange } from "@/features/analytics/domain/date-range";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 export type TimelineGranularity = "day" | "week" | "month";
 
 /**
+ * Сырой-SQL близнец студийной ветки `buildScopeWhere` (алиас брони — `b`):
+ * когорты и тепловая карта идут `$queryRaw`, и держали свою копию прежнего
+ * `OR` по `providerId` студии (29.09 доработки · 08). Без `studioId` — провайдер,
+ * как в `buildScopeWhere`.
+ */
+export function buildStudioScopeSql(context: AnalyticsContext): Prisma.Sql {
+  return context.studioId
+    ? Prisma.sql`b."studioId" = ${context.studioId}`
+    : Prisma.sql`b."providerId" = ${context.providerId}`;
+}
+
+/**
  * The tenant-scope `where` for a booking analytics query — the SINGLE tenant
  * boundary definition (HARDENING-05). MASTER scope early-returns, scoped to the
- * master's own provider; STUDIO scope covers the studio (`studioId`) or its
- * provider (`providerId`), optionally narrowed to one master.
+ * master's own provider; STUDIO scope covers the studio's bookings by
+ * `studioId` (`studioBookingsWhere` — the same field the cabinet authorizes by,
+ * 29.09 доработки · 08), optionally narrowed to one master.
  *
  * FIX-7 footgun class: the STUDIO branch must NEVER emit `{ studioId: undefined }`
  * inside the OR — a null studioId would drop the key → `{}` → match-all
@@ -33,7 +47,7 @@ export function buildScopeWhere(context: AnalyticsContext): Prisma.BookingWhereI
   }
 
   const studioScope: Prisma.BookingWhereInput = context.studioId
-    ? { OR: [{ studioId: context.studioId }, { providerId: context.providerId }] }
+    ? studioBookingsWhere(context.studioId)
     : { providerId: context.providerId };
 
   if (context.masterFilterId) {
@@ -71,13 +85,6 @@ export function parseTimeToMinutes(value: string): number {
   const minutes = Number(match[2]);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
   return Math.max(0, hours * 60 + minutes);
-}
-
-export function diffMinutes(start: string, end: string): number {
-  const startMin = parseTimeToMinutes(start);
-  const endMin = parseTimeToMinutes(end);
-  if (endMin <= startMin) return 0;
-  return endMin - startMin;
 }
 
 export function getBucketKey(date: Date, timeZone: string, granularity: TimelineGranularity): string {
@@ -136,15 +143,4 @@ export function listBucketKeys(range: AnalyticsRange, timeZone: string, granular
     }
   }
   return keys;
-}
-
-export function countWeekdaysInRange(range: AnalyticsRange, timeZone: string): number[] {
-  const counts = Array.from({ length: 7 }, () => 0);
-  const keys = listDateKeysInclusive(range.fromKey, range.toKey);
-  for (const key of keys) {
-    const date = new Date(`${key}T12:00:00.000Z`);
-    const dow = getDayOfWeek(date, timeZone);
-    counts[dow] += 1;
-  }
-  return counts;
 }

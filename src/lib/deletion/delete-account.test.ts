@@ -161,6 +161,34 @@ describe("deleteUserAccount — preserved behaviour", () => {
     expect(call.where.createdAt.lt).toBeInstanceOf(Date);
   });
 
+  // 29.09 доработки · 00-6. @probe 2026-09-29 — ветка почты снята из
+  // `otpOwners`: покраснел «коды входа — и по телефону, и по подтверждённой
+  // почте». Условие `emailVerifiedAt` снято: покраснел «неподтверждённая почта —
+  // чужие коды не трогаются». Возвращено — зелёный.
+  it("коды входа — и по телефону, и по подтверждённой почте", async () => {
+    prismaMock.userProfile.findUnique.mockResolvedValue({
+      id: USER_ID,
+      phone: "+79990001122",
+      email: "Anna@Example.ru",
+      emailVerifiedAt: new Date("2026-09-01T00:00:00Z"),
+    });
+    await deleteUserAccount(USER_ID);
+    expect(tx.otpCode.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ phone: "+79990001122" }, { email: "anna@example.ru" }] },
+    });
+  });
+
+  it("неподтверждённая почта — чужие коды не трогаются", async () => {
+    prismaMock.userProfile.findUnique.mockResolvedValue({
+      id: USER_ID,
+      phone: null,
+      email: "someone@example.ru",
+      emailVerifiedAt: null,
+    });
+    await deleteUserAccount(USER_ID);
+    expect(tx.otpCode.deleteMany).not.toHaveBeenCalled();
+  });
+
   it("404s for a missing user", async () => {
     prismaMock.userProfile.findUnique.mockResolvedValue(null);
     await expect(deleteUserAccount("nope")).rejects.toMatchObject({ status: 404 });

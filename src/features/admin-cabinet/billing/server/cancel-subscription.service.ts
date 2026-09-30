@@ -8,6 +8,10 @@ import {
   type AdminAuditContext,
 } from "@/lib/audit/admin-audit-context";
 import { createBillingAuditLog } from "@/lib/billing/audit";
+import {
+  formatBillingDeadlineLabel,
+  resolveSubscriptionTimezone,
+} from "@/lib/billing/deadline-label";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { dispatchAdminInitiatedNotification } from "@/lib/notifications/admin-initiated";
@@ -141,13 +145,16 @@ export async function adminCancelSubscription(input: CancelInput): Promise<{
   }
 
   try {
+    const timeZone = await resolveSubscriptionTimezone(subscription.userId, subscription.scope);
     await dispatchAdminInitiatedNotification({
       targetUserId: subscription.userId,
       type: NotificationType.BILLING_SUBSCRIPTION_CANCELLED_BY_ADMIN,
       title: "Подписка отменена администратором",
       body: buildSubscriptionCancelledByAdminBody({
         planName: subscription.plan.name,
-        accessUntil: subscription.currentPeriodEnd,
+        accessUntilLabel: subscription.currentPeriodEnd
+          ? formatBillingDeadlineLabel(subscription.currentPeriodEnd, timeZone)
+          : null,
         reason: input.reason ?? null,
       }),
       url: "/cabinet/billing",

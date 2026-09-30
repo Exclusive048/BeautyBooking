@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { usePrompt } from "@/hooks/use-prompt";
 import { useConfirm } from "@/hooks/use-confirm";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.bookings;
 
@@ -67,24 +66,16 @@ export function BookingCardActions({
     setBusy(status === "CONFIRMED" ? "confirm" : "decline");
     setError(null);
     try {
-      const res = await fetch(`/api/master/bookings/${bookingId}/status`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/bookings/${bookingId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, ...(comment ? { comment } : {}) }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : status === "CONFIRMED"
-            ? T.confirmError
-            : T.declineError,
-      );
+      // Раньше любой отказ без тела печатал общий дефолт вместо строки
+      // поверхности — `serverMessageOr` различает (29.09 · 11).
+      setError(serverMessageOr(err, status === "CONFIRMED" ? T.confirmError : T.declineError));
     } finally {
       setBusy(null);
     }
@@ -122,7 +113,7 @@ export function BookingCardActions({
   // buttons so the click doesn't hit the backend's «another side» 409.
   if (isInitiatorWaitingResponse) {
     return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-200">
+      <div className="rounded-lg border border-warning-border bg-warning-surface px-2.5 py-1.5 text-[11px] text-warning-text">
         {T.card.awaitingClientResponse}
       </div>
     );
@@ -160,7 +151,7 @@ export function BookingCardActions({
           </Button>
         </div>
         {error ? (
-          <p className="text-[11px] text-red-600">{error}</p>
+          <p className="text-[11px] text-danger-text">{error}</p>
         ) : null}
       </div>
       {promptModal}

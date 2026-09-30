@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
-  CATALOG_PRESENCE_CONDITIONS,
+  catalogPresenceConditions,
   type CatalogPresenceGap,
 } from "@/lib/providers/catalog-visibility";
 
@@ -21,16 +21,17 @@ const GAP_ORDER: readonly CatalogPresenceGap[] = ["hidden", "address", "schedule
  * мастер без адреса или расписания видел «Опубликован», а в каталоге его не
  * было.
  *
- * Условия берутся из `CATALOG_PRESENCE_CONDITIONS` — из них же собран предикат
+ * Условия берутся из `catalogPresenceConditions` — из них же собран предикат
  * каталога, поэтому «в каталоге» здесь и в выдаче не могут разойтись:
  * `listed` — это конъюнкция тех же условий, что и предикат. Один запрос на
  * условие — это кабинет, не горячий путь.
  */
 export async function resolveCatalogPresence(providerId: string): Promise<CatalogPresence | null> {
+  const conditions = catalogPresenceConditions();
   const [exists, ...met] = await Promise.all([
     prisma.provider.count({ where: { id: providerId } }),
     ...GAP_ORDER.map((gap) =>
-      prisma.provider.count({ where: { id: providerId, ...CATALOG_PRESENCE_CONDITIONS[gap] } }),
+      prisma.provider.count({ where: { id: providerId, ...conditions[gap] } }),
     ),
   ]);
   if (exists === 0) return null;

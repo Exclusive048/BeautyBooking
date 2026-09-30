@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SystemHealthRow } from "@/features/admin-cabinet/dashboard/components/system-health-row";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminHealth,
 } from "@/features/admin-cabinet/dashboard/types";

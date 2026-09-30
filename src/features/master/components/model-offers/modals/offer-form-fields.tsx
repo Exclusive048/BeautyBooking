@@ -3,11 +3,12 @@
 import { X } from "lucide-react";
 import { useId, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/cn";
 import type { AvailableServiceForOffer } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatRubles } from "../lib/format";
 import { MAX_REQUIREMENTS, commitRequirementDraft } from "../lib/requirements";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.create;
 
@@ -77,16 +78,12 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
     <div className="space-y-5">
       <div>
         <Label htmlFor={serviceId}>{T.serviceLabel}</Label>
-        <select
+        <Select
           id={serviceId}
           value={state.serviceId}
           disabled={serviceReadOnly}
           onChange={(event) => update("serviceId", event.target.value)}
-          className={cn(
-            "mt-1.5 block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main",
-            "focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-            "disabled:cursor-not-allowed disabled:opacity-60"
-          )}
+          className="mt-1.5 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="">{T.servicePlaceholder}</option>
           {services.map((service) => {
@@ -102,7 +99,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
               </option>
             );
           })}
-        </select>
+        </Select>
       </div>
 
       <div>
@@ -156,12 +153,12 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
           className="mt-1.5 h-11 rounded-xl px-3 text-sm"
         />
         {priceKopeks === 0 ? (
-          <p className="mt-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+          <p className="mt-1.5 text-xs text-success-text">
             ✦ {T.freeHint}
           </p>
         ) : null}
         {discountPct !== null ? (
-          <p className="mt-1.5 text-xs text-emerald-700 dark:text-emerald-300">
+          <p className="mt-1.5 text-xs text-success-text">
             {T.discountHintTemplate.replace("{percent}", String(discountPct))}
           </p>
         ) : null}
@@ -246,14 +243,13 @@ function RequirementsField({
               className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-xs text-text-main"
             >
               <span>{item}</span>
-              <button
-                type="button"
+              <Button variant="wrapper"
                 onClick={() => onRemove(value.filter((other) => other !== item))}
                 aria-label={UI_TEXT.a11y.removeItem(item)}
                 className="text-text-sec hover:text-accent-text"
               >
                 <X className="h-3 w-3" aria-hidden />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

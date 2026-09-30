@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type {
   PortfolioCategoryOption,
 } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { UploadModal } from "./modals/upload-modal";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage;
@@ -21,7 +21,7 @@ export function AddButton({ categories }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="primary" size="md" onClick={() => setOpen(true)} className="gap-1.5">
+      <Button variant="primary" size="md" onClick={() => setOpen(true)} className="gap-1.5" data-guide="portfolio">
         <Plus className="h-4 w-4" aria-hidden />
         {T.addCta}
       </Button>

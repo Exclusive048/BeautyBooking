@@ -123,7 +123,21 @@ const nextConfig = {
   // Externalising leaves these as runtime `require()`s, which is correct: they
   // are Node-only packages that must never be bundled. Server-side only —
   // the client bundle uses `@sentry/browser`, which is bundler-safe.
-  webpack: (config: { externals?: unknown[] }, { isServer }: { isServer: boolean }) => {
+  //
+  // 29.09 доработки · 18 (PERF-02): барель UI-текстов и его домены объявлены
+  // модулями без побочных эффектов. Потребители импортируют `* as UI_TEXT`, и
+  // webpack по статическому доступу `UI_TEXT.<домен>` берёт только нужные
+  // домены; правило гарантирует, что неиспользуемые реэкспорты барели
+  // отбрасываются независимо от эвристики. Замер — отчёт спеки 18.
+  webpack: (
+    config: { externals?: unknown[]; module?: { rules?: unknown[] } },
+    { isServer }: { isServer: boolean },
+  ) => {
+    config.module = config.module ?? {};
+    config.module.rules = [
+      ...(config.module.rules ?? []),
+      { test: /src[\\/]lib[\\/]ui[\\/]text(\.ts$|[\\/])/, sideEffects: false },
+    ];
     if (isServer) {
       config.externals = [
         ...(config.externals ?? []),

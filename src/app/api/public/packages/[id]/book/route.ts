@@ -9,6 +9,7 @@ import { getSessionUserFromRequest } from "@/lib/auth/session";
 import { issueGuestManagePath } from "@/lib/bookings/guest-manage";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
@@ -65,8 +66,8 @@ export async function POST(
       return jsonFail(400, "Проверьте номер телефона.", "VALIDATION_ERROR");
     }
 
-    const phoneKey = `rate:packageBook:phone:${phoneNormalized}`;
-    const ipKey = `rate:packageBook:ip:${getClientIp(req)}`;
+    const phoneKey = routeRateLimitKey(req, "phone", phoneNormalized);
+    const ipKey = routeRateLimitKey(req, "ip", getClientIp(req));
     // FIX-C11: причина отказа различима — 503 при обрыве, 429 при бюджете.
     const [phoneLimit, ipLimit] = await Promise.all([
       checkRateLimit(phoneKey, {

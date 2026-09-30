@@ -6,7 +6,8 @@ import { FormDialog } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMasterDetail } from "../server/types";
 
 const T = UI_TEXT.studioCabinet.mastersV2.editProfileDialog;
@@ -56,7 +57,7 @@ export function EditMasterProfileDialog({ studioId, detail, open, onClose }: Pro
     }
     setError(null);
     try {
-      const response = await fetch(`/api/studio/masters/${encodeURIComponent(detail.providerId)}`, {
+      await fetchJsonWithAuth<unknown>(`/api/studio/masters/${encodeURIComponent(detail.providerId)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -66,17 +67,10 @@ export function EditMasterProfileDialog({ studioId, detail, open, onClose }: Pro
           description: description.trim(),
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? T.saveFailed);
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(T.saveFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, T.saveFailed));
     }
   }
 

@@ -6,7 +6,9 @@ import { useState, useTransition } from "react";
 import { CalendarClock, Check, MessageSquare, Star, User, X } from "lucide-react";
 import { NotificationType } from "@/lib/prisma-enums";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import { usePrompt } from "@/hooks/use-prompt";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { readNotificationPayload } from "@/features/master/components/notifications/lib/payload";
 
 const T = UI_TEXT.studioCabinet.notificationsV2.actions;
@@ -38,6 +40,9 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const refresh = () => startTransition(() => router.refresh());
+  // 29.09 доработки · 10: причина отказа — окном дизайн-системы, а не
+  // `window.prompt` (его нашло правило `no-alert`, заведённое той же правкой).
+  const { prompt, modal: promptModal } = usePrompt();
 
   const payload = readNotificationPayload(payloadJson);
 
@@ -55,17 +60,10 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
         decision === "rsAccept"
           ? `/api/bookings/${encodeURIComponent(payload.bookingId)}/confirm`
           : `/api/bookings/${encodeURIComponent(payload.bookingId)}/decline-reschedule`;
-      const response = await fetch(url, { method: "POST" });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.bookingReschedule);
-        return;
-      }
+      await fetchJsonWithAuth<unknown>(url, { method: "POST" });
       refresh();
-    } catch {
-      setError(E.bookingReschedule);
+    } catch (error) {
+      setError(serverMessageOr(error, E.bookingReschedule));
     } finally {
       setBusy(null);
     }
@@ -83,7 +81,7 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
     setBusy(action);
     setError(null);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/studio/schedule/requests/${encodeURIComponent(realScheduleRequestId)}/${action}`,
         {
           method: "POST",
@@ -91,16 +89,9 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
           body: comment ? JSON.stringify({ comment }) : undefined,
         },
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.scheduleRequest);
-        return;
-      }
       refresh();
-    } catch {
-      setError(E.scheduleRequest);
+    } catch (error) {
+      setError(serverMessageOr(error, E.scheduleRequest));
     } finally {
       setBusy(null);
     }
@@ -125,9 +116,15 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
             variant="secondary"
             size="sm"
             disabled={busy !== null}
-            onClick={() => {
-              const raw = window.prompt(T.rejectPrompt) ?? "";
-              const trimmed = raw.trim();
+            onClick={async () => {
+              const reason = await prompt({
+                title: T.rejectTitle,
+                message: T.rejectPrompt,
+                label: T.rejectLabel,
+                confirmLabel: T.reject,
+                variant: "danger",
+              });
+              const trimmed = reason?.trim();
               if (!trimmed) return;
               void callScheduleRequestAction("reject", trimmed);
             }}
@@ -145,10 +142,11 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
           ) : null}
         </div>
         {error ? (
-          <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
+          <p role="alert" className="text-xs text-danger-text">
             {error}
           </p>
         ) : null}
+        {promptModal}
       </div>
     );
   }
@@ -191,7 +189,7 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
           </Link>
         </div>
         {error ? (
-          <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
+          <p role="alert" className="text-xs text-danger-text">
             {error}
           </p>
         ) : null}

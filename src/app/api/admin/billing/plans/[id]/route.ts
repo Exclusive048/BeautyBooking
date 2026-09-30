@@ -8,7 +8,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { BILLING_PERIODS } from "@/lib/billing/constants";
 import { createBillingAuditLog } from "@/lib/billing/audit";
 import { findOrphanedOfferedPeriod } from "@/lib/billing/price-active-guard";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { createAdminAuditLog } from "@/lib/audit/admin-audit";
 import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { logError, logInfo } from "@/lib/logging/logger";
@@ -110,7 +110,7 @@ async function assertNoInheritanceCycle(
   for (let depth = 0; depth < MAX_DEPTH && current; depth += 1) {
     if (current === planId) {
       throw new AppError(
-        "Обнаружен цикл наследования тарифов",
+        "Обнаружен цикл наследования тарифов — выберите другой родительский тариф.",
         400,
         "INHERITANCE_CYCLE",
       );
@@ -150,7 +150,7 @@ function assertRelaxedLimits(
         "Лимит нельзя сделать строже, чем у родительского тарифа.",
         400,
         "STRICT_LIMIT",
-        { fieldErrors: { [key]: "Limit cannot be stricter than parent." } },
+        { fieldErrors: { [key]: "Лимит строже, чем у родительского тарифа." } },
       );
     }
   }

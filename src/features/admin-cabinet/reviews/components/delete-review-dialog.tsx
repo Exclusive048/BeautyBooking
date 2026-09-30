@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
 
 const T = UI_TEXT.adminPanel.reviews.deleteDialog;
@@ -50,12 +50,12 @@ export function DeleteReviewDialog({
       <p className="text-sm text-text-main">
         {T.body.replace("{author}", review.authorDisplay)}
       </p>
-      <div className="flex items-start gap-2 rounded-xl bg-red-500/10 px-3 py-2.5">
+      <div className="flex items-start gap-2 rounded-xl bg-destructive/10 px-3 py-2.5">
         <AlertTriangle
-          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600 dark:text-red-300"
+          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger-text"
           aria-hidden
         />
-        <p className="text-xs text-red-700 dark:text-red-300">{T.warning}</p>
+        <p className="text-xs text-danger-text">{T.warning}</p>
       </div>
       <div>
         <label

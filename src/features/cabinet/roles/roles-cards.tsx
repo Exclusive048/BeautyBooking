@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ApiResponse } from "@/lib/types/api";
 import { RoleCardMaster } from "@/features/cabinet/roles/role-card-master";
 import { RoleCardStudio } from "@/features/cabinet/roles/role-card-studio";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type MasterActiveData = {
   name: string;
@@ -41,11 +41,6 @@ type Props = {
 
 type DeleteType = "master" | "studio";
 
-type ErrorPayload = {
-  ok: false;
-  error: { message: string; code?: string; details?: unknown };
-};
-
 export function RolesCards({
   hasMasterProfile,
   hasStudioProfile,
@@ -79,27 +74,17 @@ export function RolesCards({
     try {
       const endpoint =
         confirmDelete === "master" ? "/api/cabinet/master/delete" : "/api/cabinet/studio/delete";
-      const res = await fetch(endpoint, { method: "DELETE" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | ErrorPayload | null;
-      if (!res.ok || !json || !json.ok) {
-        // UI-17: фолбэк — курируемая строка, а не «Ошибка удаления: 500».
-        // HTTP-статус пользователю ничего не сообщает и ничего не предлагает;
-        // ответ без курируемого `message` — ровно тот случай, для которого
-        // `deleteFailed` и написан.
-        const message = json && !json.ok ? json.error.message : UI_TEXT.cabinetRolesPage.deleteFailed;
-        const code = json && !json.ok ? json.error.code : null;
-        if (code === "ACTIVE_BOOKINGS") {
-          const details = json && !json.ok ? (json.error.details as { count?: number } | undefined) : undefined;
-          setActiveBookingsCount(typeof details?.count === "number" ? details.count : 0);
-        } else {
-          setError(message);
-        }
-        return;
-      }
+      await fetchJsonWithAuth<{ deleted: boolean }>(endpoint, { method: "DELETE" });
       closeModal();
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : UI_TEXT.cabinetRolesPage.deleteFailed);
+      // UI-17: без курируемой строки — `deleteFailed`, а не «Ошибка удаления: 500».
+      if (err instanceof ApiClientError && err.code === "ACTIVE_BOOKINGS") {
+        const details = err.details as { count?: number } | undefined;
+        setActiveBookingsCount(typeof details?.count === "number" ? details.count : 0);
+      } else {
+        setError(serverMessageOr(err, UI_TEXT.cabinetRolesPage.deleteFailed));
+      }
     } finally {
       setDeleting(false);
     }

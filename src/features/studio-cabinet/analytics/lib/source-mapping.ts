@@ -14,13 +14,15 @@ export const SOURCE_LABEL: Record<BookingSource, string> = {
 };
 
 export const SOURCE_TONE: Record<BookingSource, string> = {
-  WEB: "bg-emerald-500",
-  MANUAL: "bg-blue-500",
+  WEB: "bg-success",
+  MANUAL: "bg-info",
+  // dark-ok: категория данных графика (источник «Приложение»), не статус
   APP: "bg-violet-500",
 };
 
 export const SOURCE_RING: Record<BookingSource, string> = {
-  WEB: "stroke-emerald-500",
-  MANUAL: "stroke-blue-500",
+  WEB: "stroke-success",
+  MANUAL: "stroke-info",
+  // dark-ok: категория данных графика (источник «Приложение»), не статус
   APP: "stroke-violet-500",
 };

@@ -2,6 +2,7 @@ import { ProviderType, StudioRole } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { fail, ok } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { resolveCatalogPresence } from "@/lib/providers/catalog-presence";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
@@ -21,10 +22,11 @@ export async function GET(req: Request) {
     type === ProviderType.STUDIO
       ? await resolveAdministeredStudioProviderId(auth.user.id)
       : (
+          // STUDIO-MASTER-PROFILES (этап 4): статус в каталоге — у ЛИЧНОГО
+          // профиля; «самый старый MASTER» мог оказаться профилем в студии.
           await prisma.provider.findFirst({
-            where: { ownerUserId: auth.user.id, type },
+            where: personalMasterProviderWhere(auth.user.id),
             select: { id: true },
-            orderBy: { createdAt: "asc" },
           })
         )?.id ?? null;
   if (!providerId) return fail("Кабинет не найден.", 404, "PROVIDER_NOT_FOUND");

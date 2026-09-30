@@ -1,5 +1,6 @@
 import { AccountType, BookingSource } from "@prisma/client";
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { clearOfferTime } from "@/lib/bookings/booking-time-policy";
 import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
@@ -15,8 +16,7 @@ import { parseBody } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { dateFromKey, parseTime } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
-import { buildConflictScopeWhere, resolveConflictOccupancyIds } from "@/lib/bookings/booking-core";
-import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
+import { ensureNoConflicts } from "@/lib/bookings/booking-core";
 import { invalidateSlotsForBookingRange } from "@/lib/bookings/slot-invalidation";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { prisma } from "@/lib/prisma";
@@ -41,14 +41,6 @@ function normalizeBufferMinutes(value: number | null | undefined): number {
   const safe = Math.floor(value as number);
   if (safe <= 0) return 0;
   return Math.min(30, safe);
-}
-
-function shiftMinutes(date: Date, minutes: number): Date {
-  return new Date(date.getTime() + minutes * 60 * 1000);
-}
-
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-  return aStart < bEnd && aEnd > bStart;
 }
 
 async function resolveBufferMinutes(
@@ -208,6 +200,9 @@ export async function POST(req: Request, ctx: RouteContext) {
       timeParts.minutes,
       application.offer.master.timezone
     );
+    // 29.09 доработки · 07 (решение владельца): окна мастера здесь нет — время
+    // назначил он сам, — но прошедшее время не подтверждается.
+    const timeClearance = clearOfferTime(startAtUtc, new Date());
 
     const durationMin =
       resolveServiceDuration({
@@ -253,56 +248,17 @@ export async function POST(req: Request, ctx: RouteContext) {
           application.offer.masterId,
           tx.provider
         );
-        const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
-        const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
-
-        // LOGIC-01: скоуп — из общего билдера. Собственная пара
-        // `(providerId, masterProviderId)` не видела брони того же мастера,
-        // созданные под другим `providerId` (личный профиль ↔ студия).
-        const conflictWhere = buildConflictScopeWhere({
+        // LOGIC-01 / LOGIC-06: общая проверка (29.09 доработки · 14) — скоуп из
+        // билдера (брони того же мастера под другим `providerId` видны), окно из
+        // `buildConflictWindowWhere` (здесь жило своё), закрытое время
+        // исполнителя. До LOGIC-06 этот путь сажал бронь внутрь BREAK/BLOCK.
+        await ensureNoConflicts(tx, {
           providerId: offerService.providerId,
           masterProviderId: application.offer.masterId ?? null,
-          occupancyIds: await resolveConflictOccupancyIds(tx, {
-            providerId: offerService.providerId,
-            masterProviderId: application.offer.masterId ?? null,
-          }),
-        });
-
-        const conflicts = await tx.booking.findMany({
-          where: {
-            ...conflictWhere,
-            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            startAtUtc: { not: null, lt: bufferedEnd },
-            endAtUtc: { not: null, gt: bufferedStart },
-          },
-          select: { id: true, startAtUtc: true, endAtUtc: true },
-          take: 1,
-        });
-
-        const conflict = conflicts.find((item) => {
-          if (!item.startAtUtc || !item.endAtUtc) return false;
-          const itemStart = bufferMin ? shiftMinutes(item.startAtUtc, -bufferMin) : item.startAtUtc;
-          const itemEnd = bufferMin ? shiftMinutes(item.endAtUtc, bufferMin) : item.endAtUtc;
-          return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
-        });
-        if (conflict) {
-          throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
-        }
-
-        // LOGIC-06: пятый путь создания брони пропускал guard объявленного
-        // отсутствия мастера. `FIX-TIMEBLOCK-ENFORCEMENT-01` объявляет
-        // `assertNoTimeBlockConflict` «ONE primitive reused at every create/move
-        // site» (`time-blocks.ts:22-25`) — этот сайт был единственным
-        // пропущенным, и подтверждение модель-оффера сажало бронь внутрь
-        // BREAK/BLOCK: мастер видел в календаре блок и бронь поверх него.
-        //
-        // Владелец блока — исполняющий мастер: `masterProviderId`, а для оффера
-        // без назначенного мастера — `providerId` (ровно как в
-        // `ensureNoConflicts`, чтобы определение владельца не разошлось).
-        await assertNoTimeBlockConflict(tx, {
-          masterProviderId: application.offer.masterId ?? offerService.providerId,
           startAtUtc,
           endAtUtc,
+          bufferMin,
+          message: "Это время уже занято. Выберите другое.",
         });
 
         // FIX-C1: третий путь, не выставлявший `Booking.studioId`. Он был
@@ -311,6 +267,7 @@ export async function POST(req: Request, ctx: RouteContext) {
         // таблица со своей одноимённой колонкой. Греп по файлу находил слово и
         // успокаивал. Теперь значение выводит writer из `providerId`.
         const booking = await createBookingRow(tx, {
+          timePolicy: timeClearance,
           data: {
             providerId: offerService.providerId,
             serviceId: offerService.id,

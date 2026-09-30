@@ -8,7 +8,7 @@ import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { withQuery } from "@/lib/public-urls";
 import { looksLikeProviderId, resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
 
 type Props = {

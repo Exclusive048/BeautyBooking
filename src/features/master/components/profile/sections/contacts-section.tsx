@@ -5,7 +5,7 @@ import type { ProfileContacts } from "@/lib/master/profile-view.service";
 import { isTelegramEnabled, isVkAuthEnabled, isYandexAuthEnabled } from "@/lib/env";
 import { PhoneVerifyActions } from "@/features/cabinet/components/phone-verify-actions";
 import { PhoneVerifyNotice } from "@/features/cabinet/components/phone-verify-notice";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { EditableFieldRow } from "../editable/editable-field-row";
 import { SectionShell } from "./section-shell";
 
@@ -140,7 +140,7 @@ function ReadonlyRow({
       </div>
       {verified ? (
         <span
-          className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+          className="inline-flex items-center gap-1 rounded-full bg-success-surface px-2 py-0.5 text-[10px] text-success-text"
           aria-label={T.verifiedLabel}
         >
           <BadgeCheck className="h-3 w-3" aria-hidden />

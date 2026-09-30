@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BookingStatus } from "@prisma/client";
-import type { ApiResponse } from "@/lib/types/api";
 import { CLIENT_TAGS } from "@/lib/crm/tags";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { Drawer } from "@/components/ui/drawer";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { FileInput } from "@/components/ui/file-input";
 
 type CardPhoto = {
   id: string;
@@ -117,20 +117,16 @@ export function ClientCardDrawer({
     setDaysSinceLastVisit(null);
     setCardTimeZone(null);
     try {
-      const res = await fetch(`${baseUrl}/${encodeURIComponent(clientKey)}/card${query}`, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<CardData> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      setNotes(json.data.card.notes ?? "");
-      setTags(json.data.card.tags ?? []);
-      setPhotos(json.data.card.photos ?? []);
-      setHistory(json.data.history ?? []);
-      setVisitsCount(json.data.visitsCount ?? 0);
-      setDaysSinceLastVisit(json.data.daysSinceLastVisit ?? null);
-      setCardTimeZone(json.data.timeZone ?? null);
+      const data = await fetchJsonWithAuth<CardData>(`${baseUrl}/${encodeURIComponent(clientKey)}/card${query}`, { cache: "no-store" });
+      setNotes(data.card.notes ?? "");
+      setTags(data.card.tags ?? []);
+      setPhotos(data.card.photos ?? []);
+      setHistory(data.history ?? []);
+      setVisitsCount(data.visitsCount ?? 0);
+      setDaysSinceLastVisit(data.daysSinceLastVisit ?? null);
+      setCardTimeZone(data.timeZone ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить карточку клиента. Попробуйте ещё раз.");
+      setError(serverMessageOr(err, "Не удалось загрузить карточку клиента. Попробуйте ещё раз."));
     } finally {
       setLoading(false);
     }
@@ -163,18 +159,14 @@ export function ClientCardDrawer({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`${baseUrl}/${encodeURIComponent(clientKey)}/card${query}`, {
+      await fetchJsonWithAuth<{ card: { id: string; notes: string | null; tags: string[] } }>(`${baseUrl}/${encodeURIComponent(clientKey)}/card${query}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes, tags }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ card: { id: string; notes: string | null; tags: string[] } }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       onUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить карточку");
+      setError(serverMessageOr(err, "Не удалось сохранить карточку"));
     } finally {
       setSaving(false);
     }
@@ -191,18 +183,14 @@ export function ClientCardDrawer({
     try {
       const form = new FormData();
       form.set("file", file);
-      const res = await fetch(`${baseUrl}/${encodeURIComponent(clientKey)}/card/photos${query}`, {
+      const data = await fetchJsonWithAuth<{ photo: CardPhoto }>(`${baseUrl}/${encodeURIComponent(clientKey)}/card/photos${query}`, {
         method: "POST",
         body: form,
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ photo: CardPhoto }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      setPhotos((current) => [json.data.photo, ...current]);
+      setPhotos((current) => [data.photo, ...current]);
       onUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить фото");
+      setError(serverMessageOr(err, "Не удалось загрузить фото"));
     } finally {
       setSaving(false);
     }
@@ -213,17 +201,13 @@ export function ClientCardDrawer({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`${baseUrl}/${encodeURIComponent(clientKey)}/card/photos/${photoId}${query}`, {
+      await fetchJsonWithAuth<{ deleted: boolean }>(`${baseUrl}/${encodeURIComponent(clientKey)}/card/photos/${photoId}${query}`, {
         method: "DELETE",
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       setPhotos((current) => current.filter((photo) => photo.id !== photoId));
       onUpdated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить фото");
+      setError(serverMessageOr(err, "Не удалось удалить фото"));
     } finally {
       setSaving(false);
     }
@@ -252,7 +236,7 @@ export function ClientCardDrawer({
       <div className="p-5">
         {loading ? <div className="text-sm text-text-sec">Загружаем...</div> : null}
         {error ? (
-          <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
+          <div role="alert" className="mt-4 rounded-2xl border border-danger-border bg-danger-surface p-3 text-sm text-danger-text">{error}</div>
         ) : null}
 
         {!loading ? (
@@ -306,7 +290,7 @@ export function ClientCardDrawer({
               </div>
               <div className="mt-3 grid gap-3 grid-cols-2 sm:grid-cols-3">
                 {photos.map((photo, index) => (
-                  <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-neutral-100">
+                  <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-2xl border bg-muted">
                     {/* PWA-FIX-01: фото карточки клиента приватное
                         (CLIENT_CARD/CLIENT_CARD_PHOTO — только владелец карточки),
                         а оптимизатор `next/image` забирает байты внутренним
@@ -371,11 +355,9 @@ export function ClientCardDrawer({
           </div>
         ) : null}
 
-        <input
+        <FileInput
           ref={fileRef}
-          type="file"
           accept="image/jpeg,image/png,image/webp"
-          className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) {

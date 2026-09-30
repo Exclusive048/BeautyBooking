@@ -13,14 +13,16 @@ type ResolveInput = {
   providerTimezone: string;
 };
 
-function resolveMetaSource(input: { rule: ScheduleRuleConfig | null; hasOverride: boolean }): DayPlan["meta"] {
+function resolveMetaSource(input: {
+  periodSource: "pattern" | "weekly-legacy" | null;
+  hasOverride: boolean;
+  templateId: string | null;
+}): DayPlan["meta"] {
+  const templateId = input.templateId ? { templateId: input.templateId } : {};
   if (input.hasOverride) {
-    return { source: "override" };
+    return { source: "override", ...templateId };
   }
-  if (input.rule?.kind === "CYCLE") {
-    return { source: "cycle" };
-  }
-  return { source: "weekly-template" };
+  return { source: input.periodSource === "pattern" ? "pattern" : "weekly-template", ...templateId };
 }
 
 export function resolveDayPlanFromRule(input: ResolveInput): DayPlan {
@@ -41,7 +43,7 @@ export function resolveDayPlanFromRule(input: ResolveInput): DayPlan {
       isWorking: false,
       workingIntervals: [],
       breaks: extraBreaks,
-      meta: resolveMetaSource({ rule: input.rule, hasOverride }),
+      meta: resolveMetaSource({ periodSource: workday.periodSource, hasOverride, templateId: null }),
     };
   }
 
@@ -49,6 +51,7 @@ export function resolveDayPlanFromRule(input: ResolveInput): DayPlan {
     isWorking: true,
     workingIntervals: [{ start: workday.startLocal, end: workday.endLocal }],
     breaks: [...workday.breaks.map((item) => ({ start: item.startLocal, end: item.endLocal })), ...extraBreaks],
-    meta: resolveMetaSource({ rule: input.rule, hasOverride }),
+    ...(workday.fixedStarts ? { fixedStarts: workday.fixedStarts } : {}),
+    meta: resolveMetaSource({ periodSource: workday.periodSource, hasOverride, templateId: workday.templateId }),
   };
 }

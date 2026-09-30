@@ -3,7 +3,7 @@ import { StudioMastersCarousel } from "@/features/public-studio/studio-masters-c
 import { getStudioMasters, getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 
 type Props = {
@@ -28,10 +28,7 @@ export async function StudioTeamSection({ studioId }: Props) {
     isOwner = owner;
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("team-section", error, [
-      `/api/providers/${studioId}`,
-      `/api/providers/${studioId}/masters`,
-    ]);
+    logPublicStudioBlockError("team-section", error, ["getProviderProfile", "listPublicTeamMasters"]);
   }
 
   if (hasError) {

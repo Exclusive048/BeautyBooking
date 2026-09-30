@@ -8,7 +8,8 @@ import type {
   ActiveOfferItem,
   AvailableServiceForOffer,
 } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { resolveRequirementsForSubmit } from "../lib/requirements";
 import { OfferFormFields, type OfferFormState } from "./offer-form-fields";
 
@@ -75,7 +76,7 @@ export function EditOfferModal({ open, onClose, offer, services }: Props) {
     try {
       const priceNumber = parseFloat(state.priceRubles.replace(",", "."));
       const priceKopeks = Number.isFinite(priceNumber) && priceNumber > 0 ? Math.round(priceNumber * 100) : null;
-      const response = await fetch(`/api/master/model-offers/${offer.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/model-offers/${offer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -87,14 +88,10 @@ export function EditOfferModal({ open, onClose, offer, services }: Props) {
           requirements: resolveRequirementsForSubmit(state),
         }),
       });
-      if (!response.ok) {
-        setError(T.errorUpdate);
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorUpdate);
+    } catch (error) {
+      setError(serverMessageOr(error, T.errorUpdate));
     } finally {
       setSaving(false);
     }
@@ -112,7 +109,7 @@ export function EditOfferModal({ open, onClose, offer, services }: Props) {
       {error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+          className="mt-4 rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
         >
           {error}
         </p>

@@ -1,17 +1,17 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/cn";
 import {
   formatRussianPhoneInput,
   formatRussianPhoneInputOnChange,
   isCompleteRussianPhoneInput,
 } from "@/lib/phone/input-format";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOf } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
 import { useAutosave } from "./use-autosave";
+import { InlineEditField, InlineEditInput, InlineEditPencil } from "@/components/ui/inline-edit";
 
 const T = UI_TEXT.cabinetMaster.profile.editable;
 
@@ -122,27 +122,18 @@ export function EditableFieldRow({
 
   const autosave = useAutosave<string>(async (next) => {
     const normalized = normalize ? normalize(next) : next;
-    const response = await fetch(apiPath, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [fieldKey]: normalized }),
-    });
-    if (!response.ok) {
+    try {
+      await fetchJsonWithAuth<unknown>(apiPath, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [fieldKey]: normalized }),
+      });
+    } catch (error) {
       // FIX-C8: действенный отказ («номер уже используется…») показывается
-      // дословно — канонический «Попробуйте ещё раз» на 409 прямо неверен.
-      let message: string | undefined;
-      try {
-        const body: unknown = await response.json();
-        const serverMessage = (body as { error?: { message?: unknown } } | null)?.error?.message;
-        if (typeof serverMessage === "string" && serverMessage.trim().length > 0) {
-          message = serverMessage;
-        }
-      } catch {
-        // Тело не JSON — остаёмся на каноне чипа.
-      }
-      // Откат оптимистичного значения: сервер правку не принял.
+      // дословно — канонический «Попробуйте ещё раз» на 409 прямо неверен;
+      // без серверной строки остаётся канон чипа. Откат оптимистичного значения.
       setSavedValue(confirmedRef.current);
-      return { ok: false, message };
+      return { ok: false, message: serverMessageOf(error) };
     }
     confirmedRef.current = normalized;
     setSavedValue(normalized);
@@ -233,7 +224,7 @@ export function EditableFieldRow({
         </div>
         {isEditing ? (
           <>
-            <input
+            <InlineEditInput
               id={inputId}
               ref={inputRef}
               value={draft}
@@ -244,7 +235,7 @@ export function EditableFieldRow({
               placeholder={placeholder}
               aria-invalid={invalidMessage ? true : undefined}
               aria-describedby={feedback ? errorId : undefined}
-              className="mt-1 block w-full border-0 border-b-2 border-primary bg-transparent py-1 text-sm text-text-main outline-none focus:ring-0"
+              className="mt-1"
             />
             {maxLength && !formatOnChange ? (
               <p className="mt-1 font-mono text-[10px] text-text-sec">
@@ -253,16 +244,13 @@ export function EditableFieldRow({
             ) : null}
           </>
         ) : (
-          <button
-            type="button"
+          <InlineEditField
             onClick={enterEdit}
-            className={cn(
-              "mt-1 block w-full text-left text-sm",
-              isEmpty ? "italic text-text-sec" : "text-text-main"
-            )}
+            empty={isEmpty}
+            className="mt-1"
           >
             {isEmpty ? T.emptyValue : toDisplay(savedValue)}
-          </button>
+          </InlineEditField>
         )}
         {feedback ? (
           <p id={errorId} className="mt-1 text-xs text-danger-text">
@@ -271,14 +259,11 @@ export function EditableFieldRow({
         ) : null}
       </div>
       {!isEditing ? (
-        <button
-          type="button"
+        <InlineEditPencil
           onClick={enterEdit}
           aria-label={T.editAriaLabel}
-          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </button>
+          className="mt-2"
+        />
       ) : null}
     </div>
   );

@@ -1,0 +1,32 @@
+{
+  "src/features/admin-cabinet/dashboard/components/events-feed.tsx": {
+    "rawFetch": 1,
+    "manualParse": 0,
+    "decision": "silent",
+    "reason": "фоновый опрос живой панели админки: следующий опрос повторит, сохранённые данные остаются на экране; сообщение каждые несколько секунд было бы шумом"
+  },
+  "src/features/admin-cabinet/dashboard/components/system-health.tsx": {
+    "rawFetch": 1,
+    "manualParse": 0,
+    "decision": "silent",
+    "reason": "фоновый опрос живой панели админки: следующий опрос повторит, сохранённые данные остаются на экране; сообщение каждые несколько секунд было бы шумом"
+  },
+  "src/features/auth/components/logout-button.tsx": {
+    "rawFetch": 1,
+    "manualParse": 0,
+    "decision": "silent",
+    "reason": "выход: ответ — редирект /logout, страница перезагружается в любом случае (полная навигация сбрасывает кэш и данные прежнего пользователя)"
+  },
+  "src/features/chat/chat-window/message-bubble.tsx": {
+    "rawFetch": 1,
+    "manualParse": 0,
+    "decision": "own",
+    "reason": "успешный ответ — байты картинки вложения, а не конверт; отказ разбирается общим readApiResponse"
+  },
+  "src/hooks/use-error-boundary-report.ts": {
+    "rawFetch": 1,
+    "manualParse": 0,
+    "decision": "silent",
+    "reason": "отчёт об ошибке рендера на сервер: отказ отчёта не должен порождать новую ошибку поверх уже упавшей страницы"
+  }
+}

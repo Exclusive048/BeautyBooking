@@ -65,12 +65,15 @@ export async function POST(req: Request) {
     }
 
     const studioOwnerUserId = studio?.ownerUserId ?? studio?.provider.ownerUserId ?? null;
-    if (studioOwnerUserId) {
+    // Владелец, вышедший из своей же студии, уведомления самому себе не получает.
+    if (studioOwnerUserId && studioOwnerUserId !== auth.user.id) {
       try {
+        // Пустые имена обрабатывают тексты (`studio-notification-texts.ts`):
+        // подставное «Мастер»/«Студия» давало «Мастер Мастер вышел…».
         await notifyStudioMemberLeft({
           studioOwnerUserId,
-          masterName: master.name || "Мастер",
-          studioName: studio?.provider.name || "Студия",
+          masterName: master.name,
+          studioName: studio?.provider.name ?? "",
         });
       } catch (error) {
         logError("POST /api/cabinet/master/leave-studio member-left notify failed", {

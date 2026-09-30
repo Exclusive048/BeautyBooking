@@ -4,11 +4,10 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { Switch } from "@/components/ui/switch";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
 import { useTelegramStatus } from "@/lib/hooks/use-telegram-status";
 import { isTelegramEnabled } from "@/lib/env.client";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type TelegramSettingsResponse = {
   enabled: boolean;
@@ -20,10 +19,6 @@ type Props = {
   title?: string;
   hint?: string;
 };
-
-function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
-  return json && !json.ok ? json.error.message ?? fallback : fallback;
-}
 
 export function TelegramNotificationsSection({
   embedded = false,
@@ -53,17 +48,14 @@ export function TelegramNotificationsSection({
     setError(null);
     setSaving(true);
     try {
-      const res = await fetchWithAuth("/api/telegram/settings", {
+      await fetchJsonWithAuth<TelegramSettingsResponse>("/api/telegram/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<TelegramSettingsResponse> | null;
-      if (!res.ok) throw new Error(getErrorMessage(json, t.updateFailed));
-      if (!json || !json.ok) throw new Error(getErrorMessage(json, t.updateFailed));
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.updateFailed);
+      setError(serverMessageOr(e, t.updateFailed));
     } finally {
       setSaving(false);
     }
@@ -112,7 +104,7 @@ export function TelegramNotificationsSection({
           {t.connectInProfile}
         </Link>
       )}
-      {error ?? statusError ? <p className="mt-2 text-xs text-rose-400">{error ?? statusError}</p> : null}
+      {error ?? statusError ? <p className="mt-2 text-xs text-danger-text">{error ?? statusError}</p> : null}
     </div>
   );
 }

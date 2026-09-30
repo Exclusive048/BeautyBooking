@@ -15,7 +15,7 @@ import { getPublicModelOffer } from "@/lib/model-offers/public.service";
 import { ModelOfferApplyForm } from "@/features/model-offers/components/public-model-offer-apply";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type PageProps = {
   params: Promise<{ code: string }>;
@@ -61,7 +61,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
     <div className="min-h-dvh bg-background">
       {/* Subtle hero gradient */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-pink-500/[0.06] via-purple-500/[0.03] to-transparent dark:from-pink-500/[0.04] dark:via-purple-500/[0.02]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-primary-magenta/[0.06] via-primary/[0.03] to-transparent"
         aria-hidden
       />
 
@@ -106,7 +106,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                   </h2>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden />
+                      <Star className="h-4 w-4 fill-rating text-rating" aria-hidden />
                       {offer.master.ratingAvg.toFixed(1)}
                       <span className="text-xs">({offer.master.ratingCount})</span>
                     </span>
@@ -136,7 +136,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
                     isFree
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
+                      ? "bg-success-surface text-success-text"
                       : "bg-primary/10 text-accent-text"
                   }`}
                 >

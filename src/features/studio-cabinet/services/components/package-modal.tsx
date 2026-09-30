@@ -9,13 +9,15 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { computeBundlePricing } from "@/features/master/components/services/lib/compute-bundle-pricing";
 import { toKopeks } from "@/lib/money/kopeks";
 import type {
   StudioPackagePickerService,
   StudioPackageView,
 } from "../server/packages-data.service";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 
 const T = UI_TEXT.studioCabinet.servicesV2.packageDialog;
 const E = UI_TEXT.studioCabinet.servicesV2.errors;
@@ -142,29 +144,23 @@ export function PackageModal({
         discountValue: numericDiscount,
         isEnabled,
       };
-      const response =
-        mode === "create"
-          ? await fetch("/api/studio/service-packages", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(payload),
-            })
-          : await fetch(`/api/studio/service-packages/${pkg!.id}`, {
-              method: "PATCH",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.packageSave);
-        return;
+      if (mode === "create") {
+        await fetchJsonWithAuth<unknown>("/api/studio/service-packages", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetchJsonWithAuth<unknown>(`/api/studio/service-packages/${pkg!.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.packageSave);
+    } catch (error) {
+      setError(serverMessageOr(error, E.packageSave));
     } finally {
       setSubmitting(false);
     }
@@ -204,9 +200,8 @@ export function PackageModal({
               {services.map((service) => {
                 const checked = selectedSet.has(service.id);
                 return (
-                  <button
+                  <Button variant="wrapper" aria-pressed={checked}
                     key={service.id}
-                    type="button"
                     onClick={() => toggleService(service.id)}
                     disabled={submitting}
                     className={cn(
@@ -227,7 +222,7 @@ export function PackageModal({
                       {UI_FMT.priceLabel(service.priceKopeks)} · {service.durationMin}{" "}
                       {T.minShort}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -242,34 +237,17 @@ export function PackageModal({
             {T.discountLabel}
           </p>
           <div className="flex items-center gap-2">
-            <div className="inline-flex rounded-xl border border-border-subtle bg-bg-page p-1">
-              <button
-                type="button"
-                onClick={() => setDiscountType(DiscountType.PERCENT)}
-                disabled={submitting}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                  discountType === DiscountType.PERCENT
-                    ? "bg-bg-card text-text-main shadow-card"
-                    : "bg-transparent text-text-sec hover:text-text-main",
-                )}
-              >
-                {T.discountPercent}
-              </button>
-              <button
-                type="button"
-                onClick={() => setDiscountType(DiscountType.FIXED)}
-                disabled={submitting}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                  discountType === DiscountType.FIXED
-                    ? "bg-bg-card text-text-main shadow-card"
-                    : "bg-transparent text-text-sec hover:text-text-main",
-                )}
-              >
-                {T.discountFixed}
-              </button>
-            </div>
+            <SegmentedTabs<DiscountType>
+              ariaLabel={T.discountTypeAria}
+              value={discountType}
+              onChange={setDiscountType}
+              disabled={submitting}
+              className="w-56 shrink-0"
+              options={[
+                { value: DiscountType.PERCENT, label: T.discountPercent },
+                { value: DiscountType.FIXED, label: T.discountFixed },
+              ]}
+            />
             <Input
               value={discountValue}
               onChange={(e) => setDiscountValue(e.target.value)}
@@ -330,7 +308,7 @@ export function PackageModal({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 // FIX-YANDEX-OAUTH — login button, bespoke-parallel to VkLoginButton.
 type YandexLoginButtonProps = {

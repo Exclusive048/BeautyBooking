@@ -8,12 +8,12 @@ import {
  * STUDIO-APPROVE-400-FIX-A — pinning the approve endpoint's payload
  * detection.
  *
- * Approve fan-outs through two appliers depending on `payloadJson`
- * shape:
- *   - `isScheduleEditorRequestPayload(payload) === true` →
- *     `applyScheduleSnapshot` (the canonical EDITOR_V1 path)
- *   - otherwise → legacy `applySchedulePayload` (validates the older
- *     `{ templates, weekly, overrides }` SchedulePayload shape)
+ * Approve fan-outs by `payloadJson` shape: `CHANGES_V1` (накопительная
+ * заявка) → `applyScheduleChangesRequest`, `PATTERN_V1` → график,
+ * `isScheduleEditorRequestPayload(payload) === true` → EDITOR_V1 snapshot;
+ * anything else is refused (422 — «отправьте заявку заново»; the legacy
+ * `{ templates, weekly, overrides }` applier was removed with
+ * SCHEDULE-LEGACY-API-REMOVAL).
  *
  * Pre-fix, the showcase seed produced placeholder JSON that matched
  * neither (`{ kind: "WEEKLY", delta: "..." }` / `{ kind: "OVERRIDE",

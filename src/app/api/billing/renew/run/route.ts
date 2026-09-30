@@ -20,7 +20,7 @@ import * as cache from "@/lib/cache/cache";
 import { invalidatePlanCache } from "@/lib/billing/get-current-plan";
 import { env } from "@/lib/env";
 import { processTrialExpirations } from "@/lib/billing/trial-cron";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 

@@ -7,7 +7,7 @@ import { TaskRow, type TaskUrgency } from "@/features/master/components/dashboar
 import { workContextLabel } from "@/features/master/components/work-context-badge";
 import type { DashboardData } from "@/lib/master/dashboard.service";
 import { formatLocalHm } from "@/lib/schedule/timezone";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.attention;
 

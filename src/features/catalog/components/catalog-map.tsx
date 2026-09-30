@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { Loader2, LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CatalogMapPoint } from "@/features/catalog/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { clientEnv } from "@/lib/env.client";
 
 type MapSearchPayload = {
@@ -517,6 +517,7 @@ export function CatalogMap({
           return;
         }
         markProgrammaticMove();
+        // motion-canon: API Яндекс.Карт — длительность в миллисекундах, не framer.
         activeMap.setBounds(bounds, { checkZoomRange: true, zoomMargin: 64, duration: 300 });
       });
 
@@ -639,8 +640,10 @@ export function CatalogMap({
     const clustered = Boolean(clustererRef.current?.getObjectState(entry.placemark)?.isClustered);
     markProgrammaticMove();
     if (clustered) {
+      // motion-canon: API Яндекс.Карт — длительность в миллисекундах, не framer.
       map.setCenter(coords, Math.max(map.getZoom(), MAP_ZOOM_ON_POINT), { duration: 300 });
     } else {
+      // motion-canon: API Яндекс.Карт — длительность в миллисекундах, не framer.
       map.panTo(coords, { duration: 300, flying: false });
     }
   }, [followSelection, mapStatus, markProgrammaticMove, selectedId]);

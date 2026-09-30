@@ -57,10 +57,16 @@ const NAMED_BY_CALLER: { file: string; reason: string }[] = [
     reason: "shared-обёртка, спредит {...props} — имя ставит вызывающий",
   },
   {
-    file: "src/features/master/components/portfolio/modals/tag-input.tsx",
-    reason:
-      "id приходит пропом `inputId`; htmlFor стоит у вызывающего (edit-item-modal), " +
-      "потому что подпись «Теги» принадлежит его разметке",
+    file: "src/components/ui/file-input.tsx",
+    reason: "shared-обёртка (29.09 доработки · 22), спредит {...props} — имя ставит вызывающий",
+  },
+  {
+    file: "src/components/ui/inline-edit.tsx",
+    reason: "shared-обёртки inline-edit (29.09 доработки · 22), спредят {...props} — id/htmlFor у строки",
+  },
+  {
+    file: "src/components/ui/range-input.tsx",
+    reason: "shared-обёртка (29.09 доработки · 22), спредит {...props} — aria-label ставит вызывающий",
   },
 ];
 

@@ -4,8 +4,10 @@ import { Check, MessageCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import type { ApplicationItem } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ProposeTimeModal } from "./modals/propose-time-modal";
 import { RejectApplicationModal } from "./modals/reject-application-modal";
 
@@ -32,6 +34,7 @@ export function ApplicationActionsIsland({
   offerEndLocal,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [proposeOpen, setProposeOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [savingQuick, setSavingQuick] = useState(false);
@@ -40,7 +43,7 @@ export function ApplicationActionsIsland({
     if (savingQuick) return;
     setSavingQuick(true);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/master/model-applications/${application.id}/propose-time`,
         {
           method: "POST",
@@ -48,11 +51,10 @@ export function ApplicationActionsIsland({
           body: JSON.stringify({ proposedTimeLocal: offerStartLocal }),
         }
       );
-      if (!response.ok) {
-        window.alert(T.errorApprove);
-        return;
-      }
       router.refresh();
+    } catch (error) {
+      // «Заявка уже обработана» (409) — гонка двух вкладок: дословно.
+      toast.error(serverMessageOr(error, T.errorApprove));
     } finally {
       setSavingQuick(false);
     }

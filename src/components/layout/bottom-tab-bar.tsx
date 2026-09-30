@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, type ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { Children, isValidElement, useCallback, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -52,14 +51,34 @@ type BarProps = {
   children: ReactNode;
 };
 
+/**
+ * Полоса активной вкладки — одна на панель, едет между вкладками CSS-переходом
+ * (29.09 доработки · 19). Раньше это был `layoutId` framer-motion на каждой
+ * вкладке: layout-проекция не входит в лёгкий набор `domAnimation`, а панель
+ * стоит на КАЖДОЙ странице телефона — ради одной полоски весь `domMax` ехал бы
+ * в шелл. Вкладки — равные доли ширины (`flex-1`), поэтому сдвиг — это
+ * `translateX(индекс × 100%)` полосы шириной в одну долю. Индекс — из пропа
+ * `active` детей: все носители передают `BottomTab` прямо детьми (массивом из
+ * `map` или условным элементом).
+ */
+function activeTabIndex(children: ReactNode): { index: number; count: number } {
+  const tabs = Children.toArray(children).filter(isValidElement);
+  const index = tabs.findIndex((tab) => (tab.props as { active?: boolean }).active === true);
+  return { index, count: tabs.length };
+}
+
 export function BottomTabBar({ ariaLabel, children }: BarProps) {
   const publishNavHeight = usePublishedNavHeight();
+  const { index: activeIndex, count } = activeTabIndex(children);
 
   return (
     <nav
       ref={publishNavHeight}
       aria-label={ariaLabel}
-      className="fixed inset-x-0 bottom-0 z-40 lg:hidden"
+      // 29.09 · 01-б: пока открыт модальный слой (`useOverlayA11y` ставит
+      // `data-overlay-open` на <html>), панель скрыта — и из касаний, и из
+      // дерева доступности.
+      className="fixed inset-x-0 bottom-0 z-nav lg:hidden [html[data-overlay-open]_&]:invisible"
     >
       {/* PWA-FIX-06 — подложка покрывает весь `<nav>` до нижней кромки экрана,
           а safe-area отдаётся строке вкладок: с отступом на прозрачном `<nav>`
@@ -68,6 +87,16 @@ export function BottomTabBar({ ariaLabel, children }: BarProps) {
       {/* PWA-UX-BATCH-01 — инсет минус 10px: кнопки ближе к нижней кромке,
           без пустой полосы высотой инсета под ними. */}
       <div className="relative pb-[max(0px,calc(env(safe-area-inset-bottom,0px)-10px))]">
+        {activeIndex >= 0 && count > 0 ? (
+          <span
+            aria-hidden
+            data-testid="bottom-tab-indicator"
+            className="pointer-events-none absolute left-0 top-0 z-10 h-0.5 transition-transform duration-200 ease-brand motion-reduce:transition-none"
+            style={{ width: `${100 / count}%`, transform: `translateX(${activeIndex * 100}%)` }}
+          >
+            <span className="absolute inset-x-3 inset-y-0 rounded-full bg-gradient-to-r from-primary to-primary-magenta" />
+          </span>
+        ) : null}
         <ul className="flex h-12 items-stretch">{children}</ul>
       </div>
     </nav>
@@ -117,19 +146,10 @@ const TAB_CLASS =
 export function BottomTab(props: BottomTabProps) {
   const { icon: Icon, label, active = false, badge = 0, dot = false, dotLabel, ariaLabel } = props;
   const showDot = dot && badge <= 0;
-  const reduce = useReducedMotion();
   const tone = active ? "text-accent-text" : "text-text-sec";
 
   const body = (
     <>
-      {active ? (
-        <motion.span
-          layoutId="bottom-tab-indicator"
-          aria-hidden
-          className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-gradient-to-r from-primary to-primary-magenta"
-          transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 30 }}
-        />
-      ) : null}
       <span className="relative">
         <Icon className={cn("h-5 w-5 transition-colors", tone)} aria-hidden />
         {badge > 0 ? (

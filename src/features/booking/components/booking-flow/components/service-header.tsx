@@ -1,6 +1,6 @@
 import { Clock, Flame } from "lucide-react";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 
 type Props = {
@@ -42,7 +42,7 @@ export function ServiceHeader({
           <span className="text-sm text-text-sec line-through">
             {UI_FMT.priceLabel(slot.originalPrice ?? servicePrice)}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-orange-600 dark:text-orange-300">
+          <span className="inline-flex items-center gap-1 rounded-md bg-hot/15 px-1.5 py-0.5 text-[11px] font-semibold text-hot-text">
             <Flame className="h-3 w-3" aria-hidden strokeWidth={1.8} />
             -{slot.discountPercent ?? slot.discountValue ?? 0}%
           </span>

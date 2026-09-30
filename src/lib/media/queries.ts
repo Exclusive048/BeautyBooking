@@ -6,6 +6,7 @@ import {
   SITE_LOGIN_HERO_SETTING_KEY,
   SITE_LOGO_SETTING_KEY,
 } from "@/lib/media/settings";
+import { readSiteAssetCache, writeSiteAssetCache } from "@/lib/media/site-asset-cache";
 
 export async function getLatestAvatarUrlForEntity(
   entityType: MediaEntityType,
@@ -17,7 +18,23 @@ export async function getLatestAvatarUrlForEntity(
 
 type SiteAsset = { url: string } | null;
 
+/**
+ * Картинка сайта по ключу настройки — через кэш (29.09 доработки · 20): шапка
+ * каждой страницы спрашивает логотип, а меняется он раз в месяцы. Сброс —
+ * `invalidateSiteAssetCache` в `lib/media/service.ts`.
+ */
 async function getSiteAssetBySettingKey(
+  settingKey: string,
+  kind: MediaKind,
+): Promise<SiteAsset> {
+  const cached = await readSiteAssetCache(settingKey);
+  if (cached) return cached.asset;
+  const asset = await loadSiteAssetBySettingKey(settingKey, kind);
+  await writeSiteAssetCache(settingKey, asset);
+  return asset;
+}
+
+async function loadSiteAssetBySettingKey(
   settingKey: string,
   kind: MediaKind,
 ): Promise<SiteAsset> {

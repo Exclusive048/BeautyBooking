@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
 import { salonInputToUtcIso } from "@/lib/schedule/datetime-input";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const SLOT_MIN = 30;
 
@@ -77,21 +78,20 @@ export function EmptyCellsOverlay({
   };
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1]">
+    <div className="pointer-events-none absolute inset-0 z-1">
       {slots.map((slot) => {
         const top = (slot.startMin - hourStart * 60) * pxPerMin;
         const height = SLOT_MIN * pxPerMin;
         if (top < 0 || top + height > (hourEnd - hourStart) * hourPx) return null;
         return (
-          <button
+          <Button variant="wrapper"
             key={`${iso}:${slot.startMin}`}
-            type="button"
             onClick={() => handleClick(slot.startMin)}
             className="pointer-events-auto absolute inset-x-1 cursor-pointer rounded-md border border-transparent text-center text-[10px] font-medium text-accent-text opacity-0 transition-opacity hover:border-primary/30 hover:bg-primary/5 hover:opacity-100 focus-visible:opacity-100"
             style={{ top, height }}
           >
             {UI_TEXT.cabinetMaster.schedule.emptyCellHint}
-          </button>
+          </Button>
         );
       })}
     </div>

@@ -2,7 +2,7 @@
 
 import { Layers, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCitiesCounts } from "@/features/admin-cabinet/cities/types";
 
 type Props = {
@@ -34,7 +34,7 @@ export function CitiesHeader({ counts, onAdd, onFindDuplicates }: Props) {
               ·
             </span>
             <span>
-              <span className="tabular-nums text-amber-600 dark:text-amber-400">
+              <span className="tabular-nums text-warning-text">
                 {counts.dup}
               </span>{" "}
               {T.header.countsDups}

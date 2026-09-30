@@ -10,7 +10,7 @@ import {
 import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
 import { signConsentCookieValue, TELEGRAM_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
 import { isProduction } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FIX-9 (HARDENING-06) — Telegram login "start" step. The widget fetches this

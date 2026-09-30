@@ -4,9 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { usePrompt } from "@/hooks/use-prompt";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.dashboard;
 
@@ -37,25 +36,17 @@ export function BookingActionButtons({ bookingId, isPastConfirmWindow = false }:
     setBusy(status === "CONFIRMED" ? "confirm" : "decline");
     setError(null);
     try {
-      const res = await fetch(`/api/master/bookings/${bookingId}/status`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/bookings/${bookingId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, ...(comment ? { comment } : {}) }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       // Re-render the server tree so counters and the row disappear.
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : status === "CONFIRMED"
+      setError(serverMessageOr(err, status === "CONFIRMED"
             ? T.bookingActions.confirmError
-            : T.bookingActions.declineError,
-      );
+            : T.bookingActions.declineError));
     } finally {
       setBusy(null);
     }
@@ -101,7 +92,7 @@ export function BookingActionButtons({ bookingId, isPastConfirmWindow = false }:
             {T.bookings.confirmAction}
           </Button>
         </div>
-        {error ? <p className="text-[11px] text-red-600">{error}</p> : null}
+        {error ? <p className="text-[11px] text-danger-text">{error}</p> : null}
       </div>
       {promptModal}
     </>

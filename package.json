@@ -28,6 +28,7 @@
     "check:env-discipline": "node scripts/check-env-discipline.mjs",
     "check:mojibake": "node scripts/check-mojibake.mjs",
     "check:tz": "node scripts/check-tz.mjs",
+    "check:client-text-bundle": "node scripts/check-client-text-bundle.mjs",
     "db:reset:dev": "npx prisma migrate reset --force && npm run redis:flush:dev && npm run seed:test",
     "redis:flush:dev": "node scripts/dev-redis-flush.mjs",
     "worker:build": "npx tsc --noEmit",
@@ -78,6 +79,7 @@
     "serwist": "^9.5.12",
     "sharp": "^0.35.3",
     "swr": "^2.4.0",
+    "tailwind-merge": "^2.6.1",
     "tsx": "^4.21.0",
     "web-push": "^3.6.7",
     "zod": "^4.3.6"

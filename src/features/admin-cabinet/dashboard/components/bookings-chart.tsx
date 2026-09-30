@@ -1,5 +1,5 @@
 import { ChartCard } from "@/features/admin-cabinet/dashboard/components/chart-card";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminChartSeries } from "@/features/admin-cabinet/dashboard/types";
 
 type Props = {

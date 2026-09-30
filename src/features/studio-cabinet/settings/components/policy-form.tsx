@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioPolicyData } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.settingsV2.policy;
@@ -94,9 +94,13 @@ export function PolicyForm({ providerId, data }: Props) {
       setError(T.minBookingAheadInvalid);
       return;
     }
-    const maxDays = parseIntInRange(draft.maxBookingDaysAhead, 1, 365);
+    const maxDays = parseIntInRange(
+      draft.maxBookingDaysAhead,
+      BOOKING_RULE_LIMITS.maxDaysAhead.min,
+      BOOKING_RULE_LIMITS.maxDaysAhead.max,
+    );
     if (maxDays === null) {
-      setError(T.maxBookingAheadInvalid);
+      setError(T.maxBookingAheadInvalid(BOOKING_RULE_LIMITS.maxDaysAhead.max));
       return;
     }
     const freeCancelRaw = draft.cancellationDeadlineHours.trim();
@@ -109,7 +113,7 @@ export function PolicyForm({ providerId, data }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetchWithAuth(`/api/studios/${encodeURIComponent(providerId)}`, {
+      await fetchJsonWithAuth<unknown>(`/api/studios/${encodeURIComponent(providerId)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -121,17 +125,9 @@ export function PolicyForm({ providerId, data }: Props) {
           remindersEnabled: draft.remindersEnabled,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        // Серверная строка курируемая и конкретнее канона — показываем её (FIX-C8).
-        setError(body?.error?.message ?? TX.error);
-        return;
-      }
       router.refresh();
-    } catch {
-      setError(TX.error);
+    } catch (error) {
+      setError(serverMessageOr(error, TX.error));
     } finally {
       setSubmitting(false);
     }
@@ -175,8 +171,8 @@ export function PolicyForm({ providerId, data }: Props) {
               disabled={submitting}
               inputMode="numeric"
               type="number"
-              min={1}
-              max={365}
+              min={BOOKING_RULE_LIMITS.maxDaysAhead.min}
+              max={BOOKING_RULE_LIMITS.maxDaysAhead.max}
             />
             <span className="shrink-0 text-sm text-text-sec">{T.daysUnit}</span>
           </div>

@@ -7,7 +7,7 @@ import {
   type MarketingPlan,
 } from "@/lib/billing/marketing-pricing";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.pricing;
 

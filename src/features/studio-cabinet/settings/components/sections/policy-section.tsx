@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { PolicyForm } from "../policy-form";
 import { SectionCard } from "../section-card";
 import type { StudioPolicyData } from "../../lib/types";
@@ -24,8 +24,10 @@ type Props = {
  */
 export function PolicySection({ providerId, data }: Props) {
   return (
-    <SectionCard title={T.title} description={T.description}>
-      <PolicyForm providerId={providerId} data={data} />
-    </SectionCard>
+    <div data-guide="rules" className="rounded-2xl">
+      <SectionCard title={T.title} description={T.description}>
+        <PolicyForm providerId={providerId} data={data} />
+      </SectionCard>
+    </div>
   );
 }

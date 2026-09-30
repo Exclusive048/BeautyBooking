@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.servicesV2.addCategoryDialog;
 const E = UI_TEXT.studioCabinet.servicesV2.errors;
@@ -43,23 +44,16 @@ export function AddCategoryDialog({ open, onClose }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/categories/propose", {
+      await fetchJsonWithAuth<unknown>("/api/categories/propose", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.categoryCreate);
-        return;
-      }
       setTitle("");
       onClose();
       router.refresh();
-    } catch {
-      setError(E.categoryCreate);
+    } catch (error) {
+      setError(serverMessageOr(error, E.categoryCreate));
     } finally {
       setSubmitting(false);
     }
@@ -82,7 +76,7 @@ export function AddCategoryDialog({ open, onClose }: Props) {
           />
         </label>
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

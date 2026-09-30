@@ -16,6 +16,7 @@ import {
 import { invalidateRecentMastersCache } from "@/lib/bookings/recent-masters";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
 import { toAppError } from "@/lib/api/errors";
@@ -66,8 +67,8 @@ export async function POST(req: Request) {
     }
 
     // Two-axis rate limit — both must pass.
-    const phoneKey = `rate:publicBooking:phone:${phoneNormalized}`;
-    const ipKey = `rate:publicBooking:ip:${getClientIp(req)}`;
+    const phoneKey = routeRateLimitKey(req, "phone", phoneNormalized);
+    const ipKey = routeRateLimitKey(req, "ip", getClientIp(req));
     // FIX-C11: перегрузка с конфигом несёт ПРИЧИНУ отказа — обрыв Redis отвечает
     // 503, исчерпанный бюджет 429. Политика та же (fail-closed, инв. #6).
     const [phoneLimit, ipLimit] = await Promise.all([
@@ -149,6 +150,7 @@ export async function POST(req: Request) {
       referencePhotoAssetId: body.referencePhotoAssetId ?? null,
       bookingAnswers: body.bookingAnswers ?? null,
       clientUserId,
+      rateLimitKey: routeRateLimitKey(req, "user", clientUserId),
       idempotencyKey,
     });
 

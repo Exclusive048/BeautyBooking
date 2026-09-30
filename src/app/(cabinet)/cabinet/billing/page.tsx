@@ -10,7 +10,7 @@ import { getCurrentMasterProviderContext } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 

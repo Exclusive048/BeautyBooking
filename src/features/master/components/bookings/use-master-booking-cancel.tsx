@@ -2,9 +2,8 @@
 
 import { useCallback } from "react";
 import { useConfirm } from "@/hooks/use-confirm";
-import { ApiClientError } from "@/lib/http/client";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.card;
 
@@ -20,27 +19,22 @@ function readPackageId(details: unknown): string | null {
 
 async function send(url: string, init: RequestInit, fallback: string): Promise<CancelAttempt> {
   try {
-    const res = await fetch(url, {
+    await fetchJsonWithAuth<unknown>(url, {
       ...init,
       headers: { "Content-Type": "application/json" },
     });
-    const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-    if (res.ok && json?.ok) return { ok: true };
-    const error = json && !json.ok ? json.error : null;
-    return {
-      ok: false,
-      // FIX-C8: отказы здесь действенные («статус изменился — обновите
-      // страницу», «поздно отменять») — строка сервера помечается `fromServer`,
-      // и поверхность показывает её дословно (`serverMessageOr`).
-      error: new ApiClientError({
-        message: error?.message || fallback,
-        code: error?.code,
-        status: res.status,
-        fromServer: Boolean(error?.message),
-      }),
-      packageId: error?.code === "PACKAGE_CANCEL_WHOLE" ? readPackageId(error.details) : null,
-    };
-  } catch {
+    return { ok: true };
+  } catch (error) {
+    // FIX-C8: отказы здесь действенные («статус изменился — обновите
+    // страницу», «поздно отменять») — строка сервера помечена `fromServer`
+    // общим разбором, и поверхность показывает её дословно (`serverMessageOr`).
+    if (error instanceof ApiClientError) {
+      return {
+        ok: false,
+        error,
+        packageId: error.code === "PACKAGE_CANCEL_WHOLE" ? readPackageId(error.details) : null,
+      };
+    }
     return { ok: false, error: new ApiClientError({ message: fallback, status: 0 }), packageId: null };
   }
 }

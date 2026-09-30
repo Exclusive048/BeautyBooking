@@ -29,11 +29,55 @@ import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
  * `AND`, а не разворачивает спредом рядом со своим `OR` — ключ перезаписался бы
  * молча.
  */
-export const WORKING_WEEK_WHERE = {
+const WORKING_WEEK_WHERE = {
   weeklyScheduleConfig: {
     is: { days: { some: { isActive: true, templateId: { not: null } } } },
   },
 } satisfies Prisma.ProviderWhereInput;
+
+/**
+ * SCHEDULE-PATTERNS-01 (этап 2) — «есть расписание» с графиками по датам:
+ * период графика, не кончившийся до сегодня, с хотя бы одним рабочим днём
+ * (расписание настраивается «на сколько настроил», решение владельца, —
+ * кончившееся расписание окошек не даёт). Профиль без графика (перенос недели
+ * ещё не прошёл) проверяется по-старому — по неделе.
+ *
+ * «Сегодня» — дата UTC: у салонов РФ (UTC+2…+12) дата салона бывает на день
+ * впереди, то есть кончившийся вчера график может продержаться в выдаче до
+ * полуночи UTC. Это в пользу мастера и дешевле, чем пояс на каждого.
+ *
+ * Этап 3 — третья ветка: рабочий день, отмеченный в календаре на сегодня или
+ * позже («Каждый раз по-разному — отмечу дни сам» — график без рабочих дней,
+ * а рабочие дни стоят в календаре). Дата «Особого дня» хранится полночью UTC
+ * даты салона, поэтому сравнение с полночью UTC сегодняшней даты точное.
+ */
+function providerHasScheduleWhere(todayKey: string): Prisma.ProviderWhereInput {
+  return {
+    OR: [
+      {
+        scheduleOverrides: {
+          some: {
+            date: { gte: new Date(`${todayKey}T00:00:00.000Z`) },
+            isDayOff: false,
+            OR: [
+              { kind: "TEMPLATE", templateId: { not: null }, OR: [{ isActive: null }, { isActive: true }] },
+              { kind: "TIME_RANGE", startLocal: { not: null } },
+            ],
+          },
+        },
+      },
+      {
+        schedulePatterns: {
+          some: {
+            OR: [{ endsOn: null }, { endsOn: { gte: todayKey } }],
+            days: { some: { templateId: { not: null } } },
+          },
+        },
+      },
+      { AND: [{ schedulePatterns: { none: {} } }, WORKING_WEEK_WHERE] },
+    ],
+  };
+}
 
 /**
  * VISIBILITY-CATALOG-STATUS (2026-09-23) — те же три условия ПО ОТДЕЛЬНОСТИ,
@@ -43,19 +87,24 @@ export const WORKING_WEEK_WHERE = {
  */
 export type CatalogPresenceGap = "hidden" | "address" | "schedule";
 
-export const CATALOG_PRESENCE_CONDITIONS = {
-  hidden: { isPublished: true },
-  address: { cityId: { not: null } },
-  schedule: {
-    OR: [
-      { type: ProviderType.MASTER, ...WORKING_WEEK_WHERE },
-      {
-        type: ProviderType.STUDIO,
-        masters: { some: { ...STUDIO_ACTIVE_MASTER_WHERE, ...WORKING_WEEK_WHERE } },
-      },
-    ],
-  },
-} satisfies Record<CatalogPresenceGap, Prisma.ProviderWhereInput>;
+export function catalogPresenceConditions(
+  now: Date = new Date(),
+): Record<CatalogPresenceGap, Prisma.ProviderWhereInput> {
+  const hasSchedule = providerHasScheduleWhere(now.toISOString().slice(0, 10));
+  return {
+    hidden: { isPublished: true },
+    address: { cityId: { not: null } },
+    schedule: {
+      OR: [
+        { type: ProviderType.MASTER, AND: [hasSchedule] },
+        {
+          type: ProviderType.STUDIO,
+          masters: { some: { AND: [STUDIO_ACTIVE_MASTER_WHERE, hasSchedule] } },
+        },
+      ],
+    },
+  };
+}
 
 /**
  * STUDIO-MASTER-PROFILES (этап 2, решение владельца 2026-09-27): профиль мастера
@@ -66,10 +115,11 @@ export const CATALOG_PRESENCE_CONDITIONS = {
  * на студийную услугу идёт только через студию, иначе она становилась ЛИЧНОЙ
  * записью мастера (`booking-core` теперь такую запись отклоняет).
  */
-export function catalogVisibleProviderWhere(): Prisma.ProviderWhereInput {
+export function catalogVisibleProviderWhere(now: Date = new Date()): Prisma.ProviderWhereInput {
+  const conditions = catalogPresenceConditions(now);
   return {
-    ...CATALOG_PRESENCE_CONDITIONS.hidden,
-    ...CATALOG_PRESENCE_CONDITIONS.address,
-    ...CATALOG_PRESENCE_CONDITIONS.schedule,
+    ...conditions.hidden,
+    ...conditions.address,
+    ...conditions.schedule,
   };
 }

@@ -6,9 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { UI_FMT } from "@/lib/ui/fmt";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type RawStatus = "PENDING" | "REJECTED" | "APPROVED_WAITING_CLIENT" | "CONFIRMED" | "TIME_PROPOSED";
 type NormalizedStatus = "PENDING" | "REJECTED" | "TIME_PROPOSED" | "CONFIRMED";
@@ -45,10 +45,7 @@ type ModelApplicationItem = {
   };
 };
 
-function extractApiError<T>(json: ApiResponse<T> | null, fallback: string): string {
-  if (json && !json.ok) return json.error.message || fallback;
-  return fallback;
-}
+const E = UI_TEXT.clientCabinet.modelApplications;
 
 function normalizeStatus(status: RawStatus): NormalizedStatus {
   if (status === "APPROVED_WAITING_CLIENT" || status === "TIME_PROPOSED") return "TIME_PROPOSED";
@@ -119,15 +116,14 @@ export function ClientModelApplicationsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchWithAuth("/api/me/model-applications", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ applications: ModelApplicationItem[]; nextCursor: string | null }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(extractApiError(json, "Не удалось загрузить заявки"));
-      }
-      setItems(Array.isArray(json.data.applications) ? json.data.applications : []);
-      setNextCursor(json.data.nextCursor ?? null);
+      const data = await fetchJsonWithAuth<{ applications: ModelApplicationItem[]; nextCursor: string | null }>(
+        "/api/me/model-applications",
+        { cache: "no-store" },
+      );
+      setItems(Array.isArray(data.applications) ? data.applications : []);
+      setNextCursor(data.nextCursor ?? null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить заявки");
+      setError(serverMessageOr(loadError, E.loadFailed));
       setItems([]);
     } finally {
       setLoading(false);
@@ -139,15 +135,14 @@ export function ClientModelApplicationsPage() {
     setLoadingMore(true);
     try {
       const url = `/api/me/model-applications?cursor=${encodeURIComponent(nextCursor)}`;
-      const res = await fetchWithAuth(url, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ applications: ModelApplicationItem[]; nextCursor: string | null }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(extractApiError(json, "Не удалось загрузить заявки"));
-      }
-      setItems((prev) => [...prev, ...(Array.isArray(json.data.applications) ? json.data.applications : [])]);
-      setNextCursor(json.data.nextCursor ?? null);
+      const data = await fetchJsonWithAuth<{ applications: ModelApplicationItem[]; nextCursor: string | null }>(
+        url,
+        { cache: "no-store" },
+      );
+      setItems((prev) => [...prev, ...(Array.isArray(data.applications) ? data.applications : [])]);
+      setNextCursor(data.nextCursor ?? null);
     } catch (moreError) {
-      setActionError(moreError instanceof Error ? moreError.message : "Не удалось загрузить заявки");
+      setActionError(serverMessageOr(moreError, E.loadFailed));
     } finally {
       setLoadingMore(false);
     }
@@ -162,18 +157,15 @@ export function ClientModelApplicationsPage() {
       setConfirmingId(applicationId);
       setActionError(null);
       try {
-        const res = await fetchWithAuth(`/api/model-applications/${applicationId}/confirm`, {
+        await fetchJsonWithAuth<{ bookingId: string | null }>(`/api/model-applications/${applicationId}/confirm`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ bookingId: string | null }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(extractApiError(json, "Не удалось подтвердить время. Попробуйте ещё раз."));
-        }
         await load();
       } catch (confirmError) {
-        setActionError(confirmError instanceof Error ? confirmError.message : "Не удалось подтвердить время");
+        // «Время этого предложения уже прошло…» (29.09 · 07) и прочие — дословно.
+        setActionError(serverMessageOr(confirmError, E.confirmFailed));
       } finally {
         setConfirmingId(null);
       }
@@ -198,7 +190,7 @@ export function ClientModelApplicationsPage() {
 
   if (error) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-600 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+      <div role="alert" className="rounded-2xl border border-danger-border bg-danger-surface p-5 text-sm text-danger-text">
         {error}
       </div>
     );
@@ -218,7 +210,7 @@ export function ClientModelApplicationsPage() {
   return (
     <div className="space-y-3">
       {actionError ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{actionError}</div>
+        <div role="alert" className="rounded-2xl border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">{actionError}</div>
       ) : null}
 
       {sortedItems.map((item) => {
@@ -273,7 +265,7 @@ export function ClientModelApplicationsPage() {
             </div>
 
             {normalizedStatus === "TIME_PROPOSED" ? (
-              <div className="mt-3 rounded-xl border border-blue-200/70 bg-blue-50/70 px-3 py-2 text-xs text-blue-700">
+              <div className="mt-3 rounded-xl border border-info-border bg-info-surface px-3 py-2 text-xs text-info-text">
                 Предложенное время: {item.proposedTimeLocal ?? "—"}
               </div>
             ) : null}

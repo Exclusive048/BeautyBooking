@@ -2,7 +2,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type LegalSection = { id: string; title: string };
 
@@ -124,7 +124,7 @@ function DraftBanner() {
   return (
     <div
       role="note"
-      className="border-y border-amber-300/60 bg-amber-50 text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200"
+      className="border-y border-warning-border bg-warning-surface text-warning-text"
     >
       <div className="mx-auto flex w-full max-w-[1280px] items-start gap-3 px-4 py-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />

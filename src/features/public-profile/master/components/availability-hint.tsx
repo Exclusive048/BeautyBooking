@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AvailabilityHint as AvailabilityHintData } from "@/lib/master/public-profile-view.service";
 
 type Props = {
@@ -27,10 +27,10 @@ function formatLaterDate(dateKey: string, timezone: string): string {
 export function AvailabilityHint({ hint, timezone }: Props) {
   if (hint.kind === "today") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-text">
         <span aria-hidden className="relative flex h-2 w-2">
-          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/70" />
-          <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="absolute inset-0 animate-ping rounded-full bg-success/70" />
+          <span className="relative h-2 w-2 rounded-full bg-success" />
         </span>
         {T.availableTodayTemplate.replace("{time}", hint.time)}
       </span>

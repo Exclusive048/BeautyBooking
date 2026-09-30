@@ -14,6 +14,7 @@ import {
   type StudioServicesKpis,
 } from "../lib/types";
 import { STUDIO_ACTIVE_MASTER_WHERE } from "@/lib/studio/master-eligibility";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 /**
  * CATEGORY-UNIFICATION-A: services-data service reads + groups by
@@ -58,7 +59,6 @@ function resolveBookingPriceKopeks(input: {
 
 async function get30dBookingsByService(
   studioId: string,
-  providerId: string,
 ): Promise<Map<string, { count: number; revenue: number }>> {
   const todayStart = startOfUtcDay(new Date());
   const periodStart = addUtcDays(todayStart, -29);
@@ -66,7 +66,7 @@ async function get30dBookingsByService(
 
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [{ studioId }, { providerId }],
+      ...studioBookingsWhere(studioId),
       startAtUtc: { gte: periodStart, lt: periodEnd },
       status: { in: COMPLETED_STATUSES },
     },
@@ -285,7 +285,7 @@ export async function loadStudioServicesListData(input: {
         },
       },
     }),
-    get30dBookingsByService(studio.id, studio.providerId),
+    get30dBookingsByService(studio.id),
   ]);
 
   const items: StudioServiceListItem[] = services.map((service) => ({
@@ -354,10 +354,7 @@ export async function loadStudioServicesKpis(
   }
   const categoriesCount = usedGlobalCategoryIds.size + (hasUncategorized ? 1 : 0);
 
-  const bookingsByService = await get30dBookingsByService(
-    studio.id,
-    studio.providerId,
-  );
+  const bookingsByService = await get30dBookingsByService(studio.id);
 
   let popularServiceId: string | null = null;
   let popularBookings = 0;
@@ -462,7 +459,7 @@ export async function loadStudioServiceDetail(input: {
   const periodEnd = addUtcDays(todayStart, 1);
   const periodBookings = await prisma.booking.findMany({
     where: {
-      OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
+      ...studioBookingsWhere(studio.id),
       serviceId: service.id,
       startAtUtc: { gte: periodStart, lt: periodEnd },
       status: { in: COMPLETED_STATUSES },

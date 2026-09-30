@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Suggestion = {
   value: string;
@@ -23,6 +24,8 @@ export function DistrictSuggestInput({ value, onChange, className }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  /** Отказ подсказок: лимит (429) и недоступный сервис (503) — дословно (29.09 · 11). */
+  const [suggestError, setSuggestError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const debounceRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -65,20 +68,18 @@ export function DistrictSuggestInput({ value, onChange, className }: Props) {
       (async () => {
         try {
           const params = new URLSearchParams({ q: trimmed });
-          const res = await fetch(`/api/address/suggest?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          if (!res.ok || controller.signal.aborted) return;
-          const json = (await res.json().catch(() => null)) as {
-            ok: boolean;
-            data: { suggestions: Array<{ value: string }> };
-          } | null;
-          if (!json || !json.ok || controller.signal.aborted) return;
-          setSuggestions(json.data.suggestions ?? []);
+          const data = await fetchJson<{ suggestions?: Suggestion[] }>(
+            `/api/address/suggest?${params.toString()}`,
+            { cache: "no-store", signal: controller.signal },
+          );
+          if (controller.signal.aborted) return;
+          setSuggestions(data?.suggestions ?? []);
+          setSuggestError(null);
         } catch (error) {
           if (error instanceof DOMException && error.name === "AbortError") return;
+          if (controller.signal.aborted) return;
           setSuggestions([]);
+          setSuggestError(serverMessageOr(error, UI_TEXT.catalog.sidebar.districtSuggestFailed));
         } finally {
           if (!controller.signal.aborted) setLoading(false);
         }
@@ -123,19 +124,24 @@ export function DistrictSuggestInput({ value, onChange, className }: Props) {
           autoComplete="off"
         />
         {draft.length > 0 ? (
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={clear}
             aria-label={UI_TEXT.catalog.sidebar.districtClear}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
       </div>
 
+      {open && suggestError && !loading ? (
+        <p role="alert" className="mt-1 text-xs text-danger-text">
+          {suggestError}
+        </p>
+      ) : null}
+
       {open && (loading || suggestions.length > 0) ? (
-        <div className="absolute left-0 right-0 z-40 mt-1 max-h-52 overflow-y-auto rounded-2xl border border-border-subtle bg-bg-card shadow-card">
+        <div className="absolute left-0 right-0 z-30 mt-1 max-h-52 overflow-y-auto rounded-2xl border border-border-subtle bg-bg-card shadow-card">
           {loading ? (
             <div className="px-3 py-2 text-xs text-text-sec">{UI_TEXT.common.loading}</div>
           ) : (

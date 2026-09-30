@@ -104,19 +104,19 @@ describe("buildPlanEditedSummary", () => {
 });
 
 describe("buildSubscriptionCancelledByAdminBody", () => {
-  it("includes plan name and formatted access-until date", () => {
+  it("includes plan name and the access-until label as given", () => {
     const body = buildSubscriptionCancelledByAdminBody({
       planName: "Premium",
-      accessUntil: new Date("2026-06-01T10:00:00Z"),
+      accessUntilLabel: "01 июня 2026 г. (Екатеринбург, GMT+5)",
     });
     expect(body).toContain("«Premium»");
-    expect(body).toMatch(/Доступ сохранится до .+ 2026/);
+    expect(body).toContain("Доступ сохранится до 01 июня 2026 г. (Екатеринбург, GMT+5).");
   });
 
   it("falls back to generic copy when accessUntil is null", () => {
     const body = buildSubscriptionCancelledByAdminBody({
       planName: "PRO",
-      accessUntil: null,
+      accessUntilLabel: null,
     });
     expect(body).toContain("до конца оплаченного периода");
   });
@@ -124,7 +124,7 @@ describe("buildSubscriptionCancelledByAdminBody", () => {
   it("appends reason", () => {
     const body = buildSubscriptionCancelledByAdminBody({
       planName: "PRO",
-      accessUntil: null,
+      accessUntilLabel: null,
       reason: "нарушение условий",
     });
     expect(body).toContain("Причина: нарушение условий");

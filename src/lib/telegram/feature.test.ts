@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
  * we must not regress.
  */
 
-// Mirrors `isTelegramEnabled` in env.ts: String(env.NEXT_PUBLIC_TELEGRAM_ENABLED) === "true"
+// Mirrors the admin-flag string semantics (`"true"` only). The env ceiling is
+// no longer a flag: since ENV-SPLIT-01 it is a set NEXT_PUBLIC_TELEGRAM_BOT_USERNAME.
 function envFlagFromValue(value: unknown): boolean {
   return String(value) === "true";
 }

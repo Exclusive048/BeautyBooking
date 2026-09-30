@@ -4,8 +4,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  * FIX-C12 · CHAT-SEND-OUTAGE-CODE-ASYMMETRY — последний сайт того дефекта,
  * который FIX-C11 закрыл на путях записи брони.
  *
- * `rate:chatSend:` внесён в `SENSITIVE_KEY_PREFIXES` (FIX-B12), то есть при
- * обрыве Redis отказ ЕСТЬ — и пользователь, отправляющий ПЕРВОЕ сообщение,
+ * Путь `/api/chat/threads` чувствителен (FIX-B12; с 29.09 доработки · 15 —
+ * по шаблону пути в ключе, прежде — префиксом ключа `rate:chatSend:`), то есть
+ * при обрыве Redis отказ ЕСТЬ — и пользователь, отправляющий ПЕРВОЕ сообщение,
  * читал «Слишком много сообщений. Подождите немного.». Политика не меняется:
  * роут отказывает и там, и там. Меняются код и текст.
  *
@@ -16,9 +17,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  * @probe   что сломать: вернуть в роут legacy-перегрузку
  *          `checkRateLimit(key, RATE_LIMIT.limit, RATE_LIMIT.windowSeconds)`
  *          с `if (!allowed) return jsonFail(429, …)`.
- *          наблюдалось: «обрыв обязан читаться как 503: получено 429» → красный;
- *          плюс красный инвентарь в `rate-limit/refusal.test.ts`
- *          («legacy-перегрузка вернулась…»). Восстановлено, зелено.
+ *          наблюдалось: «обрыв обязан читаться как 503: получено 429» → красный.
+ *          С 29.09 доработки · 15 перегрузки нет — такой возврат не компилируется
+ *          (`rate-limit/keys.test.ts`).
  */
 
 const checkRateLimit = vi.hoisted(() => vi.fn());

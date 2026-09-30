@@ -1,4 +1,5 @@
 import type { ErrorCode } from "@/lib/api/errors";
+import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import type { ApiResponse } from "@/lib/types/api";
 
 export type ApiClientErrorShape = {
@@ -6,6 +7,8 @@ export type ApiClientErrorShape = {
   code?: ErrorCode;
   status: number;
   fromServer?: boolean;
+  details?: unknown;
+  fieldErrors?: Record<string, string | string[]>;
 };
 
 export class ApiClientError extends Error {
@@ -21,12 +24,18 @@ export class ApiClientError extends Error {
    * собственную догадку (`SMOKE-01 · F3`).
    */
   readonly fromServer: boolean;
+  /** `error.details` конверта (например, число записей у ACTIVE_BOOKINGS) — как прислал сервер. */
+  readonly details?: unknown;
+  /** Ошибки полей отказа проверки (`validationError`) — как прислал сервер. */
+  readonly fieldErrors?: Record<string, string | string[]>;
 
   constructor(input: ApiClientErrorShape) {
     super(input.message);
     this.code = input.code;
     this.status = input.status;
     this.fromServer = input.fromServer ?? false;
+    this.details = input.details;
+    this.fieldErrors = input.fieldErrors;
   }
 }
 
@@ -54,6 +63,15 @@ export function serverMessageOr(error: unknown, fallback: string): string {
   return error instanceof ApiClientError && error.fromServer ? error.message : fallback;
 }
 
+/**
+ * То же решение для каналов, где свою строку подставляет сам компонент (чип
+ * автосохранения печатает канон из `UI_TEXT`, если сообщения нет): серверная
+ * строка или `undefined`.
+ */
+export function serverMessageOf(error: unknown): string | undefined {
+  return serverMessageOr(error, "") || undefined;
+}
+
 export function getErrorMessageByCode(code?: ErrorCode): string | null {
   if (!code) return null;
   const map: Partial<Record<ErrorCode, string>> = {
@@ -72,36 +90,44 @@ async function readJson<T>(res: Response): Promise<ApiResponse<T> | null> {
   return (await res.json().catch(() => null)) as ApiResponse<T> | null;
 }
 
-export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, init);
+/**
+ * ЕДИНСТВЕННЫЙ разбор ответа API на клиенте (29.09 доработки · 11,
+ * ERROR-MESSAGE-UI-HELPER): успех — `data`, отказ — `ApiClientError` с
+ * `fromServer`. Для сайтов, которым нужен сам `Response` (свой `fetch` с
+ * заголовками, `FormData`, выбор по статусу до разбора). Разбирать конверт
+ * руками (`json.error?.message ?? …`) не нужно и нельзя: так на клиенте жили 49
+ * вторых разборов, каждый без `fromServer`.
+ */
+export async function readApiResponse<T>(res: Response): Promise<T> {
   const json = await readJson<T>(res);
+  if (res.ok && json && json.ok) return json.data;
 
-  if (!res.ok) {
-    // FIX-C3: `res.statusText` из цепочки убран. Это строка протокола («Too
-    // Many Requests», «Forbidden») — всегда английская и никогда не адресована
-    // пользователю; попадая сюда, она выигрывала у русского дефолта просто
-    // потому, что стояла раньше. `check:error-message-lang` этого не видит по
-    // построению: гейт сторожит СЕРВЕРНЫЕ конверты, а здесь клиент.
-    const serverMessage = json && !json.ok ? json.error?.message : null;
-    const code = json && !json.ok ? json.error?.code : undefined;
-    throw new ApiClientError({
-      message: serverMessage ?? DEFAULT_ERROR_MESSAGE,
-      code,
-      status: res.status,
-      fromServer: Boolean(serverMessage),
-    });
-  }
+  // FIX-C3: `res.statusText` в цепочку не входит. Это строка протокола («Too
+  // Many Requests», «Forbidden») — всегда английская и никогда не адресована
+  // пользователю; попадая сюда, она выигрывала у русского дефолта просто
+  // потому, что стояла раньше. `check:error-message-lang` этого не видит по
+  // построению: гейт сторожит СЕРВЕРНЫЕ конверты, а здесь клиент.
+  const failure = json && !json.ok ? json.error : null;
+  const serverMessage = failure?.message ?? null;
+  throw new ApiClientError({
+    message: serverMessage ?? DEFAULT_ERROR_MESSAGE,
+    code: failure?.code,
+    status: res.status,
+    fromServer: Boolean(serverMessage),
+    details: failure?.details,
+    fieldErrors: failure?.fieldErrors,
+  });
+}
 
-  if (!json || !json.ok) {
-    const serverMessage = json?.error?.message ?? null;
-    const code = json?.error?.code;
-    throw new ApiClientError({
-      message: serverMessage ?? DEFAULT_ERROR_MESSAGE,
-      code,
-      status: res.status,
-      fromServer: Boolean(serverMessage),
-    });
-  }
+export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  return readApiResponse<T>(await fetch(input, init));
+}
 
-  return json.data;
+/**
+ * `fetchJson` для кабинетов: тот же разбор поверх `fetchWithAuth` (обновление
+ * сессии и уход на `/login` по 401). На публичных страницах не использовать —
+ * там 401 значит «покажи окно входа», а не «уведи со страницы».
+ */
+export async function fetchJsonWithAuth<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  return readApiResponse<T>(await fetchWithAuth(input, init));
 }

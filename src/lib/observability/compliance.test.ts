@@ -72,6 +72,7 @@ describe("reportComplianceWriteFailure", () => {
       consentWrite: "compliance.consent-write-failed",
       pdAccessWrite: "compliance.pd-access-write-failed",
       mediaPurgeEnqueue: "compliance.media-purge-enqueue-failed",
+      pdAccessAnomaly: "compliance.pd-access-anomaly",
     });
     const values = Object.values(COMPLIANCE_FINGERPRINTS);
     expect(new Set(values).size).toBe(values.length);

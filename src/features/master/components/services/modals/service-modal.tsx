@@ -14,9 +14,10 @@ import type {
   ServiceCategoryOption,
   ServiceItemView,
 } from "@/lib/master/services-view.service";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatDuration } from "../lib/format";
+import { Select } from "@/components/ui/select";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.service;
 
@@ -120,9 +121,8 @@ export function ServiceModal({
       if (onlinePaymentsAvailable) {
         payload.onlinePaymentEnabled = onlinePayment;
       }
-      let response: Response;
       if (mode === "create") {
-        response = await fetch("/api/master/services", {
+        await fetchJsonWithAuth<unknown>("/api/master/services", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -132,7 +132,7 @@ export function ServiceModal({
           }),
         });
       } else {
-        response = await fetch(`/api/master/services/${service!.id}`, {
+        await fetchJsonWithAuth<unknown>(`/api/master/services/${service!.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -142,14 +142,10 @@ export function ServiceModal({
           }),
         });
       }
-      if (!response.ok) {
-        setError(mode === "create" ? T.errorCreate : T.errorUpdate);
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(mode === "create" ? T.errorCreate : T.errorUpdate);
+    } catch (error) {
+      setError(serverMessageOr(error, mode === "create" ? T.errorCreate : T.errorUpdate));
     } finally {
       setSaving(false);
     }
@@ -170,29 +166,24 @@ export function ServiceModal({
     setCategoryError(null);
     setCategoryToast(null);
     try {
-      const response = await fetch("/api/categories/propose", {
+      const created = await fetchJsonWithAuth<{
+        id: string;
+        title: string;
+        status: "PENDING" | "APPROVED" | "REJECTED";
+      }>("/api/categories/propose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmedCategoryDraft }),
       });
-      const json = (await response.json().catch(() => null)) as
-        | ApiResponse<{ id: string; title: string; status: "PENDING" | "APPROVED" | "REJECTED" }>
-        | null;
-      if (!response.ok || !json || !json.ok) {
-        const message =
-          json && !json.ok && json.error.message ? json.error.message : T.categoryCreateFailed;
-        setCategoryError(message);
-        return;
-      }
       // Insert into the local list, alphabetic-sort, auto-select the
       // freshly proposed entry. The server marks it PENDING with
       // visibleToAll:false; the master can use it right away because
       // `listAvailableGlobalCategories` already includes their own
       // proposed rows.
       const newCategory: ServiceCategoryOption = {
-        id: json.data.id,
-        name: json.data.title,
-        status: json.data.status,
+        id: created.id,
+        name: created.title,
+        status: created.status,
       };
       setCategoryList((prev) =>
         [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name, "ru")),
@@ -201,8 +192,8 @@ export function ServiceModal({
       setCategoryToast(T.categoryCreatedToast);
       setCreatingCategory(false);
       setCategoryDraft("");
-    } catch {
-      setCategoryError(T.categoryCreateFailed);
+    } catch (error) {
+      setCategoryError(serverMessageOr(error, T.categoryCreateFailed));
     } finally {
       setCategorySubmitting(false);
     }
@@ -219,23 +210,18 @@ export function ServiceModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/master/services/${service.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/services/${service.id}`, {
         method: "DELETE",
       });
-      if (!response.ok) {
-        const json = await response.json().catch(() => null);
-        const code = json?.error?.code;
-        if (code === "SERVICE_HAS_BOOKINGS") {
-          setError(T.errorHasBookings);
-        } else {
-          setError(T.errorDelete);
-        }
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorDelete);
+    } catch (error) {
+      // Своя, более точная строка для записей на услуге — до общего решения.
+      if (error instanceof ApiClientError && error.code === "SERVICE_HAS_BOOKINGS") {
+        setError(T.errorHasBookings);
+      } else {
+        setError(serverMessageOr(error, T.errorDelete));
+      }
     } finally {
       setSaving(false);
     }
@@ -261,11 +247,10 @@ export function ServiceModal({
         <Field label={T.categoryLabel}>
           {(controlId) => (
           <>
-          <select
+          <Select
             id={controlId}
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-            className="block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            onChange={(event) => setCategoryId(event.target.value)}
           >
             <option value="">{T.categoryNone}</option>
             {categoryList.map((category) => (
@@ -275,7 +260,7 @@ export function ServiceModal({
                   : category.name}
               </option>
             ))}
-          </select>
+          </Select>
 
           {creatingCategory ? (
             <div className="mt-2 flex flex-col gap-2 rounded-xl border border-border-subtle bg-bg-input/40 p-2.5">
@@ -309,14 +294,13 @@ export function ServiceModal({
                 </Button>
               </div>
               {categoryError ? (
-                <p className="text-xs text-red-600" role="alert">
+                <p className="text-xs text-danger-text" role="alert">
                   {categoryError}
                 </p>
               ) : null}
             </div>
           ) : (
-            <button
-              type="button"
+            <Button variant="wrapper"
               onClick={() => {
                 setCreatingCategory(true);
                 setCategoryToast(null);
@@ -325,11 +309,11 @@ export function ServiceModal({
             >
               <Plus className="h-3 w-3" aria-hidden />
               {T.categoryCreateCta}
-            </button>
+            </Button>
           )}
 
           {categoryToast ? (
-            <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
+            <p className="mt-2 text-xs text-success-text">
               {categoryToast}
             </p>
           ) : null}
@@ -340,18 +324,17 @@ export function ServiceModal({
         <div className="grid grid-cols-2 gap-3">
           <Field label={T.durationLabel}>
             {(controlId) => (
-              <select
+              <Select
                 id={controlId}
                 value={duration}
-                onChange={(event) => setDuration(Number(event.target.value))}
-                className="block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                onChange={(event) => setDuration(Number(event.target.value))}
               >
                 {DURATION_OPTIONS.map((min) => (
                   <option key={min} value={min}>
                     {formatDuration(min)}
                   </option>
                 ))}
-              </select>
+              </Select>
             )}
           </Field>
           <Field label={T.priceLabel}>
@@ -399,7 +382,7 @@ export function ServiceModal({
         {error ? (
           <p
             role="alert"
-            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+            className="rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
           >
             {error}
           </p>
@@ -409,11 +392,11 @@ export function ServiceModal({
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4">
         {mode === "edit" ? (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="wrapper"
+            size="none"
             onClick={handleDelete}
             disabled={saving}
-            className="gap-1.5 text-rose-700 dark:text-rose-300"
+            className="inline-flex h-9 items-center justify-center rounded-2xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface gap-1.5"
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
             {T.deleteCta}

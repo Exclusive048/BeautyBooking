@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import type { AnalyticsKpi } from "@/lib/master/analytics-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatNumber,
   formatPercent,

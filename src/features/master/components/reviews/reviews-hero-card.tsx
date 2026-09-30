@@ -1,7 +1,7 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ReviewStats } from "@/lib/master/reviews-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { pluralize } from "@/features/master/components/clients/lib/format";
 import { StarsDisplay } from "./stars-display";
 
@@ -64,8 +64,8 @@ export function ReviewsHeroCard({ stats }: Props) {
         <p
           className={cn(
             "mt-4 inline-flex items-center gap-1 font-mono text-xs uppercase tracking-[0.18em]",
-            trendUp && "text-emerald-700 dark:text-emerald-300",
-            trendDown && "text-rose-700 dark:text-rose-300"
+            trendUp && "text-success-text",
+            trendDown && "text-danger-text"
           )}
         >
           {trendUp ? (

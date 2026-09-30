@@ -5,9 +5,9 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { providerPublicUrl, withQuery } from "@/lib/public-urls";
-import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 
 type PortfolioDetail = {
@@ -54,12 +54,14 @@ export default function BookFromPortfolioClient() {
     void (async () => {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/portfolio/${portfolioId}`, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ item: PortfolioDetail }> | null;
-      if (!cancelled && res.ok && json && json.ok) {
-        setDetail(json.data.item);
-      } else if (!cancelled) {
-        setError(json && !json.ok ? json.error.message : UI_TEXT.feed.detailsFailed);
+      try {
+        const data = await fetchJson<{ item: PortfolioDetail }>(`/api/portfolio/${portfolioId}`, {
+          cache: "no-store",
+        });
+        if (!cancelled) setDetail(data.item);
+      } catch (error) {
+        // Раньше обрыв сети здесь был необработанным отказом промиса.
+        if (!cancelled) setError(serverMessageOr(error, UI_TEXT.feed.detailsFailed));
       }
       if (!cancelled) setLoading(false);
     })();
@@ -91,12 +93,12 @@ export default function BookFromPortfolioClient() {
         </div>
       ) : null}
       {!hasPortfolioId ? (
-        <div className="rounded-2xl border border-red-300/60 bg-red-950/30 p-4 text-sm text-red-200">
+        <div className="rounded-2xl border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
           {UI_TEXT.feed.detailsFailed}
         </div>
       ) : null}
       {error ? (
-        <div className="rounded-2xl border border-red-300/60 bg-red-950/30 p-4 text-sm text-red-200">
+        <div className="rounded-2xl border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">
           {error}
         </div>
       ) : null}

@@ -1,7 +1,9 @@
 import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
-import { serverApiFetch } from "@/lib/api/server-fetch";
-import { UI_TEXT } from "@/lib/ui/text";
+import { emptyOnRefusal } from "@/features/public-profile/master/server/refusal";
+import { getViewer } from "@/features/public-profile/master/server/viewer";
+import { listPortfolioFeed } from "@/lib/feed/portfolio.service";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type PortfolioItemPreview = {
   id: string;
@@ -17,10 +19,12 @@ type Props = {
 };
 
 async function fetchPortfolio(providerId: string): Promise<PortfolioItemPreview[]> {
-  const path = `/api/feed/portfolio?masterId=${encodeURIComponent(providerId)}&limit=8`;
-  const json = await serverApiFetch<{ items: PortfolioItemPreview[] }>(path);
-  if (!json.ok) return [];
-  return json.data.items ?? [];
+  const viewer = await getViewer();
+  const feed = await emptyOnRefusal(
+    () => listPortfolioFeed({ limit: 8, masterId: providerId, currentUserId: viewer?.id }),
+    { items: [], nextCursor: null },
+  );
+  return feed.items;
 }
 
 export async function PortfolioSection({ providerId }: Props) {
@@ -31,9 +35,7 @@ export async function PortfolioSection({ providerId }: Props) {
     items = await fetchPortfolio(providerId);
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-portfolio", error, [
-      `/api/feed/portfolio?masterId=${encodeURIComponent(providerId)}&limit=8`,
-    ]);
+    logPublicBlockError("master-portfolio", error, ["listPortfolioFeed"]);
   }
 
   if (hasError) {

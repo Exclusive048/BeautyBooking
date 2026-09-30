@@ -6,10 +6,13 @@ import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { cn } from "@/lib/cn";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import type { PortfolioCategoryOption } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Select } from "@/components/ui/select";
+import { FileInput } from "@/components/ui/file-input";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.upload;
 
@@ -212,8 +215,36 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
     }
   };
 
+  // На телефоне окно во весь экран: превью фото крупнее, а «Загрузить» всегда
+  // под пальцем внизу экрана.
   return (
-    <ModalSurface open={open} onClose={close} title={T.title} className="max-w-xl">
+    <ModalSurface
+      open={open}
+      onClose={close}
+      title={T.title}
+      className="max-w-xl"
+      fullScreenOnMobile
+      stickyFooter
+      footer={
+        <>
+          <Button variant="secondary" size="md" onClick={close} disabled={uploading}>
+            {T.cancel}
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={submit}
+            disabled={uploading || validQueue.length === 0}
+          >
+            {uploading
+              ? T.submitting
+              : validQueue.length > 0
+                ? T.submitTemplate.replace("{count}", String(validQueue.length))
+                : T.submit}
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-4">
         <DropZone
           inputId={inputId}
@@ -245,18 +276,17 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
                   )}
                 />
                 {entry.errorCode ? (
-                  <p className="mt-1 text-[10px] leading-snug text-rose-700 dark:text-rose-300">
+                  <p className="mt-1 text-[10px] leading-snug text-danger-text">
                     {entry.errorCode === "size" ? T.errorSize : T.errorType}
                   </p>
                 ) : null}
-                <button
-                  type="button"
+                <PhotoActionButton
+                  label={T.previewRemoveAria}
                   onClick={() => removeFromQueue(index)}
-                  aria-label={T.previewRemoveAria}
-                  className="absolute right-1 top-1 rounded-full bg-bg-card/90 p-1 text-text-sec shadow-card hover:text-rose-700 dark:hover:text-rose-300"
+                  className="absolute right-0 top-0"
                 >
-                  <X className="h-3 w-3" aria-hidden />
-                </button>
+                  <X className="h-4 w-4" aria-hidden />
+                </PhotoActionButton>
               </li>
             ))}
           </ul>
@@ -269,11 +299,11 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
           >
             {T.defaultCategoryLabel}
           </label>
-          <select
+          <Select
             id={defaultCategorySelectId}
             value={defaultCategoryId}
             onChange={(event) => setDefaultCategoryId(event.target.value)}
-            className="mt-1.5 block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="mt-1.5"
           >
             <option value="">{T.defaultCategoryNone}</option>
             {categories.map((category) => (
@@ -281,7 +311,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
                 {category.name}
               </option>
             ))}
-          </select>
+          </Select>
           <p className="mt-1.5 text-xs text-text-sec">{T.defaultCategoryHint}</p>
         </div>
 
@@ -312,29 +342,11 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         {error ? (
           <p
             role="alert"
-            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+            className="rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
           >
             {error}
           </p>
         ) : null}
-      </div>
-
-      <div className="mt-6 flex flex-wrap justify-end gap-2">
-        <Button variant="secondary" size="md" onClick={close} disabled={uploading}>
-          {T.cancel}
-        </Button>
-        <Button
-          variant="primary"
-          size="md"
-          onClick={submit}
-          disabled={uploading || validQueue.length === 0}
-        >
-          {uploading
-            ? T.submitting
-            : validQueue.length > 0
-              ? T.submitTemplate.replace("{count}", String(validQueue.length))
-              : T.submit}
-        </Button>
       </div>
     </ModalSurface>
   );
@@ -371,18 +383,20 @@ function DropZone({
       )}
     >
       <Upload className="mb-2 h-8 w-8 text-text-sec/60" aria-hidden />
-      <p className="font-display text-base text-text-main">
+      {/* На тач-экране перетаскивать нечем — там просто «Выбрать фото». */}
+      <p className="font-display text-base text-text-main [@media(pointer:coarse)]:hidden">
         {isDragging ? T.dropZoneActive : T.dropZoneTitle}
       </p>
-      <p className="mt-1 text-xs text-text-sec">{T.dropZoneSubtitle}</p>
-      <input
+      <p className="mt-1 text-xs text-text-sec [@media(pointer:coarse)]:hidden">{T.dropZoneSubtitle}</p>
+      <p className="hidden font-display text-base text-text-main [@media(pointer:coarse)]:block">
+        {T.selectFileCta}
+      </p>
+      <FileInput mode="label-target"
         ref={inputRef}
         id={inputId}
-        type="file"
         accept={ACCEPT.join(",")}
         multiple
         onChange={onChange}
-        className="sr-only"
       />
     </label>
   );

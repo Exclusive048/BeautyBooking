@@ -101,7 +101,7 @@ for (const root of ROOTS) {
 }
 
 if (violations.length > 0) {
-  console.error("UI text hardcode check failed. Move user-facing strings to src/lib/ui/text.ts");
+  console.error("UI text hardcode check failed. Move user-facing strings to src/lib/ui/text/<домен>.ts");
   for (const violation of violations) {
     console.error(`${violation.filePath}:${violation.line} ${violation.text}`);
   }
@@ -171,7 +171,7 @@ for (const filePath of collectTsxFiles(resolve(process.cwd(), "src"))) {
 
 if (a11yViolations.length > 0) {
   console.error(
-    "Русский текст в aria-label / placeholder / alt задан хардкодом. Перенесите в src/lib/ui/text.ts:"
+    "Русский текст в aria-label / placeholder / alt задан хардкодом. Перенесите в src/lib/ui/text/<домен>.ts:"
   );
   for (const violation of a11yViolations) {
     console.error(`${violation.filePath}:${violation.line} ${violation.text}`);
@@ -193,20 +193,50 @@ if (a11yViolations.length > 0) {
  * («сохранён» с ё, но «сохранены» без), а гейт со словарём наполовину хуже
  * отсутствующего.
  */
-const TEXT_SOURCE = resolve(process.cwd(), "src/lib/ui/text.ts");
-const textLines = readFileSync(TEXT_SOURCE, "utf8").split("\n");
+/**
+ * 29.09 доработки · 18: тексты разложены по файлам доменов `src/lib/ui/text/*.ts`,
+ * а `src/lib/ui/text.ts` — барель без единой строки. Читать только барель
+ * значило бы проверять пустоту и оставаться зелёным при любом «...»; поэтому
+ * набор файлов выводится из папки, пустой набор — отказ, а сама машинерия
+ * перед прогоном проверяется на фикстуре (не-вакуумность — не по числу находок).
+ */
+const TEXT_DIR = "src/lib/ui/text";
+
+function findEllipsis(source) {
+  const found = [];
+  source.split("\n").forEach((line, index) => {
+    const re = /"((?:[^"\\]|\\.)*)"/g;
+    let match;
+    while ((match = re.exec(line)) !== null) {
+      if (match[1].includes("...")) found.push({ line: index + 1, value: match[1].slice(0, 80) });
+    }
+  });
+  return found;
+}
+
+const FIXTURE = 'export const fixture = {\n  loading: "Загрузка...",\n  ok: "Загрузка…",\n} as const;\n';
+const fixtureHits = findEllipsis(FIXTURE);
+if (fixtureHits.length !== 1 || fixtureHits[0].line !== 2) {
+  console.error("check:ui-text (UI-19): проверка многоточия не ловит «...» на фикстуре — машинерия сломана.");
+  process.exit(1);
+}
+
+const textFiles = readdirSync(resolve(process.cwd(), TEXT_DIR))
+  .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+  .map((name) => `${TEXT_DIR}/${name}`);
+if (textFiles.length === 0) {
+  console.error(`check:ui-text (UI-19): в ${TEXT_DIR} нет файлов доменов — это ошибка раскладки, а не чистота.`);
+  process.exit(1);
+}
+
 const ellipsis = [];
-textLines.forEach((line, index) => {
-  const re = /"((?:[^"\\]|\\.)*)"/g;
-  let match;
-  while ((match = re.exec(line)) !== null) {
-    if (match[1].includes("...")) ellipsis.push({ line: index + 1, value: match[1].slice(0, 80) });
-  }
-});
+for (const file of textFiles) {
+  for (const row of findEllipsis(readFileSync(resolve(process.cwd(), file), "utf8"))) ellipsis.push({ file, ...row });
+}
 
 if (ellipsis.length > 0) {
   console.error("Многоточие в UI-строках пишется одним символом «…», а не тремя точками:");
-  for (const row of ellipsis) console.error(`  src/lib/ui/text.ts:${row.line}  ${row.value}`);
+  for (const row of ellipsis) console.error(`  ${row.file}:${row.line}  ${row.value}`);
   process.exit(1);
 }
 

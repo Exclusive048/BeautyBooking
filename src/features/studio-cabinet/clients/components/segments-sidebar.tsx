@@ -3,8 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Crown, Moon, Sparkles, Star, Users } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioClientSegmentKey, StudioClientsSegmentCounts } from "../lib/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.clientsV2.segments;
 
@@ -48,8 +49,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
           const active = selected === entry.key;
           return (
             <li key={entry.key}>
-              <button
-                type="button"
+              <Button variant="wrapper"
                 onClick={() => select(entry.key)}
                 aria-pressed={active}
                 className={cn(
@@ -71,7 +71,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
                 >
                   {counts[entry.key]}
                 </span>
-              </button>
+              </Button>
             </li>
           );
         })}

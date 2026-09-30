@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { matchAdminNavItem } from "@/features/admin-cabinet/config/admin-nav";
 
 export type AdminCrumb = {

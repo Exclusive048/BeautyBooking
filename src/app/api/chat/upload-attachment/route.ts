@@ -5,6 +5,7 @@ import { formatZodError } from "@/lib/api/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getSessionUser } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { uploadChatAttachmentAsset } from "@/lib/media/service";
 import {
   MEDIA_ALLOWED_MIME_TYPES,
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     }
 
     const rateLimit = await checkRateLimit(
-      `rl:/api/chat/upload-attachment:user:${user.id}`,
+      routeRateLimitKey(req, "user", user.id),
       CHAT_ATTACHMENT_UPLOAD_RATE_LIMIT,
     );
     if (rateLimit.limited) {

@@ -1,6 +1,7 @@
 import { Prisma, type BookingSource } from "@prisma/client";
 
 import type { BookingTx } from "@/lib/bookings/booking-transaction";
+import { assertClearanceMatches, type BookingTimeClearance } from "@/lib/bookings/booking-time-policy";
 
 /**
  * FIX-C1 · SMOKE-01 · F1 — ЕДИНСТВЕННЫЙ writer строк `Booking`.
@@ -12,9 +13,9 @@ import type { BookingTx } from "@/lib/bookings/booking-transaction";
  * мастера: любое действие отвечало `404 BOOKING_NOT_FOUND`. Причина —
  * расхождение двух ответов на вопрос «чья это бронь»:
  *
- *   - **журнал и календарь** скоупятся `OR: [{ studioId }, { providerId }]`
- *     (`studio-cabinet/bookings/server/bookings-list.service.ts:120`,
- *     `lib/studio/calendar.service.ts:99`) — то есть ПОКАЗЫВАЮТ по providerId;
+ *   - **журнал и календарь** скоупились `OR: [{ studioId }, { providerId }]`
+ *     (`studio-cabinet/bookings/server/bookings-list.service.ts`) — то
+ *     есть ПОКАЗЫВАЛИ по providerId;
  *   - **авторизация действия** идёт через `assertBelongsToStudio("booking", …)`
  *     (`lib/studio/tenancy.ts:80`) — `where: { id, studioId }`, то есть
  *     РАЗРЕШАЕТ только по `studioId`.
@@ -23,6 +24,18 @@ import type { BookingTx } from "@/lib/bookings/booking-transaction";
  * слова `studioId` в файле не было. `createClientBooking` (легаси) и
  * подтверждение модель-оффера — тоже. Остальные четыре пути его выставляли, и
  * именно поэтому дефект выглядел как «иногда не работает».
+ *
+ * ## Сейчас: показывает = разрешает = `studioId` (29.09 доработки · 08)
+ *
+ * С тех пор как `studioId` выводит только этот writer, ветка `providerId` в
+ * списках стала избыточной и свёрнута: журнал, календарь, KPI, клиенты,
+ * аналитика, удаление кабинета и уход мастера берут `studioBookingsWhere`
+ * (`lib/studio/booking-scope.ts`) — то же поле, что `tenancy.ts`. Старые строки
+ * выровнены миграцией `20260929130000_booking_studio_id_backfill`, а дрейф
+ * колонки мимо writer'а (`updateMany` пост-деплоя) ловит `deploy:post`
+ * (`reportBookingStudioScopeDrift`): строка, у которой `studioId` разошёлся с
+ * поверхностью, из журнала студии теперь пропадает, а не становится
+ * неуправляемой.
  *
  * ## Почему ЭТОТ writer, а не «дописать поле в трёх местах»
  *
@@ -45,9 +58,9 @@ import type { BookingTx } from "@/lib/bookings/booking-transaction";
  * Членство (`Provider.studioId`) отвечает на вопрос «в какой студии состоит
  * мастер», а нужен ответ на «через чью поверхность снята бронь». Это разные
  * вопросы: мастер студии, ведущий частную практику, принимает записи и через
- * личный профиль (`/u/<username>`) — сегодня это разрешено (LOGIC-01 п.5
- * остался открытым продуктовым решением, `AUDIT-CAMPAIGN-BLOCKED.md`), и такие
- * брони студия не показывает и не должна ими управлять. Вывод из членства
+ * личный профиль (`/u/<username>`) — это решение владельца (FIX-D1; с
+ * STUDIO-MASTER-PROFILES — только его собственные услуги), и такие брони студия
+ * не показывает и не должна ими управлять. Вывод из членства
  * отдал бы их студии, вывод из поверхности — нет.
  *
  * Второе, менее заметное: членство меняется во времени. Мастер, ушедший из
@@ -92,8 +105,19 @@ export type BookingRowData = Omit<
  */
 export async function createBookingRow<S extends Prisma.BookingSelect>(
   db: BookingTx,
-  args: { data: BookingRowData; select: S },
+  args: {
+    data: BookingRowData;
+    select: S;
+    /**
+     * 29.09 доработки · 07 — разрешение на время: выдают только функции
+     * `booking-time-policy.ts`, каждая после проверки своей строки политики
+     * (таблица — в шапке `policy-enforcement.ts`). Путь без выбора политики не
+     * компилируется.
+     */
+    timePolicy: BookingTimeClearance;
+  },
 ): Promise<Prisma.BookingGetPayload<{ select: S }>> {
+  assertClearanceMatches(args.timePolicy, args.data.startAtUtc as Date | string);
   const studio = await db.studio.findUnique({
     where: { providerId: args.data.providerId },
     select: { id: true },

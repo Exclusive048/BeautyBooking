@@ -1,6 +1,6 @@
 import { GitMerge, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   canonicalName: string;
@@ -15,10 +15,10 @@ const T = UI_TEXT.adminPanel.cities.detail.duplicate;
  * pre-filled merge dialog. */
 export function CityDuplicateBanner({ canonicalName, onMerge }: Props) {
   return (
-    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+    <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4">
       <div className="mb-2 flex items-center gap-2">
-        <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />
-        <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+        <Info className="h-4 w-4 text-warning-text" aria-hidden />
+        <span className="text-sm font-semibold text-warning-text">
           {T.title}
         </span>
       </div>

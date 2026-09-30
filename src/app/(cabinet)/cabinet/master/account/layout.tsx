@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { AccountNav } from "@/features/master/components/account/account-nav";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
 

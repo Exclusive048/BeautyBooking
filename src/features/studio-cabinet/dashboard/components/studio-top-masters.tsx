@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Users } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioTopMasterRow } from "../server/types";
 
 const T = UI_TEXT.studioCabinet.dashboardV2.topMasters;

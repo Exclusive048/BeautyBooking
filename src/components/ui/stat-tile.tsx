@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { defaultUnlessOverridden } from "@/lib/ui/class-groups";
 
 /**
  * PWA-FIX-10 — общая плитка показателя для всех кабинетов.
@@ -26,9 +25,8 @@ import { defaultUnlessOverridden } from "@/lib/ui/class-groups";
  * одинаково, — оболочкой, строкой «иконка + подпись», строкой значения и
  * подписью под ним; остальное приходит слотами `badge` / `footer`.
  *
- * Радиус и отступы объявлены через `defaultUnlessOverridden` (CN-CONFLICT-CLASS):
- * `cn` — плоский join, и жёсткий дефолт примитива побеждал бы `className`
- * вызывающего не по порядку в атрибуте, а по порядку правил в бандле.
+ * Радиус и отступы — дефолты: `className` вызывающего их перебивает (`cn` —
+ * tailwind-merge). ⚠️ `sm:p-4` снимает только `sm:p-*` вызывающего.
  */
 
 /**
@@ -111,8 +109,8 @@ export function StatTile({
       className={cn(
         "border border-border-subtle bg-bg-card",
         ACCENT_BORDER[accent],
-        defaultUnlessOverridden(className, "radius", "rounded-2xl"),
-        defaultUnlessOverridden(className, "padding-all", compact ? "p-2 sm:p-4" : "p-3 sm:p-4"),
+        "rounded-2xl",
+        compact ? "p-2 sm:p-4" : "p-3 sm:p-4",
         className,
       )}
     >
@@ -131,8 +129,11 @@ export function StatTile({
         <p
           title={labelTooltip}
           className={cn(
-            "min-w-0 flex-1 truncate leading-tight text-text-sec sm:text-xs",
+            "min-w-0 flex-1 truncate text-text-sec sm:text-xs",
             compact ? "text-[10px]" : "text-[11px]",
+            // `leading-*` — после размера шрифта: `cn` (tailwind-merge) выбрасывает
+            // ранний `leading-*`, если позже стоит размер (он задаёт и высоту строки).
+            "leading-tight",
             labelTooltip &&
               "cursor-help decoration-text-sec/30 decoration-dotted underline-offset-2 hover:underline",
           )}
@@ -152,8 +153,9 @@ export function StatTile({
       <p className={cn("flex items-baseline gap-1", compact ? "mt-1" : "mt-1.5")}>
         <span
           className={cn(
-            "truncate font-display leading-tight tabular-nums sm:text-2xl",
+            "truncate font-display tabular-nums sm:text-2xl",
             compact ? "text-base" : "text-xl",
+            "leading-tight",
             ACCENT_VALUE[accent],
           )}
         >

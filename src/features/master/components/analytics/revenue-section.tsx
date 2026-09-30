@@ -1,7 +1,7 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { RevenueSection as RevenueSectionData } from "@/lib/master/analytics-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatPercent, formatRubles, formatRublesShort } from "./lib/format";
 
 const T = UI_TEXT.cabinetMaster.analytics.revenue;
@@ -175,8 +175,8 @@ function DeltaInline({ deltaPct }: { deltaPct: number | null }) {
       className={cn(
         "inline-flex items-center gap-1 font-mono text-xs",
         isFlat && "text-text-sec",
-        isPositive && !isFlat && "text-emerald-700 dark:text-emerald-300",
-        !isPositive && !isFlat && "text-rose-700 dark:text-rose-300"
+        isPositive && !isFlat && "text-success-text",
+        !isPositive && !isFlat && "text-danger-text"
       )}
     >
       {Icon ? <Icon className="h-3 w-3" aria-hidden /> : null}

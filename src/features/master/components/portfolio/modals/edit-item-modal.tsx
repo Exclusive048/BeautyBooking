@@ -2,23 +2,31 @@
 
 import { Crop, Replace, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { useConfirm } from "@/hooks/use-confirm";
-import { cn } from "@/lib/cn";
+import { fetchJson, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import type {
   PortfolioCategoryOption,
   PortfolioItemView,
   PortfolioServiceOption,
   PortfolioTagOption,
 } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { CropModal } from "./crop-modal";
 import { TagInput } from "./tag-input";
+import { Select } from "@/components/ui/select";
+import { ChipButton } from "@/components/ui/chip-button";
+import { FileInput } from "@/components/ui/file-input";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.edit;
+
+// Те же границы, что у загрузки новых работ (`upload-modal.tsx`); сервер
+// проверяет их сам (`validate-image-upload.ts`) — здесь только быстрый отказ.
+const REPLACE_ACCEPT = ["image/jpeg", "image/png", "image/webp"] as const;
+const REPLACE_MAX_BYTES = 10 * 1024 * 1024;
 
 type Props = {
   open: boolean;
@@ -31,9 +39,11 @@ type Props = {
 
 /**
  * Full edit form. Category select, services multi-select, tag input
- * (autocomplete), isPublic toggle, crop trigger, delete. The
- * "Заменить" action is disabled in 31b — replacing the underlying
- * MediaAsset is a separate flow on the backlog.
+ * (autocomplete), isPublic toggle, crop, replace photo, delete.
+ *
+ * «Заменить» (29.09 доработки · 01-в): новый файл уходит в `POST /api/media`
+ * с `replaceAssetId`; сервер переносит строку работы на новый файл (услуги,
+ * теги, порядок и видимость сохраняются) и только потом удаляет старый.
  */
 export function EditItemModal({
   open,
@@ -54,6 +64,38 @@ export function EditItemModal({
   const [error, setError] = useState<string | null>(null);
   const { confirm, modal: confirmModal } = useConfirm();
   const [cropOpen, setCropOpen] = useState(false);
+  const [replacing, setReplacing] = useState(false);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+
+  const replacePhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !item.mediaAssetId || replacing) return;
+    if (!(REPLACE_ACCEPT as readonly string[]).includes(file.type)) {
+      setError(T.errorReplaceType);
+      return;
+    }
+    if (file.size > REPLACE_MAX_BYTES) {
+      setError(T.errorReplaceSize);
+      return;
+    }
+    setReplacing(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.set("entityType", "MASTER");
+      form.set("entityId", item.ownerProviderId);
+      form.set("kind", "PORTFOLIO");
+      form.set("replaceAssetId", item.mediaAssetId);
+      form.set("file", file);
+      await fetchJson("/api/media", { method: "POST", body: form });
+      router.refresh();
+    } catch (err) {
+      setError(serverMessageOr(err, T.errorReplace));
+    } finally {
+      setReplacing(false);
+    }
+  };
 
   // React 19 sync-to-props (compare during render). When the master
   // clicks "Edit" on a different item without closing the page, the
@@ -70,17 +112,17 @@ export function EditItemModal({
   }
 
   const close = () => {
-    if (saving) return;
+    if (saving || replacing) return;
     setError(null);
     onClose();
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (saving || replacing) return;
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/master/portfolio/${item.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/portfolio/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -90,21 +132,17 @@ export function EditItemModal({
           isPublic,
         }),
       });
-      if (!response.ok) {
-        setError(T.errorUpdate);
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorUpdate);
+    } catch (error) {
+      setError(serverMessageOr(error, T.errorUpdate));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (saving) return;
+    if (saving || replacing) return;
     const ok = await confirm({
       message: T.confirmDelete,
       variant: "danger",
@@ -113,15 +151,11 @@ export function EditItemModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/master/portfolio/${item.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        setError(T.errorDelete);
-        return;
-      }
+      await fetchJsonWithAuth<unknown>(`/api/master/portfolio/${item.id}`, { method: "DELETE" });
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorDelete);
+    } catch (error) {
+      setError(serverMessageOr(error, T.errorDelete));
     } finally {
       setSaving(false);
     }
@@ -133,7 +167,40 @@ export function EditItemModal({
 
   return (
     <>
-      <ModalSurface open={open} onClose={close} title={T.title} className="max-w-2xl">
+      <ModalSurface
+        open={open}
+        onClose={close}
+        title={T.title}
+        className="max-w-2xl"
+        fullScreenOnMobile
+        stickyFooter
+        footer={
+          <div className="flex w-full items-center justify-between gap-2">
+            {/* `wrapper`, а не `ghost`: цвет текста варианта перебивал красный
+                (cn — простая склейка). На телефоне — только корзина, чтобы
+                подвал помещался в одну строку. */}
+            <Button
+              variant="wrapper"
+              size="none"
+              onClick={handleDelete}
+              disabled={saving || replacing}
+              aria-label={T.deleteCta}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span className="hidden sm:inline">{T.deleteCta}</span>
+            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="md" onClick={close} disabled={saving || replacing}>
+                {T.cancel}
+              </Button>
+              <Button variant="primary" size="md" onClick={submit} disabled={saving || replacing}>
+                {saving ? T.submitting : T.submit}
+              </Button>
+            </div>
+          </div>
+        }
+      >
         <div className="grid grid-cols-1 gap-5 md:grid-cols-[180px,1fr]">
           <div className="space-y-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
@@ -151,7 +218,7 @@ export function EditItemModal({
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={!item.mediaAssetId || saving}
+                disabled={!item.mediaAssetId || saving || replacing}
                 onClick={() => setCropOpen(true)}
                 className="gap-1.5"
               >
@@ -159,15 +226,23 @@ export function EditItemModal({
                 {T.cropCta}
               </Button>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
-                disabled
-                title={T.replaceSoonHint}
+                disabled={!item.mediaAssetId || saving || replacing}
+                onClick={() => replaceInputRef.current?.click()}
                 className="gap-1.5"
+                data-testid="portfolio-edit-replace"
               >
                 <Replace className="h-3.5 w-3.5" aria-hidden />
-                {T.replaceCta}
+                {replacing ? T.replacing : T.replaceCta}
               </Button>
+              <FileInput
+                ref={replaceInputRef}
+                accept={REPLACE_ACCEPT.join(",")}
+                tabIndex={-1}
+                aria-hidden
+                onChange={(event) => void replacePhoto(event)}
+              />
             </div>
           </div>
 
@@ -179,11 +254,11 @@ export function EditItemModal({
               >
                 {T.categoryLabel}
               </label>
-              <select
+              <Select
                 id={categorySelectId}
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
-                className="mt-1.5 block h-11 w-full rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="mt-1.5"
               >
                 <option value="">{T.categoryNone}</option>
                 {categories.map((category) => (
@@ -191,7 +266,7 @@ export function EditItemModal({
                     {category.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
@@ -205,20 +280,13 @@ export function EditItemModal({
                   {services.map((service) => {
                     const active = serviceIds.includes(service.id);
                     return (
-                      <button
+                      <ChipButton
                         key={service.id}
-                        type="button"
+                        active={active}
                         onClick={() => toggleService(service.id)}
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-xs transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                          active
-                            ? "border-primary bg-primary text-white"
-                            : "border-border-subtle bg-bg-card text-text-main hover:border-primary/40"
-                        )}
                       >
                         {service.name}
-                      </button>
+                      </ChipButton>
                     );
                   })}
                 </div>
@@ -253,7 +321,7 @@ export function EditItemModal({
             {error ? (
               <p
                 role="alert"
-                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+                className="rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
               >
                 {error}
               </p>
@@ -261,26 +329,6 @@ export function EditItemModal({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={saving}
-            className="gap-1.5 text-rose-700 dark:text-rose-300"
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            {T.deleteCta}
-          </Button>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="md" onClick={close} disabled={saving}>
-              {T.cancel}
-            </Button>
-            <Button variant="primary" size="md" onClick={submit} disabled={saving}>
-              {saving ? T.submitting : T.submit}
-            </Button>
-          </div>
-        </div>
       </ModalSurface>
 
       {cropOpen && item.mediaAssetId ? (

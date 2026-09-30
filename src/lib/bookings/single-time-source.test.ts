@@ -29,10 +29,7 @@ import { resolve, join } from "node:path";
  *   • `TimeBlock.startAt/endAt` и `ScheduleBreak` — их СОБСТВЕННЫЕ
  *     канонические колонки;
  *   • `Booking.proposedStartAt/proposedEndAt` — предложение переноса,
- *     отдельная сущность (инв. #32);
- *   • `CalendarBooking.startAt` — DTO-поле публичного ответа, которое
- *     наполняется из `startAtUtc` (`studio/calendar.service.ts`). Имя в
- *     ответе — контракт с мобильным клиентом, переименование ≠ этот фикс.
+ *     отдельная сущность (инв. #32).
  */
 
 const PROJECT_ROOT = resolve(__dirname, "..", "..", "..");

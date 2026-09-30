@@ -5,8 +5,9 @@ import { WindowHeader } from "@/features/chat/chat-window/window-header";
 import { Thread } from "@/features/chat/chat-window/thread";
 import { Composer } from "@/features/chat/composer/composer";
 import { useConversationThread } from "@/features/chat/hooks/use-conversation-thread";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective } from "@/features/chat/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.chat;
 
@@ -45,13 +46,12 @@ export function ChatWindow({
       <section className="flex min-w-0 flex-1 items-center justify-center bg-bg-page p-8 text-center text-sm text-text-sec">
         <div>
           <p className="mb-3">{error}</p>
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => void refresh()}
             className="text-accent-text underline-offset-2 hover:underline"
           >
             {T.thread.retry}
-          </button>
+          </Button>
         </div>
       </section>
     );

@@ -1,6 +1,6 @@
 import { getMasterPublicProfileView } from "@/lib/master/public-profile-view.service";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -16,7 +16,7 @@ export async function AboutSection({ providerId }: Props) {
     view = await getMasterPublicProfileView(providerId);
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-about", error, [`/api/providers/${providerId}`]);
+    logPublicBlockError("master-about", error, ["getMasterPublicProfileView"]);
   }
 
   if (hasError || !view) {

@@ -12,6 +12,16 @@
  *      приглашению на заготовку и оставшимся без него.
  *   5. STUDIO-REVIEW-MASTER-RATING — рейтинг мастерам с отзывами о визитах в
  *      студию, оставленными до того, как они стали засчитываться мастеру.
+ *   6. SCHEDULE-PATTERNS-01 — неделя каждого профиля без графика становится
+ *      графиком «с начала времён, продлевается автоматически» (у действующих
+ *      мастеров ничего не меняется). Сбой одного профиля деплой НЕ
+ *      останавливает — до переноса движок читает его неделю по-старому.
+ *   7. 29.09 доработки · 08 — сторож данных скоупа студии: `Booking.studioId`
+ *      обязан совпадать с поверхностью записи (списки студии читают только
+ *      его). Ничего не пишет: при дрейфе — строка ошибки с fingerprint
+ *      `integrity.booking-studio-scope-drift` и счётчиками по классам; деплой
+ *      не останавливается. Идёт ПОСЛЕДНИМ — после шага 0, который переписывает
+ *      брони `updateMany` мимо writer'а.
  *   0. STUDIO-MASTER-PROFILES (идёт ПЕРВЫМ) — мастера студий делятся на личный
  *      профиль и профиль в студии (`studios/master-profile-split.ts`). Раньше
  *      выдачи адресов (п. 4): у профиля в студии страницы нет, и шаг адресов
@@ -32,6 +42,11 @@ import {
   reconcileStudioVisitReviewsWith,
   splitAllStudioMastersWith,
 } from "../src/lib/studios/master-profile-split";
+import { backfillWeeklySchedulePatterns } from "../src/lib/schedule/patterns-core";
+import {
+  bookingStudioScopeDriftTotal,
+  reportBookingStudioScopeDrift,
+} from "../src/lib/bookings/booking-studio-scope-drift";
 
 const prisma = new PrismaClient();
 
@@ -68,6 +83,17 @@ async function main(): Promise<void> {
 
   const studioReviewRatings = await backfillStudioReviewMasterRatings(prisma);
   console.log(`post-deploy · studio review master ratings: recalculated ${studioReviewRatings.masters}`);
+
+  const schedulePatterns = await backfillWeeklySchedulePatterns(prisma);
+  console.log(
+    `post-deploy · schedule patterns: converted ${schedulePatterns.converted}, failed ${schedulePatterns.failed.length}`,
+  );
+  for (const item of schedulePatterns.failed) {
+    console.error(`post-deploy · schedule pattern backfill failed for ${item.providerId}: ${item.error}`);
+  }
+
+  const studioScopeDrift = await reportBookingStudioScopeDrift(prisma);
+  console.log(`post-deploy · booking studio scope drift: ${bookingStudioScopeDriftTotal(studioScopeDrift)}`);
 }
 
 main()

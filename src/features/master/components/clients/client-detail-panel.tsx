@@ -4,16 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { History, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ApiResponse } from "@/lib/types/api";
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ClientDetailHeader } from "./client-detail-header";
 import { ClientDetailSkeleton } from "./client-detail-skeleton";
 import { ClientDetailStats } from "./client-detail-stats";
 import { ClientNotesEditor } from "./client-notes-editor";
 import { ClientVisitHistory } from "./client-visit-history";
 import { EmptyDetailState } from "./empty-detail-state";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.actions;
 const DETAIL_T = UI_TEXT.cabinetMaster.clients.detail;
@@ -65,27 +64,16 @@ export function ClientDetailPanel({ selectedKey, onBack }: Props) {
     let cancelled = false;
     const controller = new AbortController();
 
-    fetch(`/api/master/clients/${encodeURIComponent(selectedKey)}/detail`, {
+    fetchJsonWithAuth<ClientDetailView>(`/api/master/clients/${encodeURIComponent(selectedKey)}/detail`, {
       signal: controller.signal,
       cache: "no-store",
     })
-      .then(async (response) => {
-        const json = (await response.json().catch(() => null)) as
-          | ApiResponse<ClientDetailView>
-          | null;
-        if (!response.ok || !json || !json.ok) {
-          const message = json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE;
-          throw new Error(message);
-        }
-        if (!cancelled) setState({ kind: "loaded", data: json.data });
+      .then((data) => {
+        if (!cancelled) setState({ kind: "loaded", data });
       })
       .catch((error: unknown) => {
         if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : "Не удалось открыть карточку клиента. Попробуйте ещё раз.";
-        setState({ kind: "error", message });
+        setState({ kind: "error", message: serverMessageOr(error, DETAIL_T.loadFailed) });
       });
 
     return () => {
@@ -102,7 +90,7 @@ export function ClientDetailPanel({ selectedKey, onBack }: Props) {
   }
   if (state.kind === "error") {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
+      <div className="rounded-2xl border border-danger-border bg-danger-surface p-5 text-sm text-danger-text">
         <p className="mb-2 font-medium">{DETAIL_T.emptyTitle}</p>
         <p className="mb-3">{state.message}</p>
         <Button type="button" variant="ghost" size="sm" className="rounded-lg" onClick={onBack}>

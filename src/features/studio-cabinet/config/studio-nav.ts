@@ -3,6 +3,7 @@ import {
   Bell,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
   Home,
   ListChecks,
   Scissors,
@@ -33,6 +34,7 @@ export type StudioNavItem = {
     | "dashboard"
     | "schedule"
     | "scheduleSettings"
+    | "teamSchedule"
     | "scheduleRequests"
     | "bookings"
     | "masters"
@@ -58,7 +60,7 @@ export type StudioNavGroup = {
  * sidebar and the mobile bottom-nav read from this config; UI_TEXT keys
  * resolve to localised labels at render time.
  *
- * 12 nav items in 5 groups. "Rooms" is intentionally excluded (out of
+ * 13 nav items in 5 groups (SCHEDULE-PATTERNS-01 этап 4 добавил «График команды»). "Rooms" is intentionally excluded (out of
  * scope for current release). Schedule-requests was added in the
  * preceding STUDIO-SCHEDULE-REQUEST-APPROVAL-A commit; this config
  * surfaces it as a first-class nav item with a pending badge.
@@ -96,6 +98,13 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         href: "/cabinet/studio/schedule/settings",
         labelKey: "scheduleSettings",
         icon: Settings,
+      },
+      // SCHEDULE-PATTERNS-01 (этап 4): мастера студии × дни.
+      {
+        id: "team-schedule",
+        href: "/cabinet/studio/schedule/team",
+        labelKey: "teamSchedule",
+        icon: CalendarRange,
       },
       {
         id: "bookings",

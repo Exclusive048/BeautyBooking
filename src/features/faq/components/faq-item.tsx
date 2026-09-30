@@ -1,8 +1,10 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
+import { INSTANT, MOTION } from "@/lib/ui/motion";
 import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   /** Stable slug used to build #faq-{id} anchor and as React key. */
@@ -22,6 +24,7 @@ type Props = {
  */
 export function FAQItem({ id, question, answer }: Props) {
   const [open, setOpen] = useState(false);
+  // Раскрытие по высоте `reducedMotion="user"` не гасит (это не transform).
   const reduce = useReducedMotion();
 
   return (
@@ -29,38 +32,37 @@ export function FAQItem({ id, question, answer }: Props) {
       id={`faq-${id}`}
       className="scroll-mt-20 overflow-hidden rounded-xl border border-border-subtle bg-bg-card/50 transition-colors hover:border-primary/30"
     >
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-4 p-5 text-left"
         aria-expanded={open}
         aria-controls={`faq-panel-${id}`}
       >
         <span className="font-medium text-text-main">{question}</span>
-        <motion.span
-          animate={reduce ? undefined : { rotate: open ? 180 : 0 }}
-          transition={reduce ? undefined : { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+        <m.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={MOTION.micro}
           className="shrink-0 text-text-sec"
           aria-hidden
         >
           <ChevronDown className="h-5 w-5" />
-        </motion.span>
-      </button>
+        </m.span>
+      </Button>
       <AnimatePresence initial={false}>
         {open ? (
-          <motion.div
+          <m.div
             key="content"
             id={`faq-panel-${id}`}
-            initial={reduce ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
+            initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
-            exit={reduce ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
+            exit={{ height: 0, opacity: 0, transition: reduce ? INSTANT : MOTION.exit }}
+            transition={reduce ? INSTANT : MOTION.base}
             className="overflow-hidden"
           >
             <div className="px-5 pb-5 leading-relaxed text-text-sec">
               {typeof answer === "string" ? <p>{answer}</p> : answer}
             </div>
-          </motion.div>
+          </m.div>
         ) : null}
       </AnimatePresence>
     </div>

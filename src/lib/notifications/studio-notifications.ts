@@ -10,6 +10,7 @@ import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { publishRealtime } from "@/lib/notifications/service";
 import type { NotificationEvent } from "@/lib/notifications/types";
+import { STUDIO_NOTIFICATION_TEXTS as TX } from "@/lib/notifications/studio-notification-texts";
 
 const inviteInclude = {
   studio: {
@@ -231,16 +232,14 @@ export async function loadScheduleRequestWithRelations(
 async function sendStudioInviteEmail(invite: InviteWithRelations): Promise<void> {
   const email = normalizeInviteEmail(invite.email);
   if (!email || !isEmailConfigured()) return;
-  const studioName = invite.studio.provider.name || "Студия";
   const baseUrl = env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru";
-  const title = "Вас пригласили в студию";
-  const body = `Студия ${studioName} приглашает вас в команду мастеров на МастерРядом. Войдите с этой почтой — приглашение будет в уведомлениях.`;
+  const { subject, title, body, ctaLabel } = TX.inviteEmail(invite.studio.provider.name);
   const ctaUrl = `${baseUrl}/login?next=${encodeURIComponent("/notifications")}`;
   try {
     await sendEmail({
       to: email,
-      subject: `${title}: ${studioName}`,
-      html: buildNotificationEmailHtml({ title, body, ctaUrl, ctaLabel: "Открыть приглашение" }),
+      subject,
+      html: buildNotificationEmailHtml({ title, body, ctaUrl, ctaLabel }),
       text: buildNotificationEmailText({ title, body, ctaUrl }),
     });
   } catch (error) {
@@ -257,7 +256,7 @@ export async function notifyStudioInviteReceived(invite: InviteWithRelations): P
   const invitedUserId = await resolveInviteRecipientUserIdFor(invite);
   if (!invitedUserId) return;
 
-  const studioName = invite.studio.provider.name || "Студия";
+  const studioName = invite.studio.provider.name ?? "";
   const inviterLabel = resolveUserLabel({
     displayName: invite.invitedBy?.displayName ?? null,
     firstName: invite.invitedBy?.firstName ?? null,
@@ -266,8 +265,7 @@ export async function notifyStudioInviteReceived(invite: InviteWithRelations): P
     fallback: "Администратор",
   });
 
-  const title = "Приглашение в студию";
-  const body = `Вас пригласили в студию ${studioName}. Приглашение отправил(а) ${inviterLabel}.`;
+  const { title, body } = TX.inviteReceived(studioName, inviterLabel);
 
   await deliverNotification({
     userId: invitedUserId,
@@ -288,11 +286,10 @@ export async function notifyStudioInviteAccepted(invite: InviteWithRelations): P
   const ownerUserId = resolveStudioOwnerUserId(invite);
   if (!ownerUserId) return;
 
-  const studioName = invite.studio.provider.name || "Студия";
+  const studioName = invite.studio.provider.name ?? "";
   const masterLabel = await resolveInviteUserLabel(invite);
 
-  const title = "Мастер принял приглашение";
-  const body = `Мастер ${masterLabel} принял приглашение в студию ${studioName}.`;
+  const { title, body } = TX.inviteAccepted(masterLabel, studioName);
 
   await deliverNotification({
     userId: ownerUserId,
@@ -313,11 +310,10 @@ export async function notifyStudioInviteRejected(invite: InviteWithRelations): P
   const ownerUserId = resolveStudioOwnerUserId(invite);
   if (!ownerUserId) return;
 
-  const studioName = invite.studio.provider.name || "Студия";
+  const studioName = invite.studio.provider.name ?? "";
   const masterLabel = await resolveInviteUserLabel(invite);
 
-  const title = "Мастер отклонил приглашение";
-  const body = `Мастер ${masterLabel} отклонил приглашение в студию ${studioName}.`;
+  const { title, body } = TX.inviteRejected(masterLabel, studioName);
 
   await deliverNotification({
     userId: ownerUserId,
@@ -338,9 +334,8 @@ export async function notifyStudioInviteRevoked(invite: InviteWithRelations): Pr
   const invitedUserId = await resolveInviteRecipientUserIdFor(invite);
   if (!invitedUserId) return;
 
-  const studioName = invite.studio.provider.name || "Студия";
-  const title = "Приглашение отозвано";
-  const body = `Студия ${studioName} отозвала приглашение.`;
+  const studioName = invite.studio.provider.name ?? "";
+  const { title, body } = TX.inviteRevoked(studioName);
 
   const event: NotificationEvent = {
     id: `studio-invite-revoked:${invite.id}:${Date.now()}`,
@@ -363,8 +358,7 @@ export async function notifyStudioMemberLeft(input: {
   masterName: string;
   studioName: string;
 }): Promise<void> {
-  const title = "Мастер вышел из студии";
-  const body = `Мастер ${input.masterName} вышел из студии ${input.studioName}.`;
+  const { title, body } = TX.memberLeft(input.masterName, input.studioName);
 
   await deliverNotification({
     userId: input.studioOwnerUserId,
@@ -380,6 +374,29 @@ export async function notifyStudioMemberLeft(input: {
   });
 }
 
+/**
+ * 29.09 доработки · 04 (решение владельца): студия исключила мастера — ему
+ * сообщение. Без него мастер узнавал о потере студийного профиля, только
+ * открыв кабинет. Личная страница и личные записи остаются — текст так и
+ * говорит.
+ */
+export async function notifyStudioMemberRemoved(input: {
+  masterUserId: string;
+  studioName: string;
+}): Promise<void> {
+  const { title, body } = TX.memberRemoved(input.studioName);
+
+  await deliverNotification({
+    userId: input.masterUserId,
+    type: NotificationType.STUDIO_MEMBER_REMOVED,
+    title,
+    body,
+    payloadJson: { studioName: input.studioName },
+    pushUrl: "/cabinet/master",
+    telegramText: buildTelegramText(title, body),
+  });
+}
+
 export async function notifyScheduleRequestSubmitted(
   request: ScheduleRequestWithRelations
 ): Promise<void> {
@@ -387,11 +404,10 @@ export async function notifyScheduleRequestSubmitted(
     request.studio?.ownerUserId ?? request.studio?.provider.ownerUserId ?? null;
   if (!ownerUserId) return;
 
-  const studioName = request.studio?.provider.name ?? "Студия";
-  const masterName = request.provider.name || "Мастер";
+  const studioName = request.studio?.provider.name ?? "";
+  const masterName = request.provider.name ?? "";
 
-  const title = "Мастер просит изменить график";
-  const body = `Мастер ${masterName} просит изменить свой график в студии ${studioName}.`;
+  const { title, body } = TX.scheduleRequestSubmitted(masterName, studioName);
 
   await deliverNotification({
     userId: ownerUserId,
@@ -417,9 +433,8 @@ export async function notifyScheduleRequestApproved(
     request.provider.ownerUserId ?? request.provider.masterProfile?.userId ?? null;
   if (!masterUserId) return;
 
-  const studioName = request.studio?.provider.name ?? "Студия";
-  const title = "Расписание одобрено";
-  const body = `Студия ${studioName} одобрила изменения в расписании.`;
+  const studioName = request.studio?.provider.name ?? "";
+  const { title, body } = TX.scheduleRequestApproved(studioName);
 
   await deliverNotification({
     userId: masterUserId,
@@ -439,6 +454,12 @@ export async function notifyScheduleRequestApproved(
 export async function notifyMasterScheduleUpdatedByStudio(input: {
   providerId: string;
   studioProviderId: string;
+  /**
+   * SCHEDULE-PATTERNS-01 (этап 3): не слать, если такое уведомление об этом
+   * профиле уже ушло за последние N минут. Календарь правится покраской дня за
+   * днём, и без тишины мастер получал бы уведомление на каждый клик админа.
+   */
+  quietMinutes?: number;
 }): Promise<void> {
   const [provider, studio] = await Promise.all([
     prisma.provider.findUnique({
@@ -463,9 +484,20 @@ export async function notifyMasterScheduleUpdatedByStudio(input: {
   const masterUserId = provider.ownerUserId ?? provider.masterProfile?.userId ?? null;
   if (!masterUserId) return;
 
-  const studioName = studio.provider.name ?? "Студия";
-  const title = "Студия изменила ваш график";
-  const body = `Студия ${studioName} обновила ваш рабочий график.`;
+  if (input.quietMinutes) {
+    const recent = await prisma.notification.findFirst({
+      where: {
+        userId: masterUserId,
+        type: NotificationType.STUDIO_SCHEDULE_APPROVED,
+        createdAt: { gte: new Date(Date.now() - input.quietMinutes * 60_000) },
+        payloadJson: { path: ["providerId"], equals: input.providerId },
+      },
+      select: { id: true },
+    });
+    if (recent) return;
+  }
+
+  const { title, body } = TX.scheduleUpdatedByStudio(studio.provider.name);
 
   await deliverNotification({
     userId: masterUserId,
@@ -490,9 +522,8 @@ export async function notifyScheduleRequestRejected(
     request.provider.ownerUserId ?? request.provider.masterProfile?.userId ?? null;
   if (!masterUserId) return;
 
-  const studioName = request.studio?.provider.name ?? "Студия";
-  const title = "Расписание отклонено";
-  const body = `Студия ${studioName} отклонила изменения в расписании.`;
+  const studioName = request.studio?.provider.name ?? "";
+  const { title, body } = TX.scheduleRequestRejected(studioName);
 
   await deliverNotification({
     userId: masterUserId,

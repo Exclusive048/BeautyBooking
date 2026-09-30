@@ -59,6 +59,8 @@ jobs:
           context: .
           file: Dockerfile
           push: false
+          # load: образ нужен следующему шагу — из него вынимается .next.
+          load: true
           tags: beautyhub-app:ci
           # Заглушки CI — см. шапку файла. Набор ключей = прод-набор (compose args).
           # BUILD_NODE_OPTIONS — тот же heap-кап, что у прод-сборки на ВМ (compose):
@@ -77,6 +79,17 @@ jobs:
             NEXT_PUBLIC_GLITCHTIP_RELEASE=ci-${{ github.sha }}
           cache-from: type=gha,scope=app
           cache-to: type=gha,scope=app,mode=max
+
+      # 29.09 доработки · 18 (PERF-02): тексты кабинетов не едут на публичные
+      # маршруты, first-load JS `/`, `/catalog`, `/u/[username]` — в бюджете.
+      # Единственное место, где есть собранные чанки: `.next` берётся из образа
+      # (standalone несёт server/ и build-manifest, static копируется рядом).
+      - name: UI-тексты в клиентском бандле (PERF-02)
+        run: |
+          id="$(docker create beautyhub-app:ci)"
+          docker cp "$id:/app/.next" ./.next-image
+          docker rm "$id" >/dev/null
+          node scripts/check-client-text-bundle.mjs .next-image
 
       - name: Пик использованной памяти за сборку
         if: always()

@@ -1,7 +1,7 @@
 import { Star } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ReviewDistribution } from "@/lib/master/reviews-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.reviews.distribution;
 
@@ -27,10 +27,10 @@ export function ReviewsDistribution({ distribution, totalCount }: Props) {
           const percent = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
           const tone =
             star >= 4
-              ? "bg-rose-500"
+              ? "bg-primary"
               : star === 3
-                ? "bg-amber-500"
-                : "bg-slate-400";
+                ? "bg-warning"
+                : "bg-muted-foreground/50";
           return (
             <li key={star} className="flex items-center gap-3">
               <span className="flex w-7 shrink-0 items-center gap-0.5 text-xs text-text-sec">

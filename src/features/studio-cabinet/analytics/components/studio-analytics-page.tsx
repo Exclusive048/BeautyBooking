@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioAnalyticsViewData } from "../lib/types";
 import { AnalyticsControls } from "./analytics-controls";
 import { AnalyticsKpiBar } from "./analytics-kpi-bar";

@@ -8,11 +8,12 @@ import type {
   MasterServicesViewData,
   ServicePackageView,
 } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { BundleModal } from "./modals/bundle-modal";
 import { ReorderControls } from "./reorder-controls";
 import { RowMenu } from "./row-menu";
 import { formatDuration, formatRubles } from "./lib/format";
+import { Button } from "@/components/ui/button";
 
 const ROW = UI_TEXT.cabinetMaster.servicesPage.row;
 const T = UI_TEXT.cabinetMaster.servicesPage.bundleRow;
@@ -48,8 +49,7 @@ export function BundleRow({ bundle, allServices }: Props) {
             isLast={isLast}
           />
           <Package className="mt-0.5 h-4 w-4 shrink-0 text-accent-text" aria-hidden />
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setEditOpen(true)}
             className="min-w-0 flex-1 text-left"
           >
@@ -57,14 +57,14 @@ export function BundleRow({ bundle, allServices }: Props) {
             <p className="mt-0.5 truncate text-xs text-text-sec">
               {bundle.serviceNames.join(" + ")}
             </p>
-          </button>
+          </Button>
           {!bundle.isEnabled ? (
-            <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               {ROW.bundleDisabledBadge}
             </span>
           ) : null}
           {bundle.hasDisabledComponent ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+            <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-[10px] text-warning-text">
               <AlertTriangle className="h-3 w-3" aria-hidden />
               <span className="hidden sm:inline">{ROW.bundleWarning}</span>
             </span>
@@ -82,7 +82,7 @@ export function BundleRow({ bundle, allServices }: Props) {
             {T.sumLabel}: <span className="text-text-main">{formatRubles(bundle.totalPrice)}</span>
           </span>
           <span aria-hidden>·</span>
-          <span className="text-emerald-700 dark:text-emerald-300">
+          <span className="text-success-text">
             {T.discountLabel}: {discountLabel}
           </span>
           <span aria-hidden>·</span>

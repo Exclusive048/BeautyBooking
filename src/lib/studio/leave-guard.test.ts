@@ -14,6 +14,9 @@ import { findStudioLeaveBlock, studioMasterBlockingBookingsWhere } from "./leave
  * @probe 2026-09-24 — из `detachMasterFromStudio` (`lib/studios/masters.ts`)
  * удалён вызов `findStudioLeaveBlock(`: красный «каждая отвязка мастера от
  * студии проходит сторож» с именем файла. Возвращено — зелёный.
+ * @probe 2026-09-29 — после удаления `detachMasterFromStudio` (29.09 · 04): из
+ * `transferMasterOutOfStudio` убран вызов `findStudioLeaveBlock(`: красный тот же
+ * кейс с `src/lib/studio/transfer-master.ts`. Возвращено — зелёный.
  */
 
 const NOW = new Date("2026-09-24T10:00:00Z");
@@ -62,7 +65,9 @@ describe("findStudioLeaveBlock", () => {
     const where = studioMasterBlockingBookingsWhere("studio-p", ["m1"], NOW);
     const and = (where.AND ?? []) as unknown[];
     expect(and).toContainEqual({ masterProviderId: { in: ["m1"] } });
-    expect(and).toContainEqual({ OR: [{ studio: { providerId: "studio-p" } }, { providerId: "studio-p" }] });
+    // поверхность студии — `Booking.studioId` (через связь, 29.09 · 08)
+    // без прежней ветки OR по `providerId` студии
+    expect(and.slice(1)).toEqual([{ masterProviderId: { in: ["m1"] } }, { studio: { providerId: "studio-p" } }]);
     // личные записи мастера (`studioId = null`, его провайдер) условию студии не отвечают
     expect(JSON.stringify(and)).not.toContain('"providerId":"m1"');
     // живость — общий предикат удаления кабинетов

@@ -2,7 +2,7 @@
 
 import { Flag, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -15,7 +15,8 @@ import { ReportReviewModal } from "@/features/reviews/components/report-review-m
 import type { ReviewDto } from "@/lib/reviews/types";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 // AUDIT (section 4):
 // - Public review cards render only public tags.
@@ -37,7 +38,7 @@ type Props = {
 };
 
 const reviewCardText = UI_TEXT.publicProfile.reviews;
-const masterReviewText = UI_TEXT.master.reviews;
+const masterReviewText = UI_TEXT.reviews;
 
 function ReviewCard({
   review,
@@ -64,15 +65,14 @@ function ReviewCard({
         <div className="flex items-center gap-2">
           <StarsDisplay rating={review.rating} size="sm" />
           {canReport ? (
-            <button
-              type="button"
+            <Button variant="wrapper"
               onClick={() => onReport?.(review.id)}
               aria-label={masterReviewText.report}
               title={masterReviewText.report}
               className="rounded-lg p-1 text-text-sec/50 transition hover:text-text-sec focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             >
               <Flag className="h-3.5 w-3.5" aria-hidden />
-            </button>
+            </Button>
           ) : review.reportedAt && currentUserId && !review.isOwnReview ? (
             <span className="text-[10px] text-text-sec/50">{masterReviewText.reportedAt}</span>
           ) : null}
@@ -116,7 +116,6 @@ export function ReviewsPreview({
   aiSummaryEnabled = false,
 }: Props) {
   const t = UI_TEXT.publicProfile.reviews;
-  const reduce = useReducedMotion();
 
   const [reviews, setReviews] = useState<ReviewDto[]>(initialReviews);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -259,7 +258,7 @@ export function ReviewsPreview({
         </div>
 
         {summaryVisible ? (
-          <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 dark:border-primary/30 dark:bg-primary/10">
+          <div className="mt-4 rounded-2xl border border-primary/25 bg-primary/[0.08] p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-text-main">
               <Sparkles className="h-4 w-4 text-accent-text" />
               {t.summaryTitle}
@@ -293,28 +292,28 @@ export function ReviewsPreview({
           </div>
         ) : null}
 
-        <motion.div
+        <m.div
           className="mt-4 space-y-3"
           initial="hidden"
           animate="visible"
-          variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: STAGGER } } }}
         >
           {reviews.length === 0 ? (
             <div className="text-sm text-text-sec">{t.noReviews}</div>
           ) : (
             reviews.map((review) => (
-              <motion.div
+              <m.div
                 key={review.id}
-                variants={reduce ? undefined : {
-                  hidden: { opacity: 0, y: 8 },
-                  visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
+                variants={{
+                  hidden: { opacity: 0, y: DISTANCE.nudge },
+                  visible: { opacity: 1, y: 0, transition: MOTION.base },
                 }}
               >
                 <ReviewCard review={review} currentUserId={currentUserId} onReport={setReportingReviewId} />
-              </motion.div>
+              </m.div>
             ))
           )}
-        </motion.div>
+        </m.div>
 
         {/* REVIEWS-LOADMORE-01: replaces the «Все отзывы» dialog, which fetched
             a single limit=50 page and silently dropped the tail. Reviews now

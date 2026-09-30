@@ -10,7 +10,8 @@ import { WhenFilter, type WhenTimePreset } from "@/features/catalog/components/w
 import { useTopCategories, type CatalogCategory } from "@/features/catalog/lib/use-top-categories";
 import { useDeferredCommit } from "@/hooks/use-deferred-commit";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { RangeInput } from "@/components/ui/range-input";
 
 type Category = CatalogCategory;
 
@@ -89,9 +90,8 @@ function CategoriesSection({
         {visible.map((cat) => {
           const active = globalCategoryId === cat.id;
           return (
-            <button
+            <Button variant="wrapper" aria-pressed={active}
               key={cat.id}
-              type="button"
               onClick={() => onGlobalCategoryChange(active ? null : cat.id)}
               className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                 active
@@ -101,13 +101,12 @@ function CategoriesSection({
             >
               {cat.icon ? <span aria-hidden>{cat.icon}</span> : null}
               <span>{cat.title}</span>
-            </button>
+            </Button>
           );
         })}
       </div>
       {hasMore ? (
-        <button
-          type="button"
+        <Button variant="wrapper"
           onClick={() => setExpanded((v) => !v)}
           className="mt-2 px-3 text-xs font-medium text-accent-text hover:underline"
         >
@@ -117,7 +116,7 @@ function CategoriesSection({
                 "{count}",
                 String(topCategories.length),
               )}
-        </button>
+        </Button>
       ) : null}
     </section>
   );
@@ -272,8 +271,7 @@ export function CatalogSidebar({
             {ratingDraft === 0 ? UI_TEXT.catalog.sidebar.ratingAny : `${ratingDraft}+`}
           </span>
         </div>
-        <input
-          type="range"
+        <RangeInput
           min={0}
           max={5}
           step={0.5}

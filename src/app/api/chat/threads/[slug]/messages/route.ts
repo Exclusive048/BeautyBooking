@@ -7,6 +7,7 @@ import { toAppError } from "@/lib/api/errors";
 import { parseBody } from "@/lib/validation";
 import { sendConversationMessage } from "@/lib/chat/message-sender";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
@@ -46,12 +47,13 @@ export async function POST(
     const perspective =
       asParam === "client" ? "CLIENT" : asParam === "master" ? "MASTER" : isMaster ? "MASTER" : "CLIENT";
 
-    // FIX-C12: ключ `rate:chatSend:` — в `SENSITIVE_KEY_PREFIXES` (FIX-B12), то
-    // есть при обрыве Redis отказ ЕСТЬ, и legacy-перегрузка (boolean) сообщала о
-    // нём как «Слишком много сообщений» пользователю, отправляющему ПЕРВОЕ.
+    // FIX-C12: путь `/api/chat/threads` чувствителен (FIX-B12; с 29.09 · 15 —
+    // единственным признаком, шаблоном пути в ключе), то есть при обрыве Redis
+    // отказ ЕСТЬ, и прежняя boolean-перегрузка сообщала о нём как «Слишком много
+    // сообщений» пользователю, отправляющему ПЕРВОЕ.
     // Политика не меняется — роут по-прежнему отказывает; меняются код и текст.
     const refusal = resolveRateLimitRefusal(
-      await checkRateLimit(`rate:chatSend:${user.userId}`, {
+      await checkRateLimit(routeRateLimitKey(req, "user", user.userId), {
         maxRequests: RATE_LIMIT.limit,
         windowSeconds: RATE_LIMIT.windowSeconds,
       }),

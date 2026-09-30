@@ -14,7 +14,7 @@ import { getMarketingPricing } from "@/lib/billing/marketing-pricing";
 import { getCurrentSubscriptionRow } from "@/lib/billing/get-current-subscription-row";
 import { getSessionUserId } from "@/lib/auth/session";
 import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   title: "Тарифы",
@@ -55,11 +55,11 @@ export default async function PricingPage({ searchParams }: PageProps) {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-decor-primary blur-3xl"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-primary-magenta/[0.08] blur-3xl dark:bg-primary-magenta/[0.12]"
+          className="pointer-events-none absolute -left-32 top-20 h-72 w-72 rounded-full bg-decor-magenta blur-3xl"
         />
 
         <div className="relative mx-auto max-w-3xl px-4 py-12 text-center lg:py-16">

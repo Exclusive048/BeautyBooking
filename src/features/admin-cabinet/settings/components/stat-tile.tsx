@@ -10,8 +10,8 @@ type Props = {
 
 const toneClasses: Record<Tone, string> = {
   neutral: "text-text-main",
-  warning: "text-amber-700 dark:text-amber-300",
-  danger: "text-red-600 dark:text-red-400",
+  warning: "text-warning-text",
+  danger: "text-danger-text",
 };
 
 export function StatTile({ label, value, tone = "neutral" }: Props) {

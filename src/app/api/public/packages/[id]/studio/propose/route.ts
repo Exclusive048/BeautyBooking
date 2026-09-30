@@ -7,6 +7,7 @@ import { parseISOToUTC } from "@/lib/time";
 import { proposeStudioPackagePlacement } from "@/lib/bookings/package-booking-studio";
 import { getSessionUserFromRequest } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
@@ -37,7 +38,7 @@ export async function POST(
 ) {
   try {
     const rate = await checkRateLimit(
-      `rl:/api/public/packages/studio/propose:ip:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       PROPOSE_RATE,
     );
     if (rate.limited) return tooManyRequests(rate.retryAfterSeconds);

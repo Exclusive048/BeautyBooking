@@ -2,7 +2,7 @@
 
 import { Users } from "lucide-react";
 import { Select } from "@/components/ui/select";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.scheduleSettings.masterPicker;
 

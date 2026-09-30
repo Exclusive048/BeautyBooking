@@ -5,7 +5,7 @@ import { deliverNotification } from "@/lib/notifications/delivery";
 import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 import { getAppPublicUrl } from "@/lib/telegram/config";
 import { logError, logInfo } from "@/lib/logging/logger";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { SlotFreedPayload } from "@/lib/queue/types";
 
 const ANTI_SPAM_TTL_SECONDS = 86400;

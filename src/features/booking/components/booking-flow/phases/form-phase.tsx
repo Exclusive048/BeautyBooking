@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
 import { PhoneInput } from "@/features/booking/components/booking-flow/components/phone-input";
 import { SummaryBlock } from "@/features/booking/components/booking-flow/components/summary-block";
@@ -16,6 +16,7 @@ import { LegalConsentGroup } from "@/features/auth/components/legal-consent-grou
 import { hasRequiredConsents, type ConsentFlags } from "@/lib/legal/consent-flags";
 import type { ServiceBookingConfig } from "@/features/booking/lib/booking-config";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
+import { FileInput } from "@/components/ui/file-input";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 const TB = UI_TEXT.publicProfile.booking;
@@ -126,14 +127,13 @@ export function FormPhase({
 
   return (
     <div className="space-y-4 p-5">
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={onBack}
         className="inline-flex items-center gap-1 text-xs text-text-sec transition hover:text-text-main"
       >
         <ChevronLeft className="h-3 w-3" aria-hidden strokeWidth={2} />
         {T.formBackToSelection}
-      </button>
+      </Button>
 
       <div className="text-[11px] font-medium uppercase tracking-wider text-text-sec">
         {T.formContactsEyebrow}
@@ -162,7 +162,7 @@ export function FormPhase({
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-text-main">
             {T.nameLabel}
-            <span className="ml-0.5 text-rose-500">*</span>
+            <span className="ml-0.5 text-danger-text">*</span>
           </span>
           <Input
             value={clientName}
@@ -210,7 +210,7 @@ export function FormPhase({
         <p className="text-xs text-text-sec">{TB.bookingConfigLoading}</p>
       ) : null}
       {bookingConfigError ? (
-        <p className="text-xs text-rose-500">{bookingConfigError}</p>
+        <p className="text-xs text-danger-text">{bookingConfigError}</p>
       ) : null}
       {bookingConfig &&
       (bookingConfig.requiresReferencePhoto || bookingConfig.questions.length > 0) ? (
@@ -221,25 +221,35 @@ export function FormPhase({
 
           {bookingConfig.requiresReferencePhoto ? (
             <div>
-              <label htmlFor={referencePhotoId} className="mb-1.5 block text-xs text-text-sec">
-                {TB.referencePhotoLabel} <span className="text-rose-400">*</span>
+              <p className="mb-1.5 block text-xs text-text-sec">
+                {TB.referencePhotoLabel} <span className="text-danger-text">*</span>
+              </p>
+              <label htmlFor={referencePhotoId} className="inline-block">
+                <FileInput
+                  id={referencePhotoId}
+                  mode="label-target"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) onReferenceUpload(file);
+                  }}
+                  disabled={referenceUploading}
+                  className="peer"
+                />
+                <Button
+                  asChild
+                  variant="secondary"
+                  size="sm"
+                  className="cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-primary-glow/45 peer-disabled:pointer-events-none peer-disabled:opacity-50"
+                >
+                  <span>{TB.referencePhotoPick}</span>
+                </Button>
               </label>
-              <input
-                id={referencePhotoId}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) onReferenceUpload(file);
-                }}
-                disabled={referenceUploading}
-                className="block w-full text-xs text-text-sec"
-              />
               {referenceUploading ? (
                 <p className="mt-1.5 text-xs text-text-sec">{TB.referencePhotoUploading}</p>
               ) : null}
               {referenceUploadError ? (
-                <p className="mt-1.5 text-xs text-rose-400">{referenceUploadError}</p>
+                <p className="mt-1.5 text-xs text-danger-text">{referenceUploadError}</p>
               ) : null}
               {referencePreviewUrl ? (
                 <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg">
@@ -261,7 +271,7 @@ export function FormPhase({
                 <div key={question.id}>
                   <label className="mb-1 block text-sm text-text-main">
                     {question.text}
-                    {question.required ? <span className="text-rose-400"> *</span> : null}
+                    {question.required ? <span className="text-danger-text"> *</span> : null}
                   </label>
                   <Input
                     value={bookingAnswers[question.id] ?? ""}
@@ -292,7 +302,7 @@ export function FormPhase({
       ) : null}
 
       {submitError ? (
-        <p role="alert" className="text-sm text-rose-600 dark:text-rose-300">
+        <p role="alert" className="text-sm text-danger-text">
           {submitError}
         </p>
       ) : null}

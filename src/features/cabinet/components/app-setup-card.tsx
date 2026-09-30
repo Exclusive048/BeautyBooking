@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Bell, Check, Download, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { usePushOptIn } from "@/features/cabinet/hooks/use-push-opt-in";
 import { cn } from "@/lib/cn";
 import { promptPwaInstall, type PwaPlatform } from "@/lib/pwa/install-state";
 import { usePwaInstall } from "@/lib/pwa/use-pwa-install";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.pwa.onboarding;
 const PUSH = UI_TEXT.settings.notifications.push;
@@ -73,7 +74,6 @@ type Props = {
 export function AppSetupCard({ variant = "dashboard", className }: Props) {
   const install = usePwaInstall();
   const push = usePushOptIn();
-  const reduce = useReducedMotion();
   const [dismissed, setDismissed] = useState(readDismissed);
   const [platform, setPlatform] = useState<PwaPlatform | null>(null);
   const [installing, setInstalling] = useState(false);
@@ -102,11 +102,11 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
   };
 
   return (
-    <motion.section
+    <m.section
       aria-labelledby="app-setup-title"
-      initial={reduce ? false : { opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: DISTANCE.rise }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      transition={MOTION.section}
       className={className}
     >
       <Card className="p-5 md:p-6">
@@ -224,6 +224,6 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
           </div>
         </div>
       </Card>
-    </motion.section>
+    </m.section>
   );
 }

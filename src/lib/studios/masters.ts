@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
-import { findStudioLeaveBlock } from "@/lib/studio/leave-guard";
 import { ProviderType } from "@prisma/client";
 
 type StudioMasterRecord = {
@@ -165,37 +164,4 @@ export async function attachMasterToStudio(
   }
 
   return { ok: true, data: { id: master.id, name: master.name, studioId } };
-}
-
-export async function detachMasterFromStudio(
-  studioId: string,
-  masterProviderId: string
-): Promise<Result<StudioMasterRecord>> {
-  const studio = await ensureStudio(studioId);
-  if (!studio.ok) return studio;
-
-  const master = await prisma.provider.findUnique({
-    where: { id: masterProviderId },
-    select: { id: true, name: true, type: true, studioId: true },
-  });
-  if (!master || master.type !== ProviderType.MASTER || master.studioId !== studioId) {
-    return { ok: false, status: 404, message: "Мастер не найден.", code: "MASTER_NOT_FOUND" };
-  }
-
-  // STUDIO-LEAVE-GUARD: живые записи студии сначала переносятся или отменяются.
-  const block = await findStudioLeaveBlock(prisma, {
-    studioProviderId: studioId,
-    masterProviderIds: [master.id],
-    actor: "STUDIO",
-  });
-  if (block) return { ok: false, status: 409, message: block.message, code: block.code };
-
-  const updated = await prisma.provider.update({
-    where: { id: master.id },
-    // STUDIO-PAUSE-SPLIT-01: пауза — свойство членства в студии, уходит вместе с ним.
-    data: { studioId: null, studioPaused: false },
-    select: { id: true, name: true, studioId: true },
-  });
-
-  return { ok: true, data: updated };
 }

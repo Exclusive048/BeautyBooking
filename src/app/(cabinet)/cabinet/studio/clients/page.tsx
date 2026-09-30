@@ -1,9 +1,11 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { StudioClientsPage } from "@/features/studio-cabinet/clients/components/studio-clients-page";
 import { loadStudioClientsData } from "@/features/studio-cabinet/clients/server/clients-data.service";
 import { isStudioClientSegmentKey } from "@/features/studio-cabinet/clients/lib/types";
 import { loadStudioCabinetShellExtras } from "@/features/studio-cabinet/schedule/server/shell-extras.service";
 import { getSessionUser } from "@/lib/auth/session";
+import { extractClientIp } from "@/lib/http/ip";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 
 type SearchParams = {
@@ -42,6 +44,8 @@ export default async function StudioClientsRoute({ searchParams }: Props) {
   const [data, shellExtras] = await Promise.all([
     loadStudioClientsData({
       studioId,
+      actorUserId: user.id,
+      actorIp: extractClientIp({ headers: await headers() }),
       segment,
       search,
       masterId,

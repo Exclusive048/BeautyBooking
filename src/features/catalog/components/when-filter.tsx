@@ -7,7 +7,7 @@ import { ChipButton } from "@/components/ui/chip-button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FREE_SLOT_HORIZON_DAYS } from "@/lib/schedule/free-slot-keys-shared";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * CATALOG-DATE-TIME-FILTER (2026-09-24) — блок «Когда» каталога: день

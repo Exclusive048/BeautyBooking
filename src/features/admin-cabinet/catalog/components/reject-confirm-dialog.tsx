@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.catalog.rejectDialog;
 
@@ -84,7 +84,7 @@ export function RejectConfirmDialog({
             maxLength={MAX_LEN}
           />
           {error ? (
-            <p role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="mt-1.5 text-xs text-danger-text">
               {error}
             </p>
           ) : null}

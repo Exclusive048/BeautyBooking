@@ -4,8 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioServiceListItem } from "../lib/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.servicesV2.list;
 
@@ -33,8 +34,7 @@ export function ServiceListItem({
   };
 
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       onClick={select}
       className={cn(
         "flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all",
@@ -96,11 +96,11 @@ export function ServiceListItem({
           ))}
         </div>
         {service.masters.length === 0 ? (
-          <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
+          <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
             {T.noMasterBadge}
           </span>
         ) : null}
       </div>
-    </button>
+    </Button>
   );
 }

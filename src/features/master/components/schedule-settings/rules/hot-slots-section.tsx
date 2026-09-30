@@ -5,8 +5,8 @@ import { Switch } from "@/components/ui/switch";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { cn } from "@/lib/cn";
 import type { HotSlotsDto } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
-import { ChipGroup } from "../components/chip-group";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ChipGroup } from "@/components/ui/chip-group";
 import { SettingRow } from "../components/setting-row";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.rules.hotSlots;

@@ -4,7 +4,7 @@ import { Calendar, Phone } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective, ConversationPartnerDto } from "@/features/chat/types";
 
 const T = UI_TEXT.chat;
@@ -30,21 +30,20 @@ export function WindowHeader({
 }: Props) {
   const statusLabel = hasOpenBooking ? T.header.statusOpen : T.header.statusClosed;
   const statusClass = hasOpenBooking
-    ? "text-emerald-700 dark:text-emerald-300"
+    ? "text-success-text"
     : "text-text-sec";
 
   return (
     <header className="flex h-[68px] shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-card px-4 md:px-5">
       <div className="flex min-w-0 items-center gap-3">
         {onMobileBack ? (
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={onMobileBack}
             className="md:hidden -ml-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-text-sec hover:text-text-main"
             aria-label={T.header.back}
           >
             ‹
-          </button>
+          </Button>
         ) : null}
         <div className="relative shrink-0">
           {partner.avatarUrl ? (
@@ -63,7 +62,7 @@ export function WindowHeader({
           {hasOpenBooking ? (
             <span
               aria-hidden
-              className="absolute -bottom-px -right-px h-[11px] w-[11px] rounded-full border-2 border-bg-card bg-emerald-500"
+              className="absolute -bottom-px -right-px h-[11px] w-[11px] rounded-full border-2 border-bg-card bg-success"
             />
           ) : null}
         </div>

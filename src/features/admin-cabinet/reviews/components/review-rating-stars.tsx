@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   rating: number;
@@ -26,7 +26,7 @@ export function ReviewRatingStars({ rating, size = "sm" }: Props) {
           className={cn(
             dim,
             idx < filled
-              ? "fill-amber-400 text-amber-400"
+              ? "fill-rating text-rating"
               : "fill-transparent text-border-subtle",
           )}
           aria-hidden

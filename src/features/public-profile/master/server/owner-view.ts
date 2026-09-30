@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { getSessionUser } from "@/lib/auth/session";
+import { getViewer } from "@/features/public-profile/master/server/viewer";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
  * `cache()` dedupes within the request like the sibling `getProvider`.
  */
 export const isViewerProfileOwner = cache(async (providerId: string): Promise<boolean> => {
-  const user = await getSessionUser();
+  const user = await getViewer();
   if (!user) return false;
   const provider = await prisma.provider.findUnique({
     where: { id: providerId },

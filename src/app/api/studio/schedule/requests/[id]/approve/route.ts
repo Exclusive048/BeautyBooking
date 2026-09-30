@@ -5,13 +5,16 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
-import { applySchedulePayload, type SchedulePayload } from "@/lib/schedule/unified";
 import {
   applyScheduleSnapshot,
   isScheduleEditorRequestPayload,
   normalizeScheduleEditorRequestPayload,
 } from "@/lib/schedule/editor";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestApproved } from "@/lib/notifications/studio-notifications";
+import { applyScheduleChangesRequest } from "@/lib/schedule/change-requests";
+import { approvePatternChangeRequest } from "@/lib/schedule/pattern-apply";
+import { isScheduleChangesPayload } from "@/lib/schedule/schedule-changes-shared";
+import { isPatternChangeRequestPayload } from "@/lib/schedule/patterns-shared";
 
 export const runtime = "nodejs";
 
@@ -53,14 +56,23 @@ export async function POST(
     // seed fix in place a properly-formed payload won't trip it, but
     // legacy or migration-corrupted rows still might.
     try {
-      if (isScheduleEditorRequestPayload(request.payloadJson)) {
+      if (isScheduleChangesPayload(request.payloadJson)) {
+        // SCHEDULE-STUDIO-PROFILE-CALENDAR: накопленные правки — неделя или
+        // график и дни календаря — одной транзакцией.
+        await applyScheduleChangesRequest(request.providerId, request.payloadJson);
+      } else if (isPatternChangeRequestPayload(request.payloadJson)) {
+        // SCHEDULE-PATTERNS-01 (этап 4): заявка мастера в формате графика.
+        await approvePatternChangeRequest(request.providerId, request.payloadJson.request);
+      } else if (isScheduleEditorRequestPayload(request.payloadJson)) {
         const normalized = normalizeScheduleEditorRequestPayload(request.payloadJson);
         await applyScheduleSnapshot(request.providerId, normalized);
       } else {
-        await applySchedulePayload(
-          request.providerId,
-          request.payloadJson as unknown as SchedulePayload,
-        );
+        // SCHEDULE-PATTERNS-01: заявка старого формата (`{ templates, weekly,
+        // overrides }`) писала бы в недельную таблицу, а у профиля с графиком
+        // неделя — только история: одобрение молча ничего бы не изменило.
+        // Интерфейс такие заявки не создаёт; отказ ниже превращается в 422 с
+        // просьбой отправить заявку заново.
+        throw new AppError("Заявка в старом формате.", 400, "INVALID_BODY");
       }
     } catch (error) {
       const inner = error instanceof AppError ? error : toAppError(error);

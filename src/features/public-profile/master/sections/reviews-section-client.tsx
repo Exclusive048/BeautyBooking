@@ -3,8 +3,8 @@
 import { useState } from "react";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ReviewDto } from "@/lib/reviews/types";
-import type { ApiResponse } from "@/lib/types/api";
 import { ReviewsPreview } from "@/features/public-profile/master/reviews-preview";
+import { fetchJson } from "@/lib/http/client";
 
 type Props = {
   providerId: string;
@@ -36,11 +36,13 @@ export function ReviewsSectionClient({
   const [reviewsCount, setReviewsCount] = useState(initialReviewsCount);
 
   async function handleRatingRefresh() {
-    const res = await fetch(`/api/providers/${providerId}`, { cache: "no-store" });
-    const json = (await res.json().catch(() => null)) as ApiResponse<{ provider: ProviderProfileDto | null }> | null;
-    if (!res.ok || !json || !json.ok || !json.data.provider) return;
-    setRating(json.data.provider.rating);
-    setReviewsCount(json.data.provider.reviews);
+    // Фон: обновить рейтинг после отзыва; не прочитали — остаётся прежний.
+    const data = await fetchJson<{ provider: ProviderProfileDto | null }>(`/api/providers/${providerId}`, {
+      cache: "no-store",
+    }).catch(() => null);
+    if (!data?.provider) return;
+    setRating(data.provider.rating);
+    setReviewsCount(data.provider.reviews);
   }
 
   return (

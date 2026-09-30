@@ -1,7 +1,7 @@
 import { Layers } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ServiceCategoryOption } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { AddServiceButton } from "./add-service-button";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.empty;

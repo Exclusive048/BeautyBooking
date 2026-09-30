@@ -3,7 +3,7 @@ import { EmailNotificationsSection } from "@/features/cabinet/components/email-n
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { PushNotificationsSection } from "@/features/cabinet/components/push-notifications";
 import { isTelegramEnabled } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.notifications;
 const FG = UI_TEXT.billing.featureGate;

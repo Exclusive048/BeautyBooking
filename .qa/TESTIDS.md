@@ -55,9 +55,33 @@
 | `notification-row` | each notification card — same file. Carries `data-group` (bookings/reminders/reviews/promo/billing/studio/models/system) and `data-unread` ("true"/"false") so a pass can assert filtering + read state without reading Russian copy |
 | `notifications-empty` | empty state — same file (mutually exclusive with `notifications-list`) |
 | `package-wizard` | solo package wizard build step — `public-profile/master/components/package-booking-flow.tsx` (PACKAGE-SOLO-WIZARD-01) |
+| `bottom-tab-indicator` | active-tab stripe of the phone bottom bar (public + three cabinets) — `components/layout/bottom-tab-bar.tsx`. One per bar; moves by `transform: translateX(index × 100%)` (CSS transition, 29.09 доработки · 19), so a pass can assert the stripe moved by reading its inline `transform` |
 | `package-component` | each package component row — same file. Carries `data-state` (`placed`/`active`/`waiting`) so a pass can assert wizard progress + the sequential gating without reading Russian copy. Exactly one row is `active` until all are placed |
 | `package-date-grid` / `package-time-grid` | the active component's date / time pickers — same file. `package-time-grid` renders **only after a date is picked** (date → time, per component) |
 | `package-review` / `package-contacts` / `package-success` | the wizard's later steps — same file. `package-contacts` appears **once**, after every component is placed |
+| `schedule-calendar` | schedule calendar tab root — `features/master/components/schedule-settings/calendar/schedule-calendar-tab.tsx` (SCHEDULE-PATTERNS-01 этап 3; master personal settings and studio admin «Расписание мастера») |
+| `schedule-calendar-day` | each day cell — same file. Carries `data-date` (salon date `YYYY-MM-DD`), so a pass picks a day without reading Russian labels; in request mode (studio profile) a day already in the studio request also carries `data-requested="true"` |
+| `schedule-calendar-request` | request-mode banner «В заявке студии: …» — same file (SCHEDULE-STUDIO-PROFILE-CALENDAR); rendered only while the open request is non-empty |
+| `schedule-request-review-days` | «Дни календаря» list (было → стало) in a studio schedule-request card — `features/studio-cabinet/schedule-requests/components/payload-preview.tsx` |
+| `setup-guide-card` | «Первые шаги» on the cabinet home — `features/cabinet/setup-guide/setup-guide-card.tsx` (SETUP-GUIDE-01); master dashboard and studio home, absent once hidden |
+| `setup-guide-continue` | the card's «Перейти» to the next step — same file; absent when every step is done (the card collapses to the summary) |
+| `setup-guide-step` | each step row — same file. Carries `data-step` (`profile`/`address`/`services`/`masters`/`assign`/`schedule`/`rules`/`portfolio`/`catalog`), `data-done`, and `data-blocked="true"` for studio steps waiting for the first active master |
+| `setup-guide-hint` | the step hint panel on `?guide=<step>` screens — `features/cabinet/setup-guide/setup-guide-hint.tsx`. Carries `data-step` / `data-done`; it re-checks every 6 s, so wait for `data-done="true"` instead of reloading |
+| `toast-region` | the fixed short-message region — `components/ui/toast.tsx` (29.09 · 10). Always rendered, even empty (two live regions inside: `role="status"` for success/info, `role="alert"` for errors) |
+| `toast-item` | each short message — same file. Carries `data-tone` (`success`/`error`/`info`) so a pass can assert the outcome without reading Russian copy |
+| `setup-guide-next` | the hint's «Дальше: …» / «Готово» — same file (absent on an unconfirmed rules step, where «Всё подходит» shows) |
+| `setup-guide-hint-collapse` / `setup-guide-hint-expand` | the hint's «Свернуть подсказку» and the collapsed one-line pill that expands it — same file. The hint carries `data-collapsed`; on narrow screens it collapses by itself over a sticky bottom bar (`data-guide-avoid`) and is `visibility: hidden` while a text field is focused |
+| `setup-guide-hidden` | the one-line notice that replaces the dashboard card right after «Скрыть» — `setup-guide-card.tsx`; link «В профиль» |
+| `setup-guide-profile` / `setup-guide-profile-row` | «Первые шаги» section of the main profile `/cabinet/profile` — `features/cabinet/setup-guide/setup-guide-profile-card.tsx`; one row per cabinet with `data-scope` (`master`/`studio`) and `data-hidden`; «Показать на главной» / «Продолжить». Absent for users without a master or administered studio cabinet |
+| `portfolio-card` | each master portfolio tile — `features/master/components/portfolio/portfolio-card.tsx` (PORTFOLIO-PHOTO-UX-01) |
+| `portfolio-card-edit` / `portfolio-card-delete` | the always-visible «Изменить» / «Удалить» buttons on the tile (bottom-right, `PhotoActionButton`) — same file; delete asks for confirmation |
+| `portfolio-card-menu` / `portfolio-card-menu-list` | the «⋮» button (top-right) and its menu — same file. The list is portalled to `body` with a fixed position clamped to the viewport, so query it from the page, not from inside the tile |
+| `portfolio-edit-replace` | «Заменить» in the master's «Редактирование работы» window — `features/master/components/portfolio/modals/edit-item-modal.tsx` (29.09 · 01-в); opens a hidden file input, the work keeps its services/tags/visibility |
+| `master-studio-membership` / `master-leave-studio` | the «Вы работаете в составе студии» card and its «Выйти из студии» button in `/cabinet/master/account/account` — `features/master/components/account/account/studio-membership-card.tsx` (29.09 · 04) |
+| `studio-master-remove` | «Удалить из студии» in the studio masters detail header — `features/studio-cabinet/masters/components/master-detail-header.tsx` (29.09 · 04); hidden for INVITED masters |
+| `guest-manage-review` / `guest-manage-review-done` | «Оставить отзыв» and the «Спасибо за отзыв!» line on `/booking/manage/[token]` — `features/booking/guest-manage/guest-manage-page.tsx` (29.09 · 05); shown only inside the review window |
+| `schedule-wizard-quick` | quick presets on the first step of «Настроить график» — `features/master/components/schedule-settings/plan/schedule-wizard.tsx` (SCHEDULE-WIZARD-QUICK-01) |
+| `team-board-ending-soon` | «Настроено до …» under a master's name on «График команды» — `features/studio-cabinet/schedule-team/components/team-board.tsx` |
 | `notifications-invites` | studio-invites section — same file. **Rendered only when the viewer has ≥1 pending invite** (NOTIFICATIONS-REDESIGN-01); its absence is the expected state for most users, not a failure |
 
 ### Key CTAs
@@ -68,7 +92,7 @@
 | `login-verify` | `app/login/login-client.tsx` | submit OTP → log in |
 | `login-tab-phone` / `login-tab-email` | `app/login/login-client.tsx` (via `ui/segmented-tabs.tsx`) | switch OTP channel — **present only when email OTP is configured** (`isEmailConfigured()`); phone-only deployments render no tabs |
 | `notifications-filters` | `features/notifications/components/notifications-center-page.tsx` | filter-pill row — **rendered only when >1 group has items** (a single-category inbox needs no filter) |
-| `notifications-filter-pill` | same file | one semantic-group pill (`Все`/`Записи`/…) — role- and data-gated; use `data-group` on `notification-row` to assert the effect |
+| `notifications-filter-pill` | same file | one semantic-group filter (`Все`/`Записи`/…) — since 29.09 · 22 a `Tabs` item (`<button aria-pressed>` with a count badge), still one per group; role- and data-gated; use `data-group` on `notification-row` to assert the effect |
 | `notifications-only-unread` | same file | «Только непрочитанные» switch |
 | `notifications-mark-all` | same file | «Прочитать все» — **rendered only when unread > 0** |
 | `login-back` | `app/login/login-client.tsx` | OTP step → back to phone/email entry |

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { findUnique, update, deleteObject, getStorageProvider, logError } = vi.hoisted(() => ({
+const { findUnique, update, embeddingDeleteMany, deleteObject, getStorageProvider, logError } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   update: vi.fn(),
+  embeddingDeleteMany: vi.fn(),
   deleteObject: vi.fn(),
   getStorageProvider: vi.fn(),
   logError: vi.fn(),
@@ -14,6 +15,8 @@ vi.mock("@/lib/prisma", () => ({
       findUnique,
       update,
     },
+    mediaAssetEmbedding: { deleteMany: embeddingDeleteMany },
+    $transaction: async (ops: Array<Promise<unknown>>) => Promise.all(ops),
   },
 }));
 
@@ -43,12 +46,15 @@ vi.mock("@/lib/media/access", () => ({
 vi.mock("@/lib/advisor/cache", () => ({ invalidateAdvisorCache: vi.fn() }));
 vi.mock("@/lib/queue/queue", () => ({ enqueue: vi.fn() }));
 
+import { Prisma } from "@prisma/client";
 import { deleteAssetById } from "@/lib/media/service";
 
 describe("media/deleteAssetById order-of-operations", () => {
   beforeEach(() => {
     findUnique.mockReset();
     update.mockReset();
+    embeddingDeleteMany.mockReset();
+    embeddingDeleteMany.mockResolvedValue({ count: 0 });
     deleteObject.mockReset();
     getStorageProvider.mockReset();
     logError.mockReset();
@@ -92,7 +98,7 @@ describe("media/deleteAssetById order-of-operations", () => {
     expect(calls).toEqual(["db.update", "storage.delete"]);
     expect(update).toHaveBeenCalledWith({
       where: { id: "asset-1" },
-      data: { deletedAt: expect.any(Date) },
+      data: expect.objectContaining({ deletedAt: expect.any(Date) }),
     });
     expect(deleteObject).toHaveBeenCalledWith("key/abc.jpg");
   });
@@ -117,5 +123,22 @@ describe("media/deleteAssetById order-of-operations", () => {
         storageKey: "key/xyz.jpg",
       }),
     );
+  });
+
+  // 29.09 доработки · 16 (RKN-AUDIT-01): вместе с `deletedAt` — одной
+  // транзакцией — уходят данные, выведенные из фото для визуального поиска.
+  it("вместе с deletedAt удаляет эмбеддинг и обнуляет visual* (visualIndexed не трогает)", async () => {
+    findUnique.mockResolvedValue({ id: "asset-3", storageKey: "k3", deletedAt: null });
+    update.mockResolvedValue({});
+    deleteObject.mockResolvedValue(undefined);
+
+    await deleteAssetById("asset-3");
+
+    const data = update.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data.visualDescription).toBeNull();
+    expect(data.visualCategory).toBeNull();
+    expect(data.visualMeta).toBe(Prisma.DbNull);
+    expect(data).not.toHaveProperty("visualIndexed");
+    expect(embeddingDeleteMany).toHaveBeenCalledWith({ where: { assetId: "asset-3" } });
   });
 });

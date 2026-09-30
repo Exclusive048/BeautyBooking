@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type DateFormatOptions = { locale?: string; timeZone?: string };
 
@@ -96,7 +96,7 @@ export const UI_FMT = {
     return `${day}.${month}`;
   },
   ratingLabel(rating: number, count: number): string {
-    if (count <= 0) return UI_TEXT.publicProfile.hero.novice;
+    if (count <= 0) return UI_TEXT.common.novice;
     return `⭐ ${rating.toFixed(1)} (${count})`;
   },
   /**

@@ -23,6 +23,7 @@ import { env, isProduction } from "@/lib/env";
 import { initServerObservability } from "@/lib/observability/server";
 import { flushReports, reportError } from "@/lib/observability/report";
 import { processBookingReminder, reconcileBookingReminders } from "@/lib/bookings/reminders";
+import { detectPdAccessAnomalies } from "@/lib/audit/pd-access-anomaly";
 import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
@@ -45,6 +46,8 @@ import { runSmartPriceJob } from "@/lib/hot-slots/smart-price-job";
 import { runBookingReviewPromptJob } from "@/lib/bookings/review-prompts";
 import { finalizePastBookings } from "@/lib/bookings/finalize-past";
 import { expirePendingBookings } from "@/lib/bookings/expire-pending";
+import { purgeExpiredOtpCodes } from "@/lib/auth/otp-cleanup";
+import { runScheduleEndingReminders } from "@/lib/schedule/schedule-ending";
 import {
   indexMediaAsset,
   isVisualSearchMissingAssetError,
@@ -229,6 +232,41 @@ function startPeriodicJobs() {
   };
   runPendingExpirySafe();
 
+  // SCHEDULE-PATTERNS-01 (этап 3): «расписание скоро закончится» — за неделю до
+  // конца настроенного расписания, одно уведомление на дату окончания. При
+  // старте и раз в 6 часов: срок в днях, точнее не нужно.
+  const runScheduleEndingSafe = () => {
+    void runScheduleEndingReminders()
+      .then((summary) => {
+        if (summary.sent > 0) logInfo("schedule.ending.reminded", summary);
+      })
+      .catch((error) => {
+        logError("Schedule ending reminder job failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("schedule.ending", error);
+      });
+  };
+  runScheduleEndingSafe();
+  setInterval(runScheduleEndingSafe, 6 * 60 * 60 * 1000);
+
+  // Просроченные коды входа (телефон и почта) — при старте и раз в сутки.
+  // Раньше не удалялись никогда: строка несёт телефон или адрес получателя.
+  const runOtpCleanupSafe = () => {
+    void purgeExpiredOtpCodes()
+      .then((summary) => {
+        if (summary.deleted > 0) logInfo("auth.otpCleanup.done", summary);
+      })
+      .catch((error) => {
+        logError("OTP cleanup job failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("auth.otpCleanup", error);
+      });
+  };
+  runOtpCleanupSafe();
+  setInterval(runOtpCleanupSafe, 24 * 60 * 60 * 1000);
+
   // VISUAL-SEARCH-UNRECOGNIZED-01: фото, которые прежний конвейер пометил
   // нераспознанными (описание обрывалось лимитом токенов), один раз на версию
   // конвейера уходят в индексацию заново. Метка в SystemConfig — повторный
@@ -285,6 +323,19 @@ function startPeriodicJobs() {
         reportWorkerFailure("bookings.reminders.reconcile", error);
       });
   }, reminderReconcileIntervalMs);
+
+  // 29.09 доработки · 16 (PD-ACCESS-ANOMALY-DETECTION): аномальные массовые
+  // чтения ПДн — окно последнего часа раз в 15 минут. Пока действует режим
+  // наблюдения (`PD_ANOMALY_ALERTS_ENABLED = false`), превышение — только лог.
+  const pdAnomalyIntervalMs = 15 * 60 * 1000;
+  setInterval(() => {
+    void detectPdAccessAnomalies().catch((error) => {
+      logError("PD access anomaly detection failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      reportWorkerFailure("pd-access.anomaly", error);
+    });
+  }, pdAnomalyIntervalMs);
 
   // RES-26: снимок MRR держался на ОДНОМ внешнем срабатывании cron'а в сутки, и
   // пропуск оставлял в ряду дыру навсегда. Подбор — не бэкфилл, а второй шанс

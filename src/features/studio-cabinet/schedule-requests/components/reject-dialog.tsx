@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   open: boolean;

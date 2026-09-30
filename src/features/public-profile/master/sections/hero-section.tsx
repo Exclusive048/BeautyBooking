@@ -3,7 +3,7 @@ import { logPublicBlockError } from "@/features/public-profile/master/server/blo
 import { getSessionUser } from "@/lib/auth/session";
 import { isProviderFavorited } from "@/lib/favorites/get-favorites";
 import { getMasterPublicProfileView } from "@/lib/master/public-profile-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -17,7 +17,7 @@ export async function HeroSection({ providerId }: Props) {
     view = await getMasterPublicProfileView(providerId);
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-hero", error, [`/api/providers/${providerId}`]);
+    logPublicBlockError("master-hero", error, ["getMasterPublicProfileView"]);
   }
 
   if (hasError) {

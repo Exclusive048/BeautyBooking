@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { blockingBookingWhere } from "@/lib/deletion/active-bookings";
+import { studioBookingsWhereByProvider } from "@/lib/studio/booking-scope";
 
 /**
  * STUDIO-LEAVE-GUARD (2026-09-24, решение владельца) — мастер не уходит из
@@ -14,15 +15,18 @@ import { blockingBookingWhere } from "@/lib/deletion/active-bookings";
  *
  * «Живая» — тот же предикат, что блокирует удаление кабинетов
  * (`blockingBookingWhere`, DELETION-03): одно правило на «запись ещё впереди».
- * «Студийная» — видимая журналу студии: `studioId` этой студии либо её
- * провайдер (как `countBlockingStudioBookings`). Личные записи мастера с его
+ * «Студийная» — видимая журналу студии: `studioId` этой студии
+ * (`studioBookingsWhereByProvider` — тот же скоуп, что у журнала и
+ * `countBlockingStudioBookings`: показывает = разрешает = `studioId`,
+ * 29.09 доработки · 08). Личные записи мастера с его
  * собственной страницы (`studioId = null`, STUDIO-MASTER-OWN-BOOKINGS-01) уход
  * не блокируют — они уходят вместе с мастером.
  *
- * Путей отвязки четыре, и все зовут этот модуль: уход мастера и исключение
- * администратором (`transferMasterOutOfStudio`), `detachMasterFromStudio`
- * (`DELETE /api/studios/[id]/masters`) и `POST /api/studios/[id]/leave`.
- * Сторож полноты — `leave-guard.test.ts`.
+ * Путь отвязки один — `transferMasterOutOfStudio`: уход мастера
+ * (`POST /api/cabinet/master/leave-studio`) и исключение администратором
+ * (`POST /api/cabinet/studio/members/[memberId]/remove`). Два прежних пути без
+ * вызывающих (`DELETE /api/studios/[id]/masters`, `POST /api/studios/[id]/leave`)
+ * удалены в 29.09 доработки · 04. Сторож полноты — `leave-guard.test.ts`.
  */
 
 type BookingCounter = { booking: { count: (args: { where: Prisma.BookingWhereInput }) => Promise<number> } };
@@ -38,7 +42,7 @@ export function studioMasterBlockingBookingsWhere(
     AND: [
       blockingBookingWhere(now),
       { masterProviderId: { in: masterProviderIds } },
-      { OR: [{ studio: { providerId: studioProviderId } }, { providerId: studioProviderId }] },
+      studioBookingsWhereByProvider(studioProviderId),
     ],
   };
 }

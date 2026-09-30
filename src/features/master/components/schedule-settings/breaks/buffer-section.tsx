@@ -1,7 +1,7 @@
 "use client";
 
-import { UI_TEXT } from "@/lib/ui/text";
-import { ChipGroup } from "../components/chip-group";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ChipGroup } from "@/components/ui/chip-group";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.breaks.buffer;
 

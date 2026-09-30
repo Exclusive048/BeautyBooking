@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { Button, type ButtonVariant, type ButtonSize } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { defaultUnlessOverridden } from "@/lib/ui/class-groups";
 
 /**
  * Shared empty-state primitive — consolidates ~10-15 cabinet empty-state
@@ -40,6 +39,8 @@ type EmptyStateActionBase = {
   variant?: ButtonVariant;
   size?: ButtonSize;
   leadingIcon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  /** SETUP-GUIDE-01: метка, по которой подсказка «Первых шагов» подсвечивает кнопку. */
+  guide?: string;
 };
 
 export type EmptyStateAction =
@@ -72,12 +73,10 @@ export function EmptyState({
       className={cn(
         "flex flex-col items-center justify-center text-center",
         variant === "card" ? "rounded-2xl border border-dashed border-border-subtle bg-bg-card/60" : null,
-        // CN-CONFLICT-CLASS: `cn` — плоский join, и `py-12` примитива побеждал
-        // `py-8`/`py-4` вызывающего по порядку правил в бандле (величина
-        // больше — правило ниже). Отступы — дефолт, если вызывающий группу не
-        // трогал (PWA-UX-BATCH-01: схлопнутая колонка канбана просит `py-4`).
-        defaultUnlessOverridden(className, "padding-x", variant === "card" ? "px-6" : "px-4"),
-        defaultUnlessOverridden(className, "padding-y", "py-12"),
+        // Отступы — дефолт: `py-8`/`py-4` вызывающего побеждают (`cn` —
+        // tailwind-merge; схлопнутая колонка канбана просит `py-4`).
+        variant === "card" ? "px-6" : "px-4",
+        "py-12",
         className,
       )}
     >
@@ -120,7 +119,7 @@ export function EmptyState({
 }
 
 function EmptyStateActionButton({ action }: { action: EmptyStateAction }) {
-  const { label, leadingIcon: LeadingIcon, variant = "secondary", size = "md" } = action;
+  const { label, leadingIcon: LeadingIcon, variant = "secondary", size = "md", guide } = action;
   const content = (
     <>
       {LeadingIcon ? <LeadingIcon className="mr-1.5 h-4 w-4" aria-hidden /> : null}
@@ -130,14 +129,14 @@ function EmptyStateActionButton({ action }: { action: EmptyStateAction }) {
 
   if ("href" in action && action.href) {
     return (
-      <Button asChild variant={variant} size={size}>
+      <Button asChild variant={variant} size={size} data-guide={guide}>
         <Link href={action.href}>{content}</Link>
       </Button>
     );
   }
 
   return (
-    <Button variant={variant} size={size} onClick={action.onClick}>
+    <Button variant={variant} size={size} onClick={action.onClick} data-guide={guide}>
       {content}
     </Button>
   );

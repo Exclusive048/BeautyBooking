@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * Masks a user's display name to "<First name> <First-letter-of-last-name>." —

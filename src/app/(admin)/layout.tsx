@@ -8,7 +8,7 @@ import type {
 } from "@/features/admin-cabinet/types";
 import { hasAdminRole } from "@/lib/auth/guards";
 import { getSessionUser } from "@/lib/auth/session";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },

@@ -8,7 +8,7 @@ import {
 } from "@/lib/master/reviews-view.service";
 import { prisma } from "@/lib/prisma";
 import { decodePublicId, encodePublicId } from "@/lib/public-id";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ReviewsFilterChips } from "./reviews-filter-chips";
 import { ReviewsDistribution } from "./reviews-distribution";
 import { ReviewsFeed } from "./reviews-feed";

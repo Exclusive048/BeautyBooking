@@ -1,5 +1,5 @@
 import type { MasterAnalyticsPeriodId } from "@/lib/master/analytics-period";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ComparisonToggle } from "./comparison-toggle";
 import { PeriodChips } from "./period-chips";
 

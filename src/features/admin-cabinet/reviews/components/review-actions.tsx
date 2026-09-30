@@ -2,7 +2,7 @@
 
 import { Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
 
 const T = UI_TEXT.adminPanel.reviews.actions;
@@ -35,11 +35,11 @@ export function ReviewActions({ review, busy, onApprove, onDelete }: Props) {
         </Button>
       ) : null}
       <Button
-        variant="ghost"
-        size="sm"
+        variant="wrapper"
+        size="none"
         onClick={onDelete}
         disabled={busy}
-        className="w-full text-red-600 hover:bg-red-500/10 hover:text-red-700 dark:text-red-300"
+        className="inline-flex h-9 items-center justify-center rounded-2xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface w-full"
       >
         <Trash2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
         {T.delete}

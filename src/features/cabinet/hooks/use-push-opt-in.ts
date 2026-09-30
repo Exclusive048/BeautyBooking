@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { clientEnv } from "@/lib/env.client";
 import {
   getPushPermission,
@@ -9,8 +8,8 @@ import {
   requestAndSubscribe,
   unsubscribeBrowserPush,
 } from "@/lib/notifications/push/push-client";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type MeUser = {
   pushNotificationsEnabled: boolean;
@@ -43,11 +42,10 @@ export function usePushOptIn(): PushOptIn {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth("/api/me", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ user: MeUser | null }> | null;
-      if (json?.ok && json.data.user) {
-        setEnabled(Boolean(json.data.user.pushNotificationsEnabled));
-      }
+      const data = await fetchJsonWithAuth<{ user: MeUser | null }>("/api/me", { cache: "no-store" });
+      if (data.user) setEnabled(Boolean(data.user.pushNotificationsEnabled));
+    } catch {
+      // Фон: не прочитали — остаётся состояние по умолчанию, тумблер работает.
     } finally {
       setPermission(getPushPermission());
       setLoading(false);
@@ -60,17 +58,13 @@ export function usePushOptIn(): PushOptIn {
 
   const persist = useCallback(
     async (next: boolean) => {
-      const res = await fetchWithAuth("/api/me", {
+      await fetchJsonWithAuth<unknown>("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pushNotificationsEnabled: next }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.toggleFailed);
-      }
     },
-    [t.toggleFailed]
+    []
   );
 
   const toggle = useCallback(
@@ -109,7 +103,7 @@ export function usePushOptIn(): PushOptIn {
           void unsubscribeBrowserPush();
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : t.toggleFailed);
+        setError(serverMessageOr(err, t.toggleFailed));
       } finally {
         setToggling(false);
       }

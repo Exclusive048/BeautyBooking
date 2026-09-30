@@ -11,8 +11,12 @@ import {
 import { Paperclip, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { QuickReplies } from "@/features/chat/composer/quick-replies";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective } from "@/features/chat/types";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { FileInput } from "@/components/ui/file-input";
 
 const T = UI_TEXT.chat;
 const QUICK_HIDE_KEY = "chat.quickReplies.hidden";
@@ -113,25 +117,14 @@ export function Composer({
     const formData = new FormData();
     formData.append("image", file);
     try {
-      const res = await fetch("/api/chat/upload-attachment", {
+      const uploaded = await fetchJsonWithAuth<{ assetId: string }>("/api/chat/upload-attachment", {
         method: "POST",
         body: formData,
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { assetId: string } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        const message =
-          json && !json.ok ? json.error.message : T.composer.attachUploadFailed;
-        URL.revokeObjectURL(previewUrl);
-        setAttachment({ phase: "error", message });
-        return;
-      }
-      setAttachment({ phase: "ready", previewUrl, assetId: json.data.assetId });
-    } catch {
+      setAttachment({ phase: "ready", previewUrl, assetId: uploaded.assetId });
+    } catch (error) {
       URL.revokeObjectURL(previewUrl);
-      setAttachment({ phase: "error", message: T.composer.attachUploadFailed });
+      setAttachment({ phase: "error", message: serverMessageOr(error, T.composer.attachUploadFailed) });
     }
   }
 
@@ -155,7 +148,7 @@ export function Composer({
     setSending(true);
     setErrorMessage(null);
     try {
-      const res = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/chat/threads/${encodeURIComponent(conversationSlug)}/messages?as=${perspective}`,
         {
           method: "POST",
@@ -166,24 +159,14 @@ export function Composer({
           }),
         },
       );
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: unknown }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        const message =
-          json && !json.ok ? json.error.message : T.composer.sendFailed;
-        setErrorMessage(message);
-        return;
-      }
       setDraft("");
       if (attachment.phase === "ready" || attachment.phase === "uploading") {
         URL.revokeObjectURL(attachment.previewUrl);
       }
       setAttachment({ phase: "idle" });
       onSent();
-    } catch {
-      setErrorMessage(T.composer.sendFailed);
+    } catch (error) {
+      setErrorMessage(serverMessageOr(error, T.composer.sendFailed));
     } finally {
       setSending(false);
     }
@@ -256,14 +239,13 @@ export function Composer({
           <span className="text-xs text-text-sec">
             {isAttachmentUploading ? T.composer.attachUploading : "Фото"}
           </span>
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={handleAttachmentRemove}
             aria-label={T.composer.attachRemoveAria}
             className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-text-sec hover:text-text-main"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -275,8 +257,7 @@ export function Composer({
             : "border-border-subtle bg-bg-input/40",
         )}
       >
-        <button
-          type="button"
+        <Button variant="ghost" size="icon"
           onClick={() => fileInputRef.current?.click()}
           disabled={!canSend || sending || isAttachmentUploading}
           aria-label={T.composer.attachAria}
@@ -286,15 +267,13 @@ export function Composer({
           )}
         >
           <Paperclip className="h-4 w-4" aria-hidden strokeWidth={1.8} />
-        </button>
-        <input
+        </Button>
+        <FileInput
           ref={fileInputRef}
-          type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={handleAttachmentPick}
-          className="hidden"
         />
-        <textarea
+        <Textarea variant="bare"
           ref={textareaRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -307,7 +286,7 @@ export function Composer({
           className="min-h-[32px] flex-1 resize-none border-none bg-transparent px-1 py-1.5 text-sm leading-snug text-text-main outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed"
           style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
         />
-        <button
+        <Button variant="wrapper"
           type="submit"
           disabled={!canSubmit}
           aria-label={T.composer.send}
@@ -319,16 +298,16 @@ export function Composer({
           )}
         >
           <Send className="h-4 w-4" aria-hidden strokeWidth={1.8} />
-        </button>
+        </Button>
       </div>
 
       {errorMessage ? (
-        <p role="alert" className="mt-1.5 text-xs text-rose-600 dark:text-rose-300">
+        <p role="alert" className="mt-1.5 text-xs text-danger-text">
           {errorMessage}
         </p>
       ) : null}
       {attachment.phase === "error" ? (
-        <p role="alert" className="mt-1.5 text-xs text-rose-600 dark:text-rose-300">
+        <p role="alert" className="mt-1.5 text-xs text-danger-text">
           {attachment.message}
         </p>
       ) : null}

@@ -26,6 +26,7 @@ const prismaMock = vi.hoisted(() => ({
   scheduleTemplate: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleOverride: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleBreak: { findMany: vi.fn(), aggregate: vi.fn() },
+  schedulePattern: { findMany: vi.fn(), aggregate: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -65,13 +66,18 @@ const TIMEZONE = "Asia/Yekaterinburg";
 function primeScheduleStructure(
   structureUpdatedAt: Date | null,
   timeBlocks: { updatedAt: Date | null; count: number } = { updatedAt: null, count: 0 },
+  patterns: { updatedAt: Date | null; count: number } = { updatedAt: null, count: 0 },
+  overrideCount = 0,
 ): void {
   prismaMock.$transaction.mockResolvedValue([
-    { _max: { updatedAt: structureUpdatedAt } },
+    // SCHEDULE-PATTERNS-01 (этап 3): у «Особых дней» тоже счётчик.
+    { _max: { updatedAt: structureUpdatedAt }, _count: overrideCount },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: timeBlocks.updatedAt }, _count: timeBlocks.count },
+    // SCHEDULE-PATTERNS-01: шестой агрегат — графики (метка + счётчик).
+    { _max: { updatedAt: patterns.updatedAt }, _count: patterns.count },
   ]);
 }
 
@@ -160,6 +166,45 @@ describe("PERF-18 · версия расписания зависит от ра�
     const before = await freshVersion();
 
     primeScheduleStructure(new Date("2026-08-01T10:00:00.000Z"), { updatedAt: blockStamp, count: 1 });
+    const after = await freshVersion();
+
+    expect(after).not.toBe(before);
+  });
+
+  it("SCHEDULE-PATTERNS-01: новый график меняет версию", async () => {
+    const base = new Date("2026-08-01T10:00:00.000Z");
+    primeScheduleStructure(base);
+    const before = await freshVersion();
+
+    primeScheduleStructure(base, undefined, {
+      updatedAt: new Date("2026-09-28T09:00:00.000Z"),
+      count: 1,
+    });
+    const after = await freshVersion();
+
+    expect(after).not.toBe(before);
+  });
+
+  it("SCHEDULE-PATTERNS-01: удаление периода графика меняет версию, даже если максимум не сдвинулся", async () => {
+    const base = new Date("2026-08-01T10:00:00.000Z");
+    const patternStamp = new Date("2026-09-28T09:00:00.000Z");
+    primeScheduleStructure(base, undefined, { updatedAt: patternStamp, count: 3 });
+    const before = await freshVersion();
+
+    primeScheduleStructure(base, undefined, { updatedAt: patternStamp, count: 2 });
+    const after = await freshVersion();
+
+    expect(after).not.toBe(before);
+  });
+
+  it("SCHEDULE-PATTERNS-01 (этап 3): «вернуть как по графику» меняет версию, даже если максимум не сдвинулся", async () => {
+    // Покраска дня — строка `ScheduleOverride`; возврат дня к графику её
+    // удаляет, и удалённая строка не обязана быть максимумом по `updatedAt`.
+    const base = new Date("2026-08-01T10:00:00.000Z");
+    primeScheduleStructure(base, undefined, undefined, 5);
+    const before = await freshVersion();
+
+    primeScheduleStructure(base, undefined, undefined, 4);
     const after = await freshVersion();
 
     expect(after).not.toBe(before);

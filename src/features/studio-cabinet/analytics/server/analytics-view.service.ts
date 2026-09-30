@@ -35,6 +35,7 @@ import type {
   StudioAnalyticsViewId,
   TopClientRow,
 } from "../lib/types";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 /**
  * STUDIO-ANALYTICS-A — server orchestrator for `/cabinet/studio/analytics`.
@@ -181,7 +182,7 @@ async function loadMastersView(input: {
     prisma.booking.groupBy({
       by: ["masterProviderId"],
       where: {
-        OR: [{ studioId }, { providerId: studioProviderId }],
+        ...studioBookingsWhere(studioId),
         startAtUtc: { gte: currentRange.fromUtc, lt: currentRange.toUtcExclusive },
         masterProviderId: { not: null },
       },

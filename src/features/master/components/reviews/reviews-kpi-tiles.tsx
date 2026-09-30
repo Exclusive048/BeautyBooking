@@ -1,7 +1,7 @@
 import { Camera, Clock, MailOpen } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { ReviewStats } from "@/lib/master/reviews-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.reviews.kpi;
 

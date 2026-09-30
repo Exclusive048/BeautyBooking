@@ -144,7 +144,54 @@
 | 7 | **Справочники — после первого `migrate deploy`** (PWA-FIX-01, 2026-09-01), тем же приёмом, что миграции: `$C --profile db run --rm --no-deps migrate npm run seed:reference` и `… npm run seed:review-tags` (`C="docker compose --env-file .env.production -f docker-compose.prod.yml"`, каталог `/opt/app`). ⚠️ **Только образ `beautyhub-worker`** — в `web`/`api` лежит standalone-бандл без `package.json`, `tsx` и исходников, и до 2026-09-01 каталога `scripts/` не было даже в worker-образе (`.dockerignore` исключал `scripts`), то есть команда падала бы «Cannot find module». Требуется пересобранный worker: `$C --profile app build worker`. Все города вместо Москвы — `npm run seed:reference -- --cities=all` | сид печатает `Готово: городов 1, категорий 12, FREE-планов 2`; `/api/cities`, `/api/catalog/global-categories`, `/api/billing/plans` перестают отдавать пустые списки | 🔴 **Пропуск не ломает ни одну пробу — прод выглядит здоровым и не работает.** Замер 2026-09-01 на боевом стенде: `db:ok`, `redis:ok`, страницы 200, а все три справочника пусты; следствия — в шапке `scripts/seed-reference-data.ts`. Оба сида идемпотентны (`upsert`), гонять повторно безопасно. ⚠️ `seed:test` в проде **запрещён** (`prisma/seeds/guard.ts`) — он про аккаунты, а не про справочники |
 | 8 | **Тарифы — делает сам деплой** (BILLING-CATALOG-01, 2026-09-22: шаг «5/7 (б)» `deploy.yml` — `$C --profile db run --rm --no-deps migrate npm run seed:plans` после миграций). Руками в `/admin/billing` заводить НЕ нужно | в логе прогона строки `✓ MASTER_PRO — 1 мес 600 ₽ · …` для всех шести планов; до 1 ноября — строка «выдаю PREMIUM зарегистрированным кабинетам» | Каталог (3 тарифа × мастер/студия + цены) живёт в `src/lib/billing/plan-catalog.ts`. Перезапись тарифов — **только при новой версии каталога** (`PLAN_CATALOG_VERSION`, метка `SystemConfig.billingPlanCatalogVersion`); в остальные деплои сид лишь досоздаёт недостающее, поэтому правки из `/admin/billing` переживают обычный деплой. Пока идёт акция (до 1 ноября 00:00 МСК) сид выдаёт PREMIUM до конца акции всем уже зарегистрированным мастерам/студиям — идемпотентно, платящих не трогает. Провал шага останавливает деплой ДО рестарта |
 
+> **Скоуп студии — только `Booking.studioId`** (29.09 доработки · 08, миграция данных `20260929130000_booking_studio_id_backfill`). **До `migrate deploy` — инвентарь на проде** (только чтение):
+> ```sql
+> BEGIN READ ONLY;
+> WITH e AS (SELECT b.id, b."studioId", s.id AS expected FROM "Booking" b LEFT JOIN "Studio" s ON s."providerId" = b."providerId")
+> SELECT count(*) FILTER (WHERE expected IS NOT NULL AND "studioId" IS NULL) AS a_studio_null,
+>        count(*) FILTER (WHERE expected IS NOT NULL AND "studioId" <> expected) AS b_other_studio,
+>        count(*) FILTER (WHERE expected IS NULL AND "studioId" IS NOT NULL) AS c_personal_with_studio
+> FROM e;
+> ROLLBACK;
+> ```
+> (а) и (б) миграция чинит сама (ожидаемо 0 — прод живёт с 2026-09-01, после FIX-C1). **(в) > 0 → к владельцу до деплоя, со списком** (`SELECT id, "studioId", "providerId", "createdAt" … WHERE expected IS NULL AND "studioId" IS NOT NULL`): такие записи считать личными (`studioId → null`, пропадут из журнала студии) или студийными (`providerId →` провайдер студии, как шаг 5 `master-profile-split.ts`); рекомендация — запись на услугу студии — студийная, на свою услугу мастера — личная. После деплоя в логе `deploy:post` — строка `post-deploy · booking studio scope drift: 0`; не ноль → там же JSON-строка `integrity.booking-studio-scope-drift` с классами и id.
+
+> **Миграция «Первых шагов»** (`20260928160000_setup_guide`, SETUP-GUIDE-01, 2026-09-29) — аддитивная (две nullable-колонки `Provider`) плюс данные: всем существующим кабинетам ставится `setupRulesConfirmedAt` (их правила записи уже работали — шаг «Правила записи» им не предлагается). Откат на `:previous` безопасен: прежний код колонок не читает. Руками ничего делать не нужно.
+
 > 🔴 **Про AI-миграцию.** Опасение «`AiSpendCounter` (секция `[36/36] …fix_b16_ai_spend_counter` объединённого baseline) приедет после старта приложения → `AiSpendCounter` fail-closed → 503 на каждый платный вызов» **структурно закрыто** (`V1`): и `deploy.yml`, и `depends_on` в compose ставят миграции перед подъёмом. Сама миграция аддитивна (`CREATE TABLE`), блокировок на горячих таблицах не берёт.
+
+### B.2.1. Недельные таблицы расписания — только после деплоя графиков (29.09 доработки · 17)
+
+Порядок трёх деплоев, и он обязателен (решение владельца 29.09):
+
+1. **Графики** (SCHEDULE-PATTERNS-01) — `deploy:post` переносит недели в графики (`backfillWeeklySchedulePatterns`); движок ещё умеет читать неделю у профиля без графика — это страховка на случай, если перенос у кого-то упал (`failed` в выводе `deploy:post`).
+2. **Этап A** (код без недельных таблиц; таблицы остаются) — только когда проверка 1 ниже на проде = 0.
+3. **Этап B** (миграция `drop_weekly_schedule_tables`) — отдельным деплоем после A, после повторной проверки 1, снимка и **явного согласия владельца**. Автооткат `deploy.yml` возвращает `:previous` — им обязан быть образ этапа A.
+
+Проверки (только чтение, результат — в отчёт владельцу; dev-БД 2026-09-29: 0 / 0 / 0 / 0):
+
+```sql
+BEGIN READ ONLY;
+-- 1. неделя с рабочими днями у профиля без графика — ОБЯЗАНО быть 0
+SELECT count(*) FROM "WeeklyScheduleConfig" w
+WHERE NOT EXISTS (SELECT 1 FROM "SchedulePattern" p WHERE p."providerId" = w."providerId")
+  AND EXISTS (SELECT 1 FROM "WeeklyScheduleDay" d WHERE d."configId" = w.id AND d."isActive" AND d."templateId" IS NOT NULL);
+-- 2. справочно: любая неделя без графика; все графики профиля кончились, а неделя есть
+SELECT count(*) FROM "WeeklyScheduleConfig" w
+WHERE NOT EXISTS (SELECT 1 FROM "SchedulePattern" p WHERE p."providerId" = w."providerId");
+SELECT count(*) FROM "WeeklyScheduleConfig" w
+WHERE EXISTS (SELECT 1 FROM "SchedulePattern" p WHERE p."providerId" = w."providerId")
+  AND NOT EXISTS (SELECT 1 FROM "SchedulePattern" p WHERE p."providerId" = w."providerId"
+    AND (p."endsOn" IS NULL OR p."endsOn" >= to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD')));
+-- 3. справочно: шаблоны, на которые ссылается только неделя (после дропа станут «не используются»)
+SELECT count(*) FROM "ScheduleTemplate" t
+WHERE EXISTS (SELECT 1 FROM "WeeklyScheduleDay" d WHERE d."templateId" = t.id)
+  AND NOT EXISTS (SELECT 1 FROM "SchedulePatternDay" pd WHERE pd."templateId" = t.id)
+  AND NOT EXISTS (SELECT 1 FROM "ScheduleOverride" o WHERE o."templateId" = t.id);
+ROLLBACK;
+```
+
+Перед этапом B — отдельный снимок двух таблиц вне ротации семи снимков `deploy.yml`, **хранить 90 дней** (решение 17.2): `pg_dump -Fc -t '"WeeklyScheduleConfig"' -t '"WeeklyScheduleDay"'`. Проверка 1 ≠ 0 — этап B не начинать, разобрать `failed` из `deploy:post`.
 
 ## B.3. Проверка после деплоя — в порядке «худшее раньше»
 
@@ -183,6 +230,8 @@
 
 Вход по email-OTP → приземление в кабинет; публичные страницы (`/`, `/catalog`, `/pricing`, `/privacy`, `/terms`, `/consent`) отдают < 400; гостевая бронь **без согласия** отклоняется. Это то, что уже проходило на прод-сборке (§3.1) — здесь повторяется против настоящего окружения.
 
+**Ожидаемо, не авария (29.09 доработки · 15):** имена ключей рейт-лимита сменились (шаблон пути в ключе, личность — HMAC), поэтому в момент первого деплоя после этого изменения все окна лимитов начинаются заново — на графиках лимитера это сброс счётчиков. Ключи прежнего формата истекают сами (у каждого есть срок окна; ключ без срока лечится на первом превышении — RATE-LIMIT-TTL-HEAL).
+
 ### B.3.6. Наблюдаемость до того, как придёт трафик
 
 Alert-rules GlitchTip на четыре fingerprint'а (§3, таблица) — **имена это контракт**, переименование осиротит правило и молчание будет читаться как «всё хорошо».
@@ -208,6 +257,7 @@ FIX-C12 снял риск **по построению**: `isMissingObjectError` 
 |---|---|
 | **Лежит Redis** | на образе `:previous` он лежит ровно так же. Именно поэтому гейт отката смотрит **только `db`** (`V12`): откат по Redis был бы обрядом, а не средством. Идти в `redis-down.md` |
 | **Применённые миграции** | откатом **не отменяются**. Код `:previous` обязан жить с новой схемой (миграции аддитивны by policy); для деструктивных точка возврата — **только снимок БД** (B.2.1) |
+| **Новое значение enum'а после отката** *(SCHEDULE-PATTERNS-01 этап 3, миграция `20260928140000_schedule_calendar_palette`; то же — SCHEDULE-STUDIO-PROFILE-CALENDAR, миграция `20260928150000_studio_schedule_ending`)* | миграции добавляют `NotificationType.SCHEDULE_ENDING` и `STUDIO_SCHEDULE_ENDING`. Код `:previous` о них не знает: как только новый воркер создаст такое уведомление, клиент Prisma прежнего образа падает на чтении этой строки (центр уведомлений, бейдж). Откат после такого деплоя = сначала `DELETE FROM "Notification" WHERE type IN ('SCHEDULE_ENDING', 'STUDIO_SCHEDULE_ENDING')` (напоминания пересоздаст новый код), потом откат |
 | **Провал миграций** | отката не требует: рестарт ещё не выполнялся, прежняя версия продолжает работать |
 | **Первый деплой** | `:previous` не существует — **exit 1 без отката**, чинить вперёд |
 | **Хранится один шаг назад** | `:previous` перезаписывается в начале каждого деплоя. Два деплоя подряд — и предыдущая версия недоступна |
@@ -525,7 +575,7 @@ curl -s -H "X-Forwarded-For: 1.2.3.4" -H "Cookie: <кука админ-сесс�
 - **Третья миграция 2026-09-24 — `20260924140000_booking_status_before_change`**, аддитивная: nullable-колонка `Booking.statusBeforeChange` (статус до запроса переноса, RESCHEDULE-DECLINE-RESTORE-STATUS). Бэкфилла нет — у строк до миграции отказ от переноса ведёт себя по-старому (`CONFIRMED`).
 - **Первый проход воркера после выкатки PENDING-EXPIRY отменит накопившиеся неподтверждённые записи** *(2026-09-24)*: всё `NEW`/`PENDING`, созданное больше 24 ч назад или чьё начало уже прошло, станет `REJECTED` (`cancelledBy = SYSTEM`, причина «Запись не подтвердили вовремя.»). Уведомления уходят только по визитам, которые ещё не закончились; по прошедшим — молча, это уборка. Если перед выкаткой хочется знать масштаб: `SELECT count(*) FROM "Booking" WHERE status IN ('NEW','PENDING') AND ("createdAt" < now() - interval '24 hours' OR "startAtUtc" <= now());` — и сколько из них с визитом впереди: добавить `AND "endAtUtc" > now()`.
 - **Сессии после выкатки SESSION-REFRESH-PATH-01** — `bh_refresh` переехал с пути `/api/auth/refresh` на `/`. Уже выданные куки со старым путём продолжают работать через клиентский `fetchWithAuth` и гасятся при первой же ротации; принудительного выхода никто не получит. Если после выкатки пойдут жалобы «выкидывает на вход», первым делом смотреть телеметрию `surface: "auth"` (`refresh-rotate` / `refresh-rotate-grace`).
-- **Пост-деплой шаг `npm run deploy:post` — АВТОМАТИЧЕСКИЙ** *(2026-09-23)*. `deploy.yml` зовёт его сразу после `seed:plans` в том же `migrate`-контейнере (`scripts/post-deploy.ts`), руками ничего запускать не нужно. Оба прохода идемпотентны: (1) бэкфилл ссылок на обрезанные аватары CROP-PUBLIC-01 (`lib/media/avatar-crop-backfill.ts`; публичные поверхности показывают `Provider.avatarUrl`, а ссылка на вырез пишется рантаймом только при следующей загрузке/правке обрезки — проход выравнивает старые); (2) bootstrap-админы BOOTSTRAP-ADMIN-01 (`lib/auth/bootstrap-admins.ts`) — роль возвращается на каждом деплое, если её сняли или аккаунт появился после миграции; (3) строки работ к фото студий STUDIO-PORTFOLIO-FEED; (4) адреса страниц мастерам из приглашений STAGED-MASTER-USERNAME; (5) рейтинг мастерам с уже оставленными отзывами о визитах в студию STUDIO-REVIEW-MASTER-RATING (`lib/reviews/studio-review-master-backfill.ts`, пересчёт единственным писателем рейтинга — повтор пишет то же самое). Ручной вход для разбора — `npx tsx scripts/backfill-avatar-crop-urls.ts` (dry run) → `--apply`. Упавший шаг останавливает деплой до `up -d` — это намеренно: он пишет данные, и молча пропущенный проход хуже остановки.
+- **Пост-деплой шаг `npm run deploy:post` — АВТОМАТИЧЕСКИЙ** *(2026-09-23)*. `deploy.yml` зовёт его сразу после `seed:plans` в том же `migrate`-контейнере (`scripts/post-deploy.ts`), руками ничего запускать не нужно. Оба прохода идемпотентны: (1) бэкфилл ссылок на обрезанные аватары CROP-PUBLIC-01 (`lib/media/avatar-crop-backfill.ts`; публичные поверхности показывают `Provider.avatarUrl`, а ссылка на вырез пишется рантаймом только при следующей загрузке/правке обрезки — проход выравнивает старые); (2) bootstrap-админы BOOTSTRAP-ADMIN-01 (`lib/auth/bootstrap-admins.ts`) — роль возвращается на каждом деплое, если её сняли или аккаунт появился после миграции; (3) строки работ к фото студий STUDIO-PORTFOLIO-FEED; (4) адреса страниц мастерам из приглашений STAGED-MASTER-USERNAME; (5) рейтинг мастерам с уже оставленными отзывами о визитах в студию STUDIO-REVIEW-MASTER-RATING (`lib/reviews/studio-review-master-backfill.ts`, пересчёт единственным писателем рейтинга — повтор пишет то же самое). (6) перенос недель в графики SCHEDULE-PATTERNS-01 (`backfillWeeklySchedulePatterns`, `lib/schedule/patterns-core.ts`): каждая `WeeklyScheduleConfig` без графика становится графиком «с начала времён, продлевается автоматически»; сбой одного профиля деплой НЕ останавливает (печатается в лог) — до переноса движок читает его неделю по-старому, следующий деплой подхватит. Миграция `20260928120000_schedule_override_unique_date` удаляет дубли «Особых дней» (остаётся действовавшая строка) и ставит уникальность; `20260928130000_schedule_patterns` — аддитивная. Ручной вход для разбора — `npx tsx scripts/backfill-avatar-crop-urls.ts` (dry run) → `--apply`. Упавший шаг останавливает деплой до `up -d` — это намеренно: он пишет данные, и молча пропущенный проход хуже остановки.
 - **Snapshot `.qa/snapshots/post-seed.dump`** — local-only dev-baseline, **не прод-артефакт**, в коммиты не попадает. Регенерировать локально только после изменения схемы/seed.
 
 ---

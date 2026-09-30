@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { moneyRUBPlainFromKopeks } from "@/lib/format";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type RuleState = {
   isEnabled: boolean;
@@ -55,17 +54,13 @@ export function HotSlotsSettingsSection({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(`/api/provider/hot-slots/rule${scopeQuery}`, {
+      const data = await fetchJsonWithAuth<{ rule: RuleState }>(`/api/provider/hot-slots/rule${scopeQuery}`, {
         cache: "no-store",
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ rule: RuleState }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : text.loadFailed);
-      }
-      setRule(json.data.rule);
+      setRule(data.rule);
       setStatus(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : text.loadFailed);
+      setError(serverMessageOr(err, text.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -100,19 +95,15 @@ export function HotSlotsSettingsSection({
       if (rule.applyMode === "PRICE_FROM" && (!rule.minPriceFrom || rule.minPriceFrom <= 0)) {
         throw new Error(text.minPriceRequired);
       }
-      const res = await fetchWithAuth(`/api/provider/hot-slots/rule${scopeQuery}`, {
+      const data = await fetchJsonWithAuth<{ rule: RuleState }>(`/api/provider/hot-slots/rule${scopeQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rule),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ rule: RuleState }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : text.saveFailed);
-      }
-      setRule(json.data.rule);
+      setRule(data.rule);
       setStatus(UI_TEXT.common.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : text.saveFailed);
+      setError(serverMessageOr(err, text.saveFailed));
     } finally {
       setSaving(false);
     }
@@ -130,7 +121,7 @@ export function HotSlotsSettingsSection({
     return (
       <div className={embedded ? "p-4" : "rounded-2xl bg-white/[0.04] p-4"}>
         <p className="text-sm text-text-sec">{text.unavailable}</p>
-        {error ? <p className="mt-2 text-xs text-rose-400">{error}</p> : null}
+        {error ? <p className="mt-2 text-xs text-danger-text">{error}</p> : null}
       </div>
     );
   }
@@ -293,7 +284,7 @@ export function HotSlotsSettingsSection({
         ) : null}
       </div>
 
-      {error ? <p className="text-xs text-rose-400">{error}</p> : null}
+      {error ? <p className="text-xs text-danger-text">{error}</p> : null}
       {status ? <p className="text-xs text-text-sec">{status}</p> : null}
 
       <div className="flex justify-end">

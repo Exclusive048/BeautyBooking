@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { useRevalidateMe } from "@/lib/hooks/use-me";
 
@@ -16,6 +16,21 @@ type Props = {
   onChanged?: (items: NotificationCenterInviteItem[]) => void;
   className?: string;
 };
+
+/** «Вас приглашают в команду «Студия Ольги»» — название подсвечено. */
+function InviteTitle({ studioName }: { studioName: string }) {
+  const t = UI_TEXT.notificationsCenter.invites;
+  const name = studioName.trim();
+  if (!name) return <>{t.titleNoName}</>;
+  const [before, after = ""] = t.titleTemplate.split("{name}");
+  return (
+    <>
+      {before}
+      <span className="text-accent-text">{name}</span>
+      {after}
+    </>
+  );
+}
 
 export function StudioInviteCards({ invites, onChanged, className }: Props) {
   const t = UI_TEXT.notificationsCenter.invites;
@@ -42,14 +57,16 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
     setSavingId(inviteId);
     setError(null);
     try {
-      const response = await fetch(`/api/invites/${inviteId}/${action}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const json = (await response.json().catch(() => null)) as ApiResponse<{ inviteId: string }> | null;
-      if (!response.ok || !json || !json.ok) {
-        const code = json && !json.ok ? String(json.error.code ?? "") : "";
+      try {
+        await fetchJsonWithAuth<{ inviteId: string }>(`/api/invites/${inviteId}/${action}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+      } catch (error) {
+        // Приглашение уже неактивно (отозвано, принято, отклонено) — убрать
+        // карточку и сказать своей строкой; прочее — дословно.
+        const code = error instanceof ApiClientError ? String(error.code ?? "") : "";
         if (
           code === "INVITE_REVOKED" ||
           code === "INVITE_NOT_FOUND" ||
@@ -60,7 +77,8 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
           setError(t.inactive);
           return;
         }
-        setError(json && !json.ok ? json.error.message : t.actionFailed);
+        if (!(error instanceof ApiClientError)) throw error;
+        setError(serverMessageOr(error, t.actionFailed));
         return;
       }
 
@@ -110,7 +128,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-text-main">
-                  {t.titlePrefix} <span className="text-accent-text">{invite.studioName}</span> {t.titleSuffix}
+                  <InviteTitle studioName={invite.studioName} />
                 </div>
                 {invite.studioTagline ? (
                   <div className="mt-0.5 text-xs text-text-sec">{invite.studioTagline}</div>
@@ -153,7 +171,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
         ))}
       </div>
       {error ? (
-        <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+        <div role="alert" className="mt-3 rounded-xl border border-danger-border bg-danger-surface p-3 text-sm text-danger-text">
           {error}
         </div>
       ) : null}

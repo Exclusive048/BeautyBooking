@@ -1,5 +1,6 @@
 import { AppError } from "@/lib/api/errors";
 import { getDayOfWeek, getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
+import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 
 /**
  * BOOKING-WIDGET-A — Provider policy enforcement.
@@ -26,6 +27,25 @@ import { getDayOfWeek, getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/
  *
  * Rules kept simple + side-effect-free so unit tests cover them
  * exhaustively.
+ *
+ * ── Политика времени по путям создания и переноса записи ──────────────────
+ * Ратифицировано владельцем 2026-09-29 (29.09 доработки · 07). Путь создания
+ * обязан предъявить `createBookingRow` разрешение (`booking-time-policy.ts`),
+ * поэтому без выбранной строки этой таблицы запись не компилируется.
+ *
+ * | путь                                     | мин. за | макс. вперёд | новые клиенты | прошлое |
+ * |------------------------------------------|---------|--------------|---------------|---------|
+ * | воронка / легаси / пакеты (клиент)       | да      | да           | да            | нет     |
+ * | «Новая запись» админа студии             | нет     | да (строже)  | да (строже)   | да      |
+ * | ручная запись мастера                    | нет     | нет          | нет           | да      |
+ * | подтверждение модель-оффера              | нет     | нет          | нет           | нет     |
+ * | перенос клиентом / мастером (предложение)| да      | да           | —             | нет     |
+ * | перенос админом студии                   | нет     | да (строже)  | —             | нет     |
+ *
+ * «Строже» — из окон студии и мастера (`stricterBookingWindow`,
+ * `stricterAcceptNewClients`). Ручная запись принимает прошедшее время по
+ * решению владельца (занести прошедший визит); пикер оператора прошлых окошек
+ * по-прежнему не показывает.
  */
 
 export type ProviderPolicy = {
@@ -44,9 +64,15 @@ export function earliestBookableUtc(policy: Pick<ProviderPolicy, "minBookingHour
   return new Date(now.getTime() + hours * MS_PER_HOUR);
 }
 
-/** Latest UTC moment a booking may start, given the policy + now. */
+/**
+ * Latest UTC moment a booking may start, given the policy + now.
+ *
+ * SCHEDULE-PATTERNS-01: не дальше горизонта расписания. В БД остались значения
+ * до 365 дней (прежний потолок редактора), а дни за горизонтом движок отдаёт
+ * закрытыми — без прижатия перенос проверял бы окно, которого у расписания нет.
+ */
 export function latestBookableUtc(policy: Pick<ProviderPolicy, "maxBookingDaysAhead">, now: Date): Date {
-  const days = Math.max(1, policy.maxBookingDaysAhead);
+  const days = Math.min(SCHEDULE_HORIZON_DAYS, Math.max(1, policy.maxBookingDaysAhead));
   return new Date(now.getTime() + days * MS_PER_DAY);
 }
 
@@ -109,6 +135,53 @@ export function assertBookingWindow(
 }
 
 /**
+ * 29.09 доработки · 07 — «время уже прошло». Одно правило для переноса
+ * студии, применения переноса и подтверждения модель-оффера (раньше — копии).
+ * Ручная запись мастера и студии прошлое время ПРИНИМАЕТ (решение владельца
+ * 2026-09-29: можно занести прошедший визит) — здесь её нет.
+ */
+export function assertNotInPast(startAtUtc: Date, now: Date, message: string): void {
+  // `<=`, как у прежних копий: «ровно сейчас» — тоже уже не будущее.
+  if (startAtUtc.getTime() <= now.getTime()) {
+    throw new AppError(message, 409, "CONFLICT");
+  }
+}
+
+/**
+ * 29.09 доработки · 07 — только «максимум вперёд» окна записи (без
+ * «минимум за»): так окно действует на записи администратора студии (решение
+ * владельца 2026-09-29) — звонок «через час» записать можно, дальше
+ * «максимума» мастера и студии — нет.
+ */
+export function assertWithinMaxDaysAhead(
+  startAtUtc: Date,
+  policy: Pick<ProviderPolicy, "maxBookingDaysAhead">,
+  now: Date,
+): void {
+  if (startAtUtc.getTime() > latestBookableUtc(policy, now).getTime()) {
+    throw new AppError(
+      `Запись возможна не далее чем на ${policy.maxBookingDaysAhead} дней вперёд.`,
+      400,
+      "BOOKING_TOO_FAR",
+      { maxBookingDaysAhead: policy.maxBookingDaysAhead },
+    );
+  }
+}
+
+/**
+ * 29.09 доработки · 07 — «принимает новых клиентов» на услугу студии у её
+ * мастера — строже из двух, как окно записи (BOOKING-WINDOW-STRICTER): закрыт
+ * хоть один — новый клиент не записывается. Раньше флаг мастера студии не
+ * читался вовсе.
+ */
+export function stricterAcceptNewClients(
+  owner: Pick<ProviderPolicy, "acceptNewClients">,
+  master: Pick<ProviderPolicy, "acceptNewClients"> | null | undefined,
+): Pick<ProviderPolicy, "acceptNewClients"> {
+  return { acceptNewClients: owner.acceptNewClients && (master?.acceptNewClients ?? true) };
+}
+
+/**
  * Throws `AppError` (403) when the provider doesn't accept new clients
  * AND the booking would be the first one for this client. `priorBookingsCount`
  * is the number of (non-cancelled) bookings the same `clientUserId`
@@ -150,6 +223,23 @@ export function clampVisibleSlotsHorizon(
   const horizonKey = toLocalDateKey(horizon, timeZone);
   if (!requestedToKey) return horizonKey;
   return requestedToKey < horizonKey ? requestedToKey : horizonKey;
+}
+
+/**
+ * 29.09 доработки · 03 — сколько дней вперёд публичный виджет записи
+ * показывает в полосе дат: «максимум вперёд» (окно записи), у мастера — ещё
+ * «Сколько окошек вперёд» (`visibleSlotDays`), и не дальше горизонта расписания.
+ * Одно правило для профиля студии и мастеров в её виджете — раньше полоса
+ * виджета студии была зашита на 30 дней и расходилась с окном в обе стороны.
+ * У студии `visibleSlotDays` не передаётся: такой настройки у неё нет.
+ */
+export function publicBookingHorizonDays(policy: {
+  maxBookingDaysAhead: number;
+  visibleSlotDays?: number | null;
+}): number {
+  const limits = [policy.maxBookingDaysAhead, SCHEDULE_HORIZON_DAYS];
+  if (typeof policy.visibleSlotDays === "number") limits.push(policy.visibleSlotDays);
+  return Math.max(1, Math.min(...limits));
 }
 
 /**

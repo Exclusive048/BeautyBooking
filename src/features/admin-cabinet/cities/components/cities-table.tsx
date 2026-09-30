@@ -2,7 +2,6 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CitiesEmpty } from "@/features/admin-cabinet/cities/components/cities-empty";
 import { CitiesHeader } from "@/features/admin-cabinet/cities/components/cities-header";
 import { CitiesDetailPanel } from "@/features/admin-cabinet/cities/components/cities-detail-panel";
@@ -14,13 +13,14 @@ import {
 import { DeleteCityConfirm } from "@/features/admin-cabinet/cities/components/delete-city-confirm";
 import { DuplicateGroupsModal } from "@/features/admin-cabinet/cities/components/duplicate-groups-modal";
 import { MergeCityDialog } from "@/features/admin-cabinet/cities/components/merge-city-dialog";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCitiesCounts,
   AdminCityRow,
   AdminDuplicateGroup,
 } from "@/features/admin-cabinet/cities/types";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.adminPanel.cities;
 
@@ -30,8 +30,6 @@ type Props = {
   counts: AdminCitiesCounts;
   selectedId: string | null;
 };
-
-type Toast = { kind: "success" | "error"; text: string } | null;
 
 /**
  * The client-side conductor for /admin/cities. Holds:
@@ -54,9 +52,8 @@ export function CitiesTable({
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<AdminCityRow[]>(initialRows);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const toast = useToast();
   const [, startTransition] = useTransition();
-  const reduce = useReducedMotion();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [mergeSource, setMergeSource] = useState<AdminCityRow | null>(null);
@@ -80,14 +77,6 @@ export function CitiesTable({
       ? rows.find((r) => r.id === selectedId) ?? null
       : null;
 
-  const showToast = useCallback(
-    (text: string, kind: "success" | "error" = "success") => {
-      setToast({ kind, text });
-      window.setTimeout(() => setToast(null), 2400);
-    },
-    [],
-  );
-
   const updateSelectedParam = useCallback(
     (nextId: string | null) => {
       const params = new URLSearchParams(searchParams?.toString() ?? "");
@@ -110,17 +99,16 @@ export function CitiesTable({
     const previous = city.isActive;
     patchRow(city.id, { isActive: !previous });
     try {
-      const res = await fetch(`/api/admin/cities/${city.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/admin/cities/${city.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !previous }),
       });
-      if (!res.ok) throw new Error("toggle failed");
-      showToast(T.toasts.visibilityToggled);
+      toast.success(T.toasts.visibilityToggled);
       router.refresh();
-    } catch {
+    } catch (error) {
       patchRow(city.id, { isActive: previous });
-      showToast(T.toasts.errorGeneric, "error");
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     } finally {
       setBusyId(null);
     }
@@ -140,70 +128,66 @@ export function CitiesTable({
     },
   ) => {
     try {
-      const res = await fetch(`/api/admin/cities/${city.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/admin/cities/${city.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      if (!res.ok) throw new Error("save failed");
       patchRow(city.id, { ...patch });
-      showToast(T.toasts.updated);
+      toast.success(T.toasts.updated);
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     }
   };
 
   const handleCreate = async (value: CreateCityValue) => {
     try {
-      const res = await fetch("/api/admin/cities", {
+      await fetchJsonWithAuth<unknown>("/api/admin/cities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(value),
       });
-      if (!res.ok) throw new Error("create failed");
       setCreateOpen(false);
-      showToast(T.toasts.created);
+      toast.success(T.toasts.created);
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      const res = await fetch(`/api/admin/cities/${deleteTarget.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/admin/cities/${deleteTarget.id}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("delete failed");
       setRows((prev) => prev.filter((r) => r.id !== deleteTarget.id));
       if (selectedId === deleteTarget.id) updateSelectedParam(null);
       setDeleteTarget(null);
-      showToast(T.toasts.deleted);
+      toast.success(T.toasts.deleted);
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     }
   };
 
   const handleMerge = async (targetCityId: string) => {
     if (!mergeSource) return;
     try {
-      const res = await fetch(`/api/admin/cities/${mergeSource.id}/merge`, {
+      await fetchJsonWithAuth<unknown>(`/api/admin/cities/${mergeSource.id}/merge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetCityId }),
       });
-      if (!res.ok) throw new Error("merge failed");
       setRows((prev) => prev.filter((r) => r.id !== mergeSource.id));
       if (selectedId === mergeSource.id) updateSelectedParam(null);
       setMergeSource(null);
       setMergePrefilledTarget(null);
-      showToast(T.toasts.merged);
+      toast.success(T.toasts.merged);
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     }
   };
 
@@ -214,25 +198,6 @@ export function CitiesTable({
         onAdd={() => setCreateOpen(true)}
         onFindDuplicates={() => setDuplicatesOpen(true)}
       />
-
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            role="status"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            className={cn(
-              "rounded-2xl border px-4 py-2.5 text-sm",
-              toast.kind === "success"
-                ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-red-300/40 bg-red-500/10 text-red-700 dark:text-red-300",
-            )}
-          >
-            {toast.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
         <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">

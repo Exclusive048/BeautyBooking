@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FolderOpen, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioServiceCategoryRow } from "../lib/types";
 import { AddCategoryDialog } from "./add-category-dialog";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.servicesV2.categories;
 
@@ -58,14 +59,13 @@ export function CategoriesSidebar({
         <h2 className="font-display text-sm font-semibold text-text-main">
           {T.title}
         </h2>
-        <button
-          type="button"
+        <Button variant="wrapper"
           onClick={() => setAddOpen(true)}
           className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-primary/10"
         >
           <Plus className="h-3.5 w-3.5" aria-hidden />
           {T.addCategory}
-        </button>
+        </Button>
       </header>
 
       {hasAnyCategory ? (
@@ -99,8 +99,7 @@ export function CategoriesSidebar({
             const active = category.id === selectedCategoryId;
             return (
               <li key={category.id}>
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => select(category.id)}
                   className={cn(
                     "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition-colors",
@@ -116,7 +115,7 @@ export function CategoriesSidebar({
                     </span>
                     {category.status === "PENDING" ? (
                       <span
-                        className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
+                        className="shrink-0 rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text"
                         title={T.pendingHint}
                       >
                         {T.pendingBadge}
@@ -133,7 +132,7 @@ export function CategoriesSidebar({
                   >
                     {category.servicesCount}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}

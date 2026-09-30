@@ -38,6 +38,7 @@ vi.mock("@prisma/client", () => {
 });
 
 import { Prisma } from "@prisma/client";
+import { logInfo } from "@/lib/logging/logger";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 
 const moskvaRow = {
@@ -130,6 +131,32 @@ describe("detectCityFromAddress", () => {
     // we'd look up slug="g-moskva" or similar and miss the existing row.
     expect(findUnique).toHaveBeenCalledWith({ where: { slug: "moskva" } });
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("новый город получает пояс своего субъекта, адрес в лог не пишется", async () => {
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 53.2,
+      geoLng: 50.15,
+      locality: "Самара",
+      regions: ["Приволжский федеральный округ", "Самарская область"],
+    });
+    findUnique.mockResolvedValue(null);
+    findFirst.mockResolvedValue(null);
+    create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      ...krasnodarRow,
+      id: "city-samara",
+      slug: "samara",
+      name: "Самара",
+      timezone: data.timezone,
+    }));
+
+    const result = await detectCityFromAddress("Самара, ул. Ленинградская 1, кв. 5");
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ slug: "samara", timezone: "Europe/Samara" }),
+    });
+    expect(result).toMatchObject({ ok: true, timezone: "Europe/Samara", wasCreated: true });
+    expect(JSON.stringify(vi.mocked(logInfo).mock.calls)).not.toContain("Ленинградская");
   });
 
   it("auto-creates new city with autoCreated:true when slug doesn't exist", async () => {

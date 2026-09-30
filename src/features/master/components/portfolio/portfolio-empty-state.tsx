@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type {
   PortfolioCategoryOption,
 } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { UploadModal } from "./modals/upload-modal";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.empty;
@@ -36,6 +36,7 @@ export function PortfolioEmptyState({ categories }: Props) {
           onClick: () => setOpen(true),
           variant: "primary",
           leadingIcon: Plus,
+          guide: "portfolio",
         }}
       >
         <ul className="mx-auto mt-8 grid max-w-md grid-cols-3 gap-3 text-text-sec">

@@ -10,9 +10,9 @@ import {
 } from "@/features/booking/components/slot-picker/slot-picker";
 import { addDaysToDateKey, diffDateKeys } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 
 const T = UI_TEXT.schedule.operatorSlots;
@@ -190,15 +190,10 @@ export function OperatorSlotPicker({
       setResult({ key: requestKey, slots: [], error: message, focusStart: null });
       onChangeRef.current(null);
     };
-    void fetch(url.toString(), { cache: "no-store" })
-      .then(async (res) => {
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ slots: ApiSlot[] }> | null;
+    void fetchJsonWithAuth<{ slots: ApiSlot[] }>(url.toString(), { cache: "no-store" })
+      .then((data) => {
         if (cancelled) return;
-        if (!res.ok || !json || !json.ok) {
-          fail(json && !json.ok ? json.error.message : T.error);
-          return;
-        }
-        const daySlots = (json.data.slots ?? []).filter(
+        const daySlots = (data.slots ?? []).filter(
           (slot) => toLocalDateKey(slot.startAtUtc, timeZone) === selectedDate,
         );
 
@@ -219,8 +214,8 @@ export function OperatorSlotPicker({
           onChangeRef.current(null);
         }
       })
-      .catch(() => {
-        if (!cancelled) fail(T.error);
+      .catch((error: unknown) => {
+        if (!cancelled) fail(serverMessageOr(error, T.error));
       });
     return () => {
       cancelled = true;

@@ -2,13 +2,6 @@ import { z } from "zod";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
-export const studioCalendarQuerySchema = z.object({
-  studioId: z.string().trim().min(1),
-  date: z.string().trim().min(1),
-  view: z.enum(["day", "week", "month"]).default("week"),
-  masterIds: z.string().trim().optional(),
-});
-
 export const createStudioBlockSchema = z.object({
   studioId: z.string().trim().min(1),
   masterId: z.string().trim().min(1),

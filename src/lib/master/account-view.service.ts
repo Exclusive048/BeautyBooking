@@ -1,7 +1,8 @@
 import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan, type CurrentPlanInfo } from "@/lib/billing/get-current-plan";
 import { prisma } from "@/lib/prisma";
-import { personalMasterProviderWhere } from "@/lib/master/access";
+import { listStudioMasterProfiles, personalMasterProviderWhere } from "@/lib/master/access";
+import { studioMasterBlockingBookingsWhere } from "@/lib/studio/leave-guard";
 
 /**
  * Server aggregator for `/cabinet/master/account` (31-final).
@@ -66,21 +67,48 @@ export type MasterAccountViewData = {
   plan: MasterAccountPlan;
   /** UserProfile.roles snapshot for the Account tab's roles card. */
   roles: string[];
+  /**
+   * 29.09 доработки · 04 — мастер работает в студии: карточка «Выйти из
+   * студии». `blockingBookings` — будущие записи студии у этого мастера, то
+   * же правило, по которому сервер откажет в выходе (`leave-guard.ts`).
+   */
+  studioMembership: { studioName: string; blockingBookings: number } | null;
 };
+
+/**
+ * Профиль мастера, который уходит из студии, — тот же выбор, что у
+ * `POST /api/cabinet/master/leave-studio`: профиль в студии, а до разделения
+ * профилей — сам личный профиль со `studioId`.
+ */
+async function loadStudioMembership(
+  userId: string,
+  personal: { id: string; studioId: string | null },
+): Promise<MasterAccountViewData["studioMembership"]> {
+  const studioProfiles = await listStudioMasterProfiles(userId);
+  const profileId = studioProfiles[0]?.id ?? (personal.studioId ? personal.id : null);
+  const studioProviderId = studioProfiles[0]?.studioProviderId ?? personal.studioId;
+  if (!profileId || !studioProviderId) return null;
+
+  const [studio, blockingBookings] = await Promise.all([
+    prisma.provider.findUnique({ where: { id: studioProviderId }, select: { name: true } }),
+    prisma.booking.count({ where: studioMasterBlockingBookingsWhere(studioProviderId, [profileId]) }),
+  ]);
+  return { studioName: studio?.name ?? "", blockingBookings };
+}
 
 export async function getMasterAccountView(input: {
   userId: string;
 }): Promise<MasterAccountViewData | null> {
   const provider = await prisma.provider.findFirst({
     where: personalMasterProviderWhere(input.userId),
-    select: { id: true },
+    select: { id: true, studioId: true },
     orderBy: { createdAt: "asc" },
   });
   if (!provider) return null;
 
   const now = new Date();
 
-  const [user, telegramLink, vkLink, subscription, plan, activeSessionCount] = await Promise.all([
+  const [user, telegramLink, vkLink, subscription, plan, activeSessionCount, studioMembership] = await Promise.all([
     prisma.userProfile.findUnique({
       where: { id: input.userId },
       select: {
@@ -111,6 +139,7 @@ export async function getMasterAccountView(input: {
         expiresAt: { gt: now },
       },
     }),
+    loadStudioMembership(input.userId, provider),
   ]);
 
   if (!user) return null;
@@ -151,5 +180,6 @@ export async function getMasterAccountView(input: {
       isPaid: plan.tier === "PRO" || plan.tier === "PREMIUM",
     },
     roles: user.roles,
+    studioMembership,
   };
 }

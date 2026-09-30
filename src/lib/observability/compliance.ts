@@ -42,6 +42,11 @@ export const COMPLIANCE_FINGERPRINTS = {
   pdAccessWrite: "compliance.pd-access-write-failed",
   /** `enqueueMediaPurge` — задача на удаление медиа не поставлена: аккаунт удалён, байты остались. */
   mediaPurgeEnqueue: "compliance.media-purge-enqueue-failed",
+  /**
+   * `detectPdAccessAnomalies` — массовое чтение ПДн сверх порога (29.09 доработки · 16).
+   * Не сбой записи, а сигнал; имя — такой же контракт с alert-rule.
+   */
+  pdAccessAnomaly: "compliance.pd-access-anomaly",
 } as const;
 
 export type ComplianceFingerprint =

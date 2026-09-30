@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import useSWRInfinite from "swr/infinite";
 import { Button } from "@/components/ui/button";
 import { FeedCollage, useCollageColumns } from "@/features/home/components/feed-collage";
@@ -13,7 +12,7 @@ import { StoriesViewerOverlayLazy } from "@/features/home/components/stories-vie
 import { StoriesViewerProvider } from "@/features/home/stories-viewer-context";
 import { fetchJson } from "@/lib/http/client";
 import type { HomeFeedGroup, HomeFeedPage } from "@/lib/feed/home-feed.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type FeedPage = HomeFeedPage;
 
@@ -51,11 +50,8 @@ function uniqueGroups(pages: FeedPage[] | undefined): HomeFeedGroup[] {
 const fetcher = (url: string) => fetchJson<FeedPage>(url);
 
 export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
-  const router = useRouter();
   const columns = useCollageColumns();
-  const searchParams = useSearchParams();
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   const { data, size, setSize, isLoading, error, mutate } = useSWRInfinite<FeedPage>(
     getKey,
@@ -74,20 +70,6 @@ export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
   const isLoadingMore =
     Boolean(isLoading) ||
     (size > 0 && data !== undefined && typeof data[size - 1] === "undefined");
-
-  // Toast about deletion → strip ?deleted=1 once shown
-  useEffect(() => {
-    const deleted = searchParams.get("deleted");
-    if (deleted !== "1") return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setToast(UI_TEXT.home.accountDeleted);
-    const timer = window.setTimeout(() => setToast(null), 2400);
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("deleted");
-    const suffix = next.toString();
-    router.replace(suffix ? `/?${suffix}` : "/");
-    return () => window.clearTimeout(timer);
-  }, [router, searchParams]);
 
   // Infinite scroll
   useEffect(() => {
@@ -118,19 +100,10 @@ export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
 
       <RecentMastersSection />
 
-      {toast ? (
-        <div
-          role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-950/40 dark:text-emerald-300"
-        >
-          {toast}
-        </div>
-      ) : null}
-
       {error && !isInitialLoading ? (
         <div
           role="alert"
-          className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-amber-300/60 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200"
+          className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-warning-border bg-warning-surface p-4 text-sm text-warning-text"
         >
           <div>
             <p className="font-medium">{T.error.title}</p>

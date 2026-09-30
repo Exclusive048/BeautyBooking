@@ -5,7 +5,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { moneyRUBFromKopeks } from "@/lib/format";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
@@ -19,7 +19,7 @@ export async function StudioDetailsSection({ studioId }: Props) {
     studio = await getStudioProfile(studioId);
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("details-section", error, [`/api/providers/${studioId}`]);
+    logPublicStudioBlockError("details-section", error, ["getProviderProfile"]);
   }
 
   if (hasError) {

@@ -89,10 +89,12 @@ ${UNTRUSTED_BLOCK_RULE}`,
     buildUserPrompt(input: {
       name: string;
       category: string;
-      price: number;
+      /** Цена услуги в КОПЕЙКАХ (как хранится); в промпт — рубли. */
+      priceKopeks: number;
       durationMin: number;
     }): string {
-      return `Название: ${input.name}, Категория: ${input.category}, Цена: ${input.price}₽, Время: ${input.durationMin} мин.`;
+      const priceRub = Math.round(input.priceKopeks / 100);
+      return `Название: ${input.name}, Категория: ${input.category}, Цена: ${priceRub}₽, Время: ${input.durationMin} мин.`;
     },
   },
 

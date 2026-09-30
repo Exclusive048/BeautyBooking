@@ -11,6 +11,7 @@ import {
   writeAddressCache,
 } from "@/lib/maps/address-cache";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 export const runtime = "nodejs";
@@ -117,7 +118,7 @@ export async function GET(req: Request) {
     // SEC-04: собственный тир — цена запроса здесь в деньгах, а не в CPU, и
     // не должна зависеть от настроек общего публичного лимита.
     const limit = await checkRateLimit(
-      `rl:address:geocode:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       RATE_LIMITS.addressGeocode,
     );
     if (limit.limited) {

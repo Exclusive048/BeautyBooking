@@ -19,7 +19,7 @@ import {
   type PlanFeatureOverrides,
   type PlanNode,
 } from "@/lib/billing/features";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPlanInheritanceCandidate } from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing;
@@ -403,7 +403,7 @@ function LimitFeatureRow({
           <span>{TF.unlimited}</span>
         </label>
         {error ? (
-          <span className="text-xs text-red-600 dark:text-red-400">{error}</span>
+          <span className="text-xs text-danger-text">{error}</span>
         ) : null}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 
@@ -18,7 +18,7 @@ export function ConflictPhase({ onRetry }: Props) {
   return (
     <div className="p-5 text-center">
       <AlertCircle
-        className="mx-auto mb-3 h-10 w-10 text-amber-500"
+        className="mx-auto mb-3 h-10 w-10 text-warning-text"
         aria-hidden
         strokeWidth={1.6}
       />

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { FeaturesPageClient } from "@/features/billing/components/features-page-client";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 

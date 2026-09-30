@@ -2,18 +2,16 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { BillingTabEmpty } from "@/features/admin-cabinet/billing/components/billing-tab-empty";
 import { CancelSubscriptionDialog } from "@/features/admin-cabinet/billing/components/subscriptions-tab/cancel-subscription-dialog";
 import { SubscriptionsTableRow } from "@/features/admin-cabinet/billing/components/subscriptions-tab/subscriptions-row";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.adminPanel.billing;
-
-type Toast = { kind: "success" | "error"; text: string } | null;
 
 type Props = {
   rows: AdminSubscriptionRow[];
@@ -39,16 +37,7 @@ export function SubscriptionsTable({ rows: initialRows, nextCursor }: Props) {
   const [rows, setRows] = useState<AdminSubscriptionRow[]>(initialRows);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [target, setTarget] = useState<AdminSubscriptionRow | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
-  const reduce = useReducedMotion();
-
-  const showToast = useCallback(
-    (text: string, kind: "success" | "error" = "success") => {
-      setToast({ kind, text });
-      window.setTimeout(() => setToast(null), 2400);
-    },
-    [],
-  );
+  const toast = useToast();
 
   const loadMore = useCallback(() => {
     if (!nextCursor) return;
@@ -64,7 +53,7 @@ export function SubscriptionsTable({ rows: initialRows, nextCursor }: Props) {
     if (!target) return;
     setBusyId(target.id);
     try {
-      const res = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/admin/billing/subscriptions/${target.id}/cancel`,
         {
           method: "POST",
@@ -72,15 +61,14 @@ export function SubscriptionsTable({ rows: initialRows, nextCursor }: Props) {
           body: JSON.stringify({ reason: reason || undefined }),
         },
       );
-      if (!res.ok) throw new Error("cancel failed");
       // Optimistic — local hide. server refresh syncs definitive
       // state (status field, etc) on next render.
       setRows((prev) => prev.filter((r) => r.id !== target.id));
       setTarget(null);
-      showToast(T.toasts.subscriptionCancelled);
+      toast.success(T.toasts.subscriptionCancelled);
       router.refresh();
-    } catch {
-      showToast(T.toasts.cancelError, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.cancelError));
     } finally {
       setBusyId(null);
     }
@@ -96,25 +84,6 @@ export function SubscriptionsTable({ rows: initialRows, nextCursor }: Props) {
 
   return (
     <div className="space-y-3">
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            role="status"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            className={cn(
-              "rounded-2xl border px-4 py-2.5 text-sm",
-              toast.kind === "success"
-                ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-red-300/40 bg-red-500/10 text-red-700 dark:text-red-300",
-            )}
-          >
-            {toast.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
       <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px]">

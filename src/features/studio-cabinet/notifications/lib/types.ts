@@ -41,6 +41,8 @@ export type StudioNotificationsData = {
   kpi: StudioNotificationsKpi;
   chipCounts: StudioNotificationsChipCounts;
   groups: NotificationDayGroup[];
+  /** Пояс студии: время прихода уведомления — по нему (salon-tz, rule 17). */
+  timeZone: string;
   activeChip: StudioNotificationChip;
   sort: NotificationSort;
 };

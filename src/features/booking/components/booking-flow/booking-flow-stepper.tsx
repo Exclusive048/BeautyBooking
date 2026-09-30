@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import {
   fetchPublicServiceBookingConfig,
   uploadBookingReference,
   type ServiceBookingConfig,
 } from "@/features/booking/lib/booking-config";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJson, readApiResponse, serverMessageOr } from "@/lib/http/client";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
+import { useToast } from "@/components/ui/toast";
 import {
   fetchRetryingDuplicates,
   isDuplicateRequestResponse,
@@ -122,7 +125,7 @@ export function BookingFlowStepper({
   const idempotencyKeyRef = useRef<string>(
     typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`,
   );
-  const reduce = useReducedMotion();
+  const toast = useToast();
 
   const [state, dispatch] = useReducer(
     bookingFlowReducer,
@@ -198,13 +201,13 @@ export function BookingFlowStepper({
     setMeLoading(true);
     (async () => {
       try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | { ok: true; data: { user: SessionUser | null } }
-          | { ok: false }
-          | null;
+        // Фон: подставить имя и телефон вошедшему. Не прочитали — форма пустая,
+        // как у гостя.
+        const me = await fetchJson<{ user: SessionUser | null }>("/api/me", { cache: "no-store" }).catch(
+          () => null,
+        );
         if (cancelled) return;
-        const user = json?.ok ? (json.data.user ?? null) : null;
+        const user = me?.user ?? null;
         setMe(user);
         if (user?.phone) {
           dispatch({ type: "setPhone", value: user.phone.replace(/\D/g, "") });
@@ -255,19 +258,20 @@ export function BookingFlowStepper({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/public/bookings/${encodeURIComponent(id)}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          clearBookingIdFromUrl();
+        let remote: { booking: RemoteBookingResponse };
+        try {
+          remote = await fetchJson<{ booking: RemoteBookingResponse }>(
+            `/api/public/bookings/${encodeURIComponent(id)}`,
+            { cache: "no-store" },
+          );
+        } catch (error) {
+          // Запись по ссылке недоступна (удалена, чужая) — снять `?bookingId=`
+          // и показать выбор заново; обрыв сети — оставить как есть.
+          if (error instanceof ApiClientError) clearBookingIdFromUrl();
           return;
         }
-        const json = (await res.json().catch(() => null)) as
-          | { ok: true; data: { booking: RemoteBookingResponse } }
-          | { ok: false }
-          | null;
-        if (cancelled || !json?.ok) return;
-        const booking = asConfirmedBooking(json.data.booking, Boolean(me));
+        if (cancelled) return;
+        const booking = asConfirmedBooking(remote.booking, Boolean(me));
         if (booking) {
           dispatch({ type: "loadConfirmedBooking", booking });
         }
@@ -400,17 +404,11 @@ export function BookingFlowStepper({
         return;
       }
 
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { booking: { id: string }; manageUrl?: string | null } }
-        | { ok: false; error: { code: string; message: string } }
-        | null;
-
-      if (!res.ok || !json || !json.ok) {
-        const message =
-          json && !json.ok
-            ? json.error.message
-            : UI_TEXT.publicProfile.booking.submitFailed;
-        setSubmitError(message);
+      let created: { booking: { id: string }; manageUrl?: string | null };
+      try {
+        created = await readApiResponse<{ booking: { id: string }; manageUrl?: string | null }>(res);
+      } catch (error) {
+        setSubmitError(serverMessageOr(error, UI_TEXT.publicProfile.booking.submitFailed));
         return;
       }
 
@@ -418,7 +416,7 @@ export function BookingFlowStepper({
       // saves a roundtrip on first submit. The URL refresh path will fetch
       // /api/public/bookings/[id] for the masked phone etc.
       const fallbackConfirmation: ConfirmedBooking = {
-        id: json.data.booking.id,
+        id: created.booking.id,
         status: "PENDING",
         startAtUtc: state.selectedSlot.startAtUtc,
         endAtUtc: state.selectedSlot.endAtUtc,
@@ -433,10 +431,10 @@ export function BookingFlowStepper({
         timezone: providerTimezone,
         clientPhoneMasked: maskRussianPhone(submitPhone),
         isAuthenticatedUser: Boolean(me),
-        manageUrl: json.data.manageUrl ?? null,
+        manageUrl: created.manageUrl ?? null,
       };
 
-      writeBookingIdToUrl(json.data.booking.id);
+      writeBookingIdToUrl(created.booking.id);
       dispatch({ type: "submitSuccess", booking: fallbackConfirmation });
 
       // Quietly fetch the safe DTO so the success card gets the
@@ -444,29 +442,23 @@ export function BookingFlowStepper({
       // the fallback card intact.
       void (async () => {
         try {
-          const detailRes = await fetch(
-            `/api/public/bookings/${encodeURIComponent(json.data.booking.id)}`,
+          const detail = await fetchJson<{ booking: RemoteBookingResponse }>(
+            `/api/public/bookings/${encodeURIComponent(created.booking.id)}`,
             { cache: "no-store" },
           );
-          const detail = (await detailRes.json().catch(() => null)) as
-            | { ok: true; data: { booking: RemoteBookingResponse } }
-            | { ok: false }
-            | null;
-          if (detail?.ok) {
-            const enriched = asConfirmedBooking(detail.data.booking, Boolean(me), {
-              serviceName,
-              servicePrice,
-              providerTimezone,
+          const enriched = asConfirmedBooking(detail.booking, Boolean(me), {
+            serviceName,
+            servicePrice,
+            providerTimezone,
+          });
+          // EXP-022: skip the state update if the stepper unmounted while
+          // this detached fetch was in flight.
+          if (enriched && mountedRef.current) {
+            // GUEST-MANAGE-LINK: ссылка есть только в ответе на создание — сохраняем её.
+            dispatch({
+              type: "loadConfirmedBooking",
+              booking: { ...enriched, manageUrl: fallbackConfirmation.manageUrl },
             });
-            // EXP-022: skip the state update if the stepper unmounted while
-            // this detached fetch was in flight.
-            if (enriched && mountedRef.current) {
-              // GUEST-MANAGE-LINK: ссылка есть только в ответе на создание — сохраняем её.
-              dispatch({
-                type: "loadConfirmedBooking",
-                booking: { ...enriched, manageUrl: fallbackConfirmation.manageUrl },
-              });
-            }
           }
         } catch {
           /* keep fallback */
@@ -498,7 +490,7 @@ export function BookingFlowStepper({
   const handleCancelAuthBooking = useCallback(async () => {
     if (!state.confirmedBooking) return;
     try {
-      const res = await fetch(
+      await fetchJson<unknown>(
         `/api/bookings/${encodeURIComponent(state.confirmedBooking.id)}/cancel`,
         {
           method: "POST",
@@ -506,26 +498,26 @@ export function BookingFlowStepper({
           body: JSON.stringify({}),
         },
       );
-      if (res.ok) {
-        // After successful cancel — clear URL state and return to selection
-        // for a fresh attempt. The widget stays mounted.
-        clearBookingIdFromUrl();
-        dispatch({ type: "retryFromConflict" });
-      }
-    } catch {
-      /* surface failure quietly — user still sees their booking */
+      // After successful cancel — clear URL state and return to selection
+      // for a fresh attempt. The widget stays mounted.
+      clearBookingIdFromUrl();
+      dispatch({ type: "retryFromConflict" });
+    } catch (error) {
+      // 29.09 доработки · 10–11: отказ не молчит — запись по-прежнему на
+      // экране; срок отмены и прочие отказы сервера — дословно.
+      toast.error(serverMessageOr(error, UI_TEXT.publicProfile.bookingFlow.cancelFailed));
     }
-  }, [state.confirmedBooking]);
+  }, [state.confirmedBooking, toast]);
 
   return (
     <div className="overflow-hidden rounded-[20px] border border-border-subtle bg-bg-card">
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div
+        <m.div
           key={state.phase}
-          initial={reduce ? false : { opacity: 0, y: 6 }}
-          animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-          exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0, y: DISTANCE.nudge }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -DISTANCE.nudge }}
+          transition={MOTION.base}
         >
           {state.phase === "selection" ? (
             <SelectionPhase
@@ -591,7 +583,7 @@ export function BookingFlowStepper({
           {state.phase === "conflict" ? (
             <ConflictPhase onRetry={() => dispatch({ type: "retryFromConflict" })} />
           ) : null}
-        </motion.div>
+        </m.div>
       </AnimatePresence>
     </div>
   );

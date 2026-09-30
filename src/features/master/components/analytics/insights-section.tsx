@@ -1,7 +1,7 @@
 import { AlertTriangle, RefreshCw, Sparkles, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { Insight, InsightVariant } from "@/lib/master/analytics-insights";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.analytics.insights;
 
@@ -43,20 +43,20 @@ export function InsightsSection({ insights, periodLabel }: Props) {
 
 const VARIANT_CARD: Record<InsightVariant, string> = {
   opportunity:
-    "border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20",
+    "border-primary/20 bg-primary/5",
   positive:
-    "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20",
+    "border-success-border bg-success-surface",
   warning:
-    "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20",
+    "border-warning-border bg-warning-surface",
   recommendation:
-    "border-slate-200 bg-slate-50 dark:border-slate-700/50 dark:bg-slate-900/30",
+    "border-border bg-muted",
 };
 
 const VARIANT_EYEBROW: Record<InsightVariant, string> = {
-  opportunity: "text-rose-700 dark:text-rose-300",
-  positive: "text-emerald-700 dark:text-emerald-300",
-  warning: "text-amber-700 dark:text-amber-300",
-  recommendation: "text-slate-700 dark:text-slate-300",
+  opportunity: "text-accent-text",
+  positive: "text-success-text",
+  warning: "text-warning-text",
+  recommendation: "text-muted-foreground",
 };
 
 const VARIANT_ICON: Record<InsightVariant, typeof AlertTriangle> = {

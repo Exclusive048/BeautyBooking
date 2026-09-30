@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/cn";
 import { LEGAL_DOCUMENTS } from "@/lib/legal/documents";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * RKN-FIX-01 — consent, split by purpose.

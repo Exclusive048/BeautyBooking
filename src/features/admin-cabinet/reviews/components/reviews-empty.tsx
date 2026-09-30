@@ -1,5 +1,5 @@
 import { Inbox } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewTab } from "@/features/admin-cabinet/reviews/types";
 
 const T = UI_TEXT.adminPanel.reviews.empty;

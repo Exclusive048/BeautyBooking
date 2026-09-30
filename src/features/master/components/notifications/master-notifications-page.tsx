@@ -10,7 +10,7 @@ import {
   parseTab,
 } from "@/lib/master/notifications.service";
 import { prisma } from "@/lib/prisma";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { DaySeparator } from "./day-separator";
 import { NotificationsEmptyState } from "./empty-state";
 import { MarkAllReadButton } from "./mark-all-read-button";

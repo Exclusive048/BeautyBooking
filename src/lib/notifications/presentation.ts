@@ -184,6 +184,15 @@ export function resolveNotificationOpenHref(
     return "/cabinet/billing";
   }
 
+  // SCHEDULE-PATTERNS-01: «расписание скоро кончится» — в настройки расписания
+  // того профиля, о котором речь (адрес кладёт отправитель).
+  if (type === "SCHEDULE_ENDING") {
+    const href = parsePayloadRecord(payload)?.settingsHref;
+    return typeof href === "string" && href.startsWith("/cabinet/") ? href : "/cabinet/master/schedule/settings";
+  }
+  // Расписание мастера в студии кончается — владельцу студии, в «График команды».
+  if (type === "STUDIO_SCHEDULE_ENDING") return "/cabinet/studio/schedule/team";
+
   const booking = parseBookingPayload(payload);
   if (!booking) return undefined;
 

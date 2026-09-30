@@ -22,7 +22,7 @@ import {
   type RollingRange,
 } from "@/lib/master/analytics-period";
 import type { MasterAnalyticsFeatureFlags } from "@/lib/master/analytics-features";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * Server-side aggregator for `/cabinet/master/analytics` (30a).

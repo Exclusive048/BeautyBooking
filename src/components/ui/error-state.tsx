@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import {
   AlertCircle,
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
 
 export type ErrorStateVariant = "default" | "danger" | "warning";
 
@@ -75,16 +76,12 @@ const ICON_BG: Record<ErrorStateVariant, string> = {
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.07 } },
+  visible: { transition: { staggerChildren: STAGGER } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 14 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
-  },
+  hidden: { opacity: 0, y: DISTANCE.rise },
+  visible: { opacity: 1, y: 0, transition: MOTION.base },
 };
 
 function ActionButton({ action, variant }: { action: ErrorStateAction; variant: "primary" | "secondary" }) {
@@ -112,19 +109,18 @@ export function ErrorState({
   className,
 }: Props) {
   const Icon = icon ? NAMED_ICONS[icon] : DEFAULT_ICONS[variant];
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
-  const item = reduce ? undefined : itemVariants;
+  const container = containerVariants;
+  const item = itemVariants;
 
   return (
-    <motion.div
+    <m.div
       className={cn("flex flex-col items-center px-4 py-16 text-center", className)}
       variants={container}
       initial="hidden"
       animate="visible"
     >
       {/* Icon circle */}
-      <motion.div
+      <m.div
         variants={item}
         className={cn(
           "flex h-20 w-20 items-center justify-center rounded-full",
@@ -132,36 +128,36 @@ export function ErrorState({
         )}
       >
         <Icon className={cn("h-10 w-10", ICON_COLORS[variant])} aria-hidden />
-      </motion.div>
+      </m.div>
 
       {/* Title */}
-      <motion.h1
+      <m.h1
         variants={item}
         className="mt-6 text-2xl font-bold text-text-main md:text-3xl"
       >
         {title}
-      </motion.h1>
+      </m.h1>
 
       {/* Description */}
       {description && (
-        <motion.p
+        <m.p
           variants={item}
           className="mt-3 max-w-sm text-base leading-relaxed text-text-sec"
         >
           {description}
-        </motion.p>
+        </m.p>
       )}
 
       {/* Actions */}
       {(primaryAction ?? secondaryAction) && (
-        <motion.div
+        <m.div
           variants={item}
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           {primaryAction && <ActionButton action={primaryAction} variant="primary" />}
           {secondaryAction && <ActionButton action={secondaryAction} variant="secondary" />}
-        </motion.div>
+        </m.div>
       )}
-    </motion.div>
+    </m.div>
   );
 }

@@ -1,7 +1,7 @@
 import { User } from "lucide-react";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { EditableFieldRow } from "../editable/editable-field-row";
 import { UsernameEditableRow } from "../editable/username-editable-row";
 import { SectionShell } from "./section-shell";

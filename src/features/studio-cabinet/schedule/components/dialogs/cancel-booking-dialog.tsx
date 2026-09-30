@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.cancelDialog;
 const E = UI_TEXT.studioCabinet.scheduleV2.errors;
@@ -40,23 +41,16 @@ export function CancelBookingDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${bookingId}/cancel`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ reason: reason.trim() || undefined }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.cancel);
-        return;
-      }
       setReason("");
       onClose();
       router.refresh();
-    } catch {
-      setError(E.cancel);
+    } catch (error) {
+      setError(serverMessageOr(error, E.cancel));
     } finally {
       setSubmitting(false);
     }

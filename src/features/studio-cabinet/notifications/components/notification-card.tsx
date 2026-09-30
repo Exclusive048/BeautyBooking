@@ -2,7 +2,7 @@ import { cn } from "@/lib/cn";
 import { getCardConfig } from "@/features/master/components/notifications/lib/card-config";
 import { readNotificationPayload } from "@/features/master/components/notifications/lib/payload";
 import { resolveCurrentWhenLabel } from "@/lib/notifications/current-when";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { NotificationCenterNotificationItem } from "../lib/types";
 import { NotificationActions } from "./notification-actions";
 
@@ -10,9 +10,12 @@ const T = UI_TEXT.studioCabinet.notificationsV2.card;
 
 type Props = {
   item: NotificationCenterNotificationItem;
+  /**
+   * Пояс студии (salon-tz, rule 17): карточка рендерится на сервере, и без
+   * пояса время прихода шло по часам контейнера, а дни групп — по поясу студии.
+   */
+  timeZone: string;
 };
-
-const RU_FMT = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
 /**
  * Server-rendered notification card. Pulls visual config (icon + tonal
@@ -24,13 +27,17 @@ const RU_FMT = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-di
  * "Касается" line surfaces clientName + serviceName from `payloadJson`
  * (per master pattern). No «Кабинет N» — no cabinet model exists.
  */
-export function NotificationCard({ item }: Props) {
+export function NotificationCard({ item, timeZone }: Props) {
   const config = getCardConfig(item.type);
   const Icon = config.icon;
   const payload = readNotificationPayload(item.payloadJson);
   // RESCHEDULE-CURRENT-TIME: живое время брони, если оно разошлось с текстом.
   const currentWhen = resolveCurrentWhenLabel(payload);
-  const timeLabel = RU_FMT.format(new Date(item.createdAt));
+  const timeLabel = new Date(item.createdAt).toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  });
 
   const relatesParts: string[] = [];
   if (payload.clientName) relatesParts.push(payload.clientName);

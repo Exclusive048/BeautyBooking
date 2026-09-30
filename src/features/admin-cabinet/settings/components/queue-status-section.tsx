@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import { StatTile } from "@/features/admin-cabinet/settings/components/stat-tile";
 import type { QueueSnapshot } from "@/features/admin-cabinet/settings/types";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type ApiPayload = {
   stats: { pending: number; processing: number; dead: number };
@@ -33,21 +33,17 @@ export function QueueStatusSection({ initial }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/queue", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<ApiPayload> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.loadFailed);
-      }
+      const data = await fetchJsonWithAuth<ApiPayload>("/api/admin/queue", { cache: "no-store" });
       setSnapshot({
-        stats: json.data.stats,
-        deadJobs: json.data.deadJobs.map((item) => ({
+        stats: data.stats,
+        deadJobs: data.deadJobs.map((item) => ({
           queueIndex: item.queueIndex,
           type: item.job.type,
           retryCount: typeof item.job.attempts === "number" ? item.job.attempts : null,
         })),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.loadFailed);
+      setError(serverMessageOr(err, t.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -64,12 +60,10 @@ export function QueueStatusSection({ initial }: Props) {
     setBusyIndex(index);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/queue/${index}`, { method: "PATCH" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) throw new Error(t.retryFailed);
+      await fetchJsonWithAuth<unknown>(`/api/admin/queue/${index}`, { method: "PATCH" });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.retryFailed);
+      setError(serverMessageOr(err, t.retryFailed));
     } finally {
       setBusyIndex(null);
     }
@@ -79,12 +73,10 @@ export function QueueStatusSection({ initial }: Props) {
     setBusyIndex(index);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/queue/${index}`, { method: "DELETE" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) throw new Error(t.deleteFailed);
+      await fetchJsonWithAuth<unknown>(`/api/admin/queue/${index}`, { method: "DELETE" });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.deleteFailed);
+      setError(serverMessageOr(err, t.deleteFailed));
     } finally {
       setBusyIndex(null);
     }
@@ -112,7 +104,7 @@ export function QueueStatusSection({ initial }: Props) {
       {error ? (
         <div
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+          className="rounded-xl border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text"
         >
           {error}
         </div>

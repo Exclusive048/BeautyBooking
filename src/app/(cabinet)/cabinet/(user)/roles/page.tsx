@@ -6,7 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { resolveCatalogPresence, type CatalogPresence } from "@/lib/providers/catalog-presence";
 import { getMeProfile } from "@/lib/users/profile";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const masterCabinetHref = "/cabinet/master";
 const studioCabinetHref = "/cabinet/studio";

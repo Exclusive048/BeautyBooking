@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FIX-C3 · item 3 — у отказа приватного вложения появилась ПРИЧИНА.
@@ -79,7 +79,8 @@ describe("FIX-C3 · клиент различает состояния отка�
   });
 
   it("сообщение сервера показывается пользователю, а не глотается", () => {
-    expect(bubble).toMatch(/json\.error\?\.message/);
+    // 29.09 · 11: отказ разбирает общий `readApiResponse`, строку выбирает `serverMessageOr`.
+    expect(bubble).toMatch(/readApiResponse<unknown>\(res\)[\s\S]*serverMessageOr\(error/);
     expect(bubble).toMatch(/reason \?\? UI_TEXT\.chat\.composer\.attachmentLoadFailed/);
   });
 

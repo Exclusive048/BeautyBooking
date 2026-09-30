@@ -6,9 +6,10 @@ import type { Area } from "react-easy-crop";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
-import type { ApiResponse } from "@/lib/types/api";
 import { cropAreaImageStyle, toCropArea } from "@/lib/media/crop-geometry";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { RangeInput } from "@/components/ui/range-input";
 
 /**
  * PERF-17 — `react-easy-crop` статическим импортом отсюда ехал восьми
@@ -157,18 +158,14 @@ export function CropPicker({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/media/${assetId}/crop`, {
+      await fetchJsonWithAuth<{ asset: unknown }>(`/api/media/${assetId}/crop`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cropData),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: unknown }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.saveFailed);
-      }
       onSave(cropData.cropX, cropData.cropY, cropData.cropWidth, cropData.cropHeight);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t.saveFailed);
+      setError(serverMessageOr(saveError, t.saveFailed));
     } finally {
       setBusy(false);
     }
@@ -196,16 +193,14 @@ export function CropPicker({
 
       {/* Zoom slider */}
       <div className="flex items-center gap-3 px-1" role="group" aria-label={t.zoomLabel}>
-        <button
-          type="button"
+        <Button variant="wrapper"
           aria-label={t.zoomOut}
           onClick={() => setZoom((z) => Math.max(1, z - 0.1))}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-text-sec hover:bg-bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <ZoomOut className="h-4 w-4" aria-hidden="true" />
-        </button>
-        <input
-          type="range"
+        </Button>
+        <RangeInput
           min={1}
           max={3}
           step={0.01}
@@ -214,14 +209,13 @@ export function CropPicker({
           aria-label={t.zoomLabel}
           className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border-subtle accent-primary"
         />
-        <button
-          type="button"
+        <Button variant="wrapper"
           aria-label={t.zoomIn}
           onClick={() => setZoom((z) => Math.min(3, z + 0.1))}
           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-text-sec hover:bg-bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         >
           <ZoomIn className="h-4 w-4" aria-hidden="true" />
-        </button>
+        </Button>
       </div>
 
       {/* Preview */}
@@ -244,7 +238,7 @@ export function CropPicker({
       ) : null}
 
       {error ? (
-        <div role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <div role="alert" className="text-xs text-danger-text">
           {error}
         </div>
       ) : null}

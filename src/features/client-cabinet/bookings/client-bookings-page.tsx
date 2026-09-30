@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs } from "@/components/ui/tabs";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -32,7 +33,7 @@ import { ICS_FAILURE_PARAM, type IcsExportFailure } from "@/lib/bookings/ics-exp
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type {
@@ -429,32 +430,12 @@ function FilterBar({
   ];
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => {
-          const active = opt.value === filter.status;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onChange({ ...filter, status: opt.value })}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                active
-                  ? "bg-primary text-white"
-                  : "bg-bg-input text-text-sec hover:bg-bg-input/70 hover:text-text-main"
-              }`}
-            >
-              <span>{opt.label}</span>
-              <span
-                className={`font-mono text-xs ${
-                  active ? "text-white/80" : "text-text-sec/70"
-                }`}
-              >
-                {opt.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.filterAria}
+        items={options.map((opt) => ({ id: opt.value, label: opt.label, badge: opt.count }))}
+        value={filter.status}
+        onChange={(id) => onChange({ ...filter, status: id as Filter["status"] })}
+      />
       <div className="relative ml-auto w-full sm:w-72">
         <Search
           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
@@ -860,7 +841,7 @@ function actionClass(variant: ActionVariant): string {
     case "primary":
       return "border-primary/30 bg-primary/10 text-accent-text hover:bg-primary/15";
     case "danger":
-      return "text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30";
+      return "text-danger-text hover:bg-danger-surface";
     default:
       return "text-text-sec hover:bg-bg-input/70 hover:text-text-main";
   }
@@ -880,17 +861,15 @@ function ActionButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="wrapper"
       onClick={onClick}
       disabled={disabled}
-      className={`${ACTION_BASE} disabled:pointer-events-none disabled:opacity-50 ${actionClass(
-        variant,
-      )}`}
+      className={`${ACTION_BASE} ${actionClass(variant)}`}
     >
       <Icon className="h-3.5 w-3.5" aria-hidden />
       {label}
-    </button>
+    </Button>
   );
 }
 

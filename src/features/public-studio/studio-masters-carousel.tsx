@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { providerPublicUrl, studioBookingUrl } from "@/lib/public-urls";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
@@ -59,16 +60,15 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
       const entries = await Promise.all(
         masters.map(async (master) => {
           const portfolioOwner = master.portfolioProviderId ?? null;
-          const portfolioRes = portfolioOwner
-            ? await fetch(`/api/feed/portfolio?masterId=${encodeURIComponent(portfolioOwner)}&limit=3`, {
-                cache: "no-store",
-              })
-            : null;
-          const portfolioJson = portfolioRes
-            ? ((await portfolioRes.json().catch(() => null)) as ApiResponse<{ items: PortfolioFeedItem[] }> | null)
-            : null;
-          const portfolio =
-            portfolioRes?.ok && portfolioJson && portfolioJson.ok ? portfolioJson.data.items : [];
+          // Превью работ мастера: не прочитали — карточка без миниатюр.
+          const portfolio = portfolioOwner
+            ? await fetchJson<{ items: PortfolioFeedItem[] }>(
+                `/api/feed/portfolio?masterId=${encodeURIComponent(portfolioOwner)}&limit=3`,
+                { cache: "no-store" },
+              )
+                .then((data) => data.items)
+                .catch(() => [] as PortfolioFeedItem[])
+            : [];
 
           const value: MasterExtra = {
             avatarUrl: master.avatarUrl ?? null,
@@ -134,7 +134,7 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
                   src={master.avatarUrl}
                   alt={master.name}
                   sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-                  className="object-cover transition group-hover:scale-[1.03]"
+                  className={`object-cover ${IMAGE_ZOOM}`}
                 />
               ) : (
                 <div className="h-full w-full bg-bg-input" />

@@ -2,8 +2,8 @@
 
 import { useCallback, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminBillingTab } from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing.tabs;
@@ -46,29 +46,12 @@ export function BillingTabs({ active }: Props) {
   );
 
   return (
-    <nav
-      className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border-subtle bg-bg-card p-1 shadow-card"
-      aria-label={T.navAria}
-    >
-      {TABS.map((tab) => {
-        const isActive = active === tab.key;
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setTab(tab.key)}
-            aria-current={isActive ? "page" : undefined}
-            className={cn(
-              "inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm transition-colors",
-              isActive
-                ? "bg-bg-input text-text-main shadow-sm"
-                : "text-text-sec hover:bg-bg-input/60 hover:text-text-main",
-            )}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </nav>
+    <SegmentedTabs<AdminBillingTab>
+      value={active}
+      onChange={setTab}
+      ariaLabel={T.navAria}
+      className="w-full sm:max-w-xl"
+      options={TABS.map((tab) => ({ value: tab.key, label: tab.label }))}
+    />
   );
 }

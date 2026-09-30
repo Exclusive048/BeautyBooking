@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.reviews.header;
 
@@ -19,7 +19,7 @@ export function ReviewsHeader({ pendingReports }: Props) {
             ·
           </span>
           <span>
-            <span className="tabular-nums text-amber-600 dark:text-amber-400">
+            <span className="tabular-nums text-warning-text">
               {pendingReports}
             </span>{" "}
             {T.pendingSuffix}

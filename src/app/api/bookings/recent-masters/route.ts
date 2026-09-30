@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRecentMasters } from "@/lib/bookings/recent-masters";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
     const user = await getSessionUser();
     if (!user) return fail("Войдите в аккаунт, чтобы продолжить.", 401, "UNAUTHORIZED");
 
-    const rl = await checkRateLimit(`recent-masters:${user.id}`, RATE_LIMITS.publicApi);
+    const rl = await checkRateLimit(routeRateLimitKey(req, "user", user.id), RATE_LIMITS.publicApi);
     if (rl.limited) return fail("Слишком много запросов.", 429, "RATE_LIMITED");
 
     const items = await getRecentMasters(user.id);

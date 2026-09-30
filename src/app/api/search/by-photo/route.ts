@@ -6,6 +6,7 @@ import { tooManyRequests } from "@/lib/api/response";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import type {
   VisualSearchFailureReason,
   VisualSearchHttpResponse,
@@ -21,7 +22,7 @@ import {
   setCachedByPhotoResult,
 } from "@/lib/visual-search/by-photo-guards";
 import { AiSpendCeilingError } from "@/lib/ai/spend-ceiling";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const runtime = "nodejs";
 
@@ -56,7 +57,7 @@ function mapReasonToMessage(reason: VisualSearchFailureReason): string {
 export async function POST(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      `rl:visual-search:by-photo:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       VISUAL_SEARCH_RATE_LIMIT
     );
     if (rateLimit.limited) {

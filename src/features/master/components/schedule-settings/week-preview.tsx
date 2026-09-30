@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import type { DayScheduleDto } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.preview;
 const DAY = UI_TEXT.cabinetMaster.scheduleSettings.week.days;

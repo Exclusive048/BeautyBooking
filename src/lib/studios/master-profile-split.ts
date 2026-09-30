@@ -465,10 +465,12 @@ export async function claimStagedStudioProfileTx(
   tx: Tx,
   input: { stagedId: string; personalId: string; ownerUserId: string },
 ): Promise<void> {
-  const [staged, personal, stagedConfig] = await Promise.all([
+  const [staged, personal, stagedConfig, stagedPatterns] = await Promise.all([
     tx.provider.findUnique({ where: { id: input.stagedId }, select: { avatarUrl: true } }),
     tx.provider.findUnique({ where: { id: input.personalId }, select: { avatarUrl: true } }),
     tx.weeklyScheduleConfig.findUnique({ where: { providerId: input.stagedId }, select: { id: true } }),
+    // SCHEDULE-PATTERNS-01: у заготовки может быть уже и график, не только неделя.
+    tx.schedulePattern.count({ where: { providerId: input.stagedId } }),
   ]);
   await tx.provider.update({
     where: { id: input.stagedId },
@@ -481,14 +483,17 @@ export async function claimStagedStudioProfileTx(
     },
     select: { id: true },
   });
-  if (!stagedConfig) {
+  if (!stagedConfig && stagedPatterns === 0) {
     await copyProviderScheduleTx(tx, input.personalId, input.stagedId);
   }
 }
 
 /**
- * Копия расписания профиля в новый профиль: шаблоны с перерывами, неделя,
- * особые дни (кроме прошедших) и легаси-перерывы. id шаблонов перепривязываются.
+ * Копия расписания профиля в новый профиль: шаблоны с перерывами (с именем дня
+ * палитры), графики и особые дни (кроме прошедших) и легаси-перерывы. Неделя
+ * (`WeeklyScheduleConfig`) копируется только у профиля БЕЗ графиков: у профиля
+ * с графиком она история, и в копии без действующих периодов она ожила бы
+ * (движок читает неделю у профиля без графика). id шаблонов перепривязываются.
  */
 export async function copyProviderScheduleTx(tx: Tx, fromId: string, toId: string): Promise<void> {
   const templates = await tx.scheduleTemplate.findMany({
@@ -496,9 +501,12 @@ export async function copyProviderScheduleTx(tx: Tx, fromId: string, toId: strin
     select: {
       id: true,
       name: true,
+      label: true,
       startLocal: true,
       endLocal: true,
       color: true,
+      scheduleMode: true,
+      fixedSlotTimes: true,
       breaks: { select: { startLocal: true, endLocal: true, sortOrder: true, title: true } },
     },
   });
@@ -508,9 +516,12 @@ export async function copyProviderScheduleTx(tx: Tx, fromId: string, toId: strin
       data: {
         providerId: toId,
         name: template.name,
+        label: template.label,
         startLocal: template.startLocal,
         endLocal: template.endLocal,
         color: template.color,
+        scheduleMode: template.scheduleMode,
+        fixedSlotTimes: template.fixedSlotTimes,
         breaks: { create: template.breaks.map((item) => ({ ...item })) },
       },
       select: { id: true },
@@ -519,12 +530,16 @@ export async function copyProviderScheduleTx(tx: Tx, fromId: string, toId: strin
   }
   const mapTemplate = (id: string | null) => (id ? templateIdMap.get(id) ?? null : null);
 
-  const config = await tx.weeklyScheduleConfig.findUnique({
-    where: { providerId: fromId },
-    select: {
-      days: { select: { weekday: true, templateId: true, isActive: true, scheduleMode: true, fixedSlotTimes: true } },
-    },
-  });
+  const sourceHasPatterns =
+    (await tx.schedulePattern.findFirst({ where: { providerId: fromId }, select: { id: true } })) !== null;
+  const config = sourceHasPatterns
+    ? null
+    : await tx.weeklyScheduleConfig.findUnique({
+        where: { providerId: fromId },
+        select: {
+          days: { select: { weekday: true, templateId: true, isActive: true, scheduleMode: true, fixedSlotTimes: true } },
+        },
+      });
   if (config) {
     await tx.weeklyScheduleConfig.create({
       data: {
@@ -546,6 +561,42 @@ export async function copyProviderScheduleTx(tx: Tx, fromId: string, toId: strin
   // `ScheduleOverride.date` — полночь даты салона в UTC; вчерашних и раньше не
   // переносим (запас в сутки покрывает любой пояс).
   const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // SCHEDULE-PATTERNS-01: графики — действующий и будущие периоды (кончившиеся
+  // новому профилю ни к чему). Даты графика — строки `YYYY-MM-DD`.
+  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+  const patterns = await tx.schedulePattern.findMany({
+    where: { providerId: fromId, OR: [{ endsOn: null }, { endsOn: { gte: yesterdayKey } }] },
+    select: {
+      kind: true,
+      cycleDays: true,
+      anchorOn: true,
+      startsOn: true,
+      endsOn: true,
+      days: { select: { position: true, templateId: true } },
+    },
+  });
+  for (const pattern of patterns) {
+    await tx.schedulePattern.create({
+      data: {
+        providerId: toId,
+        kind: pattern.kind,
+        cycleDays: pattern.cycleDays,
+        anchorOn: pattern.anchorOn,
+        startsOn: pattern.startsOn,
+        endsOn: pattern.endsOn,
+        days: {
+          createMany: {
+            data: pattern.days.map((day) => ({
+              position: day.position,
+              templateId: mapTemplate(day.templateId),
+            })),
+          },
+        },
+      },
+      select: { id: true },
+    });
+  }
   const overrides = await tx.scheduleOverride.findMany({
     where: { providerId: fromId, date: { gte: yesterday } },
     select: {

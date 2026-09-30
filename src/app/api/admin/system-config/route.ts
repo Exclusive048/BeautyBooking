@@ -36,7 +36,7 @@ const FLAG_DEFAULTS = {
   // in `getLegalDraftMode()`.
   legalDraftMode: true,
   // FIX-TELEGRAM-KILLSWITCH: raw admin toggle defaults to ON. The env hard
-  // ceiling (NEXT_PUBLIC_TELEGRAM_ENABLED) clamps the EFFECTIVE value to off
+  // ceiling (a set NEXT_PUBLIC_TELEGRAM_BOT_USERNAME since ENV-SPLIT-01) clamps the EFFECTIVE value to off
   // when the env is off — applied in `getTelegramEnabled()` / `getSystemFlags()`,
   // not here. This raw value is what the audit diff records.
   telegramEnabled: true,

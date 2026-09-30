@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { BookingSource, MediaEntityType, ProviderType } from "@prisma/client";
 import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, type RateLimitKey } from "@/lib/rate-limit";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { CREATE_BOOKING_RATE_LIMIT } from "@/lib/bookings/rateLimit";
 import {
@@ -59,6 +59,13 @@ export async function createBooking(input: {
    */
   clientUserId: string;
   idempotencyKey?: string | null;
+  /**
+   * Ключ лимита создания — строит роут (`routeRateLimitKey(req, "user", …)`):
+   * шаблон пути берётся из запроса, а у этой функции запроса нет (29.09
+   * доработки · 15). До этого ключ `rate:createBooking:<user>` был общим для
+   * `/api/bookings` и `/api/public/bookings`; теперь у каждого пути своё ведро.
+   */
+  rateLimitKey: RateLimitKey;
 }): Promise<BookingDto> {
   const namespaceKey = input.clientUserId;
   let idempotencyKey: string | null = null;
@@ -83,7 +90,7 @@ export async function createBooking(input: {
     // FIX-C11: обрыв Redis отвечает 503 «сервис недоступен», а не 429 «слишком
     // много запросов» — отказ тот же (fail-closed, инв. #6), сигнал верный.
     const refusal = resolveRateLimitRefusal(
-      await checkRateLimit(`rate:createBooking:${namespaceKey}`, {
+      await checkRateLimit(input.rateLimitKey, {
         maxRequests: CREATE_BOOKING_RATE_LIMIT.limit,
         windowSeconds: CREATE_BOOKING_RATE_LIMIT.windowSeconds,
       })
@@ -102,6 +109,7 @@ export async function createBooking(input: {
       endAtUtc,
       bufferMin,
       shouldAutoConfirm,
+      timeClearance,
     } = await resolveBookingCore({
       providerId: input.providerId,
       serviceId: input.serviceId,
@@ -160,6 +168,7 @@ export async function createBooking(input: {
         });
 
         const created = await createBookingRow(tx, {
+          timePolicy: timeClearance,
           data: {
             providerId: input.providerId,
             serviceId: service.id,

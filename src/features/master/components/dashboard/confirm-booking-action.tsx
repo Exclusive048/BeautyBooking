@@ -3,9 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.dashboard.attention;
 const TB = UI_TEXT.cabinetMaster.bookings;
@@ -32,18 +31,14 @@ export function ConfirmBookingAction({ bookingId }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`/api/master/bookings/${bookingId}/status`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/bookings/${bookingId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "CONFIRMED" }),
       });
-      const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!response.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : TB.confirmError);
+      setError(serverMessageOr(err, TB.confirmError));
     } finally {
       setBusy(false);
     }
@@ -61,7 +56,7 @@ export function ConfirmBookingAction({ bookingId }: Props) {
         {busy ? T.confirmBookingBusy : T.confirmBookingCta}
       </Button>
       {error ? (
-        <p className="text-[11px] text-rose-600 dark:text-rose-300">{error}</p>
+        <p className="text-[11px] text-danger-text">{error}</p>
       ) : null}
     </div>
   );

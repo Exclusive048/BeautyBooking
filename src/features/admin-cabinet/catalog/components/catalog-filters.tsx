@@ -5,13 +5,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCategoryCounts,
   AdminCategoryParentOption,
   AdminCategoryStatusFilter,
 } from "@/features/admin-cabinet/catalog/types";
+import { Tabs } from "@/components/ui/tabs";
 
 type Props = {
   status: AdminCategoryStatusFilter;
@@ -83,39 +83,17 @@ export function CatalogFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border-subtle bg-bg-card p-1 shadow-card">
-        {STATUS_TABS.map((tab) => {
-          const active = status === tab.value;
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() =>
-                pushParams((params) => {
-                  if (tab.value === "all") params.delete("status");
-                  else params.set("status", tab.value);
-                })
-              }
-              className={cn(
-                "inline-flex h-8 items-center gap-2 rounded-xl px-3 text-sm transition-colors",
-                active
-                  ? "bg-bg-input text-text-main shadow-sm"
-                  : "text-text-sec hover:bg-bg-input/60 hover:text-text-main",
-              )}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 font-mono text-[11px] tabular-nums",
-                  active ? "bg-bg-card text-text-main" : "text-text-sec",
-                )}
-              >
-                {counts[tab.countKey]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.statusAria}
+        items={STATUS_TABS.map((tab) => ({ id: tab.value, label: tab.label, badge: counts[tab.countKey] }))}
+        value={status}
+        onChange={(id) =>
+          pushParams((params) => {
+            if (id === "all") params.delete("status");
+            else params.set("status", id);
+          })
+        }
+      />
 
       <Select
         value={parent}

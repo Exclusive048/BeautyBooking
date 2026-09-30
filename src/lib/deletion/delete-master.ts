@@ -91,7 +91,11 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
       tx.scheduleOverride.deleteMany({ where: { providerId } }),
       tx.scheduleBreak.deleteMany({ where: { providerId } }),
       tx.weeklyScheduleConfig.deleteMany({ where: { providerId } }),
-      tx.scheduleTemplate.deleteMany({ where: { providerId } }),
+      // SCHEDULE-PATTERNS-01: график — строго до шаблонов (позиции графика
+      // держат шаблон через RESTRICT), поэтому цепочкой, а не рядом в `all`.
+      tx.schedulePattern
+        .deleteMany({ where: { providerId } })
+        .then(() => tx.scheduleTemplate.deleteMany({ where: { providerId } })),
       tx.scheduleChangeRequest.deleteMany({ where: { providerId } }),
       tx.masterService.deleteMany({ where: { masterProviderId: providerId } }),
       tx.clientNote.deleteMany({ where: { masterId: providerId } }),
@@ -175,7 +179,9 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
         tx.scheduleOverride.deleteMany({ where: { providerId: studioProfileId } }),
         tx.scheduleBreak.deleteMany({ where: { providerId: studioProfileId } }),
         tx.weeklyScheduleConfig.deleteMany({ where: { providerId: studioProfileId } }),
-        tx.scheduleTemplate.deleteMany({ where: { providerId: studioProfileId } }),
+        tx.schedulePattern
+          .deleteMany({ where: { providerId: studioProfileId } })
+          .then(() => tx.scheduleTemplate.deleteMany({ where: { providerId: studioProfileId } })),
         tx.scheduleChangeRequest.deleteMany({ where: { providerId: studioProfileId } }),
         tx.discountRule.deleteMany({ where: { providerId: studioProfileId } }),
         tx.hotSlot.deleteMany({ where: { providerId: studioProfileId } }),

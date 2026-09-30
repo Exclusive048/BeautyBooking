@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
 import type { WeekScheduleCell } from "../lib/week-occupancy";
 

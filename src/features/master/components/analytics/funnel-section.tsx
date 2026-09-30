@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 import type { FunnelStep } from "@/lib/master/analytics-funnel";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.analytics.funnel;
 
@@ -83,7 +83,7 @@ function FunnelStepRow({ step, maxCount }: { step: FunnelStep; maxCount: number 
 }
 
 function getDropRateColor(pct: number): string {
-  if (pct >= 80) return "text-emerald-700 dark:text-emerald-300";
-  if (pct >= 50) return "text-amber-700 dark:text-amber-300";
-  return "text-rose-700 dark:text-rose-300";
+  if (pct >= 80) return "text-success-text";
+  if (pct >= 50) return "text-warning-text";
+  return "text-danger-text";
 }

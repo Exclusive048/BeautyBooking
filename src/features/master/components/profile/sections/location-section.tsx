@@ -1,7 +1,7 @@
 import { MapPin } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { AddressEditor } from "../editable/address-editor";
 import { TimezoneSelector } from "../editable/timezone-selector";
 import { SectionShell } from "./section-shell";

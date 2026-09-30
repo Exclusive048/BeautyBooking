@@ -109,6 +109,13 @@ model Provider {
   // (`lib/studio/master-eligibility.ts`, инв. #24).
   studioPaused Boolean @default(false)
 
+  // SETUP-GUIDE-01 (2026-09-28): «Первые шаги» кабинета. Остальные шаги
+  // отмечаются сами по данным (`lib/onboarding/setup-guide.ts`); у правил
+  // записи есть значения по умолчанию, поэтому их просмотр подтверждают явно.
+  // `setupGuideHiddenAt` — человек скрыл карточку на главной.
+  setupRulesConfirmedAt DateTime?
+  setupGuideHiddenAt    DateTime?
+
   publicUsername String? @unique
 
   publicUsernameUpdatedAt DateTime?
@@ -140,6 +147,8 @@ model Provider {
   scheduleTemplates ScheduleTemplate[]
 
   weeklyScheduleConfig WeeklyScheduleConfig?
+
+  schedulePatterns SchedulePattern[]
 
   scheduleChangeRequests ScheduleChangeRequest[]
 

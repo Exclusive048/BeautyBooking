@@ -1,6 +1,7 @@
 import "server-only";
 import { ProviderType, type SubscriptionScope } from "@prisma/client";
 import { env } from "@/lib/env";
+import { personalMasterProviderWhere } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
 
@@ -47,11 +48,13 @@ export async function resolveSubscriptionTimezone(
   userId: string,
   scope: SubscriptionScope
 ): Promise<string> {
+  // STUDIO-MASTER-PROFILES (этап 4): подписка мастера — его личного профиля;
+  // «самый старый MASTER» мог оказаться профилем в студии (пояс студии).
   const provider = await prisma.provider.findFirst({
-    where: {
-      ownerUserId: userId,
-      type: scope === "STUDIO" ? ProviderType.STUDIO : ProviderType.MASTER,
-    },
+    where:
+      scope === "STUDIO"
+        ? { ownerUserId: userId, type: ProviderType.STUDIO }
+        : personalMasterProviderWhere(userId),
     select: { timezone: true },
     orderBy: { createdAt: "asc" },
   });

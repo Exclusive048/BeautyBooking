@@ -136,6 +136,7 @@
     --destructive-foreground: 255 255 255;
     --success: 31 122 77;
     --warning: 180 83 9;
+    --info: 37 99 235;               /* 29.09 · 23: точки и тонированные заливки синего статуса */
 
     /* === Статусные ПОВЕРХНОСТИ (UI-26/27, AUDIT-CAMPAIGN-02 п.8) ===
        Значения сняты с Badge.variantClasses (прошёл контраст-ревью):
@@ -157,6 +158,42 @@
     --info-surface: rgb(239 246 255);
     --info-text: rgb(29 78 216);
     --info-border: rgb(191 219 254);
+
+    /* === Палитра рабочих дней расписания (SCHEDULE-PATTERNS-01, этап 3) ===
+       Решение владельца: у каждого мастера своя палитра, цвета неяркие.
+       Шесть приглушённых оттенков — шалфей, пыльно-голубой, песок, лаванда,
+       глина, морская волна; текст `text-main` читается на всех. Ключ цвета
+       хранится в `ScheduleTemplate.color` («1»…«6»), классы — через мост
+       `schedule-day-*` в tailwind.config.js. Менять только парой light+dark. */
+    --schedule-day-1: 214 226 207;
+    --schedule-day-2: 207 220 234;
+    --schedule-day-3: 238 224 196;
+    --schedule-day-4: 222 213 234;
+    --schedule-day-5: 238 210 204;
+    --schedule-day-6: 202 226 224;
+
+    /* === Акценты-категории, не статусы (29.09 доработки · 23, UI-27) ===
+       `hot` — «горящее окошко» (продуктовый акцент, решение владельца 23.3):
+       иконка и заливка-подложка `bg-hot/10`; `hot-text` — мелкий жирный текст
+       скидки на этой подложке (orange-700: у orange-600 на светлой карточке
+       3.6:1, ниже порога 4.5). `rating` — звёзды оценки в каталоге и на
+       публичных карточках (amber-500, как в референсе `catalog.js`); звёзды
+       в кабинетах — бордовые `fill-primary`, как в референсе `clientReviews.js`.
+       Менять только парой light+dark. */
+    --hot: 249 115 22;
+    --hot-text: 194 65 12;
+    --rating: 245 158 11;
+
+    /* Декоративные пятна за заголовками лендингов (`bg-decor-primary`,
+       `bg-decor-magenta`): прозрачность своя у темы — в тёмной пятно плотнее,
+       иначе на угольном фоне его не видно. Было `dark:bg-primary/[0.12]` в
+       пяти файлах (29.09 доработки · 23). */
+    --decor-alpha: 0.08;
+    /* Заливка подписи логотипа на поверхностях, где она стоит прямо на фоне
+       страницы (`bg-wordmark` + `bg-clip-text`): бренд-градиент в светлой теме,
+       ровный кремовый в тёмной — бордовый хвост «…дом» тонул в угольном фоне.
+       Было `dark:text-text-main` поверх градиента (вход, «Вход недоступен»). */
+    --wordmark-fill: linear-gradient(135deg, rgb(var(--brand-from)) 0%, rgb(var(--brand-via)) 55%, rgb(var(--brand-deep)) 100%);
   }
 
   .dark {
@@ -249,6 +286,7 @@
     --destructive-foreground: 255 255 255;
     --success: 52 168 99;
     --warning: 217 119 6;
+    --info: 96 165 250;
 
     /* Статусные поверхности — тёмная половина (пары к :root, см. коммент там).
        Альфа запечена в значение: …-950/0.4 у заливки, …-800/0.5 у рамки. */
@@ -264,6 +302,23 @@
     --info-surface: rgb(23 37 84 / 0.4);
     --info-text: rgb(147 197 253);
     --info-border: rgb(30 64 175 / 0.5);
+
+    /* Палитра рабочих дней — тёмная половина (пары к :root): те же оттенки,
+       приглушённые в глубину, чтобы кремовый текст читался. */
+    --schedule-day-1: 58 74 56;
+    --schedule-day-2: 50 64 88;
+    --schedule-day-3: 86 72 46;
+    --schedule-day-4: 70 58 90;
+    --schedule-day-5: 90 55 52;
+    --schedule-day-6: 42 76 74;
+
+    /* Акценты-категории — тёмная половина (пары к :root). */
+    --hot: 251 146 60;
+    --hot-text: 251 146 60;
+    --rating: 251 191 36;
+
+    --decor-alpha: 0.12;
+    --wordmark-fill: linear-gradient(rgb(var(--text-main)), rgb(var(--text-main)));
   }
 
   html,
@@ -659,6 +714,38 @@
 
 /* FIX-R2-06-B — transient highlight applied by useFocusHighlight to a
    deep-linked (`?focus=`) list row. Brief ring pulse, then auto-removed. */
+/* SETUP-GUIDE-01 — элемент, на который указывает подсказка «Первых шагов»
+   (`setup-guide-hint.tsx`). Рамка держится, пока подсказка открыта; пульс —
+   только без «уменьшить движение». */
+/* SETUP-GUIDE-01 — пока открыта подсказка шага, конец страницы кабинета
+   прокручивается выше неё (высоту публикует подсказка). Нижняя навигация
+   телефона учтена: на ПК её высота 0. */
+html[data-guide-hint] .guide-space {
+  padding-bottom: calc(var(--guide-hint-space, 0px) + var(--bottom-nav-h, 0px));
+}
+
+.guide-target {
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 6px rgb(var(--primary) / 0.18);
+  scroll-margin-block: 96px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .guide-target {
+    animation: guide-target-pulse 1.4s ease-out 3;
+  }
+  @keyframes guide-target-pulse {
+    0% {
+      box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 0 rgb(var(--primary) / 0.35);
+    }
+    70% {
+      box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 12px rgb(var(--primary) / 0);
+    }
+    100% {
+      box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 6px rgb(var(--primary) / 0.18);
+    }
+  }
+}
+
 .focus-row-highlight {
   border-radius: 0.75rem;
   box-shadow: 0 0 0 2px rgb(var(--primary)), 0 0 0 6px rgb(var(--primary) / 0.18);

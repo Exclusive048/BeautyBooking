@@ -7,8 +7,10 @@ import {
   earliestBookableUtc,
   isWithinBookableWindow,
   latestBookableUtc,
+  publicBookingHorizonDays,
   stricterBookingWindow,
 } from "./policy-enforcement";
+import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 
 const NOW = new Date("2026-05-20T10:00:00Z");
 const hours = (n: number) => new Date(NOW.getTime() + n * 60 * 60 * 1000);
@@ -34,6 +36,11 @@ describe("policy-enforcement / latestBookableUtc", () => {
   it("clamps zero/negative to 1 day minimum", () => {
     expect(latestBookableUtc({ maxBookingDaysAhead: 0 }, NOW).toISOString()).toBe(
       days(1).toISOString(),
+    );
+  });
+  it("SCHEDULE-PATTERNS-01: never past the schedule horizon (stored 365 from the old ceiling)", () => {
+    expect(latestBookableUtc({ maxBookingDaysAhead: 365 }, NOW).toISOString()).toBe(
+      days(SCHEDULE_HORIZON_DAYS).toISOString(),
     );
   });
 });
@@ -169,5 +176,30 @@ describe("stricterBookingWindow", () => {
       minBookingHoursAhead: 3,
       maxBookingDaysAhead: 20,
     });
+  });
+});
+
+/**
+ * 29.09 доработки · 03 — полоса дат виджета студии: окно записи, у мастера —
+ * ещё «Сколько окошек вперёд», не дальше горизонта расписания.
+ *
+ * @probe 2026-09-29 — `visibleSlotDays` не учитывается (лимиты без него):
+ * покраснел «у мастера — и «Сколько окошек вперёд»» (получено 30 вместо 7).
+ * Возвращено — зелёный.
+ */
+describe("publicBookingHorizonDays", () => {
+  it("окно записи, не дальше горизонта расписания", () => {
+    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 14 })).toBe(14);
+    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 90 })).toBe(90);
+    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 365 })).toBe(SCHEDULE_HORIZON_DAYS);
+  });
+
+  it("у мастера — и «Сколько окошек вперёд»", () => {
+    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 30, visibleSlotDays: 7 })).toBe(7);
+    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 14, visibleSlotDays: 60 })).toBe(14);
+  });
+
+  it("не меньше одного дня", () => {
+    expect(publicBookingHorizonDays({ maxBookingDaysAhead: 0 })).toBe(1);
   });
 });

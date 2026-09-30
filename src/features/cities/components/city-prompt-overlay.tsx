@@ -12,7 +12,8 @@ import {
   isCityPromptDismissed,
   setCurrentCitySlug,
 } from "@/lib/cities/client-city";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 type CityItem = {
   id: string;
@@ -90,14 +91,13 @@ export function CityPromptOverlay() {
   // Heading kept as an in-panel <h2> to preserve its text-2xl display size.
   return (
     <ModalSurface open={show} onClose={handleClose} size="sm">
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={handleClose}
         aria-label={T.close}
         className="absolute right-3 top-3 -m-2 rounded-lg p-3.5 text-text-sec transition-colors hover:bg-muted hover:text-text-main"
       >
         <X className="h-4 w-4" aria-hidden />
-      </button>
+      </Button>
 
       <h2 id="city-prompt-title" className="font-display text-2xl font-semibold text-text-main">
         {T.title}
@@ -106,15 +106,14 @@ export function CityPromptOverlay() {
 
       <div className="mt-6 max-h-[320px] space-y-2 overflow-y-auto pr-1">
         {cities.map((city) => (
-          <button
+          <Button variant="wrapper"
             key={city.id}
-            type="button"
             onClick={() => handleChoose(city.slug)}
             className="flex w-full items-center justify-between rounded-xl border border-border-subtle/60 px-4 py-3 text-left text-sm font-medium text-text-main transition-colors hover:border-primary hover:bg-primary/5"
           >
             <span>{city.name}</span>
             <span aria-hidden className="text-text-sec">→</span>
-          </button>
+          </Button>
         ))}
       </div>
 

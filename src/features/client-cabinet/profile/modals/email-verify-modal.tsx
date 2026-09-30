@@ -5,8 +5,9 @@ import { Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { Notice } from "@/components/ui/notice";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.clientCabinet.profilePage.emailVerify;
 
@@ -213,11 +214,7 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
 }
 
 function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="rounded-xl border border-rose-300/50 bg-rose-50/60 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-      {message}
-    </div>
-  );
+  return <Notice tone="danger">{message}</Notice>;
 }
 
 function ResendRow({
@@ -251,12 +248,8 @@ function ResendRow({
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onResend}
-      className="text-xs text-accent-text hover:underline"
-    >
+    <Button variant="wrapper" onClick={onResend} className="rounded text-xs text-accent-text hover:underline">
       {T.resend}
-    </button>
+    </Button>
   );
 }

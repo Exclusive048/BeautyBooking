@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const DEFAULT_LENGTH = 6;
 
@@ -56,9 +57,8 @@ const cellVariants = {
     y: [0, -3, 0],
     scale: [1, 0.965, 1],
     transition: {
-      duration: 0.3,
+      ...MOTION.base,
       delay: index * 0.04,
-      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
     },
   }),
   // Accepted: a taller, slower cascade paired with the colour sweep below.
@@ -66,9 +66,8 @@ const cellVariants = {
     y: [0, -5, 0],
     scale: [1, 1.06, 1],
     transition: {
-      duration: 0.36,
+      ...MOTION.section,
       delay: index * 0.045,
-      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
     },
   }),
 };
@@ -87,8 +86,10 @@ const cellVariants = {
  * LOGIN-WOW-01 adds the completion choreography on top: the cells are wrapped
  * in motion containers (the `<input>` itself is never transformed, so its
  * `focus:-translate-y-0.5` lift and every keyboard/touch behaviour are
- * untouched), and `state` drives lock-in → verifying → success. Every stage is
- * gated on `useReducedMotion` and degrades to an instant state swap.
+ * untouched), and `state` drives lock-in → verifying → success. Reduced motion:
+ * the cells' lift/scale is dropped by `MotionConfig reducedMotion="user"`
+ * (MotionProvider), the endless verifying sweep is gated on `useReducedMotion`
+ * here (29.09 доработки · 19).
  */
 export function OtpInput({
   value,
@@ -192,9 +193,9 @@ export function OtpInput({
   }
 
   const complete = value.length >= length;
-  // Reduced motion collapses every stage to `rest` — the colour/ring changes
-  // below still communicate the stage, without translation or scale.
-  const cellStage = reduce ? "rest" : state === "success" ? "success" : complete ? "lock" : "rest";
+  // Reduced motion: подъём и масштаб ячеек гасит `MotionConfig reducedMotion="user"`;
+  // смена цвета и кольца ниже по-прежнему показывает стадию.
+  const cellStage = state === "success" ? "success" : complete ? "lock" : "rest";
   const inFlight = state === "verifying" || state === "success";
 
   return (
@@ -209,7 +210,7 @@ export function OtpInput({
       {Array.from({ length }).map((_, index) => {
         const filled = Boolean(value[index]);
         return (
-          <motion.div
+          <m.div
             key={index}
             className="relative min-w-0"
             custom={index}
@@ -242,9 +243,8 @@ export function OtpInput({
                 "disabled:cursor-not-allowed",
                 // While a code is in flight the grid must read as "working", not
                 // as "dead form" — so the disabled dimming is dropped for those
-                // two stages only. Emitted as one branch (never both) because
-                // `cn` is a plain join and two competing `disabled:opacity-*`
-                // utilities would resolve by stylesheet order, not class order.
+                // two stages only. Emitted as one branch (never both): exactly
+                // one `disabled:opacity-*` is in play, whatever `cn` merges.
                 inFlight ? "disabled:opacity-100" : "disabled:opacity-50",
                 // UI-27: заливка ошибочной ячейки — статусный токен, `dark:`-вилка
                 // уходит в переменную темы. Рамка НАМЕРЕННО остаётся литеральной
@@ -254,7 +254,7 @@ export function OtpInput({
                 // токен ослабил бы сигнал ошибки на единственном шаге входа.
                 // Вилки тем у неё нет, поэтому предмету UI-27 она не противоречит.
                 state === "error"
-                  ? "border-red-400/70 bg-danger-surface"
+                  ? "border-destructive/70 bg-danger-surface"
                   : filled
                     ? "login-otp-pop border-primary bg-primary/5"
                     : "border-border-control",
@@ -270,18 +270,14 @@ export function OtpInput({
                 is nearly the dark card's own value (#7A102C on #302026) and the
                 beat would be invisible in dark, whereas magenta reads in both
                 themes and is the brand gradient's own end stop. */}
-            <motion.span
+            <m.span
               aria-hidden
               className="pointer-events-none absolute inset-0 rounded-2xl bg-primary-magenta/10 ring-2 ring-inset ring-primary-magenta"
               initial={false}
               animate={{ opacity: state === "success" ? 1 : 0 }}
-              transition={
-                reduce
-                  ? { duration: 0 }
-                  : { duration: 0.22, delay: state === "success" ? index * 0.045 : 0 }
-              }
+              transition={{ ...MOTION.base, delay: state === "success" ? index * 0.045 : 0 }}
             />
-          </motion.div>
+          </m.div>
         );
       })}
 
@@ -291,12 +287,13 @@ export function OtpInput({
       {state === "verifying" && !reduce ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-2xl"
+          className="pointer-events-none absolute inset-0 z-2 overflow-hidden rounded-2xl"
         >
-          <motion.span
+          <m.span
             className="absolute inset-y-0 block w-1/3 bg-gradient-to-r from-transparent via-primary-magenta/25 to-transparent"
             initial={{ x: "-120%" }}
             animate={{ x: "320%" }}
+            // motion-canon: намеренно — бесконечная волна «проверяем», не переход.
             transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }}
           />
         </span>

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioServicesKpis } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.servicesV2.kpis;

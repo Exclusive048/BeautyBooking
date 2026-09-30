@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const NUMBER_FMT = new Intl.NumberFormat("ru-RU");
 const T = UI_TEXT.cabinetMaster.servicesPage.durationFormat;

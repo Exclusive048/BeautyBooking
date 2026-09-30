@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CropPicker } from "@/features/media/components/crop-picker";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.crop;
 
@@ -25,7 +25,7 @@ export function CropModal({ open, onClose, assetId, imageUrl }: Props) {
   const router = useRouter();
 
   return (
-    <ModalSurface open={open} onClose={onClose} title={T.title} className="max-w-2xl">
+    <ModalSurface open={open} onClose={onClose} title={T.title} className="max-w-2xl" fullScreenOnMobile>
       <CropPicker
         assetId={assetId}
         imageUrl={imageUrl}

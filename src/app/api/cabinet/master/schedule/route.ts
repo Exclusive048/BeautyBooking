@@ -1,29 +1,13 @@
-import { StudioRole, SubscriptionScope } from "@prisma/client";
+import { SubscriptionScope } from "@prisma/client";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { createFeatureGateError } from "@/lib/billing/guards";
-import {
-  cancelBookingInTx,
-  runCancelBookingSideEffects,
-  type CancelBookingSideEffects,
-} from "@/lib/bookings/cancelBooking";
-import {
-  canCancelIndividually,
-  resolveBookingRuntimeStatus,
-  type BookingRuntimeStatus,
-} from "@/lib/bookings/flow";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { getCurrentMasterProviderContext, listStudioMasterProfiles } from "@/lib/master/access";
-import {
-  loadBookingWithRelations,
-  notifyCancelledByMaster,
-  notifyProviderSideCancelled,
-} from "@/lib/notifications/booking-notifications";
 import { prisma } from "@/lib/prisma";
-import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
+import { resolveScheduleActor, type ScheduleActorMode } from "@/lib/schedule/schedule-actor";
 import {
   applyScheduleSnapshotTx,
   buildScheduleSnapshot,
@@ -35,7 +19,6 @@ import {
   normalizeWeekScheduleInput,
   SCHEDULE_SNAPSHOT_TX_OPTIONS,
   serializeScheduleState,
-  toScheduleEditorRequestPayload,
   type BookingRulesDto,
   type DayScheduleDto,
   type EditorExceptionInput,
@@ -43,12 +26,15 @@ import {
   type ScheduleEditorSnapshot,
   type VisibilityDto,
 } from "@/lib/schedule/editor";
-import { ensureStudioRole } from "@/lib/studio/access";
+import { notifyMasterScheduleUpdatedByStudio } from "@/lib/notifications/studio-notifications";
+import type { CalendarPaintAction } from "@/lib/schedule/calendar-shared";
 import {
-  loadScheduleRequestWithRelations,
-  notifyMasterScheduleUpdatedByStudio,
-  notifyScheduleRequestSubmitted,
-} from "@/lib/notifications/studio-notifications";
+  exceptionsToDayChanges,
+  submitStudioScheduleChange,
+  type ScheduleChangeOutcome,
+} from "@/lib/schedule/change-requests";
+import { weekSignature } from "@/lib/schedule/patterns";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { updateMasterProfile } from "@/lib/master/profile.service";
 
 export const runtime = "nodejs";
@@ -58,7 +44,6 @@ type PatchBody = {
   /** Single-row exception path used by the legacy editor (studio cabinet). */
   exception?: unknown;
   deleteException?: unknown;
-  dayOffConflictResolution?: unknown;
   slotStepMin?: unknown;
   bookingRules?: unknown;
   visibility?: unknown;
@@ -75,26 +60,7 @@ type SettingsPatch = {
   hotSlots: HotSlotsDto | null | undefined;
 };
 
-type DayOffConflictResolution = {
-  action: "CANCEL_BOOKINGS_AND_SET_OFF";
-  bookingIds: string[];
-};
-
-type DayOffConflictBooking = {
-  id: string;
-  clientName: string;
-  status: BookingRuntimeStatus;
-  timeLabel: string;
-  canCancel: boolean;
-};
-
-type ActorMode = "SOLO_MASTER" | "STUDIO_ADMIN" | "STUDIO_MASTER";
-
-type ActorContext = {
-  mode: ActorMode;
-  providerId: string;
-  studioProviderId: string | null;
-};
+type ActorMode = ScheduleActorMode;
 
 type PendingStatus = "PENDING" | "REJECTED" | null;
 
@@ -111,235 +77,6 @@ type RouteResponse = ScheduleEditorSnapshot & {
 };
 
 type ExceptionWithId = EditorExceptionInput & { id?: string };
-
-function isConflictStatus(status: BookingRuntimeStatus): boolean {
-  return status !== "REJECTED" && status !== "FINISHED";
-}
-
-function parseDayOffConflictResolution(value: unknown): DayOffConflictResolution | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  if (record.action !== "CANCEL_BOOKINGS_AND_SET_OFF") return null;
-  if (!Array.isArray(record.bookingIds)) return null;
-  const bookingIds = record.bookingIds
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => Boolean(item));
-  if (bookingIds.length === 0) return null;
-  return {
-    action: "CANCEL_BOOKINGS_AND_SET_OFF",
-    bookingIds,
-  };
-}
-
-async function listDayOffConflicts(input: {
-  providerId: string;
-  dateKey: string;
-  timezone: string;
-}): Promise<DayOffConflictBooking[]> {
-  const dayStartUtc = dateFromLocalDateKey(input.dateKey, input.timezone, 0, 0);
-  const dayEndUtc = dateFromLocalDateKey(addDaysToDateKey(input.dateKey, 1), input.timezone, 0, 0);
-  const now = new Date();
-  const rows = await prisma.booking.findMany({
-    where: {
-      OR: [{ masterProviderId: input.providerId }, { masterProviderId: null, providerId: input.providerId }],
-      startAtUtc: { gte: dayStartUtc, lt: dayEndUtc },
-      endAtUtc: { gt: now },
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-    },
-    select: {
-      id: true,
-      clientName: true,
-      status: true,
-      startAtUtc: true,
-      endAtUtc: true,
-      bookingPackageId: true,
-    },
-    orderBy: { startAtUtc: "asc" },
-  });
-
-  return rows
-    .map((row) => {
-      const runtimeStatus = resolveBookingRuntimeStatus({
-        status: row.status,
-        startAtUtc: row.startAtUtc,
-        endAtUtc: row.endAtUtc,
-        now,
-      });
-      if (!isConflictStatus(runtimeStatus)) return null;
-      const timeLabel = row.startAtUtc
-        ? new Intl.DateTimeFormat("ru-RU", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: input.timezone,
-          }).format(row.startAtUtc)
-        : "--:--";
-      return {
-        id: row.id,
-        clientName: row.clientName,
-        status: runtimeStatus,
-        timeLabel,
-        // LOGIC-13: критерий тот же, по которому судит сама отмена. Пока он
-        // здесь был свой (только статус), компонент пакета помечался
-        // отменяемым — а `cancelBooking` бросает на нём 409
-        // `PACKAGE_CANCEL_WHOLE` (инв. #34), и цикл отмен падал уже после
-        // того, как соседние брони были отменены и клиентам ушли уведомления.
-        // Теперь `assertConflictResolution` отвечает отказом ДО первой отмены.
-        canCancel: canCancelIndividually({
-          status: runtimeStatus,
-          bookingPackageId: row.bookingPackageId,
-        }),
-      };
-    })
-    .filter((item): item is DayOffConflictBooking => item !== null);
-}
-
-function assertConflictResolution(input: {
-  conflicts: DayOffConflictBooking[];
-  resolution: DayOffConflictResolution | null;
-}): void {
-  const nonCancellable = input.conflicts.filter((item) => !item.canCancel);
-  if (nonCancellable.length > 0) {
-    throw new AppError(
-      "На этот день есть записи, которые нельзя отменить автоматически.",
-      409,
-      "SCHEDULE_DAY_OFF_CONFLICT",
-      {
-        bookings: input.conflicts,
-        nonCancellableCount: nonCancellable.length,
-      }
-    );
-  }
-
-  if (!input.resolution) {
-    throw new AppError(
-      "На этот день есть записи. Подтвердите их отмену, чтобы сделать день выходным.",
-      409,
-      "SCHEDULE_DAY_OFF_CONFLICT",
-      {
-        bookings: input.conflicts,
-        nonCancellableCount: 0,
-      }
-    );
-  }
-
-  const requiredIds = new Set(input.conflicts.map((item) => item.id));
-  const providedIds = new Set(input.resolution.bookingIds);
-  if (
-    requiredIds.size !== providedIds.size ||
-    Array.from(requiredIds).some((bookingId) => !providedIds.has(bookingId))
-  ) {
-    throw new AppError(
-      "Список записей для отмены устарел. Обновите день и повторите действие.",
-      409,
-      "SCHEDULE_DAY_OFF_CONFLICT",
-      {
-        bookings: input.conflicts,
-        nonCancellableCount: 0,
-      }
-    );
-  }
-}
-
-/**
- * LOGIC-13: побочные эффекты отмен — ПОСЛЕ коммита общей транзакции.
- * Инвалидация слотов и системное сообщение в чат идут через общий
- * `runCancelBookingSideEffects` (второй реализации быть не должно),
- * уведомление клиенту — здесь, потому что оно специфично для этого пути.
- */
-async function runConflictCancellationSideEffects(input: {
-  effects: CancelBookingSideEffects[];
-  req: Request;
-  /** Кто сохранил расписание: мастер сам или администратор студии за него. */
-  actorUserId: string;
-}): Promise<void> {
-  for (const effects of input.effects) {
-    await runCancelBookingSideEffects(effects);
-    try {
-      const fullBooking = await loadBookingWithRelations(effects.bookingId);
-      if (fullBooking && fullBooking.status === "REJECTED") {
-        await notifyCancelledByMaster(fullBooking, { actorUserId: input.actorUserId });
-        // NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS: выходной мастеру ставит и
-        // администратор студии — тогда мастер узнаёт об отменённых записях.
-        await notifyProviderSideCancelled(fullBooking, {
-          actorUserId: input.actorUserId,
-          kind: "CANCELLED",
-        });
-      }
-    } catch (error) {
-      logError("PATCH /api/cabinet/master/schedule cancel notification failed", {
-        requestId: getRequestId(input.req),
-        route: "PATCH /api/cabinet/master/schedule",
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-    }
-  }
-}
-
-async function resolveTargetProvider(req: Request, userId: string): Promise<ActorContext> {
-  const url = new URL(req.url);
-  const studioId = url.searchParams.get("studioId")?.trim() ?? "";
-  const masterId = url.searchParams.get("masterId")?.trim() ?? "";
-  const profileId = url.searchParams.get("profile")?.trim() ?? "";
-
-  // STUDIO-MASTER-PROFILES (этап 4): свой профиль в студии — расписание
-  // работы в студии; мастер предлагает его изменения заявкой студии.
-  if (profileId && !studioId && !masterId) {
-    const studioProfile = (await listStudioMasterProfiles(userId)).find((item) => item.id === profileId);
-    if (!studioProfile) {
-      throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
-    }
-    return {
-      mode: "STUDIO_MASTER",
-      providerId: studioProfile.id,
-      studioProviderId: studioProfile.studioProviderId,
-    };
-  }
-
-  if (!studioId && !masterId) {
-    const ownProvider = await getCurrentMasterProviderContext(userId);
-    return {
-      mode: ownProvider.studioId ? "STUDIO_MASTER" : "SOLO_MASTER",
-      providerId: ownProvider.id,
-      studioProviderId: ownProvider.studioId,
-    };
-  }
-
-  if (!studioId || !masterId) {
-    throw new AppError("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
-  }
-
-  await ensureStudioRole({
-    studioId,
-    userId,
-    allowed: [StudioRole.OWNER, StudioRole.ADMIN],
-  });
-
-  const studio = await prisma.studio.findUnique({
-    where: { id: studioId },
-    select: { providerId: true },
-  });
-  if (!studio) {
-    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
-  }
-
-  const master = await prisma.provider.findFirst({
-    where: {
-      id: masterId,
-      type: "MASTER",
-      studioId: studio.providerId,
-    },
-    select: { id: true },
-  });
-  if (!master) {
-    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
-  }
-
-  return {
-    mode: "STUDIO_ADMIN",
-    providerId: master.id,
-    studioProviderId: studio.providerId,
-  };
-}
 
 function buildCurrentState(snapshot: ScheduleEditorSnapshot): {
   weekSchedule: DayScheduleDto[];
@@ -499,46 +236,6 @@ async function loadStudioMasterStatus(providerId: string): Promise<{
   };
 }
 
-async function upsertStudioMasterRequest(input: {
-  providerId: string;
-  studioProviderId: string;
-  payload: ReturnType<typeof toScheduleEditorRequestPayload>;
-}): Promise<{ id: string; created: boolean }> {
-  const studio = await prisma.studio.findUnique({
-    where: { providerId: input.studioProviderId },
-    select: { id: true },
-  });
-  if (!studio) {
-    throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
-  }
-
-  const pending = await prisma.scheduleChangeRequest.findFirst({
-    where: { providerId: input.providerId, status: "PENDING" },
-    select: { id: true },
-  });
-
-  if (pending) {
-    await prisma.scheduleChangeRequest.update({
-      where: { id: pending.id },
-      data: {
-        payloadJson: input.payload,
-      },
-    });
-    return { id: pending.id, created: false };
-  }
-
-  const created = await prisma.scheduleChangeRequest.create({
-    data: {
-      studioId: studio.id,
-      providerId: input.providerId,
-      payloadJson: input.payload,
-      status: "PENDING",
-    },
-    select: { id: true },
-  });
-  return { id: created.id, created: true };
-}
-
 async function buildResponse(input: {
   providerId: string;
   mode: ActorMode;
@@ -571,7 +268,7 @@ export async function GET(req: Request) {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
-    const actor = await resolveTargetProvider(req, user.id);
+    const actor = await resolveScheduleActor(req, user.id);
     const data = await buildResponse({
       providerId: actor.providerId,
       mode: actor.mode,
@@ -594,7 +291,7 @@ export async function PATCH(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
-    const actor = await resolveTargetProvider(req, user.id);
+    const actor = await resolveScheduleActor(req, user.id);
 
     const body = (await req.json().catch(() => null)) as PatchBody | null;
     if (!body || typeof body !== "object") {
@@ -619,7 +316,11 @@ export async function PATCH(req: Request) {
     // изменением расписания и порождало пустую заявку.
     if (settingsPatch.visibility) {
       const currentPublished = currentSnapshot.visibility.isPublished;
-      if (actor.mode === "STUDIO_MASTER" && settingsPatch.visibility.isPublished !== currentPublished) {
+      if (
+        actor.mode === "STUDIO_MASTER" &&
+        !actor.studioProfile &&
+        settingsPatch.visibility.isPublished !== currentPublished
+      ) {
         await updateMasterProfile(actor.providerId, { isPublished: settingsPatch.visibility.isPublished });
       }
       if (actor.mode !== "SOLO_MASTER") {
@@ -659,91 +360,80 @@ export async function PATCH(req: Request) {
       return jsonOk(data);
     }
 
-    // Брони, которые день-выходной обязан отменить. Сами отмены — ниже, в той
-    // же транзакции, что и запись расписания (LOGIC-13).
-    let conflictsToCancel: DayOffConflictBooking[] = [];
-    if (actor.mode === "SOLO_MASTER" && body.exception !== undefined) {
-      const normalizedException = normalizeExceptionInput(body.exception);
-      if (!normalizedException.isWorkday) {
-        const conflicts = await listDayOffConflicts({
-          providerId: actor.providerId,
-          dateKey: normalizedException.date,
-          timezone: currentSnapshot.timezone,
-        });
-        if (conflicts.length > 0) {
-          const resolution = parseDayOffConflictResolution(body.dayOffConflictResolution);
-          assertConflictResolution({ conflicts, resolution });
-          conflictsToCancel = conflicts;
-        }
-      }
-    }
-
+    // SCHEDULE-PATTERNS-01 (этап 3, решение владельца 2026-09-28): выходной на
+    // день с записями записи НЕ отменяет — перенос и отмена на совести мастера.
+    // Прежний принудительный шаг «подтвердите отмену записей» (409
+    // `SCHEDULE_DAY_OFF_CONFLICT`, LOGIC-13) снят вместе с отменами внутри
+    // записи расписания: у пути больше нет побочных эффектов на записи.
     if (actor.mode === "STUDIO_MASTER") {
       if (!actor.studioProviderId) {
         throw new AppError("Студия не найдена.", 404, "STUDIO_NOT_FOUND");
       }
-      const requestPayload = toScheduleEditorRequestPayload(nextState);
-      const requestResult = await upsertStudioMasterRequest({
-        providerId: actor.providerId,
-        studioProviderId: actor.studioProviderId,
-        payload: requestPayload,
-      });
-      if (requestResult.created) {
-        try {
-          const createdRequest = await loadScheduleRequestWithRelations(requestResult.id);
-          if (createdRequest) {
-            await notifyScheduleRequestSubmitted(createdRequest);
-          }
-        } catch (error) {
-          logError("PATCH /api/cabinet/master/schedule request notification failed", {
-            requestId: getRequestId(req),
-            route: "PATCH /api/cabinet/master/schedule",
-            stack: error instanceof Error ? error.stack : undefined,
-          });
-        }
+      // SCHEDULE-STUDIO-PROFILE-CALENDAR: правки копятся в открытой заявке —
+      // неделя «Часов» и изменённые «Особые дни» (как правки дней), а не
+      // заменяют её целиком. Правила записи и видимость профиля в студии
+      // заявкой не согласуются (раньше они молча выпадали из тела заявки).
+      const outcomes: ScheduleChangeOutcome[] = [];
+      const route = "PATCH /api/cabinet/master/schedule";
+      if (weekSignature(nextState.weekSchedule) !== weekSignature(currentState.weekSchedule)) {
+        outcomes.push(
+          await submitStudioScheduleChange({
+            req,
+            route,
+            providerId: actor.providerId,
+            studioProviderId: actor.studioProviderId,
+            change: { kind: "week", week: nextState.weekSchedule },
+          }),
+        );
+      }
+      const todayKey = toLocalDateKey(new Date(), currentSnapshot.timezone);
+      const dayGroups = new Map<string, { action: CalendarPaintAction; dates: string[] }>();
+      for (const day of exceptionsToDayChanges(currentState.exceptions, nextState.exceptions, todayKey)) {
+        const key = JSON.stringify(day.action);
+        const group = dayGroups.get(key) ?? { action: day.action, dates: [] };
+        group.dates.push(day.date);
+        dayGroups.set(key, group);
+      }
+      for (const group of dayGroups.values()) {
+        outcomes.push(
+          await submitStudioScheduleChange({
+            req,
+            route,
+            providerId: actor.providerId,
+            studioProviderId: actor.studioProviderId,
+            change: { kind: "days", dates: group.dates, action: group.action },
+          }),
+        );
       }
       const data = await buildResponse({
         providerId: actor.providerId,
         mode: actor.mode,
-        lastAction: requestResult.created ? "REQUEST_CREATED" : "REQUEST_UPDATED",
+        lastAction: outcomes.includes("created")
+          ? "REQUEST_CREATED"
+          : outcomes.some((outcome) => outcome !== "unchanged")
+            ? "REQUEST_UPDATED"
+            : "NO_CHANGES",
       });
       return jsonOk(data);
     }
 
-    // LOGIC-13: отмены конфликтующих броней и запись расписания — ОДНА
-    // транзакция. Раньше отмены шли простым циклом до `applyScheduleSnapshot`,
-    // и любой сбой между ними оставлял состояние, из которого нет выхода:
-    // брони отменены (клиентам ушли уведомления), а день остался рабочим —
-    // отката нет, повтор действия уже не найдёт что отменять.
-    const cancelEffects = await prisma.$transaction(async (tx) => {
-      const effects: CancelBookingSideEffects[] = [];
-      for (const booking of conflictsToCancel) {
-        const result = await cancelBookingInTx(tx, {
-          bookingId: booking.id,
-          cancelledBy: "PROVIDER",
-          reason: "День отмечен выходным в расписании мастера",
-        });
-        effects.push(result.sideEffects);
-      }
+    await prisma.$transaction(
+      (tx) =>
+        applyScheduleSnapshotTx(tx, actor.providerId, {
+          weekSchedule: nextState.weekSchedule,
+          exceptions: nextState.exceptions,
+          slotStepMin: nextState.slotStepMin,
+          bufferBetweenBookingsMin: nextState.bufferBetweenBookingsMin,
+          bookingRules: settingsPatch.bookingRules,
+          visibility: settingsPatch.visibility,
+          hotSlots: settingsPatch.hotSlots,
+        }),
+      SCHEDULE_SNAPSHOT_TX_OPTIONS,
+    );
 
-      await applyScheduleSnapshotTx(tx, actor.providerId, {
-        weekSchedule: nextState.weekSchedule,
-        exceptions: nextState.exceptions,
-        slotStepMin: nextState.slotStepMin,
-        bufferBetweenBookingsMin: nextState.bufferBetweenBookingsMin,
-        bookingRules: settingsPatch.bookingRules,
-        visibility: settingsPatch.visibility,
-        hotSlots: settingsPatch.hotSlots,
-      });
-
-      return effects;
-    }, SCHEDULE_SNAPSHOT_TX_OPTIONS);
-
-    // Побочные эффекты — строго после коммита (то же правило, что внутри
-    // `applyScheduleSnapshot`: до коммита кэш сбрасывать не на что, а откат
-    // оставил бы его вычищенным под старые данные).
+    // Инвалидация — строго после коммита: до него кэш сбрасывать не на что, а
+    // откат оставил бы его вычищенным под старые данные.
     await invalidateSlotsForMaster(actor.providerId);
-    await runConflictCancellationSideEffects({ effects: cancelEffects, req, actorUserId: user.id });
 
     if (actor.mode === "STUDIO_ADMIN" && actor.studioProviderId) {
       try {

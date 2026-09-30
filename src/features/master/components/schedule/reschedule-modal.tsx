@@ -15,9 +15,9 @@ import {
 } from "@/features/booking/components/slot-picker/slot-picker";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
-import type { ApiResponse } from "@/lib/types/api";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 
 const T = UI_TEXT.cabinetMaster.schedule.reschedule;
@@ -179,24 +179,15 @@ export function RescheduleModal({
     if (!open) return;
     let cancelled = false;
     setContextLoading(true);
-    void fetch(`/api/master/bookings/${encodeURIComponent(bookingId)}/reschedule-context`, {
-      cache: "no-store",
-    })
-      .then(async (res) => {
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<RescheduleContext>
-          | null;
-        if (cancelled) return;
-        if (!res.ok || !json || !json.ok) {
-          setContextError(
-            json && !json.ok ? json.error.message : T.contextError,
-          );
-          return;
-        }
-        setContext(json.data);
+    void fetchJsonWithAuth<RescheduleContext>(
+      `/api/master/bookings/${encodeURIComponent(bookingId)}/reschedule-context`,
+      { cache: "no-store" },
+    )
+      .then((data) => {
+        if (!cancelled) setContext(data);
       })
-      .catch(() => {
-        if (!cancelled) setContextError(T.contextError);
+      .catch((error: unknown) => {
+        if (!cancelled) setContextError(serverMessageOr(error, T.contextError));
       })
       .finally(() => {
         if (!cancelled) setContextLoading(false);
@@ -225,22 +216,13 @@ export function RescheduleModal({
     // RESCHEDULE-SELF-SLOT: окно самой брони не занято — иначе сдвиг на
     // полчаса внутри своего же окна был невозможен.
     url.searchParams.set("excludeBookingId", bookingId);
-    void fetch(url.toString(), { cache: "no-store" })
-      .then(async (res) => {
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ slots: ApiSlot[] }>
-          | null;
-        if (cancelled) return;
-        if (!res.ok || !json || !json.ok) {
-          setError(json && !json.ok ? json.error.message : T.slotsError);
-          setSlots([]);
-          return;
-        }
-        setSlots(json.data.slots ?? []);
+    void fetchJsonWithAuth<{ slots: ApiSlot[] }>(url.toString(), { cache: "no-store" })
+      .then((data) => {
+        if (!cancelled) setSlots(data.slots ?? []);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!cancelled) {
-          setError(T.slotsError);
+          setError(serverMessageOr(error, T.slotsError));
           setSlots([]);
         }
       })
@@ -317,9 +299,9 @@ export function RescheduleModal({
         className="max-w-md"
       >
         <div className="space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-200">
+          <div className="rounded-xl border border-warning-border bg-warning-surface p-4 text-sm text-warning-text">
             <p className="font-medium">{T.pendingTitle}</p>
-            <p className="mt-1 text-amber-800/90 dark:text-amber-200/80">
+            <p className="mt-1 text-warning-text">
               {T.pendingBody}
             </p>
           </div>
@@ -340,7 +322,7 @@ export function RescheduleModal({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/reschedule`, {
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${bookingId}/reschedule`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -350,21 +332,15 @@ export function RescheduleModal({
           ...(comment.trim() ? { comment: comment.trim() } : {}),
         }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<unknown>
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        const errorCode = json && !json.ok ? json.error.code : null;
-        const errorMessage = json && !json.ok ? json.error.message : null;
-        if (errorCode === "SLOT_CONFLICT") {
-          throw new Error(T.conflictError);
-        }
-        throw new Error(errorMessage || T.genericError);
-      }
       onClose();
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : T.genericError);
+      // Занятое окошко — своя, более точная строка поверхности; прочее — дословно.
+      setError(
+        err instanceof ApiClientError && err.code === "SLOT_CONFLICT"
+          ? T.conflictError
+          : serverMessageOr(err, T.genericError),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -401,7 +377,7 @@ export function RescheduleModal({
               {T.contextLoading}
             </div>
           ) : contextError ? (
-            <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50/70 p-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+            <div role="alert" className="rounded-xl border border-danger-border bg-danger-surface p-3 text-sm text-danger-text">
               {contextError}
             </div>
           ) : context ? (
@@ -467,7 +443,7 @@ export function RescheduleModal({
         </div>
 
         {error ? (
-          <p role="alert" className="mt-3 text-xs text-red-600">
+          <p role="alert" className="mt-3 text-xs text-danger-text">
             {error}
           </p>
         ) : null}

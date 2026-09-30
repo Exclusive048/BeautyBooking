@@ -4,14 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Crop, Pencil, Trash2 } from "lucide-react";
 import type { MediaEntityType } from "@prisma/client";
 import { MediaEntityType as MediaEntityTypeValue } from "@/lib/prisma-enums";
-import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { assetHasCrop } from "@/lib/media/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CropPicker } from "@/features/media/components/crop-picker";
+import { FileInput } from "@/components/ui/file-input";
 
 type Props = {
   entityType: MediaEntityType;
@@ -78,12 +79,8 @@ export function AvatarEditor({
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(buildListUrl(entityType, entityId), { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.loadFailed);
-      }
-      const nextAssets = json.data.assets;
+      const data = await fetchJsonWithAuth<{ assets: MediaAssetDto[] }>(buildListUrl(entityType, entityId), { cache: "no-store" });
+      const nextAssets = data.assets;
       setAssets(nextAssets);
       if (openCropAfterLoadRef.current) {
         openCropAfterLoadRef.current = false;
@@ -94,7 +91,7 @@ export function AvatarEditor({
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.loadFailed);
+      setError(serverMessageOr(e, t.loadFailed));
     } finally {
       setLoaded(true);
     }
@@ -112,15 +109,11 @@ export function AvatarEditor({
         if (replaceAssetId) form.set("replaceAssetId", replaceAssetId);
         form.set("file", file);
 
-        const res = await fetch("/api/media", { method: "POST", body: form });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : t.uploadFailed);
-        }
+        await fetchJsonWithAuth<{ asset: MediaAssetDto }>("/api/media", { method: "POST", body: form });
         openCropAfterLoadRef.current = true;
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : t.uploadFailed);
+        setError(serverMessageOr(e, t.uploadFailed));
       } finally {
         setBusy(false);
       }
@@ -133,14 +126,10 @@ export function AvatarEditor({
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/media/${activeAsset.id}`, { method: "DELETE" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.deleteFailed);
-      }
+      await fetchJsonWithAuth<{ result: { id: string } }>(`/api/media/${activeAsset.id}`, { method: "DELETE" });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.deleteFailed);
+      setError(serverMessageOr(e, t.deleteFailed));
     } finally {
       setBusy(false);
     }
@@ -304,13 +293,11 @@ export function AvatarEditor({
         </Button>
       ) : null}
 
-      {error ? <div className="text-xs text-red-600">{error}</div> : null}
+      {error ? <div className="text-xs text-danger-text">{error}</div> : null}
 
-      <input
+      <FileInput
         ref={inputRef}
-        type="file"
         accept="image/jpeg,image/png,image/webp"
-        className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) {

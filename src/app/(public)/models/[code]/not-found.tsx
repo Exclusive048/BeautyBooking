@@ -1,7 +1,7 @@
 import { ErrorState } from "@/components/ui/error-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
-const t = UI_TEXT.pages.notFound.modelOffer;
+const t = UI_TEXT.errorPages.notFound.modelOffer;
 
 export default function ModelOfferNotFound() {
   return (
@@ -11,7 +11,7 @@ export default function ModelOfferNotFound() {
       title={t.title}
       description={t.subtitle}
       primaryAction={{ label: t.goOffers, href: "/models" }}
-      secondaryAction={{ label: UI_TEXT.pages.notFound.goHome, href: "/" }}
+      secondaryAction={{ label: UI_TEXT.errorPages.notFound.goHome, href: "/" }}
     />
   );
 }

@@ -2,30 +2,28 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { PublicStats } from "@/lib/stats/public-stats";
 
 const containerVariants = {
   hidden: {},
   visible: {
-    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+    transition: { staggerChildren: STAGGER, delayChildren: 0.05 },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 18 },
+  hidden: { opacity: 0, y: DISTANCE.rise },
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.5,
-      ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
-    },
+    transition: MOTION.section,
   },
 };
 
@@ -43,9 +41,8 @@ export function HeroSection({ stats }: Props) {
   const T = UI_TEXT.homeGuest;
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
-  const item = reduce ? undefined : itemVariants;
+  const container = containerVariants;
+  const item = itemVariants;
 
   const showStats = stats !== null && stats.masters >= STATS_MIN_MASTERS;
   const eyebrowText = stats !== null && stats.masters >= STATS_MIN_MASTERS
@@ -59,7 +56,7 @@ export function HeroSection({ stats }: Props) {
   }
 
   return (
-    <motion.section
+    <m.section
       variants={container}
       initial="hidden"
       animate="visible"
@@ -68,42 +65,42 @@ export function HeroSection({ stats }: Props) {
       {/* Decorative blobs — CSS only, no SVG */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
+        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-decor-primary blur-3xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-primary-magenta/[0.08] blur-3xl dark:bg-primary-magenta/[0.12]"
+        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-decor-magenta blur-3xl"
       />
 
       <div className="relative mx-auto max-w-3xl text-center">
         {/* Eyebrow */}
-        <motion.p
+        <m.p
           variants={item}
           className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text"
         >
           {eyebrowText}
-        </motion.p>
+        </m.p>
 
         {/* Headline with Fraunces italic accent */}
-        <motion.h1
+        <m.h1
           variants={item}
           className="mt-4 text-balance text-[2.25rem] font-bold leading-[1.1] tracking-tight text-text-main sm:text-5xl lg:text-[3.75rem]"
         >
           {T.heroTitle}{" "}
           <em className="font-display font-normal italic text-accent-text">{T.heroTitleAccent}</em>{" "}
           {T.heroTitleAfter}
-        </motion.h1>
+        </m.h1>
 
         {/* Subtitle */}
-        <motion.p
+        <m.p
           variants={item}
           className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-text-sec sm:text-lg"
         >
           {T.heroSubtitle}
-        </motion.p>
+        </m.p>
 
         {/* Search bar */}
-        <motion.form
+        <m.form
           variants={item}
           onSubmit={handleSubmit}
           className="mx-auto mt-8 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center"
@@ -124,10 +121,10 @@ export function HeroSection({ stats }: Props) {
           <Button type="submit" size="lg" className="h-14 px-7 text-base">
             {T.searchCta}
           </Button>
-        </motion.form>
+        </m.form>
 
         {/* Stats — reserve height to avoid CLS */}
-        <motion.div
+        <m.div
           variants={item}
           className="mx-auto mt-8 flex min-h-[3rem] items-center justify-center"
         >
@@ -147,8 +144,8 @@ export function HeroSection({ stats }: Props) {
               </div>
             </div>
           ) : null}
-        </motion.div>
+        </m.div>
       </div>
-    </motion.section>
+    </m.section>
   );
 }

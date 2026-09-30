@@ -7,7 +7,7 @@ import { getQueueStats } from "@/lib/queue/queue";
 import { readWorkerLiveness } from "@/lib/queue/worker-liveness";
 import type { WorkerLiveness } from "@/lib/queue/worker-liveness";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatCount } from "@/features/admin-cabinet/dashboard/server/shared";
 import type {
   AdminHealth,

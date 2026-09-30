@@ -2,8 +2,9 @@
 
 import { PlanTier, SubscriptionStatus } from "@/lib/prisma-enums";
 import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatPlanName } from "@/features/admin-cabinet/users/lib/plan-display";
 import type { AdminUserPlanSnapshot } from "@/features/admin-cabinet/users/types";
 
@@ -11,7 +12,7 @@ const T = UI_TEXT.adminPanel.users.plan;
 
 const TIER_TONE: Record<PlanTier, string> = {
   [PlanTier.FREE]: "bg-bg-input text-text-sec",
-  [PlanTier.PRO]: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
+  [PlanTier.PRO]: "bg-success/[0.12] text-success-text",
   [PlanTier.PREMIUM]: "bg-primary/[0.12] text-accent-text",
 };
 
@@ -33,14 +34,14 @@ export function UserPlanPill({ plan, onClick, disabled }: Props) {
   }
   const isPastDue = plan.status === SubscriptionStatus.PAST_DUE;
   return (
-    <button
-      type="button"
+    <Button
+      variant="wrapper"
       onClick={onClick}
       disabled={disabled}
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors",
         TIER_TONE[plan.tier],
-        isPastDue && "ring-1 ring-inset ring-amber-500/40",
+        isPastDue && "ring-1 ring-inset ring-warning/40",
         "hover:brightness-105 disabled:opacity-60",
       )}
       title={T.change}
@@ -52,11 +53,11 @@ export function UserPlanPill({ plan, onClick, disabled }: Props) {
         </span>
       ) : null}
       {isPastDue ? (
-        <span className="font-mono text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-300">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-warning-text">
           · {T.pastDue}
         </span>
       ) : null}
       <ChevronDown className="h-3 w-3" aria-hidden />
-    </button>
+    </Button>
   );
 }

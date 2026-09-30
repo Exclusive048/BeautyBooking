@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import type { ButtonSize, ButtonVariant } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type LogoutButtonProps = {
   variant?: ButtonVariant;
@@ -28,12 +28,13 @@ export function LogoutButton({ variant, size, className }: LogoutButtonProps) {
             // Full page reload — clears SWR cache, React state, and all client-side data.
             // router.replace() leaves the SWR in-memory cache intact, causing stale user
             // data (phone, name) to remain visible in the navbar until the next revalidation.
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- полная перезагрузка сбрасывает SWR и данные прежнего пользователя
             window.location.href = "/";
           }
         });
       }}
     >
-      {pending ? UI_TEXT.auth.logoutPending : UI_TEXT.auth.logout}
+      {pending ? UI_TEXT.nav.logoutPending : UI_TEXT.nav.logout}
     </Button>
   );
 }

@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminReviewTab,
   AdminReviewsCounts,
 } from "@/features/admin-cabinet/reviews/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.adminPanel.reviews;
 const SEARCH_DEBOUNCE_MS = 200;
@@ -65,39 +65,21 @@ export function ReviewsFilters({ tab, search, counts }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-bg-input/60 p-1">
-        {TABS.map((tabDef) => {
-          const active = tab === tabDef.value;
-          return (
-            <button
-              key={tabDef.value}
-              type="button"
-              onClick={() =>
-                pushParams((params) => {
-                  if (tabDef.value === "flagged") params.delete("tab");
-                  else params.set("tab", tabDef.value);
-                })
-              }
-              className={cn(
-                "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-sm transition-colors",
-                active
-                  ? "bg-bg-card text-text-main shadow-sm"
-                  : "text-text-sec hover:text-text-main",
-              )}
-            >
-              <span>{T.tabs[tabDef.labelKey]}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 font-mono text-[11px] tabular-nums",
-                  active ? "bg-bg-input text-text-main" : "text-text-sec/80",
-                )}
-              >
-                {counts[tabDef.countKey]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.filters.tabsAria}
+        items={TABS.map((tabDef) => ({
+          id: tabDef.value,
+          label: T.tabs[tabDef.labelKey],
+          badge: counts[tabDef.countKey],
+        }))}
+        value={tab}
+        onChange={(id) =>
+          pushParams((params) => {
+            if (id === "flagged") params.delete("tab");
+            else params.set("tab", id);
+          })
+        }
+      />
 
       <div className="relative min-w-[14rem] flex-1">
         <Search

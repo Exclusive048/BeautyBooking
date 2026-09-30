@@ -31,9 +31,9 @@ import {
 } from "@/lib/bookings/action-state";
 import { cn } from "@/lib/cn";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.schedule.bookingCard;
 
@@ -145,19 +145,15 @@ export function BookingCardActionsMenu({
       setBusy(action);
       setError(null);
       try {
-        const res = await fetch(`/api/master/bookings/${bookingId}/status`, {
+        await fetchJsonWithAuth<unknown>(`/api/master/bookings/${bookingId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status, ...(comment ? { comment } : {}) }),
         });
-        const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-        }
         setOpen(false);
         startTransition(() => router.refresh());
       } catch (err) {
-        setError(err instanceof Error ? err.message : T.actionError);
+        setError(serverMessageOr(err, T.actionError));
       } finally {
         setBusy(null);
       }
@@ -198,7 +194,7 @@ export function BookingCardActionsMenu({
       const cancelled = await cancelBooking(bookingId, comment);
       if (cancelled) startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : T.actionError);
+      setError(serverMessageOr(err, T.actionError));
     } finally {
       setBusy(null);
     }
@@ -254,7 +250,7 @@ export function BookingCardActionsMenu({
       <div
         ref={menuRef}
         role="menu"
-        className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
+        className="fixed z-popover w-48 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
         style={{ top: coords.top, left: coords.left }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -310,7 +306,7 @@ export function BookingCardActionsMenu({
           </MenuItem>
         ) : null}
         {error ? (
-          <p className="border-t border-border-subtle px-3 py-2 text-[11px] text-red-600">
+          <p className="border-t border-border-subtle px-3 py-2 text-[11px] text-danger-text">
             {error}
           </p>
         ) : null}
@@ -320,9 +316,8 @@ export function BookingCardActionsMenu({
   return (
     <>
       <div className="absolute right-1 top-1">
-        <button
+        <Button variant="wrapper"
           ref={triggerRef}
-          type="button"
           aria-label={T.actionsAria}
           onClick={(event) => {
             event.stopPropagation();
@@ -332,7 +327,7 @@ export function BookingCardActionsMenu({
           aria-expanded={open}
         >
           <MoreVertical className="h-3.5 w-3.5" aria-hidden />
-        </button>
+        </Button>
       </div>
 
       {mounted && menuContent ? createPortal(menuContent, document.body) : null}
@@ -374,19 +369,18 @@ function MenuItem({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       onClick={onClick}
       disabled={disabled}
       title={title}
       role="menuitem"
       className={cn(
         "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-bg-input/70 disabled:cursor-not-allowed disabled:opacity-60",
-        variant === "danger" ? "text-red-600 dark:text-red-400" : "text-text-main",
+        variant === "danger" ? "text-danger-text" : "text-text-main",
       )}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       <span>{children}</span>
-    </button>
+    </Button>
   );
 }

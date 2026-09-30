@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LegalSection } from "@/features/legal/components/legal-layout";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const TERMS_SECTIONS: ReadonlyArray<LegalSection> = [
   { id: "terms-definitions", title: "Термины и определения" },

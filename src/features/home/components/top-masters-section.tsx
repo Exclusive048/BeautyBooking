@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, Star } from "lucide-react";
+import { HOVER_LIFT, IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { searchCatalog, type CatalogProviderItem } from "@/lib/catalog/catalog.service";
 import { logError } from "@/lib/logging/logger";
 import { providerPublicUrl } from "@/lib/public-urls";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type TopMaster = {
   // QA-103: no internal CUID — key/link off publicUsername.
@@ -61,7 +62,7 @@ function MasterCard({ master }: { master: TopMaster }) {
 
   return (
     <Link href={profileHref} className="group block">
-      <Card className="overflow-hidden border-border-subtle/60 transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-card">
+      <Card className={`overflow-hidden border-border-subtle/60 group-hover:shadow-card ${HOVER_LIFT}`}>
         {/* Cover photo */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
           {master.photo ? (
@@ -69,14 +70,14 @@ function MasterCard({ master }: { master: TopMaster }) {
               src={master.photo}
               alt={master.title}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+              className={`object-cover ${IMAGE_ZOOM}`}
             />
           ) : master.avatarUrl ? (
             <ResilientImage
               src={master.avatarUrl}
               alt={master.title}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+              className={`object-cover ${IMAGE_ZOOM}`}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-text-placeholder">

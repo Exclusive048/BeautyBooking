@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   DEFAULT_STUDIO_SETTINGS_SECTION,
   type StudioSettingsData,

@@ -13,11 +13,11 @@ export function SectionCard({ title, description, children, danger }: Props) {
     <section
       className={cn(
         "rounded-2xl border bg-bg-card p-4 md:p-5",
-        danger ? "border-rose-300/50 dark:border-rose-800/50" : "border-border-subtle",
+        danger ? "border-danger-border" : "border-border-subtle",
       )}
     >
       <header className="mb-3">
-        <h3 className={cn("font-display text-base font-semibold", danger ? "text-rose-700 dark:text-rose-400" : "text-text-main")}>
+        <h3 className={cn("font-display text-base font-semibold", danger ? "text-danger-text" : "text-text-main")}>
           {title}
         </h3>
         {description ? (

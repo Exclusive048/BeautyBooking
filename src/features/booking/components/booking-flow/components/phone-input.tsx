@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatRussianPhone } from "@/features/booking/components/booking-flow/lib/format-phone";
+import { Input } from "@/components/ui/input";
 
 type Props = {
   value: string;
@@ -31,9 +32,9 @@ export function PhoneInput({ value, onChange, required, autoFocus, error }: Prop
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-text-main">
         {T.phoneLabel}
-        {required ? <span className="ml-0.5 text-rose-500">*</span> : null}
+        {required ? <span className="ml-0.5 text-danger-text">*</span> : null}
       </span>
-      <input
+      <Input
         type="tel"
         inputMode="numeric"
         autoComplete="tel"
@@ -45,12 +46,8 @@ export function PhoneInput({ value, onChange, required, autoFocus, error }: Prop
           setDisplay(parsed.display);
           onChange(parsed.digits);
         }}
-        className={cn(
-          "w-full rounded-md border bg-bg-card px-3 py-2.5 font-mono text-sm text-text-main outline-none transition placeholder:text-text-placeholder",
-          error
-            ? "border-rose-500 focus:border-rose-600"
-            : "border-border-subtle focus:border-primary",
-        )}
+        aria-invalid={error ? true : undefined}
+        className={cn("font-mono", error && "border-destructive focus-visible:border-destructive")}
       />
     </label>
   );

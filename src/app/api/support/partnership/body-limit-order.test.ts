@@ -43,13 +43,13 @@ beforeEach(() => {
 
 describe("POST /api/support/partnership — порядок проверок (SEC-16)", () => {
   it("отвечает 429 на исчерпанном лимите, не разбирая тело", async () => {
-    checkRateLimit.mockResolvedValue(false);
+    checkRateLimit.mockResolvedValue({ limited: true, retryAfterSeconds: 60 });
     const res = await POST(makeRequest("{ это не JSON"));
     expect(res.status).toBe(429);
   });
 
   it("отвечает 413 на переборе размера — тело до разбора не доходит", async () => {
-    checkRateLimit.mockResolvedValue(true);
+    checkRateLimit.mockResolvedValue({ limited: false });
     const res = await POST(
       makeRequest("{}", { "content-length": String(MAX_JSON_BODY_BYTES + 1) }),
     );
@@ -57,7 +57,7 @@ describe("POST /api/support/partnership — порядок проверок (SEC
   });
 
   it("в пределах лимита и планки разбирает тело как раньше", async () => {
-    checkRateLimit.mockResolvedValue(true);
+    checkRateLimit.mockResolvedValue({ limited: false });
     const res = await POST(makeRequest("{ это не JSON"));
     expect(res.status).toBe(400);
     expect(checkRateLimit).toHaveBeenCalledTimes(1);

@@ -109,8 +109,9 @@ describe("SEC-03 · toApiRouteTemplate", () => {
     expect(toApiRouteTemplate("/api/master/clients/plus79991000000/detail")).toBe(
       "/api/master/clients/:id/detail",
     );
-    expect(toApiRouteTemplate("/api/provider/schedule/overrides/2026-08-05")).toBe(
-      "/api/provider/schedule/overrides/:id",
+    // Дата в роли значения: сегмента «2026-08-05» в дереве нет.
+    expect(toApiRouteTemplate("/api/studio/schedule/requests/2026-08-05/approve")).toBe(
+      "/api/studio/schedule/requests/:id/approve",
     );
   });
 

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.mastersV2.revokeDialog;
 const E = UI_TEXT.studioCabinet.mastersV2.errors;
@@ -43,21 +44,14 @@ export function RevokeInviteDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/studio/masters/${masterId}?studioId=${encodeURIComponent(studioId)}`,
         { method: "DELETE" },
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.revokeFailed);
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.revokeFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, E.revokeFailed));
     } finally {
       setSubmitting(false);
     }

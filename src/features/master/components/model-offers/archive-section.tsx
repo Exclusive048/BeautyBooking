@@ -1,5 +1,5 @@
 import type { ActiveOfferItem } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { OfferCard } from "./offer-card";
 import { pluralize } from "./lib/format";
 

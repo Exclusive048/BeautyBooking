@@ -3,12 +3,12 @@ import { MasterPageHeader } from "@/features/master/components/master-page-heade
 import { getSessionUser } from "@/lib/auth/session";
 import { getMasterModelOffersView } from "@/lib/master/model-offers-view.service";
 import { prisma } from "@/lib/prisma";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ActiveOffersSection } from "./active-offers-section";
 import { ArchiveSection } from "./archive-section";
 import { OffersKpiCards } from "./offers-kpi-cards";
 import { PendingApplicationsSection } from "./pending-applications-section";
-import { personalMasterProviderWhere } from "@/lib/master/access";
+import { getMasterWorkProfiles, personalMasterProviderWhere } from "@/lib/master/access";
 
 const T = UI_TEXT.cabinetMaster;
 
@@ -56,6 +56,9 @@ export async function MasterModelOffersPage({ searchParams }: Props) {
 
   const data = await getMasterModelOffersView({
     masterProviderId: provider.id,
+    // STUDIO-MASTER-PROFILES (этап 4): офферы — и личные, и перенесённые на
+    // профиль в студии (студийные); новые создаются из личных услуг.
+    offerMasterIds: (await getMasterWorkProfiles(user.id)).allIds,
     filterOfferId,
     now,
   });

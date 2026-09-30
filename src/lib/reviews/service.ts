@@ -14,6 +14,7 @@ import { targetReviewsWhere } from "@/lib/reviews/review-scope";
 import {
   REVIEW_PRIVATE_TAGS_MAX,
   REVIEW_PUBLIC_TAGS_MAX,
+  REVIEW_WINDOW_DAYS,
 } from "@/lib/reviews/constants";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { toReviewDto, type ReviewDto, type ReviewTagDto } from "@/lib/reviews/types";
@@ -566,6 +567,46 @@ export async function getReviewAvailabilityForBooking(input: {
     nowUtc: input.nowUtc ?? new Date(),
   });
   return { canLeave, reviewId: null, canDelete: false };
+}
+
+/**
+ * Запись клиента у провайдера, на которую сейчас можно оставить отзыв (самая
+ * свежая), либо null — для кнопки «Оставить отзыв» на публичной странице
+ * мастера и студии. Одним запросом: раньше секция отзывов по HTTP брала ВСЕ
+ * записи клиента (`/api/me/bookings`) и опрашивала `/api/reviews/can-leave` по
+ * одной (29.09 доработки · 00-12). Правило окна — то же `canLeaveReview`.
+ */
+export async function findReviewableBookingId(input: {
+  currentUserId: string;
+  providerId: string;
+  nowUtc?: Date;
+}): Promise<string | null> {
+  const nowUtc = input.nowUtc ?? new Date();
+  // Окно отзыва — REVIEW_WINDOW_DAYS после конца визита; двое суток запаса
+  // покрывают длительность услуги и `REVIEW_GRACE_MINUTES`.
+  const earliestStart = new Date(nowUtc.getTime() - (REVIEW_WINDOW_DAYS + 2) * 24 * 60 * 60 * 1000);
+  const candidates = await prisma.booking.findMany({
+    where: {
+      clientUserId: input.currentUserId,
+      providerId: input.providerId,
+      review: { is: null },
+      startAtUtc: { gte: earliestStart, lte: nowUtc },
+    },
+    select: {
+      id: true,
+      clientUserId: true,
+      status: true,
+      startAtUtc: true,
+      endAtUtc: true,
+      service: { select: { durationMin: true } },
+    },
+    orderBy: { startAtUtc: "desc" },
+    take: 20,
+  });
+  const reviewable = candidates.find((booking) =>
+    canLeaveReview({ booking, currentUserId: input.currentUserId, nowUtc }),
+  );
+  return reviewable?.id ?? null;
 }
 
 export async function canLeaveReviewForBooking(input: {

@@ -1,4 +1,5 @@
-import { BookingStatus, BookingSource, type Prisma } from "@prisma/client";
+import { BookingStatus, BookingSource, PdAccessActorType, type Prisma } from "@prisma/client";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import type { MasterWorkProfiles } from "@/lib/master/access";
 import {
   BOOKING_WORK_CONTEXT_SELECT,
@@ -353,6 +354,12 @@ async function loadAggregates(
 
 export async function getMasterClientsView(input: {
   providerId: string;
+  /**
+   * Кто читает — для следа массового чтения ПДн (`PdAccessLog`, RKN-FIX-10):
+   * страница «Клиенты» и есть та поверхность, ради которой он заведён.
+   */
+  actorUserId: string;
+  actorIp: string | null;
   /** STUDIO-MASTER-PROFILES (этап 4): все рабочие профили мастера. */
   workProfiles?: MasterWorkProfiles;
   timezone: string;
@@ -452,6 +459,20 @@ export async function getMasterClientsView(input: {
 
   const filtered = applySearchFilter(applyTabFilter(enriched, input.activeTab), input.search);
   filtered.sort((left, right) => compareClients(left, right, input.sort));
+
+  await recordPdAccess({
+    surface: "master.clients.list",
+    actorType: PdAccessActorType.MASTER,
+    actorUserId: input.actorUserId,
+    entityType: "ClientCard",
+    rowCount: filtered.length,
+    filterFingerprint: buildFilterFingerprint({
+      tab: input.activeTab !== "all",
+      q: Boolean(input.search),
+    }),
+    scopeProviderId: input.providerId,
+    ipAddress: input.actorIp,
+  });
 
   return {
     kpi: {

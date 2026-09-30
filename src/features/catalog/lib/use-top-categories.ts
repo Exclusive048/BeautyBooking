@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson } from "@/lib/http/client";
 
 export type CatalogCategory = {
   id: string;
@@ -24,14 +24,8 @@ let categoriesPromise: Promise<CatalogCategory[]> | null = null;
 
 function loadCategories(): Promise<CatalogCategory[]> {
   if (categoriesPromise) return categoriesPromise;
-  categoriesPromise = fetch("/api/catalog/global-categories?status=APPROVED")
-    .then(async (res) => {
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ categories: CatalogCategory[] }>
-        | null;
-      if (!res.ok || !json || !json.ok) throw new Error("categories");
-      return json.data.categories.filter((category) => category.parentId === null);
-    })
+  categoriesPromise = fetchJson<{ categories: CatalogCategory[] }>("/api/catalog/global-categories?status=APPROVED")
+    .then((data) => data.categories.filter((category) => category.parentId === null))
     .catch(() => {
       categoriesPromise = null;
       return [];

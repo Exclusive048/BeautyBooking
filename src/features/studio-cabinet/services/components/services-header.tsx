@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioCategoryPickerOption } from "../lib/types";
 import { AddServiceDialog } from "./add-service-dialog";
 
@@ -37,7 +37,7 @@ export function ServicesHeader({
           </h1>
           <p className="mt-1 max-w-xl text-sm text-text-sec">{T.subtitle}</p>
         </div>
-        <Button variant="primary" onClick={() => setOpen(true)}>
+        <Button variant="primary" onClick={() => setOpen(true)} data-guide="services">
           <Plus className="h-4 w-4" aria-hidden />
           {T.addService}
         </Button>

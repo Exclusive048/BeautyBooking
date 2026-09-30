@@ -16,13 +16,16 @@
 // fail-closed, а их в проекте ТРИ (§10 снапшота).
 //
 // @probe (GUARD-INTEGRITY): внесение `rl:visual-search:by-photo:` в
-// `SENSITIVE_KEY_PREFIXES` роняет первый тест; наблюдавшийся текст падения — в
-// отчёте FIX-B16 § Пробы.
+// `SENSITIVE_KEY_PREFIXES` роняло первый тест (отчёт FIX-B16 § Пробы). С 29.09
+// доработки · 15 чувствительность — только по шаблону пути: та же проба теперь —
+// `/api/search` в `SENSITIVE_ROUTE_PREFIXES`.
 
 import { describe, expect, it } from "vitest";
 import { checkRateLimit, isSensitiveRouteKey } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 
-const BY_PHOTO_KEY = "rl:visual-search:by-photo:203.0.113.7";
+// Ключ строит тот же конструктор, что роут (29.09 доработки · 15): шаблон пути — из запроса.
+const BY_PHOTO_KEY = routeRateLimitKey(new Request("http://x/api/search/by-photo", { method: "POST" }), "ip", "203.0.113.7");
 const BY_PHOTO_PROXY_KEY = "rl:publicApi:203.0.113.7:POST:/api/search/by-photo";
 
 describe("SEC-04 — частотный лимит by-photo деградирует, а не закрывается", () => {
@@ -50,6 +53,8 @@ describe("SEC-04 — частотный лимит by-photo деградируе
   it("контроль машинерии: тот же предикат ПРИЗНАЁТ заведомо чувствительный ключ", () => {
     // Иначе оба утверждения выше зеленели бы на предикате, который всегда false.
     expect(isSensitiveRouteKey("rl:publicApi:203.0.113.7:POST:/api/bookings")).toBe(true);
-    expect(isSensitiveRouteKey("rate:createBooking:user-1")).toBe(true);
+    expect(
+      isSensitiveRouteKey(routeRateLimitKey(new Request("http://x/api/bookings", { method: "POST" }), "user", "user-1")),
+    ).toBe(true);
   });
 });

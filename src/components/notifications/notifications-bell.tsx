@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
-import type { ApiResponse } from "@/lib/types/api";
 import type { NotificationEvent } from "@/lib/notifications/types";
 import {
   getNotificationPresentation,
@@ -14,8 +14,9 @@ import {
 } from "@/lib/notifications/presentation";
 import { useNotificationsBell } from "@/features/notifications/hooks/use-notifications-bell";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth } from "@/lib/http/client";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 
 type Props = {
   ariaLabel: string;
@@ -61,6 +62,8 @@ function resolveChatHref(payload: { bookingId: string; senderType?: "CLIENT" | "
 export function NotificationsBell({ ariaLabel }: Props) {
   const router = useRouter();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  // Портал всплывающих уведомлений — только на клиенте.
+  const hydrated = useIsHydrated();
   const viewerTimeZone = useViewerTimeZoneContext();
   const timersRef = useRef<Map<string, number>>(new Map());
   const seenToastIdsRef = useRef<Map<string, number>>(new Map());
@@ -109,9 +112,9 @@ export function NotificationsBell({ ariaLabel }: Props) {
 
   const markRead = async (notificationId: string) => {
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, { method: "POST" });
+      await fetchJsonWithAuth<unknown>(`/api/notifications/${notificationId}/read`, { method: "POST" });
     } catch {
-      // ignore
+      // Фон: пометка «прочитано» при открытии — отказ не мешает перейти.
     } finally {
       refresh();
     }
@@ -121,11 +124,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
     const booking = parseBookingPayload(payload);
     if (!booking) return;
     try {
-      const res = await fetch(`/api/bookings/${booking.bookingId}/confirm`, { method: "POST" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${booking.bookingId}/confirm`, { method: "POST" });
       await markRead(notificationId);
     } catch {
       // ignore
@@ -136,15 +135,11 @@ export function NotificationsBell({ ariaLabel }: Props) {
     const booking = parseBookingPayload(payload);
     if (!booking) return;
     try {
-      const res = await fetch(`/api/bookings/${booking.bookingId}/cancel`, {
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${booking.bookingId}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: UI_TEXT.notifications.declineReason }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       await markRead(notificationId);
     } catch {
       // ignore
@@ -168,13 +163,16 @@ export function NotificationsBell({ ariaLabel }: Props) {
         >
           <span aria-hidden>🔔</span>
           {hasUnread ? (
-            <span className="absolute -right-1 -top-1 inline-flex h-3 w-3 rounded-full bg-red-500" />
+            <span className="absolute -right-1 -top-1 inline-flex h-3 w-3 rounded-full bg-destructive" />
           ) : null}
         </Link>
       </Button>
 
-      {toasts.length > 0 ? (
-        <div className="fixed right-4 top-4 z-50 flex w-[min(360px,90vw)] flex-col gap-3">
+      {/* 29.09 доработки · 21: всплывающие уведомления — порталом в `body`
+          на слое `z-toast`. Внутри шапки (`sticky` + `backdrop-blur`) `fixed`
+          отсчитывался от шапки, а не от экрана, и уходил под затемнение окна. */}
+      {hydrated && toasts.length > 0 ? createPortal(
+        <div className="fixed right-4 top-4 z-toast flex w-[min(360px,90vw)] flex-col gap-3">
           {toasts.map((toast) => {
             const booking = parseBookingPayload(toast.payloadJson);
             const chatPayload =
@@ -220,7 +218,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
                 {toast.type !== "CHAT_MESSAGE_RECEIVED" && openHref ? (
                   <div className="mt-3">
                     <Button asChild size="sm" variant="secondary">
-                      <Link href={openHref}>{UI_TEXT.notificationsCenter.openAction}</Link>
+                      <Link href={openHref}>{UI_TEXT.notifications.openAction}</Link>
                     </Button>
                   </div>
                 ) : null}
@@ -230,7 +228,8 @@ export function NotificationsBell({ ariaLabel }: Props) {
               </div>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

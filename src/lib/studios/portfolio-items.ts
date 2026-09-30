@@ -57,18 +57,26 @@ export async function syncStudioPortfolioItemsSafe(studioProviderId: string): Pr
 }
 
 /**
- * «Заменить фото» создаёт НОВЫЙ `MediaAsset` и удаляет старый. Подпись
- * (исполнитель, услуга) и дата работы переезжают на новое фото, а не теряются.
+ * «Заменить фото» создаёт НОВЫЙ `MediaAsset` и удаляет старый. Строка работы
+ * (у студии — подпись «мастер · услуга», у мастера — услуги, теги, порядок,
+ * видимость) переезжает на новое фото, а не теряется. Владелец работы —
+ * `PortfolioItem.masterId`: Provider студии либо мастера (29.09 · 01-в — раньше
+ * только студия, и у мастера замены не было вовсе).
+ *
+ * Ссылка на фото — по id файла (`contains`, как в `media/service.ts`
+ * `isPortfolioAssetPublic`): id — cuid, чужую строку не заденет, а старые
+ * строки с абсолютной ссылкой тоже переедут.
  */
-export async function carryStudioPortfolioItem(
-  studioProviderId: string,
+export async function carryPortfolioItem(
+  ownerProviderId: string,
   fromAssetId: string,
   toAssetId: string,
-): Promise<void> {
-  await prisma.portfolioItem.updateMany({
-    where: { masterId: studioProviderId, mediaUrl: buildMediaFileUrl(fromAssetId) },
+): Promise<number> {
+  const { count } = await prisma.portfolioItem.updateMany({
+    where: { masterId: ownerProviderId, mediaUrl: { contains: fromAssetId } },
     data: { mediaUrl: buildMediaFileUrl(toAssetId) },
   });
+  return count;
 }
 
 export type StudioPortfolioAttributionItem = {

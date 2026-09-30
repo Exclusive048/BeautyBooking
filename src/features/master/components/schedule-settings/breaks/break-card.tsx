@@ -2,8 +2,9 @@
 
 import { Minus, X } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatDaysOfWeek, type RecurringBreakGroup } from "../lib/format-helpers";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.breaks.recurring;
 
@@ -38,14 +39,13 @@ export function BreakCard({ group, onDelete }: Props) {
       <span className="shrink-0 font-mono text-xs tabular-nums text-text-sec">
         {group.startLocal}–{group.endLocal}
       </span>
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={() => void handleClick()}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-rose-600"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-danger-text"
         aria-label={T.deleteAria}
       >
         <X className="h-4 w-4" aria-hidden />
-      </button>
+      </Button>
       {modal}
     </div>
   );

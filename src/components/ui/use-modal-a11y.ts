@@ -203,6 +203,39 @@ export function useBodyScrollLock(active: boolean, mediaQuery?: string): void {
 }
 
 /**
+ * 29.09 доработки · 01-б — пока открыт хотя бы один модальный слой, на `<html>`
+ * стоит `data-overlay-open`: нижняя навигация (`BottomTabBar`) по нему прячется.
+ * Жалоба «панель яркая поверх затемнения» в Chromium не воспроизводилась, но
+ * скрытие снимает её при любой причине (WebKit/PWA, размытие панели) и заодно
+ * убирает панель из касаний и из дерева доступности, пока окно открыто.
+ *
+ * Счётчик, а не флаг: слои вкладываются (окно поверх листа «Ещё»), и закрытие
+ * внутреннего не должно возвращать панель, пока открыт внешний. Снятие — в
+ * cleanup эффекта, поэтому размонтирование без закрытия счётчик не «залипает».
+ */
+const overlayCounts = new WeakMap<HTMLElement, number>();
+
+export function markOverlayOpen(root: HTMLElement): () => void {
+  overlayCounts.set(root, (overlayCounts.get(root) ?? 0) + 1);
+  root.dataset.overlayOpen = "";
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const next = Math.max(0, (overlayCounts.get(root) ?? 1) - 1);
+    overlayCounts.set(root, next);
+    if (next === 0) delete root.dataset.overlayOpen;
+  };
+}
+
+function useOverlayOpenMarker(open: boolean): void {
+  useEffect(() => {
+    if (!open) return;
+    return markOverlayOpen(document.documentElement);
+  }, [open]);
+}
+
+/**
  * UI-13 — весь контракт модального оверлея одним вызовом.
  *
  * Три focus-хука выше существовали и раньше, но контракт ими не
@@ -233,6 +266,7 @@ export function useOverlayA11y({
   initialFocusRef?: RefObject<HTMLElement | null>;
 }): void {
   useBodyScrollLock(open);
+  useOverlayOpenMarker(open);
   useEffect(() => {
     if (!open) return;
     const handleKey = (event: KeyboardEvent) => {

@@ -1,5 +1,5 @@
 "use client";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Building2, ChevronRight, MapPin, Share2, Star } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -15,7 +15,8 @@ import type {
   MasterPublicProfileView,
 } from "@/lib/master/public-profile-view.service";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   view: MasterPublicProfileView;
@@ -56,7 +57,6 @@ function formatExperience(months: number | null): string | null {
 export function HeroBlock({ view, isAuthenticated = false, initialFavorited = false }: Props) {
   const { provider, planTier, experienceMonths, availability, studio } = view;
   const [shareMessage, setShareMessage] = useState<string | null>(null);
-  const reduce = useReducedMotion();
   const isPremium = planTier === "PREMIUM";
   const mapsHref = buildYandexMapsUrl({
     address: provider.address,
@@ -102,10 +102,10 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
         </nav>
 
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
-          <motion.div
-            initial={reduce ? false : { opacity: 0, scale: 0.92 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          <m.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={MOTION.section}
             className="shrink-0"
           >
             <PremiumRing active={isPremium}>
@@ -124,23 +124,23 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 </div>
               )}
             </PremiumRing>
-          </motion.div>
+          </m.div>
 
           <div className="min-w-0 flex-1">
-            <motion.h1
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              transition={reduce ? { duration: 0 } : { duration: 0.35, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            <m.h1
+              initial={{ opacity: 0, y: DISTANCE.nudge }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...MOTION.section, delay: 0.08 }}
               className="font-display text-3xl leading-tight text-text-main md:text-[40px]"
             >
               {provider.name}
-            </motion.h1>
+            </m.h1>
 
             {(provider.tagline || experienceLabel) && (
-              <motion.div
-                initial={reduce ? false : { opacity: 0, y: 6 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+              <m.div
+                initial={{ opacity: 0, y: DISTANCE.nudge }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...MOTION.base, delay: 0.16 }}
                 className="mt-2 flex flex-wrap items-center gap-x-2 text-base text-text-sec"
               >
                 {provider.tagline ? <span>{provider.tagline}</span> : null}
@@ -150,17 +150,17 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                   </span>
                 ) : null}
                 {experienceLabel ? <span>{experienceLabel}</span> : null}
-              </motion.div>
+              </m.div>
             )}
 
             {/* QA-115 (FIX-06): studio affiliation — links to the studio's public
                 profile via its public username (never an internal id); plain text
                 when the studio isn't publicly linkable. */}
             {studio ? (
-              <motion.div
-                initial={reduce ? false : { opacity: 0, y: 6 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.19, ease: [0.22, 1, 0.36, 1] }}
+              <m.div
+                initial={{ opacity: 0, y: DISTANCE.nudge }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...MOTION.base, delay: 0.19 }}
                 className="mt-3"
               >
                 {studio.publicUsername ? (
@@ -177,18 +177,18 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                     <span>{T.studioAffiliationTemplate.replace("{name}", studio.name)}</span>
                   </span>
                 )}
-              </motion.div>
+              </m.div>
             ) : null}
 
-            <motion.div
-              initial={reduce ? false : { opacity: 0, y: 6 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            <m.div
+              initial={{ opacity: 0, y: DISTANCE.nudge }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...MOTION.base, delay: 0.22 }}
               className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
             >
               <span className="inline-flex items-center gap-1.5 text-text-main">
                 <Star
-                  className="h-4 w-4 fill-amber-500 text-amber-500"
+                  className="h-4 w-4 fill-rating text-rating"
                   aria-hidden
                   strokeWidth={1.5}
                 />
@@ -212,13 +212,13 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 hint={availability}
                 timezone={provider.timezone}
               />
-            </motion.div>
+            </m.div>
 
             {provider.categories.length > 0 ? (
-              <motion.div
-                initial={reduce ? false : { opacity: 0 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-                transition={reduce ? { duration: 0 } : { duration: 0.3, delay: 0.3 }}
+              <m.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ ...MOTION.base, delay: 0.3 }}
                 className="mt-4 flex flex-wrap gap-1.5"
               >
                 {provider.categories.slice(0, 6).map((category) => (
@@ -229,7 +229,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                     {category}
                   </span>
                 ))}
-              </motion.div>
+              </m.div>
             ) : null}
 
             {/* FEAT-PROVIDER-SOCIALS: VK / Instagram community icons (shown only

@@ -8,6 +8,7 @@ import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { parseBody } from "@/lib/validation";
 
@@ -23,7 +24,7 @@ export async function PATCH(req: Request) {
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
     const rateLimit = await checkRateLimit(
-      `rl:/api/master/settings/auto-publish-stories:user:${user.id}`,
+      routeRateLimitKey(req, "user", user.id),
       RATE_LIMITS.cabinetMutation,
     );
     if (rateLimit.limited) {

@@ -6,15 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteCabinetModal } from "@/components/deletion/DeleteCabinetModal";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.account;
-
-type ErrorPayload = {
-  ok: false;
-  error: { message: string; code?: string; details?: unknown };
-};
 
 /**
  * Необратимое действие кабинета мастера — удаление КАБИНЕТА, а не аккаунта.
@@ -46,28 +41,19 @@ export function DangerZoneCard() {
     setError(null);
     setActiveBookingsCount(null);
     try {
-      const response = await fetch("/api/cabinet/master/delete", { method: "DELETE" });
-      const json = (await response.json().catch(() => null)) as
-        | ApiResponse<{ deleted: boolean }>
-        | ErrorPayload
-        | null;
-      if (!response.ok || !json || !json.ok) {
-        const failure = json && !json.ok ? json.error : null;
-        if (failure?.code === "ACTIVE_BOOKINGS") {
-          const details = failure.details as { count?: number } | undefined;
-          setActiveBookingsCount(typeof details?.count === "number" ? details.count : 0);
-        } else {
-          // Серверная строка курируемая (например, «Слишком часто…») и говорит
-          // больше канона; своя — только когда тела нет.
-          setError(failure?.message || UI_TEXT.cabinetRolesPage.deleteFailed);
-        }
-        return;
-      }
+      await fetchJsonWithAuth<{ deleted: boolean }>("/api/cabinet/master/delete", { method: "DELETE" });
       setOpen(false);
       router.push("/cabinet/roles");
       router.refresh();
-    } catch {
-      setError(UI_TEXT.cabinetRolesPage.deleteFailed);
+    } catch (error) {
+      if (error instanceof ApiClientError && error.code === "ACTIVE_BOOKINGS") {
+        const details = error.details as { count?: number } | undefined;
+        setActiveBookingsCount(typeof details?.count === "number" ? details.count : 0);
+      } else {
+        // Серверная строка курируемая (например, «Слишком часто…») и говорит
+        // больше канона; своя — только когда тела нет.
+        setError(serverMessageOr(error, UI_TEXT.cabinetRolesPage.deleteFailed));
+      }
     } finally {
       setLoading(false);
     }
@@ -75,24 +61,25 @@ export function DangerZoneCard() {
 
   return (
     <>
-      <section className="rounded-2xl border border-rose-200 bg-rose-50/40 p-5 dark:border-rose-900/40 dark:bg-rose-950/20">
+      <section className="rounded-2xl border border-danger-border bg-danger-surface p-5">
         <header className="mb-3 flex items-center gap-2">
           <AlertTriangle
-            className="h-4 w-4 text-rose-700 dark:text-rose-300"
+            className="h-4 w-4 text-danger-text"
             aria-hidden
           />
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700 dark:text-rose-300">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-danger-text">
             {T.dangerZoneHeading}
           </p>
         </header>
         <h3 className="font-display text-base text-text-main">{T.dangerZoneTitle}</h3>
         <p className="mt-2 text-sm leading-relaxed text-text-sec">{T.dangerZoneBody}</p>
         <div className="mt-4">
+          {/* `wrapper`, а не `ghost`: цвет текста варианта перебивал красный. */}
           <Button
-            variant="ghost"
-            size="sm"
+            variant="wrapper"
+            size="none"
             onClick={openModal}
-            className="gap-1.5 border border-rose-200 text-rose-700 hover:bg-rose-100/60 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/40"
+            className="inline-flex h-9 items-center justify-center rounded-2xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface gap-1.5 border border-danger-border"
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
             {T.dangerZoneCta}

@@ -70,6 +70,23 @@ function mergeIntervals(intervals: BlockInterval[]): BlockInterval[] {
   return merged;
 }
 
+/** Начала окошек по сетке шага внутри рабочего отрезка (обычный день). */
+function buildGridStarts(input: {
+  windowStart: number;
+  windowEnd: number;
+  stepMin: number;
+  earliest: number;
+  durationMin: number;
+}): number[] {
+  const start = Math.max(roundUpToStep(input.windowStart, input.stepMin), input.earliest);
+  const end = roundDownToStep(input.windowEnd, input.stepMin);
+  const starts: number[] = [];
+  for (let t = start; t + input.durationMin <= end; t += input.stepMin) {
+    starts.push(t);
+  }
+  return starts;
+}
+
 export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
   if (!input.dayPlan.isWorking) return [];
   if (input.dayPlan.workingIntervals.length === 0) return [];
@@ -124,21 +141,40 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
       )
     : null;
 
+  // SCHEDULE-PATTERNS-01 (этап 1): у дня «Фиксированное время» кандидаты —
+  // ровно выбранные мастером начала, а не сетка шага. Раньше движок строил
+  // сетку по дню 00:00–23:55 и выбранные времена отсекал только фильтр
+  // `bookable-window.ts`: время не по сетке (10:15 при шаге 30) не предлагалось
+  // никогда, а ядро записи и остальные потребители видели всю сетку.
+  const fixedStarts = input.dayPlan.fixedStarts
+    ? input.dayPlan.fixedStarts
+        .map((value) => timeToMinutes(value))
+        .filter((value): value is number => value !== null)
+        .sort((a, b) => a - b)
+    : null;
+
   for (const interval of input.dayPlan.workingIntervals) {
     const windowStart = timeToMinutes(interval.start);
     const windowEnd = timeToMinutes(interval.end);
     if (windowStart === null || windowEnd === null || windowStart >= windowEnd) continue;
 
-    let start = roundUpToStep(windowStart, stepMin);
-    const end = roundDownToStep(windowEnd, stepMin);
-
     if (input.dateKey < nowLocalKey) continue;
-    if (input.dateKey === nowLocalKey) {
-      start = Math.max(start, roundUpToStep(nowMinutes, stepMin));
-    }
+    const earliest = input.dateKey === nowLocalKey ? nowMinutes : 0;
+
+    const candidates = fixedStarts
+      ? fixedStarts.filter(
+          (t) => t >= windowStart && t >= earliest && t + input.serviceDurationMin <= windowEnd,
+        )
+      : buildGridStarts({
+          windowStart,
+          windowEnd,
+          stepMin,
+          earliest: input.dateKey === nowLocalKey ? roundUpToStep(nowMinutes, stepMin) : 0,
+          durationMin: input.serviceDurationMin,
+        });
 
     let bookingCursor = 0;
-    for (let t = start; t + input.serviceDurationMin <= end; t += stepMin) {
+    for (const t of candidates) {
       const blocked = blockIntervals.some((b) => t < b.end && t + input.serviceDurationMin > b.start);
       if (blocked) continue;
 

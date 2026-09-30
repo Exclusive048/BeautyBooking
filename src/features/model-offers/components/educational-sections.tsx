@@ -1,6 +1,6 @@
 import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.models;
 

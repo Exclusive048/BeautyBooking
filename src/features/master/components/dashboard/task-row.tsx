@@ -23,7 +23,7 @@ type Props = {
 export function TaskRow({ icon: Icon, title, description, cta, urgency, focusId }: Props) {
   const iconColor =
     urgency === "high"
-      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+      ? "bg-warning/10 text-warning-text"
       : "bg-primary/10 text-accent-text";
 
   return (

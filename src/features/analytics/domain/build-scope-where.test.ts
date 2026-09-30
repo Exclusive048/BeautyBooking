@@ -30,9 +30,9 @@ describe("buildScopeWhere — HARDENING-05 tenant scope", () => {
     expect(where.OR?.some((clause) => Object.keys(clause).length === 0)).toBe(false);
   });
 
-  it("STUDIO scope (studioId set, no master filter) → byte-identical to pre-fix OR", () => {
+  it("STUDIO scope (studioId set, no master filter) → записи поверхности студии (studioId, 29.09 · 08)", () => {
     const where = buildScopeWhere(ctx({ scope: "STUDIO", studioId: "studio-1", providerId: "prov-1" }));
-    expect(where).toEqual({ OR: [{ studioId: "studio-1" }, { providerId: "prov-1" }] });
+    expect(where).toEqual({ studioId: "studio-1" });
   });
 
   it("STUDIO scope + masterFilterId → studio scope AND the chosen master (preserved)", () => {
@@ -41,7 +41,7 @@ describe("buildScopeWhere — HARDENING-05 tenant scope", () => {
     );
     expect(where).toEqual({
       AND: [
-        { OR: [{ studioId: "studio-1" }, { providerId: "prov-1" }] },
+        { studioId: "studio-1" },
         { masterProviderId: "m-7" },
       ],
     });

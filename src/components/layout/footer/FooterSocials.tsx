@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import { PRESS } from "@/components/ui/motion-classes";
 import { VkIcon } from "@/components/ui/vk-icon";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { env, isTelegramEnabled } from "@/lib/env";
 
 type SocialLink = {
@@ -51,7 +52,7 @@ export function FooterSocials() {
           aria-label={social.label}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle/80 bg-bg-input text-text-sec transition-all duration-200 hover:scale-105 hover:border-primary/40 hover:bg-bg-card hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border-subtle/80 bg-bg-input text-text-sec transition-all duration-200 hover:border-primary/40 hover:bg-bg-card hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${PRESS}`}
         >
           {social.icon}
         </a>

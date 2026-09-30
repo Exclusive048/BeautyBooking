@@ -1,4 +1,5 @@
 import type { Provider, Service } from "@prisma/client";
+import { publicBookingHorizonDays } from "@/lib/bookings/policy-enforcement";
 import type { ProviderCardDto, ProviderProfileDto, ProviderServiceDto } from "@/lib/providers/dto";
 
 type ProviderProfileSource = Pick<
@@ -23,6 +24,8 @@ type ProviderProfileSource = Pick<
   | "socialVk"
   | "socialInstagram"
   | "cancellationDeadlineHours"
+  | "maxBookingDaysAhead"
+  | "visibleSlotDays"
   | "geoLat"
   | "geoLng"
 > & { services: ProviderServiceSource[] };
@@ -44,7 +47,7 @@ type ProviderCardSource = Pick<
 type ProviderServiceSource = Pick<Service, "id" | "name" | "durationMin" | "price"> & {
   // FIX-R2-04-C: canonical attached category = Service.globalCategory (label +
   // orderIndex). Optional — the public booking surfaces (getProviderProfile)
-  // select it for grouping; cabinet/internal callers (e.g. /api/providers/me)
+  // select it for grouping; cabinet/internal callers
   // omit it and simply get `categoryName: null` (no grouping needed there).
   globalCategory?: { name: string; orderIndex: number } | null;
 };
@@ -102,6 +105,10 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     socialVk: provider.socialVk ?? null,
     socialInstagram: provider.socialInstagram ?? null,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
+    bookingHorizonDays: publicBookingHorizonDays({
+      maxBookingDaysAhead: provider.maxBookingDaysAhead,
+      visibleSlotDays: provider.type === "STUDIO" ? null : provider.visibleSlotDays,
+    }),
     hotSlotsEnabled: false,
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,

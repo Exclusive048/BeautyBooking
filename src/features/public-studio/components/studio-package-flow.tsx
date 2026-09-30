@@ -25,12 +25,10 @@ import {
   type StudioPlacedComponent,
 } from "@/lib/bookings/package-cursor";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJson, readApiResponse, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
-import {
-  fetchRetryingDuplicates,
-  isDuplicateRequestResponse,
-} from "@/lib/http/idempotent-retry";
+import { fetchRetryingDuplicates } from "@/lib/http/idempotent-retry";
 
 const T = UI_TEXT.publicStudio.packageBooking;
 
@@ -272,7 +270,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
     setProposing(true);
     setError(null);
     try {
-      const res = await fetch(
+      const proposed = await fetchJson<Proposal>(
         `/api/public/packages/${encodeURIComponent(bundle.id)}/studio/propose`,
         {
           method: "POST",
@@ -280,18 +278,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           body: JSON.stringify({ selections: buildSelections() }),
         },
       );
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: Proposal }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json?.ok) {
-        setError(json && !json.ok ? json.error.message : T.proposeError);
-        return;
-      }
-      setProposal(json.data);
+      setProposal(proposed);
       setPhase("review");
-    } catch {
-      setError(T.networkError);
+    } catch (error) {
+      setError(
+        error instanceof ApiClientError ? serverMessageOr(error, T.proposeError) : T.networkError,
+      );
     } finally {
       setProposing(false);
     }
@@ -336,27 +328,24 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           consent: me ? undefined : consent,
         }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data?: { manageUrl?: string | null } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json?.ok) {
-        setError(json && !json.ok ? json.error.message : T.bookError);
-        // A conflict means a placement went stale — send the client back to rebuild.
-        // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
-        // выполняется», а не устаревшее размещение. Отправлять клиента
-        // пересобирать пакет, который, скорее всего, уже создан, — ровно та
-        // ложь, из-за которой одиночный флоу показывал «время занято».
-        if (res.status === 409 && !(await isDuplicateRequestResponse(res))) {
-          setPhase("build");
-          setProposal(null);
-        }
+      const created = await readApiResponse<{ manageUrl?: string | null } | undefined>(res);
+      setManageUrl(created?.manageUrl ?? null);
+      setPhase("success");
+    } catch (error) {
+      if (!(error instanceof ApiClientError)) {
+        setError(T.networkError);
         return;
       }
-      setManageUrl(json.data?.manageUrl ?? null);
-      setPhase("success");
-    } catch {
-      setError(T.networkError);
+      setError(serverMessageOr(error, T.bookError));
+      // A conflict means a placement went stale — send the client back to rebuild.
+      // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
+      // выполняется», а не устаревшее размещение. Отправлять клиента
+      // пересобирать пакет, который, скорее всего, уже создан, — ровно та
+      // ложь, из-за которой одиночный флоу показывал «время занято».
+      if (error.status === 409 && error.code !== "DUPLICATE_REQUEST") {
+        setPhase("build");
+        setProposal(null);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -380,10 +369,10 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                 return (
                   <li
                     key={component.serviceId}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-3 py-2.5"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-success-text">
                         <Check className="h-3.5 w-3.5" aria-hidden />
                       </span>
                       <div className="min-w-0">
@@ -400,13 +389,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
+                    <Button variant="wrapper"
                       onClick={() => changeFrom(index)}
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs text-text-sec transition hover:text-text-main"
                     >
                       <Pencil className="h-3 w-3" aria-hidden /> {T.change}
-                    </button>
+                    </Button>
                   </li>
                 );
               }
@@ -453,9 +441,8 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                       <div className="mb-1 text-xs text-text-sec">{T.pickMaster}</div>
                       <div className="mb-3 flex flex-wrap gap-2">
                         {assignedMasters.map((master) => (
-                          <button
+                          <Button variant="wrapper" aria-pressed={selectedMasterId === master.id}
                             key={master.id}
-                            type="button"
                             onClick={() => setSelectedMasterId(master.id)}
                             className={`rounded-full border px-3 py-1.5 text-xs transition ${
                               selectedMasterId === master.id
@@ -464,7 +451,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                             }`}
                           >
                             {master.name}
-                          </button>
+                          </Button>
                         ))}
                       </div>
 
@@ -472,9 +459,8 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                         <>
                           <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
                             {days.map((d) => (
-                              <button
+                              <Button variant="wrapper" aria-pressed={selectedDay === d.key}
                                 key={d.key}
-                                type="button"
                                 onClick={() => setSelectedDay(d.key)}
                                 className={`shrink-0 rounded-xl border px-3 py-2 text-xs transition ${
                                   selectedDay === d.key
@@ -483,26 +469,25 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                                 }`}
                               >
                                 {d.label}
-                              </button>
+                              </Button>
                             ))}
                           </div>
                           {slotsLoading ? (
                             <div className="py-5 text-center text-sm text-text-sec">{T.slotsLoading}</div>
                           ) : slotsError ? (
-                            <div className="py-5 text-center text-sm text-red-600">{slotsError}</div>
+                            <div className="py-5 text-center text-sm text-danger-text">{slotsError}</div>
                           ) : slots.length === 0 ? (
                             <div className="py-5 text-center text-sm text-text-sec">{T.noSlots}</div>
                           ) : (
                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                               {slots.map((slot) => (
-                                <button
+                                <Button variant="wrapper"
                                   key={slot.startAtUtc}
-                                  type="button"
                                   onClick={() => pickSlot(slot)}
                                   className="rounded-xl border border-border-subtle px-2 py-2 text-sm text-text-main transition hover:border-primary/60"
                                 >
                                   {fmtTime(slot.startAtUtc)}
-                                </button>
+                                </Button>
                               ))}
                             </div>
                           )}
@@ -515,7 +500,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
             })}
           </ol>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-text">{error}</p> : null}
 
           {allPlaced ? (
             <Button
@@ -534,13 +519,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
 
       {phase === "review" && proposal ? (
         <div className="space-y-4">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setPhase("build")}
             className="inline-flex items-center gap-1 text-xs text-text-sec hover:text-text-main"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
-          </button>
+          </Button>
           <ul className="space-y-2">
             {proposal.components.map((c, i) => (
               <li
@@ -568,7 +552,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
             <span className="text-sm text-text-sec">{T.total}</span>
             <span className="font-display text-lg text-text-main">{UI_FMT.priceLabel(proposal.totalKopeks)}</span>
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-text">{error}</p> : null}
           <Button variant="primary" size="lg" className="w-full" onClick={() => setPhase("contacts")}>
             {T.continue}
           </Button>
@@ -577,13 +561,12 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
 
       {phase === "contacts" && proposal ? (
         <div className="space-y-4">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setPhase("review")}
             className="inline-flex items-center gap-1 text-xs text-text-sec hover:text-text-main"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
-          </button>
+          </Button>
           {!me ? (
             <>
               <label className="block text-sm">
@@ -626,7 +609,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
             <span className="text-sm text-text-sec">{T.total}</span>
             <span className="font-display text-lg text-text-main">{UI_FMT.priceLabel(proposal.totalKopeks)}</span>
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-text">{error}</p> : null}
           <Button
             variant="primary"
             size="lg"
@@ -641,7 +624,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
 
       {phase === "success" ? (
         <div className="space-y-4 py-4 text-center">
-          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success-text">
             <Sparkles className="h-6 w-6" aria-hidden />
           </div>
           <div className="font-display text-xl text-text-main">{T.successTitle}</div>

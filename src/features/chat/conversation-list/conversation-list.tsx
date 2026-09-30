@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { ListHeader } from "@/features/chat/conversation-list/list-header";
 import { ConversationRow } from "@/features/chat/conversation-list/conversation-row";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ConversationListItemDto, ChatPerspective } from "@/features/chat/types";
 
 const T = UI_TEXT.chat;

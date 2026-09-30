@@ -2,7 +2,7 @@ import { getMasterPublicProfileView } from "@/lib/master/public-profile-view.ser
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { ServicesSectionClient } from "@/features/public-profile/master/sections/services-section-client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -21,7 +21,7 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
     view = await getMasterPublicProfileView(providerId);
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-services", error, [`/api/providers/${providerId}`]);
+    logPublicBlockError("master-services", error, ["getMasterPublicProfileView"]);
   }
 
   if (hasError) {

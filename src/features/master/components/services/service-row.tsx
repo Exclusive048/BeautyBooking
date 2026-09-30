@@ -6,11 +6,12 @@ import type {
   ServiceCategoryOption,
   ServiceItemView,
 } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ServiceModal } from "./modals/service-modal";
 import { ReorderControls } from "./reorder-controls";
 import { RowMenu } from "./row-menu";
 import { formatDuration, formatRubles } from "./lib/format";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.row;
 
@@ -39,19 +40,18 @@ export function ServiceRow({ service, categories, onlinePaymentsAvailable }: Pro
           isFirst={isFirst}
           isLast={isLast}
         />
-        <button
-          type="button"
+        <Button variant="wrapper"
           onClick={() => setEditOpen(true)}
           aria-label={T.editAriaLabel}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >
           <span className="truncate text-sm text-text-main">{service.name}</span>
           {!service.isEnabled ? (
-            <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               {T.disabledBadge}
             </span>
           ) : null}
-        </button>
+        </Button>
         <span className="shrink-0 font-mono text-[11px] text-text-sec">
           {formatDuration(service.durationMin)}
         </span>

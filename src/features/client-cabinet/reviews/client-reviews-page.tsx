@@ -5,12 +5,14 @@ import useSWR from "swr";
 import Link from "next/link";
 import { Star, Reply, Pencil, Trash2, ExternalLink, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { Badge } from "@/components/ui/badge";
 import type {
   ClientReviewItem,
@@ -30,11 +32,7 @@ type ReviewsApiPayload = {
 type Filter = "all" | "withReply" | "withoutReply" | "fiveStar";
 
 const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then(async (res) => {
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? "load_failed");
-    return json.data as ReviewsApiPayload;
-  });
+  fetchJsonWithAuth<ReviewsApiPayload>(url);
 
 export function ClientReviewsPage() {
   const { data, mutate, isLoading, error } = useSWR<ReviewsApiPayload>(
@@ -62,12 +60,15 @@ export function ClientReviewsPage() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const res = await fetch(`/api/reviews/${deleteTarget.id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? T.deleteFailed);
+    try {
+      await fetchJsonWithAuth<unknown>(`/api/reviews/${deleteTarget.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch (error) {
+      // Диалог подтверждения показывает `message` отказа — решение здесь.
+      throw new Error(serverMessageOr(error, T.deleteFailed));
+    }
     setDeleteTarget(null);
     await mutate();
   };
@@ -228,25 +229,12 @@ function FilterBar({
     { value: "fiveStar", label: T.filterFiveStar },
   ];
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((opt) => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-              active
-                ? "bg-primary text-white"
-                : "bg-bg-input text-text-sec hover:bg-bg-input/70 hover:text-text-main"
-            }`}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <Tabs
+      ariaLabel={T.filterAria}
+      items={options.map((opt) => ({ id: opt.value, label: opt.label }))}
+      value={value}
+      onChange={(id) => onChange(id as Filter)}
+    />
   );
 }
 

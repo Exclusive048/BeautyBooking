@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminHealthStat,
   AdminHealthTone,
@@ -16,9 +16,9 @@ const STAT_LABEL: Record<AdminHealthStat["key"], string> = {
 };
 
 const DOT: Record<AdminHealthTone, string> = {
-  ok: "bg-emerald-500",
-  warn: "bg-amber-500",
-  error: "bg-red-500",
+  ok: "bg-success",
+  warn: "bg-warning",
+  error: "bg-destructive",
   neutral: "bg-text-sec/40",
 };
 

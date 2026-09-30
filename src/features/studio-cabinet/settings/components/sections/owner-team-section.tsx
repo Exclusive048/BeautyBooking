@@ -1,5 +1,5 @@
 import { Crown, Shield } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
 import type { StudioOwnerTeamData, StudioTeamMember } from "../../lib/types";
 
@@ -56,7 +56,7 @@ function TeamRow({ member, accent }: { member: StudioTeamMember; accent: "owner"
         aria-hidden
         className={
           accent === "owner"
-            ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+            ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-warning-surface text-warning-text"
             : "grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-bg-input text-text-sec"
         }
       >
@@ -68,8 +68,8 @@ function TeamRow({ member, accent }: { member: StudioTeamMember; accent: "owner"
           <span
             className={
               accent === "owner"
-                ? "rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300"
-                : "rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300"
+                ? "rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text"
+                : "rounded-full border border-info-border bg-info-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-info-text"
             }
           >
             {accent === "owner" ? T.roleOwner : T.roleAdmin}

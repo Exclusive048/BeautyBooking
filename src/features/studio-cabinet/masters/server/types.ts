@@ -59,6 +59,12 @@ export type StudioMasterDetail = StudioMasterListItem & {
    * стоит имя из аккаунта), специализация и описание.
    */
   profile: { name: string; tagline: string; description: string };
+  /**
+   * 29.09 доработки · 04 — будущие записи студии у мастера: пока они есть,
+   * сервер откажет в «Удалить из студии» (`leave-guard.ts`); число
+   * показывается в шапке заранее.
+   */
+  blockingStudioBookings: number;
 };
 
 export type StudioMasterFilter = "all" | "active" | "invited" | "disabled";

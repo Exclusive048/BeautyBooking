@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
-import { toApiRouteTemplate } from "@/lib/rate-limit/route-template";
+import { proxyRateLimitKey } from "@/lib/rate-limit/keys";
 import { verifyToken } from "@/lib/auth/jwt";
 import { startApiMetricsFlusher } from "@/lib/monitoring/api-metrics";
 import { installHttpApiMetricsHook } from "@/lib/monitoring/http-metrics-hook";
@@ -506,7 +506,7 @@ export async function proxy(request: NextRequest) {
     const ip = getClientIp(request);
     // SEC-03: ключ строится по ШАБЛОНУ роута, а не по конкретному URL. Иначе
     // каждый id — своё ведро, и перечисление по id не throttled вообще.
-    const key = `rl:${tier}:${ip}:${method}:${toApiRouteTemplate(pathname)}`;
+    const key = proxyRateLimitKey(tier, ip, method, pathname);
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
     if (result.limited) {

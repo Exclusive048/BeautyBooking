@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * Кого добавляем: внутренний `providerId` (кабинет/публичный профиль, где он уже
@@ -54,6 +56,7 @@ export function FavoriteToggleButton({
   className,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [ownFavorited, setOwnFavorited] = useState(initialFavorited);
   const [pending, setPending] = useState(false);
   const favorited = controlledFavorited ?? ownFavorited;
@@ -75,22 +78,23 @@ export function FavoriteToggleButton({
     setFavorited(next);
     setPending(true);
     try {
-      const res = await fetch("/api/favorites/toggle", {
+      const data = await fetchJson<{ favorited?: boolean }>("/api/favorites/toggle", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(providerId ? { providerId } : { providerUsername }),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setFavorited(!next);
-        return;
+      if (typeof data?.favorited === "boolean" && data.favorited !== next) {
+        setFavorited(data.favorited);
       }
-      if (typeof json.data?.favorited === "boolean" && json.data.favorited !== next) {
-        setFavorited(json.data.favorited);
-      }
-    } catch {
+    } catch (error) {
       setFavorited(!next);
+      // Раньше откат был молчаливым — сердце просто «не нажималось» (29.09 · 11).
+      if (error instanceof ApiClientError && error.status === 401) {
+        router.push("/login?next=" + encodeURIComponent(window.location.pathname));
+      } else {
+        toast.error(serverMessageOr(error, UI_TEXT.common.favoriteToggle.errorGeneric));
+      }
     } finally {
       setPending(false);
     }
@@ -103,7 +107,7 @@ export function FavoriteToggleButton({
       <button
         type="button"
         aria-pressed={favorited}
-        aria-label={UI_TEXT.publicProfile.hero.favorite}
+        aria-label={UI_TEXT.common.favoriteToggle.label}
         onClick={toggle}
         disabled={pending}
         className={cn(
@@ -130,7 +134,7 @@ export function FavoriteToggleButton({
     <button
       type="button"
       aria-pressed={favorited}
-      aria-label={UI_TEXT.publicProfile.hero.favorite}
+      aria-label={UI_TEXT.common.favoriteToggle.label}
       onClick={toggle}
       disabled={pending}
       className={`${base} ${className ?? ""}`}
@@ -142,7 +146,7 @@ export function FavoriteToggleButton({
         aria-hidden
       />
       {variant === "pill" ? (
-        <span>{UI_TEXT.publicProfile.hero.favorite}</span>
+        <span>{UI_TEXT.common.favoriteToggle.label}</span>
       ) : null}
     </button>
   );

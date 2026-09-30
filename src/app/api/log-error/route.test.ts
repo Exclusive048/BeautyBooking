@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * SECURITY-EXPOSURE-AUDIT-01 · Y2 — pins the rate-limit polarity so it cannot
- * silently invert again. The legacy `checkRateLimit(key, limit, window)`
- * overload returns `true` = ALLOWED; the route previously treated that as
+ * silently invert again. The (now removed) legacy `checkRateLimit(key, limit,
+ * window)` overload returned `true` = ALLOWED; the route treated that as
  * `isLimited`, so it 429'd the first 20 reports/min and accepted everything
- * past the limit. These tests assert the corrected direction:
- *   allowed (true)  → 200 (report is logged)
- *   limited (false) → 429
+ * past the limit. Since 29.09 доработки · 15 the result carries `limited`
+ * explicitly. These tests assert the direction:
+ *   { limited: false } → 200 (report is logged)
+ *   { limited: true }  → 429
  */
 
 const checkRateLimit = vi.hoisted(() => vi.fn());
@@ -38,27 +39,26 @@ beforeEach(() => {
 });
 
 describe("POST /api/log-error rate-limit polarity", () => {
-  it("accepts and logs the report when the limiter ALLOWS (true)", async () => {
-    checkRateLimit.mockResolvedValue(true);
+  it("accepts and logs the report when the limiter ALLOWS", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false });
     const res = await POST(makeRequest({ message: "boom", url: "/x" }));
     expect(res.status).toBe(200);
     expect(logError).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects with 429 when the limiter LIMITS (false)", async () => {
-    checkRateLimit.mockResolvedValue(false);
+  it("rejects with 429 when the limiter LIMITS", async () => {
+    checkRateLimit.mockResolvedValue({ limited: true, retryAfterSeconds: 60 });
     const res = await POST(makeRequest({ message: "boom", url: "/x" }));
     expect(res.status).toBe(429);
     // The report must NOT be logged once the limit is hit.
     expect(logError).not.toHaveBeenCalled();
   });
 
-  it("passes the legacy (key, limit, window) triple, not a config object", async () => {
-    checkRateLimit.mockResolvedValue(true);
+  it("passes a route key (template of this path) and a config object", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false });
     await POST(makeRequest({ message: "boom" }));
-    const [key, limit, windowSeconds] = checkRateLimit.mock.calls[0];
-    expect(key).toBe("log-error:1.2.3.4");
-    expect(typeof limit).toBe("number");
-    expect(typeof windowSeconds).toBe("number");
+    const [key, config] = checkRateLimit.mock.calls[0];
+    expect(key).toMatch(/^rl:route:ip:[0-9a-f]{32}:\/api\/log-error$/);
+    expect(config).toMatchObject({ maxRequests: expect.any(Number), windowSeconds: expect.any(Number) });
   });
 });

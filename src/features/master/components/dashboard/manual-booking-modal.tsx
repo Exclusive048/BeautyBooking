@@ -11,11 +11,10 @@ import {
   OperatorSlotPicker,
   type OperatorSlot,
 } from "@/features/booking/components/operator-slot-picker";
-import type { ApiResponse } from "@/lib/types/api";
 import type { DashboardServiceLite } from "@/lib/master/dashboard.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.dashboard.manualBooking;
 
@@ -101,7 +100,7 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
     try {
       // Окошко пришло с сервера инстантом UTC — конвертировать нечего.
       const startAtIso = slot.startAtUtc;
-      const res = await fetch("/api/master/bookings", {
+      await fetchJsonWithAuth<unknown>("/api/master/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -112,10 +111,6 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
           notes: notes.trim() || undefined,
         }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       // Reset form, close, then refresh server data.
       setClientName("");
       setClientPhone("");
@@ -124,7 +119,7 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
       closeModal();
       startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : T.createError);
+      setError(serverMessageOr(err, T.createError));
     } finally {
       setSaving(false);
     }
@@ -139,7 +134,7 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
     >
       <>
         {!canManualBook ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-400/30 dark:bg-amber-950/30 dark:text-amber-200">
+          <p className="rounded-lg border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
             {T.notSoloHint}
           </p>
         ) : null}
@@ -198,7 +193,7 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
             disabled={!canManualBook}
           />
         </div>
-        {error ? <p className="mt-3 text-xs text-red-600">{error}</p> : null}
+        {error ? <p className="mt-3 text-xs text-danger-text">{error}</p> : null}
         <div className="mt-6 flex justify-end gap-2">
           <Button
             type="button"

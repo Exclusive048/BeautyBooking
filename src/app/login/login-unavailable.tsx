@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Clock3 } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.auth.loginPage.unavailable;
 
@@ -33,7 +33,7 @@ export default function LoginUnavailable() {
         <div className="mb-6 flex justify-center">
           {/* See the login form's mobile hint: the gradient wordmark is
               burgundy in both themes and loses contrast on the dark card. */}
-          <BrandLogo variant="full" size="sm" href={null} textClassName="dark:text-text-main" />
+          <BrandLogo variant="full" size="sm" href={null} textClassName="bg-wordmark" />
         </div>
 
         <span className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-white">

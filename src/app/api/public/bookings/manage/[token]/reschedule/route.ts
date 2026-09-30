@@ -3,6 +3,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { rescheduleGuestBooking, resolveGuestManageScope } from "@/lib/bookings/guest-manage";
 import { guestManageRateLimitRefusal } from "@/lib/bookings/guest-manage-route";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { ensureStartBeforeEnd, parseISOToUTC } from "@/lib/time";
@@ -21,7 +22,7 @@ const bodySchema = bookingRescheduleSchema.and(z.object({ bookingId: z.string().
  */
 export async function POST(req: Request, ctx: { params: Promise<{ token: string }> }) {
   try {
-    const refusal = await guestManageRateLimitRefusal(`rate:guestManage:ip:${getClientIp(req)}`);
+    const refusal = await guestManageRateLimitRefusal(routeRateLimitKey(req, "ip", getClientIp(req)));
     if (refusal) return refusal;
 
     const { token } = await ctx.params;

@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Size = "sm" | "md" | "lg";
 
@@ -47,14 +47,14 @@ export function StarsDisplay({ rating, size = "md", ariaLabel }: Props) {
             <Star
               className={cn(
                 SIZE_CLASS[size],
-                isFull ? "fill-amber-500 text-amber-500" : "text-text-sec/40"
+                isFull ? "fill-rating text-rating" : "text-text-sec/40"
               )}
               aria-hidden
             />
             {isHalf ? (
               <Star
                 className={cn(
-                  "absolute inset-0 fill-amber-500 text-amber-500",
+                  "absolute inset-0 fill-rating text-rating",
                   SIZE_CLASS[size]
                 )}
                 style={{ clipPath: "inset(0 50% 0 0)" }}

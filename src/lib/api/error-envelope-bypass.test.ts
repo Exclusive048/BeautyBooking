@@ -52,6 +52,28 @@ import { describe, expect, it } from "vitest";
  *          разбор — `ENVELOPE-BYPASS-TRIAGE-02` в BACKLOG.
  *          Повторная проба после расширения: обе прежде слепые формы в
  *          `api/health/route.ts` → 1 failed, файл назван.
+ *
+ * @probe   ENVELOPE-BYPASS-TRIAGE-02 (29.09 доработки · 09) — четвёртая форма.
+ *          В `src/app/api/health/route.ts` дописан
+ *          `return new NextResponse(JSON.stringify({ ok: false, error: { message: "x" } }), { status: 503 });`.
+ *          Форма убрана из `ENVELOPE_FORMS`: утверждение об инвентаре ЗЕЛЁНОЕ
+ *          (вызов невидим), краснеет только контроль машинерии — «разборщик
+ *          перестал видеть ручной конверт ошибки… expected 4 to be 5», то есть
+ *          и удаление формы теперь ловится. Форма на месте: «конверт собран мимо
+ *          fail()/jsonFail() и не заморожен в инвентаре:
+ *          src/app/api/health/route.ts (1)». Вторая проба по одной
+ *          оси: в `health/worker` возвращён один
+ *          `Response.json({ error: "Unauthorized" }, { status: 401 })` →
+ *          «число обходов в файле изменилось: … заморожено 2, найдено 3».
+ *          Восстановлено побайтно — зелёный.
+ *
+ * ## Слепые формы (названы, не закрыты)
+ *
+ *   · вычисленный статус — `{ status: alive ? 200 : 503 }`: литерала ≥ 400 в
+ *     вызове нет, и конверт без `ok: false` не считается;
+ *   · конверт, собранный в другой функции и возвращённый переменной, считается
+ *     там, где вызван конструктор, — а не там, откуда уходит ответ;
+ *   · любая форма вне четырёх в `ENVELOPE_FORMS` (свой хелпер-обёртка).
  */
 
 const SRC = join(process.cwd(), "src");
@@ -94,40 +116,30 @@ const FROZEN_BYPASS_INVENTORY: Record<string, { count: number; reason: string }>
   },
 
   /* ---------------------------------------------------------------- *
-   * 🔴 FIX-C7 · RETRO-PROBE — найдены расширением детектора на две
-   * формы, которых он не видел (`Response.json(`, `new Response(`).
-   * Это ЗАМОРОЗКА, а НЕ ратификация: ни один из трёх не разбирался
-   * посайтово, как это делал FIX-B18. Разбор — `ENVELOPE-BYPASS-TRIAGE-02`
-   * в BACKLOG. Строки стоят здесь, чтобы список перестал молчать о них.
+   * FIX-C7 · RETRO-PROBE нашёл ещё 9 сайтов в 3 файлах (формы
+   * `Response.json(` и `new Response(`); ENVELOPE-BYPASS-TRIAGE-02
+   * (29.09 доработки · 09) разобрал их посайтово: 5 сведены к `fail()`
+   * (4 отказа `health/worker` с английскими текстами + `public/stats`,
+   * роут удалён решением владельца), 4 ратифицированы ниже.
    * ---------------------------------------------------------------- */
 
   "src/app/api/health/worker/route.ts": {
-    count: 6,
+    count: 2,
     reason:
-      "🔴 НЕ РАЗОБРАН (FIX-C7). Шесть конвертов через `Response.json(...)`, тексты " +
-      "АНГЛИЙСКИЕ: «Service unavailable» ×4, «Unauthorized». `check:error-message-lang` " +
-      "их не видит по построению (он знает пять именованных каналов), и этот сторож не " +
-      "видел тоже — то есть у английских строк не было НИ ОДНОГО наблюдателя. Смягчающее: " +
-      "роут гейтится секретом `WORKER_SECRET` и адресован мониторингу, а не человеку, " +
-      "поэтому язык здесь — вопрос конвенции, а не UX. Решать посайтово.",
+      "РАТИФИЦИРОВАНО (ENVELOPE-BYPASS-TRIAGE-02): данные пробы (`alive: false`, " +
+      "`lastPingAgo`, `queue`) с кодом 503 для мониторинга, а не сообщение об ошибке; " +
+      "текста в теле нет. Мониторинг читает код и `alive` (DEPLOY-BACKLOG I8). Отказы " +
+      "доступа и сбой записи отметки в этом файле идут через fail().",
   },
 
   "src/app/api/og/profile/route.tsx": {
     count: 2,
     reason:
-      "ВЕРОЯТНО ЗАКОННЫЙ (FIX-C7), но не проверен: маршрут отдаёт КАРТИНКУ (`next/og`), " +
-      "и его потребитель — тег `<img>`, которому JSON-конверт бесполезен ровно так же, " +
-      "как в FIX-C3 · F3-3. `new Response(\"Missing username\", { status: 400 })` — это " +
-      "текст/плейн, а не конверт. Проверить, не должен ли ответ быть плейсхолдер-картинкой.",
-  },
-
-  "src/app/api/public/stats/route.ts": {
-    count: 1,
-    reason:
-      "🔴 НЕ РАЗОБРАН (FIX-C7) и выглядит чистой привычкой: `new Response(JSON.stringify(" +
-      "{ ok: false, error: { message } }))` руками воспроизводит форму `fail()` — но без " +
-      "`requestId` и без репортинга 5xx в трекер. Ровно тот класс, который FIX-B18 свёл " +
-      "к конверту в семи файлах; этот восьмой он не увидел.",
+      "РАТИФИЦИРОВАНО (ENVELOPE-BYPASS-TRIAGE-02): роут картинки (`next/og`) для " +
+      "краулеров соцсетей и мессенджеров, тело — text/plain, JSON-конверт потребителю " +
+      "бесполезен. Тексты русские. Картинку-заглушку не делаем: 404 на `og:image` " +
+      "значит «без превью», а заглушка с 200 закэшировалась бы на сутки и пережила бы " +
+      "публикацию профиля. Скрытому профилю страница ссылку на эту картинку не даёт.",
   },
 };
 
@@ -160,15 +172,18 @@ function listSourceFiles(dir: string): string[] {
  *   · `new Response(JSON.stringify({ ok: false, … }), { status })`  → **passed**;
  *   · `Response.json({ ok: false, … }, { status: 503 })`            → **passed**.
  *
- * И это НЕ гипотетика: обе слепые формы в дереве живые —
- * `api/health/worker/route.ts` собирает **7** конвертов ошибки через
+ * И это НЕ гипотетика: обе слепые формы в дереве были живые —
+ * `api/health/worker/route.ts` собирал **6** конвертов ошибки через
  * `Response.json(...)` (включая английские `"Service unavailable"` /
  * `"Unauthorized"`), `api/public/stats/route.ts` — один через
- * `new Response(JSON.stringify(...))`. То есть строка «единственный законный
+ * `new Response(JSON.stringify(...))` (оба разобраны ENVELOPE-BYPASS-TRIAGE-02).
+ * Четвёртая форма того же семейства — `new NextResponse(` (29.09 · 09): в
+ * дереве она живёт только в успешных потоках, но слепой ей быть незачем
+ * (правило 4 GUARD-INTEGRITY — проверка по семейству). То есть строка «единственный законный
  * обход в дереве» напротив `src/proxy.ts` была неверна, и неверна она была
  * именно потому, что детектор смотрел на одно имя из трёх.
  */
-const ENVELOPE_FORMS = ["NextResponse.json(", "Response.json(", "new Response("] as const;
+const ENVELOPE_FORMS = ["NextResponse.json(", "Response.json(", "new Response(", "new NextResponse("] as const;
 
 /**
  * Считает ручные конверты ответа, чей аргумент выглядит ответом об ошибке.
@@ -177,7 +192,8 @@ const ENVELOPE_FORMS = ["NextResponse.json(", "Response.json(", "new Response("]
  *
  * ⚠️ `NextResponse.json(` — префикс, оканчивающийся на `Response.json(`,
  * поэтому позиции дедуплицируются по КОНЦУ вызова: иначе один вызов считался
- * бы дважды. Аналогично `new Response(` не пересекается с остальными.
+ * бы дважды. `new Response(` и `new NextResponse(` друг с другом и с `.json(`
+ * не пересекаются.
  */
 function countErrorEnvelopes(source: string): number {
   const counted = new Set<number>();
@@ -235,24 +251,26 @@ describe("FIX-B14 — обходы конверта ошибок заморож�
    * пустой инвентарь остаётся законным успехом.
    */
   it("счётчик отличает конверт ошибки от успешного ответа (контроль машинерии)", () => {
-    // FIX-C7: фикстура покрывает ВСЕ ТРИ формы. Прежняя знала одну, и ровно
-    // поэтому контроль машинерии оставался зелёным, пока две другие были слепы.
+    // FIX-C7: фикстура покрывает ВСЕ формы (29.09 · 09 — четыре). Прежняя знала
+    // одну, и ровно поэтому контроль машинерии оставался зелёным, пока другие были слепы.
     const errorEnvelope = `
       NextResponse.json({ ok: false, error: { message: "Ошибка.", code: "X" } }, { status: 400 });
       NextResponse.json({ error: "BOOM" }, { status: 503 });
       Response.json({ error: "Service unavailable" }, { status: 503 });
       new Response(JSON.stringify({ ok: false, error: { message: "Ошибка." } }), { status: 500 });
+      new NextResponse(JSON.stringify({ ok: false }), { status: 500 });
     `;
     const successEnvelope = `
       NextResponse.json({ ok: true, data: { id: 1 } }, { status: 201 });
       NextResponse.json({ ok: true, data: {} });
       Response.json({ ok: true, data: { id: 2 } });
       new Response(JSON.stringify({ ok: true }), { status: 200 });
+      new NextResponse(JSON.stringify({ ok: true }), { status: 200 });
     `;
     expect(
       countErrorEnvelopes(errorEnvelope),
       "разборщик перестал видеть ручной конверт ошибки — главное утверждение стало бы вакуумным",
-    ).toBe(4);
+    ).toBe(5);
     expect(
       countErrorEnvelopes(successEnvelope),
       "разборщик считает успешные ответы обходами — инвентарь наполнится шумом",

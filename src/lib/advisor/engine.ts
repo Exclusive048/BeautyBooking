@@ -5,7 +5,7 @@ import { getAiFeaturesEnabled } from "@/lib/ai/config";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { AiSpendCeilingError } from "@/lib/ai/spend-ceiling";
 import type { AdvisorInsight } from "@/lib/advisor/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export async function computeAdvisorInsights(providerId: string): Promise<AdvisorInsight[]> {
   const stats = await collectMasterStats(providerId);

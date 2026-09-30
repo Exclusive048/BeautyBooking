@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
+import { buildStudioScopeSql } from "@/features/analytics/domain/helpers";
 
 type CohortRow = {
   cohortMonth: string;
@@ -56,7 +57,7 @@ function buildScopeFilters(context: AnalyticsContext): Prisma.Sql {
     );
   } else {
     filters.push(
-      Prisma.sql`(b."studioId" = ${context.studioId} OR b."providerId" = ${context.providerId})`
+      buildStudioScopeSql(context)
     );
     if (context.masterFilterId) {
       filters.push(Prisma.sql`b."masterProviderId" = ${context.masterFilterId}`);

@@ -26,7 +26,7 @@ type Props = {
  * Server orchestrator for `/admin/users`. Slots together the caption,
  * 5-tile role strip, redundant filter row, and the table+pagination.
  * Each child owns its own URL-state writes via `router.replace`; this
- * wrapper just threads server-fetched data downward.
+ * wrapper just threads server-loaded data downward.
  */
 export function AdminUsers({
   rows,

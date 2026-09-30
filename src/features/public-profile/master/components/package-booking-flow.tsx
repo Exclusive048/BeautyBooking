@@ -20,12 +20,10 @@ import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { PublicBundleView } from "@/lib/master/public-profile-view.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJson, readApiResponse, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
-import {
-  fetchRetryingDuplicates,
-  isDuplicateRequestResponse,
-} from "@/lib/http/idempotent-retry";
+import { fetchRetryingDuplicates } from "@/lib/http/idempotent-retry";
 
 const T = UI_TEXT.publicProfile.packageBooking;
 
@@ -198,13 +196,9 @@ export function PackageBookingFlow({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | { ok: true; data: { user: SessionUser | null } }
-          | { ok: false }
-          | null;
-        if (cancelled || !json?.ok) return;
-        const user = json.data.user;
+        const meData = await fetchJson<{ user: SessionUser | null }>("/api/me", { cache: "no-store" });
+        if (cancelled) return;
+        const user = meData.user;
         setMe(user);
         if (user?.displayName) setName((prev) => prev || user.displayName!.trim());
         if (user?.phone) setPhone((prev) => prev || user.phone!);
@@ -271,18 +265,12 @@ export function PackageBookingFlow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slots: buildSlots() }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: Proposal }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json?.ok) {
-        setError(json && !json.ok ? json.error.message : T.proposeError);
-        return;
-      }
-      setProposal(json.data);
+      setProposal(await readApiResponse<Proposal>(res));
       setPhase("review");
-    } catch {
-      setError(T.networkError);
+    } catch (error) {
+      setError(
+        error instanceof ApiClientError ? serverMessageOr(error, T.proposeError) : T.networkError,
+      );
     } finally {
       setProposing(false);
     }
@@ -310,7 +298,7 @@ export function PackageBookingFlow({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/public/packages/${encodeURIComponent(bundle.id)}/book`, {
+      const created = await fetchJson<{ manageUrl?: string | null } | undefined>(`/api/public/packages/${encodeURIComponent(bundle.id)}/book`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -327,28 +315,23 @@ export function PackageBookingFlow({
           consent: me ? undefined : consent,
         }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data?: { manageUrl?: string | null } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json?.ok) {
-        setError(json && !json.ok ? json.error.message : T.bookError);
-        // A conflict means a placement went stale — send the client back to
-        // rebuild. Nothing was created: the create is all-or-none.
-        // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
-        // выполняется», а не устаревшее размещение. Отправлять клиента
-        // пересобирать пакет, который, скорее всего, уже создан, — ровно та
-        // ложь, из-за которой одиночный флоу показывал «время занято».
-        if (res.status === 409 && !(await isDuplicateRequestResponse(res))) {
-          setPhase("build");
-          setProposal(null);
-        }
+      setManageUrl(created?.manageUrl ?? null);
+      setPhase("success");
+    } catch (error) {
+      if (!(error instanceof ApiClientError)) {
+        setError(T.networkError);
         return;
       }
-      setManageUrl(json.data?.manageUrl ?? null);
-      setPhase("success");
-    } catch {
-      setError(T.networkError);
+      setError(serverMessageOr(error, T.bookError));
+      // A conflict means a placement went stale — back to rebuild (all-or-none).
+      // LOGIC-10: 409 `DUPLICATE_REQUEST` — это «тот же запрос ещё
+      // выполняется», а не устаревшее размещение. Отправлять клиента
+      // пересобирать пакет, который, скорее всего, уже создан, — ровно та
+      // ложь, из-за которой одиночный флоу показывал «время занято».
+      if (error.status === 409 && error.code !== "DUPLICATE_REQUEST") {
+        setPhase("build");
+        setProposal(null);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -375,10 +358,10 @@ export function PackageBookingFlow({
                     key={component.serviceId}
                     data-testid="package-component"
                     data-state="placed"
-                    className="flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success/5 px-3 py-2.5"
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-success-text">
                         <Check className="h-3.5 w-3.5" aria-hidden />
                       </span>
                       <div className="min-w-0">
@@ -391,14 +374,13 @@ export function PackageBookingFlow({
                         </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
+                    <Button variant="wrapper"
                       onClick={() => changeFrom(index)}
                       data-testid="package-change"
                       className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs text-text-sec transition hover:text-text-main"
                     >
                       <Pencil className="h-3 w-3" aria-hidden /> {T.change}
-                    </button>
+                    </Button>
                   </li>
                 );
               }
@@ -476,7 +458,7 @@ export function PackageBookingFlow({
             })}
           </ol>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-text">{error}</p> : null}
 
           {allPlaced ? (
             <Button
@@ -496,13 +478,12 @@ export function PackageBookingFlow({
 
       {phase === "review" && proposal ? (
         <div className="space-y-4" data-testid="package-review">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setPhase("build")}
             className="inline-flex items-center gap-1 text-xs text-text-sec hover:text-text-main"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
-          </button>
+          </Button>
           {zoneLabel ? (
             <p className="font-mono text-xs text-accent-text">{zoneLabel}</p>
           ) : null}
@@ -532,7 +513,7 @@ export function PackageBookingFlow({
               {UI_FMT.priceLabel(proposal.totalKopeks)}
             </span>
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-text">{error}</p> : null}
           <Button
             variant="primary"
             size="lg"
@@ -547,13 +528,12 @@ export function PackageBookingFlow({
 
       {phase === "contacts" && proposal ? (
         <div className="space-y-4" data-testid="package-contacts">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setPhase("review")}
             className="inline-flex items-center gap-1 text-xs text-text-sec hover:text-text-main"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
-          </button>
+          </Button>
           {!me ? (
             <>
               <label className="block text-sm">
@@ -614,7 +594,7 @@ export function PackageBookingFlow({
               {UI_FMT.priceLabel(proposal.totalKopeks)}
             </span>
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-danger-text">{error}</p> : null}
           <Button
             variant="primary"
             size="lg"
@@ -630,7 +610,7 @@ export function PackageBookingFlow({
 
       {phase === "success" ? (
         <div className="space-y-4 py-4 text-center" data-testid="package-success">
-          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success-text">
             <Sparkles className="h-6 w-6" aria-hidden />
           </div>
           <div className="font-display text-xl text-text-main">{T.successTitle}</div>

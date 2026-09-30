@@ -1,6 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 type Props = {
@@ -15,12 +16,18 @@ type Props = {
  * Two-up choice card used by the Rules tab's "Подтверждение записи"
  * pair (Auto vs Manual). Shares the same active/inactive treatment as
  * the Hours-tab mode toggle so brand grammar stays consistent.
+ *
+ * 29.09 доработки · 22: перенесён из `features/master/.../schedule-settings`
+ * в общие компоненты (им пользуется и пошаговое окно графика студии); кнопка —
+ * `Button variant="wrapper"`, поэтому у карточки фирменное кольцо фокуса, а
+ * выбранность объявлена диктору (`aria-pressed`).
  */
 export function ModeCard({ active, title, description, icon: Icon, onClick }: Props) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="wrapper"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
         "rounded-2xl border p-4 text-left transition-colors",
         active
@@ -42,6 +49,6 @@ export function ModeCard({ active, title, description, icon: Icon, onClick }: Pr
         <span className="font-medium text-text-main">{title}</span>
       </div>
       <p className="text-xs text-text-sec">{description}</p>
-    </button>
+    </Button>
   );
 }

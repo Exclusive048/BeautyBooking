@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CRM_CLIENTS_WINDOW_MONTHS } from "@/lib/crm/clients-window";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.clientsV2.header;
 // PERF-06: подпись окна — shared-ключ обоих кабинетов (прецедент UI-33).

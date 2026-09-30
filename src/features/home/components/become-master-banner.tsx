@@ -1,36 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.1, delayChildren: 0.05 } },
+  visible: { transition: { staggerChildren: STAGGER, delayChildren: 0.05 } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
+  hidden: { opacity: 0, y: DISTANCE.rise },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
+    transition: MOTION.section,
   },
 };
 
 export function BecomeMasterBanner() {
   const T = UI_TEXT.homeGuest.becomeMaster;
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
-  const item = reduce ? undefined : itemVariants;
+  const container = containerVariants;
+  const item = itemVariants;
 
   return (
-    <motion.section
+    <m.section
       variants={container}
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: "-80px" }}
+      viewport={VIEWPORT_ONCE}
       className="relative overflow-hidden bg-brand-gradient px-6 py-20 text-white sm:px-10 sm:py-24"
     >
       {/* Decorative pastel blobs */}
@@ -53,21 +53,21 @@ export function BecomeMasterBanner() {
       />
 
       <div className="relative mx-auto max-w-3xl text-center">
-        <motion.h2
+        <m.h2
           variants={item}
           className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl"
         >
           <em className="font-display font-semibold italic">{T.title}</em>
-        </motion.h2>
+        </m.h2>
 
-        <motion.p
+        <m.p
           variants={item}
           className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/80 sm:text-lg"
         >
           {T.subtitle}
-        </motion.p>
+        </m.p>
 
-        <motion.div
+        <m.div
           variants={item}
           className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
         >
@@ -82,8 +82,8 @@ export function BecomeMasterBanner() {
           >
             <Link href="/how-it-works">{T.ctaSecondary}</Link>
           </Button>
-        </motion.div>
+        </m.div>
       </div>
-    </motion.section>
+    </m.section>
   );
 }

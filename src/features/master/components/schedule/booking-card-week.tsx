@@ -6,7 +6,7 @@ import { formatLocalHm } from "@/lib/schedule/timezone";
 import { laneStyle, type LanePlacement } from "@/lib/calendar/lane-layout";
 import type { ScheduleBookingItem } from "@/lib/master/schedule.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.bookingCard;
 
@@ -82,8 +82,8 @@ export function BookingCardWeek({
     variant === "confirmed"
       ? "bg-brand-gradient text-white shadow-brand"
       : variant === "pending"
-        ? "border border-amber-400/60 bg-amber-100/40 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200"
-        : "border border-emerald-500/60 bg-emerald-100/40 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200";
+        ? "border border-warning/60 bg-warning-surface text-warning-text"
+        : "border border-success/60 bg-success-surface text-success-text";
 
   return (
     <article
@@ -110,7 +110,7 @@ export function BookingCardWeek({
         {isNewClient && !isPending && showDetails ? (
           <Badge
             variant="default"
-            className="shrink-0 border-emerald-500/40 bg-emerald-500/15 py-0 text-[10px] leading-tight text-emerald-900 dark:text-emerald-100"
+            className="shrink-0 border-success/40 bg-success/15 py-0 leading-tight text-success-text"
           >
             {T.newBadge}
           </Badge>

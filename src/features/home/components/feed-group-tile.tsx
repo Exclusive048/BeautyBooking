@@ -3,15 +3,17 @@
 import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
+import { m, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
 import { FavoriteToggleButton } from "@/components/ui/favorite-toggle-button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { formatWorkCaption } from "@/lib/feed/work-caption";
 import type { HomeFeedGroup } from "@/lib/feed/home-feed.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { COLLAGE_RATIO_CLASS, type CollageRatio } from "@/features/home/lib/collage-layout";
 
 type Props = {
@@ -101,7 +103,7 @@ export function FeedGroupTile({
               sizes="(min-width: 1024px) 16vw, 33vw"
               priority={priority && index === 0}
               loading={priority && index === 0 ? undefined : "lazy"}
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              className={`object-cover ${IMAGE_ZOOM}`}
             />
           </div>
         );
@@ -161,12 +163,12 @@ export function FeedGroupTile({
   }
 
   return (
-    <motion.article
+    <m.article
       data-testid="home-feed-tile"
       data-works={total}
-      initial={reduce ? false : { opacity: 0 }}
+      initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={reduce ? { duration: 0 } : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      transition={MOTION.base}
       aria-roledescription={isCarousel ? "carousel" : undefined}
       aria-label={isCarousel ? fill(T.carouselAria, { author: group.authorName }) : undefined}
       className={cn(
@@ -209,7 +211,7 @@ export function FeedGroupTile({
           />
         </>
       ) : null}
-    </motion.article>
+    </m.article>
   );
 }
 

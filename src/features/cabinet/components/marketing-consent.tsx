@@ -5,12 +5,11 @@ import Link from "next/link";
 import { Megaphone, ShieldAlert } from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { LEGAL_DOCUMENTS } from "@/lib/legal/documents";
-import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * RKN-FIX-18 — отзыв согласия на маркетинговые коммуникации.
@@ -55,9 +54,10 @@ export function MarketingConsentSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth("/api/me/consents/marketing", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<State> | null;
-      if (json?.ok) setState({ enabled: json.data.enabled, agreedAt: json.data.agreedAt });
+      const data = await fetchJsonWithAuth<State>("/api/me/consents/marketing", { cache: "no-store" });
+      setState({ enabled: data.enabled, agreedAt: data.agreedAt });
+    } catch {
+      // Чтение: не прочитали — тумблер остаётся в прежнем виде.
     } finally {
       setLoading(false);
     }
@@ -76,20 +76,14 @@ export function MarketingConsentSection() {
       // Оптимистично — но источником правды остаётся ответ сервера.
       setState((prev) => (prev ? { ...prev, enabled: next } : prev));
       try {
-        const res = await fetchWithAuth("/api/me/consents/marketing", {
+        const data = await fetchJsonWithAuth<State>("/api/me/consents/marketing", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled: next }),
         });
-        const json = (await res.json().catch(() => null)) as ApiResponse<State> | null;
-        if (json?.ok) {
-          setState({ enabled: json.data.enabled, agreedAt: json.data.agreedAt });
-        } else {
-          setError(t.error);
-          await load();
-        }
-      } catch {
-        setError(t.error);
+        setState({ enabled: data.enabled, agreedAt: data.agreedAt });
+      } catch (error) {
+        setError(serverMessageOr(error, t.error));
         await load();
       } finally {
         inFlight.current = false;

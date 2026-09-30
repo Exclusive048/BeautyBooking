@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.notifications;
 
@@ -23,24 +26,23 @@ export function MarkReadButton({ notificationId, isUnread }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [, startTransition] = useTransition();
+  const toast = useToast();
 
   const handleClick = async () => {
     if (!isUnread || busy) return;
     setBusy(true);
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, { method: "POST" });
+      await fetchJsonWithAuth<unknown>(`/api/notifications/${notificationId}/read`, { method: "POST" });
       startTransition(() => router.refresh());
-    } catch {
-      // Surface failures via the global toast in a follow-up; for now
-      // the user can retry on the next render.
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.errors.markRead));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       onClick={handleClick}
       disabled={!isUnread || busy}
       aria-label={T.markRead}
@@ -48,10 +50,10 @@ export function MarkReadButton({ notificationId, isUnread }: Props) {
         "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
         isUnread
           ? "text-text-sec hover:bg-bg-input hover:text-text-main"
-          : "text-emerald-600 dark:text-emerald-400"
+          : "text-success-text"
       )}
     >
       <Check className="h-3.5 w-3.5" aria-hidden />
-    </button>
+    </Button>
   );
 }

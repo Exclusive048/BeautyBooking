@@ -1,6 +1,6 @@
 import type { RevenueSplit } from "@/lib/bookings/work-context";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.workContext;
 

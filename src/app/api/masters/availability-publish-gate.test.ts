@@ -41,6 +41,7 @@ vi.mock("@/lib/providers/resolve-provider", () => ({
       timezone: "Europe/Moscow",
       minBookingHoursAhead: 2,
       maxBookingDaysAhead: 60,
+      visibleSlotDays: 30,
     });
   },
 }));

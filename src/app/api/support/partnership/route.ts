@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -7,6 +6,8 @@ import type { ErrorCode } from "@/lib/api/errors";
 import { env } from "@/lib/env";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { readBodyTextCapped } from "@/lib/http/body-limit";
 import { extractClientIp } from "@/lib/http/ip";
 import { SMTP_TIMEOUTS } from "@/lib/email/sender";
@@ -89,10 +90,6 @@ const partnershipSchema = z.object({
 const RATE_LIMIT = 3;
 const RATE_WINDOW_SECONDS = 10 * 60;
 
-function hashKey(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
-
 function buildEmailText(input: {
   kind: PartnershipKind;
   organizationName: string;
@@ -137,10 +134,17 @@ export async function POST(req: Request) {
   const ip = extractClientIp(req);
   const userAgent = req.headers.get("user-agent") ?? null;
 
-  const ipKey = `partnership:ip:${hashKey(ip ?? "unknown")}`;
-  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-  if (!ipAllowed) {
-    return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
+  const ipRefusal = resolveRateLimitRefusal(
+    await checkRateLimit(routeRateLimitKey(req, "ip", ip ?? "unknown"), {
+      maxRequests: RATE_LIMIT,
+      windowSeconds: RATE_WINDOW_SECONDS,
+    }),
+  );
+  if (ipRefusal) {
+    // Свой текст — для исчерпанного бюджета; обрыв зависимости — общий 503.
+    return ipRefusal.status === 429
+      ? supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED")
+      : supportFail(ipRefusal.status, ipRefusal.message, ipRefusal.code);
   }
 
   const read = await readBodyTextCapped(req);

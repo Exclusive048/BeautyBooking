@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { VkBadgeIcon } from "@/components/ui/vk-icon";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type VkLoginButtonProps = {
   iconOnly?: boolean;

@@ -14,10 +14,12 @@ import type {
   MasterServicesViewData,
   ServicePackageView,
 } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { computeBundlePricing } from "../lib/compute-bundle-pricing";
 import { toKopeks } from "@/lib/money/kopeks";
 import { formatDuration, formatRubles } from "../lib/format";
+import { Select } from "@/components/ui/select";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.bundle;
 
@@ -119,28 +121,25 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         discountValue: numericDiscount,
         isEnabled,
       };
-      let response: Response;
       if (mode === "create") {
-        response = await fetch("/api/master/service-packages", {
+        await fetchJsonWithAuth<unknown>("/api/master/service-packages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
       } else {
-        response = await fetch(`/api/master/service-packages/${bundle!.id}`, {
+        await fetchJsonWithAuth<unknown>(`/api/master/service-packages/${bundle!.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
       }
-      if (!response.ok) {
-        setError(mode === "create" ? T.errorCreate : T.errorUpdate);
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(mode === "create" ? T.errorCreate : T.errorUpdate);
+    } catch (error) {
+      // «В пакет нужно добавить минимум 2 услуги» и прочие отказы проверки —
+      // дословно (29.09 · 11).
+      setError(serverMessageOr(error, mode === "create" ? T.errorCreate : T.errorUpdate));
     } finally {
       setSaving(false);
     }
@@ -157,17 +156,13 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/master/service-packages/${bundle.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/service-packages/${bundle.id}`, {
         method: "DELETE",
       });
-      if (!response.ok) {
-        setError(T.errorDelete);
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorDelete);
+    } catch (error) {
+      setError(serverMessageOr(error, T.errorDelete));
     } finally {
       setSaving(false);
     }
@@ -245,15 +240,15 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
             {T.discountLabel}
           </label>
           <div className="mt-1.5 flex items-center gap-2">
-            <select
+            <Select
               value={discountType}
               onChange={(event) => setDiscountType(event.target.value as DiscountType)}
               aria-label={T.discountTypeLabel}
-              className="h-11 w-24 rounded-xl border border-border-subtle bg-bg-input px-3 text-sm text-text-main focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="w-24"
             >
               <option value={DiscountType.PERCENT}>{T.discountTypePercent}</option>
               <option value={DiscountType.FIXED}>{T.discountTypeFixed}</option>
-            </select>
+            </Select>
             <Input
               id={discountValueId}
               type="number"
@@ -310,7 +305,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         {error ? (
           <p
             role="alert"
-            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+            className="rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
           >
             {error}
           </p>
@@ -320,11 +315,11 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4">
         {mode === "edit" ? (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="wrapper"
+            size="none"
             onClick={handleDelete}
             disabled={saving}
-            className="gap-1.5 text-rose-700 dark:text-rose-300"
+            className="inline-flex h-9 items-center justify-center rounded-2xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface gap-1.5"
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
             {T.deleteCta}
@@ -391,7 +386,7 @@ function PreviewRow({
     <div className="flex items-baseline justify-between gap-3 font-mono text-sm">
       <span
         className={cn(
-          accent === "emerald" && "text-emerald-700 dark:text-emerald-300",
+          accent === "emerald" && "text-success-text",
           muted && "text-[11px] text-text-sec",
           !accent && !muted && "text-text-sec"
         )}
@@ -400,7 +395,7 @@ function PreviewRow({
       </span>
       <span
         className={cn(
-          accent === "emerald" && "text-emerald-700 dark:text-emerald-300",
+          accent === "emerald" && "text-success-text",
           muted && "text-[11px] text-text-sec",
           bold && "text-base text-text-main",
           !accent && !muted && !bold && "text-text-main"

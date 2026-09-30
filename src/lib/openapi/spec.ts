@@ -158,6 +158,164 @@ const excludeBookingIdQuery: ParameterObject = {
     "Booking being rescheduled: its own window (and buffer) is not treated as occupied, and slots use that booking's own length (service snapshots). Requires a session of a party to that booking.",
 };
 
+// SCHEDULE-PATTERNS-01: чьё расписание (`resolveScheduleActor`) — личное по
+// умолчанию, профиль в студии (`profile`) или мастер студии для её админа.
+const SCHEDULE_ACTOR_PARAMETERS: ParameterObject[] = [
+  { name: "profile", in: "query", required: false, schema: { type: "string" }, description: "Own studio profile id" },
+  { name: "studioId", in: "query", required: false, schema: { type: "string" }, description: "Studio id (studio admin)" },
+  { name: "masterId", in: "query", required: false, schema: { type: "string" }, description: "Master of that studio (studio admin)" },
+];
+
+const SCHEDULE_TIME: SchemaObject = { type: "string", description: "HH:MM, salon time" };
+
+const SCHEDULE_PATTERN_REQUEST_SCHEMA: SchemaObject = {
+  type: "object",
+  properties: {
+    templates: {
+      type: "array",
+      description:
+        "Working days used by this schedule (0–28; none for the manual mode); pattern days reference them by index",
+      items: {
+        type: "object",
+        properties: {
+          label: {
+            type: "string",
+            maxLength: 40,
+            description: "Palette name; a named day stays in the palette when unused",
+          },
+          color: { type: "string", enum: ["1", "2", "3", "4", "5", "6"], description: "Muted palette colour key" },
+          startTime: SCHEDULE_TIME,
+          endTime: SCHEDULE_TIME,
+          breaks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { start: SCHEDULE_TIME, end: SCHEDULE_TIME, title: { type: "string", nullable: true } },
+              required: ["start", "end"],
+            },
+          },
+          scheduleMode: { type: "string", enum: ["FLEXIBLE", "FIXED"] },
+          fixedSlotTimes: { type: "array", items: SCHEDULE_TIME },
+        },
+        required: ["startTime", "endTime", "scheduleMode"],
+      },
+    },
+    pattern: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["WEEK", "WEEKS", "CYCLE"] },
+        cycleDays: { type: "integer", minimum: 1, maximum: 28 },
+        anchorOn: { type: "string", format: "date", description: "Salon date of position 0 (a Monday for weeks)" },
+        startsOn: { type: "string", format: "date", description: "First day, not in the past" },
+        endsOn: {
+          type: "string",
+          format: "date",
+          nullable: true,
+          description: "Last day (at most 3 months ahead); null — extend automatically",
+        },
+        days: {
+          type: "array",
+          description: "Per position: index into templates, or null for a day off",
+          items: { type: "integer", nullable: true },
+        },
+        resumePrevious: {
+          type: "boolean",
+          default: false,
+          description: "After endsOn: false — no schedule; true — the previous schedule resumes",
+        },
+      },
+      required: ["kind", "cycleDays", "anchorOn", "startsOn", "endsOn", "days"],
+    },
+  },
+  required: ["templates", "pattern"],
+};
+
+const SCHEDULE_BREAKS_SCHEMA: SchemaObject = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: { start: SCHEDULE_TIME, end: SCHEDULE_TIME, title: { type: "string", nullable: true } },
+    required: ["start", "end"],
+  },
+};
+
+const SCHEDULE_CALENDAR_SCHEMA: SchemaObject = {
+  type: "object",
+  properties: {
+    timezone: { type: "string" },
+    pending: {
+      type: "object",
+      nullable: true,
+      description:
+        "Studio-profile calendar: what the master already sent to the studio in the open request (null for other actors)",
+      properties: {
+        hasWeek: { type: "boolean" },
+        hasPattern: { type: "boolean" },
+        days: {
+          type: "array",
+          items: { type: "object", properties: { date: { type: "string", format: "date" }, action: { type: "object" } } },
+        },
+      },
+    },
+    studio: {
+      type: "object",
+      nullable: true,
+      description:
+        "Personal calendar of a master who also works in a studio: studio working days by date (read-only)",
+      properties: { name: { type: "string" }, days: { type: "object" } },
+    },
+    todayKey: { type: "string", format: "date" },
+    fromKey: { type: "string", format: "date" },
+    lastKey: { type: "string", format: "date", description: "Last configurable day (today + 3 months)" },
+    days: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          date: { type: "string", format: "date" },
+          past: { type: "boolean" },
+          beyond: { type: "boolean" },
+          isWorking: { type: "boolean" },
+          start: { type: "string", nullable: true },
+          end: { type: "string", nullable: true },
+          fixed: { type: "boolean" },
+          templateId: { type: "string", nullable: true },
+          painted: { type: "boolean", description: "Changed in the calendar rather than taken from the schedule" },
+          bookings: { type: "integer" },
+        },
+        required: ["date", "past", "beyond", "isWorking", "fixed", "painted", "bookings"],
+      },
+    },
+  },
+  required: ["timezone", "todayKey", "fromKey", "lastKey", "days"],
+};
+
+const SCHEDULE_PALETTE_DAY_SCHEMA: SchemaObject = {
+  type: "object",
+  properties: {
+    label: { type: "string", maxLength: 40 },
+    color: { type: "string", enum: ["1", "2", "3", "4", "5", "6"] },
+    startTime: SCHEDULE_TIME,
+    endTime: SCHEDULE_TIME,
+    breaks: SCHEDULE_BREAKS_SCHEMA,
+    scheduleMode: { type: "string", enum: ["FLEXIBLE", "FIXED"] },
+    fixedSlotTimes: { type: "array", items: SCHEDULE_TIME },
+  },
+  required: ["label", "color", "startTime", "endTime", "scheduleMode"],
+};
+
+const SCHEDULE_PATTERN_CONFLICT_SCHEMA: SchemaObject = {
+  type: "object",
+  properties: {
+    bookingId: { type: "string" },
+    startAtUtc: { type: "string", format: "date-time" },
+    endAtUtc: { type: "string", format: "date-time" },
+    clientName: { type: "string", nullable: true },
+    reason: { type: "string", enum: ["DAY_OFF", "OUTSIDE_HOURS"] },
+  },
+  required: ["bookingId", "startAtUtc", "endAtUtc", "clientName", "reason"],
+};
+
 // MOVE-PICKER-DURATION: студийный перенос этой записи к запрошенному мастеру.
 const moveBookingIdQuery: ParameterObject = {
   name: "moveBookingId",
@@ -218,7 +376,6 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/ReviewData" },
               { $ref: "#/components/schemas/ReviewListData" },
               { $ref: "#/components/schemas/CanLeaveReviewData" },
-              { $ref: "#/components/schemas/StudioCalendarData" },
               { $ref: "#/components/schemas/TimeBlockData" },
               { $ref: "#/components/schemas/StudioServicesData" },
               { $ref: "#/components/schemas/AssignMasterData" },
@@ -226,7 +383,6 @@ export const openApiSpec = {
               { $ref: "#/components/schemas/StudioMasterListData" },
               { $ref: "#/components/schemas/BulkUpdatedData" },
               { $ref: "#/components/schemas/StudioCategoryData" },
-              { $ref: "#/components/schemas/MasterDayData" },
               { $ref: "#/components/schemas/MasterScheduleData" },
               { $ref: "#/components/schemas/MasterProfileData" },
               { $ref: "#/components/schemas/MasterPortfolioListData" },
@@ -1116,30 +1272,6 @@ export const openApiSpec = {
           canDelete: { type: "boolean" },
         },
       },
-      CalendarMaster: {
-        type: "object",
-        required: ["id", "name", "isActive"],
-        properties: {
-          id: { type: "string" },
-          name: { type: "string" },
-          isActive: { type: "boolean" },
-        },
-      },
-      CalendarBooking: {
-        type: "object",
-        required: ["id", "masterId", "serviceId", "serviceTitle", "startAt", "endAt", "status", "clientName", "clientPhone"],
-        properties: {
-          id: { type: "string" },
-          masterId: { type: "string", nullable: true },
-          serviceId: { type: "string" },
-          serviceTitle: { type: "string" },
-          startAt: { type: "string", format: "date-time", nullable: true },
-          endAt: { type: "string", format: "date-time", nullable: true },
-          status: { type: "string" },
-          clientName: { type: "string" },
-          clientPhone: { type: "string" },
-        },
-      },
       TimeBlock: {
         type: "object",
         required: ["id", "masterId", "startAt", "endAt", "type", "note"],
@@ -1150,15 +1282,6 @@ export const openApiSpec = {
           endAt: { type: "string", format: "date-time" },
           type: { type: "string", enum: ["BREAK", "BLOCK"] },
           note: { type: "string", nullable: true },
-        },
-      },
-      StudioCalendarData: {
-        type: "object",
-        required: ["masters", "bookings", "blocks"],
-        properties: {
-          masters: { type: "array", items: { $ref: "#/components/schemas/CalendarMaster" } },
-          bookings: { type: "array", items: { $ref: "#/components/schemas/CalendarBooking" } },
-          blocks: { type: "array", items: { $ref: "#/components/schemas/TimeBlock" } },
         },
       },
       StudioClientListItem: {
@@ -1410,100 +1533,6 @@ export const openApiSpec = {
         required: ["updated"],
         properties: {
           updated: { type: "integer" },
-        },
-      },
-      MasterDayBooking: {
-        type: "object",
-        required: [
-          "id",
-          "startAt",
-          "endAt",
-          "rawStatus",
-          "status",
-          "canNoShow",
-          "clientName",
-          "clientPhone",
-          "notes",
-          "serviceTitle",
-        ],
-        properties: {
-          id: { type: "string" },
-          startAt: { type: "string", format: "date-time", nullable: true },
-          endAt: { type: "string", format: "date-time", nullable: true },
-          rawStatus: { type: "string" },
-          status: { type: "string" },
-          canNoShow: { type: "boolean" },
-          clientName: { type: "string" },
-          clientPhone: { type: "string" },
-          notes: { type: "string", nullable: true },
-          serviceTitle: { type: "string" },
-        },
-      },
-      MasterDayWorkingHours: {
-        type: "object",
-        required: ["isDayOff", "startLocal", "endLocal", "bufferBetweenBookingsMin"],
-        properties: {
-          isDayOff: { type: "boolean" },
-          startLocal: { type: "string", nullable: true },
-          endLocal: { type: "string", nullable: true },
-          bufferBetweenBookingsMin: { type: "integer" },
-        },
-      },
-      MasterDayGap: {
-        type: "object",
-        required: ["startAt", "endAt", "minutes"],
-        properties: {
-          startAt: { type: "string", format: "date-time" },
-          endAt: { type: "string", format: "date-time" },
-          minutes: { type: "integer" },
-        },
-      },
-      MasterDayReview: {
-        type: "object",
-        required: ["id", "rating", "text", "authorName", "createdAt"],
-        properties: {
-          id: { type: "string" },
-          rating: { type: "integer", minimum: 1, maximum: 5 },
-          text: { type: "string", nullable: true },
-          authorName: { type: "string" },
-          createdAt: { type: "string", format: "date-time" },
-        },
-      },
-      MasterDayServiceOption: {
-        type: "object",
-        required: ["id", "title", "price", "durationMin"],
-        properties: {
-          id: { type: "string" },
-          title: { type: "string" },
-          price: { type: "integer" },
-          durationMin: { type: "integer" },
-        },
-      },
-      MasterDayData: {
-        type: "object",
-        required: [
-          "date",
-          "isSolo",
-          "workingHours",
-          "bookings",
-          "currentBookingId",
-          "nextBookingId",
-          "monthEarnings",
-          "upcomingGaps",
-          "latestReviews",
-          "services",
-        ],
-        properties: {
-          date: { type: "string" },
-          isSolo: { type: "boolean" },
-          workingHours: { $ref: "#/components/schemas/MasterDayWorkingHours" },
-          bookings: { type: "array", items: { $ref: "#/components/schemas/MasterDayBooking" } },
-          currentBookingId: { type: "string", nullable: true },
-          nextBookingId: { type: "string", nullable: true },
-          monthEarnings: { type: "integer" },
-          upcomingGaps: { type: "array", items: { $ref: "#/components/schemas/MasterDayGap" } },
-          latestReviews: { type: "array", items: { $ref: "#/components/schemas/MasterDayReview" } },
-          services: { type: "array", items: { $ref: "#/components/schemas/MasterDayServiceOption" } },
         },
       },
       CreateMasterBookingInput: {
@@ -2317,6 +2346,29 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/public/bookings/manage/{token}/review": {
+      post: {
+        summary: "Leave a review for a finished guest booking by its signed manage link",
+        tags: ["bookings", "reviews"],
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReviewCreateInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse({ $ref: "#/components/schemas/ReviewData" }, "Created"),
+          "400": errorResponse("Validation error"),
+          "403": errorResponse("Review not allowed (window) or booking belongs to an account"),
+          "404": errorResponse("Link is invalid or expired, or the booking is not covered by the link"),
+          "409": errorResponse("Review already left"),
+          "429": errorResponse("Rate limited"),
+          "503": errorResponse("Rate limiter unavailable"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     "/api/public/bookings/manage/{token}/reschedule": {
       post: {
         summary: "Request a reschedule of a guest booking by its signed manage link",
@@ -2954,6 +3006,74 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/me/setup-guide": {
+      get: {
+        summary: "«Первые шаги» of the signed-in user's own master/studio cabinet: steps, which are done, what is next",
+        tags: ["me"],
+        parameters: [
+          {
+            name: "scope",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["master", "studio"] },
+            description: "Which own cabinet (default: master). Studio — the one open in the cabinet, owner or admin only.",
+          },
+        ],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              guide: {
+                type: "object",
+                properties: {
+                  scope: { type: "string", enum: ["master", "studio"] },
+                  steps: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: { id: { type: "string" }, done: { type: "boolean" }, href: { type: "string" } },
+                    },
+                  },
+                  doneCount: { type: "integer" },
+                  total: { type: "integer" },
+                  nextId: { type: "string", nullable: true },
+                  hidden: { type: "boolean" },
+                  invitesPending: { type: "integer" },
+                },
+              },
+            },
+            required: ["guide"],
+          }),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Cabinet not found"),
+        },
+      },
+      patch: {
+        summary: "Confirm the booking rules step, or hide/show the «Первые шаги» card",
+        tags: ["me"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  scope: { type: "string", enum: ["master", "studio"] },
+                  action: { type: "string", enum: ["confirmRules", "hide", "show"] },
+                },
+                required: ["scope", "action"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ type: "object", properties: { ok: { type: "boolean" } } }),
+          "400": errorResponse("Invalid body"),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Cabinet not found"),
+        },
+      },
+    },
     "/api/me/catalog-presence": {
       get: {
         summary: "Whether the signed-in user's own master/studio cabinet is listed in the catalog, and which conditions are missing",
@@ -2981,6 +3101,253 @@ export const openApiSpec = {
           }),
           "401": errorResponse("Unauthorized"),
           "404": errorResponse("Not found"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule/pattern": {
+      put: {
+        summary:
+          "Apply a dated work schedule (week, alternating weeks or N-on/M-off cycle) from the setup wizard; bookings left on new days off are listed, not changed",
+        tags: ["schedule"],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        requestBody: { required: true, content: { "application/json": { schema: SCHEDULE_PATTERN_REQUEST_SCHEMA } } },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              snapshot: { type: "object" },
+              conflicts: { type: "array", items: SCHEDULE_PATTERN_CONFLICT_SCHEMA },
+            },
+            required: ["snapshot", "conflicts"],
+          }),
+          "400": errorResponse("Invalid schedule"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio profile schedule is changed by the studio"),
+          "404": errorResponse("Not found"),
+        },
+      },
+      patch: {
+        summary: "Set the last day of the configured schedule, or null to extend it automatically",
+        tags: ["schedule"],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: { endsOn: { type: "string", format: "date", nullable: true } },
+                required: ["endsOn"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ type: "object", properties: { snapshot: { type: "object" } }, required: ["snapshot"] }),
+          "400": errorResponse("Invalid date"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio profile schedule is changed by the studio"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule/pattern/preview": {
+      post: {
+        summary: "Dry run of the setup wizard: bookings the new schedule would leave on days off or outside working hours",
+        tags: ["schedule"],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        requestBody: { required: true, content: { "application/json": { schema: SCHEDULE_PATTERN_REQUEST_SCHEMA } } },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: { conflicts: { type: "array", items: SCHEDULE_PATTERN_CONFLICT_SCHEMA } },
+            required: ["conflicts"],
+          }),
+          "400": errorResponse("Invalid schedule"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio profile schedule is changed by the studio"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule/calendar": {
+      get: {
+        summary: "Schedule calendar for the current month through the 3-month horizon, as the slot engine sees it",
+        tags: ["schedule"],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: { calendar: SCHEDULE_CALENDAR_SCHEMA },
+            required: ["calendar"],
+          }),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Not found"),
+        },
+      },
+      put: {
+        summary:
+          "Paint calendar days: a palette working day, a day off, own hours, or back to the schedule; bookings are kept. " +
+          "For a studio profile the days are added to the open studio request instead (withdraw removes a day from it)",
+        tags: ["schedule"],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  dates: { type: "array", items: { type: "string", format: "date" }, description: "1–93 salon dates" },
+                  action: {
+                    type: "object",
+                    properties: {
+                      kind: { type: "string", enum: ["template", "off", "reset", "hours", "withdraw"] },
+                      templateId: { type: "string" },
+                      startTime: SCHEDULE_TIME,
+                      endTime: SCHEDULE_TIME,
+                      breaks: SCHEDULE_BREAKS_SCHEMA,
+                    },
+                    required: ["kind"],
+                  },
+                },
+                required: ["dates", "action"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              calendar: SCHEDULE_CALENDAR_SCHEMA,
+              snapshot: { type: "object" },
+              request: {
+                type: "object",
+                description: "Studio profile only: what happened to the open studio request",
+                properties: { outcome: { type: "string", enum: ["created", "updated", "withdrawn", "unchanged"] } },
+              },
+            },
+            required: ["calendar", "snapshot"],
+          }),
+          "400": errorResponse("Invalid days or action"),
+          "401": errorResponse("Unauthorized"),
+          "404": errorResponse("Studio not found"),
+        },
+      },
+    },
+    "/api/studio/schedule/team": {
+      get: {
+        summary:
+          "Studio team board: active masters × 14 days (salon dates) as the slot engine sees them, with each master's schedule plan and palette; read-only",
+        tags: ["schedule"],
+        parameters: [
+          {
+            name: "from",
+            in: "query",
+            required: false,
+            description: "First day of the window (studio date); clamped to 4 weeks back … horizon",
+            schema: { type: "string", format: "date" },
+          },
+        ],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: {
+              board: {
+                type: "object",
+                properties: {
+                  todayKey: { type: "string", format: "date" },
+                  fromKey: { type: "string", format: "date" },
+                  lastKey: { type: "string", format: "date" },
+                  minFromKey: { type: "string", format: "date" },
+                  dates: { type: "array", items: { type: "string", format: "date" } },
+                  masters: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        name: { type: "string" },
+                        avatarUrl: { type: "string", nullable: true },
+                        timezone: { type: "string" },
+                        plan: { type: "object" },
+                        days: { type: "array", items: { type: "object" } },
+                      },
+                      required: ["id", "name", "timezone", "plan", "days"],
+                    },
+                  },
+                },
+                required: ["todayKey", "fromKey", "lastKey", "minFromKey", "dates", "masters"],
+              },
+            },
+            required: ["board"],
+          }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio owner or admin only"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule/palette": {
+      post: {
+        summary: "Create a named palette working day (hours, breaks, booking mode, muted colour)",
+        tags: ["schedule"],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        requestBody: { required: true, content: { "application/json": { schema: SCHEDULE_PALETTE_DAY_SCHEMA } } },
+        responses: {
+          "200": okResponse({
+            type: "object",
+            properties: { templateId: { type: "string" }, snapshot: { type: "object" } },
+            required: ["templateId", "snapshot"],
+          }),
+          "400": errorResponse("Invalid working day"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio profile schedule is changed by the studio"),
+          "409": errorResponse("Palette is full"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule/palette/{templateId}": {
+      patch: {
+        summary: "Rename or recolour a palette working day (hours never change: other hours are a new day)",
+        tags: ["schedule"],
+        parameters: [
+          { name: "templateId", in: "path", required: true, schema: { type: "string" } },
+          ...SCHEDULE_ACTOR_PARAMETERS,
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  label: { type: "string", maxLength: 40 },
+                  color: { type: "string", enum: ["1", "2", "3", "4", "5", "6"] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ type: "object", properties: { snapshot: { type: "object" } }, required: ["snapshot"] }),
+          "400": errorResponse("Invalid name or colour"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio profile schedule is changed by the studio"),
+          "404": errorResponse("Not found"),
+        },
+      },
+      delete: {
+        summary: "Delete a palette working day that no schedule, week or future calendar day uses",
+        tags: ["schedule"],
+        parameters: [
+          { name: "templateId", in: "path", required: true, schema: { type: "string" } },
+          ...SCHEDULE_ACTOR_PARAMETERS,
+        ],
+        responses: {
+          "200": okResponse({ type: "object", properties: { snapshot: { type: "object" } }, required: ["snapshot"] }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Studio profile schedule is changed by the studio"),
+          "404": errorResponse("Not found"),
+          "409": errorResponse("Working day is in use"),
         },
       },
     },
@@ -3161,26 +3528,6 @@ export const openApiSpec = {
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
           "409": errorResponse("Conflict"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/calendar": {
-      get: {
-        summary: "Studio unified calendar",
-        tags: ["studio", "calendar"],
-        parameters: [
-          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
-          { name: "date", in: "query", required: true, schema: { type: "string" } },
-          { name: "view", in: "query", required: false, schema: { type: "string", enum: ["day", "week", "month"] } },
-          { name: "masterIds", in: "query", required: false, schema: { type: "string" } },
-        ],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/StudioCalendarData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Studio not found"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -3593,20 +3940,6 @@ export const openApiSpec = {
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/master/day": {
-      get: {
-        summary: "Master day timeline",
-        tags: ["master"],
-        parameters: [{ name: "date", in: "query", required: true, schema: { type: "string" } }],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/MasterDayData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
           "500": errorResponse("Internal error"),
         },
       },

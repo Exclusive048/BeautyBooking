@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export type TabItem = {
@@ -11,6 +11,10 @@ export type TabItem = {
   disabled?: boolean;
   /** Optional native title attribute — shown as tooltip on hover, useful for "Скоро" hints on disabled tabs. */
   title?: string;
+  /** Иконка перед подписью (фильтр уведомлений по типу). */
+  icon?: ReactNode;
+  /** `data-testid` для QA-локаторов. */
+  testId?: string;
 };
 
 /**
@@ -29,20 +33,31 @@ export type TabItem = {
  * сжимается до доступной ширины. Проверять надо поведением — `innerWidth ===
  * documentElement.clientWidth` (`.qa/no-horizontal-overflow.spec.ts`), а не
  * чтением классов.
+ *
+ * 29.09 доработки · 22 (решение владельца 22.2 — «один вид»): это вкладки
+ * разделов И фильтры списков с 4+ вариантами или со счётчиком (`badge`) во всех
+ * кабинетах; 2–3 варианта без счётчика — `SegmentedTabs`, чипы (теги, быстрые
+ * вставки) — `ChipButton`. Выбранная вкладка объявлена диктору (`aria-pressed`),
+ * у кнопок фирменное кольцо фокуса.
  */
 export function Tabs({
   items,
   value,
   onChange,
   className,
+  ariaLabel,
 }: {
   items: TabItem[];
   value: string;
   onChange: (id: string) => void;
   className?: string;
+  /** Что переключают вкладки — для диктора («Статус записей»). */
+  ariaLabel?: string;
 }) {
   return (
     <div
+      role={ariaLabel ? "group" : undefined}
+      aria-label={ariaLabel}
       className={cn(
         "inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl border border-border-subtle bg-bg-input p-1.5 shadow-card scrollbar-hide",
         className
@@ -60,9 +75,12 @@ export function Tabs({
               onChange(t.id);
             }}
             aria-disabled={disabled}
+            aria-pressed={active}
+            data-testid={t.testId}
             title={t.title}
             className={cn(
-              "inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-300",
+              "inline-flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/45",
               disabled
                 ? "cursor-not-allowed text-text-sec/40"
                 : active
@@ -70,6 +88,7 @@ export function Tabs({
                 : "text-text-sec hover:bg-bg-card/80 hover:text-text-main"
             )}
           >
+            {t.icon}
             <span>{t.label}</span>
             {t.badge !== undefined ? (
               <span

@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Check, ExternalLink, Loader2, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import type { VkCommunityView } from "@/features/admin-cabinet/settings/types";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { DISTANCE } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Status = "idle" | "saving" | "removing" | "saved" | "removed" | "error";
 
@@ -30,7 +31,6 @@ export function VkCommunitySection({ initial }: Props) {
   const [token, setToken] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const reduce = useReducedMotion();
 
   const busy = status === "saving" || status === "removing";
   const hasStored = view.community !== null;
@@ -41,24 +41,20 @@ export function VkCommunitySection({ initial }: Props) {
     setErrorMessage(null);
     const fallback = method === "PUT" ? t.errorLabel : t.removeErrorLabel;
     try {
-      const res = await fetch("/api/admin/vk-community", {
+      const data = await fetchJsonWithAuth<VkCommunityView>("/api/admin/vk-community", {
         method,
         headers: method === "PUT" ? { "Content-Type": "application/json" } : undefined,
         body: method === "PUT" ? JSON.stringify({ token: token.trim() }) : undefined,
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<VkCommunityView> | null;
-      if (!res.ok || !json || !json.ok) {
-        // Сервер отвечает действенным текстом («ключ другого сообщества», «нет
-        // права на сообщения») — его и показываем.
-        throw new Error(json && !json.ok ? json.error.message : fallback);
-      }
-      setView(json.data);
+      setView(data);
       setToken("");
       setStatus(method === "PUT" ? "saved" : "removed");
       window.setTimeout(() => setStatus((curr) => (curr === "saved" || curr === "removed" ? "idle" : curr)), 1800);
     } catch (err) {
+      // Сервер отвечает действенным текстом («ключ другого сообщества», «нет
+      // права на сообщения») — его и показываем.
       setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : fallback);
+      setErrorMessage(serverMessageOr(err, fallback));
     }
   };
 
@@ -82,38 +78,38 @@ export function VkCommunitySection({ initial }: Props) {
         <>
           <AnimatePresence mode="wait">
             {busy ? (
-              <motion.span
+              <m.span
                 key="busy"
-                initial={reduce ? false : { opacity: 0 }}
+                initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-text-sec"
               >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                 {status === "removing" ? t.removingLabel : t.savingLabel}
-              </motion.span>
+              </m.span>
             ) : status === "saved" || status === "removed" ? (
-              <motion.span
+              <m.span
                 key="done"
-                initial={reduce ? false : { opacity: 0, y: -4 }}
+                initial={{ opacity: 0, y: -DISTANCE.nudge }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-success-text"
               >
                 <Check className="h-3.5 w-3.5" aria-hidden />
                 {status === "saved" ? t.savedLabel : t.removedLabel}
-              </motion.span>
+              </m.span>
             ) : status === "error" ? (
-              <motion.span
+              <m.span
                 key="error"
-                initial={reduce ? false : { opacity: 0 }}
+                initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-danger-text"
               >
                 <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 {errorMessage ?? t.errorLabel}
-              </motion.span>
+              </m.span>
             ) : null}
           </AnimatePresence>
           {hasStored ? (

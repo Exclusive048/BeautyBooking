@@ -5,7 +5,7 @@ import { Flame, Star, X } from "lucide-react";
 import { ChipButton } from "@/components/ui/chip-button";
 import { useTopCategories } from "@/features/catalog/lib/use-top-categories";
 import { moneyRUBFromKopeks } from "@/lib/format";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.catalog2.quickFilters;
 

@@ -188,12 +188,6 @@ const envSchema = z.object({
 
   // ── SMTP ──────────────────────────────────────────────────────────────────
   SMTP_HOST: z.string().optional(),
-  // PWA-FIX-02: порт, на котором приложение слушает внутри контейнера. Нужен
-  // серверному self-fetch (`lib/api/server-fetch.ts`), чтобы обращаться к
-  // собственным API-роутам по петле, а не по публичному домену. Совпадает с
-  // `ENV PORT=3000` в Dockerfile; в dev перекрывается автоматически, когда Next
-  // занимает следующий свободный порт.
-  PORT: z.coerce.number().int().positive().default(3000),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),

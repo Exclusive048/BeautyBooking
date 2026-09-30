@@ -2,7 +2,7 @@ import { Smartphone } from "lucide-react";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { TelegramNotificationsSection } from "@/features/cabinet/components/telegram-notifications";
 import { isTelegramEnabled } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
 import type { StudioNotificationsData } from "../../lib/types";
 
@@ -38,7 +38,7 @@ export function NotificationsSection({ data }: Props) {
         <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/30 p-3">
           <div className="flex items-center gap-2">
             <Smartphone
-              className={data.pushEnabled ? "h-4 w-4 text-emerald-600 dark:text-emerald-400" : "h-4 w-4 text-text-sec"}
+              className={data.pushEnabled ? "h-4 w-4 text-success-text" : "h-4 w-4 text-text-sec"}
               aria-hidden
             />
             <span className="text-sm font-medium text-text-main">{T.channelPush}</span>
@@ -46,7 +46,7 @@ export function NotificationsSection({ data }: Props) {
           <span
             className={
               data.pushEnabled
-                ? "rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+                ? "rounded-full border border-success-border bg-success-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-success-text"
                 : "rounded-full border border-border-subtle bg-bg-input px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec"
             }
           >

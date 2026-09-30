@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { getMasterPublicProfileView } from "@/lib/master/public-profile-view.service";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -19,7 +19,7 @@ export async function MapSection({ providerId }: Props) {
     view = await getMasterPublicProfileView(providerId);
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-map", error, [`/api/providers/${providerId}`]);
+    logPublicBlockError("master-map", error, ["getMasterPublicProfileView"]);
   }
 
   if (hasError || !view) {

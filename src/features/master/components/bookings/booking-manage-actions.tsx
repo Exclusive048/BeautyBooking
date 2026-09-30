@@ -8,7 +8,7 @@ import { useMasterBookingCancel } from "@/features/master/components/bookings/us
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
 import { usePrompt } from "@/hooks/use-prompt";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings;
 
@@ -105,10 +105,11 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
             <Calendar className="h-3.5 w-3.5" aria-hidden strokeWidth={1.8} />
             {T.card.reschedule}
           </Button>
+          {/* `wrapper`: у `secondary` цвет текста перебивал красный. */}
           <Button
             type="button"
-            variant="secondary"
-            size="sm"
+            variant="wrapper"
+            size="none"
             disabled={disabled || isPastModifyWindow}
             title={
               isPastModifyWindow
@@ -116,14 +117,14 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
                 : undefined
             }
             onClick={handleCancel}
-            className="flex-auto whitespace-nowrap border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-950/30"
+            className="inline-flex h-9 items-center justify-center rounded-2xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface flex-auto gap-2 whitespace-nowrap border border-danger-border bg-bg-input"
           >
             <X className="h-3.5 w-3.5" aria-hidden strokeWidth={1.8} />
             {T.card.cancel}
           </Button>
         </div>
         {error ? (
-          <p className="text-[11px] text-rose-600 dark:text-rose-300">{error}</p>
+          <p className="text-[11px] text-danger-text">{error}</p>
         ) : null}
       </div>
 

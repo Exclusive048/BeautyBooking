@@ -5,11 +5,9 @@ import { Check, Copy, Download, ExternalLink, Pencil, QrCode, Smartphone } from 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QrCodeCanvas } from "@/components/ui/qr-code-canvas";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
 import { BRAND_COLORS, withAlpha } from "@/lib/ui/brand-colors";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 type Payload = {
   username: string;
@@ -371,16 +369,12 @@ export function PublicSettingsClient({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(endpoint, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<Payload> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      setUsername(json.data.username);
-      setUrl(json.data.url);
-      setDraft(json.data.username);
+      const data = await fetchJsonWithAuth<Payload>(endpoint, { cache: "no-store" });
+      setUsername(data.username);
+      setUrl(data.url);
+      setDraft(data.username);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.saveFailed);
+      setError(serverMessageOr(err, t.saveFailed));
     } finally {
       setLoading(false);
     }
@@ -460,20 +454,16 @@ export function PublicSettingsClient({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(endpoint, {
+      const data = await fetchJsonWithAuth<Payload>(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: next }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<Payload> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      setUsername(json.data.username);
-      setUrl(json.data.url);
+      setUsername(data.username);
+      setUrl(data.url);
       setIsEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.saveFailed);
+      setError(serverMessageOr(err, t.saveFailed));
     } finally {
       setSaving(false);
     }
@@ -573,7 +563,7 @@ export function PublicSettingsClient({
                   aria-label={t.copyLink}
                 >
                   {copied ? (
-                    <Check className="h-4 w-4 text-emerald-400" />
+                    <Check className="h-4 w-4 text-success-text" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
@@ -638,8 +628,8 @@ export function PublicSettingsClient({
             </div>
           )}
 
-          {copied ? <p className="text-xs text-emerald-500">{t.copied}</p> : null}
-          {error ? <p role="alert" className="text-xs text-red-500">{error}</p> : null}
+          {copied ? <p className="text-xs text-success-text">{t.copied}</p> : null}
+          {error ? <p role="alert" className="text-xs text-danger-text">{error}</p> : null}
         </div>
       </div>
 

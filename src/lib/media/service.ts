@@ -3,6 +3,7 @@ import {
   MediaAssetStatus,
   MediaEntityType,
   MediaKind,
+  Prisma,
   SubscriptionScope,
   type MediaAsset,
 } from "@prisma/client";
@@ -30,8 +31,10 @@ import {
   SITE_LOGO_SETTING_KEY,
 } from "@/lib/media/settings";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
-import { carryStudioPortfolioItem, syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
+import { carryPortfolioItem, syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
+import { invalidateStoriesCache } from "@/lib/feed/stories.service";
 import { studioBannerSettingKey } from "@/lib/studios/portfolio-items-sync";
+import { invalidateSiteAssetCache } from "@/lib/media/site-asset-cache";
 import { enqueue } from "@/lib/queue/queue";
 import { logError } from "@/lib/logging/logger";
 
@@ -95,10 +98,28 @@ export async function deleteAssetById(assetId: string): Promise<void> {
   //    immediately. If step 2 fails, the worst case is an orphan FILE in S3
   //    (small disk leak, cleaned by future cron) — not an orphan RECORD
   //    that would surface as 404 to users.
-  await prisma.mediaAsset.update({
-    where: { id: asset.id },
-    data: { deletedAt: new Date() },
-  });
+  //    29.09 доработки · 16 (RKN-AUDIT-01): в той же транзакции уходят данные,
+  //    выведенные из фото для визуального поиска, — эмбеддинг и `visual*`.
+  //    Каскад `onDelete` срабатывает только при ЖЁСТКОМ удалении, а удаление
+  //    здесь мягкое, поэтому раньше они жили вечно (хранение без цели, 152-ФЗ
+  //    ст. 5 ч. 7). `visualIndexed` не трогаем: иначе переиндексация поставила
+  //    бы удалённое фото в очередь. Это ЕДИНСТВЕННЫЙ писатель `deletedAt` у
+  //    `MediaAsset` (сторож `media/soft-delete-single-writer.test.ts`).
+  await prisma.$transaction([
+    prisma.mediaAsset.update({
+      where: { id: asset.id },
+      data: {
+        deletedAt: new Date(),
+        visualDescription: null,
+        visualMeta: Prisma.DbNull,
+        visualCategory: null,
+      },
+    }),
+    prisma.mediaAssetEmbedding.deleteMany({ where: { assetId: asset.id } }),
+  ]);
+
+  // 29.09 доработки · 20: удалённая картинка сайта не должна жить в кэше шапки.
+  if (asset.entityType === MediaEntityType.SITE) await invalidateSiteAssetCache();
 
   // 2. Best-effort delete from storage. Swallow errors — a transient S3 outage
   //    must not surface to the user when the logical delete already succeeded.
@@ -223,13 +244,19 @@ export function exceedsStorageQuota(input: {
   return input.usedBytes + input.incomingBytes > quota;
 }
 
-async function enforceUserStorageQuota(userId: string, incomingBytes: number): Promise<void> {
+async function enforceUserStorageQuota(
+  userId: string,
+  incomingBytes: number,
+  /** Байты, которые освободит эта же загрузка (замена / вытеснение аватара). */
+  releasingBytes = 0,
+): Promise<void> {
   const used = await prisma.mediaAsset.aggregate({
     where: { createdByUserId: userId, deletedAt: null },
     _sum: { sizeBytes: true },
   });
+  const usedBytes = Math.max(0, (used._sum.sizeBytes ?? 0) - releasingBytes);
 
-  if (exceedsStorageQuota({ usedBytes: used._sum.sizeBytes ?? 0, incomingBytes })) {
+  if (exceedsStorageQuota({ usedBytes, incomingBytes })) {
     throw new AppError(
       "Место для файлов закончилось. Удалите ненужные файлы.",
       409,
@@ -439,6 +466,10 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     await enforcePortfolioLimit(user.id, input.entityType, entityId);
   }
 
+  // 29.09 доработки · 00-13: заменяемое фото и вытесняемые аватары удаляются
+  // ПОСЛЕ того, как новое сохранено. Раньше — до загрузки: при сбое загрузки
+  // работа оставалась с битой картинкой, а профиль без аватара.
+  const superseded: Array<{ id: string; sizeBytes: number; createdByUserId: string | null }> = [];
   if (input.replaceAssetId) {
     const replaceAsset = await prisma.mediaAsset.findUnique({
       where: { id: input.replaceAssetId },
@@ -452,7 +483,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     ) {
       throw new AppError("Фото изменилось. Обновите страницу и попробуйте ещё раз.", 400, "MEDIA_REPLACE_ASSET_MISMATCH");
     }
-    await deleteAssetById(replaceAsset.id);
+    superseded.push(replaceAsset);
   }
 
   if (input.kind === MediaKind.AVATAR && !input.replaceAssetId) {
@@ -463,16 +494,17 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
         kind: MediaKind.AVATAR,
         deletedAt: null,
       },
-      select: { id: true },
+      select: { id: true, sizeBytes: true, createdByUserId: true },
     });
-    for (const avatar of existingAvatars) {
-      await deleteAssetById(avatar.id);
-    }
+    superseded.push(...existingAvatars);
   }
 
-  // SEC-17: после веток замены/вытеснения — они освобождают байты, и на границе
-  // квоты замена файла обязана проходить.
-  await enforceUserStorageQuota(user.id, input.sizeBytes);
+  // SEC-17: замена и вытеснение освобождают байты, и на границе квоты замена
+  // файла обязана проходить — освобождаемое (своё) вычитается заранее.
+  const releasingBytes = superseded
+    .filter((asset) => asset.createdByUserId === user.id)
+    .reduce((sum, asset) => sum + asset.sizeBytes, 0);
+  await enforceUserStorageQuota(user.id, input.sizeBytes, releasingBytes);
 
   const storage = getStorageProvider();
   const storageKey = buildStorageKey({ ...input, entityId });
@@ -511,6 +543,39 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     throw error;
   }
 
+  // STUDIO-PORTFOLIO-FEED / 29.09 · 01-в: при замене строка работы (подпись
+  // студии; услуги, теги и видимость мастера) переезжает на новый файл — до
+  // удаления старого, чтобы работа ни на миг не ссылалась на удалённое фото.
+  if (
+    input.replaceAssetId &&
+    input.kind === MediaKind.PORTFOLIO &&
+    (input.entityType === MediaEntityType.STUDIO || input.entityType === MediaEntityType.MASTER)
+  ) {
+    await carryPortfolioItem(entityId, input.replaceAssetId, readyAsset.id)
+      .then(async (carried) => {
+        // Истории студии обновляет синхронизация ниже; у мастера — здесь.
+        if (carried > 0 && input.entityType === MediaEntityType.MASTER) await invalidateStoriesCache();
+      })
+      .catch((error) => {
+        logError("Failed to carry portfolio item to replaced asset", {
+          assetId: readyAsset.id,
+          entityType: input.entityType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }
+
+  // Новое сохранено — теперь убираем заменённое. Сбой здесь не отменяет
+  // загрузку: лишнее фото видно и удаляется руками, битое — нет.
+  for (const asset of superseded) {
+    await deleteAssetById(asset.id).catch((error) => {
+      logError("Failed to delete superseded media asset", {
+        assetId: asset.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
   if (
     input.entityType === MediaEntityType.SITE &&
     entityId === "site" &&
@@ -522,6 +587,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
       create: { key: SITE_LOGO_SETTING_KEY, value: readyAsset.id },
     });
     await clearSystemConfigFocal(SITE_LOGO_FOCAL_SETTING_KEY);
+    await invalidateSiteAssetCache();
   }
 
   if (
@@ -535,6 +601,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
       create: { key: SITE_LOGIN_HERO_SETTING_KEY, value: readyAsset.id },
     });
     await clearSystemConfigFocal(SITE_LOGIN_HERO_FOCAL_SETTING_KEY);
+    await invalidateSiteAssetCache();
   }
 
   if (
@@ -552,17 +619,9 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     await invalidateAdvisorCache(entityId);
   }
 
-  // STUDIO-PORTFOLIO-FEED: фото студии — работа в ленте и историях. При замене
-  // подпись «мастер · услуга» переезжает на новый файл.
+  // STUDIO-PORTFOLIO-FEED: фото студии — работа в ленте и историях (подпись
+  // при замене перенесена выше, до удаления старого файла).
   if (input.entityType === MediaEntityType.STUDIO && input.kind === MediaKind.PORTFOLIO) {
-    if (input.replaceAssetId) {
-      await carryStudioPortfolioItem(entityId, input.replaceAssetId, readyAsset.id).catch((error) => {
-        logError("Failed to carry studio portfolio item to replaced asset", {
-          assetId: readyAsset.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-    }
     await syncStudioPortfolioItemsSafe(entityId);
   }
 
@@ -836,6 +895,8 @@ export async function updateMediaCrop(
   // CROP-PUBLIC-01: публичная ссылка аватара несёт версию области, поэтому
   // новая область — новая ссылка в `Provider.avatarUrl`. Только если это
   // ТЕКУЩИЙ аватар кабинета (тот же выбор, что при удалении: последний READY).
+  // У логотипа сайта ссылка из кэша шапки — сбросить (29.09 доработки · 20).
+  if (updated.entityType === MediaEntityType.SITE) await invalidateSiteAssetCache();
   if (
     updated.kind === MediaKind.AVATAR &&
     (updated.entityType === MediaEntityType.MASTER || updated.entityType === MediaEntityType.STUDIO)

@@ -1,6 +1,6 @@
 import { Calendar } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
 import type { StudioBookingRow } from "../server/types";
 import { BookingRow } from "./booking-row";

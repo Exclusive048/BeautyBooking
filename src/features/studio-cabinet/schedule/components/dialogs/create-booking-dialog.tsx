@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
 import {
   OperatorSlotPicker,
@@ -140,7 +141,7 @@ export function CreateBookingDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/studio/bookings", {
+      await fetchJsonWithAuth<unknown>("/api/studio/bookings", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -152,17 +153,10 @@ export function CreateBookingDialog({
           clientPhone: normalizedPhone,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.create);
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.create);
+    } catch (error) {
+      setError(serverMessageOr(error, E.create));
     } finally {
       setSubmitting(false);
     }
@@ -266,18 +260,18 @@ export function CreateBookingDialog({
             className={
               phoneIsValid
                 ? undefined
-                : "border-red-500 focus-visible:ring-red-500/40 dark:border-red-400"
+                : "border-destructive focus-visible:ring-destructive/40"
             }
           />
           {!phoneIsValid ? (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-300" role="alert">
+            <p className="mt-1 text-xs text-danger-text" role="alert">
               {E.clientPhoneInvalid}
             </p>
           ) : null}
         </label>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

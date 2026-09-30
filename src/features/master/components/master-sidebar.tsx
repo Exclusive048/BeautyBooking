@@ -21,7 +21,7 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { MasterUserChip } from "@/features/master/components/master-user-chip";
 import { NavGroup } from "@/features/master/components/nav-group";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Counts = {
   pendingBookings: number;

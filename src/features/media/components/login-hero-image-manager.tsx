@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CropPicker } from "@/features/media/components/crop-picker";
-import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { FileInput } from "@/components/ui/file-input";
 
 const SITE_ENTITY_TYPE = "SITE";
 const SITE_ENTITY_ID = "site";
@@ -35,16 +36,11 @@ export function LoginHeroImageManager() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(buildListUrl(), { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
+      const data = await fetchJsonWithAuth<{ assets: MediaAssetDto[] }>(buildListUrl(), { cache: "no-store" });
 
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.loadFailed);
-      }
-
-      setAsset(json.data.assets[0] ?? null);
+      setAsset(data.assets[0] ?? null);
     } catch (loadError) {
-      const message = loadError instanceof Error ? loadError.message : t.loadFailed;
+      const message = serverMessageOr(loadError, t.loadFailed);
       setError(message);
     } finally {
       setLoaded(true);
@@ -66,16 +62,12 @@ export function LoginHeroImageManager() {
         }
         form.set("file", file);
 
-        const res = await fetch("/api/media", { method: "POST", body: form });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : t.uploadFailed);
-        }
+        const data = await fetchJsonWithAuth<{ asset: MediaAssetDto }>("/api/media", { method: "POST", body: form });
 
-        setAsset(json.data.asset);
+        setAsset(data.asset);
         setPickingCrop(true);
       } catch (uploadError) {
-        const message = uploadError instanceof Error ? uploadError.message : t.uploadFailed;
+        const message = serverMessageOr(uploadError, t.uploadFailed);
         setError(message);
       } finally {
         setBusy(false);
@@ -90,14 +82,10 @@ export function LoginHeroImageManager() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/media/${asset.id}`, { method: "DELETE" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.deleteFailed);
-      }
+      await fetchJsonWithAuth<{ result: { id: string } }>(`/api/media/${asset.id}`, { method: "DELETE" });
       setAsset(null);
     } catch (deleteError) {
-      const message = deleteError instanceof Error ? deleteError.message : t.deleteFailed;
+      const message = serverMessageOr(deleteError, t.deleteFailed);
       setError(message);
     } finally {
       setBusy(false);
@@ -175,13 +163,11 @@ export function LoginHeroImageManager() {
         ) : null}
       </div>
 
-      {error ? <div className="text-sm text-rose-300">{error}</div> : null}
+      {error ? <div className="text-sm text-danger-text">{error}</div> : null}
 
-      <input
+      <FileInput
         ref={inputRef}
-        type="file"
         accept="image/jpeg,image/png,image/webp"
-        className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) {

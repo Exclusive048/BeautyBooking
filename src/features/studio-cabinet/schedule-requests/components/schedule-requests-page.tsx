@@ -1,5 +1,5 @@
 import { CalendarClock } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleRequestLists } from "../server/list.service";
 import { RequestCard } from "./request-card";
 

@@ -1,7 +1,7 @@
 import { BarChart3, Calendar, Star, Wallet, type LucideIcon } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMasterDetail } from "../server/types";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail.kpis;

@@ -3,7 +3,7 @@
 import { UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMarkNoShow } from "@/features/master/components/bookings/use-mark-no-show";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.card;
 

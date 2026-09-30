@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { AlertTriangle, Clock, Package, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   StudioPackagePickerService,
   StudioPackageView,
 } from "../server/packages-data.service";
 import { DeletePackageDialog } from "./delete-package-dialog";
 import { PackageModal } from "./package-modal";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.servicesV2.package;
 
@@ -47,22 +48,20 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
               ) : null}
             </div>
             <div className="flex shrink-0 gap-1">
-              <button
-                type="button"
+              <Button variant="wrapper"
                 onClick={() => setEditOpen(true)}
                 className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-card hover:text-text-main"
                 aria-label={T.edit}
               >
                 <Pencil className="h-3.5 w-3.5" aria-hidden />
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="wrapper"
                 onClick={() => setDeleteOpen(true)}
-                className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-card hover:text-red-600"
+                className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-card hover:text-danger-text"
                 aria-label={T.delete}
               >
                 <Trash2 className="h-3.5 w-3.5" aria-hidden />
-              </button>
+              </Button>
             </div>
           </header>
 
@@ -82,7 +81,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
                   />
                   <span className="truncate">{component.name}</span>
                   {!component.isEnabled ? (
-                    <span className="text-[10px] text-amber-700 dark:text-amber-300">
+                    <span className="text-[10px] text-warning-text">
                       ({T.componentDisabled})
                     </span>
                   ) : null}
@@ -92,7 +91,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
           </div>
 
           {pkg.hasDisabledComponent ? (
-            <p className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <p className="flex items-start gap-1.5 rounded-lg border border-warning-border bg-warning-surface px-2.5 py-1.5 text-[11px] text-warning-text">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
               {T.warningDisabledComponents}
             </p>

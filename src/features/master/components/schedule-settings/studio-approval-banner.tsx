@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { useSaveStatus } from "./save-status-provider";
 
 const S = UI_TEXT.cabinetMaster.scheduleSettings.studioApproval;

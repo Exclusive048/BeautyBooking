@@ -26,8 +26,9 @@ import {
   type ServiceBookingConfig,
 } from "@/features/booking/lib/booking-config";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
+import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { BookingHero } from "./components/booking-hero";
@@ -41,6 +42,8 @@ import { BookingSummary } from "./components/booking-summary";
 import { BookingError } from "./components/booking-error";
 import { mergeAnyMasterSlots } from "./any-master-slots";
 import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
+import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
 
 type MasterAvailability = {
   serviceAvailable: boolean;
@@ -170,6 +173,21 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     }
     return "";
   }, [anyMasterSlots, masterId, slotLabel]);
+
+  // 29.09 доработки · 03: полоса дат — окно записи студии и мастера. Для
+  // выбранного мастера — меньшее из двух; для «Любой мастер» — студия и
+  // самый дальний горизонт среди мастеров услуги (окошко уйдёт тому, у кого
+  // оно есть). У мастера без поля ограничивает только студия.
+  const horizonDays = useMemo(() => {
+    const studioDays = studio?.bookingHorizonDays ?? SCHEDULE_HORIZON_DAYS;
+    const masterDays = (master: StudioMaster) => master.bookingHorizonDays ?? studioDays;
+    if (masterId && masterId !== ANY_MASTER_ID) {
+      const selected = masters.find((master) => master.id === masterId);
+      return selected ? Math.min(studioDays, masterDays(selected)) : studioDays;
+    }
+    if (availableMasters.length === 0) return studioDays;
+    return Math.min(studioDays, Math.max(...availableMasters.map(masterDays)));
+  }, [availableMasters, masterId, masters, studio]);
 
   const slots = useMemo(() => {
     if (anyMasterSlots) return anyMasterSlots.map((entry) => entry.slot);
@@ -573,7 +591,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   }
   if (loadError || !studio) {
     return (
-      <div className="rounded-2xl border border-red-300/60 bg-red-50/60 p-6 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
+      <div className="rounded-2xl border border-danger-border bg-danger-surface p-6 text-sm text-danger-text">
         {loadError ?? UI_TEXT.publicStudio.bookingError}
       </div>
     );
@@ -582,7 +600,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   if (success) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 sm:p-8">
-        <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600">
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-success-text">
           ✓
         </div>
         <h2 className="mt-4 font-display text-2xl font-semibold text-text">{UI_TEXT.bookingWidget.success.title}</h2>
@@ -675,7 +693,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
                     : ""
                 }
                 isAnyMaster={masterId === ANY_MASTER_ID}
-                visibleSlotDays={30}
+                horizonDays={horizonDays}
                 onBack={() => goBack("when")}
               />
             ) : null}
@@ -801,7 +819,7 @@ function renderBookingConfig(input: {
     return <div className="mt-4 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.bookingConfigLoading}</div>;
   }
   if (bookingConfigError) {
-    return <div className="mt-4 text-xs text-red-600">{bookingConfigError}</div>;
+    return <div className="mt-4 text-xs text-danger-text">{bookingConfigError}</div>;
   }
   if (!bookingConfig.requiresReferencePhoto && bookingConfig.questions.length === 0) return null;
 
@@ -814,22 +832,30 @@ function renderBookingConfig(input: {
               есть ранние return'ы), поэтому `useId` здесь звать нельзя:
               подпись связана с контролом обёрткой, а не `htmlFor`/`id`. */}
           <label className="block text-xs text-text-muted">
-            {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-red-500">*</span>
-            <input
-              type="file"
+            {UI_TEXT.publicProfile.booking.referencePhotoLabel} <span className="text-danger-text">*</span>
+            <FileInput
+              mode="label-target"
               accept="image/jpeg,image/png,image/webp"
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file) onReferenceUpload(file);
               }}
               disabled={referenceUploading}
-              className="mt-2 block w-full text-xs text-text-muted"
+              className="peer"
             />
+            <Button
+              asChild
+              variant="secondary"
+              size="sm"
+              className="mt-2 flex w-fit cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-primary-glow/45 peer-disabled:pointer-events-none peer-disabled:opacity-50"
+            >
+              <span>{UI_TEXT.publicProfile.booking.referencePhotoPick}</span>
+            </Button>
           </label>
           {referenceUploading ? (
             <div className="mt-2 text-xs text-text-muted">{UI_TEXT.publicProfile.booking.referencePhotoUploading}</div>
           ) : null}
-          {referenceUploadError ? <div className="mt-2 text-xs text-red-600">{referenceUploadError}</div> : null}
+          {referenceUploadError ? <div className="mt-2 text-xs text-danger-text">{referenceUploadError}</div> : null}
           {referencePreviewUrl ? (
             <div className="relative mt-3 h-44 w-full overflow-hidden rounded-xl">
               <Image
@@ -849,7 +875,7 @@ function renderBookingConfig(input: {
             <label key={question.id} className="block text-xs text-text-muted">
               <span className="text-sm text-text">
                 {question.text}
-                {question.required ? <span className="text-red-500"> *</span> : null}
+                {question.required ? <span className="text-danger-text"> *</span> : null}
               </span>
               <Input
                 type="text"

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * AUTH-GATE-01 — `authEnabled` comes from the server (`resolveAuthMethods().any`
@@ -43,7 +43,7 @@ export function TopbarAuthButton({ authEnabled = true }: { authEnabled?: boolean
       </Button>
       {authEnabled ? (
         <Button asChild size="sm">
-          <Link href="/login">{UI_TEXT.auth.login}</Link>
+          <Link href="/login">{UI_TEXT.nav.login}</Link>
         </Button>
       ) : null}
     </div>

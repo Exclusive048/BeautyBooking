@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioReviewItem } from "../lib/types";
 import { ReportReviewDialog } from "./report-review-dialog";
 import { ReviewCard } from "./review-card";

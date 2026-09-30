@@ -1,13 +1,16 @@
 import { BookingSource, Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { createBookingRow } from "@/lib/bookings/booking-row";
-import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { clearStudioAdminTime } from "@/lib/bookings/booking-time-policy";
+import { buildPhoneVariantsForMatch } from "@/lib/bookings/link-guest-bookings";
 import {
-  buildConflictScopeWhere,
-  buildConflictWindowWhere,
-  resolveConflictOccupancyIds,
-  normalizeBufferMinutes,
-} from "@/lib/bookings/booking-core";
+  assertNotInPast,
+  assertWithinMaxDaysAhead,
+  stricterAcceptNewClients,
+  stricterBookingWindow,
+} from "@/lib/bookings/policy-enforcement";
+import { bookingTransaction } from "@/lib/bookings/booking-transaction";
+import { ensureNoConflicts, normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
@@ -29,7 +32,6 @@ import { assertStudioAcceptsBookings } from "@/lib/studio/accepts-bookings";
 import { assertBelongsToStudio } from "@/lib/studio/tenancy";
 import { resolveMoveItemDurationMin } from "@/lib/studio/move-duration";
 import { planStudioMoveDuration } from "@/lib/studio/move-plan";
-import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 
@@ -40,6 +42,41 @@ import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
  * master doesn't accept arbitrary times silently.
  */
 export type MoveStrategy = "KEEP_SERVICE" | "CHANGE_SERVICE";
+
+const WINDOW_POLICY_SELECT = {
+  minBookingHoursAhead: true,
+  maxBookingDaysAhead: true,
+  acceptNewClients: true,
+} as const;
+const WINDOW_POLICY_SELECT_WITH_BUFFER = { ...WINDOW_POLICY_SELECT, bufferBetweenBookingsMin: true } as const;
+/** Окно «по умолчанию колонки», если строки студии нет (защитно; `studio` найден выше). */
+const DEFAULT_WINDOW = { minBookingHoursAhead: 0, maxBookingDaysAhead: 90 };
+
+/**
+ * 29.09 доработки · 07 — «новый ли клиент» у записи админа студии. Клиент
+ * записывается по звонку (телефон, без аккаунта), поэтому прежние визиты
+ * ищутся по номеру во всех формах (`buildPhoneVariantsForMatch`) у студии или
+ * у этого мастера. Без телефона клиент новый — как гость в воронке.
+ */
+async function countStudioClientPriorBookings(input: {
+  studioProviderId: string;
+  masterId: string;
+  clientPhone?: string;
+}): Promise<number> {
+  const phone = input.clientPhone?.trim();
+  if (!phone) return 0;
+  const { variants } = buildPhoneVariantsForMatch(phone);
+  if (variants.length === 0) return 0;
+  return prisma.booking.count({
+    where: {
+      AND: [
+        { OR: [{ providerId: input.studioProviderId }, { masterProviderId: input.masterId }] },
+        { OR: [{ clientPhone: { in: variants } }, { clientPhoneSnapshot: { in: variants } }] },
+        { status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] } },
+      ],
+    },
+  });
+}
 export type MovePricing = "KEEP_PRICE" | "APPLY_TARGET";
 
 export async function createStudioBooking(input: {
@@ -141,7 +178,6 @@ export async function createStudioBooking(input: {
   const localStart = resolveSalonLocalParts(input.startAt, salonTz);
   const workWindow = await resolveMasterWorkWindow(
     master.id,
-    localStart.weekday,
     localStart.dateKey,
   );
   const startMinutesLocal = localStart.minutesFromMidnight;
@@ -156,11 +192,37 @@ export async function createStudioBooking(input: {
   // flags; the buffer column lives on the provider row directly. Buffer
   // resolution is a pure config read + arithmetic, so it stays OUTSIDE
   // the transaction (mirrors FIX-R2-01-B `confirmBooking`).
-  const masterRow = await prisma.provider.findUnique({
-    where: { id: master.id },
-    select: { bufferBetweenBookingsMin: true },
-  });
+  const [masterRow, studioPolicy] = await Promise.all([
+    prisma.provider.findUnique({
+      where: { id: master.id },
+      select: WINDOW_POLICY_SELECT_WITH_BUFFER,
+    }),
+    prisma.provider.findUnique({ where: { id: studio.providerId }, select: WINDOW_POLICY_SELECT }),
+  ]);
   const buffer = normalizeBufferMinutes(masterRow?.bufferBetweenBookingsMin);
+
+  // 29.09 доработки · 07 (решение владельца): на «Новую запись» админа студии
+  // действуют «максимум вперёд» и «новые клиенты» — строже из студии и
+  // мастера; «минимум за» — нет (звонок «через час» записать можно), прошедшее
+  // время — можно (занести прошедший визит).
+  const now = new Date();
+  const acceptNewClients = stricterAcceptNewClients(
+    studioPolicy ?? { acceptNewClients: true },
+    masterRow,
+  );
+  const timeClearance = clearStudioAdminTime({
+    startAtUtc: input.startAt,
+    window: stricterBookingWindow(studioPolicy ?? DEFAULT_WINDOW, masterRow),
+    acceptNewClients,
+    priorBookingsCount: acceptNewClients.acceptNewClients
+      ? 0
+      : await countStudioClientPriorBookings({
+          studioProviderId: studio.providerId,
+          masterId: master.id,
+          clientPhone: input.clientPhone,
+        }),
+    now,
+  });
 
   // FIX-R2-04-A: the conflict re-check now runs INSIDE the create
   // transaction under Serializable isolation (was pre-tx with default
@@ -187,52 +249,21 @@ export async function createStudioBooking(input: {
         // следующий год, становилась кандидатом на P2034 и получала ложный
         // 409 SLOT_CONFLICT. Границы — из того же билдера, что у
         // `ensureNoConflicts`, иначе сужение запроса начнёт терять конфликты.
-        const conflicts = await tx.booking.findMany({
-          where: {
-            ...buildConflictScopeWhere({
-              providerId: studio.providerId,
-              masterProviderId: master.id,
-              occupancyIds: await resolveConflictOccupancyIds(tx, {
-                providerId: studio.providerId,
-                masterProviderId: master.id,
-              }),
-            }),
-            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            ...buildConflictWindowWhere({
-              startAtUtc: input.startAt,
-              endAtUtc: endAt,
-              bufferMin: buffer,
-            }),
-          },
-          select: { startAtUtc: true, endAtUtc: true },
-        });
-        const hasConflict = conflicts.some((row) => {
-          if (!row.startAtUtc || !row.endAtUtc) return false;
-          const itemStart = buffer
-            ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
-            : row.startAtUtc;
-          const itemEnd = buffer
-            ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
-            : row.endAtUtc;
-          return input.startAt < itemEnd && endAt > itemStart;
-        });
-        if (hasConflict) {
-          throw new AppError(
-            "Окошко уже занято у выбранного мастера. Выберите другое время.",
-            409,
-            "SLOT_CONFLICT",
-          );
-        }
-
-        // FIX-TIMEBLOCK-ENFORCEMENT-01: studio admin create is direct authority
-        // (#22) but still cannot land on a TimeBlock the master is closed for.
-        await assertNoTimeBlockConflict(tx, {
+        // Общая проверка (29.09 доработки · 14): окно и скоуп — из билдеров,
+        // занятость — тем же `tx`. FIX-TIMEBLOCK-ENFORCEMENT-01: прямое право
+        // админа (#22) не сажает запись в закрытое время мастера — это та же
+        // функция.
+        await ensureNoConflicts(tx, {
+          providerId: studio.providerId,
           masterProviderId: master.id,
           startAtUtc: input.startAt,
           endAtUtc: endAt,
+          bufferMin: buffer,
+          message: "Окошко уже занято у выбранного мастера. Выберите другое время.",
         });
 
         const booking = await createBookingRow(tx, {
+          timePolicy: timeClearance,
           data: {
             providerId: studio.providerId,
             // FIX-C1: `studioId` выводит writer из `providerId` — здесь это
@@ -348,9 +379,7 @@ export async function moveStudioBooking(input: {
       "CONFLICT",
     );
   }
-  if (input.targetStartAt.getTime() <= Date.now()) {
-    throw new AppError("Нельзя перенести запись на прошедшее время.", 409, "CONFLICT");
-  }
+  assertNotInPast(input.targetStartAt, new Date(), "Нельзя перенести запись на прошедшее время.");
 
   // STUDIO-MOVE-DURATION-01: у другого мастера та же услуга может длиться иначе
   // (`MasterService.durationOverrideMin`). Диалог и перетаскивание в календаре
@@ -381,6 +410,18 @@ export async function moveStudioBooking(input: {
     studioProviderId: studio.providerId,
     masterId: input.targetMasterId,
   });
+
+  // 29.09 доработки · 07 (решение владельца): перенос админом — не дальше
+  // «максимума вперёд» (строже из студии и нового мастера); «минимум за» — нет.
+  const [moveStudioPolicy, moveMasterPolicy] = await Promise.all([
+    prisma.provider.findUnique({ where: { id: studio.providerId }, select: WINDOW_POLICY_SELECT }),
+    prisma.provider.findUnique({ where: { id: targetMaster.id }, select: WINDOW_POLICY_SELECT }),
+  ]);
+  assertWithinMaxDaysAhead(
+    input.targetStartAt,
+    stricterBookingWindow(moveStudioPolicy ?? DEFAULT_WINDOW, moveMasterPolicy),
+    new Date(),
+  );
 
   // STUDIO-RESCHEDULE-VALIDATION-A — three guards before mutating:
   //   #1а master ↔ service compatibility
@@ -431,7 +472,6 @@ export async function moveStudioBooking(input: {
   const localStart = resolveSalonLocalParts(input.targetStartAt, salonTz);
   const workWindow = await resolveMasterWorkWindow(
     input.targetMasterId,
-    localStart.weekday,
     localStart.dateKey,
   );
   const startMinutesLocal = localStart.minutesFromMidnight;
@@ -470,54 +510,17 @@ export async function moveStudioBooking(input: {
   try {
     await bookingTransaction(
       async (tx) => {
-        // LOGIC-01: тот же скоуп, что у create. Exclude-self сохранён — при
-        // переносе бронь ещё занимает свой старый слот.
-        const conflicts = await tx.booking.findMany({
-          where: {
-            ...buildConflictScopeWhere({
-              providerId: booking.providerId,
-              masterProviderId: input.targetMasterId,
-              occupancyIds: await resolveConflictOccupancyIds(tx, {
-                providerId: booking.providerId,
-                masterProviderId: input.targetMasterId,
-              }),
-            }),
-            id: { not: booking.id },
-            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            // LOGIC-17: см. комментарий у create — без окна predicate-lock
-            // накрывает всю историю броней целевого мастера.
-            ...buildConflictWindowWhere({
-              startAtUtc: newStart,
-              endAtUtc: newEnd,
-              bufferMin: buffer,
-            }),
-          },
-          select: { id: true, startAtUtc: true, endAtUtc: true },
-        });
-        const hasConflict = conflicts.some((row) => {
-          if (!row.startAtUtc || !row.endAtUtc) return false;
-          const itemStart = buffer
-            ? new Date(row.startAtUtc.getTime() - buffer * 60_000)
-            : row.startAtUtc;
-          const itemEnd = buffer
-            ? new Date(row.endAtUtc.getTime() + buffer * 60_000)
-            : row.endAtUtc;
-          return newStart < itemEnd && newEnd > itemStart;
-        });
-        if (hasConflict) {
-          throw new AppError(
-            "Окошко уже занято у выбранного мастера. Выберите другое время.",
-            409,
-            "SLOT_CONFLICT",
-          );
-        }
-
-        // FIX-TIMEBLOCK-ENFORCEMENT-01: a move must not drop the booking into a
-        // window the TARGET master is closed for (block owner = target master).
-        await assertNoTimeBlockConflict(tx, {
+        // LOGIC-01: тот же скоуп, что у create; своя строка исключена — при
+        // переносе бронь ещё занимает старое окно. Закрытое время ЦЕЛЕВОГО
+        // мастера (FIX-TIMEBLOCK-ENFORCEMENT-01) проверяет та же функция.
+        await ensureNoConflicts(tx, {
+          providerId: booking.providerId,
           masterProviderId: input.targetMasterId,
           startAtUtc: newStart,
           endAtUtc: newEnd,
+          bufferMin: buffer,
+          excludeBookingId: booking.id,
+          message: "Окошко уже занято у выбранного мастера. Выберите другое время.",
         });
 
         // BOOKING-FLOW-AUDIT-RESIDUALS: компонент пакета не ложится поверх
@@ -526,22 +529,18 @@ export async function moveStudioBooking(input: {
         // пересечение по КЛИЕНТУ (то же, что `intraPackageOverlapMultiMaster`
         // проверяет при создании пакета) перенос пропускал.
         if (booking.bookingPackageId) {
-          const siblings = await tx.booking.findMany({
+          // conflict-scope-ok: соседи по пакету — скоуп по КЛИЕНТУ (пакет), а не по мастеру; окно без буфера, как при создании пакета.
+          const overlappingSibling = await tx.booking.findFirst({
             where: {
               bookingPackageId: booking.bookingPackageId,
               id: { not: booking.id },
               status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
+              startAtUtc: { lt: newEnd },
+              endAtUtc: { gt: newStart },
             },
-            select: { startAtUtc: true, endAtUtc: true },
+            select: { id: true },
           });
-          const overlapsSibling = siblings.some(
-            (row) =>
-              row.startAtUtc !== null &&
-              row.endAtUtc !== null &&
-              newStart < row.endAtUtc &&
-              newEnd > row.startAtUtc,
-          );
-          if (overlapsSibling) {
+          if (overlappingSibling) {
             throw new AppError(
               "В это время у клиента другая услуга из того же пакета. Выберите другое время.",
               409,

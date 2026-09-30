@@ -30,10 +30,12 @@ const GROUP_MAP: Record<NotificationType, ClientNotificationGroup> = {
   STUDIO_INVITE_ACCEPTED: "system",
   STUDIO_INVITE_REJECTED: "system",
   STUDIO_MEMBER_LEFT: "system",
+  STUDIO_MEMBER_REMOVED: "system",
   STUDIO_SCHEDULE_REQUEST: "system",
   STUDIO_SCHEDULE_APPROVED: "system",
   STUDIO_SCHEDULE_REJECTED: "system",
   STUDIO_DISBANDED: "system",
+  STUDIO_SCHEDULE_ENDING: "system",
   MASTER_CABINET_DELETED: "system",
   MODEL_NEW_APPLICATION: "system",
   MODEL_APPLICATION_RECEIVED: "system",
@@ -66,6 +68,7 @@ const GROUP_MAP: Record<NotificationType, ClientNotificationGroup> = {
   BILLING_PAYMENT_REFUNDED: "system",
   REVIEW_DELETED_BY_ADMIN: "system",
   SUBSCRIPTION_GRANTED_BY_ADMIN: "system",
+  SCHEDULE_ENDING: "system",
 };
 
 export function groupForNotificationType(

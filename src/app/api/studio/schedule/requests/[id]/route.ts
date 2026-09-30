@@ -5,17 +5,13 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
+import { buildScheduleRequestReview } from "@/lib/schedule/change-requests";
 import { buildScheduleSnapshot } from "@/lib/schedule/editor";
-import { getWeeklyScheduleConfig, listScheduleOverrides, listScheduleTemplates } from "@/lib/schedule/unified";
 
 export const runtime = "nodejs";
 
 function hasAdminRole(roles: StudioRole[]) {
   return roles.some((role) => role === StudioRole.ADMIN || role === StudioRole.OWNER);
-}
-
-function currentMonthKey(): string {
-  return new Date().toISOString().slice(0, 7);
 }
 
 export async function GET(
@@ -32,8 +28,6 @@ export async function GET(
     }
 
     const p = params instanceof Promise ? await params : params;
-    const url = new URL(req.url);
-    const month = url.searchParams.get("month") ?? currentMonthKey();
 
     const request = await prisma.scheduleChangeRequest.findFirst({
       where: { id: p.id, studioId: access.studioId },
@@ -49,11 +43,12 @@ export async function GET(
 
     if (!request) return jsonFail(404, "Запрос не найден.", "NOT_FOUND");
 
-    const [templates, weekly, overrides, editorSnapshot] = await Promise.all([
-      listScheduleTemplates(request.provider.id),
-      getWeeklyScheduleConfig(request.provider.id),
-      listScheduleOverrides(request.provider.id, month),
+    // SCHEDULE-LEGACY-API-REMOVAL: текущее расписание — снапшот настроек (как
+    // у кабинета) и «было → стало» заявки; сырые недельные таблицы у профиля с
+    // графиком ни на что не влияют и больше не отдаются.
+    const [editorSnapshot, review] = await Promise.all([
       buildScheduleSnapshot(request.provider.id),
+      buildScheduleRequestReview(request.provider.id, request.payloadJson),
     ]);
 
     return jsonOk({
@@ -65,7 +60,7 @@ export async function GET(
         provider: request.provider,
         payload: request.payloadJson,
       },
-      current: { templates, weekly, overrides, month, editorSnapshot },
+      current: { editorSnapshot, review },
     });
   } catch (error) {
     const appError = toAppError(error);

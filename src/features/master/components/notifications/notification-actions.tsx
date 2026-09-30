@@ -6,10 +6,9 @@ import { useState, useTransition } from "react";
 import { NotificationType } from "@/lib/prisma-enums";
 import { Check, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { NotificationPayload } from "./lib/payload";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { usePrompt } from "@/hooks/use-prompt";
 
 const TC = UI_TEXT.cabinetMaster.bookings.card;
@@ -58,36 +57,23 @@ export function NotificationActions({ notificationId, type, payload }: Props) {
     setBusy(action);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/master/bookings/${payload.bookingId}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: nextStatus,
-            ...(comment ? { comment } : {}),
-          }),
-        },
-      );
-      const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!response.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      await fetch(`/api/notifications/${notificationId}/read`, { method: "POST" }).catch(
-        () => null,
-      );
+      await fetchJsonWithAuth<unknown>(`/api/master/bookings/${payload.bookingId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: nextStatus,
+          ...(comment ? { comment } : {}),
+        }),
+      });
+      // Пометка «прочитано» — фон: отказ ничего не меняет в действии.
+      await fetchJsonWithAuth<unknown>(`/api/notifications/${notificationId}/read`, {
+        method: "POST",
+      }).catch(() => null);
       refresh();
     } catch (caught) {
       // Серверная строка курируемая («Укажите комментарий», «Запись уже
       // изменилась»), и на неё можно отреагировать — показываем её.
-      const message = caught instanceof Error ? caught.message : "";
-      setError(
-        message && message !== DEFAULT_ERROR_MESSAGE
-          ? message
-          : action === "confirm"
-            ? ERR.bookingConfirm
-            : ERR.bookingDecline,
-      );
+      setError(serverMessageOr(caught, action === "confirm" ? ERR.bookingConfirm : ERR.bookingDecline));
     } finally {
       setBusy(null);
     }
@@ -243,7 +229,7 @@ function StatusBadge({ status }: { status: string | null }) {
   })();
   const tone =
     status === "CONFIRMED" || status === "PREPAID" || status === "FINISHED"
-      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+      ? "bg-success-surface text-success-text"
       : "bg-bg-input text-text-sec";
   return (
     <div className="mt-3">
@@ -267,7 +253,7 @@ function ActionRow({
     <div className="mt-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">{children}</div>
       {error ? (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-xs text-danger-text">{error}</p>
       ) : null}
     </div>
   );

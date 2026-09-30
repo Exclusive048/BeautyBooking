@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatMinutes, formatRubles } from "../lib/format";
 import { SectionShell } from "./section-shell";
 

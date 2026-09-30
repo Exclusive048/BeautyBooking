@@ -7,8 +7,9 @@ import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kop
 import {
   formatPlanName,
 } from "@/features/admin-cabinet/users/lib/plan-display";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.adminPanel.billing.subs;
 const M = UI_TEXT.adminPanel.billing.methodFallback;
@@ -21,7 +22,7 @@ const DATE_FMT = new Intl.DateTimeFormat("ru-RU", {
 
 const TIER_TONE: Record<PlanTier, string> = {
   [PlanTier.FREE]: "bg-bg-input text-text-sec",
-  [PlanTier.PRO]: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
+  [PlanTier.PRO]: "bg-success/[0.12] text-success-text",
   [PlanTier.PREMIUM]: "bg-primary/[0.12] text-accent-text",
 };
 
@@ -50,7 +51,7 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
           {row.user.displayName}
         </p>
         {row.status !== SubscriptionStatus.ACTIVE ? (
-          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
             {STATUS_LABEL[row.status]}
           </p>
         ) : null}
@@ -91,7 +92,7 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
           className={cn(
             "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide",
             row.autoRenew
-              ? "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300"
+              ? "bg-success/[0.12] text-success-text"
               : "bg-bg-input text-text-sec",
           )}
         >
@@ -100,16 +101,16 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
       </td>
       <td className="px-4 py-3 text-right align-top">
         {cancelable ? (
-          <button
-            type="button"
+          <Button
+            variant="wrapper"
             onClick={onCancel}
             disabled={busy}
             aria-label={T.cancelButton}
             title={T.cancelButton}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-red-500/10 text-red-700 transition-colors hover:bg-red-500/20 disabled:opacity-50 dark:text-red-300"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-destructive/10 text-danger-text transition-colors hover:bg-destructive/20"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
       </td>
     </tr>

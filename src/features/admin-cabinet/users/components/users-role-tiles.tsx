@@ -3,7 +3,7 @@
 import { useCallback, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { UsersRoleTile } from "@/features/admin-cabinet/users/components/users-role-tile";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminUserCounts,
   AdminUserRoleGroup,

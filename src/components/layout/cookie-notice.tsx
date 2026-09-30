@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,8 @@ import {
   writeCookieNoticeAcknowledgement,
 } from "@/lib/legal/cookie-notice";
 import { LEGAL_DOCUMENTS } from "@/lib/legal/documents";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * RKN-FIX-06 — informational cookie notice.
@@ -29,7 +30,6 @@ import { UI_TEXT } from "@/lib/ui/text";
 export function CookieNotice() {
   const t = UI_TEXT.cookieNotice;
   const [dismissed, setDismissed] = useState(false);
-  const reduce = useReducedMotion();
 
   useEffect(() => {
     // Visitors who dismissed the pre-RKN-FIX-06 banner: honour it once, mirror
@@ -48,17 +48,18 @@ export function CookieNotice() {
   return (
     <AnimatePresence>
       {dismissed ? null : (
-        <motion.div
+        <m.div
           key="cookie-notice"
           role="region"
           aria-label={t.regionLabel}
-          initial={reduce ? false : { y: 80, opacity: 0 }}
-          animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1 }}
-          exit={reduce ? { opacity: 0 } : { y: 80, opacity: 0 }}
-          transition={
-            reduce ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }
-          }
-          className="fixed bottom-0 left-0 right-0 z-[45] p-3 pb-[calc(0.75rem+var(--safe-area-inset-bottom))] md:p-5 md:pb-[calc(1.25rem+var(--safe-area-inset-bottom))]"
+          // Подсказка «Первых шагов» поднимается над этим слоем, а не прячется
+          // под ним (29.09 доработки · 21: уведомление выше по слою, `z-notice`).
+          data-guide-avoid=""
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0, transition: MOTION.exit }}
+          transition={MOTION.section}
+          className="fixed bottom-0 left-0 right-0 z-notice p-3 pb-[calc(0.75rem+var(--safe-area-inset-bottom))] md:p-5 md:pb-[calc(1.25rem+var(--safe-area-inset-bottom))]"
         >
           <div className="mx-auto max-w-5xl rounded-2xl border border-border-subtle bg-bg-card/95 p-4 shadow-hover backdrop-blur-md md:p-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
@@ -85,7 +86,7 @@ export function CookieNotice() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );

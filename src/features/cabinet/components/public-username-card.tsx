@@ -4,10 +4,8 @@ import { Check, Copy, ExternalLink, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 type PublicUsernamePayload = {
   username: string;
@@ -33,16 +31,12 @@ export function PublicUsernameCard({ endpoint }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(endpoint, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      setUsername(json.data.username);
-      setUrl(json.data.url);
-      setDraft(json.data.username);
+      const data = await fetchJsonWithAuth<PublicUsernamePayload>(endpoint, { cache: "no-store" });
+      setUsername(data.username);
+      setUrl(data.url);
+      setDraft(data.username);
     } catch (err) {
-      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.updateSettings);
+      setError(serverMessageOr(err, UI_TEXT.master.profile.errors.updateSettings));
     } finally {
       setLoading(false);
     }
@@ -71,20 +65,16 @@ export function PublicUsernameCard({ endpoint }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(endpoint, {
+      const data = await fetchJsonWithAuth<PublicUsernamePayload>(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: next }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<PublicUsernamePayload> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      setUsername(json.data.username);
-      setUrl(json.data.url);
+      setUsername(data.username);
+      setUrl(data.url);
       setIsEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : UI_TEXT.master.profile.errors.saveFailed);
+      setError(serverMessageOr(err, UI_TEXT.master.profile.errors.saveFailed));
     } finally {
       setSaving(false);
     }
@@ -112,7 +102,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
             title={settingsText.publicLink.copy}
             aria-label={settingsText.publicLink.copy}
           >
-            {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+            {copied ? <Check className="h-4 w-4 text-success-text" /> : <Copy className="h-4 w-4" />}
           </Button>
           <a
             href={url}
@@ -175,7 +165,7 @@ export function PublicUsernameCard({ endpoint }: Props) {
         )}
       </div>
 
-      {error ? <div role="alert" className="text-xs text-red-600 dark:text-red-400">{error}</div> : null}
+      {error ? <div role="alert" className="text-xs text-danger-text">{error}</div> : null}
       {copied ? <div className="text-xs text-text-sec">{settingsText.publicLink.copied}</div> : null}
     </div>
   );

@@ -8,13 +8,14 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type DrawerSide = "left" | "right" | "bottom";
 export type DrawerSize = "sm" | "md" | "lg" | "xl";
@@ -122,8 +123,6 @@ export function Drawer({
   const sheetRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef<number | null>(null);
   const dragCurrentY = useRef<number>(0);
-  // MODAL-A11Y-BATCH-A: respect OS prefers-reduced-motion.
-  const shouldReduceMotion = useReducedMotion();
 
   // MODAL-A11Y-BATCH-A + UI-13: контракт диалога целиком (Escape,
   // scroll-lock, WCAG SC 2.4.3 + 3.2.1) — общий с `ModalSurface` и с
@@ -137,9 +136,9 @@ export function Drawer({
   const isBottom = side === "bottom";
   const isRight = side === "right";
 
-  const panelMotion = shouldReduceMotion
-    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
-    : isBottom
+  // Сдвиг панели тем, кто просил не двигать интерфейс, гасит
+  // `MotionConfig reducedMotion="user"` (MotionProvider) — панель встаёт на место сразу.
+  const panelMotion = isBottom
     ? { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%" } }
     : isRight
     ? { initial: { x: "100%" }, animate: { x: 0 }, exit: { x: "100%" } }
@@ -173,17 +172,20 @@ export function Drawer({
     <AnimatePresence>
       {open ? (
         <>
-          <motion.div
+          <m.div
             key="drawer-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.18 }}
-            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+            transition={MOTION.micro}
+            // Слой `scrim` (49) — выше нижней навигации (`nav`, 40), ниже листа
+            // (`modal`, 50): раньше подложка стояла вровень с навигацией и была
+            // выше неё только по порядку в DOM (29.09 · 01-б, шкала — · 21).
+            className="fixed inset-0 z-scrim bg-black/45 backdrop-blur-[2px]"
             onClick={onClose}
             aria-hidden
           />
-          <motion.div
+          <m.div
             key="drawer-panel"
             ref={sheetRef}
             role="dialog"
@@ -191,16 +193,10 @@ export function Drawer({
             aria-labelledby={title ? titleId : undefined}
             aria-label={!title ? ariaLabel : undefined}
             {...panelMotion}
-            transition={
-              shouldReduceMotion
-                ? { duration: 0 }
-                : isBottom
-                ? { type: "spring", stiffness: 320, damping: 32 }
-                : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }
-            }
+            transition={isBottom ? SPRING_SHEET : MOTION.base}
             tabIndex={-1}
             className={cn(
-              "fixed z-50 flex flex-col border-border-subtle bg-bg-page shadow-2xl",
+              "fixed z-modal flex flex-col border-border-subtle bg-bg-page shadow-2xl",
               panelPositionClass,
               isBottom ? "h-auto" : "h-full",
               className,
@@ -262,7 +258,7 @@ export function Drawer({
                 {footer}
               </div>
             ) : null}
-          </motion.div>
+          </m.div>
         </>
       ) : null}
     </AnimatePresence>

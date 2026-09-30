@@ -1,6 +1,6 @@
 import { FooterLink } from "@/components/layout/footer/FooterLink";
 import { env } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const COPYRIGHT_TEXT = UI_TEXT.footer.legal.copyright.replace("{year}", String(CURRENT_YEAR));

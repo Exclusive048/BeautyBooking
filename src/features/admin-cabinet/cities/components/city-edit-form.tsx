@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { CityTagBadge } from "@/features/admin-cabinet/cities/components/city-tag-badge";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCityRow } from "@/features/admin-cabinet/cities/types";
 
 const T = UI_TEXT.adminPanel.cities.detail;
@@ -154,7 +154,9 @@ export function CityEditForm({ city, onClose, onSave, onDelete }: Props) {
           value={draft.timezone}
           onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}
         >
-          {TIMEZONE_OPTIONS.map((tz) => (
+          {/* Текущий пояс города показывается, даже если его нет в списке —
+              иначе поле показывало бы другой пункт, а сохранение молча меняло пояс. */}
+          {(TIMEZONE_OPTIONS.includes(draft.timezone) ? TIMEZONE_OPTIONS : [draft.timezone, ...TIMEZONE_OPTIONS]).map((tz) => (
             <option key={tz} value={tz}>
               {tz}
             </option>

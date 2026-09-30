@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  PUBLISH_HORIZON_WEEKS,
+  SCHEDULE_HORIZON_DAYS,
   applyPublishHorizon,
   resolvePublishedUntilLocal,
 } from "@/lib/schedule/publish-horizon";
@@ -24,15 +24,15 @@ describe("schedule/publish-horizon — resolvePublishedUntilLocal", () => {
     });
 
     expect(withRecentEdit).toBe(withoutEdit);
-    // 2026-05-10 (MSK) + 42 days = 2026-06-21
-    expect(withRecentEdit).toBe("2026-06-21");
-    expect(PUBLISH_HORIZON_WEEKS).toBe(6);
+    // 2026-05-10 (MSK) + 92 days = 2026-08-10 (SCHEDULE-PATTERNS-01: 3 месяца)
+    expect(withRecentEdit).toBe("2026-08-10");
+    expect(SCHEDULE_HORIZON_DAYS).toBe(92);
   });
 
-  it("does NOT freeze horizon to a stale changeAtUtc (regression: 42-day cliff)", () => {
+  it("does NOT freeze horizon to a stale changeAtUtc (regression: horizon cliff)", () => {
     const nowUtc = new Date("2026-05-10T09:00:00.000Z");
-    // Master last edited schedule 70 days ago — older than the 42-day window.
-    const staleEdit = new Date("2026-03-01T09:00:00.000Z");
+    // Master last edited schedule 129 days ago — older than the 92-day window.
+    const staleEdit = new Date("2026-01-01T09:00:00.000Z");
 
     const result = resolvePublishedUntilLocal({
       changeAtUtc: staleEdit,
@@ -40,9 +40,9 @@ describe("schedule/publish-horizon — resolvePublishedUntilLocal", () => {
       timeZone: TZ,
     });
 
-    // Horizon must roll forward with `now`, NOT remain pinned at staleEdit + 42d.
-    expect(result).toBe("2026-06-21");
-    expect(result).not.toBe("2026-04-12");
+    // Horizon must roll forward with `now`, NOT remain pinned at staleEdit + 92d.
+    expect(result).toBe("2026-08-10");
+    expect(result).not.toBe("2026-04-03");
   });
 });
 

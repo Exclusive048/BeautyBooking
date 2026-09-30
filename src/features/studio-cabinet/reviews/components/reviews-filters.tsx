@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/cn";
 import { Select } from "@/components/ui/select";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   StudioReviewFilter,
   StudioReviewMasterChip,
   StudioReviewsFilterCounts,
 } from "../lib/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.filters;
 
@@ -48,36 +48,12 @@ export function ReviewsFilters({ filter, masterId, masters, counts }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap gap-1.5">
-        {CHIPS.map((chip) => {
-          const active = filter === chip.key;
-          const count = counts[chip.key];
-          return (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => selectFilter(chip.key)}
-              aria-pressed={active}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "border-primary/40 bg-primary/10 text-accent-text"
-                  : "border-border-subtle bg-bg-card text-text-sec hover:text-text-main",
-              )}
-            >
-              <span>{T[chip.labelKey]}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
-                  active ? "bg-primary/20 text-accent-text" : "bg-bg-input text-text-sec",
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.aria}
+        items={CHIPS.map((chip) => ({ id: chip.key, label: T[chip.labelKey], badge: counts[chip.key] }))}
+        value={filter}
+        onChange={(id) => selectFilter(id as StudioReviewFilter)}
+      />
       <div className="ml-auto">
         <Select
           value={masterId}

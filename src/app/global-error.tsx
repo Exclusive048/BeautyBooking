@@ -2,6 +2,7 @@
 
 import { useErrorBoundaryReport } from "@/hooks/use-error-boundary-report";
 import { BRAND_COLORS, brandGradientCss, withAlpha } from "@/lib/ui/brand-colors";
+import { BareButton } from "@/components/ui/bare-button";
 
 // UI-04: экран рендерится при падении root-layout, то есть Tailwind здесь
 // недоступен по определению — но значения обязаны быть бренд-бордовыми, а не
@@ -99,9 +100,9 @@ export default function GlobalError({
             Если проблема повторится — напишите в поддержку.
           </p>
           <div className="btns">
-            <button type="button" className="btn btn-pri" onClick={reset}>
+            <BareButton className="btn btn-pri" onClick={reset}>
               Обновить страницу
-            </button>
+            </BareButton>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/" className="btn btn-sec">На главную</a>
           </div>

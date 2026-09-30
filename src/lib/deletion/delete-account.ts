@@ -20,6 +20,8 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     select: {
       id: true,
       phone: true,
+      email: true,
+      emailVerifiedAt: true,
     },
   });
 
@@ -69,8 +71,16 @@ export async function deleteUserAccount(userId: string): Promise<void> {
   const mediaToPurge = await collectAccountMedia(userId);
 
   await prisma.$transaction(async (tx) => {
-    if (user.phone) {
-      await tx.otpCode.deleteMany({ where: { phone: user.phone } });
+    // Коды входа — и по телефону, и по почте (раньше только по телефону).
+    // Почта — только подтверждённая: неподтверждённый адрес мог быть чужим, и
+    // удалять по нему значило бы гасить чужой код входа. Прочее подберёт
+    // фоновая чистка просроченных кодов (`auth/otp-cleanup.ts`).
+    const otpOwners = [
+      ...(user.phone ? [{ phone: user.phone }] : []),
+      ...(user.email && user.emailVerifiedAt ? [{ email: user.email.trim().toLowerCase() }] : []),
+    ];
+    if (otpOwners.length > 0) {
+      await tx.otpCode.deleteMany({ where: { OR: otpOwners } });
     }
 
     // RKN-FIX-03-A: what this list covers (and, just as importantly, what it

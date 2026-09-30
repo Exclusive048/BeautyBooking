@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing.cancelDialog;

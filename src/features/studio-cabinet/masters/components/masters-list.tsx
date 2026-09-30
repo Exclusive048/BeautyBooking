@@ -1,8 +1,9 @@
 import { Plus, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMasterListItem } from "../server/types";
 import { MasterListItem } from "./master-list-item";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.mastersV2;
 
@@ -35,7 +36,12 @@ export function MastersList({
         // мастера уже стоит карточкой прямо под списком (`inviteCard` ниже) и
         // рендерится в том числе при пустом списке; вторая копия того же
         // действия дала бы два CTA подряд.
-        <EmptyState variant="card" icon={Users} title={T.list.empty} className="px-6 py-8" />
+        <EmptyState
+          variant="card"
+          icon={Users}
+          title={totalCount === 0 ? T.list.emptyTeam : T.list.empty}
+          className="px-6 py-8"
+        />
       ) : (
         <ul className="space-y-2">
           {items.map((master) => (
@@ -53,8 +59,7 @@ export function MastersList({
       )}
 
       {onInviteClick ? (
-        <button
-          type="button"
+        <Button variant="wrapper"
           onClick={onInviteClick}
           className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border-subtle bg-bg-card/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-bg-input/30"
         >
@@ -72,7 +77,7 @@ export function MastersList({
               {T.inviteCard.subtitle}
             </p>
           </div>
-        </button>
+        </Button>
       ) : null}
     </div>
   );

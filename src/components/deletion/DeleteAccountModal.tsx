@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   open: boolean;
@@ -63,7 +63,7 @@ export function DeleteAccountModal({
             type={confirmByPhone ? "tel" : "text"}
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            className="mt-2 focus:ring-2 focus:ring-red-500/30"
+            className="mt-2 focus:ring-2 focus:ring-destructive/30"
             placeholder={confirmByPhone ? (phone ?? "+7") : UI_TEXT.deletion.accountConfirmWord}
             autoComplete="off"
           />

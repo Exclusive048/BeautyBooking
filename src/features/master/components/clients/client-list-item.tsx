@@ -4,7 +4,7 @@ import { Crown } from "lucide-react";
 import { WorkContextBadge } from "@/features/master/components/work-context-badge";
 import { cn } from "@/lib/cn";
 import type { ClientListItemView } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatNumberShort,
   formatRelativeDate,
@@ -12,6 +12,7 @@ import {
   pickAvatarColor,
   pluralize,
 } from "./lib/format";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.clients.list;
 
@@ -46,8 +47,7 @@ export function ClientListItem({ client, selected, onSelect, now }: Props) {
       : T.noVisits;
 
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       aria-pressed={selected}
       onClick={() => onSelect(client.key)}
       className={cn(
@@ -71,7 +71,7 @@ export function ClientListItem({ client, selected, onSelect, now }: Props) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p className="truncate text-sm font-medium text-text-main">{client.displayName}</p>
-          {isVip ? <Crown className="h-3 w-3 shrink-0 text-amber-500" aria-hidden /> : null}
+          {isVip ? <Crown className="h-3 w-3 shrink-0 text-warning-text" aria-hidden /> : null}
           {/* STUDIO-MASTER-PROFILES (этап 3): откуда клиент — личные записи и/или студия. */}
           {client.workContexts.map((context) => (
             <span
@@ -91,6 +91,6 @@ export function ClientListItem({ client, selected, onSelect, now }: Props) {
         </p>
         <p className="font-mono text-[10px] uppercase tracking-wider text-text-sec">{T.rowRevenueLabel}</p>
       </div>
-    </button>
+    </Button>
   );
 }

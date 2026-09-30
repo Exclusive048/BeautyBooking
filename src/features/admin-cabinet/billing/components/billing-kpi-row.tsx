@@ -8,7 +8,7 @@ import {
   toneForPending,
   tonefromDelta,
 } from "@/features/admin-cabinet/billing/lib/kpi-tone";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminBillingKpis } from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing.kpi;

@@ -4,7 +4,7 @@ import { getStudioProfile, getStudioMasters } from "@/features/public-studio/ser
 import { getStudioBundles } from "@/features/public-studio/server/studio-packages.service";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
@@ -26,7 +26,7 @@ export async function StudioPackagesSection({ studioId }: Props) {
     studioProviderId = studio.id;
     studioTimezone = studio.timezone;
   } catch (error) {
-    logPublicStudioBlockError("packages-section", error, [`/api/providers/${studioId}`]);
+    logPublicStudioBlockError("packages-section", error, ["getProviderProfile"]);
     return null;
   }
 

@@ -15,6 +15,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/toast";
+import { MarketingConsentBanner } from "@/features/client-cabinet/notifications/marketing-consent-banner";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Switch } from "@/components/ui/switch";
@@ -22,7 +25,8 @@ import {
   groupForNotificationType,
   type ClientNotificationGroup,
 } from "@/lib/client-cabinet/notification-groups";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { NotificationType } from "@prisma/client";
 
 const T = UI_TEXT.clientCabinet.notifications;
@@ -66,11 +70,7 @@ const FILTER_OPTIONS: Array<{ value: Filter; label: string; icon: typeof Bell }>
 ];
 
 const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then(async (res) => {
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? "load_failed");
-    return json.data as Payload;
-  });
+  fetchJsonWithAuth<Payload>(url);
 
 export function ClientNotificationsPage() {
   // 30s auto-poll + revalidate on focus keeps the surface fresh without
@@ -90,6 +90,7 @@ export function ClientNotificationsPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [onlyUnread, setOnlyUnread] = useState(false);
   const autoMarkedRef = useRef(false);
+  const toast = useToast();
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -125,15 +126,16 @@ export function ClientNotificationsPage() {
       false,
     );
     try {
-      const res = await fetch(`/api/notifications/${id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/notifications/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isRead: next }),
       });
-      if (!res.ok) throw new Error("toggle_failed");
-    } catch {
-      // Rollback
+    } catch (error) {
+      // Rollback — и слово о нём (29.09 доработки · 10): иначе отметка
+      // молча возвращалась назад.
+      toast.error(serverMessageOr(error, T.markFailed));
       await mutate(
         (cur) =>
           cur
@@ -153,14 +155,14 @@ export function ClientNotificationsPage() {
 
   const handleClearRead = async () => {
     try {
-      const res = await fetch("/api/notifications/clear-read", {
+      await fetchJsonWithAuth<unknown>("/api/notifications/clear-read", {
         method: "POST",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("clear_failed");
       await mutate();
-    } catch {
-      // silent — list remains; user can retry
+    } catch (error) {
+      // Список остаётся — повторить можно; но сказать, что не вышло, обязаны.
+      toast.error(serverMessageOr(error, T.clearReadFailed));
     }
   };
 
@@ -172,12 +174,16 @@ export function ClientNotificationsPage() {
   useEffect(() => {
     if (autoMarkedRef.current) return;
     autoMarkedRef.current = true;
-    void fetch("/api/notifications/read-all?context=personal", {
+    // Фоновая пометка — без сообщения (оно звучало бы при каждом открытии
+    // страницы), но и без необработанного отказа промиса при обрыве сети.
+    void fetchJsonWithAuth<unknown>("/api/notifications/read-all?context=personal", {
       method: "POST",
       credentials: "include",
-    }).then(() => {
-      void mutate();
-    });
+    })
+      .then(() => {
+        void mutate();
+      })
+      .catch(() => {});
   }, [mutate]);
 
   const handleMarkAll = async () => {
@@ -192,10 +198,12 @@ export function ClientNotificationsPage() {
       false,
     );
     try {
-      await fetch("/api/notifications/read-all?context=personal", {
+      await fetchJsonWithAuth<unknown>("/api/notifications/read-all?context=personal", {
         method: "POST",
         credentials: "include",
       });
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.markAllFailed));
     } finally {
       await mutate();
     }
@@ -227,31 +235,23 @@ export function ClientNotificationsPage() {
             onClick={handleClearRead}
           >
             <Trash2 className="mr-1.5 h-4 w-4" aria-hidden />
-            Очистить прочитанные
+            {T.clearRead}
           </Button>
         </div>
       </header>
 
+      <MarketingConsentBanner />
+
       <div className="flex flex-wrap items-center gap-2">
-        {FILTER_OPTIONS.map((opt) => {
-          const Icon = opt.icon;
-          const active = opt.value === filter;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setFilter(opt.value)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                active
-                  ? "bg-primary text-white"
-                  : "bg-bg-input text-text-sec hover:bg-bg-input/70 hover:text-text-main"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-              {opt.label}
-            </button>
-          );
-        })}
+        <Tabs
+          ariaLabel={T.filterAria}
+          items={FILTER_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
+            return { id: opt.value, label: opt.label, icon: <Icon className="h-3.5 w-3.5" aria-hidden /> };
+          })}
+          value={filter}
+          onChange={(id) => setFilter(id as Filter)}
+        />
         <label className="ml-auto inline-flex items-center gap-2 rounded-full bg-bg-input px-3 py-1.5 text-sm text-text-main">
           <Switch checked={onlyUnread} onCheckedChange={setOnlyUnread} />
           <span>{T.onlyUnread}</span>
@@ -337,14 +337,13 @@ function NotificationRow({
                   </Button>
                 </Link>
               ) : null}
-              <button
-                type="button"
+              <Button
+                variant="wrapper"
                 onClick={onToggleRead}
-                className="text-xs font-medium text-text-sec hover:text-accent-text"
-                title={isUnread ? T.markRead : T.markUnread}
+                className="rounded text-xs font-medium text-text-sec hover:text-accent-text"
               >
                 {isUnread ? T.markRead : T.markUnread}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

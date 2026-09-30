@@ -8,9 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { ModalSurface } from "@/components/ui/modal-surface";
 // FIX-B5: переиспользуем СУЩЕСТВУЮЩУЮ модалку подтверждения, второй поток не заводим.
 import { EmailVerifyModal } from "@/features/client-cabinet/profile/modals/email-verify-modal";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type MeUser = {
   email: string | null;
@@ -36,15 +35,16 @@ export function EmailNotificationsSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth("/api/me", { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ user: MeUser | null }> | null;
-      if (json?.ok && json.data.user) {
+      const data = await fetchJsonWithAuth<{ user: MeUser | null }>("/api/me", { cache: "no-store" });
+      if (data.user) {
         setUser({
-          email: json.data.user.email,
-          emailNotificationsEnabled: json.data.user.emailNotificationsEnabled,
-          emailVerified: json.data.user.emailVerified,
+          email: data.user.email,
+          emailNotificationsEnabled: data.user.emailNotificationsEnabled,
+          emailVerified: data.user.emailVerified,
         });
       }
+    } catch {
+      // Чтение: не прочитали — секция покажет состояние «без почты».
     } finally {
       setLoading(false);
     }
@@ -60,18 +60,14 @@ export function EmailNotificationsSection() {
       setToggling(true);
       setError(null);
       try {
-        const res = await fetchWithAuth("/api/me", {
+        await fetchJsonWithAuth<{ user: MeUser }>("/api/me", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ emailNotificationsEnabled: nextValue }),
         });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ user: MeUser }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : t.toggleFailed);
-        }
         setUser((prev) => (prev ? { ...prev, emailNotificationsEnabled: nextValue } : prev));
       } catch (err) {
-        setError(err instanceof Error ? err.message : t.toggleFailed);
+        setError(serverMessageOr(err, t.toggleFailed));
       } finally {
         setToggling(false);
       }
@@ -130,13 +126,12 @@ export function EmailNotificationsSection() {
                   </div>
                 ) : null}
 
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => setDialogOpen(true)}
                   className="mt-2 text-xs text-accent-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:rounded"
                 >
                   {t.changeEmail}
-                </button>
+                </Button>
               </>
             ) : (
               <>
@@ -153,7 +148,7 @@ export function EmailNotificationsSection() {
             )}
 
             {error ? (
-              <div role="alert" className="mt-2 text-xs text-red-500">
+              <div role="alert" className="mt-2 text-xs text-danger-text">
                 {error}
               </div>
             ) : null}
@@ -218,24 +213,19 @@ function EmailDialog({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetchWithAuth("/api/me", {
+      await fetchJsonWithAuth<unknown>("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trimmed }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        const msg = json && !json.ok ? json.error.message : t.saveFailed;
-        if (res.status === 409) {
-          setError(t.emailTaken);
-        } else {
-          throw new Error(msg);
-        }
-        return;
-      }
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.saveFailed);
+      // Занятый адрес — своя строка поверхности; прочее — дословно.
+      setError(
+        err instanceof ApiClientError && err.status === 409
+          ? t.emailTaken
+          : serverMessageOr(err, t.saveFailed),
+      );
     } finally {
       setSaving(false);
     }
@@ -263,7 +253,7 @@ function EmailDialog({
         />
 
         {error ? (
-          <div role="alert" className="text-xs text-red-500">
+          <div role="alert" className="text-xs text-danger-text">
             {error}
           </div>
         ) : null}

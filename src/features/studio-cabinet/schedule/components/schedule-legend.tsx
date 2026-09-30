@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.legend;
 
@@ -9,11 +9,11 @@ const ITEMS: Array<{ key: keyof typeof T; class: string }> = [
   },
   {
     key: "pending",
-    class: "bg-amber-300 border border-amber-500",
+    class: "bg-warning border border-warning",
   },
   {
     key: "newClient",
-    class: "bg-emerald-300 border border-emerald-500",
+    class: "bg-success border border-success",
   },
   {
     key: "break",

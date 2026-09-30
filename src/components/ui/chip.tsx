@@ -24,7 +24,7 @@ export function Chip({
     <button
       type={type}
       className={cn(
-        "rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300",
+        "rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-200",
         variants[variant],
         className
       )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Check, Loader2 } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { useSaveStatus } from "./save-status-provider";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.saveStatus;
@@ -35,7 +35,7 @@ export function SaveStatusIndicator() {
       <span
         role="status"
         aria-live="polite"
-        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-950/30 dark:text-emerald-300"
+        className="inline-flex items-center gap-1.5 rounded-full border border-success-border bg-success-surface px-2.5 py-1 text-xs text-success-text"
       >
         <Check className="h-3 w-3" aria-hidden />
         {T.saved}
@@ -47,7 +47,7 @@ export function SaveStatusIndicator() {
     <span
       role="alert"
       title={errorMessage ?? undefined}
-      className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs text-red-700 dark:border-red-400/30 dark:bg-red-950/30 dark:text-red-300"
+      className="inline-flex items-center gap-1.5 rounded-full border border-danger-border bg-danger-surface px-2.5 py-1 text-xs text-danger-text"
     >
       <AlertCircle className="h-3 w-3" aria-hidden />
       {T.error}

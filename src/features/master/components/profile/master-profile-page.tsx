@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
 import { getMasterProfileView } from "@/lib/master/profile-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ProfilePreviewPlaceholder } from "./profile-preview-placeholder";
 import { ProfileSidebar } from "./profile-sidebar";
 import { AboutSection } from "./sections/about-section";

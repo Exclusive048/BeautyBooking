@@ -3,7 +3,8 @@ export type SystemFlags = {
   visualSearchEnabled: boolean;
   legalDraftMode: boolean;
   // FIX-TELEGRAM-KILLSWITCH: admin toggle for user-facing Telegram. Effective
-  // only BELOW the env ceiling (NEXT_PUBLIC_TELEGRAM_ENABLED) — when the env is
+  // only BELOW the env ceiling (a set NEXT_PUBLIC_TELEGRAM_BOT_USERNAME since
+  // ENV-SPLIT-01; the old NEXT_PUBLIC_TELEGRAM_ENABLED is gone) — when the env is
   // off this displays as false (locked) regardless of the stored value.
   telegramEnabled: boolean;
 };

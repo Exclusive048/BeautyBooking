@@ -6,6 +6,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { signStudioMasterViewToken } from "@/lib/studio/master-view-token";
+import { studioMasterBlockingBookingsWhere } from "@/lib/studio/leave-guard";
 import type { StudioMasterDisplayStatus } from "../lib/status-display";
 import { getMasterWeekOccupancy } from "../lib/week-occupancy";
 import type { StudioMasterDetail, StudioMasterListItem } from "./types";
@@ -251,6 +252,9 @@ export async function loadStudioMasterDetail(input: {
     viewToken: signStudioMasterViewToken({
       masterId: provider.id,
       studioId: input.studioId,
+    }),
+    blockingStudioBookings: await prisma.booking.count({
+      where: studioMasterBlockingBookingsWhere(studio.providerId, [provider.id]),
     }),
   };
 }

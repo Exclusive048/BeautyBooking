@@ -1,174 +1,60 @@
 import { prisma } from "@/lib/prisma";
 import type { MasterWorkWindow } from "@/lib/bookings/policy-enforcement";
-import { parseDateKeyToUtcStart } from "@/lib/schedule/editor-shared";
-import { timeToMinutes } from "@/lib/schedule/time";
-import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
+import { dayPlanHours } from "@/lib/schedule/day-plans";
 import { ScheduleEngine } from "@/lib/schedule/engine";
-
-type DayBreak = { startMinutes: number; endMinutes: number };
+import { timeToMinutes } from "@/lib/schedule/time";
+import type { DayPlan } from "@/lib/schedule/types";
 
 /**
- * BOOKING-FLOW-AUDIT-RESIDUALS — перерывы дня берутся из того же `DayPlan`,
- * по которому движок режет окошки (шаблон, перерывы даты, правило-цикл).
- * Своего вывода здесь нет намеренно: семантика слияния перерывов шаблона и
- * даты нетривиальна (`rule-engine.ts`), а вторая копия разошлась бы с ней.
+ * LOGIC-03 — резолвер рабочего окна мастера для guard'а рабочих часов
+ * (`assertWithinMasterWorkHours`): запись из кабинета студии, студийный
+ * перенос, перенос по запросу стороны, «окошко освободилось».
+ *
+ * SCHEDULE-PATTERNS-01 (этап 1): окно — это `DayPlan` движка, тот же, по
+ * которому режутся окошки: шаблон недели, «Особый день» на дату, перерывы
+ * даты, горизонт расписания. До этого часы резолвер читал сам — недельную
+ * строку и исключение, с собственным запасным «Пн–Сб 10–19» для мастера без
+ * расписания, которого у движка нет (движок такой день закрывает). Перерывы
+ * уже брались из движка (BOOKING-FLOW-AUDIT-RESIDUALS), часы — нет, то есть
+ * guard и окошки могли расходиться. Теперь источник один, и график с
+ * чередованием или датами (этап 2) guard получает без правок.
+ *
+ * Дата — дата САЛОНА мастера (`resolveSalonLocalParts(...).dateKey`).
  */
-async function resolveDayBreaks(masterProviderId: string, dateKey: string): Promise<DayBreak[]> {
+export async function resolveMasterWorkWindow(
+  masterProviderId: string,
+  dateKey: string,
+): Promise<MasterWorkWindow> {
   const provider = await prisma.provider.findUnique({
     where: { id: masterProviderId },
     select: { timezone: true },
   });
-  if (!provider) return [];
+  if (!provider) return CLOSED_WINDOW;
   const plan = await ScheduleEngine.getDayPlan({
     masterId: masterProviderId,
     date: dateKey,
     timezone: provider.timezone,
   });
-  const breaks: DayBreak[] = [];
+  return workWindowFromDayPlan(plan);
+}
+
+const CLOSED_WINDOW: MasterWorkWindow = { isActive: false, startMinutes: null, endMinutes: null };
+
+/** Окно guard'а из плана дня: границы дня и перерывы в минутах от полуночи салона. */
+export function workWindowFromDayPlan(plan: DayPlan | undefined): MasterWorkWindow {
+  const hours = dayPlanHours(plan);
+  const startMinutes = hours.start ? timeToMinutes(hours.start) : null;
+  const endMinutes = hours.end ? timeToMinutes(hours.end) : null;
+  if (!plan || startMinutes === null || endMinutes === null) return CLOSED_WINDOW;
+
+  const breaks: Array<{ startMinutes: number; endMinutes: number }> = [];
   for (const item of plan.breaks) {
-    const startMinutes = timeToMinutes(item.start);
-    const endMinutes = timeToMinutes(item.end);
-    if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) continue;
-    breaks.push({ startMinutes, endMinutes });
-  }
-  return breaks;
-}
-
-/**
- * LOGIC-03 — резолвер рабочего окна мастера, вынесенный из
- * `studio/bookings.service.ts`, где он был приватным.
- *
- * Причина выноса: guard рабочих часов стоял ТОЛЬКО на студийном move, а путь
- * переноса (`bookings/usecases.ts`) не проверял рабочие часы вообще — перенос
- * на воскресенье 03:00 проходил. Второй копии резолвера быть не должно: он
- * знает нетривиальный факт про хранение `ScheduleOverride.date` (см. ниже), и
- * разошедшиеся копии дали бы разные ответы на одном и том же расписании.
- */
-const DEFAULT_WORK_START_MIN = 10 * 60; // 10:00
-const DEFAULT_WORK_END_MIN = 19 * 60; // 19:00
-/** Sunday off, Mon-Sat working. JS Date.getUTCDay() / getDay(): 0 = Sun. */
-const DEFAULT_ACTIVE_DAYS = new Set([1, 2, 3, 4, 5, 6]);
-
-/**
- * SCHEDULE-SUNDAY-01 — `WeeklyScheduleDay.weekday` хранится как 1 = Пн … 7 = Вс
- * (`editor.ts`, `unified.ts`; движок переводит воскресенье в 7 в
- * `engine-context.ts`), а на вход резолвера приходит JS-день 0 = Вс … 6 = Сб
- * (`resolveSalonLocalParts`). Без перевода воскресенье искалось как `0`, строки
- * не находилось, и срабатывал дефолт «вс — выходной»: мастер, работающий по
- * воскресеньям, получал 422 «Мастер не работает в выбранный день» на создании и
- * переносе записи в студии и на любом переносе — хотя публичные слоты на это
- * воскресенье продавались.
- */
-export function toScheduleWeekday(jsWeekday: number): number {
-  return jsWeekday === 0 ? 7 : jsWeekday;
-}
-
-/**
- * STUDIO-RESCHEDULE-VALIDATION-A — resolves the target master's work
- * window for a given weekday by reading the `WeeklyScheduleConfig` +
- * `ScheduleOverride` for the requested date. Returns a normalized
- * `MasterWorkWindow` consumed by the pure
- * `assertWithinMasterWorkHours` helper.
- *
- * Override semantics:
- *   - if a `ScheduleOverride` row exists for `dateKey`, use it
- *     (handles holidays / one-off day-offs / different hours that
- *     day);
- *   - else fall back to the `WeeklyScheduleDay` for `weekday`;
- *   - else fall back to the project-wide defaults above.
- *
- * Per-day overrides take precedence over the weekly config — matches
- * what the schedule engine does at slot-build time.
- *
- * FIX-R2-04-B: `weekday` (0=Sun..6=Sat) and `dateKey` (YYYY-MM-DD) are
- * now SALON-LOCAL (derived by `resolveSalonLocalParts` against the
- * master's tz), not UTC-derived from the instant. For a non-UTC studio
- * a real-UTC instant near local midnight resolves to a different
- * UTC day/date than its salon-local day/date — reading them in UTC
- * looked up the wrong weekly day / override row. The `date: dateKey`
- * query still matches the UTC-midnight-stored override (overrides are
- * persisted at `Date.UTC(y,m,d,0,0,0)` of the local dateKey), exactly
- * as the engine buckets them via `toLocalDateKey(row.date, tz)`.
- */
-export async function resolveMasterWorkWindow(
-  masterProviderId: string,
-  weekday: number,
-  dateKey: string,
-): Promise<MasterWorkWindow> {
-  const [hours, breaks] = await Promise.all([
-    resolveMasterWorkHours(masterProviderId, weekday, dateKey),
-    resolveDayBreaks(masterProviderId, dateKey),
-  ]);
-  return hours.isActive && breaks.length > 0 ? { ...hours, breaks } : hours;
-}
-
-/**
- * Границы рабочего дня мастера без перерывов — два точечных запроса, без
- * движка. Нужны отдельно календарю студии: сетка дня раздвигается под часы
- * мастеров, и звать ради этого движок на каждого мастера было бы дорого.
- */
-export async function resolveMasterWorkHours(
-  masterProviderId: string,
-  weekday: number,
-  dateKey: string,
-): Promise<MasterWorkWindow> {
-  // FIX-R2-04-B: `ScheduleOverride.date` is a DateTime stored at
-  // UTC-midnight of the salon-local date key (editor `saveException`
-  // writes `parseDateKeyToUtcStart(dateKey)`; the engine matches via
-  // `toLocalDateKey(row.date, tz)`). A bare "YYYY-MM-DD" string is
-  // rejected by Prisma 6 ("Expected ISO-8601 DateTime") — the prior
-  // `date: dateKey` (string) form threw `PrismaClientValidationError`
-  // whenever this resolver ran. Convert the salon-local dateKey to the
-  // exact stored instant so the override point-lookup actually matches.
-  const overrideDate = parseDateKeyToUtcStart(dateKey);
-  const [override, weeklyDay] = await Promise.all([
-    prisma.scheduleOverride.findFirst({
-      where: { providerId: masterProviderId, date: overrideDate },
-      // LOGIC-11: без порядка guard брал произвольную из дублей, а движок —
-      // свою; общий канон сводит их на одну строку.
-      orderBy: SCHEDULE_OVERRIDE_PICK_ORDER,
-      include: { template: { select: { startLocal: true, endLocal: true } } },
-    }),
-    prisma.weeklyScheduleDay.findFirst({
-      where: { config: { providerId: masterProviderId }, weekday: toScheduleWeekday(weekday) },
-      include: { template: { select: { startLocal: true, endLocal: true } } },
-    }),
-  ]);
-
-  if (override) {
-    if (override.isDayOff) {
-      return { isActive: false, startMinutes: null, endMinutes: null };
-    }
-    const startStr = override.startLocal ?? override.template?.startLocal ?? null;
-    const endStr = override.endLocal ?? override.template?.endLocal ?? null;
-    if (startStr && endStr) {
-      return {
-        isActive: true,
-        startMinutes: timeToMinutes(startStr),
-        endMinutes: timeToMinutes(endStr),
-      };
-    }
+    const breakStart = timeToMinutes(item.start);
+    const breakEnd = timeToMinutes(item.end);
+    if (breakStart === null || breakEnd === null || breakEnd <= breakStart) continue;
+    breaks.push({ startMinutes: breakStart, endMinutes: breakEnd });
   }
 
-  if (weeklyDay) {
-    if (!weeklyDay.isActive) {
-      return { isActive: false, startMinutes: null, endMinutes: null };
-    }
-    const startStr = weeklyDay.template?.startLocal ?? null;
-    const endStr = weeklyDay.template?.endLocal ?? null;
-    if (startStr && endStr) {
-      return {
-        isActive: true,
-        startMinutes: timeToMinutes(startStr),
-        endMinutes: timeToMinutes(endStr),
-      };
-    }
-  }
-
-  // No config — fall back to project-wide default (Mon-Sat 10-19).
-  return {
-    isActive: DEFAULT_ACTIVE_DAYS.has(weekday),
-    startMinutes: DEFAULT_ACTIVE_DAYS.has(weekday) ? DEFAULT_WORK_START_MIN : null,
-    endMinutes: DEFAULT_ACTIVE_DAYS.has(weekday) ? DEFAULT_WORK_END_MIN : null,
-  };
+  const window = { isActive: true, startMinutes, endMinutes };
+  return breaks.length > 0 ? { ...window, breaks } : window;
 }

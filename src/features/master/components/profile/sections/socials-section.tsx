@@ -1,5 +1,5 @@
 import { Share2 } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SocialEditableRow } from "../editable/social-editable-row";
 import { SectionShell } from "./section-shell";
 

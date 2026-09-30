@@ -3,13 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Lock, ChevronDown, Sparkles, Bell, Zap, BarChart3, CreditCard, Users, Image, Wallet, Clock } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence, useReducedMotion } from "framer-motion";
 import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import { INSTANT, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Scope = "MASTER" | "STUDIO";
 
@@ -28,13 +30,12 @@ type PlanEntry = {
 };
 
 type PlansApiResponse = {
-  ok: true;
-  data: { plans: Record<string, PlanEntry[]> };
+  plans: Record<string, PlanEntry[]>;
 };
 
-async function fetchPlans(url: string): Promise<PlansApiResponse> {
-  const res = await fetch(url, { cache: "no-store" });
-  return res.json() as Promise<PlansApiResponse>;
+/** Чтение каталога тарифов для подписи «с тарифа …»: не прочитали — подписи нет. */
+function fetchPlans(url: string): Promise<PlansApiResponse> {
+  return fetchJson<PlansApiResponse>(url, { cache: "no-store" });
 }
 
 function findMinPlanLabel(
@@ -42,8 +43,8 @@ function findMinPlanLabel(
   key: string,
   scope: Scope
 ): string | null {
-  if (!plans?.data?.plans) return null;
-  const scopePlans = plans.data.plans[scope];
+  if (!plans?.plans) return null;
+  const scopePlans = plans.plans[scope];
   if (!scopePlans) return null;
   const sorted = [...scopePlans].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const plan of sorted) {
@@ -152,7 +153,7 @@ function FeatureRow({
           <span className="text-sm text-text-main">{item.title}</span>
           <p className="text-xs text-text-sec">{item.description}</p>
         </div>
-        <Badge className="shrink-0 text-[10px]">
+        <Badge className="shrink-0">
           {t.soonBadge}
         </Badge>
       </div>
@@ -184,8 +185,8 @@ function FeatureRow({
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
-        <Check className="h-3 w-3 text-emerald-500" aria-hidden />
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15">
+        <Check className="h-3 w-3 text-success-text" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
         <span className="text-sm font-medium text-text-main">{item.title}</span>
@@ -205,6 +206,7 @@ function FeatureGroupCard({
   billingHref: string;
 }) {
   const [open, setOpen] = useState(true);
+  // Раскрытие по высоте `reducedMotion="user"` не гасит (это не transform).
   const reduce = useReducedMotion();
   const { icon: GroupIcon } = group;
   const activeCount = group.items.filter((i) => i.enabled && !i.planned).length;
@@ -213,8 +215,7 @@ function FeatureGroupCard({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-bg-input/40"
@@ -226,19 +227,19 @@ function FeatureGroupCard({
         <span className="mr-2 text-xs text-text-sec">
           {t.activeCount(activeCount, totalCount)}
         </span>
-        <motion.span animate={reduce ? undefined : { rotate: open ? 180 : 0 }} transition={reduce ? { duration: 0 } : { duration: 0.2 }}>
+        <m.span animate={{ rotate: open ? 180 : 0 }} transition={MOTION.micro}>
           <ChevronDown className="h-4 w-4 text-text-sec" aria-hidden />
-        </motion.span>
-      </button>
+        </m.span>
+      </Button>
 
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <m.div
             key="content"
-            initial={reduce ? false : { height: 0, opacity: 0 }}
-            animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
-            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0, transition: reduce ? INSTANT : MOTION.exit }}
+            transition={reduce ? INSTANT : MOTION.micro}
             className="overflow-hidden"
           >
             <div className="divide-y divide-border-subtle/60 border-t border-border-subtle/60">
@@ -246,7 +247,7 @@ function FeatureGroupCard({
                 <FeatureRow key={item.key} item={item} billingHref={billingHref} />
               ))}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
@@ -289,7 +290,7 @@ export function FeaturesPageClient({ scope, billingHref }: Props) {
         <div className="flex-1">
           <p className="text-sm font-semibold text-text-main">{t.planBadge(planName)}</p>
           {allUnlocked && (
-            <p className="text-xs text-emerald-500">{t.allUnlocked}</p>
+            <p className="text-xs text-success-text">{t.allUnlocked}</p>
           )}
         </div>
         {!allUnlocked && (

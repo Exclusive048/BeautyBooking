@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { HOVER_LIFT } from "@/components/ui/motion-classes";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { groupServicesByCategory } from "@/lib/providers/group-services";
 
 type Props = {
@@ -15,7 +17,6 @@ type Props = {
 };
 
 export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
-  const reduce = useReducedMotion();
   // FIX-R2-04-C: group the services menu by attached category (presentational).
   const groups = useMemo(() => groupServicesByCategory(services), [services]);
   return (
@@ -39,22 +40,22 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
                 {group.services.length}
               </span>
             </div>
-            <motion.div
+            <m.div
               className="space-y-3"
               initial="hidden"
               animate="visible"
-              variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: STAGGER } } }}
             >
               {group.services.map((service) => {
                 const isSelected = selectedServiceIds.includes(service.id);
                 return (
-                  <motion.article
+                  <m.article
                     key={service.id}
-                    variants={reduce ? undefined : {
-                      hidden: { opacity: 0, y: 10 },
-                      visible: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
+                    variants={{
+                      hidden: { opacity: 0, y: DISTANCE.rise },
+                      visible: { opacity: 1, y: 0, transition: MOTION.base },
                     }}
-                    className="group rounded-2xl border border-border-subtle bg-bg-input/70 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-bg-card hover:shadow-card"
+                    className={`group rounded-2xl border border-border-subtle bg-bg-input/70 p-4 hover:bg-bg-card hover:shadow-card ${HOVER_LIFT}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -78,10 +79,10 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
                         <span>{UI_TEXT.publicProfile.services.add}</span>
                       </Button>
                     </div>
-                  </motion.article>
+                  </m.article>
                 );
               })}
-            </motion.div>
+            </m.div>
           </div>
         ))}
       </div>

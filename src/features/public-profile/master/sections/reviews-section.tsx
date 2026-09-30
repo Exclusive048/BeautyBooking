@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import {
   REVIEWS_PREVIEW_LIMIT,
@@ -7,11 +6,11 @@ import {
 import { getProvider } from "@/features/public-profile/master/server/provider-query";
 import { ReviewsSectionClient } from "@/features/public-profile/master/sections/reviews-section-client";
 import { isAiFeaturesEnabled } from "@/lib/env";
-import { serverApiFetch } from "@/lib/api/server-fetch";
-import type { ClientBooking } from "@/lib/bookings/dto";
+import { emptyOnRefusal } from "@/features/public-profile/master/server/refusal";
+import { getViewer } from "@/features/public-profile/master/server/viewer";
 import type { ReviewDto } from "@/lib/reviews/types";
-import { UI_TEXT } from "@/lib/ui/text";
-import { getSessionUser } from "@/lib/auth/session";
+import * as UI_TEXT from "@/lib/ui/text";
+import { findReviewableBookingId, listReviews } from "@/lib/reviews/service";
 
 type Props = {
   providerId: string;
@@ -24,49 +23,23 @@ type Props = {
  */
 async function fetchReviews(
   providerId: string,
+  viewer: Awaited<ReturnType<typeof getViewer>>,
 ): Promise<{ reviews: ReviewDto[]; hasMore: boolean }> {
-  const path =
-    `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}` +
-    `&limit=${reviewsProbeLimit(REVIEWS_PREVIEW_LIMIT)}&offset=0`;
-  const json = await serverApiFetch<{ reviews: ReviewDto[] }>(path);
-  if (!json.ok) return { reviews: [], hasMore: false };
-  const batch = json.data.reviews ?? [];
+  const batch = await emptyOnRefusal<ReviewDto[]>(
+    () =>
+      listReviews({
+        targetType: "provider",
+        targetId: providerId,
+        limit: reviewsProbeLimit(REVIEWS_PREVIEW_LIMIT),
+        offset: 0,
+        currentUser: viewer,
+      }),
+    [],
+  );
   return {
     reviews: batch.slice(0, REVIEWS_PREVIEW_LIMIT),
     hasMore: batch.length > REVIEWS_PREVIEW_LIMIT,
   };
-}
-
-async function buildCookieHeader(): Promise<string | null> {
-  const store = await cookies();
-  const entries = store.getAll();
-  if (!entries.length) return null;
-  const header = entries.map(({ name, value }) => `${name}=${value}`).join("; ");
-  return header || null;
-}
-
-async function fetchCanReviewBookingId(providerId: string): Promise<string | null> {
-  const cookieHeader = await buildCookieHeader();
-  const headers = cookieHeader ? { cookie: cookieHeader } : undefined;
-
-  const bookingsJson = await serverApiFetch<{ bookings: ClientBooking[] }>(
-    "/api/me/bookings",
-    headers ? { headers } : undefined
-  );
-  if (!bookingsJson.ok) return null;
-
-  const ownBookings = bookingsJson.data.bookings.filter((booking) => booking.provider.id === providerId);
-  for (const booking of ownBookings) {
-    const canLeaveJson = await serverApiFetch<{ canLeave: boolean }>(
-      `/api/reviews/can-leave?bookingId=${encodeURIComponent(booking.id)}`,
-      headers ? { headers } : undefined
-    );
-    if (canLeaveJson.ok && canLeaveJson.data.canLeave) {
-      return booking.id;
-    }
-  }
-
-  return null;
 }
 
 export async function ReviewsSection({ providerId }: Props) {
@@ -80,14 +53,17 @@ export async function ReviewsSection({ providerId }: Props) {
   try {
     const [providerResult, sessionUser] = await Promise.all([
       getProvider(providerId),
-      getSessionUser(),
+      getViewer(),
     ]);
     provider = providerResult;
     currentUserId = sessionUser?.id ?? null;
     if (provider) {
+      // Гостю запись для отзыва не ищется вовсе (раньше — запрос с ответом 401).
       const result = await Promise.all([
-        fetchReviews(provider.id),
-        fetchCanReviewBookingId(provider.id),
+        fetchReviews(provider.id, sessionUser),
+        currentUserId
+          ? findReviewableBookingId({ currentUserId, providerId: provider.id })
+          : Promise.resolve(null),
       ]);
       reviews = result[0].reviews;
       hasMoreReviews = result[0].hasMore;
@@ -95,11 +71,7 @@ export async function ReviewsSection({ providerId }: Props) {
     }
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-reviews", error, [
-      `/api/providers/${providerId}`,
-      `/api/reviews?targetType=provider&targetId=${encodeURIComponent(providerId)}&limit=${reviewsProbeLimit(REVIEWS_PREVIEW_LIMIT)}&offset=0`,
-      "/api/me/bookings",
-    ]);
+    logPublicBlockError("master-reviews", error, ["getProviderProfile", "listReviews", "findReviewableBookingId"]);
   }
 
   if (hasError) {

@@ -1,6 +1,6 @@
 import { Calendar, CreditCard, Users, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminKpi,
   AdminKpiKey,
@@ -84,8 +84,8 @@ function DeltaBadge({ kpi }: { kpi: AdminKpi }) {
         isZero
           ? "bg-bg-input text-text-sec"
           : isPositive
-            ? "bg-emerald-500/[0.12] text-emerald-600 dark:text-emerald-400"
-            : "bg-red-500/[0.12] text-red-600 dark:text-red-400",
+            ? "bg-success/[0.12] text-success-text"
+            : "bg-destructive/[0.12] text-danger-text",
       )}
       aria-label={
         isPositive ? T.deltaTooltipPositive : T.deltaTooltipNegative

@@ -1,5 +1,5 @@
 import { Building2, UserRound } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.legend;
 const TC = UI_TEXT.cabinetMaster.workContext;
@@ -18,14 +18,14 @@ export function ScheduleLegend({ showWorkContext = false }: { showWorkContext?: 
       <span className="inline-flex items-center gap-2">
         <span
           aria-hidden
-          className="h-2.5 w-2.5 rounded border border-amber-400/60 bg-amber-100/40"
+          className="h-2.5 w-2.5 rounded border border-warning/60 bg-warning-surface"
         />
         {T.pending}
       </span>
       <span className="inline-flex items-center gap-2">
         <span
           aria-hidden
-          className="h-2.5 w-2.5 rounded border border-emerald-500/60 bg-emerald-100/40"
+          className="h-2.5 w-2.5 rounded border border-success/60 bg-success-surface"
         />
         {T.newClient}
       </span>

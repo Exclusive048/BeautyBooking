@@ -10,17 +10,17 @@ const TIME_FMT = new Intl.DateTimeFormat("ru-RU", {
 });
 
 const DOT_CLASS: Record<AdminEventDotTone, string> = {
-  ok: "bg-emerald-500",
+  ok: "bg-success",
   new: "bg-primary",
-  sub: "bg-amber-500",
-  cancel: "bg-red-500",
-  alert: "bg-red-500",
+  sub: "bg-warning",
+  cancel: "bg-destructive",
+  alert: "bg-destructive",
 };
 
 const AMOUNT_CLASS = {
   neutral: "text-text-main",
-  positive: "text-emerald-600 dark:text-emerald-400",
-  negative: "text-red-600 dark:text-red-400",
+  positive: "text-success-text",
+  negative: "text-danger-text",
 } as const;
 
 type Props = {

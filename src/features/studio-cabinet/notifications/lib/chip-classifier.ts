@@ -62,10 +62,12 @@ export function classifyStudioChip(
     case NotificationType.STUDIO_INVITE_ACCEPTED:
     case NotificationType.STUDIO_INVITE_REJECTED:
     case NotificationType.STUDIO_MEMBER_LEFT:
+    case NotificationType.STUDIO_MEMBER_REMOVED:
     case NotificationType.STUDIO_SCHEDULE_REQUEST:
     case NotificationType.STUDIO_SCHEDULE_APPROVED:
     case NotificationType.STUDIO_SCHEDULE_REJECTED:
     case NotificationType.STUDIO_DISBANDED:
+    case NotificationType.STUDIO_SCHEDULE_ENDING:
       return "team";
 
     // Finance / billing

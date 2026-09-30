@@ -3,7 +3,7 @@ import type {
   ServiceCategoryOption,
   ServicesByCategory,
 } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ServiceRow } from "./service-row";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.categoryAccordion;

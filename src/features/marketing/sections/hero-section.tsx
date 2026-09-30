@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
 import { Button } from "@/components/ui/button";
 
 type CTA = { label: string; href: string };
@@ -18,28 +19,25 @@ type Props = {
   decoration?: ReactNode;
 };
 
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
-
 const CONTAINER = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+  visible: { transition: { staggerChildren: STAGGER, delayChildren: 0.05 } },
 };
 
 const ITEM = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } },
+  hidden: { opacity: 0, y: DISTANCE.rise },
+  visible: { opacity: 1, y: 0, transition: MOTION.section },
 };
 
 export function HeroSection({ eyebrow, title, description, cta, decoration }: Props) {
-  const reduce = useReducedMotion();
-  const variantsItem = reduce ? undefined : ITEM;
-  const variantsContainer = reduce ? undefined : CONTAINER;
+  const variantsItem = ITEM;
+  const variantsContainer = CONTAINER;
 
   // Two layouts: centered (like homepage) when no decoration, split when decoration provided.
   const split = Boolean(decoration);
 
   return (
-    <motion.section
+    <m.section
       variants={variantsContainer}
       initial="hidden"
       animate="visible"
@@ -48,11 +46,11 @@ export function HeroSection({ eyebrow, title, description, cta, decoration }: Pr
       {/* Soft brand glow — same recipe as homepage hero */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-primary/[0.08] blur-3xl dark:bg-primary/[0.12]"
+        className="pointer-events-none absolute -right-24 -top-24 h-[40rem] w-[40rem] rounded-full bg-decor-primary blur-3xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-primary-magenta/[0.08] blur-3xl dark:bg-primary-magenta/[0.12]"
+        className="pointer-events-none absolute -left-32 top-40 h-[28rem] w-[28rem] rounded-full bg-decor-magenta blur-3xl"
       />
 
       <div
@@ -64,22 +62,22 @@ export function HeroSection({ eyebrow, title, description, cta, decoration }: Pr
       >
         <div className={split ? "" : ""}>
           {eyebrow ? (
-            <motion.p
+            <m.p
               variants={variantsItem}
               className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-accent-text"
             >
               {eyebrow}
-            </motion.p>
+            </m.p>
           ) : null}
 
-          <motion.h1
+          <m.h1
             variants={variantsItem}
             className="mt-4 text-balance text-[2.25rem] font-bold leading-[1.1] tracking-tight text-text-main sm:text-5xl lg:text-[3.75rem]"
           >
             {title}
-          </motion.h1>
+          </m.h1>
 
-          <motion.p
+          <m.p
             variants={variantsItem}
             className={
               split
@@ -88,10 +86,10 @@ export function HeroSection({ eyebrow, title, description, cta, decoration }: Pr
             }
           >
             {description}
-          </motion.p>
+          </m.p>
 
           {cta?.primary || cta?.secondary ? (
-            <motion.div
+            <m.div
               variants={variantsItem}
               className={
                 split
@@ -109,19 +107,19 @@ export function HeroSection({ eyebrow, title, description, cta, decoration }: Pr
                   <Link href={cta.secondary.href}>{cta.secondary.label}</Link>
                 </Button>
               ) : null}
-            </motion.div>
+            </m.div>
           ) : null}
         </div>
 
         {split ? (
-          <motion.div
+          <m.div
             variants={variantsItem}
             className="hidden lg:block"
           >
             {decoration}
-          </motion.div>
+          </m.div>
         ) : null}
       </div>
-    </motion.section>
+    </m.section>
   );
 }

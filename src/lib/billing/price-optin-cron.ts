@@ -11,7 +11,7 @@ import {
   resolveSubscriptionTimezone,
 } from "@/lib/billing/deadline-label";
 import { moneyRUBFromKopeks } from "@/lib/format";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * BILLING-RENEWAL-OPTIN-02 (R2-05-C-v2) — price-increase opt-in reminders.

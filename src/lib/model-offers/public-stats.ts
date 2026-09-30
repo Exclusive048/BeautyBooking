@@ -1,8 +1,8 @@
-import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/lib/logging/logger";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { todayDateString } from "@/lib/model-offers/public.service";
+import { MODEL_OFFER_VISIBLE_MASTER_WHERE } from "@/lib/model-offers/visibility";
 
 /**
  * FOOTER-HONEST-METRICS (2026-09-15). Карточка «Для моделей» в футере несла
@@ -42,7 +42,7 @@ async function fetchFromDb(): Promise<PublicModelOfferStats> {
       AND: [
         { status: "ACTIVE" },
         { dateLocal: { gte: todayDateString() } },
-        { master: { isPublished: true, type: ProviderType.MASTER } },
+        { master: MODEL_OFFER_VISIBLE_MASTER_WHERE },
       ],
     },
     select: {

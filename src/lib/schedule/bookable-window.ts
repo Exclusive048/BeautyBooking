@@ -1,12 +1,8 @@
-import { prisma } from "@/lib/prisma";
 import type { AvailabilitySlot } from "@/lib/domain/schedule";
 import {
   listAvailabilitySlotsPaginated,
   type AvailabilitySlotsPageMeta,
 } from "@/lib/schedule/usecases";
-import { dateFromLocalDateKey } from "@/lib/schedule/dateKey";
-import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
-import { SCHEDULE_OVERRIDE_RANGE_ORDER } from "@/lib/schedule/override-order";
 import {
   earliestBookableUtc,
   latestBookableUtc,
@@ -38,6 +34,13 @@ import {
  *
  * The proven slot ENGINE (`listAvailabilitySlotsPaginated` →
  * `buildSlotsForDay`) is untouched — this helper only filters its output.
+ *
+ * SCHEDULE-PATTERNS-01 (этап 1): рабочие дни и режим «Фиксированное время»
+ * здесь больше НЕ проверяются. Этот helper держал собственную копию правил
+ * недели и исключений, и режим фиксированного времени знала только она — ядро
+ * записи, горящие окошки, «свободно сегодня» и фильтр каталога «когда» его не
+ * видели. Теперь режим — часть `DayPlan` движка, и окошки приходят уже
+ * отфильтрованными; здесь остаётся только окно записи.
  */
 
 export type BookableWindowProvider = {
@@ -50,37 +53,6 @@ export type BookableSlotsResult =
   | { ok: true; slots: AvailabilitySlot[]; meta: AvailabilitySlotsPageMeta }
   | { ok: false; status: number; code?: string; message: string };
 
-type EffectiveSchedule = {
-  isWorkday: boolean;
-  scheduleMode: "FLEXIBLE" | "FIXED";
-  fixedSlotSet: Set<string>;
-};
-
-function normalizeFixedSlotTime(value: string): string | null {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value.trim());
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute % 5 !== 0) {
-    return null;
-  }
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-}
-
-function normalizeFixedSlotTimes(values: string[]): string[] {
-  const unique = new Set<string>();
-  for (const value of values) {
-    const normalized = normalizeFixedSlotTime(value);
-    if (normalized) unique.add(normalized);
-  }
-  return Array.from(unique).sort((left, right) => left.localeCompare(right));
-}
-
-function dayIndexFromDateKey(dateKey: string): number {
-  const day = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
-  return day === 0 ? 6 : day - 1;
-}
-
 function toDate(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -90,8 +62,9 @@ function toDate(value: Date | string | null | undefined): Date | null {
 
 /**
  * Returns the bookable slots for a provider/service within a date range:
- * the schedule engine output, filtered by (1) the `minBookingHoursAhead`
- * cutoff and (2) the effective weekly/override workday + FIXED-mode rules.
+ * the schedule engine output (working days and FIXED-mode starts are already
+ * applied by the engine), filtered by the booking window — the
+ * `minBookingHoursAhead` cutoff and, for a foreign `windowPolicy`, its maximum.
  * `toKeyExclusive` is the EXCLUSIVE upper bound (callers convert an
  * inclusive `to` date key via `addDaysToDateKey(to, 1)`).
  */
@@ -123,6 +96,13 @@ export async function listBookableSlots(input: {
    * операторского окна не действует.
    */
   windowPolicy?: Pick<ProviderPolicy, "minBookingHoursAhead" | "maxBookingDaysAhead">;
+  /**
+   * 29.09 доработки · 07 (решение владельца): для администратора студии в
+   * операторском окне действует «максимум вперёд» (строже из студии и мастера)
+   * — окошки дальше него запись всё равно отклонит. Мастеру в своей ручной
+   * записи не передаётся.
+   */
+  operatorMaxWindow?: Pick<ProviderPolicy, "maxBookingDaysAhead">;
 }): Promise<BookableSlotsResult> {
   const { provider, serviceId, durationMinutes, fromKey, toKeyExclusive, limit, now } = input;
 
@@ -136,102 +116,18 @@ export async function listBookableSlots(input: {
     return { ok: false, status: result.status, code: result.code, message: result.message };
   }
 
-  const rangeFromUtc = dateFromLocalDateKey(result.data.meta.fromDate, provider.timezone, 0, 0);
-  const rangeToExclusiveUtc = dateFromLocalDateKey(
-    result.data.meta.toDateExclusive,
-    provider.timezone,
-    0,
-    0,
-  );
-
-  const [weeklyConfig, overrides] = await Promise.all([
-    prisma.weeklyScheduleConfig.findUnique({
-      where: { providerId: provider.id },
-      select: {
-        days: {
-          select: {
-            weekday: true,
-            isActive: true,
-            scheduleMode: true,
-            fixedSlotTimes: true,
-            templateId: true,
-          },
-        },
-      },
-    }),
-    prisma.scheduleOverride.findMany({
-      where: { providerId: provider.id, date: { gte: rangeFromUtc, lt: rangeToExclusiveUtc } },
-      select: {
-        date: true,
-        isDayOff: true,
-        isWorkday: true,
-        scheduleMode: true,
-        fixedSlotTimes: true,
-      },
-      // LOGIC-11: тот же канон, что у движка и у guard'а.
-      orderBy: SCHEDULE_OVERRIDE_RANGE_ORDER,
-    }),
-  ]);
-
-  const weekByDay = new Map<number, EffectiveSchedule>();
-  for (const day of weeklyConfig?.days ?? []) {
-    weekByDay.set(day.weekday, {
-      isWorkday: Boolean(day.isActive && day.templateId),
-      scheduleMode: day.scheduleMode ?? "FLEXIBLE",
-      fixedSlotSet: new Set(normalizeFixedSlotTimes(day.fixedSlotTimes ?? [])),
-    });
-  }
-
-  const exceptionsByDate = new Map<string, EffectiveSchedule>();
-  for (const row of overrides) {
-    const dateKey = toLocalDateKey(row.date, provider.timezone);
-    // LOGIC-11: побеждает ПЕРВАЯ строка — как в движке. Раньше здесь стоял
-    // безусловный `set`, то есть при дублях выигрывала ПОСЛЕДНЯЯ, и генератор
-    // слотов расходился с guard'ом рабочих часов даже при одинаковом порядке
-    // выборки.
-    if (exceptionsByDate.has(dateKey)) continue;
-    const fixedTimes = normalizeFixedSlotTimes(row.fixedSlotTimes ?? []);
-    exceptionsByDate.set(dateKey, {
-      isWorkday: row.isWorkday ?? !row.isDayOff,
-      scheduleMode: row.scheduleMode ?? (fixedTimes.length > 0 ? "FIXED" : "FLEXIBLE"),
-      fixedSlotSet: new Set(fixedTimes),
-    });
-  }
-
-  const effectiveCache = new Map<string, EffectiveSchedule>();
-  const getEffective = (dateKey: string): EffectiveSchedule => {
-    const cached = effectiveCache.get(dateKey);
-    if (cached) return cached;
-
-    const fromException = exceptionsByDate.get(dateKey);
-    if (fromException) {
-      effectiveCache.set(dateKey, fromException);
-      return fromException;
-    }
-
-    const weekday = dayIndexFromDateKey(dateKey) + 1;
-    const fromWeek = weekByDay.get(weekday);
-    if (fromWeek) {
-      effectiveCache.set(dateKey, fromWeek);
-      return fromWeek;
-    }
-
-    const fallback: EffectiveSchedule = {
-      isWorkday: true,
-      scheduleMode: "FLEXIBLE",
-      fixedSlotSet: new Set<string>(),
-    };
-    effectiveCache.set(dateKey, fallback);
-    return fallback;
-  };
-
   // EXP-025: anything before `now + minBookingHoursAhead` is non-bookable.
   // This is the cutoff `/slots` already applied and `/availability` lacked.
   const earliestBookable = input.operatorWindow
     ? now
     : earliestBookableUtc(input.windowPolicy ?? provider, now);
-  const latestBookable =
-    !input.operatorWindow && input.windowPolicy ? latestBookableUtc(input.windowPolicy, now) : null;
+  const latestBookable = input.operatorWindow
+    ? input.operatorMaxWindow
+      ? latestBookableUtc(input.operatorMaxWindow, now)
+      : null
+    : input.windowPolicy
+      ? latestBookableUtc(input.windowPolicy, now)
+      : null;
 
   const slots = result.data.slots.filter((slot) => {
     const startsAt = toDate(slot.startAtUtc);
@@ -239,16 +135,7 @@ export async function listBookableSlots(input: {
     if (startsAt.getTime() < earliestBookable.getTime()) return false;
     if (latestBookable && startsAt.getTime() > latestBookable.getTime()) return false;
 
-    const dateKey = toLocalDateKey(startsAt, provider.timezone);
-    const effective = getEffective(dateKey);
-
-    if (!effective.isWorkday) return false;
-    if (effective.scheduleMode !== "FIXED") return true;
-    if (effective.fixedSlotSet.size === 0) return false;
-
-    const { hour, minute } = getLocalTimeParts(startsAt, provider.timezone);
-    const localTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-    return effective.fixedSlotSet.has(localTime);
+    return true;
   });
 
   return { ok: true, slots, meta: result.data.meta };

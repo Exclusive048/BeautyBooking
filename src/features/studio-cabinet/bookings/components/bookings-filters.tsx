@@ -6,13 +6,13 @@ import { BookingStatus } from "@/lib/prisma-enums";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { BookingsTimeRange } from "../lib/time-range-filter";
 import type {
   MasterOption,
   StudioBookingsRangeCounts,
 } from "../server/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.studioCabinet.bookingsV2.filters;
 
@@ -78,28 +78,12 @@ export function BookingsFilters({
 
   return (
     <div className="space-y-3 rounded-2xl border border-border-subtle bg-bg-card p-4">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border-subtle bg-bg-page p-1">
-        {RANGES.map((opt) => {
-          const active = opt.id === range;
-          return (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => set("range", opt.id === "today" ? null : opt.id)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-bg-card text-text-main shadow-card"
-                  : "bg-transparent text-text-sec hover:text-text-main",
-              )}
-              aria-pressed={active}
-            >
-              {T.ranges[opt.labelKey]}
-              <span className="ml-1.5 text-xs text-text-sec">{countFor(opt.id)}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.rangeAria}
+        items={RANGES.map((opt) => ({ id: opt.id, label: T.ranges[opt.labelKey], badge: countFor(opt.id) }))}
+        value={range}
+        onChange={(id) => set("range", id === "today" ? null : id)}
+      />
 
       <div className="grid gap-2 sm:grid-cols-[1fr_220px_220px]">
         <div className="relative">

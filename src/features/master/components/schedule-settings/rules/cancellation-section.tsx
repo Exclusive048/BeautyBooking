@@ -1,8 +1,8 @@
 "use client";
 
 import type { BookingRulesDto, LateCancelAction } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
-import { ChipGroup } from "../components/chip-group";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ChipGroup } from "@/components/ui/chip-group";
 import { SettingRow } from "../components/setting-row";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.rules.cancellation;

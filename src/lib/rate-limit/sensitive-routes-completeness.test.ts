@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { isSensitiveRouteKey } from "@/lib/rate-limit";
+import { proxyRateLimitKey } from "@/lib/rate-limit/keys";
 import { hasMutatingHandler } from "@/lib/testing/route-handlers";
 import FROZEN from "@/lib/rate-limit/fail-open-mutating-routes.json";
 
@@ -68,7 +69,10 @@ function collectMutatingRoutes(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-const proxyKey = (method: string, template: string) => `rl:api:1.2.3.4:${method}:${template}`;
+// Ключ — тем же конструктором, что у прокси: путь с `[token]` превращается в
+// шаблон с `:id` тем же нормализатором (29.09 доработки · 15 — точные шаблоны
+// чувствительных путей записаны в форме шаблона).
+const proxyKey = (method: string, route: string) => proxyRateLimitKey("api", "1.2.3.4", method, route);
 
 describe("инв. #6 · полнота fail-closed, а не членство", () => {
   const all = collectMutatingRoutes(API_ROOT);

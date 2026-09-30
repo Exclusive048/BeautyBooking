@@ -51,6 +51,12 @@ export type YandexLocalityResult = {
   geoLat: number;
   geoLng: number;
   locality: string | null;
+  /**
+   * Названия регионов (компоненты `province`: федеральный округ, субъект; у
+   * городов федерального значения — сам город). По ним новому городу
+   * выбирается часовой пояс (`cities/region-timezone.ts`).
+   */
+  regions: string[];
 };
 
 function parsePoint(pos: string | undefined): { geoLat: number; geoLng: number } | null {
@@ -132,13 +138,16 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
   const point = parsePoint(member.Point?.pos);
   if (!point) return null;
 
-  const locality = extractLocality(
-    member.metaDataProperty?.GeocoderMetaData?.Address?.Components,
-  );
+  const components = member.metaDataProperty?.GeocoderMetaData?.Address?.Components;
+  const locality = extractLocality(components);
+  const regions = (components ?? [])
+    .filter((component) => component.kind === "province" && Boolean(component.name))
+    .map((component) => component.name as string);
 
   return {
     geoLat: point.geoLat,
     geoLng: point.geoLng,
     locality,
+    regions,
   };
 }

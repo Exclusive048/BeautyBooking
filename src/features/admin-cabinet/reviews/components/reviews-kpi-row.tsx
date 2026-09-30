@@ -2,7 +2,7 @@ import {
   ReviewsKpiCard,
   type ReviewsKpiTone,
 } from "@/features/admin-cabinet/reviews/components/reviews-kpi-card";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewsKpis } from "@/features/admin-cabinet/reviews/types";
 
 const T = UI_TEXT.adminPanel.reviews.kpi;

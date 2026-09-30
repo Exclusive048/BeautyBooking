@@ -1,5 +1,5 @@
 import { FeatureGate } from "@/components/billing/FeatureGate";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { HoursHeatmap } from "../charts/hours-heatmap";
 import { RevenueLineChart } from "../charts/revenue-line-chart";
 import { SourcesDonut } from "../charts/sources-donut";

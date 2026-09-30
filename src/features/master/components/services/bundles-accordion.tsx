@@ -3,7 +3,7 @@ import type {
   MasterServicesViewData,
   ServicePackageView,
 } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { BundleRow } from "./bundle-row";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.bundlesAccordion;

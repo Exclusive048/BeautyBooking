@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kopeks";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing.refundDialog;

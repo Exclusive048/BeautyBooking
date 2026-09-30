@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ExternalLink, Pause, Pencil, Play, UserX } from "lucide-react";
+import { CalendarDays, ExternalLink, Pause, Pencil, Play, UserMinus, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   STATUS_BADGE_CLASS,
   getStatusTone,
@@ -14,6 +14,7 @@ import {
 import type { StudioMasterDetail } from "../server/types";
 import { EditMasterProfileDialog } from "./edit-master-profile-dialog";
 import { PauseMasterDialog } from "./pause-master-dialog";
+import { RemoveMasterDialog } from "./remove-master-dialog";
 import { RevokeInviteDialog } from "./revoke-invite-dialog";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail;
@@ -47,6 +48,7 @@ export function MasterDetailHeader({
   const [pauseOpen, setPauseOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const tone = getStatusTone(detail.status);
   // FIX-STUDIO-02 (F7): an INVITED master is an unclaimed stub — pausing it is
   // meaningless (it accepts no bookings). Offer «Отозвать приглашение» instead;
@@ -105,6 +107,11 @@ export function MasterDetailHeader({
             <p className="mt-1 text-xs text-text-sec">
               {T.clientsTemplate.replace("{count}", String(detail.clientsCount))}
             </p>
+            {!isInvited && detail.blockingStudioBookings > 0 ? (
+              <p className="mt-2 rounded-xl border border-warning-border bg-warning-surface px-3 py-2 text-xs text-warning-text">
+                {T.blockingBookings(detail.blockingStudioBookings)}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -144,7 +151,20 @@ export function MasterDetailHeader({
               exist and the page rendered empty. Studio-admin chat is
               parked в backlog as a deferred feature requiring
               product + legal decision on the invariant evolution. */}
-          <div className="ml-auto">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* 29.09 доработки · 04: исключение из студии — для работающих и на
+                паузе; владелец может исключить и себя (решение владельца). */}
+            {!isInvited ? (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setRemoveOpen(true)}
+                data-testid="studio-master-remove"
+              >
+                <UserMinus className="h-3.5 w-3.5" aria-hidden />
+                {T.actions.remove}
+              </Button>
+            ) : null}
             {isInvited ? (
               <Button
                 variant="danger"
@@ -171,6 +191,17 @@ export function MasterDetailHeader({
           </div>
         </div>
       </section>
+
+      {!isInvited ? (
+        <RemoveMasterDialog
+          studioId={studioId}
+          masterId={detail.id}
+          masterName={detail.displayName}
+          viewToken={detail.viewToken}
+          open={removeOpen}
+          onClose={() => setRemoveOpen(false)}
+        />
+      ) : null}
 
       {isInvited ? (
         <RevokeInviteDialog

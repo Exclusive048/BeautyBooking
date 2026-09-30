@@ -1,7 +1,7 @@
 import { Package, Clock, Sparkles } from "lucide-react";
 import type { PublicBundleView } from "@/lib/master/public-profile-view.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { PackageBookingButton } from "@/features/public-profile/master/components/package-booking-flow";
 
 type Props = {

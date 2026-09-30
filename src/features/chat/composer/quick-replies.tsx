@@ -1,8 +1,10 @@
 "use client";
 
 import { Zap } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective } from "@/features/chat/types";
+import { Button } from "@/components/ui/button";
+import { ChipButton } from "@/components/ui/chip-button";
 
 const T = UI_TEXT.chat;
 
@@ -22,22 +24,16 @@ export function QuickReplies({ perspective, onPick, onHide }: Props) {
         {T.quickReplies.eyebrow}
       </span>
       {replies.map((text) => (
-        <button
-          key={text}
-          type="button"
-          onClick={() => onPick(text)}
-          className="rounded-full border border-border-subtle bg-bg-input/70 px-2.5 py-1 text-xs text-text-main transition hover:border-primary hover:bg-bg-card"
-        >
+        <ChipButton key={text} onClick={() => onPick(text)}>
           {text}
-        </button>
+        </ChipButton>
       ))}
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={onHide}
         className="ml-auto text-[11px] text-text-sec transition hover:text-text-main"
       >
         {T.quickReplies.hide}
-      </button>
+      </Button>
     </div>
   );
 }

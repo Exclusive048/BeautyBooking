@@ -1,6 +1,6 @@
 import { Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMasterDetail } from "../server/types";
 import { MasterDetailHeader } from "./master-detail-header";
 import { MasterDetailKpis } from "./master-detail-kpis";

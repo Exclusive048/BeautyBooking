@@ -1,7 +1,6 @@
-import { z } from "zod";
 import { ok, fail } from "@/lib/api/response";
 import { requireAuth } from "@/lib/auth/guards";
-import { detachMasterFromStudio, listStudioMasters } from "@/lib/studios/masters";
+import { listStudioMasters } from "@/lib/studios/masters";
 import { ensureStudioAdmin } from "@/lib/studios/access";
 
 /**
@@ -24,9 +23,9 @@ import { ensureStudioAdmin } from "@/lib/studios/access";
  * (`STUDIO-ATTACH-CONSENT-CONTRACT` in BACKLOG).
  */
 
-const detachSchema = z.object({
-  masterProviderId: z.string().min(1),
-});
+// 29.09 доработки · 04: `DELETE` (отвязка без переноса услуг и отзыва
+// приглашений, вызывающих не было) удалён — исключение мастера идёт одним путём,
+// `POST /api/cabinet/studio/members/[memberId]/remove`.
 
 async function ensureStudioViewer(studioId: string, userId: string) {
   return ensureStudioAdmin(studioId, userId);
@@ -47,28 +46,4 @@ export async function GET(
   if (!result.ok) return fail(result.message, result.status, result.code);
 
   return ok({ masters: result.data });
-}
-
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
-) {
-  const auth = await requireAuth();
-  if (!auth.ok) return auth.response;
-
-  const p = params instanceof Promise ? await params : params;
-  const accessError = await ensureStudioAdmin(p.id, auth.user.id);
-  if (accessError) return accessError;
-
-  const body = await req.json().catch(() => null);
-  const parsed = detachSchema.safeParse(body);
-  if (!parsed.success) return fail("Проверьте правильность заполнения полей.", 400, "VALIDATION_ERROR");
-
-  // `detachMasterFromStudio` is scoped: it only detaches a master whose
-  // `studioId` equals this studio's provider id (unconditional `!==`), so a
-  // foreign/solo master is rejected 404.
-  const result = await detachMasterFromStudio(p.id, parsed.data.masterProviderId);
-  if (!result.ok) return fail(result.message, result.status, result.code);
-
-  return ok({ master: result.data });
 }

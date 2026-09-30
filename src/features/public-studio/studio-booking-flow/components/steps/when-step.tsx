@@ -4,10 +4,11 @@ import { ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { SlotItem } from "@/features/booking/lib/studio-booking";
-import { todayKey, buildDateBounds, STUDIO_BOOKING_DAYS_AHEAD } from "@/features/booking/lib/studio-booking";
+import { todayKey, buildDateBounds } from "@/features/booking/lib/studio-booking";
+import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
@@ -74,7 +75,12 @@ type Props = {
   viewerTimeZone: string;
   selectedMasterName: string;
   isAnyMaster: boolean;
-  visibleSlotDays: number;
+  /**
+   * Сколько дней вперёд показывать в полосе дат: окно записи студии и
+   * выбранного мастера (`publicBookingHorizonDays`). 29.09 доработки · 03 —
+   * раньше здесь было зашитое 30, а потолок — несвязанное 60.
+   */
+  horizonDays: number;
   onBack: () => void;
 };
 
@@ -89,10 +95,10 @@ export function WhenStep({
   viewerTimeZone,
   selectedMasterName,
   isAnyMaster,
-  visibleSlotDays,
+  horizonDays,
   onBack,
 }: Props) {
-  const daysAhead = Math.max(1, Math.min(visibleSlotDays || STUDIO_BOOKING_DAYS_AHEAD, STUDIO_BOOKING_DAYS_AHEAD));
+  const daysAhead = Math.max(1, Math.min(horizonDays || SCHEDULE_HORIZON_DAYS, SCHEDULE_HORIZON_DAYS));
   const strip = useMemo(() => buildStrip(daysAhead, salonTimeZone), [daysAhead, salonTimeZone]);
   const bounds = useMemo(
     () => buildDateBounds(new Date(), salonTimeZone, daysAhead),
@@ -159,8 +165,7 @@ export function WhenStep({
             const inBounds = cell.dateKey >= bounds.min && cell.dateKey <= bounds.max;
             return (
               <li key={cell.dateKey} className="snap-start">
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => inBounds && onDateChange(cell.dateKey)}
                   disabled={!inBounds}
                   aria-pressed={isSelected}
@@ -183,7 +188,7 @@ export function WhenStep({
                   <span className={`text-[10px] ${isSelected ? "text-white/80" : "text-text-muted"}`}>
                     {cell.month}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}
@@ -260,9 +265,8 @@ function SlotGroup({
         {slots.map((slot) => {
           const isSelected = slot.label === selectedLabel;
           return (
-            <button
+            <Button variant="wrapper"
               key={slot.label}
-              type="button"
               onClick={() => onPick(slot.label)}
               aria-pressed={isSelected}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
@@ -272,7 +276,7 @@ function SlotGroup({
               }`}
             >
               {UI_FMT.timeShort(slot.startAtUtc, { timeZone: salonTimeZone })}
-            </button>
+            </Button>
           );
         })}
       </div>

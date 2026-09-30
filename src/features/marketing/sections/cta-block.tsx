@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { DISTANCE, MOTION, VIEWPORT_ONCE } from "@/lib/ui/motion";
 import { Button } from "@/components/ui/button";
 
 type CTA = { label: string; href: string };
@@ -13,21 +14,18 @@ type Props = {
   cta: { primary: CTA; secondary?: CTA };
 };
 
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
-
 export function CTABlock({ title, description, cta }: Props) {
-  const reduce = useReducedMotion();
-  const initial = reduce ? undefined : { opacity: 0, y: 24 };
-  const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
-  const transition = reduce ? undefined : { duration: 0.5, ease: EASE };
+  const initial = { opacity: 0, y: DISTANCE.rise };
+  const whileInView = { opacity: 1, y: 0 };
+  const transition = MOTION.section;
 
   return (
     <section className="py-16 lg:py-24">
       <div className="mx-auto max-w-[1280px] px-4">
-        <motion.div
+        <m.div
           initial={initial}
           whileInView={whileInView}
-          viewport={{ once: true, margin: "-80px" }}
+          viewport={VIEWPORT_ONCE}
           transition={transition}
           className="rounded-3xl bg-brand-gradient p-10 text-center shadow-card sm:p-12 lg:p-16"
         >
@@ -52,7 +50,7 @@ export function CTABlock({ title, description, cta }: Props) {
               </Button>
             ) : null}
           </div>
-        </motion.div>
+        </m.div>
       </div>
     </section>
   );

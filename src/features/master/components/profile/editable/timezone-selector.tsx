@@ -6,7 +6,8 @@ import { Check, Loader2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/cn";
 import { buildTimezoneOptions } from "@/lib/ui/timezone-options";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.profile.location;
 
@@ -25,6 +26,7 @@ export function TimezoneSelector({ current }: { current: string }) {
   const router = useRouter();
   const [value, setValue] = useState(current);
   const [status, setStatus] = useState<Status>("idle");
+  const [errorText, setErrorText] = useState<string | null>(null);
   const options = buildTimezoneOptions(current);
 
   const save = async (next: string) => {
@@ -32,21 +34,18 @@ export function TimezoneSelector({ current }: { current: string }) {
     setValue(next);
     setStatus("saving");
     try {
-      const response = await fetch("/api/master/profile", {
+      await fetchJsonWithAuth<unknown>("/api/master/profile", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ timezone: next }),
       });
-      if (!response.ok) {
-        setValue(previous);
-        setStatus("error");
-        return;
-      }
+      setErrorText(null);
       setStatus("saved");
       router.refresh();
       window.setTimeout(() => setStatus("idle"), 1800);
-    } catch {
+    } catch (error) {
       setValue(previous);
+      setErrorText(serverMessageOr(error, T.timezoneError));
       setStatus("error");
     }
   };
@@ -65,7 +64,7 @@ export function TimezoneSelector({ current }: { current: string }) {
             </span>
           ) : null}
           {status === "saved" ? (
-            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1 text-[10px] text-success-text">
               <Check className="h-3 w-3" aria-hidden /> {T.timezoneSaved}
             </span>
           ) : null}
@@ -83,8 +82,8 @@ export function TimezoneSelector({ current }: { current: string }) {
             </option>
           ))}
         </Select>
-        <p className={cn("mt-1.5 text-[11px]", status === "error" ? "text-red-600 dark:text-red-400" : "text-text-sec")}>
-          {status === "error" ? T.timezoneError : T.timezoneHint}
+        <p className={cn("mt-1.5 text-[11px]", status === "error" ? "text-danger-text" : "text-text-sec")}>
+          {status === "error" ? (errorText ?? T.timezoneError) : T.timezoneHint}
         </p>
       </div>
     </div>

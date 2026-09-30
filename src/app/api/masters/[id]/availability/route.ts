@@ -9,7 +9,7 @@ import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
 import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
 import { toAppError } from "@/lib/api/errors";
-import { stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
+import { clampVisibleSlotsHorizon, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { isActiveMasterOfPublishedStudio } from "@/lib/studio/active-studio-master";
 
@@ -21,6 +21,8 @@ const PROVIDER_SELECT = {
   timezone: true,
   minBookingHoursAhead: true,
   maxBookingDaysAhead: true,
+  visibleSlotDays: true,
+  studioId: true,
 } as const;
 
 /**
@@ -69,6 +71,8 @@ async function loadStudioActiveMaster(providerKey: string) {
     timezone: master.timezone,
     minBookingHoursAhead: master.minBookingHoursAhead,
     maxBookingDaysAhead: master.maxBookingDaysAhead,
+    visibleSlotDays: master.visibleSlotDays,
+    studioId: master.studioId,
   };
 }
 
@@ -137,6 +141,17 @@ export async function GET(
       studioMove?.durationMin ??
       (exclusion && exclusion.durationMin > 0 ? exclusion.durationMin : duration.data);
 
+    // 29.09 доработки · 03: публичный запрос (виджет записи в студию) видит
+    // окошки не дальше «Сколько окошек вперёд» мастера — тот же примитив, что у
+    // `/slots`. Перенос (`excludeBookingId` / `moveBookingId`) и операторское
+    // окно не обрезаются: настройка про то, что видит клиент, а не про уже
+    // существующие записи (`bookable-window.ts`).
+    const now = new Date();
+    const isPublicListing = operatorProvider === null && !exclusion && !studioMove;
+    const effectiveToKeyExclusive = isPublicListing
+      ? addDaysToDateKey(clampVisibleSlotsHorizon(toKey || null, provider, now, provider.timezone), 1)
+      : toKeyExclusive;
+
     // EXP-025: same primitive as `/slots` → min-ahead + schedule filter
     // applied identically. A slot returned here is one `assertBookingWindow`
     // will accept at submit.
@@ -154,15 +169,21 @@ export async function GET(
       serviceId,
       durationMinutes: windowMinutes,
       fromKey,
-      toKeyExclusive,
+      toKeyExclusive: effectiveToKeyExclusive,
       limit,
-      now: new Date(),
+      now,
       excludeBookingId: studioMove ? studioMove.excludeBookingId : exclusion?.bookingId,
       operatorWindow: operatorProvider !== null,
       // BOOKING-WINDOW-STRICTER: более строгое из окон владельца услуги и мастера.
       windowPolicy: serviceOwner?.provider
         ? stricterBookingWindow(serviceOwner.provider, provider)
         : undefined,
+      // 29.09 доработки · 07: оператор на профиле мастера В СТУДИИ — это админ
+      // студии, для него действует «максимум вперёд» (строже из двух).
+      operatorMaxWindow:
+        operatorProvider !== null && provider.studioId && serviceOwner?.provider
+          ? stricterBookingWindow(serviceOwner.provider, provider)
+          : undefined,
     });
     if (!bookable.ok) return fail(bookable.message, bookable.status, bookable.code);
 

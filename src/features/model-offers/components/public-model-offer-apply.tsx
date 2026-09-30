@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useMemo, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { FileInput } from "@/components/ui/file-input";
 
 type ApplyResponse = {
   application: {
@@ -31,6 +33,7 @@ const MAX_FILES = 3;
 
 export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
   const [files, setFiles] = useState<File[]>([]);
+  const router = useRouter();
   const [note, setNote] = useState("");
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -83,9 +86,8 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
 
   async function submit() {
     if (!userId) {
-      if (typeof window !== "undefined") {
-        window.location.href = loginHref;
-      }
+      // Обычный переход на страницу входа — мягкой навигацией (29.09 · 06).
+      router.push(loginHref);
       return;
     }
 
@@ -135,20 +137,20 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
     return (
       <div
         role="status"
-        className="flex flex-col items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/80 p-6 text-center dark:border-emerald-800/40 dark:bg-emerald-950/40"
+        className="flex flex-col items-center gap-3 rounded-xl border border-success-border bg-success-surface p-6 text-center"
       >
-        <CheckCircle2 className="h-10 w-10 text-emerald-500" aria-hidden />
+        <CheckCircle2 className="h-10 w-10 text-success-text" aria-hidden />
         <div>
-          <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+          <p className="font-semibold text-success-text">
             {UI_TEXT.pages.modelOffer.applySuccessTitle}
           </p>
-          <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-400">
+          <p className="mt-1 text-sm text-success-text">
             {UI_TEXT.pages.modelOffer.applySuccessText}
           </p>
         </div>
         <Link
           href="/cabinet/model-applications"
-          className="mt-1 text-sm font-medium text-emerald-700 underline underline-offset-2 hover:opacity-80 dark:text-emerald-400"
+          className="mt-1 text-sm font-medium text-success-text underline underline-offset-2 hover:opacity-80"
         >
           {UI_TEXT.pages.modelOffer.applySuccessLink}
         </Link>
@@ -184,12 +186,10 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
               {UI_TEXT.pages.modelOffer.applyPhotoHint}
             </span>
           )}
-          <input
-            type="file"
+          <FileInput mode="overlay"
             accept="image/*"
             multiple
             onChange={onFileChange}
-            className="absolute inset-0 cursor-pointer opacity-0"
             aria-label={UI_TEXT.pages.modelOffer.applyPhotoLabel}
           />
         </div>

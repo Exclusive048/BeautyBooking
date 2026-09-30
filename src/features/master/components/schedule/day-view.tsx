@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { TimeAxis } from "@/features/master/components/schedule/time-axis";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SCHEDULE_DAY_PARAM, replaceDayInUrl, resolveSelectedDayIso } from "./schedule-view-state";
 
 const T = UI_TEXT.cabinetMaster.schedule.controls;

@@ -6,7 +6,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { formatLocalHm, toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   BOOKING_CELL_CLASS,
   bookingToneFromStatus,
@@ -19,6 +19,7 @@ import {
   getBookingSourceDisplay,
 } from "../lib/source-display";
 import type { StudioBookingRow } from "../server/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.bookingsV2;
 
@@ -123,12 +124,12 @@ export function BookingRow({
               {row.client.displayName}
             </span>
             {row.client.isNewClient ? (
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <span className="rounded-full border border-success-border bg-success-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-success-text">
                 {T.client.newBadge}
               </span>
             ) : null}
             {row.client.isVip ? (
-              <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
+              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
                 {T.client.vipBadge}
               </span>
             ) : null}
@@ -174,14 +175,13 @@ export function BookingRow({
           </span>
         </td>
         <td className="px-2 py-3 align-top">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setMenuOpen(true)}
             className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
             aria-label={T.actions.menu}
           >
             <MoreHorizontal className="h-4 w-4" aria-hidden />
-          </button>
+          </Button>
         </td>
       </tr>
 

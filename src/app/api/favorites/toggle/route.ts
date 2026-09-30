@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { parseBody } from "@/lib/validation";
 import { favoriteToggleSchema } from "@/lib/favorites/schemas";
 import { toggleProviderFavorite } from "@/lib/favorites/service";
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     // needed because we already require auth above. 30/min is generous for
     // intentional clicks but cuts off scripted abuse.
     const rl = await checkRateLimit(
-      `rl:/api/favorites/toggle:user:${user.id}:ip:${getClientIp(req)}`,
+      routeRateLimitKey(req, "user-ip", `${user.id}:${getClientIp(req)}`),
       FAVORITE_TOGGLE_RATE_LIMIT,
     );
     if (rl.limited) {

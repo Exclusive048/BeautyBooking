@@ -9,8 +9,8 @@ import {
   BOOKING_RULE_LIMITS,
   type ScheduleEditorSnapshot,
 } from "@/lib/schedule/editor-shared";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.scheduleSettings.breaks;
 const E = UI_TEXT.studioCabinet.scheduleSettings.errors;
@@ -48,7 +48,7 @@ export function BreaksTab({ studioId, masterId, initialSnapshot }: Props) {
     setError(null);
     try {
       const params = new URLSearchParams({ studioId, masterId });
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/cabinet/master/schedule?${params.toString()}`,
         {
           method: "PATCH",
@@ -56,18 +56,10 @@ export function BreaksTab({ studioId, masterId, initialSnapshot }: Props) {
           body: JSON.stringify({ bufferBetweenBookingsMin: draft }),
         },
       );
-      const json = (await response.json().catch(() => null)) as
-        | ApiResponse<unknown>
-        | null;
-      if (!response.ok || !json || !json.ok) {
-        const message = json && !json.ok ? json.error.message : E.save;
-        setError(message);
-        return;
-      }
       setSavedAt(Date.now());
       router.refresh();
-    } catch {
-      setError(E.save);
+    } catch (error) {
+      setError(serverMessageOr(error, E.save));
     } finally {
       setSaving(false);
     }
@@ -107,14 +99,14 @@ export function BreaksTab({ studioId, masterId, initialSnapshot }: Props) {
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
           {error}
         </div>
       ) : null}
 
       <div className="flex items-center justify-between gap-3">
         {savedAt ? (
-          <p className="text-xs text-emerald-700 dark:text-emerald-300">
+          <p className="text-xs text-success-text">
             {T.savedHint}
           </p>
         ) : (

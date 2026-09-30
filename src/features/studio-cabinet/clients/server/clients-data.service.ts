@@ -1,4 +1,5 @@
-import { BookingStatus, ProviderType } from "@prisma/client";
+import { BookingStatus, PdAccessActorType, ProviderType } from "@prisma/client";
+import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import { prisma } from "@/lib/prisma";
 import { applyProfileNames, groupBookings, type BookingClientRow } from "@/lib/crm/clients";
 import { calculateDaysSinceLastVisit } from "@/lib/crm/clients";
@@ -14,6 +15,7 @@ import type {
   StudioClientsSegmentCounts,
 } from "../lib/types";
 import { formatDaysAgo } from "../lib/format";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 /**
  * STUDIO-CLIENTS-A — single server entrypoint for the clients page.
@@ -48,6 +50,9 @@ type StudioBookingRow = BookingClientRow & {
 
 export type LoadStudioClientsInput = {
   studioId: string;
+  /** Кто читает — для следа массового чтения ПДн (`PdAccessLog`, RKN-FIX-10). */
+  actorUserId: string;
+  actorIp: string | null;
   segment: StudioClientSegmentKey;
   search?: string;
   masterId?: string | "all";
@@ -70,7 +75,7 @@ export async function loadStudioClientsData(input: LoadStudioClientsInput): Prom
   const [bookings, masters] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
+        ...studioBookingsWhere(studio.id),
         status: { notIn: [BookingStatus.REJECTED, BookingStatus.CANCELLED, BookingStatus.NO_SHOW] },
         // PERF-06: окно на входе группировки (см. crm/clients-window.ts).
         // KPI и счётчики сегментов считаются из этого же оконного набора.
@@ -229,6 +234,25 @@ export async function loadStudioClientsData(input: LoadStudioClientsInput): Prom
 
   // KPIs derived from the full set, not the filtered slice.
   const kpis = computeKpis(allRows, monthAgo, now);
+
+  await recordPdAccess({
+    surface: "studio.clients.list",
+    actorType: PdAccessActorType.STUDIO,
+    actorUserId: input.actorUserId,
+    entityType: "ClientCard",
+    rowCount: slice.length,
+    filterFingerprint: buildFilterFingerprint(
+      {
+        segment: input.segment !== "all",
+        q: Boolean(search),
+        master: Boolean(masterFilter),
+        cursor: Boolean(input.cursor),
+      },
+      { limit: PAGE_LIMIT },
+    ),
+    scopeStudioId: studio.id,
+    ipAddress: input.actorIp,
+  });
 
   return {
     items: slice,

@@ -12,6 +12,9 @@ export type ResolvedDaySchedule = {
   startLocal: string | null;
   endLocal: string | null;
   breaks: ScheduleBreakInterval[];
+  fixedStarts: string[] | null;
+  periodSource: "pattern" | "weekly-legacy" | null;
+  templateId: string | null;
 };
 
 export function resolveDayScheduleFromRule(input: {
@@ -35,6 +38,9 @@ export function resolveDayScheduleFromRule(input: {
     startLocal: workday.startLocal,
     endLocal: workday.endLocal,
     breaks: workday.breaks,
+    fixedStarts: workday.fixedStarts,
+    periodSource: workday.periodSource,
+    templateId: workday.templateId,
   };
 }
 

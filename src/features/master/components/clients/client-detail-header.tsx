@@ -2,9 +2,10 @@ import { ChevronLeft, Crown, Mail, Phone, Plus, Send, Sparkles } from "lucide-re
 import { cn } from "@/lib/cn";
 import type { ClientStatus } from "@/lib/master/clients-classifier";
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { CopyButton } from "./copy-button";
 import { formatPhone, formatRelativeDate, getInitials, pickAvatarColor } from "./lib/format";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.clients.detail;
 const STATUS_T = UI_TEXT.cabinetMaster.clients.status;
@@ -35,10 +36,10 @@ function pluralizeApplications(count: number): string {
 }
 
 const STATUS_TONES: Record<ClientStatus, string> = {
-  new: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-  regular: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  vip: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  sleeping: "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300",
+  new: "bg-info-surface text-info-text",
+  regular: "bg-success-surface text-success-text",
+  vip: "bg-warning-surface text-warning-text",
+  sleeping: "bg-muted text-muted-foreground",
 };
 
 /**
@@ -67,15 +68,14 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
 
   return (
     <header className="space-y-3 border-b border-border-subtle pb-4">
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={onBack}
         className="inline-flex items-center gap-1.5 text-sm text-text-sec hover:text-text-main lg:hidden"
         aria-label={LIST_T.backToList}
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
         {LIST_T.backToList}
-      </button>
+      </Button>
 
       <div className="flex flex-wrap items-start gap-4">
         <span
@@ -92,7 +92,7 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display text-xl text-text-main">{client.displayName}</h2>
             {isVip ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-[11px] font-medium text-warning-text">
                 <Crown className="h-3 w-3" aria-hidden />
                 VIP
               </span>
@@ -174,15 +174,14 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
                 buckets (VIP / Постоянная / Новая / Спящая) — manual
                 tag assignment is parked in backlog per user decision
                 «tags только если нет других вариантов появления». */}
-            <button
-              type="button"
-              disabled
+            <Button variant="wrapper"
+              aria-disabled
               title={T.addTagDisabled}
               className="inline-flex cursor-not-allowed items-center gap-0.5 rounded-full border border-dashed border-border-subtle px-2 py-0.5 text-[11px] text-text-sec/60"
             >
               <Plus className="h-3 w-3" aria-hidden />
               {T.addTagLabel}
-            </button>
+            </Button>
           </div>
         </div>
 

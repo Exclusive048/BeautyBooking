@@ -1,7 +1,7 @@
 "use client";
 
 import { Drawer } from "@/components/ui/drawer";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { BookingFlowStepper } from "@/features/booking/components/booking-flow/booking-flow-stepper";
 
 type Props = {

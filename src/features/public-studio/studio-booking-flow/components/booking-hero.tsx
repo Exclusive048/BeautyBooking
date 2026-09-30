@@ -6,7 +6,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { MasterAvatar } from "./master-avatar";
 
 type Props = {
@@ -100,7 +100,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         ) : null}
         {studio.rating && studio.rating > 0 ? (
           <div className="absolute right-4 top-3 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-xs font-medium text-white backdrop-blur">
-            <Star className="h-3 w-3 text-amber-300" aria-hidden />
+            <Star className="h-3 w-3 text-rating" aria-hidden />
             <span>
               {UI_TEXT.bookingWidget.hero.ratingLabel
                 .replace("{rating}", studio.rating.toFixed(1))
@@ -122,7 +122,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
           // Стопы сведены к встроенной розовой шкале: заливка стала полностью
           // фиксированной (правило пары соблюдено буквально), градиент так же
           // углубляется к углу, а худшая точка теперь 4.52 / 4.09.
-          className="relative -mt-14 h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-bg-card bg-gradient-to-br from-pink-200 via-pink-300 to-pink-400 shadow-brand"
+          className="relative -mt-14 h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border-4 border-bg-card bg-gradient-to-br from-primary-magenta/30 via-primary-magenta/50 to-primary-magenta/70 shadow-brand"
           aria-hidden
         >
           {/* Аватар уже вырезан сервером по сохранённой области (CROP-PUBLIC-01). */}
@@ -152,7 +152,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="h-3 w-3" aria-hidden />
                 <span>{UI_TEXT.publicStudio.availableToday}</span>
-                <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                <span className="ml-1 h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
               </span>
             ) : null}
             <span className="inline-flex items-center gap-1.5">
@@ -163,7 +163,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         </div>
 
         {prefilledMaster ? (
-          <div className="flex items-center gap-3 rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 to-amber-400/[0.08] px-3 py-2.5">
+          <div className="flex items-center gap-3 rounded-xl border border-primary/25 bg-gradient-to-br from-primary/10 to-brand-accent/[0.08] px-3 py-2.5">
             <MasterAvatar
               name={prefilledMaster.name}
               avatarUrl={prefilledMaster.avatarUrl}

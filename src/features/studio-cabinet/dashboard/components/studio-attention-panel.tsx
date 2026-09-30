@@ -7,7 +7,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioAttentionItem } from "../server/types";
 
 const T = UI_TEXT.studioCabinet.dashboardV2.attention;
@@ -25,13 +25,13 @@ const META: Record<StudioAttentionItem["id"], ItemMeta> = {
     icon: UserPlus,
     titleTemplate: T.items.pendingMastersTitle,
     action: T.items.pendingMastersAction,
-    tone: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300",
+    tone: "bg-success-surface text-success-text",
   },
   "bookings-awaiting": {
     icon: CalendarCheck,
     titleTemplate: T.items.bookingsAwaitingTitle,
     action: T.items.bookingsAwaitingAction,
-    tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+    tone: "bg-warning-surface text-warning-text",
   },
   "reviews-unanswered": {
     icon: Star,
@@ -43,7 +43,7 @@ const META: Record<StudioAttentionItem["id"], ItemMeta> = {
     icon: CalendarClock,
     titleTemplate: T.items.scheduleRequestsTitle,
     action: T.items.scheduleRequestsAction,
-    tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+    tone: "bg-info-surface text-info-text",
   },
 };
 
@@ -73,7 +73,7 @@ export function StudioAttentionPanel({ items, total, urgent }: Props) {
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <CheckCircle2 className="h-8 w-8 text-emerald-500 dark:text-emerald-400" aria-hidden />
+          <CheckCircle2 className="h-8 w-8 text-success-text" aria-hidden />
           <p className="text-sm text-text-sec">{T.emptyBody}</p>
         </div>
       ) : (

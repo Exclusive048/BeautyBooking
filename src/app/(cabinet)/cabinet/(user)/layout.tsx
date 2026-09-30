@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { CabinetLayout } from "@/features/cabinet/layout/cabinet-layout";
 import { getSessionUser } from "@/lib/auth/session";
 import { getClientSidebarCounts } from "@/lib/client-cabinet/sidebar-counts";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   children: ReactNode;

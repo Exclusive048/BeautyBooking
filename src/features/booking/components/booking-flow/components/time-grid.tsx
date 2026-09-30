@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 
@@ -106,16 +108,8 @@ export function TimeGrid({
       url.searchParams.set("serviceId", serviceId);
       url.searchParams.set("from", dateKey);
       url.searchParams.set("to", dateKey);
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { slots: SlotPayload[] } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        setError(UI_TEXT.publicProfile.slots.loadFailed);
-        return;
-      }
-      const parsed: BookingFlowSlot[] = json.data.slots
+      const data = await fetchJson<{ slots: SlotPayload[] }>(url.toString(), { cache: "no-store" });
+      const parsed: BookingFlowSlot[] = data.slots
         .map((slot) => ({
           id: `${slot.startAtUtc}-${slot.label}`,
           label: slot.label,
@@ -137,8 +131,8 @@ export function TimeGrid({
         // guards any midnight-boundary edge.
         .filter((slot) => slot.dayKey === dateKey);
       setSlots(parsed);
-    } catch {
-      setError(UI_TEXT.publicProfile.slots.loadFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, UI_TEXT.publicProfile.slots.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -190,9 +184,8 @@ export function TimeGrid({
           {visibleSlots.map((slot) => {
             const isSelected = selectedSlot?.label === slot.label;
             return (
-              <button
+              <Button variant="wrapper" aria-pressed={isSelected}
                 key={slot.id}
-                type="button"
                 onClick={() => onSelect(slot)}
                 className={cn(
                   "relative h-10 rounded-lg border font-mono text-sm transition-all",
@@ -205,12 +198,12 @@ export function TimeGrid({
                 {showHotBadges && slot.isHot ? (
                   <span
                     aria-hidden
-                    className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-orange-500 text-[8px] font-bold text-white"
+                    className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-hot text-[8px] font-bold text-white"
                   >
                     ★
                   </span>
                 ) : null}
-              </button>
+              </Button>
             );
           })}
         </div>

@@ -11,7 +11,7 @@ import {
 } from "@/features/public-profile/master/reviews-constants";
 import { fetchJson } from "@/lib/http/client";
 import type { ReviewDto } from "@/lib/reviews/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   studioId: string;

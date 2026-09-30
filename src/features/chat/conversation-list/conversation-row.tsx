@@ -4,8 +4,9 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { formatRowTime } from "@/features/chat/lib/format-time";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ConversationListItemDto } from "@/features/chat/types";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   conversation: ConversationListItemDto;
@@ -33,8 +34,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
   );
 
   return (
-    <button
-      type="button"
+    <Button variant="wrapper" aria-current={isActive ? "true" : undefined}
       onClick={onClick}
       className={cn(
         "group relative flex w-full items-start gap-3 border-b border-border-subtle px-4 py-3 text-left transition-colors",
@@ -67,7 +67,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
         {conversation.hasOpenBooking ? (
           <span
             aria-hidden
-            className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-bg-card bg-emerald-500"
+            className="absolute -bottom-px -right-px h-2.5 w-2.5 rounded-full border-2 border-bg-card bg-success"
           />
         ) : null}
       </div>
@@ -110,6 +110,6 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
           ) : null}
         </div>
       </div>
-    </button>
+    </Button>
   );
 }

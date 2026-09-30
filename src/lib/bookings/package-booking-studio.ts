@@ -351,6 +351,7 @@ async function createStudioPackageBookingUnguarded(
           });
 
           const created = await createBookingRow(tx, {
+            timePolicy: core.timeClearance,
             data: {
               providerId: pkg.providerId,
               // FIX-C1: `studioId` больше не передаётся — writer выводит его из

@@ -25,7 +25,7 @@ export function TopbarShell({ children }: Props) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 border-b border-border-subtle/60 bg-bg-page/85 backdrop-blur-md transition-shadow duration-200",
+        "sticky top-0 z-topbar border-b border-border-subtle/60 bg-bg-page/85 backdrop-blur-md transition-shadow duration-200",
         scrolled && "shadow-sm",
       )}
     >

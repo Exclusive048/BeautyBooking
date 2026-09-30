@@ -20,7 +20,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   classifyImage: vi.fn(),
   transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ mediaAsset: { update: vi.fn() }, $executeRaw: vi.fn() })
+    fn({ mediaAsset: { update: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })) }, $executeRaw: vi.fn() })
   ),
 }));
 

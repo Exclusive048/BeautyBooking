@@ -6,6 +6,7 @@ import { providerIdParamSchema } from "@/lib/providers/schemas";
 import { ensureStudioAdmin } from "@/lib/studios/access";
 import { getStudioProviderById, updateStudioProviderProfile } from "@/lib/studios/studio";
 import { isValidTimeZone } from "@/lib/schedule/timezone";
+import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -49,7 +50,12 @@ const updateSchema = z
     // значение не оказывалось валидным на одной поверхности и отвергнутым на
     // другой. Запись делегируется `applyProviderBookingPolicy` (rule 5).
     minBookingHoursAhead: z.number().int().min(0).max(168).optional(),
-    maxBookingDaysAhead: z.number().int().min(1).max(365).optional(),
+    maxBookingDaysAhead: z
+      .number()
+      .int()
+      .min(BOOKING_RULE_LIMITS.maxDaysAhead.min)
+      .max(BOOKING_RULE_LIMITS.maxDaysAhead.max)
+      .optional(),
     cancellationDeadlineHours: z.number().int().min(0).max(168).nullable().optional(),
     lateCancelAction: z.enum(["none", "reminder", "fine"]).optional(),
     acceptNewClients: z.boolean().optional(),

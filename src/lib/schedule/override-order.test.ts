@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -18,9 +18,11 @@ import {
  * есть побеждала ПОСЛЕДНЯЯ. Итог: guard рабочих часов мог разрешить перенос,
  * которого генератор слотов не предлагал.
  *
- * Ноль дубликатов этим не достигается — это `@@unique` + дедуп, решение
- * владельца (см. BLOCKED). Здесь пиннится, что при дублях поведение
- * ДЕТЕРМИНИРОВАНО и одинаково у всех.
+ * SCHEDULE-PATTERNS-01 (этап 1, 2026-09-28) довёл это до конца: дедуп по
+ * этому же канону + `@@unique([providerId, date])` (миграция
+ * `20260928120000_schedule_override_unique_date`), писатели — upsert по ключу.
+ * Канон порядка остаётся у читателей как страховка: он ничего не стоит и
+ * сохраняет детерминизм, если уникальность когда-нибудь снимут.
  */
 
 describe("канон выбора строки", () => {
@@ -42,39 +44,87 @@ describe("канон выбора строки", () => {
 const SRC = join(process.cwd(), "src");
 const read = (p: string) => readFileSync(join(SRC, p), "utf8");
 
+describe("SCHEDULE-PATTERNS-01 · строка на дату одна", () => {
+  it("схема держит уникальность (профиль, дата)", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma/schema/schedule.prisma"), "utf8");
+    const model = schema.slice(schema.indexOf("model ScheduleOverride {"));
+    const body = model.slice(0, model.search(/\r?\n\}/));
+    expect(body).toMatch(/@@unique\(\[providerId, date\]\)/);
+  });
+
+  // @probe 2026-09-28: временный `lib/schedule/__probe_override.ts` с
+  // `prisma.scheduleOverride.create({ data: {} })` — красное:
+  // «expected [ 'lib/schedule/__probe_override.ts' ] to deeply equal []».
+  it("никто в src/ не создаёт строку мимо upsert по ключу даты", () => {
+    // Набор выводится из дерева: любой новый `scheduleOverride.create(` —
+    // то есть «найти, потом создать» — упадёт здесь, а не на P2002 в проде.
+    // Единственное исключение — копия исключений в НОВЫЙ профиль (дублей
+    // в источнике нет по той же уникальности).
+    const allowed = new Set(["lib/studios/master-profile-split.ts"]);
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(SRC, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          walk(rel);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+        const source = read(rel);
+        if (/scheduleOverride\.create(Many)?\(/.test(source) && !allowed.has(rel)) {
+          offenders.push(rel);
+        }
+      }
+    };
+    for (const root of ["app", "lib", "features"]) walk(root);
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("LOGIC-11 · все, кто выбирает ОДНУ строку на дату, берут канон", () => {
-  it.each([
-    ["lib/schedule/master-work-window.ts", "guard рабочих часов"],
-    ["lib/schedule/editor.ts", "писатель исключения"],
-    ["lib/schedule/usecases.ts", "писатель дня"],
-    ["lib/schedule/unified.ts", "unified-путь"],
-  ])("%s (%s)", (file) => {
-    const source = read(file);
-    expect(source).toContain("SCHEDULE_OVERRIDE_PICK_ORDER");
-    // Каждый `findFirst` по overrides обязан нести порядок — иначе новый
-    // читатель молча вернётся к произвольной строке.
-    const calls = [...source.matchAll(/scheduleOverride\.findFirst\(\{/g)];
-    expect(calls.length).toBeGreaterThan(0);
-    for (const call of calls) {
-      const block = source.slice(call.index!, call.index! + 300);
-      expect(block).toContain("orderBy: SCHEDULE_OVERRIDE_PICK_ORDER");
-    }
+  it.each([["lib/schedule/master-work-window.ts", "guard рабочих часов"]])("%s (%s)", (file) => {
+    // SCHEDULE-PATTERNS-01: guard рабочих часов берёт день из движка и строку
+    // сам больше не выбирает — прямого чтения таблиц в нём нет вовсе.
+    expect(read(file)).not.toMatch(/scheduleOverride|weeklyScheduleDay/);
   });
 
-  it.each([
-    ["lib/schedule/engine-context.ts", "движок"],
-    ["lib/schedule/bookable-window.ts", "генератор слотов"],
-  ])("%s (%s) берёт канон для диапазона", (file) => {
-    expect(read(file)).toContain("SCHEDULE_OVERRIDE_RANGE_ORDER");
+  it("каждый `findFirst` по «Особым дням» в дереве несёт канон порядка", () => {
+    // Строка на дату теперь одна по схеме, но канон ничего не стоит и держит
+    // детерминизм, если уникальность снимут. Набор выводится из дерева.
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(SRC, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          walk(rel);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) continue;
+        const source = read(rel);
+        for (const call of source.matchAll(/scheduleOverride\.findFirst\(\{/g)) {
+          const block = source.slice(call.index!, call.index! + 300);
+          if (!block.includes("orderBy: SCHEDULE_OVERRIDE_PICK_ORDER")) offenders.push(rel);
+        }
+      }
+    };
+    for (const root of ["app", "lib", "features"]) walk(root);
+    expect(offenders).toEqual([]);
   });
 
-  it("генератор слотов выбирает ПЕРВУЮ строку, как движок (был безусловный set)", () => {
+  it.each([["lib/schedule/engine-context.ts", "движок"]])(
+    "%s (%s) берёт канон для диапазона",
+    (file) => {
+      expect(read(file)).toContain("SCHEDULE_OVERRIDE_RANGE_ORDER");
+    },
+  );
+
+  it("окно записи больше не держит своей копии правил дня (SCHEDULE-PATTERNS-01)", () => {
+    // Раньше `bookable-window.ts` сам читал неделю и исключения ради режима
+    // «Фиксированное время» и выбирал строку на дату по-своему (LOGIC-11 чинил
+    // именно это расхождение). Режим переехал в `DayPlan` движка — второго
+    // читателя, способного выбрать не ту строку, не осталось.
     const source = read("lib/schedule/bookable-window.ts");
-    expect(source).toContain("if (exceptionsByDate.has(dateKey)) continue;");
-    // Порядок важен: guard должен стоять ДО записи в Map.
-    expect(source.indexOf("if (exceptionsByDate.has(dateKey)) continue;")).toBeLessThan(
-      source.indexOf("exceptionsByDate.set(dateKey"),
-    );
+    expect(source).not.toMatch(/scheduleOverride|weeklyScheduleConfig|weeklyScheduleDay/);
   });
 
   it("движок по-прежнему берёт первое совпадение — канон опирается на это", () => {

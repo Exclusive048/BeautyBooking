@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FIX-STUDIO-02 (known-open 1 + owner parity) — the floating bottom-right
@@ -20,7 +20,7 @@ export async function StudioStickyCta({ studioId }: { studioId: string }) {
     <Button
       asChild
       variant="secondary"
-      className="fixed bottom-[calc(var(--bottom-nav-h,calc(3rem+max(0px,calc(env(safe-area-inset-bottom,0px)-10px))))+1rem)] right-5 z-20 rounded-full px-5 py-3 shadow-hover lg:bottom-5"
+      className="fixed bottom-[calc(var(--bottom-nav-h,calc(3rem+max(0px,calc(env(safe-area-inset-bottom,0px)-10px))))+1rem)] right-5 z-float rounded-full px-5 py-3 shadow-hover lg:bottom-5"
     >
       <Link href="#studio-services">{UI_TEXT.publicStudio.toServices}</Link>
     </Button>

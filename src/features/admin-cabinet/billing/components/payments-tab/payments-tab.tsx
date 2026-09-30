@@ -2,19 +2,18 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BillingPaymentStatus } from "@/lib/prisma-enums";
 import { Button } from "@/components/ui/button";
 import { BillingTabEmpty } from "@/features/admin-cabinet/billing/components/billing-tab-empty";
 import { PaymentTableRow } from "@/features/admin-cabinet/billing/components/payments-tab/payment-row";
 import { RefundPaymentDialog } from "@/features/admin-cabinet/billing/components/payments-tab/refund-payment-dialog";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.adminPanel.billing;
-
-type Toast = { kind: "success" | "error"; text: string } | null;
 
 type Props = {
   pending: AdminPaymentRow[];
@@ -41,16 +40,7 @@ export function PaymentsTab({
   const [history, setHistory] = useState<AdminPaymentRow[]>(initialHistory);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [target, setTarget] = useState<AdminPaymentRow | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
-  const reduce = useReducedMotion();
-
-  const showToast = useCallback(
-    (text: string, kind: "success" | "error" = "success") => {
-      setToast({ kind, text });
-      window.setTimeout(() => setToast(null), 2400);
-    },
-    [],
-  );
+  const toast = useToast();
 
   const loadMore = useCallback(() => {
     if (!nextHistoryCursor) return;
@@ -66,7 +56,7 @@ export function PaymentsTab({
     if (!target) return;
     setBusyId(target.id);
     try {
-      const res = await fetch("/api/admin/billing/refund", {
+      await fetchJsonWithAuth<unknown>("/api/admin/billing/refund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,7 +64,6 @@ export function PaymentsTab({
           reason: reason || undefined,
         }),
       });
-      if (!res.ok) throw new Error("refund failed");
       // Optimistic — flip status to REFUNDED locally. Refund button
       // disappears because `isRefundable` recomputes false. Server
       // refresh will sync truth on next render.
@@ -85,10 +74,10 @@ export function PaymentsTab({
       setPending((prev) => prev.map(updateRow));
       setHistory((prev) => prev.map(updateRow));
       setTarget(null);
-      showToast(T.toasts.paymentRefunded);
+      toast.success(T.toasts.paymentRefunded);
       router.refresh();
-    } catch {
-      showToast(T.toasts.refundError, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.refundError));
     } finally {
       setBusyId(null);
     }
@@ -110,25 +99,6 @@ export function PaymentsTab({
 
   return (
     <div className="space-y-4">
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            role="status"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            className={cn(
-              "rounded-2xl border px-4 py-2.5 text-sm",
-              toast.kind === "success"
-                ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-red-300/40 bg-red-500/10 text-red-700 dark:text-red-300",
-            )}
-          >
-            {toast.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
       <PaymentsGroup
         title={T.payments.pendingHeader}
         rows={pending}
@@ -188,7 +158,7 @@ function PaymentsGroup({
         className={cn(
           "overflow-hidden rounded-2xl border shadow-card",
           tone === "warning"
-            ? "border-amber-500/30 bg-amber-500/5"
+            ? "border-warning/30 bg-warning/5"
             : "border-border-subtle bg-bg-card",
         )}
       >

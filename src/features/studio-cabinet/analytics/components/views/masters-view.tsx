@@ -1,7 +1,7 @@
 import { Users } from "lucide-react";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioAnalyticsViewData } from "../../lib/types";
 
 const T = UI_TEXT.studioCabinet.analyticsV2.masters;

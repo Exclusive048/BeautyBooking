@@ -3,7 +3,7 @@ import { ArrowRight, Crown, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { billingUpgradeHref } from "@/lib/billing/upgrade-href";
 import type { MasterAccountPlan } from "@/lib/master/account-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.account;
 

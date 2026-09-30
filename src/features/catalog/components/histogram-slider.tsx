@@ -2,7 +2,8 @@
 
 import { useId, useMemo } from "react";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { RangeInput } from "@/components/ui/range-input";
 
 type Props = {
   /** Absolute min/max from the data set — slider domain. */
@@ -102,10 +103,9 @@ export function HistogramSlider({ min, max, value, onChange, distribution }: Pro
           className="absolute h-full rounded-full bg-brand-gradient"
           style={{ left: `${lowPct}%`, right: `${100 - highPct}%` }}
         />
-        <input
+        <RangeInput
           id={lowId}
           aria-label={UI_TEXT.a11y.priceMin}
-          type="range"
           min={min}
           max={max}
           step={1}
@@ -113,10 +113,9 @@ export function HistogramSlider({ min, max, value, onChange, distribution }: Pro
           onChange={(e) => handleLow(Number(e.target.value))}
           className="histogram-slider-thumb pointer-events-none absolute -top-2 left-0 h-5 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto"
         />
-        <input
+        <RangeInput
           id={highId}
           aria-label={UI_TEXT.a11y.priceMax}
-          type="range"
           min={min}
           max={max}
           step={1}

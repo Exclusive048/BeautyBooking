@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCityRow } from "@/features/admin-cabinet/cities/types";
 
 const T = UI_TEXT.adminPanel.cities.deleteDialog;
@@ -36,7 +36,7 @@ export function DeleteCityConfirm({ open, city, onClose, onConfirm }: Props) {
         <p
           className={
             blocked
-              ? "rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300"
+              ? "rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-danger-text"
               : "text-sm text-text-main"
           }
         >

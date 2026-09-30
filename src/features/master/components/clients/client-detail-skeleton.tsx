@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 /**
  * Loading placeholder shown in the right pane while
  * `ClientDetailPanel` fetches detail data after a row click. Layout

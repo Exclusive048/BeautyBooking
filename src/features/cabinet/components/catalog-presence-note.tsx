@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 import useSWR from "swr";
 import { cn } from "@/lib/cn";
-import type { ApiResponse } from "@/lib/types/api";
 import type { CatalogPresence } from "@/lib/providers/catalog-presence";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinet.catalogPresence;
 
@@ -21,9 +21,12 @@ type Props = {
 };
 
 async function fetchPresence(url: string): Promise<CatalogPresence | null> {
-  const res = await fetch(url, { cache: "no-store" });
-  const json = (await res.json().catch(() => null)) as ApiResponse<CatalogPresence> | null;
-  return res.ok && json && json.ok ? json.data : null;
+  // Фон: строка статуса; не прочитали — строки нет, SWR повторит.
+  try {
+    return await fetchJsonWithAuth<CatalogPresence>(url, { cache: "no-store" });
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -45,7 +48,7 @@ export function CatalogPresenceNote({ type, refreshKey, className }: Props) {
 
   if (data.listed) {
     return (
-      <p className={cn("text-xs text-success-text", className)} data-testid="catalog-presence">
+      <p className={cn("text-xs text-success-text", className)} data-testid="catalog-presence" data-guide="catalog">
         {type === "studio" ? T.listedStudio : T.listedMaster}
       </p>
     );
@@ -53,7 +56,7 @@ export function CatalogPresenceNote({ type, refreshKey, className }: Props) {
 
   const labels = type === "studio" ? T.gapsStudio : T.gapsMaster;
   return (
-    <p className={cn("text-xs text-warning-text", className)} data-testid="catalog-presence">
+    <p className={cn("text-xs text-warning-text", className)} data-testid="catalog-presence" data-guide="catalog">
       {T.notListedPrefix} {data.gaps.map((gap) => labels[gap]).join(", ")}.
     </p>
   );

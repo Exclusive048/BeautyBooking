@@ -31,9 +31,12 @@ function makeFakeRedis() {
       store.set(k, { value: next, expireAt: e?.expireAt ?? null });
       return Number(next);
     },
-    async expire(k: string, seconds: number) {
+    async expire(k: string, seconds: number, mode?: "NX") {
       const e = store.get(k);
-      if (e) e.expireAt = now() + seconds * 1000;
+      if (!e) return 0;
+      // RATE-LIMIT-TTL-HEAL: `NX` — срок ставится, только если его нет.
+      if (mode === "NX" && e.expireAt !== null) return 0;
+      e.expireAt = now() + seconds * 1000;
       return 1;
     },
     async ttl(k: string) {

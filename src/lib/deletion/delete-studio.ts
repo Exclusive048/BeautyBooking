@@ -144,7 +144,10 @@ export async function deleteStudioCabinet(userId: string, options: CabinetDeleti
       tx.scheduleOverride.deleteMany({ where: { providerId: studio.providerId } }),
       tx.scheduleBreak.deleteMany({ where: { providerId: studio.providerId } }),
       tx.weeklyScheduleConfig.deleteMany({ where: { providerId: studio.providerId } }),
-      tx.scheduleTemplate.deleteMany({ where: { providerId: studio.providerId } }),
+      // SCHEDULE-PATTERNS-01: график — строго до шаблонов (RESTRICT).
+      tx.schedulePattern
+        .deleteMany({ where: { providerId: studio.providerId } })
+        .then(() => tx.scheduleTemplate.deleteMany({ where: { providerId: studio.providerId } })),
       tx.service.deleteMany({
         where: {
           providerId: studio.providerId,

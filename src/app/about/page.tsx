@@ -5,7 +5,7 @@ import { TextWithImage } from "@/features/marketing/sections/text-with-image";
 import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
 import { StepsSection } from "@/features/marketing/sections/steps-section";
 import { CTABlock } from "@/features/marketing/sections/cta-block";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   title: "О компании",

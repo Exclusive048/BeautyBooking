@@ -69,6 +69,9 @@ module.exports = {
         // Значения — из globals.css, здесь только проброс.
         success: "rgb(var(--success) / <alpha-value>)",
         warning: "rgb(var(--warning) / <alpha-value>)",
+        // 29.09 доработки · 23: основа синего статуса для точек и тонированных
+        // заливок (`bg-info/[0.12]`) — у тройки info-surface/-text/-border альфы нет.
+        info: "rgb(var(--info) / <alpha-value>)",
         // UI-06 — тот же класс отказа, что выше, но для `-foreground`-пар.
         // `primary` и `muted` объявлены СТРОКАМИ, а не объектами, поэтому
         // производные `*-foreground` из них не генерируются (объектом объявлен
@@ -111,8 +114,29 @@ module.exports = {
         "info-surface": "var(--info-surface)",
         "info-text": "var(--info-text)",
         "info-border": "var(--info-border)",
+        // SCHEDULE-PATTERNS-01 (этап 3): приглушённая палитра рабочих дней
+        // расписания (`--schedule-day-1…6`, пары light/dark в globals.css).
+        "schedule-day": {
+          1: "rgb(var(--schedule-day-1) / <alpha-value>)",
+          2: "rgb(var(--schedule-day-2) / <alpha-value>)",
+          3: "rgb(var(--schedule-day-3) / <alpha-value>)",
+          4: "rgb(var(--schedule-day-4) / <alpha-value>)",
+          5: "rgb(var(--schedule-day-5) / <alpha-value>)",
+          6: "rgb(var(--schedule-day-6) / <alpha-value>)",
+        },
+        // 29.09 доработки · 23 (UI-27): акценты-категории, не статусы —
+        // «горящее окошко» (`bg-hot/10`, `text-hot`, `text-hot-text`) и звёзды
+        // оценки (`fill-rating text-rating`). Пары light/dark в globals.css.
+        hot: "rgb(var(--hot) / <alpha-value>)",
+        "hot-text": "rgb(var(--hot-text) / <alpha-value>)",
+        rating: "rgb(var(--rating) / <alpha-value>)",
+        // Декоративные пятна лендингов: прозрачность — из темы (`--decor-alpha`).
+        "decor-primary": "rgb(var(--primary) / var(--decor-alpha))",
+        "decor-magenta": "rgb(var(--primary-magenta) / var(--decor-alpha))",
       },
       backgroundImage: {
+        // Подпись логотипа прямо на фоне страницы: градиент / кремовый по теме.
+        wordmark: "var(--wordmark-fill)",
         "brand-gradient":
           "linear-gradient(135deg, rgb(var(--brand-from)) 0%, rgb(var(--brand-via)) 55%, rgb(var(--brand-deep)) 100%)",
         "brand-gradient-soft":
@@ -120,6 +144,29 @@ module.exports = {
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
+      },
+      // 29.09 доработки · 21 (UI-14): шкала слоёв. Глобальные слои — от корня
+      // документа, значения — из фактического порядка (не выдуманы). Порядок
+      // сторожит src/lib/ui/z-index-scale.test.ts. Локальные слои внутри
+      // контекста родителя — числами z-0/1/2/10/20/30.
+      zIndex: {
+        1: "1",
+        2: "2",
+        sticky: "20",
+        topbar: "30",
+        float: "30",
+        nav: "40",
+        notice: "45",
+        prompt: "46",
+        scrim: "49",
+        modal: "50",
+        popover: "60",
+        toast: "70",
+      },
+      // 29.09 доработки · 19: кривая продукта — та же, что `EASE` в
+      // src/lib/ui/motion.ts (сверяет motion-canon.test.ts).
+      transitionTimingFunction: {
+        brand: "cubic-bezier(0.22, 1, 0.36, 1)",
       },
       boxShadow: {
         soft: "var(--shadow)",

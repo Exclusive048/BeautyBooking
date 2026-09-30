@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SOURCE_RING, SOURCE_TONE } from "../../lib/source-mapping";
 import type { SourceSlice } from "../../lib/types";
 

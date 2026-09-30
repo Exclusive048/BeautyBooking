@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import type { ApiResponse } from "@/lib/types/api";
 import { DeleteAccountModal } from "@/components/deletion/DeleteAccountModal";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 type Props = {
   phone: string | null;
@@ -21,16 +20,12 @@ export function DeleteAccountSection({ phone }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/me/delete", { method: "DELETE" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ deleted: boolean }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
+      await fetchJsonWithAuth<{ deleted: boolean }>("/api/me/delete", { method: "DELETE" });
       setOpen(false);
       router.push("/?deleted=1");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить аккаунт. Попробуйте ещё раз.");
+      setError(serverMessageOr(err, "Не удалось удалить аккаунт. Попробуйте ещё раз."));
     } finally {
       setLoading(false);
     }
@@ -42,9 +37,9 @@ export function DeleteAccountSection({ phone }: Props) {
           ПДн намеренно НЕ сделан тумблером. */}
       <section
         id="delete-account"
-        className="mt-12 scroll-mt-24 border-t border-red-200/40 pt-8 dark:border-red-400/20"
+        className="mt-12 scroll-mt-24 border-t border-danger-border pt-8"
       >
-        <h2 className="text-sm font-semibold text-red-500 dark:text-red-400">Удаление аккаунта</h2>
+        <h2 className="text-sm font-semibold text-danger-text">Удаление аккаунта</h2>
         <p className="mt-1 text-xs text-text-sec">
           Все ваши личные данные будут удалены с платформы безвозвратно в соответствии с
           Федеральным законом №152-ФЗ «О персональных данных». История платежей и

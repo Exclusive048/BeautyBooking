@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatNumberShort, formatShortDate } from "./lib/format";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.history;

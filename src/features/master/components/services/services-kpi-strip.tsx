@@ -1,7 +1,7 @@
 import { Layers, Package, EyeOff } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { ServicesKpi } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.kpi;
 

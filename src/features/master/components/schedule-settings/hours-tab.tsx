@@ -8,10 +8,10 @@ import {
   type ScheduleEditorSnapshot,
   type SlotStepMin,
 } from "@/lib/schedule/editor-shared";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { ChipGroup } from "./components/chip-group";
-import { ModeCard } from "./components/mode-card";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ChipGroup } from "@/components/ui/chip-group";
+import { ModeCard } from "@/components/ui/mode-card";
 import { SettingRow } from "./components/setting-row";
 import { WeeklyDaysList } from "./hours/weekly-days-list";
 import { WeekdayStrip } from "./hours/weekday-strip";
@@ -22,8 +22,9 @@ import {
 } from "./hours/lib/day-copy";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
-import { useScheduleEndpoint } from "./schedule-endpoint-context";
+import { useIsStudioProfileSchedule, useScheduleEndpoint } from "./schedule-endpoint-context";
 import { WeekPreview } from "./week-preview";
+import { summarizePattern } from "./plan/lib/describe-plan";
 import { WeekdayRow } from "./weekday-row";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings;
@@ -35,6 +36,8 @@ type Draft = {
 
 type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
+  /** SCHEDULE-PATTERNS-01: свежий снапшот после сохранения — для карточки графика. */
+  onSnapshot?: (snapshot: ScheduleEditorSnapshot) => void;
 };
 
 /**
@@ -54,11 +57,12 @@ type Props = {
  * supported by the backend — the "split day" use-case is solved by
  * adding a break in the middle.
  */
-export function HoursTab({ initialSnapshot }: Props) {
+export function HoursTab({ initialSnapshot, onSnapshot }: Props) {
   // PWA-FIX-12 — какой день правим на мобильном. Только представление: в
   // черновике и в запросе по-прежнему вся неделя, поэтому «копировать на будни»
   // и автосохранение работают как раньше. 0 = понедельник.
   const [activeDayOfWeek, setActiveDayOfWeek] = useState(0);
+  const studioProfile = useIsStudioProfileSchedule();
   const [draft, setDraft] = useState<Draft>(() => ({
     weekSchedule: initialSnapshot.weekSchedule,
     slotStepMin: clampSlotStep(initialSnapshot.slotStepMin),
@@ -81,20 +85,20 @@ export function HoursTab({ initialSnapshot }: Props) {
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch(endpoint, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weekSchedule: value.weekSchedule,
-          slotStepMin: value.slotStepMin,
-        }),
-      });
-      const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!response.ok || !json || !json.ok) {
-        const message =
-          json && !json.ok ? json.error.message : T.errors.save;
-        return { ok: false, message };
+      let data: unknown;
+      try {
+        data = await fetchJsonWithAuth<unknown>(endpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            weekSchedule: value.weekSchedule,
+            slotStepMin: value.slotStepMin,
+          }),
+        });
+      } catch (error) {
+        return { ok: false, message: serverMessageOr(error, T.errors.save) };
       }
+      onSnapshot?.(data as ScheduleEditorSnapshot);
       return { ok: true };
     },
     setStatus,
@@ -142,6 +146,42 @@ export function HoursTab({ initialSnapshot }: Props) {
       weekSchedule: clearDayPure(prev.weekSchedule, targetDayOfWeek),
     }));
   };
+
+  // SCHEDULE-PATTERNS-01: сегодня действует не недельный график (2 через 2,
+  // чередование недель) — неделей его не выразить, поэтому редактор недели
+  // скрыт, а менять график нужно через «Настроить график».
+  const plan = initialSnapshot.schedulePlan;
+  if (plan.current && plan.current.kind !== "WEEK") {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border-subtle bg-bg-card px-4">
+          <SettingRow
+            title={T.slotStep.sectionTitle}
+            subtitle={T.slotStep.hint}
+            control={
+              <ChipGroup<SlotStepMin>
+                value={draft.slotStepMin}
+                onChange={setSlotStep}
+                options={SLOT_STEP_OPTIONS.map((option) => ({
+                  value: option,
+                  label: T.slotStep.options[String(option) as keyof typeof T.slotStep.options],
+                }))}
+              />
+            }
+          />
+        </div>
+        <div className="flex items-start gap-2 rounded-2xl border border-border-subtle bg-bg-input/30 px-4 py-3 text-sm text-text-sec">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p>
+            {T.plan.weekEditorHidden(
+              summarizePattern(plan.current, plan.templates),
+              studioProfile ? T.plan.proposeCta : T.plan.setupCta,
+            )}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_22rem]">

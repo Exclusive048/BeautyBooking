@@ -35,6 +35,14 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Тот же статус, но без требования провайдера: карточка графика живёт и на
+ * странице студии, где индикатора сохранения нет (SCHEDULE-PATTERNS-01).
+ */
+export function useOptionalSaveStatus(): Ctx | null {
+  return useContext(Context);
+}
+
 export function useSaveStatus(): Ctx {
   const ctx = useContext(Context);
   if (!ctx) {

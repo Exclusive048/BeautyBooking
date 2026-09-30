@@ -13,7 +13,7 @@ import {
   getMarketingPricing,
   type MarketingPlan,
 } from "@/lib/billing/marketing-pricing";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   title: "Стать мастером",

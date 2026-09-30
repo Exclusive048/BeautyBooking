@@ -68,7 +68,7 @@ export async function GET(req: Request) {
   const username = searchParams.get("username")?.trim().toLowerCase();
 
   if (!username) {
-    return new Response("Missing username", { status: 400 });
+    return new Response("Не указан адрес профиля.", { status: 400 });
   }
 
   const provider = await prisma.provider.findFirst({
@@ -96,7 +96,7 @@ export async function GET(req: Request) {
   });
 
   if (!provider) {
-    return new Response("Provider not found", { status: 404 });
+    return new Response("Профиль не найден.", { status: 404 });
   }
 
   const subtitle = buildSubtitle(provider);

@@ -74,6 +74,7 @@ export const PROVIDER_RELATION_DISPOSITION: Record<string, RelationDisposition> 
   scheduleBreaks: { kind: "DELETED", reason: "delete-master/delete-studio: перерывы" },
   scheduleTemplates: { kind: "DELETED", reason: "delete-master/delete-studio: шаблоны расписания" },
   weeklyScheduleConfig: { kind: "DELETED", reason: "delete-master/delete-studio: недельная конфигурация расписания" },
+  schedulePatterns: { kind: "DELETED", reason: "delete-master/delete-studio: графики (SCHEDULE-PATTERNS-01)" },
   scheduleChangeRequests: { kind: "DELETED", reason: "delete-master/delete-studio: заявки на изменение расписания" },
   portfolioItems: {
     kind: "DELETED",

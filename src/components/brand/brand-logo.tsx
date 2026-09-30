@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { LogoMark } from "@/components/brand/logo-mark";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type BrandLogoVariant = "full" | "iconOnly" | "monoText";
 export type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl";

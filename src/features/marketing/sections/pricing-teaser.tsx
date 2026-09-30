@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/features/marketing/sections/section-header";
@@ -33,8 +34,6 @@ type Props = {
   fullPricingLabel: string;
 };
 
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
-
 export function PricingTeaser({
   eyebrow,
   title,
@@ -45,7 +44,6 @@ export function PricingTeaser({
   fullPricingHref,
   fullPricingLabel,
 }: Props) {
-  const reduce = useReducedMotion();
 
   return (
     <section className="py-16 lg:py-24">
@@ -59,18 +57,16 @@ export function PricingTeaser({
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {plans.map((plan, idx) => {
-            const initial = reduce ? undefined : { opacity: 0, y: 20 };
-            const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
-            const transition = reduce
-              ? undefined
-              : { duration: 0.45, ease: EASE, delay: idx * 0.05 };
+            const initial = { opacity: 0, y: DISTANCE.rise };
+            const whileInView = { opacity: 1, y: 0 };
+            const transition = { ...MOTION.section, delay: idx * STAGGER };
 
             return (
-              <motion.div
+              <m.div
                 key={plan.tier}
                 initial={initial}
                 whileInView={whileInView}
-                viewport={{ once: true, margin: "-80px" }}
+                viewport={VIEWPORT_ONCE}
                 transition={transition}
                 className={
                   plan.highlighted
@@ -149,7 +145,7 @@ export function PricingTeaser({
                     </li>
                   ))}
                 </ul>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>

@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import nodemailer from "nodemailer";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
@@ -8,6 +7,8 @@ import type { ErrorCode } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError, logInfo } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { extractClientIp } from "@/lib/http/ip";
 import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import { normalizeSupportContact } from "@/lib/support/contact-shared";
@@ -56,10 +57,6 @@ const RATE_LIMIT = 5;
 const RATE_WINDOW_SECONDS = 10 * 60;
 
 type ContactSource = "profile_option" | "manual_input" | "none";
-
-function hashKey(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
 
 function normalizeOptional(value?: string | null): string | null {
   if (value === undefined || value === null) return null;
@@ -247,18 +244,16 @@ export async function POST(req: Request) {
   // о том, что автор предполагал; на brownout'е (клиент жив, но молчит) она бы
   // молчала, хотя лимитер как раз деградировал. Удалено вместе с импортом —
   // это единственный способ не оставить сайт, который сторож обязан разбирать.
-  const ipKey = `support:ip:${hashKey(ip ?? "unknown")}`;
-  const ipAllowed = await checkRateLimit(ipKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-  if (!ipAllowed) {
-    return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
-  }
-
-  if (userId) {
-    const userKey = `support:user:${hashKey(userId)}`;
-    const userAllowed = await checkRateLimit(userKey, RATE_LIMIT, RATE_WINDOW_SECONDS);
-    if (!userAllowed) {
-      return supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED");
-    }
+  const budget = { maxRequests: RATE_LIMIT, windowSeconds: RATE_WINDOW_SECONDS };
+  const refusal = resolveRateLimitRefusal(
+    await checkRateLimit(routeRateLimitKey(req, "ip", ip ?? "unknown"), budget),
+    ...(userId ? [await checkRateLimit(routeRateLimitKey(req, "user", userId), budget)] : []),
+  );
+  if (refusal) {
+    // Свой текст — для исчерпанного бюджета; обрыв зависимости — общий 503.
+    return refusal.status === 429
+      ? supportFail(429, TOO_MANY_REQUESTS_ERROR, "RATE_LIMITED")
+      : supportFail(refusal.status, refusal.message, refusal.code);
   }
 
   const supportToRaw = env.SUPPORT_TO?.trim();

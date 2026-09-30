@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const NAV_ITEMS = [
   { href: "/cabinet/studio", label: UI_TEXT.studioCabinet.nav.home },
@@ -73,7 +73,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
     // раздел-навигация внутри скрыта (`hidden md:flex`), то есть на телефоне эта
     // полоса держала 56px экрана ПОСТОЯННО ради одного названия студии — поверх
     // 57px глобальной шапки. Разделы на мобильном несёт `StudioBottomNav`.
-    <div className="z-20 w-full px-4 lg:sticky lg:top-[var(--topbar-h)]">
+    <div className="z-sticky w-full px-4 lg:sticky lg:top-[var(--topbar-h)]">
       <div className="glass-panel mx-auto flex h-14 w-full max-w-6xl items-center justify-between rounded-[24px] px-4">
         <div className="flex items-baseline gap-2">
           <Link
@@ -93,7 +93,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "relative rounded-xl px-3 py-2 text-sm font-medium transition-all duration-300",
+                  "relative rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                   active
                     ? "bg-bg-card/80 pl-4 text-text-main shadow-card before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full before:bg-gradient-to-b before:from-primary before:to-primary-magenta"
                     : "text-text-sec hover:bg-bg-input/70 hover:text-text-main"
@@ -142,7 +142,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
               key={item.href}
               href={item.href}
               className={cn(
-                "relative whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-all duration-300",
+                "relative whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                 active
                   ? "bg-bg-card/80 pl-4 text-text-main shadow-card before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full before:bg-gradient-to-b before:from-primary before:to-primary-magenta"
                   : "text-text-sec hover:bg-bg-input/70 hover:text-text-main"

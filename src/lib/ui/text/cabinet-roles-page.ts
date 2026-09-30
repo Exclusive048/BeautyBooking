@@ -1,0 +1,16 @@
+export const cabinetRolesPage = {
+  title: "Профессиональные кабинеты",
+  subtitle: "Управляйте своими кабинетами",
+  createMaster: "Создать кабинет мастера",
+  createStudio: "Создать студию",
+  deleteFailed: "Не удалось удалить кабинет. Попробуйте ещё раз.",
+  masterProfileTitle: "Профиль мастера",
+  studioTitle: "Студия",
+  openCabinet: "Открыть кабинет",
+  masterPublished: "Профиль опубликован",
+  masterDraft: "Профиль не опубликован",
+  studioPublished: "Опубликована",
+  studioDraft: "Черновик",
+  mastersCount: "Мастеров: {count}",
+  ratingTemplate: "★ {rating} ({count})",
+} as const;

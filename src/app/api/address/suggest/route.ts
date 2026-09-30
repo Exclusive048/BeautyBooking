@@ -5,6 +5,7 @@ import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { suggestAddresses } from "@/lib/maps/address-suggest";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { parseQuery } from "@/lib/validation";
 
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
   try {
     // SEC-04: собственный тир — см. комментарий у `addressSuggest` в configs.
     const limit = await checkRateLimit(
-      `rl:address:suggest:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       RATE_LIMITS.addressSuggest,
     );
     if (limit.limited) {

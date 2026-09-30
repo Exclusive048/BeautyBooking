@@ -1,6 +1,9 @@
 import { BookingStatus, Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import type { MasterOption, StudioBookingsKpis } from "./types";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 const NEEDS_ACTION_STATUSES = [
   BookingStatus.PENDING,
@@ -20,16 +23,13 @@ function resolveRevenueKopeks(input: {
   return Math.max(0, input.service?.price ?? 0);
 }
 
-function startOfUtcDay(value: Date): Date {
-  return new Date(
-    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
-  );
-}
-
-function addUtcDays(value: Date, days: number): Date {
-  const next = new Date(value);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
+/**
+ * Начало суток САЛОНА со сдвигом в днях (salon-tz, rule 17). Раньше плитки
+ * «Сегодня», «Выручка сегодня», «7 дней» считались по UTC-суткам (29.09 · 02).
+ */
+function salonDayStart(now: Date, timeZone: string, offsetDays: number): Date {
+  return localDayRangeUtc(addDaysToDateKey(toLocalDateKey(now, timeZone), offsetDays), timeZone)
+    .startUtc;
 }
 
 /**
@@ -42,7 +42,7 @@ export async function loadStudioBookingsKpis(
 ): Promise<StudioBookingsKpis> {
   const studio = await prisma.studio.findUnique({
     where: { id: studioId },
-    select: { id: true, providerId: true },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
     return {
@@ -57,16 +57,15 @@ export async function loadStudioBookingsKpis(
     };
   }
 
-  const baseScope: Prisma.BookingWhereInput = {
-    OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
-  };
+  const baseScope: Prisma.BookingWhereInput = studioBookingsWhere(studio.id);
 
   const now = new Date();
-  const todayStart = startOfUtcDay(now);
-  const todayEnd = addUtcDays(todayStart, 1);
-  const weekAhead = addUtcDays(todayStart, 7);
-  const weekAgo = addUtcDays(todayStart, -6);
-  const last30dStart = addUtcDays(todayStart, -29);
+  const timeZone = studio.provider.timezone;
+  const todayStart = salonDayStart(now, timeZone, 0);
+  const todayEnd = salonDayStart(now, timeZone, 1);
+  const weekAhead = salonDayStart(now, timeZone, 7);
+  const weekAgo = salonDayStart(now, timeZone, -6);
+  const last30dStart = salonDayStart(now, timeZone, -29);
 
   const [
     todayBookings,
@@ -110,7 +109,7 @@ export async function loadStudioBookingsKpis(
         AND: [
           baseScope,
           { status: BookingStatus.NO_SHOW },
-          { startAtUtc: { gte: weekAgo, lt: addUtcDays(todayStart, 1) } },
+          { startAtUtc: { gte: weekAgo, lt: todayEnd } },
         ],
       },
     }),

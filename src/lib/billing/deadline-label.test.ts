@@ -3,6 +3,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { formatBillingDeadlineLabel } from "@/lib/billing/deadline-label";
+import { listSourceFiles, walkClientGraph } from "@/lib/testing/client-graph";
+import { stripComments } from "@/lib/testing/source-scan";
 
 /**
  * LOGIC-25 — дедлайн opt-in-окна рендерился cron'ом через `dateRU`, у которого
@@ -69,4 +71,80 @@ describe("dateRU не используется на серверных путя�
     // новый серверный вызывающий валит тест просто потому, что его здесь нет.
     expect(callers).toEqual([...VIEWER_TZ_ALLOWED].sort());
   });
+});
+
+/**
+ * 29.09 доработки · 00-4 — та же ошибка шире `dateRU`: дата, отформатированная
+ * НА СЕРВЕРЕ без `timeZone`, идёт по часам контейнера. Так жили «Доступ
+ * сохранится до …» в уведомлении об отмене подписки (`admin-body-templates.ts`)
+ * и дата «сегодня» в баннере кабинета студии (у студии в Екатеринбурге с 00:00
+ * до 05:00 — вчерашний день).
+ *
+ * «Только серверный модуль» выводится из ГРАФА импортов, а не из имени файла:
+ * модуль, не достижимый ни из одного `"use client"`, в браузер не попадает
+ * (`lib/testing/client-graph.ts`, тот же обход, что у PERF-11). Баннер студии —
+ * серверный компонент без `server-only` и без `/server/` в пути, признаки по
+ * имени его не видели бы. Модули клиентского графа сюда не входят: там
+ * viewer-tz бывает осознанным выбором, и это отдельный вопрос.
+ *
+ * Реестр — посайтовый (путь + вызов), идиома «кому МОЖНО»: новый серверный
+ * вызов без пояса валит тест, пока его не впишут сюда с причиной.
+ *
+ * @probe 2026-09-29 — в `studio-today-banner.tsx` из `toLocaleDateString` убран
+ * `timeZone`: покраснел «серверные модули форматируют дату с поясом» — лишний
+ * сайт `studio-today-banner.tsx :: .toLocaleDateString("ru-RU", { weekday: …})`.
+ * Возвращено — зелёный.
+ * @probe 2026-09-29 — правдоподобная форма: опции вынесены в константу
+ * без `timeZone` (`const OPTS = {…}; now.toLocaleDateString("ru-RU", OPTS)`) в
+ * `admin-body-templates.ts`: покраснел тот же тест (сайт с аргументом `OPTS`).
+ * Возвращено — зелёный.
+ *
+ * Слепые формы (осознанно): `timeZone: undefined` в аргументах засчитывается
+ * как пояс; `date.toLocaleString()` без аргументов не отличить от числа
+ * (`1500 .toLocaleString()`) и он пропускается; модули клиентского графа не
+ * проверяются вовсе, хотя при SSR тоже исполняются на сервере.
+ */
+const SERVER_DATE_WITHOUT_TZ_ALLOWED: string[] = [];
+
+const DATE_CALL = /(\.toLocaleDateString|\.toLocaleTimeString|\.toLocaleString|new Intl\.DateTimeFormat)\s*\(/g;
+/** `toLocaleString` без полей даты — это форматирование ЧИСЛА (`1 500`). */
+const DATE_OPTION_KEYS = /\b(day|month|year|hour|minute|weekday|dateStyle|timeStyle)\b/;
+
+function callArguments(source: string, openParen: number): string {
+  let depth = 0;
+  for (let i = openParen; i < source.length; i += 1) {
+    if (source[i] === "(") depth += 1;
+    else if (source[i] === ")") {
+      depth -= 1;
+      if (depth === 0) return source.slice(openParen + 1, i);
+    }
+  }
+  return "";
+}
+
+function serverDateSitesWithoutTimeZone(): string[] {
+  const { visited } = walkClientGraph();
+  const sites: string[] = [];
+  for (const file of listSourceFiles()) {
+    if (visited.has(file)) continue;
+    const source = stripComments(readFileSync(file, "utf8"));
+    for (const match of source.matchAll(DATE_CALL)) {
+      const args = callArguments(source, (match.index ?? 0) + match[0].length - 1);
+      if (/\btimeZone\b/.test(args)) continue;
+      if (match[1] === ".toLocaleString" && args.trim() !== "" && !DATE_OPTION_KEYS.test(args)) {
+        continue;
+      }
+      if (match[1] === ".toLocaleString" && args.trim() === "") continue;
+      const rel = relative(process.cwd(), file).split(sep).join("/");
+      sites.push(`${rel} :: ${match[1]}(${args.replace(/\s+/g, " ").trim()})`);
+    }
+  }
+  return sites.sort();
+}
+
+describe("серверные модули форматируют дату с поясом (rule 17)", () => {
+  it("серверные модули форматируют дату с поясом", () => {
+    expect(serverDateSitesWithoutTimeZone()).toEqual([...SERVER_DATE_WITHOUT_TZ_ALLOWED].sort());
+    // Обход всего графа импортов (как у PERF-11) — под нагрузкой дольше 5 с.
+  }, 30_000);
 });

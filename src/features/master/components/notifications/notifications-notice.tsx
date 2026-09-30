@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Info } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.notifications;
 

@@ -9,7 +9,7 @@ import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { getMasterWorkProfiles } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import { buildScheduleSnapshot } from "@/lib/schedule/editor";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SaveStatusIndicator } from "./save-status-indicator";
 import { SaveStatusProvider } from "./save-status-provider";
 import { ScheduleSettingsBody } from "./schedule-settings-body";

@@ -3,11 +3,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertOctagon, Bell, Images, ShieldCheck, UserRound, Users } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   DEFAULT_STUDIO_SETTINGS_SECTION,
   type StudioSettingsSection,
 } from "../lib/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.settingsV2.nav;
 
@@ -53,24 +54,23 @@ export function SettingsNav({ active, canDanger }: Props) {
           const isDanger = item.key === "danger";
           return (
             <li key={item.key}>
-              <button
-                type="button"
+              <Button variant="wrapper"
                 onClick={() => select(item.key)}
                 aria-pressed={isActive}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors",
                   isActive
                     ? isDanger
-                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                      ? "bg-danger-surface text-danger-text"
                       : "bg-primary/10 text-accent-text"
                     : isDanger
-                      ? "text-rose-700/80 hover:bg-rose-50/60 dark:text-rose-400/80 dark:hover:bg-rose-950/30"
+                      ? "text-danger-text hover:bg-danger-surface"
                       : "text-text-main hover:bg-bg-input/60",
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 <span>{T[item.labelKey]}</span>
-              </button>
+              </Button>
             </li>
           );
         })}

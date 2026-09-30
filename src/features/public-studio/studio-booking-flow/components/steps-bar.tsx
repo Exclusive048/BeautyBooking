@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, ChevronRight } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type WizardStep = "service" | "master" | "when" | "you";
 

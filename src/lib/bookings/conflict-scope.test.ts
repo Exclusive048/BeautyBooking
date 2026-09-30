@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/bookings/booking-core";
+import { conflictScopeOf, windowBuilderNames } from "@/lib/testing/booking-guards";
+import { parseSource, scanPrismaCalls, type PrismaCallSite } from "@/lib/testing/prisma-calls";
 
 /**
  * LOGIC-01 — предикат конфликта ключевался ПАРОЙ `(providerId, masterProviderId)`,
@@ -42,6 +44,10 @@ import { buildConflictScopeWhere, buildConflictWindowWhere } from "@/lib/booking
  *          регекспом не решается: заведено как `CONFLICT-SCOPE-PER-SITE`.
  *          Повторная проба после правки: файл, который билдер только
  *          импортирует и не зовёт → 1 failed.
+ *
+ *          29.09 доработки · 14 (CONFLICT-SCOPE-PER-SITE) — файловая проверка,
+ *          `NON_CONFLICT_READERS`, признак `overlaps(` и жёсткий список пяти
+ *          файлов заменены проверкой ПО МЕСТУ (блок «скоуп по месту» ниже).
  */
 
 type ScopeWhere = { OR: Array<Record<string, unknown>> };
@@ -185,51 +191,40 @@ describe("buildConflictScopeWhere — профили одного человек
 });
 
 /**
- * Вторая половина: копий предиката было ЧЕТЫРЕ, и каждая несла собственный
- * скоуп — именно поэтому дефект и прожил. Перечислять копии руками бессмысленно
- * (список протухнет ровно так же), поэтому guard обходит дерево: каждый файл,
- * который ИЩЕТ пересечение броней, обязан либо брать скоуп из общего билдера,
- * либо числиться в `NON_CONFLICT_READERS` с причиной, почему он не конфликт-
- * проверка. Пятая копия в новом файле не пройдёт CI.
+ * Вторая половина — скоуп ПО МЕСТУ (29.09 доработки · 14, CONFLICT-SCOPE-PER-SITE).
+ *
+ * Семья — чтение броней (`findMany | findFirst | findFirstOrThrow | count`),
+ * чей `where` содержит окно пересечения: спред строителя окна или пару
+ * `startAtUtc: { lt|lte }` + `endAtUtc: { gt|gte }`. Строители окна выводятся
+ * из дерева по свойству (функция, чей `return` отдаёт такую пару), статус в
+ * определение семьи НЕ входит — прежний признак `notIn: [...]` терял чтения со
+ * статусом через константу (`model-offers-mutations.ts`).
+ *
+ * Каждый такой сайт обязан в ТОМ ЖЕ `where` брать скоуп из
+ * `buildConflictScopeWhere(…)` / `buildOccupancyBookingWhere(…)` (напрямую или
+ * константой из той же функции) либо нести `// conflict-scope-ok: <причина>` на
+ * инструкции. До этого проверка была файловой: шестая копия парного скоупа
+ * проходила, если тот же файл звал билдер в соседней функции (FIX-C7).
+ *
+ * Проверка пересечения ПЕРЕД ЗАПИСЬЮ — одна функция, `ensureNoConflicts`
+ * (`booking-core.ts`): бывшие пять копий переведены на неё, и тест ниже держит
+ * именно форму вызова.
+ *
+ * Слепые формы: `where`, собранный в другом модуле и переданный параметром
+ * (не разрешается — сайт выпадает из семьи); сырой SQL; окно, записанное не
+ * через `startAtUtc`/`endAtUtc` (например, по `proposedStartAt`).
+ *
+ * @probe 2026-09-29 — в `studio/bookings.service.ts` (файл зовёт
+ *        `ensureNoConflicts`) добавлена шестая копия: соседняя функция с
+ *        `tx.booking.findMany({ where: { providerId, masterProviderId, status:
+ *        { notIn: [...] }, startAtUtc: { lt }, endAtUtc: { gt } } })` — красный
+ *        «каждое чтение с окном пересечения берёт скоуп по месту» с этим сайтом
+ *        (до правки — зелёный, FIX-C7); та же копия со статусом через константу
+ *        (`status: { in: ACTIVE }`) — красный; снята отметка у соседей по пакету
+ *        (`moveStudioBooking`) — красный; возвращено — зелёный.
  */
-describe("LOGIC-01 · пятая копия скоупа не пройдёт молча", () => {
+describe("скоуп конфликта — по месту чтения", () => {
   const PROJECT_ROOT = resolve(__dirname, "..", "..", "..");
-
-  /** Подпись конфликт-запроса: активные брони, пересекающие окно. */
-  const ACTIVE_BOOKING_FILTER = 'notIn: ["REJECTED", "CANCELLED", "NO_SHOW"]';
-
-  /**
-   * Файлы, где этот фильтр означает ЧТЕНИЕ (календарь, витрина, аналитика,
-   * пересчёт доступности), а не проверку конфликта перед записью.
-   */
-  /**
-   * Признак КОНФЛИКТ-АРИФМЕТИКИ, а не выборки: файл сам сравнивает интервалы.
-   * Читающие поверхности (календарь, CRM, витрина) отдают строки как есть и
-   * пересечений не считают — проверено на всех восьми исключениях: `overlaps(`
-   * встречается ровно в одном файле, и это тот, где пряталась пятая копия.
-   */
-  const OVERLAP_ARITHMETIC = "overlaps(";
-
-  /**
-   * Файлы, где этот фильтр означает ЧТЕНИЕ (календарь, витрина, аналитика,
-   * пересчёт доступности), а не проверку конфликта перед записью.
-   *
-   * 🔴 Исключение ФАЙЛОВОЕ, и в этом была дыра: `usecases.ts` числился здесь
-   * как «чтение списков броней», а рядом, в том же файле, жил
-   * `ensureNoConflictsExcluding` со СТАРЫМ парным скоупом — одна легитимная
-   * выборка амнистировала весь файл, и пятая копия прошла молча. Поэтому
-   * запись в этом списке теперь обязана быть чистой от `overlaps(` (тест ниже).
-   */
-  const NON_CONFLICT_READERS: Record<string, string> = {
-    "src/app/api/cabinet/master/schedule/route.ts": "чтение расписания кабинета",
-    "src/lib/master/clients.service.ts": "CRM-выборка клиентов мастера",
-    "src/lib/master/day.service.ts": "день мастера на экране",
-    "src/lib/master/public-profile-view.service.ts": "публичный профиль",
-    "src/lib/schedule/available-today.ts": "пересчёт availableToday",
-    "src/lib/schedule/free-slot-keys.ts": "снимок свободного времени каталога (CATALOG-DATE-TIME-FILTER)",
-    "src/lib/schedule/usecases.ts": "генератор слотов — сам источник правила скоупа",
-    "src/lib/studio/clients.service.ts": "CRM-выборка клиентов студии",
-  };
 
   function walk(relDir: string): string[] {
     const out: string[] = [];
@@ -245,69 +240,49 @@ describe("LOGIC-01 · пятая копия скоупа не пройдёт м�
     return out;
   }
 
-  const candidates = walk("src").filter((rel) =>
-    readFileSync(resolve(PROJECT_ROOT, rel), "utf8").includes(ACTIVE_BOOKING_FILTER),
+  const files = walk("src").map((rel) => ({ rel, text: readFileSync(resolve(PROJECT_ROOT, rel), "utf8") }));
+  const windowBuilders = windowBuilderNames(
+    files.filter((f) => f.text.includes("startAtUtc")).map((f) => parseSource(f.rel, f.text)),
   );
+  const family = files
+    .filter((f) => /booking\b/.test(f.text))
+    .flatMap((f) => scanPrismaCalls(f.rel, f.text, "booking").calls)
+    .map((site) => ({ site, scope: conflictScopeOf(site, windowBuilders) }))
+    .filter((x): x is { site: PrismaCallSite; scope: string } => x.scope !== null);
 
-  it("обход что-то находит — иначе guard вакуумный", () => {
-    expect(candidates.length).toBeGreaterThan(0);
+  it("строители окна найдены, семья не пуста — иначе сторож вакуумный", () => {
+    expect([...windowBuilders]).toEqual(expect.arrayContaining(["buildConflictWindowWhere", "buildBookingOverlapWhere"]));
+    expect(family.length).toBeGreaterThanOrEqual(5);
+    // единственная проверка перед записью — в семье и на билдере
+    expect(
+      family.some((x) => x.site.file === "src/lib/bookings/booking-core.ts" && x.scope === "scope:buildConflictScopeWhere"),
+    ).toBe(true);
   });
 
-  it("каждая поверхность либо на общем скоупе, либо явно не конфликт-проверка", () => {
-    const unclassified = candidates.filter((rel) => {
-      if (rel in NON_CONFLICT_READERS) return false;
-      // FIX-C7: форма ВЫЗОВА, а не наличие имени. Ниже, на списке из пяти
-      // файлов, это уже требовалось (и инв. #11 в контексте утверждал, что
-      // требуется везде) — здесь же стояла проверка на идентификатор, которую
-      // удовлетворяла одна строка импорта. Правка выравнивает выведенную
-      // проверку с той, что применялась к перечисленным.
-      return !readFileSync(resolve(PROJECT_ROOT, rel), "utf8").includes("buildConflictScopeWhere(");
-    });
-
+  it("каждое чтение с окном пересечения берёт скоуп по месту", () => {
+    const missing = family.filter((x) => x.scope === "MISSING").map((x) => `${x.site.file}:${x.site.line}`);
     expect(
-      unclassified,
-      `Файл ищет активные брони и не берёт скоуп из buildConflictScopeWhere. ` +
-        `Если это проверка конфликта — используйте общий билдер (иначе вернётся LOGIC-01). ` +
-        `Если чтение — впишите путь и причину в NON_CONFLICT_READERS: ${unclassified.join(", ")}`,
+      missing,
+      `Чтение броней с окном пересечения без скоупа из buildConflictScopeWhere / buildOccupancyBookingWhere ` +
+        `в том же where. Если это проверка конфликта — ensureNoConflicts (иначе вернётся LOGIC-01); ` +
+        `если скоуп законно другой — отметка «// conflict-scope-ok: <причина>» на инструкции: ${missing.join(", ")}`,
     ).toEqual([]);
   });
 
-  it("в списке чтений нет протухших путей", () => {
-    const stale = Object.keys(NON_CONFLICT_READERS).filter((rel) => !candidates.includes(rel));
-    expect(stale, `Пути больше не читают активные брони: ${stale.join(", ")}`).toEqual([]);
-  });
-
-  it("исключение-«чтение» не считает пересечений — иначе оно прячет проверку", () => {
-    const arithmetic = Object.keys(NON_CONFLICT_READERS).filter((rel) =>
-      readFileSync(resolve(PROJECT_ROOT, rel), "utf8").includes(OVERLAP_ARITHMETIC),
-    );
-
-    expect(
-      arithmetic,
-      `Файл объявлен читающим, но сам сравнивает интервалы (${OVERLAP_ARITHMETIC}) — ` +
-        `значит в нём есть проверка конфликта, и файловое исключение её амнистирует. ` +
-        `Именно так пятая копия скоупа пережила LOGIC-01 в usecases.ts. ` +
-        `Переведите проверку на buildConflictScopeWhere и уберите файл из списка: ${arithmetic.join(", ")}`,
-    ).toEqual([]);
-  });
-
-  it("все пять бывших копий переведены на общий скоуп", () => {
+  it("проверка пересечения перед записью — одна функция на всех пяти бывших копиях", () => {
     for (const rel of [
-      "src/lib/bookings/booking-core.ts",
       "src/lib/bookings/confirmBooking.ts",
+      "src/lib/bookings/usecases.ts",
       "src/lib/studio/bookings.service.ts",
       "src/app/api/model-applications/[applicationId]/confirm/route.ts",
-      // пятая — найдена уже после LOGIC-01, на пути предложения переноса
-      "src/lib/bookings/usecases.ts",
     ]) {
       const source = readFileSync(resolve(PROJECT_ROOT, rel), "utf8");
-      // 🔴 Форма ВЫЗОВА, а не наличие имени: проверка `includes("buildConflictScopeWhere")`
-      // была вакуумной — её удовлетворяли строка импорта и упоминание в комментарии,
-      // поэтому файл с возвращённым парным скоупом проходил guard зелёным (поймано
-      // пробой при доделке FIX-A2).
-      expect(source, `${rel}: скоуп обязан БРАТЬСЯ из общего билдера, а не только импортироваться`)
-        .toContain("buildConflictScopeWhere(");
+      expect(source, rel).toContain("ensureNoConflicts(");
     }
+    const conflictReads = family.filter(
+      (x) => x.scope === "scope:buildConflictScopeWhere",
+    );
+    expect(conflictReads.map((x) => x.site.file)).toEqual(["src/lib/bookings/booking-core.ts"]);
   });
 });
 
@@ -368,13 +343,13 @@ describe("buildConflictWindowWhere — LOGIC-17", () => {
     expect(lastYearStart < where.startAtUtc.lt && lastYearEnd > where.endAtUtc.gt).toBe(false);
   });
 
-  it("оба студийных пути фильтруют окно, а не читают историю целиком", () => {
+  it("оба студийных пути идут через ensureNoConflicts — окно из билдера", () => {
     const source = readFileSync(
       resolve(process.cwd(), "src/lib/studio/bookings.service.ts"),
       "utf8",
     );
-    // Два вызова — create и move.
-    expect(source.match(/buildConflictWindowWhere\(/g)?.length).toBe(2);
+    // Два вызова — create и move (29.09 доработки · 14: окно и скоуп внутри).
+    expect(source.match(/ensureNoConflicts\(/g)?.length).toBe(2);
     // Прежняя безоконная форма не должна вернуться.
     expect(source).not.toMatch(/startAtUtc:\s*\{\s*not:\s*null\s*\},/);
   });

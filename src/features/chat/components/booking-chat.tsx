@@ -1,17 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { scrollBehavior } from "@/lib/ui/scroll";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { NotificationEvent } from "@/lib/notifications/types";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 type ChatMessageDto = {
   id: string;
@@ -47,10 +46,6 @@ function parseChatPayload(payload: unknown): { bookingId: string } | null {
   return { bookingId: record.bookingId };
 }
 
-function toErrorMessage(json: ApiResponse<unknown> | null, fallback: string): string {
-  return json && !json.ok ? json.error.message ?? fallback : fallback;
-}
-
 export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Props) {
   const viewerTimeZone = useViewerTimeZoneContext();
   const [loading, setLoading] = useState(true);
@@ -81,20 +76,18 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
       }
       setError(null);
       try {
-        const res = await fetch(`/api/bookings/${bookingId}/chat`, { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<ChatResponse> | null;
-        if (!res.ok || !json || !json.ok) {
-          if (res.status === 403 || res.status === 409) {
-            throw new Error(UI_TEXT.chat.errors.unavailable);
-          }
-          throw new Error(toErrorMessage(json, DEFAULT_ERROR_MESSAGE));
-        }
-        setMessages(json.data.messages ?? []);
-        setIsOpen(Boolean(json.data.isOpen));
-        setIsReadOnly(Boolean(json.data.isReadOnly));
-        notifyUnread(json.data.unreadCount ?? 0);
+        const data = await fetchJsonWithAuth<ChatResponse>(`/api/bookings/${bookingId}/chat`, {
+          cache: "no-store",
+        });
+        setMessages(data.messages ?? []);
+        setIsOpen(Boolean(data.isOpen));
+        setIsReadOnly(Boolean(data.isReadOnly));
+        notifyUnread(data.unreadCount ?? 0);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : UI_TEXT.chat.errors.loadFailed);
+        // Нет доступа / чат закрыт — своя строка поверхности «Чат недоступен».
+        const unavailable =
+          loadError instanceof ApiClientError && (loadError.status === 403 || loadError.status === 409);
+        setError(unavailable ? UI_TEXT.chat.errors.unavailable : serverMessageOr(loadError, UI_TEXT.chat.errors.loadFailed));
       } finally {
         if (!silent) {
           setLoading(false);
@@ -106,11 +99,10 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
 
   const markRead = useCallback(async () => {
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/chat/read`, { method: "POST" });
-      if (!res.ok) return;
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${bookingId}/chat/read`, { method: "POST" });
       notifyUnread(0);
     } catch {
-      // ignore
+      // Фон: пометка «прочитано»; счётчик поправится со следующим чтением.
     }
   }, [bookingId, notifyUnread]);
 
@@ -171,20 +163,16 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
     setIsAtBottom(true);
 
     try {
-      const res = await fetch(`/api/bookings/${bookingId}/chat/messages`, {
+      const sent = await fetchJsonWithAuth<{ message: ChatMessageDto }>(`/api/bookings/${bookingId}/chat/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: text }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ message: ChatMessageDto }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(toErrorMessage(json, DEFAULT_ERROR_MESSAGE));
-      }
-      setMessages((prev) => prev.map((msg) => (msg.id === tempId ? json.data.message : msg)));
+      setMessages((prev) => prev.map((msg) => (msg.id === tempId ? sent.message : msg)));
     } catch (sendError) {
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       setInput(text);
-      setError(sendError instanceof Error ? sendError.message : UI_TEXT.chat.errors.sendFailed);
+      setError(serverMessageOr(sendError, UI_TEXT.chat.errors.sendFailed));
     } finally {
       setSending(false);
     }
@@ -212,7 +200,7 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
 
   if (error) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">
+      <div role="alert" className="rounded-2xl border border-danger-border bg-danger-surface p-3 text-sm text-danger-text">
         {error}
         <div className="mt-2">
           <Button size="sm" variant="secondary" onClick={() => void loadChat()}>

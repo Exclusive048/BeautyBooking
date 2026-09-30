@@ -64,7 +64,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
     const existing = await prisma.city.findUnique({
       where: { id },
-      select: { id: true, name: true, autoCreated: true },
+      select: { id: true, name: true, autoCreated: true, timezone: true },
     });
     if (!existing) return fail("Город не найден.", 404, "NOT_FOUND");
 
@@ -89,6 +89,11 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     const isVerifying =
       parsed.data.autoCreated === false && existing.autoCreated === true;
     const otherFieldsChanged = Object.keys(data).filter((k) => k !== "autoCreated");
+    const nextTimezone =
+      typeof data.timezone === "string" && data.timezone !== existing.timezone
+        ? data.timezone
+        : null;
+    let providersRetimed = 0;
 
     const updated = await prisma.$transaction(async (tx) => {
       const row = await tx.city.update({
@@ -120,6 +125,17 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         });
       }
 
+      // Пояс провайдера выводится из города при сохранении адреса; правка пояса
+      // города доходит до тех, у кого он совпадал с прежним поясом города. Кто
+      // выбрал пояс вручную (другое значение) — не трогается.
+      if (nextTimezone !== null) {
+        const retimed = await tx.provider.updateMany({
+          where: { cityId: id, timezone: existing.timezone },
+          data: { timezone: nextTimezone },
+        });
+        providersRetimed = retimed.count;
+      }
+
       if (otherFieldsChanged.length > 0) {
         await createAdminAuditLog({
           tx,
@@ -127,7 +143,11 @@ export async function PATCH(req: Request, ctx: RouteContext) {
           action: "CITY_UPDATED",
           targetType: "city",
           targetId: id,
-          details: { citySlug: row.slug, fieldsChanged: otherFieldsChanged },
+          details: {
+            citySlug: row.slug,
+            fieldsChanged: otherFieldsChanged,
+            ...(nextTimezone !== null ? { providersRetimed } : {}),
+          },
           context: auditContext,
         });
       }
@@ -139,6 +159,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       adminId: auth.user.id,
       cityId: id,
       changes: Object.keys(data),
+      ...(nextTimezone !== null ? { providersRetimed } : {}),
     });
 
     return ok({ city: updated });

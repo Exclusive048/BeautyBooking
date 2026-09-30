@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { assignLanes, laneStyle } from "@/lib/calendar/lane-layout";
 import { HScrollShadow } from "@/components/ui/h-scroll-shadow";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
@@ -35,6 +35,7 @@ import { DisabledMasterOverlay } from "./disabled-master-overlay";
 import { scrollBehavior } from "@/lib/ui/scroll";
 import { MasterColumnHeader } from "./master-column-header";
 import { TimeAxis } from "./time-axis";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.scheduleV2;
 
@@ -192,9 +193,8 @@ export function DayGrid({
                     {/* Empty cells (clickable) */}
                     {column.isAvailable
                       ? slotMinutes.map((m, index) => (
-                          <button
+                          <Button variant="wrapper"
                             key={m}
-                            type="button"
                             onClick={() => handleEmptyClick(column.id, m)}
                             className="absolute inset-x-0 transition-colors hover:bg-primary/5"
                             style={{
@@ -247,9 +247,8 @@ export function DayGrid({
                         );
                       }
                       return (
-                        <button
+                        <Button variant="wrapper"
                           key={booking.id}
-                          type="button"
                           data-focus-id={booking.id}
                           onClick={() => setActiveBooking(booking)}
                           className={cn(
@@ -266,7 +265,7 @@ export function DayGrid({
                           {pendingReschedule ? (
                             <span
                               title={T.cell.rescheduleBadge}
-                              className="absolute right-1 top-1 z-10 text-amber-600 dark:text-amber-400"
+                              className="absolute right-1 top-1 z-10 text-warning-text"
                             >
                               <RefreshCw className="h-3 w-3" aria-hidden />
                             </span>
@@ -286,7 +285,7 @@ export function DayGrid({
                               {UI_FMT.priceLabel(booking.priceKopeks)}
                             </div>
                           ) : null}
-                        </button>
+                        </Button>
                       );
                     })}
 
@@ -345,7 +344,7 @@ function BreakCell({
   const end = new Date(entry.endAtUtc);
   return (
     <div
-      className="absolute left-1 right-1 z-[5] flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-[11px] font-medium text-text-sec"
+      className="absolute left-1 right-1 z-1 flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-[11px] font-medium text-text-sec"
       style={{
         top: offsetPxFromMinute(salonMinuteOfDay(start, timezone), gridWindow),
         height: durationPx(start, end),

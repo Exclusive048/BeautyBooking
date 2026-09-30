@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import useSWR from "swr";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 
 export type TelegramStatus = {
   linked: boolean;
@@ -13,14 +13,12 @@ export type TelegramStatus = {
 const TELEGRAM_STATUS_ERROR = "Не удалось проверить подключение Telegram. Попробуйте ещё раз.";
 
 async function fetchTelegramStatus(url: string): Promise<TelegramStatus> {
-  const res = await fetch(url, { cache: "no-store" });
-  const json = (await res.json().catch(() => null)) as ApiResponse<TelegramStatus> | null;
-  if (!res.ok || !json || json.ok !== true) {
-    const message =
-      json && json.ok === false ? json.error.message ?? TELEGRAM_STATUS_ERROR : TELEGRAM_STATUS_ERROR;
-    throw new Error(message);
+  try {
+    return await fetchJson<TelegramStatus>(url, { cache: "no-store" });
+  } catch (error) {
+    // Хук отдаёт `error.message` строкой — решение принимается здесь.
+    throw new Error(serverMessageOr(error, TELEGRAM_STATUS_ERROR));
   }
-  return json.data;
 }
 
 export function useTelegramStatus() {

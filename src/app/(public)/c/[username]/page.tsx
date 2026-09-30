@@ -3,7 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { resolvePublicClientUsername } from "@/lib/publicUsername";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   params: Promise<{ username: string }> | { username: string };

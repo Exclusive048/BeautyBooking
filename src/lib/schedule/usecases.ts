@@ -30,7 +30,6 @@ import { createScheduleContext, getScheduleWindow } from "@/lib/schedule/engine-
 import { withSingleFlight } from "@/lib/cache/single-flight";
 import { buildBookingOverlapWhere } from "@/lib/schedule/overlap";
 import { bucketRangesByDateKey, loadTimeBlockRanges } from "@/lib/schedule/time-blocks";
-import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
 
 type RangeInput = {
   from: Date;
@@ -152,38 +151,23 @@ export async function setScheduleOverride(
 
   const date = validated.data.date;
   const breaks = validated.data.breaks ?? undefined;
-  const existing = await prisma.scheduleOverride.findFirst({
-    where: { providerId, date },
-    orderBy: SCHEDULE_OVERRIDE_PICK_ORDER, // LOGIC-11
-  });
+  const fields = {
+    kind: validated.data.isDayOff ? ("OFF" as const) : ("TIME_RANGE" as const),
+    isDayOff: validated.data.isDayOff,
+    startLocal: validated.data.isDayOff ? null : validated.data.startLocal ?? null,
+    endLocal: validated.data.isDayOff ? null : validated.data.endLocal ?? null,
+    templateId: null,
+    isActive: null,
+    reason: validated.data.reason ?? null,
+  };
 
   const ops: Prisma.PrismaPromise<unknown>[] = [
-    existing
-      ? prisma.scheduleOverride.update({
-          where: { id: existing.id },
-          data: {
-            kind: validated.data.isDayOff ? "OFF" : "TIME_RANGE",
-            isDayOff: validated.data.isDayOff,
-            startLocal: validated.data.isDayOff ? null : validated.data.startLocal ?? null,
-            endLocal: validated.data.isDayOff ? null : validated.data.endLocal ?? null,
-            templateId: null,
-            isActive: null,
-            reason: validated.data.reason ?? null,
-          },
-        })
-      : prisma.scheduleOverride.create({
-          data: {
-            providerId,
-            date,
-            kind: validated.data.isDayOff ? "OFF" : "TIME_RANGE",
-            isDayOff: validated.data.isDayOff,
-            startLocal: validated.data.isDayOff ? null : validated.data.startLocal ?? null,
-            endLocal: validated.data.isDayOff ? null : validated.data.endLocal ?? null,
-            templateId: null,
-            isActive: null,
-            reason: validated.data.reason ?? null,
-          },
-        }),
+    // SCHEDULE-PATTERNS-01: строка на дату одна (`@@unique([providerId, date])`).
+    prisma.scheduleOverride.upsert({
+      where: { providerId_date: { providerId, date } },
+      update: fields,
+      create: { providerId, date, ...fields },
+    }),
   ];
 
   ops.push(

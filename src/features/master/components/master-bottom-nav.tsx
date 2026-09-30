@@ -22,11 +22,13 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { BottomTab, BottomTabBar } from "@/components/layout/bottom-tab-bar";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const t = UI_TEXT.master.bookingsPage;
 const tNav = UI_TEXT.master.topbar.nav;
@@ -119,7 +121,6 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
   // её же. Контракт взят общий, разметка и анимация не тронуты.
   useOverlayA11y({ open: moreOpen, onClose: () => setMoreOpen(false), containerRef: sheetRef });
 
-  const reduce = useReducedMotion();
 
   return (
     <>
@@ -127,28 +128,28 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
       <AnimatePresence>
         {moreOpen ? (
           <>
-            <motion.div
+            <m.div
               key="overlay"
-              initial={reduce ? false : { opacity: 0 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-              exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-              transition={reduce ? { duration: 0 } : { duration: 0.18 }}
-              className="fixed inset-0 z-[49] bg-black/40 backdrop-blur-[2px] lg:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={MOTION.micro}
+              className="fixed inset-0 z-scrim bg-black/40 backdrop-blur-[2px] lg:hidden"
               onClick={() => setMoreOpen(false)}
               aria-hidden="true"
             />
-            <motion.div
+            <m.div
               key="drawer"
-              initial={reduce ? false : { y: "100%" }}
-              animate={reduce ? { y: 0 } : { y: 0 }}
-              exit={reduce ? { y: "100%" } : { y: "100%" }}
-              transition={reduce ? { duration: 0 } : { type: "spring", damping: 30, stiffness: 340 }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={SPRING_SHEET}
               ref={sheetRef}
               role="dialog"
               aria-modal="true"
               aria-labelledby={sheetTitleId}
               tabIndex={-1}
-              className="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
+              className="fixed inset-x-0 bottom-0 z-modal rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
               <div className="flex justify-center pt-3 pb-1">
@@ -156,14 +157,13 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
               </div>
               <div className="flex items-center justify-between px-5 pb-3 pt-1">
                 <span id={sheetTitleId} className="text-sm font-semibold text-text-main">{t.moreDrawerTitle}</span>
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => setMoreOpen(false)}
                   className="-m-2 rounded-lg p-3.5 text-text-sec hover:text-text-main"
                   aria-label={UI_TEXT.common.close}
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
               <div className="grid grid-cols-3 gap-1 px-4 pb-6 pt-1">
                 {MORE_ITEMS.map((item) => {
@@ -202,7 +202,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                   <span className="text-[11px] font-medium leading-tight">{t.menuMyPage}</span>
                 </Link>
               </div>
-            </motion.div>
+            </m.div>
           </>
         ) : null}
       </AnimatePresence>

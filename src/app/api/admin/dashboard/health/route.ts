@@ -1,7 +1,7 @@
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { fail, ok } from "@/lib/api/response";
 import { logError } from "@/lib/logging/logger";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { getAdminHealth } from "@/features/admin-cabinet/dashboard/server/health.service";
 
 export const dynamic = "force-dynamic";

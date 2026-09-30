@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSerialTask } from "@/hooks/use-serial-task";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import type { ProfileDTO, ProfileUpdatePatch } from "@/lib/client-cabinet/profile.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 

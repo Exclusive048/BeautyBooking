@@ -6,7 +6,8 @@ import { cn } from "@/lib/cn";
 import { BubbleMeta } from "@/features/chat/chat-window/bubble-meta";
 import { formatTimeHm } from "@/features/chat/lib/format-time";
 import type { ThreadMessageDto } from "@/features/chat/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import { readApiResponse, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   message: ThreadMessageDto;
@@ -61,14 +62,15 @@ function AttachmentImage({
   async function explainFailure() {
     setErrored(true);
     try {
+      // Успешный ответ — байты картинки, а не конверт, поэтому сырой fetch;
+      // отказ разбирает общий `readApiResponse`.
       const res = await fetch(url, { cache: "no-store" });
       if (res.ok) return; // гонка: байты доехали — сообщение не нужно
-      const json = (await res.json().catch(() => null)) as
-        | { ok: false; error?: { message?: string } }
-        | null;
-      const serverMessage = json && json.ok === false ? json.error?.message : null;
-      if (serverMessage) setReason(serverMessage);
-      else if (res.status === 403) setReason(UI_TEXT.chat.composer.attachmentNoAccess);
+      await readApiResponse<unknown>(res).catch((error: unknown) => {
+        const serverMessage = serverMessageOr(error, "");
+        if (serverMessage) setReason(serverMessage);
+        else if (res.status === 403) setReason(UI_TEXT.chat.composer.attachmentNoAccess);
+      });
     } catch {
       // Сеть недоступна — остаётся общая строка, она здесь и верна.
     }

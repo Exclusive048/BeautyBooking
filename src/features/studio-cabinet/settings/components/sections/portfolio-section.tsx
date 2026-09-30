@@ -1,6 +1,6 @@
 import { MediaEntityType } from "@prisma/client";
 import { PortfolioEditor } from "@/features/media/components/portfolio-editor";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
 
 const T = UI_TEXT.studioCabinet.settingsV2.portfolio;
@@ -18,13 +18,15 @@ type Props = {
  */
 export function PortfolioSection({ providerId, catalogCoverAssetId }: Props) {
   return (
-    <SectionCard title={T.cardTitle} description={T.cardDesc}>
-      <PortfolioEditor
-        entityType={MediaEntityType.STUDIO}
-        entityId={providerId}
-        canEdit
-        initialCatalogCoverAssetId={catalogCoverAssetId}
-      />
-    </SectionCard>
+    <div data-guide="portfolio" className="rounded-2xl">
+      <SectionCard title={T.cardTitle} description={T.cardDesc}>
+        <PortfolioEditor
+          entityType={MediaEntityType.STUDIO}
+          entityId={providerId}
+          canEdit
+          initialCatalogCoverAssetId={catalogCoverAssetId}
+        />
+      </SectionCard>
+    </div>
   );
 }

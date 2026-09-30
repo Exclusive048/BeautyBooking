@@ -2,6 +2,9 @@ import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connect
 import { logError } from "@/lib/logging/logger";
 import { sendTelegramAlert, trackError } from "@/lib/monitoring/alerts";
 import { isProduction } from "@/lib/env";
+import type { RateLimitKey } from "@/lib/rate-limit/keys";
+
+export type { RateLimitKey } from "@/lib/rate-limit/keys";
 
 export type RateLimitConfig = {
   windowSeconds: number;
@@ -35,6 +38,36 @@ type MemoryBucket = {
 
 const memoryBuckets = new Map<string, MemoryBucket>();
 const MEMORY_FALLBACK_MAX_BUCKETS = 20_000;
+
+/**
+ * 29.09 доработки · 15 (RATE-LIMIT-MECHANISM-CONSOLIDATION) — fail-closed
+ * решает ОДИН признак: шаблон пути в ключе (`lib/rate-limit/keys.ts` кладёт его
+ * последним в любой ключ). Прежние три механизма: (1) префикс пути —
+ * остался, это он; (2) префикс КЛЮЧА `SENSITIVE_KEY_PREFIXES` — удалён,
+ * пространства сведены к шаблонам по таблице ниже; (3) OTP-модуль
+ * (`auth/otp-rate-limit.ts`) — остаётся со своими командами, согласие политик
+ * держит `sensitive-routes.test.ts` (роуты, импортирующие модуль, обязаны быть
+ * чувствительными по пути).
+ *
+ *   прежнее пространство ключа   → шаблон роута                                   → чем покрыт
+ *   rate:createBooking:          → /api/bookings, /api/public/bookings             → префикс; точный шаблон
+ *   rate:publicBooking:          → /api/public/bookings                            → точный шаблон
+ *   rate:packageBook:            → /api/public/packages/:id/book                   → точный шаблон
+ *   rate:studioPackageBook:      → /api/public/packages/:id/studio/book            → точный шаблон
+ *   rate:guestManage:            → /api/public/bookings/manage/:id/{cancel,reschedule,review} → точные шаблоны
+ *   rate:chatSend:               → /api/chat/threads/:id/messages                  → префикс /api/chat/threads
+ *   rate:telegramWebhook:        → /api/telegram/webhook                           → точный шаблон
+ *   rl:categories:propose:       → /api/categories/propose                         → префикс
+ *   rl:/api/me/delete…           → /api/me/delete                                  → префикс /api/me/delete
+ *   rl:/api/cabinet/{master,studio}/delete… → те же пути                          → префиксы
+ *   rl:/api/bookings…            → /api/bookings/…                                 → префикс
+ *   rl:/api/master/portfolio…    → /api/master/portfolio/…                         → префикс
+ *   rl:/api/studio… / rl:/api/studios… → /api/studio/…, /api/studios/…             → префиксы
+ *   rl:/api/reviews…             → /api/reviews/…                                  → префикс
+ *
+ * Сверку держит `sensitive-routes.test.ts`: ключ каждого прежнего пространства
+ * добывается из настоящего лимитера роута и обязан остаться чувствительным.
+ */
 const SENSITIVE_ROUTE_PREFIXES = [
   "/api/auth",
   "/api/billing",
@@ -122,70 +155,36 @@ const SENSITIVE_ROUTE_EXCEPTIONS = [
   "/api/billing/mrr/snapshot/run",
 ] as const;
 
-const SENSITIVE_KEY_PREFIXES = [
-  "rate:createBooking:",
-  // SECURITY-EXPOSURE-AUDIT-01 · Y6: the public booking-write paths must fail
-  // CLOSED on a Redis outage like `rate:createBooking:` does, not fail open.
-  "rate:publicBooking:",
-  "rate:packageBook:",
-  "rate:studioPackageBook:",
-  // GUEST-MANAGE-LINK: отмена и перенос записи гостем по ссылке — тоже гостевая запись.
-  "rate:guestManage:",
-  "rl:categories:propose:",
-  "rl:/api/me/delete",
-  "rl:/api/cabinet/master/delete",
-  "rl:/api/cabinet/studio/delete",
-  "rl:/api/bookings",
-  "rl:/api/master/portfolio",
-  "rl:/api/studio",
-  "rl:/api/studios",
-  "rl:/api/reviews",
-  // FIX-B12: единственный из 24 роутов класса, у которого есть СВОЙ лимитер
-  // (`rate:chatSend:<userId>`, per-user отправка сообщений). Префикс пути выше
-  // делает fail-closed прокси-тир, но собственный ключ — более узкий лимитер
-  // того же роута, и оставить его fail-open значило бы держать в одном роуте
-  // две разные политики на случай обрыва Redis.
-  "rate:chatSend:",
-
-  /**
-   * FIX-B15 — политика регистрируется ЗАРАНЕЕ, пока путь недостижим.
-   *
-   * Запись ниже сегодня инертна: код до неё не доходит, потому что выше по
-   * обработчику стоит килсвитч, снимаемый **в деплое**. Именно поэтому её и надо
-   * внести сейчас: иначе флип флага делает путь живым И fail-open ОДНИМ
-   * движением, а заметить это некому — тесты зелёные, дифф пустой, гейты в
-   * деплое не работают. Регистрация здесь разводит два события: флаг меняет
-   * достижимость, политика уже верна к моменту, когда она понадобится.
-   *
-   * `rate:telegramWebhook:<ip>` (`lib/telegram/webhookRateLimit.ts`).
-   * `POST /api/telegram/webhook` первой строкой спрашивает `getTelegramEnabled()`,
-   * тот короткозамыкает на env-потолке `NEXT_PUBLIC_TELEGRAM_ENABLED` (unset →
-   * false, ФЗ-199) — до лимита, проверки секрета и записи `TelegramLinkToken`
-   * управление не доходит.
-   *
-   * Префикс ПУТИ `/api/telegram` намеренно НЕ заводится: под него попали бы
-   * `status`/`settings` — чтения кабинетных настроек, для которых обрыв Redis
-   * не повод отказывать. ⚠️ Отказ здесь придёт с текстом «слишком много
-   * запросов», а не «сервис недоступен»: `checkTelegramWebhookRateLimit` идёт
-   * через legacy-перегрузку `checkRateLimit`, которая возвращает `boolean` и
-   * причину выразить не может. Для этого сайта это приемлемо — вызывающий
-   * телеграм-бот, а не браузер, и у него свои ретраи; исправление означало бы
-   * менять legacy-перегрузку, то есть все её сайты сразу.
-   *
-   * ⚠️ Свип нашёл ВТОРОЙ ключ той же формы и осознанно его НЕ внёс:
-   * `rl:visual-search:budget:global:<UTC-дата>` — единственный денежный потолок
-   * платного vision-вызова, тоже достижимый лишь за килсвитчем
-   * (`VISUAL_SEARCH_ENABLED`). Отличие решающее: у него есть **ратифицированное
-   * обратное решение** — заголовок `visual-search/by-photo-guards.ts` (SEC-04,
-   * AUDIT-CAMPAIGN-02 п.7) прямо пишет, что деградация наследуется от
-   * `checkRateLimit` и «осознанно не ужесточается». Внести префикс значило бы
-   * молча отменить его. При этом довод «за» появляется ровно в день флипа:
-   * memory-fallback умножает суточный потолок на число процессов и обнуляет его
-   * рестартом, то есть у платного вызова перестаёт быть верхняя граница.
-   * Поэтому это пункт pre-flip-чеклиста в `DEPLOY-BACKLOG.md`, а не правка тут.
-   */
-  "rate:telegramWebhook:",
+/**
+ * Точные шаблоны: пишущие пути, чей префикс нельзя сделать чувствительным
+ * целиком. Под `/api/public/bookings` лежит `GET /api/public/bookings/[id]`
+ * (экран «запись создана» после перезагрузки) — префикс сделал бы его
+ * fail-closed; оба `propose` пакетов ничего не пишут и остаются fail-open
+ * (другие шаблоны). Гостевые пишущие входы закрыты с SECURITY-EXPOSURE-AUDIT-01
+ * · Y6 (прежде — префиксом ключа, замер FIX-C10).
+ *
+ * `/api/telegram/webhook` — политика зарегистрирована ЗАРАНЕЕ (FIX-B15): сегодня
+ * путь недостижим, пока Telegram выключен пустым
+ * `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` (ENV-SPLIT-01), и именно поэтому она
+ * записана здесь — иначе включение сделало бы путь живым И fail-open одним
+ * движением. Префикс `/api/telegram` не заводится: под ним `status`/`settings`
+ * — чтения кабинетных настроек.
+ *
+ * Следствие, принятое явно: шаблон один на ключ роута и ключ прокси, поэтому
+ * для этих путей fail-closed стал и тир прокси — отказ при обрыве приходит на
+ * хоп раньше, тем же 503 `RATE_LIMIT_UNAVAILABLE` (FIX-B12).
+ */
+const SENSITIVE_ROUTE_TEMPLATES = [
+  "/api/public/bookings",
+  "/api/public/bookings/manage/:id/cancel",
+  "/api/public/bookings/manage/:id/reschedule",
+  // 29.09 доработки · 05: отзыв гостя по той же ссылке — гостевая запись.
+  "/api/public/bookings/manage/:id/review",
+  "/api/public/packages/:id/book",
+  "/api/public/packages/:id/studio/book",
+  "/api/telegram/webhook",
 ] as const;
+
 const RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS = 60;
 
 function nowMs() {
@@ -198,23 +197,28 @@ function extractApiPathFromKey(key: string): string | null {
   return key.slice(index);
 }
 
-export function isSensitiveRouteKey(key: string): boolean {
-  if (SENSITIVE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) {
-    return true;
-  }
-  const path = extractApiPathFromKey(key);
-  if (!path) return false;
-  if (SENSITIVE_ROUTE_EXCEPTIONS.some((exception) => path === exception)) {
+/** Чувствителен ли шаблон пути (fail-closed при обрыве Redis, инв. #6). */
+export function isSensitiveRouteTemplate(template: string): boolean {
+  if (SENSITIVE_ROUTE_EXCEPTIONS.some((exception) => template === exception)) {
     return false;
   }
+  if (SENSITIVE_ROUTE_TEMPLATES.some((exact) => template === exact)) {
+    return true;
+  }
   return SENSITIVE_ROUTE_PREFIXES.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`)
+    (prefix) => template === prefix || template.startsWith(`${prefix}/`)
   );
 }
 
-function checkMemoryLimit(key: string, limit: number, windowSeconds: number): boolean {
-  const result = checkMemoryLimitDetailed(key, limit, windowSeconds);
-  return result.allowed;
+/**
+ * Чувствителен ли ключ — по шаблону пути, который оба конструктора ключа
+ * (`lib/rate-limit/keys.ts`) кладут последним. Ключ без шаблона — не
+ * чувствителен (таких конструкторы не строят).
+ */
+export function isSensitiveRouteKey(key: string): boolean {
+  const path = extractApiPathFromKey(key);
+  if (!path) return false;
+  return isSensitiveRouteTemplate(path);
 }
 
 function pruneMemoryBuckets(now: number): void {
@@ -331,6 +335,17 @@ async function checkRateLimitConfig(
     }
 
     if (count > config.maxRequests) {
+      // RATE-LIMIT-TTL-HEAL (29.09 доработки): срок окна ставится на первом
+      // инкременте, и если та команда не дошла (таймаут при brownout Redis,
+      // падение процесса между INCR и EXPIRE), ключ остаётся БЕЗ срока — лимит
+      // для этого адреса и маршрута не сбрасывается никогда. Замер на dev:
+      // `rl:publicApi:::1:GET:/api/media` — TTL −1, счётчик 152, 429 навсегда.
+      // На превышении срок досылается с `NX` (только если его нет): такой ключ
+      // живёт не дольше одного окна, а исправный окно не продлевает.
+      await withRedisCommandTimeout(
+        "rate-limit:config:expire-heal",
+        client.expire(key, config.windowSeconds, "NX")
+      );
       return { limited: true, retryAfterSeconds: config.windowSeconds };
     }
 
@@ -355,69 +370,16 @@ async function checkRateLimitConfig(
   }
 }
 
-async function checkRateLimitLegacy(
-  key: string,
-  limit: number,
-  windowSeconds: number
-): Promise<boolean> {
-  try {
-    const client = await getRedisConnection();
-    if (!client) {
-      if (isSensitiveRouteKey(key)) {
-        return false;
-      }
-      logError("Rate limit Redis unavailable, using memory fallback", {
-        key,
-        mode: "legacy",
-        __skipAlert: true,
-      });
-      maybeAlertRedisRateLimitDegraded();
-      return checkMemoryLimit(key, limit, windowSeconds);
-    }
-
-    const count = await withRedisCommandTimeout(
-      "rate-limit:legacy:incr",
-      client.incr(key)
-    );
-    if (count === 1) {
-      await withRedisCommandTimeout(
-        "rate-limit:legacy:expire",
-        client.expire(key, windowSeconds)
-      );
-    }
-    return count <= limit;
-  } catch (error) {
-    logError("Rate limit check failed", {
-      key,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    if (isSensitiveRouteKey(key)) {
-      return false;
-    }
-    maybeAlertRedisRateLimitDegraded();
-    if (isProduction) {
-      return checkMemoryLimit(key, limit, windowSeconds);
-    }
-    return true;
-  }
-}
-
+/**
+ * Единственная форма (29.09 доработки · 15): ключ — только из конструкторов
+ * `lib/rate-limit/keys.ts` (сырая строка не компилируется), ответ — с причиной
+ * отказа. Legacy-перегрузка `(key, limit, windowSeconds) → boolean` удалена: её
+ * шесть вызовов при обрыве Redis отвечали «слишком много запросов», причину
+ * она выразить не могла.
+ */
 export async function checkRateLimit(
-  key: string,
+  key: RateLimitKey,
   config: RateLimitConfig
-): Promise<RateLimitResult>;
-export async function checkRateLimit(
-  key: string,
-  limit: number,
-  windowSeconds: number
-): Promise<boolean>;
-export async function checkRateLimit(
-  key: string,
-  configOrLimit: RateLimitConfig | number,
-  windowSeconds?: number
-): Promise<RateLimitResult | boolean> {
-  if (typeof configOrLimit === "number") {
-    return checkRateLimitLegacy(key, configOrLimit, windowSeconds ?? 0);
-  }
-  return checkRateLimitConfig(key, configOrLimit);
+): Promise<RateLimitResult> {
+  return checkRateLimitConfig(key, config);
 }

@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   SERVICE_DURATION_STEP_MIN,
   SERVICE_PRICE_STEP_RUB,
@@ -91,7 +92,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
     setError(null);
     setStatusMessage(null);
     try {
-      const response = await fetch(`/api/studio/services/${detail.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/studio/services/${detail.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -106,17 +107,10 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
           isActive,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.saveFailed);
-        return;
-      }
       setStatusMessage(T.saved);
       router.refresh();
-    } catch {
-      setError(E.saveFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, E.saveFailed));
     } finally {
       setSaving(false);
     }
@@ -125,7 +119,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
   function handleUnassign(master: StudioServiceMasterChip) {
     startUnassign(async () => {
       try {
-        const response = await fetch(
+        await fetchJsonWithAuth<unknown>(
           `/api/studio/services/${detail.id}/unassign-master`,
           {
             method: "POST",
@@ -133,13 +127,9 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
             body: JSON.stringify({ studioId, masterId: master.id }),
           },
         );
-        if (!response.ok) {
-          setError(E.unassignFailed);
-          return;
-        }
         router.refresh();
-      } catch {
-        setError(E.unassignFailed);
+      } catch (error) {
+        setError(serverMessageOr(error, E.unassignFailed));
       }
     });
   }
@@ -243,14 +233,14 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
                 String(detail.assignedMasters.length),
               )}
             </p>
-            <button
-              type="button"
+            <Button variant="wrapper"
               onClick={() => setAssignOpen(true)}
               className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-accent-text transition-colors hover:bg-primary/10"
+              data-guide="assign"
             >
               <UserPlus className="h-3.5 w-3.5" aria-hidden />
               {T.assignMaster}
-            </button>
+            </Button>
           </div>
           {detail.assignedMasters.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border-subtle bg-bg-input/30 px-3 py-2 text-xs text-text-sec">
@@ -286,15 +276,14 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
                     )}
                     <span className="text-xs text-text-main">{master.displayName}</span>
                   </Link>
-                  <button
-                    type="button"
+                  <Button variant="wrapper"
                     onClick={() => handleUnassign(master)}
                     disabled={unassigning}
                     className="ml-0.5 inline-grid h-4 w-4 place-items-center rounded-full text-text-sec transition-colors hover:bg-bg-card hover:text-text-main"
                     aria-label={T.unassignMaster}
                   >
                     <X className="h-3 w-3" aria-hidden />
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -322,12 +311,12 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}
         {statusMessage ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+          <div className="rounded-lg border border-success-border bg-success-surface px-3 py-2 text-sm text-success-text">
             {statusMessage}
           </div>
         ) : null}

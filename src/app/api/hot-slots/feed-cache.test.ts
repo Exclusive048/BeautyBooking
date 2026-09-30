@@ -103,7 +103,9 @@ describe("SEC-15 · собственный тир", () => {
   it("лимит спрашивается по своему ключу, а не по общему публичному", async () => {
     await call("?limit=5");
     expect(spies.checkRateLimit).toHaveBeenCalledTimes(1);
-    expect(spies.checkRateLimit.mock.calls[0][0]).toMatch(/^rl:hot-slots:feed:/);
+    // 29.09 доработки · 15: ключ роута — `rl:route:<ось>:<hmac>:<шаблон>`, то есть
+    // своё ведро, отдельное от ключа прокси (`rl:publicApi:…`).
+    expect(spies.checkRateLimit.mock.calls[0][0]).toMatch(/^rl:route:ip:[0-9a-f]{32}:\/api\/hot-slots$/);
   });
 
   it("при срабатывании тира расчёт не запускается вовсе", async () => {

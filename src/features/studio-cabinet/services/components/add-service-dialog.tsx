@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   SERVICE_DURATION_STEP_MIN,
   SERVICE_PRICE_STEP_RUB,
@@ -83,33 +84,25 @@ export function AddServiceDialog({
     setProposingBusy(true);
     setProposeError(null);
     try {
-      const response = await fetch("/api/categories/propose", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      const json = (await response.json().catch(() => null)) as
-        | {
-            ok?: boolean;
-            data?: { id: string; title: string; status: string };
-            error?: { message?: string };
-          }
-        | null;
-      if (!response.ok || !json?.ok || !json.data) {
-        setProposeError(json?.error?.message ?? E.categoryCreate);
-        return;
-      }
+      const created = await fetchJsonWithAuth<{ id: string; title: string; status: string }>(
+        "/api/categories/propose",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: trimmed }),
+        },
+      );
       const newOption: StudioCategoryPickerOption = {
-        id: json.data.id,
-        name: json.data.title,
-        status: json.data.status === "APPROVED" ? "APPROVED" : "PENDING",
+        id: created.id,
+        name: created.title,
+        status: created.status === "APPROVED" ? "APPROVED" : "PENDING",
       };
       setOptions((prev) => [...prev, newOption]);
       setCategoryId(newOption.id);
       setProposing(false);
       setProposeName("");
-    } catch {
-      setProposeError(E.categoryCreate);
+    } catch (error) {
+      setProposeError(serverMessageOr(error, E.categoryCreate));
     } finally {
       setProposingBusy(false);
     }
@@ -145,7 +138,7 @@ export function AddServiceDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/studio/services", {
+      await fetchJsonWithAuth<unknown>("/api/studio/services", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -156,17 +149,10 @@ export function AddServiceDialog({
           globalCategoryId: categoryId,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.serviceCreate);
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.serviceCreate);
+    } catch (error) {
+      setError(serverMessageOr(error, E.serviceCreate));
     } finally {
       setSubmitting(false);
     }
@@ -226,8 +212,7 @@ export function AddServiceDialog({
               {T.categoryLabel}
             </span>
             {!proposing ? (
-              <button
-                type="button"
+              <Button variant="wrapper"
                 onClick={() => {
                   setProposing(true);
                   setProposeError(null);
@@ -236,7 +221,7 @@ export function AddServiceDialog({
               >
                 <Plus className="h-3 w-3" aria-hidden />
                 {T.proposeCategory}
-              </button>
+              </Button>
             ) : null}
           </div>
 
@@ -259,8 +244,7 @@ export function AddServiceDialog({
                 >
                   {proposingBusy ? T.proposeSubmitting : T.proposeSubmit}
                 </Button>
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => {
                     setProposing(false);
                     setProposeName("");
@@ -271,10 +255,10 @@ export function AddServiceDialog({
                   aria-label={T.proposeCancel}
                 >
                   <X className="h-3.5 w-3.5" aria-hidden />
-                </button>
+                </Button>
               </div>
               {proposeError ? (
-                <p className="text-xs text-red-600 dark:text-red-300">
+                <p className="text-xs text-danger-text">
                   {proposeError}
                 </p>
               ) : null}
@@ -299,7 +283,7 @@ export function AddServiceDialog({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

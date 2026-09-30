@@ -1,8 +1,8 @@
 "use client";
 
 import type { SlotPrecision, VisibilityDto } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
-import { ChipGroup } from "../components/chip-group";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ChipGroup } from "@/components/ui/chip-group";
 import { SettingRow } from "../components/setting-row";
 import { CatalogPresenceNote } from "@/features/cabinet/components/catalog-presence-note";
 
@@ -29,6 +29,11 @@ const DAY_OPTIONS = [
 type Props = {
   visibility: VisibilityDto;
   onChange: (next: VisibilityDto) => void;
+  /**
+   * STUDIO-MASTER-PROFILES: у расписания профиля в студии страницы нет —
+   * видимость страницы решается в личном расписании.
+   */
+  showPublished?: boolean;
 };
 
 /**
@@ -36,25 +41,27 @@ type Props = {
  * visible horizon. `isPublished = false` removes the provider from the
  * catalog (existing public-catalog behaviour).
  */
-export function SlotVisibilitySection({ visibility, onChange }: Props) {
+export function SlotVisibilitySection({ visibility, onChange, showPublished = true }: Props) {
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <h2 className="mb-4 font-display text-lg text-text-main">{T.title}</h2>
       <div className="divide-y divide-border-subtle">
-        <SettingRow
-          title={T.publishedTitle}
-          subtitle={T.publishedSubtitle}
-          // VISIBILITY-CATALOG-STATUS: не желание, а факт — в каталоге ли
-          // кабинет и чего не хватает.
-          note={<CatalogPresenceNote type="master" refreshKey={visibility.isPublished} />}
-          control={
-            <ChipGroup
-              value={visibility.isPublished}
-              onChange={(value) => onChange({ ...visibility, isPublished: value })}
-              options={PUBLISHED_OPTIONS}
-            />
-          }
-        />
+        {showPublished ? (
+          <SettingRow
+            title={T.publishedTitle}
+            subtitle={T.publishedSubtitle}
+            // VISIBILITY-CATALOG-STATUS: не желание, а факт — в каталоге ли
+            // кабинет и чего не хватает.
+            note={<CatalogPresenceNote type="master" refreshKey={visibility.isPublished} />}
+            control={
+              <ChipGroup
+                value={visibility.isPublished}
+                onChange={(value) => onChange({ ...visibility, isPublished: value })}
+                options={PUBLISHED_OPTIONS}
+              />
+            }
+          />
+        ) : null}
         <SettingRow
           title={T.precisionTitle}
           subtitle={T.precisionSubtitle}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence, useReducedMotion } from "framer-motion";
+import { INSTANT, MOTION } from "@/lib/ui/motion";
 import { ChevronDown } from "lucide-react";
 
 export type FAQItem = { readonly q: string; readonly a: string };
@@ -20,26 +21,28 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
         aria-expanded={open}
       >
         <span>{item.q}</span>
-        <motion.span
-          animate={reduce ? undefined : { rotate: open ? 180 : 0 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
+        <m.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={MOTION.micro}
           className="shrink-0 text-text-sec"
         >
           <ChevronDown className="h-4 w-4" aria-hidden />
-        </motion.span>
+        </m.span>
       </button>
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <m.div
             key="content"
-            initial={reduce ? false : { height: 0, opacity: 0 }}
-            animate={reduce ? { opacity: 1 } : { height: "auto", opacity: 1 }}
-            exit={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.22, ease: "easeInOut" }}
+            // Раскрытие по высоте `reducedMotion="user"` не гасит (это не transform) —
+            // тем, кто просил не двигать интерфейс, ответ появляется сразу.
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0, transition: reduce ? INSTANT : MOTION.exit }}
+            transition={reduce ? INSTANT : MOTION.base}
             className="overflow-hidden"
           >
             <p className="px-5 pb-5 text-sm text-text-sec leading-relaxed">{item.a}</p>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

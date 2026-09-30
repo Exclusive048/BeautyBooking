@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { Switch } from "@/components/ui/switch";
 import { CatalogPresenceNote } from "@/features/cabinet/components/catalog-presence-note";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   bannerUrl?: string | null;

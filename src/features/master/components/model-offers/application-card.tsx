@@ -2,7 +2,7 @@ import { Camera, CameraOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
 import type { ApplicationItem } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatOfferDateShort,
   pickAvatarColor,
@@ -75,7 +75,7 @@ export function ApplicationCard({ application }: Props) {
         <span
           className={cn(
             "inline-flex items-center gap-1.5 text-xs",
-            application.consentToShoot ? "text-emerald-700 dark:text-emerald-300" : "text-text-sec"
+            application.consentToShoot ? "text-success-text" : "text-text-sec"
           )}
         >
           {application.consentToShoot ? (

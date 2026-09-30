@@ -1,8 +1,8 @@
-import crypto from "crypto";
 import { requireAuth } from "@/lib/auth/guards";
 import { fail, ok } from "@/lib/api/response";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { deleteUserAccount } from "@/lib/deletion/delete-account";
 import { extractClientIp } from "@/lib/http/ip";
@@ -10,22 +10,18 @@ import { clearSessionCookies } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
-function hashKey(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
-
 export async function DELETE(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
 
   const ip = extractClientIp(req);
-  const ipKey = `rl:/api/me/delete/ip:${hashKey(ip ?? "unknown")}`;
+  const ipKey = routeRateLimitKey(req, "ip", ip ?? "unknown");
   const ipRateLimit = await checkRateLimit(ipKey, RATE_LIMITS.destructiveDelete);
   if (ipRateLimit.limited) {
     return fail("Слишком часто. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
-  const userKey = `rl:/api/me/delete/user:${hashKey(auth.user.id)}`;
+  const userKey = routeRateLimitKey(req, "user", auth.user.id);
   const userRateLimit = await checkRateLimit(userKey, RATE_LIMITS.destructiveDelete);
   if (userRateLimit.limited) {
     return fail("Слишком часто. Попробуйте позже.", 429, "RATE_LIMITED");

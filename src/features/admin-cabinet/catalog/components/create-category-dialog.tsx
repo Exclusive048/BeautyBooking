@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCategoryParentOption,
   AdminCategoryRow,
@@ -101,7 +101,7 @@ export function CreateCategoryDialog({
           {error ? (
             <p
               role="alert"
-              className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+              className="mt-1.5 text-xs text-danger-text"
             >
               {error}
             </p>

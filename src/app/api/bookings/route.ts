@@ -1,4 +1,5 @@
 import { formatZodError } from "@/lib/api/validation";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { bookingsQuerySchema } from "@/lib/bookings/schemas";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClientBooking } from "@/lib/bookings/createClientBooking";
@@ -153,6 +154,7 @@ export async function POST(req: Request) {
         referencePhotoAssetId,
         bookingAnswers,
         clientUserId: effectiveClientUserId,
+        rateLimitKey: routeRateLimitKey(req, "user", effectiveClientUserId),
         idempotencyKey: normalizedIdempotencyKey,
       });
       try {
@@ -200,6 +202,7 @@ export async function POST(req: Request) {
     }
 
     const booking = await createClientBooking(sessionUser.id, {
+      rateLimitKey: routeRateLimitKey(req, "user", sessionUser.id),
       providerId,
       serviceId,
       hotSlotId: hotSlotId ?? null,

@@ -539,6 +539,7 @@ async function createSoloPackageBookingUnguarded(
           });
 
           const created = await createBookingRow(tx, {
+            timePolicy: core.timeClearance,
             data: {
               providerId: pkg.providerId,
               // FIX-C1: соло-пакет — всегда мастер без студии (`loadPackageForBooking`

@@ -87,6 +87,12 @@ export type ProviderProfileDto = {
   socialVk: string | null;
   socialInstagram: string | null;
   cancellationDeadlineHours: number | null;
+  /**
+   * Сколько дней вперёд виджет записи показывает в полосе дат
+   * (`publicBookingHorizonDays`: окно записи, у мастера — и «Сколько окошек
+   * вперёд», не дальше горизонта расписания). 29.09 доработки · 03.
+   */
+  bookingHorizonDays: number;
   hotSlotsEnabled: boolean;
   geoLat: number | null;
   geoLng: number | null;

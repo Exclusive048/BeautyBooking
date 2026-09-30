@@ -1,10 +1,12 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import type { RateLimitKey } from "@/lib/rate-limit/keys";
 import { join, resolve, sep } from "node:path";
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ProviderType } from "@prisma/client";
 
 import { createBookingRow } from "@/lib/bookings/booking-row";
+import { clearOperatorTime } from "@/lib/bookings/booking-time-policy";
 import { stripComments } from "@/lib/testing/source-scan";
 
 /**
@@ -13,11 +15,12 @@ import { stripComments } from "@/lib/testing/source-scan";
  *
  * ## Что чинится
  *
- * Журнал и календарь студии ПОКАЗЫВАЮТ бронь по `providerId`
+ * Журнал и календарь студии ПОКАЗЫВАЛИ бронь по `providerId`
  * (`OR: [{ studioId }, { providerId }]`), а авторизация действия РАЗРЕШАЕТ её
  * только по `studioId` (`assertBelongsToStudio` → `where: { id, studioId }`).
  * Пока три из семи путей создания `studioId` не выставляли, эти два ответа
- * расходились: бронь видна в журнале, а «перенести» отвечает 404.
+ * расходились: бронь видна в журнале, а «перенести» отвечает 404. С 29.09
+ * доработки · 08 списки тоже читают только `studioId` (`studio/booking-scope.ts`).
  *
  * ## Почему тест построен именно так
  *
@@ -79,9 +82,12 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => true }));
+vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => ({ limited: false }) }));
 
-vi.mock("@/lib/bookings/booking-core", () => ({
+vi.mock("@/lib/bookings/booking-core", async () => {
+  // 29.09 доработки · 07: ядро записи выдаёт и разрешение на время (writer его требует).
+  const { clearOperatorTime } = await import("@/lib/bookings/booking-time-policy");
+  return {
   ensureNoConflicts: async () => {},
   resolveBookingCore: async () => ({
     provider: {
@@ -111,8 +117,10 @@ vi.mock("@/lib/bookings/booking-core", () => ({
     endAtUtc: new Date("2026-09-01T08:00:00.000Z"),
     bufferMin: 0,
     shouldAutoConfirm: false,
+    timeClearance: clearOperatorTime(new Date("2026-09-01T07:00:00.000Z")),
   }),
-}));
+  };
+});
 
 vi.mock("@/lib/bookings/booking-extras", () => ({
   resolveBookingExtras: async () => ({ referencePhotoAssetId: null, bookingAnswers: null }),
@@ -151,6 +159,7 @@ async function bookThrough(providerId: string, providerShape: {
     slotLabel: "01.09 10:00-11:00",
     clientName: "Смоук Екб",
     clientPhone: "+79061112233",
+    rateLimitKey: "rl:route:user:test:/api/bookings" as RateLimitKey,
     comment: null,
     clientUserId: "user-guest-1",
   });
@@ -318,16 +327,23 @@ describe("FIX-C1 · `Booking` пишет ровно один writer", () => {
       },
     } as unknown as Parameters<typeof createBookingRow>[0];
 
+    const startAtUtc = new Date("2026-10-01T09:00:00Z");
     const base = {
       serviceId: "svc-1",
       slotLabel: "l",
       clientName: "c",
       clientPhone: "p",
       source: "WEB",
+      startAtUtc,
     } as const;
+    const timePolicy = clearOperatorTime(startAtUtc);
 
-    await createBookingRow(db, { data: { ...base, providerId: STUDIO_PROVIDER_ID }, select: { id: true } });
-    await createBookingRow(db, { data: { ...base, providerId: MEMBER_PERSONAL_PROVIDER_ID }, select: { id: true } });
+    await createBookingRow(db, { data: { ...base, providerId: STUDIO_PROVIDER_ID }, select: { id: true }, timePolicy });
+    await createBookingRow(db, {
+      data: { ...base, providerId: MEMBER_PERSONAL_PROVIDER_ID },
+      select: { id: true },
+      timePolicy,
+    });
 
     expect(seen.map((d) => d.studioId)).toEqual([STUDIO_ROW_ID, null]);
   });

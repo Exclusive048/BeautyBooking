@@ -7,6 +7,7 @@ import { getClientIp } from "@/lib/http/ip";
 import { logError } from "@/lib/logging/logger";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 export async function GET(
@@ -21,7 +22,7 @@ export async function GET(
   }
 
   const ip = getClientIp(req);
-  const limit = await checkRateLimit(`rl:ai:review-summary:${ip}`, RATE_LIMITS.aiReviewSummary);
+  const limit = await checkRateLimit(routeRateLimitKey(req, "ip", ip), RATE_LIMITS.aiReviewSummary);
   if (limit.limited) {
     return fail("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
   }

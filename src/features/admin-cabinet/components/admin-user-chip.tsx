@@ -1,6 +1,6 @@
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { AdminPanelRole, AdminPanelUser } from "@/features/admin-cabinet/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = Pick<AdminPanelUser, "name" | "avatarUrl" | "role">;
 

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioServiceMasterChip } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.servicesV2.assignMasterDialog;
@@ -50,7 +51,7 @@ export function AssignMasterDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/studio/services/${serviceId}/assign-master`,
         {
           method: "POST",
@@ -58,17 +59,10 @@ export function AssignMasterDialog({
           body: JSON.stringify({ studioId, masterId }),
         },
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.assignFailed);
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.assignFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, E.assignFailed));
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +95,7 @@ export function AssignMasterDialog({
           </label>
         )}
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

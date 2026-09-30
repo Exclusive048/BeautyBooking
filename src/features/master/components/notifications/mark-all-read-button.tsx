@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import { useToast } from "@/components/ui/toast";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.notifications;
 
@@ -17,13 +19,16 @@ export function MarkAllReadButton() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [, startTransition] = useTransition();
+  const toast = useToast();
 
   const handleClick = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      await fetch("/api/notifications/read-all?context=master", { method: "POST" });
+      await fetchJsonWithAuth<unknown>("/api/notifications/read-all?context=master", { method: "POST" });
       startTransition(() => router.refresh());
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.errors.markAllRead));
     } finally {
       setBusy(false);
     }

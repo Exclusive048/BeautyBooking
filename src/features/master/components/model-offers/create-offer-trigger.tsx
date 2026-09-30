@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { AvailableServiceForOffer } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { CreateOfferModal } from "./modals/create-offer-modal";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.activeSection;

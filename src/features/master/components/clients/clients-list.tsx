@@ -3,7 +3,7 @@
 import { Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ClientListItemView } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ClientListItem } from "./client-list-item";
 
 const T = UI_TEXT.cabinetMaster.clients.list;

@@ -1,5 +1,4 @@
-import type { ApiResponse } from "@/lib/types/api";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { DEFAULT_ERROR_MESSAGE, fetchJson, serverMessageOr } from "@/lib/http/client";
 
 export type ServiceBookingQuestion = {
   id: string;
@@ -13,16 +12,15 @@ export type ServiceBookingConfig = {
   questions: ServiceBookingQuestion[];
 };
 
-async function safeJson<T>(res: Response) {
-  return (await res.json().catch(() => null)) as T | null;
-}
-
 export async function fetchPublicServiceBookingConfig(serviceId: string): Promise<ServiceBookingConfig | null> {
-  const res = await fetch(`/api/public/services/${serviceId}/booking-config`, { cache: "no-store" });
-  const json = await safeJson<ApiResponse<ServiceBookingConfig>>(res);
-
-  if (!res.ok || !json || json.ok !== true) return null;
-  return json.data;
+  // Чтение: без настроек записи форма работает с настройками по умолчанию.
+  try {
+    return await fetchJson<ServiceBookingConfig>(`/api/public/services/${serviceId}/booking-config`, {
+      cache: "no-store",
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function uploadBookingReference(
@@ -31,15 +29,14 @@ export async function uploadBookingReference(
   const formData = new FormData();
   formData.set("image", file);
 
-  const res = await fetch("/api/bookings/upload-reference", { method: "POST", body: formData });
-  const json = await safeJson<ApiResponse<{ assetId: string }>>(res);
-
-  if (!res.ok || !json || json.ok !== true) {
-    return {
-      ok: false,
-      error: json && json.ok === false ? json.error.message : DEFAULT_ERROR_MESSAGE,
-    };
+  try {
+    const data = await fetchJson<{ assetId: string }>("/api/bookings/upload-reference", {
+      method: "POST",
+      body: formData,
+    });
+    return { ok: true, assetId: data.assetId };
+  } catch (error) {
+    // Размер, тип файла, лимит — отказы сервера дословно.
+    return { ok: false, error: serverMessageOr(error, DEFAULT_ERROR_MESSAGE) };
   }
-
-  return { ok: true, assetId: json.data.assetId };
 }

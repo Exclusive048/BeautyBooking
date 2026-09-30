@@ -4,7 +4,7 @@ import type {
   StudioCabinetServiceOption,
   StudioCabinetShellExtras,
 } from "@/features/studio-cabinet/schedule/server/shell-extras.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioClientRow } from "../lib/types";
 import { ClientTableRow } from "./client-row";
 

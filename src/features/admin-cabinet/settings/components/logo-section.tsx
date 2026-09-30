@@ -1,6 +1,6 @@
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * PERF-25: серверный компонент. Интерактивность целиком в `<AvatarEditor>`

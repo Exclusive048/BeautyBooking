@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.replyForm;
 const E = UI_TEXT.studioCabinet.reviewsV2.toasts;
@@ -32,23 +33,16 @@ export function ReviewReplyForm({ reviewId, onCancel }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, {
+      await fetchJsonWithAuth<unknown>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text: trimmed }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.error);
-        return;
-      }
       setText("");
       onCancel();
       router.refresh();
-    } catch {
-      setError(E.error);
+    } catch (error) {
+      setError(serverMessageOr(error, E.error));
     } finally {
       setSubmitting(false);
     }
@@ -69,7 +63,7 @@ export function ReviewReplyForm({ reviewId, onCancel }: Props) {
       {error ? (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
+          className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger-text"
         >
           {error}
         </div>

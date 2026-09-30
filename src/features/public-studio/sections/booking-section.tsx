@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { studioBookingUrl } from "@/lib/public-urls";
 
 type Props = {
@@ -19,7 +19,7 @@ export async function StudioBookingSection({ studioId, bookingParams }: Props) {
     studio = await getStudioProfile(studioId);
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("booking-section", error, [`/api/providers/${studioId}`]);
+    logPublicStudioBlockError("booking-section", error, ["getProviderProfile"]);
   }
 
   if (hasError) {

@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   ChatPerspective,
   ThreadBookingCardDto,
@@ -42,8 +42,8 @@ export function SystemMessage({ message, perspective, viewerTimezone }: Props) {
   const PillIcon = isCancelled ? XCircle : CheckCircle;
 
   const pillClasses = isCancelled
-    ? "bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300"
-    : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300";
+    ? "bg-muted text-muted-foreground"
+    : "bg-success-surface text-success-text";
 
   return (
     <div className="my-2 flex flex-col items-center gap-2">

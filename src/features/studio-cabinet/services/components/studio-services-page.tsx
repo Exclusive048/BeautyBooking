@@ -61,12 +61,14 @@ export function StudioServicesPage({
           categories={categories}
           selectedCategoryId={selectedCategoryId}
         />
-        <ServicesList
-          items={items}
-          selectedServiceId={detail?.id ?? null}
-          search={search}
-          selectedCategory={selectedCategory}
-        />
+        <div data-guide="assign" className="min-w-0 rounded-2xl">
+          <ServicesList
+            items={items}
+            selectedServiceId={detail?.id ?? null}
+            search={search}
+            selectedCategory={selectedCategory}
+          />
+        </div>
         <div className="min-w-0">
           {detail ? (
             <ServiceDetailPanel

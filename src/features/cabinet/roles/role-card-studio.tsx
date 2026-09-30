@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type StudioActiveData = {
   name: string;
@@ -40,7 +40,7 @@ export function RoleCardStudio(props: Props) {
   if (props.mode === "empty") {
     return (
       <Card className="h-full border-dashed">
-        <CardContent className="flex h-full flex-col justify-between p-5">
+        <CardContent className="flex h-full flex-col justify-between p-5 md:p-5">
           <div className="flex items-center gap-4">
             <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-2xl border border-border-subtle bg-bg-input text-3xl text-text-sec">
               +
@@ -75,7 +75,7 @@ export function RoleCardStudio(props: Props) {
   if (props.mode === "upsell") {
     return (
       <Card className="h-full opacity-70">
-        <CardContent className="flex h-full flex-col justify-between p-5">
+        <CardContent className="flex h-full flex-col justify-between p-5 md:p-5">
           <div className="flex items-center gap-4">
             <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-2xl border border-border-subtle bg-bg-input text-3xl text-text-sec">
               +
@@ -125,7 +125,7 @@ export function RoleCardStudio(props: Props) {
 
   return (
     <Card className="h-full">
-      <CardContent className="flex h-full flex-col justify-between p-5">
+      <CardContent className="flex h-full flex-col justify-between p-5 md:p-5">
         <div className="flex items-center gap-4">
           <div className="h-[60px] w-[60px] shrink-0 overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             {data.logoUrl ? (
@@ -150,7 +150,7 @@ export function RoleCardStudio(props: Props) {
                 <span
                   className={cn(
                     "h-2 w-2 rounded-full",
-                    isPublished ? "bg-emerald-400" : "bg-border-subtle"
+                    isPublished ? "bg-success" : "bg-border-subtle"
                   )}
                 />
                 <span className="truncate">{statusMetric}</span>
@@ -178,7 +178,7 @@ export function RoleCardStudio(props: Props) {
               variant="ghost"
               size="none"
               onClick={props.onDelete}
-              className="mt-4 text-xs text-text-sec underline-offset-2 hover:text-red-500 hover:underline"
+              className="mt-4 text-xs text-text-sec underline-offset-2 hover:text-danger-text hover:underline"
             >
               {UI_TEXT.cabinetRoles.studio.deleteRole}
             </Button>

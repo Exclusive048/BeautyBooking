@@ -139,14 +139,14 @@ describe("FIX-C5 · детектор семьи выводится по импо
 });
 
 describe("LOGIC-06 · владелец блока определяется одинаково", () => {
-  it("модель-оффер использует ту же формулу, что `ensureNoConflicts`", () => {
+  it("модель-оффер проверяет закрытое время самой `ensureNoConflicts`", () => {
     const route = read("src/app/api/model-applications/[applicationId]/confirm/route.ts");
     const core = read("src/lib/bookings/booking-core.ts");
-    // `masterProviderId ?? providerId` — расхождение здесь означало бы, что
-    // один и тот же блок для двух путей принадлежит разным мастерам
+    // `masterProviderId ?? providerId` — расхождение означало бы, что один и тот
+    // же блок для двух путей принадлежит разным мастерам. С 29.09 доработки · 14
+    // своей копии формулы у маршрута нет: он зовёт общую проверку.
     expect(core).toMatch(/masterProviderId:\s*input\.masterProviderId \?\? input\.providerId/);
-    expect(route).toMatch(
-      /masterProviderId:\s*application\.offer\.masterId \?\? offerService\.providerId/,
-    );
+    expect(route).toContain("ensureNoConflicts(");
+    expect(route).not.toContain("assertNoTimeBlockConflict(");
   });
 });

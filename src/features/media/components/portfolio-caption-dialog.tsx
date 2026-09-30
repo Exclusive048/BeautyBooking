@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Select } from "@/components/ui/select";
 import type { StudioPortfolioAttributionData } from "@/lib/studios/portfolio-items";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type PortfolioCaptionValue = {
   performerId: string | null;

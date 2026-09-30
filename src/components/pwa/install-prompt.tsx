@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/hooks/use-me";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { isProduction } from "@/lib/env.client";
 import { promptPwaInstall } from "@/lib/pwa/install-state";
 import { usePwaInstall } from "@/lib/pwa/use-pwa-install";
@@ -55,7 +56,6 @@ export function PWAInstallPrompt() {
   const install = usePwaInstall();
   const [visible, setVisible] = useState(false);
   const ios = install.platform === "ios";
-  const reduce = useReducedMotion();
 
   // Show banner once user is authenticated and conditions are met
   useEffect(() => {
@@ -83,13 +83,13 @@ export function PWAInstallPrompt() {
   return (
     <AnimatePresence>
       {visible ? (
-        <motion.div
+        <m.div
           key="install-banner"
-          initial={reduce ? false : { y: 80, opacity: 0 }}
-          animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1 }}
-          exit={reduce ? { opacity: 0 } : { y: 80, opacity: 0 }}
-          transition={reduce ? { duration: 0 } : { type: "spring", damping: 28, stiffness: 320 }}
-          className="fixed bottom-20 left-3 right-3 z-[46] lg:bottom-6 lg:left-auto lg:right-5 lg:w-80"
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "100%", opacity: 0, transition: MOTION.exit }}
+          transition={SPRING_SHEET}
+          className="fixed bottom-20 left-3 right-3 z-prompt lg:bottom-6 lg:left-auto lg:right-5 lg:w-80"
         >
           <div className="rounded-2xl border border-border-subtle bg-bg-card px-4 py-3.5 shadow-card backdrop-blur-sm">
             <div className="flex items-start gap-3">
@@ -136,7 +136,7 @@ export function PWAInstallPrompt() {
               </div>
             ) : null}
           </div>
-        </motion.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

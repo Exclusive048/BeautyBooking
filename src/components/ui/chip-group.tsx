@@ -20,6 +20,9 @@ type Props<T> = {
  * across the Rules and Visibility tabs (booking-window choices, slot
  * precision, cancellation hours, etc.). Supports any value type — keys
  * the buttons by `String(value)`, so values must serialise unambiguously.
+ *
+ * 29.09 доработки · 22: перенесён из `features/master/.../schedule-settings`
+ * в общие компоненты — его импортирует и студия (окно «График по очереди»).
  */
 export function ChipGroup<T>({ value, onChange, options, size = "md", disabled = false }: Props<T>) {
   return (

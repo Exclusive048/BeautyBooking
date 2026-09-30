@@ -17,10 +17,14 @@ type Props = {
  * and `scroll-mt-24` consistent so the SectionNav anchor jumps land just
  * below the sticky page header.
  */
+/** SETUP-GUIDE-01: какие разделы подсвечивает подсказка «Первых шагов». */
+const GUIDE_BY_ANCHOR: Partial<Record<string, string>> = { header: "profile", location: "address" };
+
 export function SectionShell({ anchor, icon: Icon, title, subtitle, actions, children }: Props) {
   return (
     <section
       id={`profile-${anchor}`}
+      data-guide={GUIDE_BY_ANCHOR[anchor]}
       className="scroll-mt-24 rounded-2xl border border-border-subtle bg-bg-card p-5"
     >
       <header className="flex flex-wrap items-start justify-between gap-3">

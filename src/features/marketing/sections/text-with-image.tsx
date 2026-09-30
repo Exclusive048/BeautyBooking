@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { DISTANCE, MOTION, VIEWPORT_ONCE } from "@/lib/ui/motion";
 
 type Props = {
   eyebrow?: string;
@@ -13,8 +14,6 @@ type Props = {
   imagePosition?: "left" | "right";
 };
 
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
-
 export function TextWithImage({
   eyebrow,
   title,
@@ -22,10 +21,9 @@ export function TextWithImage({
   image,
   imagePosition = "right",
 }: Props) {
-  const reduce = useReducedMotion();
-  const initial = reduce ? undefined : { opacity: 0, y: 18 };
-  const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
-  const transition = reduce ? undefined : { duration: 0.5, ease: EASE };
+  const initial = { opacity: 0, y: DISTANCE.rise };
+  const whileInView = { opacity: 1, y: 0 };
+  const transition = MOTION.section;
 
   // No image → single centered column. With image → 2-col split with optional flip.
   const hasImage = Boolean(image);
@@ -42,10 +40,10 @@ export function TextWithImage({
               : "mx-auto max-w-3xl"
           }
         >
-          <motion.div
+          <m.div
             initial={initial}
             whileInView={whileInView}
-            viewport={{ once: true, margin: "-80px" }}
+            viewport={VIEWPORT_ONCE}
             transition={transition}
             className={hasImage && imagePosition === "left" ? "lg:col-start-2" : ""}
           >
@@ -62,17 +60,17 @@ export function TextWithImage({
                 {p}
               </p>
             ))}
-          </motion.div>
+          </m.div>
           {hasImage ? (
-            <motion.div
+            <m.div
               initial={initial}
               whileInView={whileInView}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={reduce ? undefined : { duration: 0.5, ease: EASE, delay: 0.08 }}
+              viewport={VIEWPORT_ONCE}
+              transition={{ ...MOTION.section, delay: 0.08 }}
               className={imagePosition === "left" ? "lg:col-start-1" : ""}
             >
               {image}
-            </motion.div>
+            </m.div>
           ) : null}
         </div>
       </div>

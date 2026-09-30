@@ -5,8 +5,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ChipButton } from "@/components/ui/chip-button";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.reject;
 
@@ -62,21 +63,17 @@ export function RejectApplicationModal({ open, onClose, applicationId, clientNam
         customNeeded
           ? customText.trim()
           : REASONS.find((row) => row.code === code)?.label ?? "";
-      const response = await fetch(`/api/master/model-applications/${applicationId}/reject`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/model-applications/${applicationId}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
       });
-      if (!response.ok) {
-        setError(T.errorReject);
-        return;
-      }
       setCode(null);
       setCustomText("");
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorReject);
+    } catch (error) {
+      setError(serverMessageOr(error, T.errorReject));
     } finally {
       setSaving(false);
     }
@@ -94,20 +91,13 @@ export function RejectApplicationModal({ open, onClose, applicationId, clientNam
           {REASONS.map((reason) => {
             const active = code === reason.code;
             return (
-              <button
+              <ChipButton
                 key={reason.code}
-                type="button"
+                active={active}
                 onClick={() => setCode(reason.code)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-sm transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                  active
-                    ? "bg-primary text-white shadow-card"
-                    : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40"
-                )}
               >
                 {reason.label}
-              </button>
+              </ChipButton>
             );
           })}
         </div>
@@ -130,7 +120,7 @@ export function RejectApplicationModal({ open, onClose, applicationId, clientNam
       {error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+          className="mt-4 rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
         >
           {error}
         </p>

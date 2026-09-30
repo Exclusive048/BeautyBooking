@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { EventsFeedItem } from "@/features/admin-cabinet/dashboard/components/events-feed-item";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminEventItem,
   AdminEventsResponse,
@@ -40,7 +41,6 @@ export function EventsFeed({ initial }: Props) {
   // выполняет его следом, а у опроса значение — «сейчас», и отложенный тик
   // сразу после предыдущего это тот же лишний запрос.
   const inFlight = useRef(false);
-  const reduce = useReducedMotion();
 
   const latestMs = items.length > 0 ? items[0]!.timeMs : 0;
 
@@ -117,15 +117,15 @@ export function EventsFeed({ initial }: Props) {
         <ul className="flex flex-col">
           <AnimatePresence initial={false}>
             {items.map((event) => (
-              <motion.div
+              <m.div
                 key={event.id}
-                initial={reduce ? false : { opacity: 0, y: -8 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-                transition={reduce ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                initial={{ opacity: 0, y: -DISTANCE.nudge }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={MOTION.base}
               >
                 <EventsFeedItem event={event} />
-              </motion.div>
+              </m.div>
             ))}
           </AnimatePresence>
         </ul>
@@ -139,7 +139,7 @@ function LiveBadge() {
     <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
       <span
         aria-hidden
-        className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
+        className="h-1.5 w-1.5 animate-pulse rounded-full bg-success"
       />
       {T.liveBadge(POLL_MS / 1000)}
     </span>

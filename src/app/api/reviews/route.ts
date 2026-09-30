@@ -1,12 +1,10 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
-import { invalidateReviewSummaryCache } from "@/lib/ai/review-summary";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { createReviewSchema, listReviewsQuerySchema } from "@/lib/reviews/schemas";
 import { createReview, listReviews } from "@/lib/reviews/service";
-import { loadReviewWithRelations, notifyReviewLeft } from "@/lib/notifications/review-notifications";
-import { decodePublicId } from "@/lib/public-id";
+import { afterReviewCreated } from "@/lib/reviews/after-create";
 import { parseBody, parseQuery } from "@/lib/validation";
 import type { ApiFieldErrors } from "@/lib/api/contracts";
 
@@ -70,23 +68,7 @@ export async function POST(req: Request) {
       publicTagIds: body.publicTagIds,
       privateTagIds: body.privateTagIds,
     });
-    try {
-      // R2-06-E (FIX-18 tail): `review.id` from createReview is the opaque
-      // public token; decode it before the raw `findFirst` lookup (raw cuids
-      // pass through) so the REVIEW_LEFT notification actually fires — it was
-      // silently a no-op because the encoded id never matched a raw row.
-      const fullReview = await loadReviewWithRelations(decodePublicId(review.id));
-      if (fullReview) {
-        await notifyReviewLeft(fullReview);
-      }
-    } catch (error) {
-      logError("POST /api/reviews notification failed", {
-        requestId: getRequestId(req),
-        route: "POST /api/reviews",
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-    }
-    void invalidateReviewSummaryCache(review.targetId);
+    await afterReviewCreated(review, { requestId: getRequestId(req), route: "POST /api/reviews" });
     return jsonOk({ review }, { status: 201 });
   } catch (error) {
     const appError = toAppError(error);

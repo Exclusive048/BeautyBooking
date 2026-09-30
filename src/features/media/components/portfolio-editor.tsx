@@ -4,20 +4,22 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { Pencil, Star, Tag, Trash2 } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
-import type { ApiResponse } from "@/lib/types/api";
 import type { MediaAssetDto } from "@/lib/media/types";
 import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { Button } from "@/components/ui/button";
+import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { cn } from "@/lib/cn";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioPortfolioAttributionData } from "@/lib/studios/portfolio-items";
 import { formatWorkCaption } from "@/lib/feed/work-caption";
 import {
   PortfolioCaptionDialog,
   type PortfolioCaptionValue,
 } from "./portfolio-caption-dialog";
+import { FileInput } from "@/components/ui/file-input";
 
 type Props = {
   entityType: MediaEntityType;
@@ -90,30 +92,22 @@ export function PortfolioEditor({
   const loadAttribution = useCallback(async () => {
     if (!captionsEnabled) return;
     try {
-      const res = await fetch(`/api/studios/${encodeURIComponent(entityId)}/portfolio`, {
+      const result = await fetchJsonWithAuth<StudioPortfolioAttributionData>(`/api/studios/${encodeURIComponent(entityId)}/portfolio`, {
         cache: "no-store",
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<StudioPortfolioAttributionData> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : mediaText.captionLoadFailed);
-      }
-      setAttribution(json.data);
+      setAttribution(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : mediaText.captionLoadFailed);
+      setError(serverMessageOr(e, mediaText.captionLoadFailed));
     }
   }, [captionsEnabled, entityId, mediaText.captionLoadFailed]);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(buildListUrl(entityType, entityId), { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ assets: MediaAssetDto[] }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : mediaText.loadFailed);
-      }
-      setAssets(json.data.assets);
+      const result = await fetchJsonWithAuth<{ assets: MediaAssetDto[] }>(buildListUrl(entityType, entityId), { cache: "no-store" });
+      setAssets(result.assets);
     } catch (e) {
-      setError(e instanceof Error ? e.message : mediaText.loadFailed);
+      setError(serverMessageOr(e, mediaText.loadFailed));
       return;
     }
     await loadAttribution();
@@ -139,19 +133,15 @@ export function PortfolioEditor({
         if (replaceAssetId) form.set("replaceAssetId", replaceAssetId);
         form.set("file", file);
 
-        const res = await fetch("/api/media", { method: "POST", body: form });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ asset: MediaAssetDto }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : mediaText.uploadFailed);
-        }
+        const result = await fetchJsonWithAuth<{ asset: MediaAssetDto }>("/api/media", { method: "POST", body: form });
         await load();
         // Новое фото студии — сразу спросить, кто и что делал (замена
         // сохраняет прежнюю подпись, поэтому для неё не спрашиваем).
         if (captionsEnabled && !replaceAssetId) {
-          setCaptionAssetId(json.data.asset.id);
+          setCaptionAssetId(result.asset.id);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : mediaText.uploadFailed);
+        setError(serverMessageOr(e, mediaText.uploadFailed));
       } finally {
         setBusy(false);
       }
@@ -161,18 +151,19 @@ export function PortfolioEditor({
 
   const saveCaption = useCallback(
     async (assetId: string, value: PortfolioCaptionValue) => {
-      const res = await fetch(
-        `/api/studios/${encodeURIComponent(entityId)}/portfolio/${encodeURIComponent(assetId)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(value),
-        },
-      );
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        // FormDialog покажет сообщение и оставит диалог открытым.
-        throw new Error(json && !json.ok ? json.error.message : mediaText.captionSaveFailed);
+      try {
+        await fetchJsonWithAuth<unknown>(
+          `/api/studios/${encodeURIComponent(entityId)}/portfolio/${encodeURIComponent(assetId)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(value),
+          },
+        );
+      } catch (error) {
+        // FormDialog покажет `message` и оставит диалог открытым — поэтому
+        // решение «серверная или своя» принимается здесь.
+        throw new Error(serverMessageOr(error, mediaText.captionSaveFailed));
       }
       setCaptionAssetId(null);
       await loadAttribution();
@@ -196,14 +187,10 @@ export function PortfolioEditor({
       setBusy(true);
       setError(null);
       try {
-        const res = await fetch(`/api/media/${id}`, { method: "DELETE" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ result: { id: string } }> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : mediaText.deleteFailed);
-        }
+        await fetchJsonWithAuth<{ result: { id: string } }>(`/api/media/${id}`, { method: "DELETE" });
         await load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : mediaText.deleteFailed);
+        setError(serverMessageOr(e, mediaText.deleteFailed));
       } finally {
         setBusy(false);
       }
@@ -216,18 +203,14 @@ export function PortfolioEditor({
       setBusy(true);
       setError(null);
       try {
-        const res = await fetch(`/api/studios/${encodeURIComponent(entityId)}`, {
+        await fetchJsonWithAuth<unknown>(`/api/studios/${encodeURIComponent(entityId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ catalogCoverAssetId: id }),
         });
-        const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : mediaText.makeCoverFailed);
-        }
         setCoverId(id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : mediaText.makeCoverFailed);
+        setError(serverMessageOr(e, mediaText.makeCoverFailed));
       } finally {
         setBusy(false);
       }
@@ -279,7 +262,7 @@ export function PortfolioEditor({
           >
             {limitReached ? mediaText.limitReached : mediaText.addPhoto}
           </Button>
-          <div className={`text-xs ${limitWarning ? "text-amber-600" : "text-text-sec"}`}>
+          <div className={`text-xs ${limitWarning ? "text-warning-text" : "text-text-sec"}`}>
             {limitLabel}
           </div>
         </div>
@@ -307,9 +290,13 @@ export function PortfolioEditor({
             }
           }}
         >
-          <div className="text-sm font-medium text-text-main">{portfolioText.dropTitle}</div>
-          <div className="mt-1 text-xs text-text-sec">
+          {/* На тач-экране перетаскивать нечем — там просто «Выбрать фото». */}
+          <div className="text-sm font-medium text-text-main [@media(pointer:coarse)]:hidden">{portfolioText.dropTitle}</div>
+          <div className="mt-1 text-xs text-text-sec [@media(pointer:coarse)]:hidden">
             {portfolioText.dropSubtitle} {busy ? portfolioText.uploadingSuffix : ""}
+          </div>
+          <div className="hidden text-sm font-medium text-text-main [@media(pointer:coarse)]:block">
+            {portfolioText.pickTitle} {busy ? portfolioText.uploadingSuffix : ""}
           </div>
         </div>
       ) : null}
@@ -376,38 +363,35 @@ export function PortfolioEditor({
               </Button>
             ) : null}
 
+            {/* Видны всегда: только при наведении на телефоне их не было видно
+                вовсе (правила для тач-экранов не было). Столбиком — слева сверху
+                значок «Главное фото», снизу полоса подписи. */}
             {canEdit ? (
-              <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                <Button
-                  variant="ghost"
-                  size="none"
+              <div className="absolute right-0 top-0 flex flex-col">
+                <PhotoActionButton
+                  label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
                   onClick={() => {
                     setReplaceTargetId(asset.id);
                     replaceInputRef.current?.click();
                   }}
-                  aria-label={mediaText.replacePhotoAria}
                   disabled={busy}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="none"
+                  <Pencil className="h-4 w-4" aria-hidden />
+                </PhotoActionButton>
+                <PhotoActionButton
+                  label={`${mediaText.removePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
                   onClick={() => void remove(asset.id)}
-                  aria-label={mediaText.removePhotoAria}
                   disabled={busy}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                </PhotoActionButton>
               </div>
             ) : null}
           </div>
         ))}
       </div>
 
-      {error ? <div className="text-xs text-red-600">{error}</div> : null}
+      {error ? <div className="text-xs text-danger-text">{error}</div> : null}
 
       {captionsEnabled && attribution && captionAssetId ? (
         <PortfolioCaptionDialog
@@ -428,7 +412,7 @@ export function PortfolioEditor({
           aria-modal="true"
           aria-label={mediaText.closePreviewAria}
           tabIndex={-1}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-modal flex items-center justify-center bg-black/70 p-4"
         >
           <Button variant="wrapper" className="absolute inset-0" onClick={closePreview} aria-label={mediaText.closePreviewAria} />
           <div className="relative h-[90vh] w-[90vw]">
@@ -444,11 +428,9 @@ export function PortfolioEditor({
         </div>
       ) : null}
 
-      <input
+      <FileInput
         ref={addInputRef}
-        type="file"
         accept="image/jpeg,image/png,image/webp"
-        className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) {
@@ -458,11 +440,9 @@ export function PortfolioEditor({
         }}
       />
 
-      <input
+      <FileInput
         ref={replaceInputRef}
-        type="file"
         accept="image/jpeg,image/png,image/webp"
-        className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file && replaceTargetId) {

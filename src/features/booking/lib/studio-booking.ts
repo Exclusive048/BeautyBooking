@@ -1,9 +1,9 @@
-import type { ApiResponse } from "@/lib/types/api";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
 import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
 
 export type StudioMaster = {
   id: string;
@@ -37,6 +37,11 @@ export type StudioMaster = {
   // treated as 0 (the pre-fix behavior — never stricter than the validator
   // for different-master pairs).
   bufferMin?: number;
+  /**
+   * 29.09 доработки · 03: сколько дней вперёд у мастера видны окошки
+   * (`publicBookingHorizonDays`). Нет — ограничивает только студия.
+   */
+  bookingHorizonDays?: number;
 };
 
 /**
@@ -107,8 +112,6 @@ export type MastersResult =
   | { ok: true; masters: StudioMaster[] }
   | { ok: false; error: string };
 
-export const STUDIO_BOOKING_DAYS_AHEAD = 60;
-
 /**
  * LOGIC-26 — tz-источник этих ключей: **salon-tz** (rule 17).
  *
@@ -136,7 +139,7 @@ function isValidDateKey(dateKey: string): boolean {
 export function buildDateBounds(
   base: Date,
   timeZone: string,
-  daysAhead: number = STUDIO_BOOKING_DAYS_AHEAD
+  daysAhead: number
 ) {
   const min = toLocalDateKey(base, timeZone);
   return { min, max: addDaysToDateKey(min, daysAhead) };
@@ -167,50 +170,29 @@ export function buildDayOptions(
   return out;
 }
 
-async function safeJson<T>(res: Response) {
-  return (await res.json().catch(() => null)) as T | null;
-}
+const TS = UI_TEXT.publicStudio;
 
 export async function fetchStudioProfile(studioId: string): Promise<StudioProfileResult> {
-  const res = await fetch(`/api/providers/${studioId}`, { cache: "no-store" });
-  const json = await safeJson<ApiResponse<{ provider: ProviderProfileDto | null }>>(res);
-
-  if (!res.ok) {
-    return { ok: false, error: DEFAULT_ERROR_MESSAGE };
+  try {
+    const data = await fetchJson<{ provider: ProviderProfileDto | null }>(`/api/providers/${studioId}`, {
+      cache: "no-store",
+    });
+    if (!data.provider) return { ok: false, error: TS.profileLoadFailed };
+    return { ok: true, provider: data.provider };
+  } catch (error) {
+    return { ok: false, error: serverMessageOr(error, TS.profileLoadFailed) };
   }
-
-  if (!json) {
-    return { ok: false, error: "Не удалось загрузить студию" };
-  }
-
-  if (json.ok !== true) {
-    return { ok: false, error: json.error.message ?? "Не удалось загрузить студию" };
-  }
-
-  if (!json.data.provider) {
-    return { ok: false, error: "Не удалось загрузить студию" };
-  }
-
-  return { ok: true, provider: json.data.provider };
 }
 
 export async function fetchStudioMasters(studioId: string): Promise<MastersResult> {
-  const res = await fetch(`/api/providers/${studioId}/masters`, { cache: "no-store" });
-  const json = await safeJson<ApiResponse<{ masters: StudioMaster[] }>>(res);
-
-  if (!res.ok) {
-    return { ok: false, error: DEFAULT_ERROR_MESSAGE };
+  try {
+    const data = await fetchJson<{ masters: StudioMaster[] }>(`/api/providers/${studioId}/masters`, {
+      cache: "no-store",
+    });
+    return { ok: true, masters: data.masters ?? [] };
+  } catch (error) {
+    return { ok: false, error: serverMessageOr(error, TS.mastersLoadFailed) };
   }
-
-  if (!json) {
-    return { ok: false, error: "Не удалось загрузить мастеров" };
-  }
-
-  if (json.ok !== true) {
-    return { ok: false, error: json.error.message ?? "Не удалось загрузить мастеров" };
-  }
-
-  return { ok: true, masters: json.data.masters ?? [] };
 }
 
 export async function fetchMasterAvailability(
@@ -219,7 +201,7 @@ export async function fetchMasterAvailability(
   dateKey: string
 ): Promise<AvailabilityResult> {
   if (!isValidDateKey(dateKey)) {
-    return { ok: false, error: "Не удалось открыть этот день. Выберите другой.", code: "DATE_INVALID" };
+    return { ok: false, error: TS.dateInvalid, code: "DATE_INVALID" };
   }
 
   const url = new URL(`/api/masters/${masterId}/availability`, window.location.origin);
@@ -227,34 +209,28 @@ export async function fetchMasterAvailability(
   url.searchParams.set("from", dateKey);
   url.searchParams.set("limit", "1");
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  const json = await safeJson<ApiResponse<{ slots: SlotItem[]; meta: { toDateExclusive: string } }>>(res);
-
-  if (!res.ok) {
+  try {
+    const data = await fetchJson<{ slots: SlotItem[]; meta: { toDateExclusive: string } }>(url.toString(), {
+      cache: "no-store",
+    });
+    return { ok: true, slots: data.slots ?? [] };
+  } catch (error) {
     return {
       ok: false,
-      error: "Не удалось загрузить окошки. Попробуйте ещё раз.",
+      error: serverMessageOr(error, TS.slotsLoadFailed),
+      code: error instanceof ApiClientError ? error.code : undefined,
     };
   }
-
-  if (!json) {
-    return { ok: false, error: "Не удалось загрузить окошки" };
-  }
-
-  if (json.ok !== true) {
-    return { ok: false, error: json.error.message ?? "Не удалось загрузить окошки", code: json.error?.code };
-  }
-
-  return { ok: true, slots: json.data.slots ?? [] };
 }
 
 export async function fetchBookingMe() {
-  const res = await fetch("/api/me", { method: "GET" });
-  const json = await safeJson<ApiResponse<{ user: BookingUser | null }>>(res);
-
-  if (!json) return null;
-  if (json.ok !== true) return null;
-  return json.data.user ?? null;
+  // Фон: подставить данные вошедшему; не прочитали — как у гостя.
+  try {
+    const data = await fetchJson<{ user: BookingUser | null }>("/api/me", { method: "GET" });
+    return data.user ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function createBooking(
@@ -266,48 +242,31 @@ export async function createBooking(
    */
   idempotencyKey?: string,
 ): Promise<BookingCreateResult> {
-  const res = await fetch("/api/bookings", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {}),
-    },
-    body: JSON.stringify(input),
-  });
-
-  const json = await safeJson<ApiResponse<{ booking: { id: string }; manageUrl?: string | null }>>(res);
-  const errorCode = json && json.ok !== true ? json.error?.code : undefined;
-
-  if (res.status === 401 && errorCode === "UNAUTHORIZED") {
-    return { ok: false, error: "AUTH_REQUIRED", code: errorCode, status: res.status };
-  }
-
-  if (!res.ok) {
+  try {
+    const data = await fetchJson<{ booking: { id: string }; manageUrl?: string | null }>("/api/bookings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {}),
+      },
+      body: JSON.stringify(input),
+    });
+    return { ok: true, bookingId: data.booking?.id ?? "ok", manageUrl: data.manageUrl ?? null };
+  } catch (error) {
+    // Обрыв сети — как и раньше, наверх: у вызывающего своя ветка про сеть.
+    if (!(error instanceof ApiClientError)) throw error;
+    if (error.status === 401 && error.code === "UNAUTHORIZED") {
+      return { ok: false, error: "AUTH_REQUIRED", code: error.code, status: error.status };
+    }
     // Серверная строка курируемая (AppError): «Укажите телефон», «Это время уже
     // занято», «Запись возможна не раньше чем за N ч» — на каждую из них
     // пользователь может отреагировать, а общий канон «попробуйте ещё раз»
     // для них прямо неверен (повтор даст тот же отказ).
-    const serverMessage = json && json.ok !== true ? json.error?.message : undefined;
     return {
       ok: false,
-      error: serverMessage || "Не удалось создать запись. Попробуйте ещё раз.",
-      code: errorCode,
-      status: res.status,
+      error: serverMessageOr(error, TS.bookingError),
+      code: error.code,
+      status: error.status,
     };
   }
-
-  if (!json) {
-    return { ok: false, error: "Не удалось создать запись", status: res.status };
-  }
-
-  if (json.ok !== true) {
-    return {
-      ok: false,
-      error: json.error.message ?? "Не удалось создать запись",
-      code: json.error?.code,
-      status: res.status,
-    };
-  }
-
-  return { ok: true, bookingId: json.data.booking?.id ?? "ok", manageUrl: json.data.manageUrl ?? null };
 }

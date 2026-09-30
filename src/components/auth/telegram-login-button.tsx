@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { withConsentQuery, type SocialConsent } from "@/components/auth/social-consent";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { clientEnv } from "@/lib/env.client";
 
 type TelegramLoginButtonProps = {
@@ -79,22 +80,19 @@ export default function TelegramLoginButton({
     void (async () => {
       let authUrl = "/api/auth/telegram/login";
       try {
-        const res = await fetch(withConsentQuery("/api/auth/telegram/login-init", consentQuery ? { granted: true, query: consentQuery } : undefined), {
-          method: "GET",
-          credentials: "same-origin",
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const payload = (await res.json().catch(() => null)) as
-            | { data?: { state?: string } }
-            | null;
-          const state = payload?.data?.state;
-          if (state) {
-            authUrl = `/api/auth/telegram/login?s=${encodeURIComponent(state)}`;
-          }
+        const payload = await fetchJson<{ state?: string }>(
+          withConsentQuery(
+            "/api/auth/telegram/login-init",
+            consentQuery ? { granted: true, query: consentQuery } : undefined,
+          ),
+          { method: "GET", credentials: "same-origin", cache: "no-store" },
+        );
+        if (payload?.state) {
+          authUrl = `/api/auth/telegram/login?s=${encodeURIComponent(payload.state)}`;
         }
       } catch {
-        // Network error — leave authUrl without a nonce (the GET will reject).
+        // Отказ или обрыв сети — authUrl остаётся без nonce, и GET откажет
+        // (fail-closed); причину скажет сам вход.
       }
       if (cancelled) return;
 

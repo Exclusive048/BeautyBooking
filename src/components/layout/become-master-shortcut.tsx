@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BECOME_MASTER_HREF } from "@/lib/auth/available-cabinets";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * NAV-BECOME-MASTER-01 — «Стать мастером» у клиента без кабинета, в слоте
@@ -10,8 +10,8 @@ import { UI_TEXT } from "@/lib/ui/text";
  * (`shouldOfferBecomeMaster` + отсутствие ярлыков) — здесь только вид.
  *
  * Высота 40px — как у ярлыков и соседних иконок шапки; `size="none"` + свои
- * `h-10 px-4`, а не `size="sm"` с перебиванием `h-9`: `cn` — плоский join, и
- * победитель конфликта `h-*` зависел бы от порядка правил в бандле.
+ * `h-10 px-4`: размер задан целиком здесь, а не перебиванием `h-9` у
+ * `size="sm"` (так было надёжно и при плоском `cn`, до tailwind-merge).
  */
 export function BecomeMasterShortcut() {
   return (

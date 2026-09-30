@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   open: boolean;
@@ -52,7 +52,7 @@ export function DeleteCabinetModal({
             type="text"
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            className="mt-2 focus:ring-2 focus:ring-red-500/30"
+            className="mt-2 focus:ring-2 focus:ring-destructive/30"
             placeholder={CONFIRM_KEYWORD}
           />
         </label>

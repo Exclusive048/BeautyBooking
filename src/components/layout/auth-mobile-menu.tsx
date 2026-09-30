@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useRef, useState } from "react";
+import { AnimatePresence, m } from "framer-motion";
 import { Menu, X, Scissors, Building2, ChevronRight } from "lucide-react";
+import { AnchoredPortal } from "@/components/ui/anchored-portal";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import type { CabinetKind } from "@/lib/auth/available-cabinets";
 import { BECOME_MASTER_HREF, hasProfessionalCabinet } from "@/lib/auth/available-cabinets";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
 type WorkspaceMenuLink = {
@@ -107,33 +109,9 @@ export function AuthMobileMenu({
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const reduce = useReducedMotion();
   const professionalLabel = hasProfessionalCabinet(availableCabinets)
     ? UI_TEXT.nav.professionalRoles
     : UI_TEXT.nav.becomeMaster;
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (!rootRef.current?.contains(target)) {
-        setOpen(false);
-      }
-    };
-
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onEscape);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onEscape);
-    };
-  }, [open]);
 
   const closeMenu = () => setOpen(false);
 
@@ -149,39 +127,42 @@ export function AuthMobileMenu({
       >
         <AnimatePresence mode="wait" initial={false}>
           {open ? (
-            <motion.span
+            <m.span
               key="close"
-              initial={reduce ? false : { opacity: 0, rotate: -90 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1, rotate: 0 }}
-              exit={reduce ? { opacity: 0 } : { opacity: 0, rotate: 90 }}
-              transition={reduce ? { duration: 0 } : { duration: 0.15 }}
+              initial={{ opacity: 0, rotate: -90 }}
+              animate={{ opacity: 1, rotate: 0 }}
+              exit={{ opacity: 0, rotate: 90 }}
+              transition={MOTION.micro}
               className="flex items-center justify-center"
             >
               <X className="h-5 w-5" aria-hidden />
-            </motion.span>
+            </m.span>
           ) : (
-            <motion.span
+            <m.span
               key="open"
-              initial={reduce ? false : { opacity: 0, rotate: 90 }}
-              animate={reduce ? { opacity: 1 } : { opacity: 1, rotate: 0 }}
-              exit={reduce ? { opacity: 0 } : { opacity: 0, rotate: -90 }}
-              transition={reduce ? { duration: 0 } : { duration: 0.15 }}
+              initial={{ opacity: 0, rotate: 90 }}
+              animate={{ opacity: 1, rotate: 0 }}
+              exit={{ opacity: 0, rotate: -90 }}
+              transition={MOTION.micro}
               className="flex items-center justify-center"
             >
               <Menu className="h-5 w-5" aria-hidden />
-            </motion.span>
+            </m.span>
           )}
         </AnimatePresence>
       </Button>
 
+      {/* 29.09 доработки · 21: меню — порталом (`z-popover`), как меню
+          пользователя: внутри шапки оно уходило под нижнюю навигацию. */}
+      <AnchoredPortal open={open} anchorRef={rootRef} onDismiss={closeMenu} align="end">
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={reduce ? false : { opacity: 0, scale: 0.95, y: -8 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -8 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute right-0 z-[100] mt-2 w-[min(88vw,320px)] rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
+          <m.div
+            initial={{ opacity: 0, scale: 0.95, y: -DISTANCE.nudge }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -DISTANCE.nudge, transition: MOTION.exit }}
+            transition={MOTION.micro}
+            className="w-[min(88vw,320px)] rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
           >
             {!isGuest && (
               <div className="rounded-2xl bg-bg-input px-3 py-2">
@@ -241,7 +222,7 @@ export function AuthMobileMenu({
                 {/* AUTH-GATE-01: no login method available → no «Вход» CTA. */}
                 {authEnabled ? (
                   <Button asChild className="w-full" size="sm">
-                    <Link href="/login" onClick={closeMenu}>{UI_TEXT.auth.login}</Link>
+                    <Link href="/login" onClick={closeMenu}>{UI_TEXT.nav.login}</Link>
                   </Button>
                 ) : null}
                 <Button asChild variant="secondary" className="w-full" size="sm">
@@ -299,9 +280,10 @@ export function AuthMobileMenu({
                 </div>
               </>
             )}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
+      </AnchoredPortal>
     </div>
   );
 }

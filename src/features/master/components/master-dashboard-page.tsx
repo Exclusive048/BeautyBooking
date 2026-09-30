@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2 } from "lucide-react";
 import { env } from "@/lib/env";
@@ -10,12 +11,18 @@ import { UpcomingBookingsSection } from "@/features/master/components/dashboard/
 import { NewBookingButton } from "@/features/master/components/manual-booking/new-booking-button";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
+import { Button } from "@/components/ui/button";
 import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
+import { SetupGuideCard } from "@/features/cabinet/setup-guide/setup-guide-card";
+import { loadMasterSetupGuide } from "@/lib/onboarding/setup-guide";
 import { getSessionUser, getSessionUserId } from "@/lib/auth/session";
 import { getCurrentMasterProviderId, getMasterWorkProfiles } from "@/lib/master/access";
 import { getMasterDashboardData } from "@/lib/master/dashboard.service";
+import { isScheduleEndingSoon } from "@/lib/schedule/calendar-shared";
+import { loadSchedulePlan } from "@/lib/schedule/patterns";
 import { getDayOfWeek } from "@/lib/schedule/timezone";
-import { UI_TEXT } from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * Master cabinet dashboard — `/cabinet/master/dashboard`.
@@ -47,7 +54,14 @@ export async function MasterDashboardPage() {
   // The sidebar still surfaces it via the layout's own `getUnreadBadgeCount`.
   // STUDIO-MASTER-PROFILES (этап 4): рабочие списки — по всем профилям мастера.
   const workProfiles = await getMasterWorkProfiles(userId);
-  const data = await getMasterDashboardData({ masterId, workProfiles });
+  const [data, schedulePlan, setupGuide] = await Promise.all([
+    getMasterDashboardData({ masterId, workProfiles }),
+    // SCHEDULE-PATTERNS-01 (этап 3): плашка «расписание скоро закончится».
+    loadSchedulePlan(masterId),
+    // SETUP-GUIDE-01: «Первые шаги» — пока кабинет не настроен до конца.
+    loadMasterSetupGuide(userId),
+  ]);
+  const scheduleEndsOn = isScheduleEndingSoon(schedulePlan) ? schedulePlan.configuredUntil : null;
 
   const firstName =
     sessionUser.firstName?.trim() ||
@@ -117,6 +131,24 @@ export async function MasterDashboardPage() {
             </span>
           </div>
         ) : null}
+
+        {scheduleEndsOn ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-warning-border bg-warning-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-warning-text">
+              {UI_TEXT.cabinetMaster.scheduleSettings.plan.endingSoonHint(
+                // Дата-ключ салона — календарная дата без пояса: подпись в UTC полудня.
+                UI_FMT.dateShort(`${scheduleEndsOn}T12:00:00.000Z`, { timeZone: "UTC" }),
+              )}
+            </p>
+            <Button asChild variant="secondary" size="sm" className="shrink-0 rounded-xl">
+              <Link href="/cabinet/master/schedule/settings">
+                {UI_TEXT.cabinetMaster.scheduleSettings.plan.endingCta}
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+
+        {setupGuide && !setupGuide.hidden ? <SetupGuideCard guide={setupGuide} /> : null}
 
         <GreetingHero
           firstName={firstName}

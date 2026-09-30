@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type Crumb = {
   label: string;
@@ -55,7 +55,7 @@ export function MasterPageHeader({
   actionsInline = false,
 }: Props) {
   return (
-    <header className="z-20 border-b border-border-subtle bg-bg-page/85 px-4 py-3 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
+    <header className="z-sticky border-b border-border-subtle bg-bg-page/85 px-4 py-3 backdrop-blur-md md:px-6 lg:sticky lg:top-[var(--topbar-h)] lg:px-8 lg:py-4">
       <div
         className={cn(
           "flex flex-wrap justify-between gap-4",

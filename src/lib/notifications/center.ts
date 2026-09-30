@@ -329,7 +329,11 @@ export async function getNotificationCenterData(input: {
       return {
         id: `schedule-request:${item.id}`,
         title: "Мастер просит изменить график",
-        body: `${masterName} · ${details} · студия ${item.studio?.provider.name ?? "Студия"}`,
+        // 29.09 · 01-а: название в «ёлочках», без слова «студия» — иначе
+        // «студия Студия Ольги».
+        body: [masterName, details, item.studio?.provider.name ? `«${item.studio.provider.name}»` : null]
+          .filter(Boolean)
+          .join(" · "),
         type: "SCHEDULE_REQUEST",
         channel: "STUDIO",
         isRead: false,

@@ -5,7 +5,7 @@ import { Crown } from "lucide-react";
 import { UserAvatar } from "@/features/admin-cabinet/users/components/user-avatar";
 import { UserPlanPill } from "@/features/admin-cabinet/users/components/user-plan-pill";
 import { UserRoleBadge } from "@/features/admin-cabinet/users/components/user-role-badge";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminUserRow } from "@/features/admin-cabinet/users/types";
 
 const T = UI_TEXT.adminPanel.users;

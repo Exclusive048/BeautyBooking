@@ -11,6 +11,8 @@ export type StudioTodayBannerData = {
   mastersOnShift: StudioMasterOnShift[];
   totalMasters: number;
   averageLoadPercent: number;
+  /** Пояс студии: дата «сегодня» в баннере — по нему (salon-tz). */
+  timeZone: string;
 };
 
 export type StudioKpiTile = {

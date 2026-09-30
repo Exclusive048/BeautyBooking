@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
 import type { BreakDto, DayScheduleDto } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { DayActionMenu } from "./hours/day-action-menu";
 import { computeNetHours } from "./hours/lib/compute-hours";
 
@@ -180,21 +180,19 @@ export function WeekdayRow({
                 key={`break-${index}`}
                 className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-bg-input/70 px-2 py-1"
               >
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => setEditingBreakIndex(index)}
                   className="font-mono text-xs text-text-main transition hover:text-accent-text"
                 >
                   {row.start}–{row.end}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button variant="wrapper"
                   onClick={() => removeBreak(index)}
                   aria-label={T.removeBreakAria}
                   className="inline-flex h-4 w-4 items-center justify-center rounded text-text-sec transition hover:bg-bg-page hover:text-text-main"
                 >
                   <X className="h-3 w-3" aria-hidden />
-                </button>
+                </Button>
               </span>
             );
           })}

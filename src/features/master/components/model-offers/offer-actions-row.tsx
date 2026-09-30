@@ -4,12 +4,14 @@ import { Archive, Pencil, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/hooks/use-confirm";
 import type {
   ActiveOfferItem,
   AvailableServiceForOffer,
 } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { EditOfferModal } from "./modals/edit-offer-modal";
 import { pluralize } from "./lib/format";
 
@@ -33,6 +35,7 @@ type Props = {
  */
 export function OfferActionsRow({ offer, services }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { confirm, modal: confirmModal } = useConfirm();
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,14 +66,12 @@ export function OfferActionsRow({ offer, services }: Props) {
     if (!ok) return;
     setBusy(true);
     try {
-      const response = await fetch(`/api/master/model-offers/${offer.id}/close`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/model-offers/${offer.id}/close`, {
         method: "POST",
       });
-      if (!response.ok) {
-        window.alert(T.errorClose);
-        return;
-      }
       router.refresh();
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.errorClose));
     } finally {
       setBusy(false);
     }
@@ -84,16 +85,14 @@ export function OfferActionsRow({ offer, services }: Props) {
     if (!ok) return;
     setBusy(true);
     try {
-      const response = await fetch(`/api/master/model-offers/${offer.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/master/model-offers/${offer.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "ARCHIVED" }),
       });
-      if (!response.ok) {
-        window.alert(T.errorArchive);
-        return;
-      }
       router.refresh();
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.errorArchive));
     } finally {
       setBusy(false);
     }

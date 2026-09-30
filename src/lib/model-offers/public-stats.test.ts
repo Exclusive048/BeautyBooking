@@ -15,6 +15,7 @@ vi.mock("@/lib/redis/connection", () => ({
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn() }));
 
 import { getPublicModelOfferStats } from "@/lib/model-offers/public-stats";
+import { MODEL_OFFER_VISIBLE_MASTER_WHERE } from "@/lib/model-offers/visibility";
 
 describe("getPublicModelOfferStats", () => {
   beforeEach(() => {
@@ -43,7 +44,7 @@ describe("getPublicModelOfferStats", () => {
       AND: [
         { status: "ACTIVE" },
         { dateLocal: { gte: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) } },
-        { master: { isPublished: true, type: "MASTER" } },
+        { master: MODEL_OFFER_VISIBLE_MASTER_WHERE },
       ],
     });
   });

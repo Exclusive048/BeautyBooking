@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { AvailabilitySlotPreview } from "@/lib/search-by-time/types";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { providerPublicUrl, withQuery } from "@/lib/public-urls";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   provider: { id: string; publicUsername: string | null };
@@ -48,7 +48,7 @@ export function SlotBubblesRow({ provider, serviceId, slots }: Props) {
             aria-label={UI_TEXT.a11y.bookAtSlot(slot.label)}
           >
             <span>{slot.label}</span>
-            {discount ? <span className="text-[10px] text-emerald-400">{discount}</span> : null}
+            {discount ? <span className="text-[10px] text-success-text">{discount}</span> : null}
           </Link>
         );
       })}

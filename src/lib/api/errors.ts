@@ -130,7 +130,12 @@ const ERROR_CODES = [
   "SERVICE_NOT_FOUND",
   "SERVICE_REQUIRED",
   "SERVICE_UNAVAILABLE",
-  "SCHEDULE_DAY_OFF_CONFLICT",
+  // SCHEDULE-PATTERNS-01: график не собирается (длина цикла, даты, чужой шаблон).
+  "SCHEDULE_PATTERN_INVALID",
+  // SCHEDULE-PATTERNS-01 (этап 3): палитра рабочих дней полна; рабочий день
+  // нельзя удалить, пока он стоит в графике или в будущем дне календаря.
+  "SCHEDULE_PALETTE_FULL",
+  "SCHEDULE_TEMPLATE_IN_USE",
   "SLOT_CONFLICT",
   // FIX-TIMEBLOCK-ENFORCEMENT-01 — booking overlaps a studio/master TimeBlock.
   "TIME_BLOCKED",

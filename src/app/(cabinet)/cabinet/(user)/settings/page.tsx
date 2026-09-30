@@ -8,7 +8,7 @@ import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
 import { MarketingConsentSection } from "@/features/cabinet/components/marketing-consent";
 import { getSessionUser } from "@/lib/auth/session";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { getVkCommunity } from "@/lib/vk/community";
 
 export default async function SettingsPage() {

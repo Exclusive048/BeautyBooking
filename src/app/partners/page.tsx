@@ -4,7 +4,7 @@ import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
 import { PartnershipForm } from "@/features/partners/components/partnership-form";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   title: "Сотрудничество",

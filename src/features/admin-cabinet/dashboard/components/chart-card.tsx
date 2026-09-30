@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminChartSeries } from "@/features/admin-cabinet/dashboard/types";
 
 const T = UI_TEXT.adminPanel.dashboard.charts;
@@ -215,8 +215,8 @@ function DeltaText({
         isZero
           ? "text-text-sec"
           : isPositive
-            ? "text-emerald-600 dark:text-emerald-400"
-            : "text-red-600 dark:text-red-400",
+            ? "text-success-text"
+            : "text-danger-text",
       )}
     >
       {data.deltaText} {suffix}

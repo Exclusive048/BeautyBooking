@@ -1,5 +1,5 @@
 import { BillingPaymentStatus } from "@/lib/prisma-enums";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.billing.payments.status;
 
@@ -32,9 +32,9 @@ export function paymentStatusDisplay(
 }
 
 export const PAYMENT_STATUS_TONE_CLASS: Record<PaymentStatusTone, string> = {
-  success: "bg-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300",
-  warning: "bg-amber-500/[0.12] text-amber-700 dark:text-amber-300",
-  destructive: "bg-red-500/[0.12] text-red-700 dark:text-red-300",
+  success: "bg-success/[0.12] text-success-text",
+  warning: "bg-warning/[0.12] text-warning-text",
+  destructive: "bg-destructive/[0.12] text-danger-text",
   muted: "bg-bg-input text-text-sec",
   info: "bg-primary/[0.12] text-accent-text",
 };

@@ -2,8 +2,9 @@
 
 import { Check, Pencil, X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCategoryStatus } from "@/features/admin-cabinet/catalog/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.adminPanel.catalog.rowActions;
 
@@ -75,26 +76,23 @@ function IconButton({
 }) {
   const toneClass: Record<IconButtonTone, string> = {
     success:
-      "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300",
+      "bg-success/10 text-success-text hover:bg-success/20",
     danger:
-      "bg-red-500/10 text-red-700 hover:bg-red-500/20 dark:text-red-300",
+      "bg-destructive/10 text-danger-text hover:bg-destructive/20",
     neutral:
       "bg-bg-input text-text-sec hover:bg-bg-input/80 hover:text-text-main",
   };
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="wrapper"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
       title={label}
-      className={cn(
-        "inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors disabled:opacity-50",
-        toneClass[tone],
-      )}
+      className={cn("inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors", toneClass[tone])}
     >
       {children}
-    </button>
+    </Button>
   );
 }

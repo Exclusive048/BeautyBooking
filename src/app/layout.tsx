@@ -20,14 +20,16 @@ import { PWAUpdatePrompt } from "@/components/pwa/update-prompt";
 import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { DevServiceWorkerReset } from "@/components/pwa/dev-sw-reset";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { ToastProvider } from "@/components/ui/toast";
 import { CookieNotice } from "@/components/layout/cookie-notice";
 import { PushManager } from "@/components/pwa/push-manager";
 import { SWRProvider } from "@/components/providers/swr-provider";
+import { MotionProvider } from "@/components/providers/motion-provider";
 import { resolveAuthMethods } from "@/lib/auth/auth-methods";
 import { getNonce } from "@/lib/csp/nonce";
 import { resolveViewport } from "@/lib/pwa/viewport";
 import { COOKIE_NOTICE_COOKIE, hasAcknowledgedCookieNotice } from "@/lib/legal/cookie-notice";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
 import { env } from "@/lib/env";
 import { safeJsonLd } from "@/lib/seo/schema";
@@ -197,6 +199,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <SWRProvider>
+        <MotionProvider>
         <ThemeProvider nonce={nonce}>
           <ViewerTimeZoneProvider>
             <ThemeColorMeta />
@@ -204,12 +207,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <NetworkBanner />
             <PWAUpdatePrompt />
             <PWAInstallPrompt />
-            <AppShell>{children}</AppShell>
-            <BottomNav authEnabled={authEnabled} />
+            {/* Короткие сообщения — выше границы навигации (переживают router.refresh
+                и переход между кабинетами); область рендерится после BottomNav. */}
+            <ToastProvider>
+              <AppShell>{children}</AppShell>
+              <BottomNav authEnabled={authEnabled} />
+            </ToastProvider>
             {cookieNoticeAcknowledged ? null : <CookieNotice />}
             <PushManager />
           </ViewerTimeZoneProvider>
         </ThemeProvider>
+        </MotionProvider>
         </SWRProvider>
       </body>
     </html>

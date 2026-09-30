@@ -1,7 +1,7 @@
 import { Heart, Repeat, Users, Wallet } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { ClientsKpi } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatRubles } from "./lib/format";
 
 const T = UI_TEXT.cabinetMaster.clients.kpi;

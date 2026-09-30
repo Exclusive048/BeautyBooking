@@ -30,6 +30,7 @@ const prismaMock = vi.hoisted(() => ({
   scheduleTemplate: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleOverride: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleBreak: { findMany: vi.fn(), aggregate: vi.fn() },
+  schedulePattern: { findMany: vi.fn(), aggregate: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -104,11 +105,13 @@ describe("RESCHEDULE-SELF-SLOT · окно переносимой брони н�
       { _max: { updatedAt: null } },
       { _max: { updatedAt: null } },
       { _max: { updatedAt: null }, _count: 0 },
+      { _max: { updatedAt: null }, _count: 0 },
     ]);
     prismaMock.weeklyScheduleConfig.findUnique.mockResolvedValue(null);
     prismaMock.scheduleTemplate.findMany.mockResolvedValue([]);
     prismaMock.scheduleOverride.findMany.mockResolvedValue([]);
     prismaMock.scheduleBreak.findMany.mockResolvedValue([]);
+    prismaMock.schedulePattern.findMany.mockResolvedValue([]);
     prismaMock.booking.findMany.mockResolvedValue([]);
     prismaMock.timeBlock.findMany.mockResolvedValue([]);
     store.set(buildScheduleVersionCacheKey(PROVIDER_ID), {

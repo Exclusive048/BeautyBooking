@@ -1,3 +1,4 @@
+import { fail } from "@/lib/api/response";
 import { getQueueStats } from "@/lib/queue/queue";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
@@ -8,6 +9,16 @@ import { WORKER_ALIVE_THRESHOLD_MS, WORKER_LAST_PING_KEY } from "@/lib/queue/wor
 export const runtime = "nodejs";
 
 const WORKER_PING_TTL_SECONDS = 300;
+
+/**
+ * ENVELOPE-BYPASS-TRIAGE-02 (29.09 доработки · 09): отказы доступа и сбой
+ * записи отметки — конверт проекта через `fail()` (русский текст, код,
+ * `requestId`, запись 5xx в лог), как у соседнего `health/status`. Ответы GET
+ * с `alive: false` и 503 — не сообщение об ошибке, а данные пробы для
+ * мониторинга (он читает код и `alive`); они ратифицированы в инвентаре
+ * `lib/api/error-envelope-bypass.test.ts`.
+ */
+const SERVICE_UNAVAILABLE_MESSAGE = "Сервис временно недоступен.";
 
 function resolveWorkerSecret(): string | null {
   const secret = env.WORKER_SECRET?.trim();
@@ -27,14 +38,14 @@ function verifyWorkerSecret(request: Request): Response | null {
       logError("WORKER_SECRET not configured in production — rejecting worker health request", {
         __skipAlert: true,
       });
-      return Response.json({ error: "Service unavailable" }, { status: 503 });
+      return fail(SERVICE_UNAVAILABLE_MESSAGE, 503, "SERVICE_UNAVAILABLE");
     }
     return null;
   }
 
   const providedSecret = request.headers.get("x-worker-secret")?.trim() ?? "";
   if (!providedSecret || !timingSafeStringEqual(providedSecret, expectedSecret)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
   }
 
   return null;
@@ -47,7 +58,7 @@ export async function POST(request: Request) {
   try {
     const redis = await getRedisConnection();
     if (!redis) {
-      return Response.json({ error: "Service unavailable" }, { status: 503 });
+      return fail(SERVICE_UNAVAILABLE_MESSAGE, 503, "SERVICE_UNAVAILABLE");
     }
 
     // FIX-C4: запись heartbeat ограничена сверху. Пост-дедлайн — тот же 503,
@@ -59,7 +70,7 @@ export async function POST(request: Request) {
     );
     return Response.json({ ok: true });
   } catch {
-    return Response.json({ error: "Service unavailable" }, { status: 503 });
+    return fail(SERVICE_UNAVAILABLE_MESSAGE, 503, "SERVICE_UNAVAILABLE");
   }
 }
 

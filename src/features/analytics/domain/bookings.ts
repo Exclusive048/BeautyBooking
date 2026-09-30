@@ -4,7 +4,7 @@ import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { addDaysToDateKey, diffDateKeys } from "@/lib/schedule/dateKey";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
 import type { AnalyticsRange } from "@/features/analytics/domain/date-range";
-import { buildCreatedAtRange, buildScopeWhere } from "@/features/analytics/domain/helpers";
+import { buildCreatedAtRange, buildScopeWhere, buildStudioScopeSql } from "@/features/analytics/domain/helpers";
 import { STATUS_CANCELLED, STATUS_CONFIRMED, STATUS_NO_SHOW } from "@/features/analytics/domain/status-map";
 
 type FunnelResult = {
@@ -90,7 +90,7 @@ export async function getBookingsHeatmap(input: {
     );
   } else {
     scopeFilters.push(
-      Prisma.sql`(b."studioId" = ${input.context.studioId} OR b."providerId" = ${input.context.providerId})`
+      buildStudioScopeSql(input.context)
     );
     if (input.context.masterFilterId) {
       scopeFilters.push(Prisma.sql`b."masterProviderId" = ${input.context.masterFilterId}`);

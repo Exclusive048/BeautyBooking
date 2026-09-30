@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { canCancelIndividually } from "@/lib/bookings/flow";
+import { stripComments } from "@/lib/testing/source-scan";
 
 /**
  * LOGIC-13 — «отметить день выходным» отменяло конфликтующие брони простым
@@ -17,9 +18,8 @@ import { canCancelIndividually } from "@/lib/bookings/flow";
  *     сбой в снапшоте после последней отмены оставлял то же состояние без
  *     выхода: брони отменены, день рабочий, отката нет.
  *
- * Тест закрывает обе: предикат — значением, атомарность — формой вызова в
- * роуте (одиночная `cancelBooking` или `applyScheduleSnapshot` в этом файле
- * означают собственную транзакцию, то есть возврат дефекта).
+ * Предикат закрыт значением (ниже). Вторую половину снял сам предмет: с
+ * SCHEDULE-PATTERNS-01 выходной записи не отменяет вовсе (второй `describe`).
  */
 
 const ROUTE_PATH = resolve(process.cwd(), "src/app/api/cabinet/master/schedule/route.ts");
@@ -44,37 +44,32 @@ describe("canCancelIndividually — LOGIC-13", () => {
   });
 });
 
-describe("день-выходной: отмены и запись расписания — одна транзакция (LOGIC-13)", () => {
-  const source = readFileSync(ROUTE_PATH, "utf8");
+/**
+ * SCHEDULE-PATTERNS-01 (этап 3, решение владельца 2026-09-28): записи на днях,
+ * ставших выходными, ОСТАЮТСЯ — перенос и отмена на совести мастера. Путь
+ * записи расписания больше не отменяет брони вовсе: ни принудительного шага
+ * «подтвердите отмену» (409 `SCHEDULE_DAY_OFF_CONFLICT`), ни отмен внутри
+ * транзакции. Предикат `canCancelIndividually` (выше) остаётся — им судят
+ * отмену на поверхностях записи.
+ *
+ * @probe 2026-09-28: в роут возвращён импорт `cancelBookingInTx` и его вызов в
+ *        транзакции расписания → «роут расписания записи не отменяет» красный.
+ */
+describe("выходной в расписании записи не отменяет (SCHEDULE-PATTERNS-01)", () => {
+  const source = stripComments(readFileSync(ROUTE_PATH, "utf8"));
 
-  it("список конфликтов читает bookingPackageId и отдаёт его в предикат", () => {
-    // Предикат может быть сколь угодно верным — если поверхность не читает
-    // поле или подставляет в него константу, компонент пакета снова
-    // объявляется отменяемым.
-    expect(source).toMatch(/bookingPackageId:\s*true/);
-    expect(source).toMatch(/bookingPackageId:\s*row\.bookingPackageId/);
+  it("роут расписания записи не отменяет", () => {
+    expect(source).not.toMatch(/cancelBooking(InTx)?\s*\(/);
+    expect(source).not.toMatch(/runCancelBookingSideEffects|notifyCancelledByMaster/);
   });
 
-  it("роут не вызывает одиночную cancelBooking — только tx-форму", () => {
-    // `cancelBooking(` открывает СВОЮ транзакцию и рассылает побочные эффекты
-    // немедленно — то есть до того, как расписание записано.
-    expect(source).not.toMatch(/[^a-zA-Z]cancelBooking\s*\(/);
-    expect(source).toMatch(/cancelBookingInTx\s*\(\s*tx\s*,/);
+  it("принудительного шага «подтвердите отмену записей» нет", () => {
+    expect(source).not.toMatch(/SCHEDULE_DAY_OFF_CONFLICT/);
+    expect(source).not.toMatch(/dayOffConflictResolution/);
   });
 
-  it("роут не вызывает applyScheduleSnapshot — только tx-форму", () => {
+  it("снапшот по-прежнему пишется одной транзакцией (LOGIC-12)", () => {
     expect(source).not.toMatch(/[^a-zA-Z]applyScheduleSnapshot\s*\(/);
     expect(source).toMatch(/applyScheduleSnapshotTx\s*\(\s*tx\s*,/);
-  });
-
-  it("побочные эффекты отмен идут после коммита, а не внутри транзакции", () => {
-    const txStart = source.indexOf("prisma.$transaction(async (tx)");
-    const sideEffects = source.indexOf("runConflictCancellationSideEffects({");
-    expect(txStart).toBeGreaterThan(-1);
-    expect(sideEffects).toBeGreaterThan(txStart);
-    // вызов побочных эффектов — вне тела транзакции: между ним и стартом
-    // транзакции обязан быть её закрывающий вызов с бюджетом
-    const between = source.slice(txStart, sideEffects);
-    expect(between).toContain("SCHEDULE_SNAPSHOT_TX_OPTIONS)");
   });
 });

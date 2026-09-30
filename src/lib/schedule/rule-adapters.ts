@@ -1,34 +1,8 @@
-import type { Prisma, ScheduleBreakKind, ScheduleOverrideKind } from "@prisma/client";
-import type { DayOfWeek, ScheduleBreakInterval } from "@/lib/domain/schedule";
-import type {
-  ScheduleOverrideConfig,
-  ScheduleRuleConfig,
-  ScheduleRulePayload,
-} from "@/lib/schedule/rule-engine";
-import { parseScheduleRulePayload } from "@/lib/schedule/rule-engine";
+import type { ScheduleOverrideKind } from "@prisma/client";
+import type { ScheduleBreakInterval } from "@/lib/domain/schedule";
+import type { ScheduleOverrideConfig } from "@/lib/schedule/rule-engine";
+import { fixedStartsForMode } from "@/lib/schedule/fixed-starts";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-
-type ActiveRuleRecord = {
-  kind: "WEEKLY" | "CYCLE";
-  timezone: string;
-  anchorDate: Date | null;
-  payloadJson: Prisma.JsonValue;
-  isActive: boolean;
-};
-
-type WeeklyRow = {
-  dayOfWeek: number;
-  startLocal: string;
-  endLocal: string;
-};
-
-type BreakRow = {
-  kind: ScheduleBreakKind;
-  dayOfWeek: number | null;
-  date: Date | null;
-  startLocal: string;
-  endLocal: string;
-};
 
 type OverrideRow = {
   date: Date;
@@ -40,85 +14,17 @@ type OverrideRow = {
   isActive: boolean | null;
   note: string | null;
   reason: string | null;
+  scheduleMode: "FLEXIBLE" | "FIXED" | null;
+  fixedSlotTimes: string[];
 };
 
-function fallbackTimezone(input: string | null | undefined): string {
-  const value = typeof input === "string" ? input.trim() : "";
-  return value.length > 0 ? value : "Europe/Moscow";
-}
-
-function buildWeeklyFallbackPayload(input: {
-  weeklyRows: WeeklyRow[];
-  breakRows: BreakRow[];
-}): ScheduleRulePayload | null {
-  const rowsByDay = new Map<number, WeeklyRow[]>();
-  for (const row of input.weeklyRows) {
-    const list = rowsByDay.get(row.dayOfWeek) ?? [];
-    list.push(row);
-    rowsByDay.set(row.dayOfWeek, list);
-  }
-
-  const weekly = Array.from({ length: 7 }, (_, dayOfWeek) => {
-    const rows = rowsByDay.get(dayOfWeek) ?? [];
-    const first = rows[0] ?? null;
-    const breaks: ScheduleBreakInterval[] = input.breakRows
-      .filter((item) => item.kind === "WEEKLY" && item.dayOfWeek === dayOfWeek && !item.date)
-      .map((item) => ({
-        startLocal: item.startLocal,
-        endLocal: item.endLocal,
-      }));
-
-    return {
-      dayOfWeek: dayOfWeek as DayOfWeek,
-      isWorkday: first !== null,
-      startLocal: first?.startLocal ?? null,
-      endLocal: first?.endLocal ?? null,
-      breaks,
-    };
-  });
-
-  const hasAnyWorkday = weekly.some((item) => item.isWorkday);
-  if (!hasAnyWorkday) return null;
-  return { weekly };
-}
-
-export function buildScheduleRuleConfig(input: {
-  providerTimezone: string | null | undefined;
-  activeRule: ActiveRuleRecord | null;
-  weeklyRows: WeeklyRow[];
-  breakRows: BreakRow[];
-}): ScheduleRuleConfig | null {
-  const timezone = fallbackTimezone(input.activeRule?.timezone ?? input.providerTimezone);
-  if (input.activeRule?.isActive) {
-    const parsed = parseScheduleRulePayload(input.activeRule.kind, input.activeRule.payloadJson);
-    if (parsed) {
-      return {
-        kind: input.activeRule.kind,
-        timezone,
-        anchorDate: input.activeRule.anchorDate ?? null,
-        payload: parsed,
-      };
-    }
-  }
-
-  const fallbackPayload = buildWeeklyFallbackPayload({
-    weeklyRows: input.weeklyRows,
-    breakRows: input.breakRows,
-  });
-  if (!fallbackPayload) return null;
-
-  return {
-    kind: "WEEKLY",
-    timezone,
-    anchorDate: null,
-    payload: fallbackPayload,
-  };
-}
-
-type TemplateInfo = {
+/** Рабочий день из палитры в том виде, в каком его читает движок. */
+export type TemplateInfo = {
   startLocal: string;
   endLocal: string;
   breaks: ScheduleBreakInterval[];
+  /** SCHEDULE-PATTERNS-01 (этап 2): режим записи — свойство шаблона. */
+  fixedStarts: string[] | null;
 };
 
 export function toScheduleOverrideConfigs(
@@ -159,12 +65,17 @@ export function toScheduleOverrideConfigs(
       }
       const template = row.templateId ? templatesById.get(row.templateId) ?? null : null;
       if (template) {
+        // «В этот день — рабочий день X из палитры»: часы, перерывы и режим —
+        // шаблона. Режим исключения строки учитывается только у старых строк,
+        // где шаблон режима ещё не нёс.
         return {
           date: row.date,
           kind: "TIME_RANGE",
           startLocal: template.startLocal,
           endLocal: template.endLocal,
           breaks: template.breaks,
+          fixedStarts: template.fixedStarts ?? fixedStartsForMode(row),
+          templateId: row.templateId,
           note: row.note ?? row.reason ?? null,
         };
       }
@@ -176,25 +87,8 @@ export function toScheduleOverrideConfigs(
       startLocal: row.startLocal ?? null,
       endLocal: row.endLocal ?? null,
       breaks: overrideBreaks,
+      fixedStarts: fixedStartsForMode(row),
       note: row.note ?? row.reason ?? null,
     };
   });
-}
-
-export function buildDateBreaksMap(
-  rows: BreakRow[],
-  timezone: string
-): Map<string, ScheduleBreakInterval[]> {
-  const map = new Map<string, ScheduleBreakInterval[]>();
-  for (const row of rows) {
-    if (!row.date) continue;
-    const key = toLocalDateKey(row.date, timezone);
-    const list = map.get(key) ?? [];
-    list.push({
-      startLocal: row.startLocal,
-      endLocal: row.endLocal,
-    });
-    map.set(key, list);
-  }
-  return map;
 }

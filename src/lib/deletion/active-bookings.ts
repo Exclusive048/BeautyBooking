@@ -1,5 +1,6 @@
 import { BookingStatus, type Prisma } from "@prisma/client";
 import { BOOKING_FINISH_GRACE_MINUTES, normalizeBookingStatus } from "@/lib/bookings/flow";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 /**
  * DELETION-03 — «есть активные записи» считается ОДНИМ предикатом во всех трёх
@@ -44,19 +45,19 @@ export function countBlockingMasterBookings(db: BookingCounter, providerId: stri
 }
 
 /**
- * Живые записи студии — ровно те, что видит журнал студии (`studioId` либо
- * провайдер студии). Записи мастеров команды с их ЛИЧНЫХ страниц сюда не
+ * Живые записи студии — ровно те, что видит журнал студии (`studioId`,
+ * `studioBookingsWhere`). Записи мастеров команды с их ЛИЧНЫХ страниц сюда не
  * входят: студия их не видит и закрыть не может, а удаление студии их не
  * затрагивает (мастер остаётся со своим кабинетом).
  */
 export function countBlockingStudioBookings(
   db: BookingCounter,
-  studio: { id: string; providerId: string },
+  studio: { id: string },
   now?: Date,
 ): Promise<number> {
   return db.booking.count({
     where: {
-      AND: [blockingBookingWhere(now), { OR: [{ studioId: studio.id }, { providerId: studio.providerId }] }],
+      AND: [blockingBookingWhere(now), studioBookingsWhere(studio.id)],
     },
   });
 }

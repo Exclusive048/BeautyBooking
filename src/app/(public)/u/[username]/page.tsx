@@ -13,7 +13,7 @@ import { withQuery } from "@/lib/public-urls";
 import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { getNonce } from "@/lib/csp/nonce";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
 import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
@@ -176,6 +176,9 @@ async function findProviderForMeta(username: string) {
   });
 }
 
+/** Общая картинка бренда — та же, что `openGraph.images` в `app/layout.tsx`. */
+const BRAND_OG_IMAGE = { url: "/brand/icon-512.png", width: 512, height: 512 } as const;
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username: raw } = await Promise.resolve(params);
   const username = normalizeUsername(raw);
@@ -204,8 +207,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     services: provider.services,
   });
 
-  const ogImagePath = `/api/og/profile?username=${encodeURIComponent(canonicalUsername)}`;
+  // Превью-картинку отдаёт `/api/og/profile` только опубликованному профилю
+  // (иначе 404). Страница по ссылке открывается и без публикации, поэтому
+  // неопубликованному — общая картинка бренда (как в корневом layout), а не
+  // ссылка, которая всегда ведёт в 404.
+  const ogImagePath = provider.isPublished
+    ? `/api/og/profile?username=${encodeURIComponent(canonicalUsername)}`
+    : BRAND_OG_IMAGE.url;
   const ogImageUrl = baseUrl ? `${baseUrl}${ogImagePath}` : ogImagePath;
+  const ogImage = provider.isPublished
+    ? { url: ogImageUrl, width: 1200, height: 630, alt: provider.name }
+    : { ...BRAND_OG_IMAGE, url: ogImageUrl, alt: UI_TEXT.brand.name };
 
   return {
     title,
@@ -217,17 +229,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       url: canonicalUrl,
       type: "profile",
-      images: [
-        {
-          url: ogImageUrl,
-          width: 1200,
-          height: 630,
-          alt: provider.name,
-        },
-      ],
+      images: [ogImage],
     },
     twitter: {
-      card: "summary_large_image",
+      card: provider.isPublished ? "summary_large_image" : "summary",
       title,
       description,
       images: [ogImageUrl],

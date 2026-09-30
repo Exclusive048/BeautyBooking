@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const TPause = UI_TEXT.studioCabinet.mastersV2.pauseDialog;
 const TActivate = UI_TEXT.studioCabinet.mastersV2.activateDialog;
@@ -42,7 +43,7 @@ export function PauseMasterDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/studio/masters/${masterId}`, {
+      await fetchJsonWithAuth<unknown>(`/api/studio/masters/${masterId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -50,31 +51,22 @@ export function PauseMasterDialog({
           isActive: mode === "activate",
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string; code?: string; details?: { max?: number } } }
-          | null;
-        const err = body?.error;
-        // FIX-STUDIO-02 (F6): the team-cap block returns a raw English
-        // «Limit reached» (`billing/guards.ts`, a generic helper shared with
-        // media/hot-slots). Localize it HERE by error code + `details.max` —
-        // never surface the raw message for LIMIT_REACHED. Enforcement is
-        // untouched; this is message-only.
-        if (err?.code === "LIMIT_REACHED") {
-          setError(
-            typeof err.details?.max === "number"
-              ? E.teamCapReached.replace("{max}", String(err.details.max))
-              : E.teamCapReachedGeneric,
-          );
-        } else {
-          setError(err?.message ?? E.actionFailed);
-        }
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.actionFailed);
+    } catch (error) {
+      // FIX-STUDIO-02 (F6): лимит команды сервер отдаёт общим «Limit reached»
+      // (`billing/guards.ts`, общий помощник) — локализуем ЗДЕСЬ по коду и
+      // `details.max`; сырую строку для LIMIT_REACHED не показываем никогда.
+      if (error instanceof ApiClientError && error.code === "LIMIT_REACHED") {
+        const max = (error.details as { max?: number } | undefined)?.max;
+        setError(
+          typeof max === "number"
+            ? E.teamCapReached.replace("{max}", String(max))
+            : E.teamCapReachedGeneric,
+        );
+      } else {
+        setError(serverMessageOr(error, E.actionFailed));
+      }
     } finally {
       setSubmitting(false);
     }

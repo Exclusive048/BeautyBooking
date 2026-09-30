@@ -8,7 +8,7 @@ import {
 } from "@/lib/master/analytics-period";
 import { isDateKey } from "@/lib/schedule/dateKey";
 import { getMasterAnalyticsView } from "@/lib/master/analytics-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { AnalyticsKpiCards } from "./analytics-kpi-cards";
 

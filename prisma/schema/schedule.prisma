@@ -50,11 +50,27 @@ model ScheduleTemplate {
 
   color String?
 
+  // SCHEDULE-PATTERNS-01 (этап 3): имя рабочего дня в палитре («Утро»,
+  // «Полный день»). `name` — технический ключ (уникален у провайдера, у дней
+  // редактора — подпись содержимого), поэтому подпись для человека отдельно;
+  // `null` — палитра подписывает день часами. `color` — ключ приглушённого
+  // цвета палитры `1`…`6` (токены `schedule-day-*`), `null` — по порядку.
+  label String? @db.VarChar(40)
+
+  // SCHEDULE-PATTERNS-01 (этап 2): режим записи — свойство рабочего дня из
+  // палитры, а не дня недели. «Утро 10:00, 13:00, 16:00» — это один шаблон,
+  // который можно поставить в любую позицию графика. До этапа 2 режим жил на
+  // `WeeklyScheduleDay` / `ScheduleOverride` (там и остаётся для старых строк).
+  scheduleMode   ScheduleMode @default(FLEXIBLE)
+  fixedSlotTimes String[]     @default([])
+
   breaks ScheduleTemplateBreak[]
 
   scheduleOverrides ScheduleOverride[]
 
   weeklyScheduleDays WeeklyScheduleDay[]
+
+  patternDays SchedulePatternDay[]
 
   createdAt DateTime @default(now())
 
@@ -84,6 +100,67 @@ model ScheduleTemplateBreak {
   // when null.
   title String?
 
+  @@index([templateId])
+}
+
+// SCHEDULE-PATTERNS-01 (этап 2) — график мастера: последовательность из
+// `cycleDays` позиций от даты отсчёта `anchorOn`, повторяется по кругу.
+// Одна формула на всё: неделя = 7 от понедельника, чередование недель = 14/21/28
+// от понедельника «недели 1», 2 через 2 = 4 от первого рабочего дня.
+//
+// Период действия — `startsOn…endsOn` включительно. Периоды одного профиля НЕ
+// пересекаются: новый обрезает старые (писатель — `lib/schedule/patterns.ts`),
+// поэтому на любую дату график однозначен, а прошлые дни сохраняют тот график,
+// по которому работали. `startsOn = null` — «с начала времён» (перенесённая
+// неделя), `endsOn = null` — «продлевается автоматически»; иначе расписание
+// кончается в `endsOn` (решение владельца: не дальше 3 месяцев вперёд).
+//
+// Даты — даты САЛОНА строкой `YYYY-MM-DD`: сравниваются лексикографически и
+// не зависят от пояса хранения (у `ScheduleOverride.date` это отдельная
+// ловушка — UTC-полночь даты салона).
+model SchedulePattern {
+  id String @id @default(cuid())
+
+  providerId String
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  kind SchedulePatternKind
+
+  cycleDays Int
+
+  anchorOn String @db.VarChar(10)
+
+  startsOn String? @db.VarChar(10)
+
+  endsOn String? @db.VarChar(10)
+
+  days SchedulePatternDay[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, startsOn])
+}
+
+// Позиция графика: рабочий день из палитры (`templateId`) или выходной (`null`).
+// Шаблон удалить нельзя, пока на него ссылается хоть одна позиция — в том числе
+// прошлых периодов: иначе прошлые дни молча стали бы выходными.
+model SchedulePatternDay {
+  id String @id @default(cuid())
+
+  patternId String
+
+  pattern SchedulePattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  position Int
+
+  templateId String?
+
+  template ScheduleTemplate? @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@unique([patternId, position])
   @@index([templateId])
 }
 
@@ -121,6 +198,10 @@ model ScheduleOverride {
 
   updatedAt DateTime @updatedAt
 
+  // SCHEDULE-PATTERNS-01 (этап 1): одна строка на дату. Без уникальности
+  // параллельное автосохранение давало дубли, и читатели расходились в выборе
+  // строки (LOGIC-11); календарь на 3 месяца с покраской сделал бы их частыми.
+  @@unique([providerId, date])
   @@index([providerId])
   @@index([providerId, date])
 }

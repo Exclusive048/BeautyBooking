@@ -9,8 +9,9 @@ import { ModelsTopBlock } from "@/features/model-offers/components/models-top-bl
 import { OfferCard } from "@/features/model-offers/components/offer-card";
 import { listModelOfferFilters, listPublicModelOffers } from "@/lib/model-offers/public.service";
 import { getServerCity } from "@/lib/cities/server-city";
+import { formatModelOfferCount } from "@/lib/model-offers/offer-count";
 import { getModelOfferUserState } from "@/lib/model-offers/user-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   title: "Для моделей",
@@ -33,16 +34,6 @@ function parsePage(value: string | undefined): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed < 1) return 1;
   return parsed;
-}
-
-function formatCount(count: number): string {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return T.list.countLabelOne.replace("{count}", String(count));
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return T.list.countLabelFew.replace("{count}", String(count));
-  }
-  return T.list.countLabelMany.replace("{count}", String(count));
 }
 
 function buildPageHref(input: { page: number; categoryId?: string }): string {
@@ -87,7 +78,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
         <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="font-display text-2xl text-text-main lg:text-3xl">{listTitle}</h2>
           {offers.items.length > 0 ? (
-            <p className="text-sm text-text-sec tabular-nums">{formatCount(offers.items.length)}</p>
+            <p className="text-sm text-text-sec tabular-nums">{formatModelOfferCount(offers.items.length)}</p>
           ) : null}
         </div>
 

@@ -2,7 +2,7 @@
 
 import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AutosaveStatus } from "./use-autosave";
 
 const T = UI_TEXT.cabinetMaster.profile.editable;
@@ -25,8 +25,8 @@ export function SaveStatusChip({ status, className }: Props) {
         "inline-flex items-center gap-1 text-[11px] transition-opacity duration-200",
         visible ? "opacity-100" : "opacity-0",
         status === "saving" && "text-text-sec",
-        status === "saved" && "text-emerald-700 dark:text-emerald-300",
-        status === "error" && "text-rose-700 dark:text-rose-300",
+        status === "saved" && "text-success-text",
+        status === "error" && "text-danger-text",
         className
       )}
     >

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiClientError, fetchJson } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FIX-C3 · SMOKE-01 · F3 — курируемое сообщение сервера доходит до человека, а

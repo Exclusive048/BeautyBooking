@@ -1,7 +1,7 @@
 import { cn } from "@/lib/cn";
 import type { NotificationCenterNotificationItem } from "@/lib/notifications/center";
 import { resolveCurrentWhenLabel } from "@/lib/notifications/current-when";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { getCardConfig } from "./lib/card-config";
 import { formatTimeAgo } from "./lib/format-time-ago";
 import { readNotificationPayload } from "./lib/payload";

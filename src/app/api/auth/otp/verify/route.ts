@@ -21,7 +21,7 @@ import { extractClientIp } from "@/lib/http/ip";
 import { hasRequiredConsents } from "@/lib/legal/consent-flags";
 import { recordUserConsents } from "@/lib/legal/consent";
 import { isPhoneAuthEnabled } from "@/lib/env";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {

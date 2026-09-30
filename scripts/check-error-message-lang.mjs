@@ -84,7 +84,17 @@ const CYRILLIC = /[А-Яа-яЁё]/;
  * литерал среди первых двух аргументов (статус/секунды всегда числовые).
  * Код ошибки — третий аргумент, до него разбор не доходит по построению.
  */
-const CALLS = ["new AppError(", "fail(", "jsonFail(", "tooManyRequests(", "validationError("];
+// SCHEDULE-PATTERNS-01: `patternError` — фабрика отказов писателя графиков (`lib/schedule/patterns.ts`),
+// `calendarError` — календаря и палитры (`lib/schedule/calendar.ts`, этап 3).
+const CALLS = [
+  "new AppError(",
+  "fail(",
+  "jsonFail(",
+  "tooManyRequests(",
+  "validationError(",
+  "patternError(",
+  "calendarError(",
+];
 const MESSAGE_ARG_SCAN_DEPTH = 2;
 
 /**

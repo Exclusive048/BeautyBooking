@@ -38,8 +38,8 @@ export const BOOKING_CELL_CLASS: Record<BookingStatusTone, string> = {
   confirmed:
     "border border-primary/40 bg-primary/15 text-text-main hover:bg-primary/20",
   pending:
-    "border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200",
-  new: "border border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-200",
+    "border border-warning-border bg-warning-surface text-warning-text hover:brightness-95",
+  new: "border border-success-border bg-success-surface text-success-text hover:brightness-95",
   done: "border border-border-subtle bg-bg-input/70 text-text-sec",
   muted: "border border-border-subtle bg-bg-input/40 text-text-sec",
 };

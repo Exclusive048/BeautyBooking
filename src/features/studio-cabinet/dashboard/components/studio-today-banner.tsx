@@ -1,6 +1,6 @@
 import { Users } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioTodayBannerData } from "../server/types";
 
 type Props = {
@@ -17,16 +17,23 @@ function initialsOf(name: string): string {
   return (first + last).toUpperCase() || "•";
 }
 
-function formatToday(now: Date): string {
+/**
+ * Дата «сегодня» — по поясу СТУДИИ (salon-tz, rule 17): баннер рендерится на
+ * сервере, и без пояса дата шла по часам контейнера (у студии в Екатеринбурге
+ * с 00:00 до 05:00 — вчерашний день). Метка зоны не нужна: это дата студии в
+ * её собственном кабинете.
+ */
+function formatToday(now: Date, timeZone: string): string {
   return now.toLocaleDateString("ru-RU", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone,
   });
 }
 
 export function StudioTodayBanner({ data, studioName }: Props) {
-  const today = formatToday(new Date());
+  const today = formatToday(new Date(), data.timeZone);
   const visibleMasters = data.mastersOnShift.slice(0, 5);
   const extraCount = Math.max(0, data.mastersOnShift.length - visibleMasters.length);
 
@@ -47,9 +54,7 @@ export function StudioTodayBanner({ data, studioName }: Props) {
             {today}
           </div>
           <h2 className="font-display text-2xl font-bold leading-tight md:text-3xl">
-            {T.titleTemplate
-              .replace("{studioName}", studioName)
-              .replace("{count}", String(data.bookingsToday))}
+            {T.title(studioName, data.bookingsToday)}
           </h2>
           <p className="mt-2 max-w-xl text-sm opacity-90 md:text-[15px]">
             {T.subtitleTemplate

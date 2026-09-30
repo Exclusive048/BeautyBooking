@@ -18,7 +18,7 @@ export function CityTagBadge({ tag, isDuplicate, className }: Props) {
       className={cn(
         "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[10px] font-semibold tracking-tight",
         isDuplicate
-          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+          ? "bg-warning/15 text-warning-text"
           : "bg-bg-input text-text-sec",
         className,
       )}

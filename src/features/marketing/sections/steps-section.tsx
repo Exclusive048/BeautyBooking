@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
 import { SectionHeader } from "@/features/marketing/sections/section-header";
 
 export type Step = {
@@ -18,10 +19,7 @@ type Props = {
   columns?: 4 | 5;
 };
 
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
-
 export function StepsSection({ eyebrow, title, description, steps, columns }: Props) {
-  const reduce = useReducedMotion();
   const cols = columns ?? (steps.length === 5 ? 5 : 4);
   // Both class strings are static literals so Tailwind JIT picks them up.
   const gridClass = cols === 5 ? "lg:grid-cols-5" : "lg:grid-cols-4";
@@ -31,17 +29,15 @@ export function StepsSection({ eyebrow, title, description, steps, columns }: Pr
         <SectionHeader eyebrow={eyebrow} title={title} description={description} />
         <ol className={`mt-12 grid gap-10 md:grid-cols-2 ${gridClass}`}>
           {steps.map((step, idx) => {
-            const initial = reduce ? undefined : { opacity: 0, y: 18 };
-            const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
-            const transition = reduce
-              ? undefined
-              : { duration: 0.45, ease: EASE, delay: idx * 0.06 };
+            const initial = { opacity: 0, y: DISTANCE.rise };
+            const whileInView = { opacity: 1, y: 0 };
+            const transition = { ...MOTION.section, delay: idx * STAGGER };
             return (
-              <motion.li
+              <m.li
                 key={step.title}
                 initial={initial}
                 whileInView={whileInView}
-                viewport={{ once: true, margin: "-80px" }}
+                viewport={VIEWPORT_ONCE}
                 transition={transition}
               >
                 <div className="mb-4 font-display text-5xl leading-none text-accent-text/25">
@@ -49,7 +45,7 @@ export function StepsSection({ eyebrow, title, description, steps, columns }: Pr
                 </div>
                 <h3 className="mb-2 font-display text-xl text-text-main">{step.title}</h3>
                 <p className="leading-relaxed text-text-sec">{step.description}</p>
-              </motion.li>
+              </m.li>
             );
           })}
         </ol>

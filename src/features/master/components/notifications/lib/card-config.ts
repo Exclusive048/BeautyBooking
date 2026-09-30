@@ -1,4 +1,5 @@
 import { NotificationType } from "@prisma/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   AlertCircle,
   Bell,
@@ -46,46 +47,49 @@ const FALLBACK_CONFIG: CardConfig = {
   label: "Уведомление",
 };
 
+// 29.09 · 23: «новая запись» — акцент бренда, а не ошибка (rose был цветом
+// «активного», таблица статусов скилла); неявка делит тот же вид.
 const ROSE_URGENT: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-rose-100 dark:bg-rose-900/30",
-  iconColor: "text-rose-600 dark:text-rose-400",
-  accentBg: "bg-rose-500",
+  iconBg: "bg-primary/10",
+  iconColor: "text-accent-text",
+  accentBg: "bg-primary",
 };
 
+// Отмена и отклонение — красный статус (решение владельца 23.1).
 const ROSE_SOFT: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-rose-100 dark:bg-rose-900/30",
-  iconColor: "text-rose-600 dark:text-rose-400",
-  accentBg: "bg-rose-400",
+  iconBg: "bg-danger-surface",
+  iconColor: "text-danger-text",
+  accentBg: "bg-destructive/70",
 };
 
 const AMBER: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-amber-100 dark:bg-amber-900/30",
-  iconColor: "text-amber-600 dark:text-amber-400",
-  accentBg: "bg-amber-500",
+  iconBg: "bg-warning-surface",
+  iconColor: "text-warning-text",
+  accentBg: "bg-warning",
 };
 
 const AMBER_SOFT: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-amber-100 dark:bg-amber-900/30",
-  iconColor: "text-amber-600 dark:text-amber-400",
-  accentBg: "bg-amber-400",
+  iconBg: "bg-warning-surface",
+  iconColor: "text-warning-text",
+  accentBg: "bg-warning",
 };
 
 const BLUE: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-blue-100 dark:bg-blue-900/30",
-  iconColor: "text-blue-600 dark:text-blue-400",
-  accentBg: "bg-blue-500",
+  iconBg: "bg-info-surface",
+  iconColor: "text-info-text",
+  accentBg: "bg-info",
 };
 
 const EMERALD: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-emerald-100 dark:bg-emerald-900/30",
-  iconColor: "text-emerald-600 dark:text-emerald-400",
-  accentBg: "bg-emerald-500",
+  iconBg: "bg-success-surface",
+  iconColor: "text-success-text",
+  accentBg: "bg-success",
 };
 
 const SLATE: Pick<CardConfig, "iconBg" | "iconColor" | "accentBg"> = {
-  iconBg: "bg-slate-100 dark:bg-slate-800/40",
-  iconColor: "text-slate-600 dark:text-slate-300",
-  accentBg: "bg-slate-400",
+  iconBg: "bg-muted",
+  iconColor: "text-muted-foreground",
+  accentBg: "bg-muted-foreground/60",
 };
 
 const CONFIG_MAP: Partial<Record<NotificationType, CardConfig>> = {
@@ -110,6 +114,11 @@ const CONFIG_MAP: Partial<Record<NotificationType, CardConfig>> = {
   [NotificationType.HOT_SLOT_BOOKED]: { icon: Sparkles, ...EMERALD, label: "Окошко заняли" },
   [NotificationType.HOT_SLOT_EXPIRING]: { icon: Zap, ...AMBER, label: "Окошко скоро сгорит" },
   [NotificationType.MASTER_WEEKLY_STATS]: { icon: TrendingUp, ...SLATE, label: "Сводка недели" },
+  [NotificationType.SCHEDULE_ENDING]: {
+    icon: Calendar,
+    ...AMBER,
+    label: UI_TEXT.cabinetMaster.scheduleSettings.plan.endingNotificationLabel,
+  },
   [NotificationType.CATEGORY_APPROVED]: { icon: FolderCheck, ...EMERALD, label: "Категория принята" },
   [NotificationType.CATEGORY_REJECTED]: { icon: FolderX, ...ROSE_SOFT, label: "Категория отклонена" },
 };

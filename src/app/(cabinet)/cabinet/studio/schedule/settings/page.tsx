@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
  * Studio version of `/cabinet/master/schedule/settings`. **No new
  * backend endpoint** — `/api/cabinet/master/schedule` already handles
  * the `STUDIO_ADMIN` actor mode via `?studioId=…&masterId=…` query
- * params (see `resolveTargetProvider` in that route). This page just
+ * params (see `resolveScheduleActor` (`lib/schedule/schedule-actor.ts`)). This page just
  * presents the UI with a master picker + tabs shell. Phase A
  * ships Hours + Rules tabs; Visibility / Breaks / Exceptions are
  * placeholders deferred to Phase B.

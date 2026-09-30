@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.clients.detail;
 
@@ -31,14 +32,13 @@ export function CopyButton({ value }: Props) {
   };
 
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       onClick={handleClick}
       aria-label={T.copyAria}
       className={cn(
         "inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
         copied
-          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+          ? "bg-success-surface text-success-text"
           : "text-text-sec hover:bg-bg-input hover:text-text-main"
       )}
     >
@@ -47,6 +47,6 @@ export function CopyButton({ value }: Props) {
       ) : (
         <Copy className="h-3.5 w-3.5" aria-hidden />
       )}
-    </button>
+    </Button>
   );
 }

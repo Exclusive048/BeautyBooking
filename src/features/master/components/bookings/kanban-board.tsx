@@ -1,6 +1,6 @@
 import { KanbanColumn } from "@/features/master/components/bookings/kanban-column";
 import type { ColumnId, KanbanData } from "@/lib/master/bookings.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.columns;
 

@@ -7,7 +7,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { citySlugFromName } from "@/lib/cities/normalize";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.cities.createDialog;
 
@@ -201,7 +201,7 @@ export function CreateCityDialog({ open, onClose, onSubmit }: Props) {
         </div>
 
         {error ? (
-          <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          <p role="alert" className="text-xs text-danger-text">
             {error}
           </p>
         ) : null}

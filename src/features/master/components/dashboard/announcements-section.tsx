@@ -1,6 +1,6 @@
 import { AnnouncementCard } from "@/features/master/components/dashboard/announcement-card";
 import { ANNOUNCEMENTS } from "@/features/master/lib/announcements";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.announcements;
 

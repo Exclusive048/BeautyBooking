@@ -1,5 +1,5 @@
 import { Bell } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { NotificationDayGroup } from "../lib/types";
 import { NotificationCard } from "./notification-card";
 
@@ -7,9 +7,11 @@ const T = UI_TEXT.studioCabinet.notificationsV2;
 
 type Props = {
   groups: NotificationDayGroup[];
+  /** Пояс студии — в нём дни групп и время карточек. */
+  timeZone: string;
 };
 
-export function NotificationsFeed({ groups }: Props) {
+export function NotificationsFeed({ groups, timeZone }: Props) {
   if (groups.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle bg-bg-card p-10 text-center">
@@ -30,7 +32,7 @@ export function NotificationsFeed({ groups }: Props) {
           <ul className="space-y-2">
             {group.items.map((item) => (
               <li key={item.id}>
-                <NotificationCard item={item} />
+                <NotificationCard item={item} timeZone={timeZone} />
               </li>
             ))}
           </ul>

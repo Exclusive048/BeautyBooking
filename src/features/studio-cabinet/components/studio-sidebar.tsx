@@ -14,7 +14,7 @@ import {
   type StudioNavItem,
 } from "@/features/studio-cabinet/config/studio-nav";
 import type { StudioSidebarCounts } from "@/features/studio-cabinet/server/sidebar-counts.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   counts: StudioSidebarCounts;

@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   current: number;
@@ -42,15 +43,14 @@ export function CatalogPagination({ current, total, onChange }: Props) {
 
   return (
     <nav className="flex items-center justify-center gap-1.5" aria-label={UI_TEXT.a11y.pagination}>
-      <button
-        type="button"
+      <Button variant="wrapper"
         aria-label={T.prevAria}
         disabled={current === 1}
         onClick={() => onChange(current - 1)}
         className={`${cellBase} ${inactive} disabled:cursor-not-allowed disabled:opacity-40`}
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
-      </button>
+      </Button>
 
       {pages.map((p, i) =>
         p === "ellipsis" ? (
@@ -62,27 +62,25 @@ export function CatalogPagination({ current, total, onChange }: Props) {
             …
           </span>
         ) : (
-          <button
+          <Button variant="wrapper"
             key={p}
-            type="button"
             onClick={() => onChange(p)}
             aria-current={p === current ? "page" : undefined}
             className={`${cellBase} ${p === current ? active : inactive}`}
           >
             {p}
-          </button>
+          </Button>
         ),
       )}
 
-      <button
-        type="button"
+      <Button variant="wrapper"
         aria-label={T.nextAria}
         disabled={current === total}
         onClick={() => onChange(current + 1)}
         className={`${cellBase} ${inactive} disabled:cursor-not-allowed disabled:opacity-40`}
       >
         <ChevronRight className="h-4 w-4" aria-hidden />
-      </button>
+      </Button>
     </nav>
   );
 }

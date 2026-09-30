@@ -1,7 +1,7 @@
 import { Archive, Inbox, Sparkles, TrendingUp } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { OffersKpi } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.kpi;
 

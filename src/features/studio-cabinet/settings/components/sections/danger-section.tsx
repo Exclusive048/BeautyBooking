@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { DeleteStudioDialog } from "../delete-studio-dialog";
 import { SectionCard } from "../section-card";
 import type { StudioGeneralData } from "../../lib/types";

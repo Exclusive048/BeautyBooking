@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { PublicModelOfferFilterCategory } from "@/lib/model-offers/public.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   categories: ReadonlyArray<PublicModelOfferFilterCategory>;

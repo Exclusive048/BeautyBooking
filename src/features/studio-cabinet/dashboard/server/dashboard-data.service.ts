@@ -6,6 +6,9 @@ import {
   ScheduleChangeRequestStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import { loadDayPlans } from "@/lib/schedule/day-plans";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import {
   formatPointsDelta,
@@ -24,8 +27,10 @@ import type {
   StudioOccupancyRow,
   StudioPopularService,
   StudioRevenueChartData,
+  StudioTodayBannerData,
   StudioTopMasterRow,
 } from "./types";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 const COMPLETED_STATUSES = [
   BookingStatus.CONFIRMED,
@@ -46,10 +51,16 @@ const PENDING_BOOKING_STATUSES = [
   BookingStatus.CHANGE_REQUESTED,
 ];
 
-function startOfDayUtc(value: Date): Date {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+/**
+ * Начало суток САЛОНА, в которые попадает момент (rule 17, salon-tz). Раньше —
+ * UTC-сутки: у студии в Екатеринбурге с 00:00 до 05:00 «сегодня» было вчерашним
+ * днём, и записи первых часов дня уходили во вчера.
+ */
+function startOfSalonDay(value: Date, timeZone: string): Date {
+  return dateFromLocalDateKey(toLocalDateKey(value, timeZone), timeZone, 0, 0);
 }
 
+/** Сдвиг на целые сутки (24 ч): в поясах РФ нет перехода на летнее время. */
 function addUtcDays(value: Date, days: number): Date {
   const next = new Date(value);
   next.setUTCDate(next.getUTCDate() + days);
@@ -59,6 +70,8 @@ function addUtcDays(value: Date, days: number): Date {
 type StudioContext = {
   studioId: string;
   providerId: string;
+  /** Пояс студии — границы «сегодня» и периодов считаются по нему. */
+  timeZone: string;
 };
 
 type BookingForRevenue = {
@@ -92,7 +105,7 @@ async function loadCompletedBookingsInRange(
 ): Promise<BookingForRevenue[]> {
   return prisma.booking.findMany({
     where: {
-      OR: [{ studioId: ctx.studioId }, { providerId: ctx.providerId }],
+      ...studioBookingsWhere(ctx.studioId),
       startAtUtc: { gte: fromUtc, lt: toExclusiveUtc },
       status: { in: COMPLETED_STATUSES },
     },
@@ -128,60 +141,63 @@ function sumRevenueKopeks(bookings: BookingForRevenue[]): number {
 
 async function getMastersOnShiftToday(
   providerId: string,
-  weekday: number,
+  now: Date,
 ): Promise<StudioMasterOnShift[]> {
-  // A master is "on shift today" when their weekly schedule has an
-  // active day for the current weekday OR they have any booking
-  // scheduled today (covers ad-hoc overrides). Simpler approximation
-  // — full schedule-engine integration is backlogged.
+  // SCHEDULE-PATTERNS-01 (этап 1): «на смене сегодня» = движок считает день
+  // рабочим (`loadDayPlans`): неделя, «Особый день» (выходной, отпуск, свои
+  // часы) и горизонт. Раньше — строка недели по дню недели UTC: отпуск на
+  // сегодня не учитывался, а день недели после полуночи UTC у Екатеринбурга
+  // был ещё вчерашним. «Сегодня» — по поясу мастера (он же пояс студии).
   const masters = await prisma.provider.findMany({
-    where: {
-      type: ProviderType.MASTER,
-      studioId: providerId,
-      weeklyScheduleConfig: {
-        days: {
-          some: { weekday, isActive: true },
-        },
-      },
-    },
-    select: { id: true, name: true, avatarUrl: true },
+    where: { type: ProviderType.MASTER, studioId: providerId },
+    select: { id: true, name: true, avatarUrl: true, timezone: true },
   });
-  return masters.map((master) => ({
-    id: master.id,
-    name: master.name,
-    avatarUrl: master.avatarUrl ?? null,
-  }));
+  if (masters.length === 0) return [];
+
+  const todayKeyById = new Map(masters.map((master) => [master.id, toLocalDateKey(now, master.timezone)]));
+  const keys = Array.from(new Set(todayKeyById.values())).sort();
+  const plans = await loadDayPlans({
+    providerIds: masters.map((master) => master.id),
+    fromKey: keys[0],
+    toKeyExclusive: addDaysToDateKey(keys[keys.length - 1], 1),
+    now,
+  });
+
+  return masters
+    .filter((master) => {
+      const todayKey = todayKeyById.get(master.id);
+      return todayKey ? plans.get(master.id)?.get(todayKey)?.isWorking === true : false;
+    })
+    .map((master) => ({
+      id: master.id,
+      name: master.name,
+      avatarUrl: master.avatarUrl ?? null,
+    }));
 }
 
 async function buildTodayBanner(
   ctx: StudioContext,
   now: Date,
-): Promise<{
-  bookingsToday: number;
-  mastersOnShift: StudioMasterOnShift[];
-  totalMasters: number;
-  averageLoadPercent: number;
-}> {
-  const todayStart = startOfDayUtc(now);
+): Promise<StudioTodayBannerData> {
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
   const todayEnd = addUtcDays(todayStart, 1);
-  const weekday = now.getUTCDay() === 0 ? 7 : now.getUTCDay();
 
   const [bookingsToday, mastersOnShift, totalMasters, mastersWithBookingsToday] =
     await Promise.all([
       prisma.booking.count({
         where: {
-          OR: [{ studioId: ctx.studioId }, { providerId: ctx.providerId }],
+          ...studioBookingsWhere(ctx.studioId),
           startAtUtc: { gte: todayStart, lt: todayEnd },
           status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
         },
       }),
-      getMastersOnShiftToday(ctx.providerId, weekday),
+      getMastersOnShiftToday(ctx.providerId, now),
       prisma.provider.count({
         where: { type: ProviderType.MASTER, studioId: ctx.providerId },
       }),
       prisma.booking.findMany({
         where: {
-          OR: [{ studioId: ctx.studioId }, { providerId: ctx.providerId }],
+          ...studioBookingsWhere(ctx.studioId),
           startAtUtc: { gte: todayStart, lt: todayEnd },
           status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
         },
@@ -207,6 +223,7 @@ async function buildTodayBanner(
     mastersOnShift,
     totalMasters,
     averageLoadPercent,
+    timeZone: ctx.timeZone,
   };
 }
 
@@ -215,7 +232,7 @@ async function buildKpis(
   now: Date,
   banner: { mastersOnShift: StudioMasterOnShift[]; totalMasters: number },
 ): Promise<StudioKpis> {
-  const todayStart = startOfDayUtc(now);
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
   const periodStart = addUtcDays(todayStart, -29); // last 30 days inclusive
   const periodEnd = addUtcDays(todayStart, 1);
   const previousStart = addUtcDays(periodStart, -30);
@@ -283,7 +300,7 @@ async function buildTopMasters(
   ctx: StudioContext,
   now: Date,
 ): Promise<StudioTopMasterRow[]> {
-  const todayStart = startOfDayUtc(now);
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
   const periodStart = addUtcDays(todayStart, -29);
   const periodEnd = addUtcDays(todayStart, 1);
 
@@ -347,7 +364,7 @@ async function buildAttentionItems(
       }),
       prisma.booking.count({
         where: {
-          OR: [{ studioId: ctx.studioId }, { providerId: ctx.providerId }],
+          ...studioBookingsWhere(ctx.studioId),
           status: { in: PENDING_BOOKING_STATUSES },
           // BOOKING-FLOW-AUDIT-RESIDUALS: подтвердить можно только до начала
           // (`isBookingPastConfirmWindow`) — прошедшие неподтверждённые записи
@@ -410,13 +427,13 @@ async function buildTopOccupancyToday(
   mastersOnShift: StudioMasterOnShift[],
 ): Promise<StudioOccupancyRow[]> {
   if (mastersOnShift.length === 0) return [];
-  const todayStart = startOfDayUtc(now);
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
   const todayEnd = addUtcDays(todayStart, 1);
 
   const bookingsTodayByMaster = await prisma.booking.groupBy({
     by: ["masterProviderId", "providerId"],
     where: {
-      OR: [{ studioId: ctx.studioId }, { providerId: ctx.providerId }],
+      ...studioBookingsWhere(ctx.studioId),
       startAtUtc: { gte: todayStart, lt: todayEnd },
       status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
     },
@@ -454,7 +471,7 @@ async function buildPopularServices(
   ctx: StudioContext,
   now: Date,
 ): Promise<StudioPopularService[]> {
-  const todayStart = startOfDayUtc(now);
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
   const periodStart = addUtcDays(todayStart, -29);
   const periodEnd = addUtcDays(todayStart, 1);
 
@@ -514,15 +531,19 @@ export async function buildRevenueChart(
 ): Promise<StudioRevenueChartData> {
   const studio = await prisma.studio.findUnique({
     where: { id: studioId },
-    select: { id: true, providerId: true },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
     return { totalKopeks: 0, points: [] };
   }
-  const ctx: StudioContext = { studioId: studio.id, providerId: studio.providerId };
+  const ctx: StudioContext = {
+    studioId: studio.id,
+    providerId: studio.providerId,
+    timeZone: studio.provider.timezone,
+  };
 
   const days = daysForPeriod(period);
-  const todayStart = startOfDayUtc(now);
+  const todayStart = startOfSalonDay(now, ctx.timeZone);
   const periodStart = addUtcDays(todayStart, -(days - 1));
   const periodEnd = addUtcDays(todayStart, 1);
 
@@ -561,12 +582,16 @@ export async function loadStudioDashboardData(input: {
 }): Promise<StudioDashboardData> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
-    select: { id: true, providerId: true },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
   });
   if (!studio) {
     throw new Error(`Studio not found: ${input.studioId}`);
   }
-  const ctx: StudioContext = { studioId: studio.id, providerId: studio.providerId };
+  const ctx: StudioContext = {
+    studioId: studio.id,
+    providerId: studio.providerId,
+    timeZone: studio.provider.timezone,
+  };
   const now = new Date();
 
   const banner = await buildTodayBanner(ctx, now);

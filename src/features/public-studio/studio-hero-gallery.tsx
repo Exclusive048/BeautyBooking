@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { withQuery } from "@/lib/public-urls";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
@@ -70,6 +70,7 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref, hideBooking
               className="object-cover"
             />
           ) : (
+            // dark-ok: подложка героя без фото — всегда тёмная, как фото под белым текстом
             <div className="h-full w-full bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />

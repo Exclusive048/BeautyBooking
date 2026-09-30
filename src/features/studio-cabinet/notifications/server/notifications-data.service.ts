@@ -137,6 +137,7 @@ export async function loadStudioNotificationsData(
     kpi: { unreadCount, totalCount, todayCount, needsDecisionCount, pushEnabled },
     chipCounts,
     groups,
+    timeZone,
     activeChip: input.activeChip,
     sort: input.sort,
   };

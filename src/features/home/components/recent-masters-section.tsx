@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { moneyRUBPlainFromKopeks } from "@/lib/format";
 import type { RecentMasterItem } from "@/lib/bookings/recent-masters";
-import type { ApiResponse } from "@/lib/types/api";
 
 // FIX-03 (QA-109): `lastService.price` is kopecks — render ÷100 (plain number
 // + ₽ suffix, preserving the original presentation).
@@ -112,15 +112,10 @@ export function RecentMastersSection() {
 
   const fetchMasters = useCallback(async () => {
     try {
-      const res = await fetch("/api/bookings/recent-masters", {
+      const data = await fetchJson<{ items: RecentMasterItem[] }>("/api/bookings/recent-masters", {
         cache: "no-store",
       });
-      if (!res.ok) return;
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
-        items: RecentMasterItem[];
-      }> | null;
-      if (!json || !json.ok) return;
-      setItems(json.data.items);
+      setItems(data.items);
     } catch {
       /* silent — graceful degradation */
     } finally {

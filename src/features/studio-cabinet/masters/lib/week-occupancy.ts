@@ -1,6 +1,8 @@
 import { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { loadDayPlans } from "@/lib/schedule/day-plans";
 
 const ACTIVE_BOOKING_STATUSES_NOTIN = [
   BookingStatus.REJECTED,
@@ -59,14 +61,10 @@ export async function getMasterWeekOccupancy(input: {
   const weekStart = startOfUtcWeekMonday(now);
   const weekEnd = addUtcDays(weekStart, 7);
 
-  const [provider, config, bookings] = await Promise.all([
+  const [provider, bookings] = await Promise.all([
     prisma.provider.findUnique({
       where: { id: input.providerId },
       select: { timezone: true },
-    }),
-    prisma.weeklyScheduleConfig.findUnique({
-      where: { providerId: input.providerId },
-      select: { days: { select: { weekday: true, isActive: true } } },
     }),
     prisma.booking.findMany({
       where: {
@@ -92,9 +90,20 @@ export async function getMasterWeekOccupancy(input: {
   const timeZone = provider?.timezone ?? "Europe/Moscow";
   const todayKey = toLocalDateKey(now, timeZone);
 
-  const activeWeekdays = new Set(
-    (config?.days ?? []).filter((day) => day.isActive).map((day) => day.weekday),
+  // SCHEDULE-PATTERNS-01 (этап 1): выходной — по движку на КОНКРЕТНУЮ дату
+  // (неделя + «Особый день» + горизонт), а не по строке недели: отпуск на этой
+  // неделе раньше показывался рабочими днями.
+  const cellKeys = Array.from({ length: 7 }, (_, dayIndex) =>
+    toLocalDateKey(addUtcDays(weekStart, dayIndex), timeZone),
   );
+  const plans = (
+    await loadDayPlans({
+      providerIds: [input.providerId],
+      fromKey: cellKeys[0],
+      toKeyExclusive: addDaysToDateKey(cellKeys[6], 1),
+      now,
+    })
+  ).get(input.providerId);
 
   const bookingsByLocalDay = new Map<string, number>();
   for (const booking of bookings) {
@@ -106,8 +115,8 @@ export async function getMasterWeekOccupancy(input: {
   return Array.from({ length: 7 }, (_, dayIndex) => {
     const date = addUtcDays(weekStart, dayIndex);
     const weekday = dayIndex + 1; // 1=Mon ... 7=Sun
-    const isDayOff = !activeWeekdays.has(weekday);
     const cellKey = toLocalDateKey(date, timeZone);
+    const isDayOff = plans?.get(cellKey)?.isWorking !== true;
     const booked = bookingsByLocalDay.get(cellKey) ?? 0;
     const dayOfMonth = Number(cellKey.split("-")[2]);
     return {

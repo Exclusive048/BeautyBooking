@@ -1,6 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { AnimatePresence, m, type Variants } from "framer-motion";
+import { MOTION } from "@/lib/ui/motion";
 import type { ReactNode } from "react";
 import type { WizardStep } from "./steps-bar";
 
@@ -29,20 +30,19 @@ const variants: Variants = {
 };
 
 export function StepTransition({ step, direction, children }: Props) {
-  const reduce = useReducedMotion();
   return (
     <AnimatePresence mode="wait" custom={direction} initial={false}>
-      <motion.div
+      <m.div
         key={step}
         custom={direction}
-        variants={reduce ? undefined : variants}
+        variants={variants}
         initial="enter"
         animate="center"
         exit="exit"
-        transition={reduce ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        transition={MOTION.base}
       >
         {children}
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }

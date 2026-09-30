@@ -1,21 +1,20 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { CompactHero } from "@/features/model-offers/components/compact-hero";
 import { markModelsIntroSeen } from "@/lib/model-offers/intro-seen-action";
 import { scrollBehavior } from "@/lib/ui/scroll";
 import type { ModelOfferUserState } from "@/lib/model-offers/user-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import { INSTANT, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   userState: ModelOfferUserState;
   /** EducationalSections rendered as server component, passed in as JSX. */
   children: ReactNode;
 };
-
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
 /**
  * Orchestrates the top of /models — hero + educational content — based on
@@ -27,8 +26,9 @@ const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
  */
 export function ModelsTopBlock({ userState, children }: Props) {
   const [open, setOpen] = useState(false);
-  const educationalRef = useRef<HTMLDivElement>(null);
+  // Раскрытие по высоте `reducedMotion="user"` не гасит (это не transform).
   const reduce = useReducedMotion();
+  const educationalRef = useRef<HTMLDivElement>(null);
 
   // Fire-and-forget cookie marker on first visit. Failures are silent — at
   // worst the user stays a "newcomer" for one more visit, which is harmless.
@@ -81,17 +81,17 @@ export function ModelsTopBlock({ userState, children }: Props) {
       <CompactHero open={open} onLearnMoreClick={handleToggle} />
       <AnimatePresence initial={false}>
         {open ? (
-          <motion.div
+          <m.div
             ref={educationalRef}
             key="educational"
-            initial={reduce ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
+            initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
-            exit={reduce ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.3, ease: EASE }}
+            exit={{ height: 0, opacity: 0, transition: reduce ? INSTANT : MOTION.exit }}
+            transition={reduce ? INSTANT : MOTION.base}
             className="overflow-hidden"
           >
             {children}
-          </motion.div>
+          </m.div>
         ) : null}
       </AnimatePresence>
     </>

@@ -4,9 +4,15 @@ import { describe, expect, it, vi } from "vitest";
 import { jsonFail } from "@/lib/api/contracts";
 import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
 import { BOOKING_STATUS_CHANGED_MESSAGE } from "@/lib/bookings/transition";
-import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
+import {
+  ApiClientError,
+  fetchJson,
+  fetchJsonWithAuth,
+  readApiResponse,
+  serverMessageOr,
+} from "@/lib/http/client";
 import { stripComments } from "@/lib/testing/source-scan";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FIX-C8 · CLIENT-ERROR-PASSTHROUGH — отказы, на которые пользователь может
@@ -53,6 +59,9 @@ import { UI_TEXT } from "@/lib/ui/text";
  *          безусловно) → красный на counter-case «отказ без тела оставляет
  *          строку поверхности» в трёх семействах сразу.
  *          Восстановлено побайтно, `git diff` пуст, зелено.
+ * @probe 2026-09-29 (29.09 · 04) — в `remove-master-dialog.tsx` ошибка
+ *          заменена своей строкой (`setError(E.removeFailed)`, без
+ *          `serverMessageOr`): красный на этом файле. Возвращено — зелёный.
  */
 
 /** Ответ сервера как его увидит браузер: настоящий конверт, настоящий статус. */
@@ -220,6 +229,41 @@ describe("FIX-C8 · действенный отказ доходит до пол
     });
   });
 
+  describe("29.09 · 11 — один разбор на три пути", () => {
+    /** Ошибка, которую бросит путь, как плоский объект — для сравнения. */
+    async function refusalVia(path: "fetchJson" | "fetchJsonWithAuth" | "readApiResponse") {
+      const call =
+        path === "fetchJson"
+          ? fetchJson("/x")
+          : path === "fetchJsonWithAuth"
+            ? fetchJsonWithAuth("/x")
+            : readApiResponse(await fetch("/x"));
+      return call.then(
+        () => null,
+        (e: unknown) => {
+          const err = e as ApiClientError;
+          return { type: err.constructor.name, message: err.message, code: err.code, status: err.status, fromServer: err.fromServer };
+        },
+      );
+    }
+
+    it.each([
+      ["курируемый отказ", () => jsonFail(409, "Заявка уже обработана.", "CONFLICT")],
+      ["лимитер 503", () => otpRateLimitFail({ ok: false, error: "RATE_LIMIT_UNAVAILABLE", status: 503, retryAfterSec: 60 })],
+      ["500 без тела", () => new Response(null, { status: 500 })],
+    ])("%s — одинаковая ошибка у fetchJson, fetchJsonWithAuth и readApiResponse", async (_name, make) => {
+      const results = [];
+      for (const path of ["fetchJson", "fetchJsonWithAuth", "readApiResponse"] as const) {
+        wire(make());
+        results.push(await refusalVia(path));
+        vi.unstubAllGlobals();
+      }
+      expect(results[0]?.type).toBe("ApiClientError");
+      expect(results[1]).toEqual(results[0]);
+      expect(results[2]).toEqual(results[0]);
+    });
+  });
+
   describe("осознанный отказ от passthrough пиннится тоже", () => {
     it("`serverMessageOr` не показывает подставленный дефолт как серверный", async () => {
       wire(new Response("<html>502</html>", { status: 502 }));
@@ -262,6 +306,160 @@ const ACTIONABLE_REFUSAL_SURFACES = [
   // CANCEL-DURING-RESCHEDULE: отмена записи клиентом — окно 60 минут и срок
   // отмены называют причину; раньше отказ здесь глотался целиком.
   "src/features/client-cabinet/bookings/client-bookings-page.tsx",
+  // 29.09 доработки · 04: выход из студии и исключение — 409
+  // MASTER_HAS_STUDIO_BOOKINGS называет число записей и что с ними сделать.
+  "src/features/master/components/account/account/studio-membership-card.tsx",
+  "src/features/studio-cabinet/masters/components/remove-master-dialog.tsx",
+  // 29.09 доработки · 11, область 1 — адреса: лимит подсказок (429) и
+  // недоступный сервис (503) — разные советы, оба видны при вводе.
+  "src/features/master/components/profile/editable/address-editor.tsx",
+  "src/features/catalog/components/district-suggest-input.tsx",
+  "src/lib/maps/use-address-with-geocode.ts",
+  // 29.09 доработки · 11, область 2 — модель-офферы: «Заявка уже обработана» (409)
+  // при гонке двух вкладок и отказы создания/правки/закрытия — дословно.
+  "src/features/master/components/model-offers/application-actions-island.tsx",
+  "src/features/master/components/model-offers/modals/create-offer-modal.tsx",
+  "src/features/master/components/model-offers/modals/edit-offer-modal.tsx",
+  "src/features/master/components/model-offers/modals/propose-time-modal.tsx",
+  "src/features/master/components/model-offers/modals/reject-application-modal.tsx",
+  "src/features/master/components/model-offers/offer-actions-row.tsx",
+  // 29.09 доработки · 11, область 3 — кабинет мастера: услуги, портфолио, профиль,
+  // записи, клиенты, уведомления, расписание, горящие окошки, удаление кабинета, сессии.
+  "src/features/master/components/account/account/danger-zone-card.tsx",
+  "src/features/master/components/account/security/sessions-card.tsx",
+  "src/features/master/components/bookings/booking-card-actions.tsx",
+  "src/features/master/components/bookings/use-mark-no-show.tsx",
+  "src/features/master/components/clients/client-detail-panel.tsx",
+  "src/features/master/components/clients/client-notes-editor.tsx",
+  "src/features/master/components/dashboard/booking-action-buttons.tsx",
+  "src/features/master/components/dashboard/confirm-booking-action.tsx",
+  "src/features/master/components/dashboard/manual-booking-modal.tsx",
+  "src/features/master/components/hot-slots-settings-section.tsx",
+  "src/features/master/components/notifications/mark-all-read-button.tsx",
+  "src/features/master/components/notifications/mark-read-button.tsx",
+  "src/features/master/components/notifications/notification-actions.tsx",
+  "src/features/master/components/portfolio/modals/edit-item-modal.tsx",
+  "src/features/master/components/portfolio/portfolio-card.tsx",
+  "src/features/master/components/profile/editable/editable-field-row.tsx",
+  "src/features/master/components/profile/editable/editable-textarea-row.tsx",
+  "src/features/master/components/profile/editable/social-editable-row.tsx",
+  "src/features/master/components/profile/editable/timezone-selector.tsx",
+  "src/features/master/components/profile/editable/username-editable-row.tsx",
+  "src/features/master/components/schedule-settings/breaks-tab.tsx",
+  "src/features/master/components/schedule-settings/calendar/palette-modal.tsx",
+  "src/features/master/components/schedule-settings/calendar/schedule-calendar-tab.tsx",
+  "src/features/master/components/schedule-settings/hours-tab.tsx",
+  "src/features/master/components/schedule-settings/plan/schedule-plan-card.tsx",
+  "src/features/master/components/schedule-settings/plan/schedule-wizard.tsx",
+  "src/features/master/components/schedule-settings/rules-tab.tsx",
+  "src/features/master/components/schedule-settings/visibility-tab.tsx",
+  "src/features/master/components/schedule/booking-card-actions-menu.tsx",
+  "src/features/master/components/schedule/reschedule-modal.tsx",
+  "src/features/master/components/services/modals/bundle-modal.tsx",
+  "src/features/master/components/services/modals/service-modal.tsx",
+  "src/features/master/components/services/reorder-controls.tsx",
+  "src/features/master/components/services/row-menu.tsx",
+  // 29.09 доработки · 11, область 4 — админка: «Город с таким слагом уже существует»,
+  // «Лимит нельзя сделать строже…», цикл тарифов/категорий, ключ ВК — дословно.
+  "src/features/admin-cabinet/billing/components/payments-tab/payments-tab.tsx",
+  "src/features/admin-cabinet/billing/components/plans-grid.tsx",
+  "src/features/admin-cabinet/billing/components/subscriptions-tab/subscriptions-table.tsx",
+  "src/features/admin-cabinet/catalog/components/catalog-table.tsx",
+  "src/features/admin-cabinet/cities/components/cities-table.tsx",
+  "src/features/admin-cabinet/reviews/components/reviews-list.tsx",
+  "src/features/admin-cabinet/settings/components/media-cleanup-section.tsx",
+  "src/features/admin-cabinet/settings/components/queue-status-section.tsx",
+  "src/features/admin-cabinet/settings/components/seo-section.tsx",
+  "src/features/admin-cabinet/settings/components/system-flags-section.tsx",
+  "src/features/admin-cabinet/settings/components/visual-search-section.tsx",
+  "src/features/admin-cabinet/settings/components/vk-community-section.tsx",
+  "src/features/admin-cabinet/users/components/users-table.tsx",
+  // 29.09 доработки · 11, область 5 — кабинет студии: мастера, услуги и пакеты, календарь,
+  // отзывы, уведомления, настройки и удаление студии — отказы сервера дословно.
+  "src/features/studio-cabinet/masters/components/edit-master-profile-dialog.tsx",
+  "src/features/studio-cabinet/masters/components/invite-master-dialog.tsx",
+  "src/features/studio-cabinet/masters/components/pause-master-dialog.tsx",
+  "src/features/studio-cabinet/masters/components/revoke-invite-dialog.tsx",
+  "src/features/studio-cabinet/notifications/components/notification-actions.tsx",
+  "src/features/studio-cabinet/notifications/components/notifications-filters.tsx",
+  "src/features/studio-cabinet/reviews/components/report-review-dialog.tsx",
+  "src/features/studio-cabinet/reviews/components/review-reply-form.tsx",
+  "src/features/studio-cabinet/schedule-settings/components/breaks-tab.tsx",
+  "src/features/studio-cabinet/schedule-settings/components/hours-tab.tsx",
+  "src/features/studio-cabinet/schedule-settings/components/rules-tab.tsx",
+  "src/features/studio-cabinet/schedule-settings/components/visibility-tab.tsx",
+  "src/features/studio-cabinet/schedule-team/components/team-board.tsx",
+  "src/features/studio-cabinet/schedule-team/components/team-rhythm-modal.tsx",
+  "src/features/studio-cabinet/schedule/components/dialogs/booking-action-menu.tsx",
+  "src/features/studio-cabinet/schedule/components/dialogs/cancel-booking-dialog.tsx",
+  "src/features/studio-cabinet/schedule/components/dialogs/create-booking-dialog.tsx",
+  "src/features/studio-cabinet/schedule/components/dialogs/manage-breaks-dialog.tsx",
+  "src/features/studio-cabinet/schedule/components/dialogs/move-booking-dialog.tsx",
+  "src/features/studio-cabinet/services/components/add-category-dialog.tsx",
+  "src/features/studio-cabinet/services/components/add-service-dialog.tsx",
+  "src/features/studio-cabinet/services/components/assign-master-dialog.tsx",
+  "src/features/studio-cabinet/services/components/delete-package-dialog.tsx",
+  "src/features/studio-cabinet/services/components/delete-service-dialog.tsx",
+  "src/features/studio-cabinet/services/components/package-modal.tsx",
+  "src/features/studio-cabinet/services/components/service-detail-panel.tsx",
+  "src/features/studio-cabinet/settings/components/delete-studio-dialog.tsx",
+  "src/features/studio-cabinet/settings/components/policy-form.tsx",
+  "src/features/studio-cabinet/settings/components/profile-media-editor.tsx",
+  // 29.09 доработки · 11, области 6–8 — кабинет клиента, вход/поддержка/чат/уведомления,
+  // медиа, биллинг, публичные страницы, каталог и запись. Все решают через общий
+  // чокпоинт; сырых запросов в них нет (остаток — client-fetch-inventory.json).
+  "src/app/book/book-client.tsx",
+  "src/app/support/support-client.tsx",
+  "src/components/ui/favorite-toggle-button.tsx",
+  "src/features/billing/components/billing-page.tsx",
+  "src/features/billing/components/public-settings-client.tsx",
+  "src/features/booking/components/booking-flow/booking-flow-stepper.tsx",
+  "src/features/booking/components/booking-flow/components/date-grid.tsx",
+  "src/features/booking/components/booking-flow/components/time-grid.tsx",
+  "src/features/booking/components/operator-slot-picker.tsx",
+  "src/features/booking/guest-manage/guest-manage-page.tsx",
+  "src/features/booking/lib/booking-config.ts",
+  "src/features/booking/lib/studio-booking.ts",
+  "src/features/cabinet/components/delete-account-section.tsx",
+  "src/features/cabinet/components/email-notifications.tsx",
+  "src/features/cabinet/components/marketing-consent.tsx",
+  "src/features/cabinet/components/public-username-card.tsx",
+  "src/features/cabinet/components/telegram-notifications.tsx",
+  "src/features/cabinet/components/vk-notifications.tsx",
+  "src/features/cabinet/hooks/use-push-opt-in.ts",
+  "src/features/cabinet/roles/roles-cards.tsx",
+  "src/features/cabinet/setup-guide/setup-guide-card.tsx",
+  "src/features/cabinet/setup-guide/setup-guide-hint.tsx",
+  "src/features/cabinet/setup-guide/setup-guide-profile-card.tsx",
+  "src/features/catalog/components/catalog-card.tsx",
+  "src/features/catalog/pages/catalog-page-client.tsx",
+  "src/features/chat/components/booking-chat.tsx",
+  "src/features/chat/composer/composer.tsx",
+  "src/features/chat/hooks/use-conversation-thread.ts",
+  "src/features/chat/hooks/use-conversations.ts",
+  "src/features/client-cabinet/bookings/client-reschedule-modal.tsx",
+  "src/features/client-cabinet/bookings/client-review-modal.tsx",
+  "src/features/client-cabinet/favorites/client-favorites-page.tsx",
+  "src/features/client-cabinet/notifications/client-notifications-page.tsx",
+  "src/features/client-cabinet/profile/client-profile-page.tsx",
+  "src/features/client-cabinet/reviews/client-reviews-page.tsx",
+  "src/features/client-cabinet/reviews/edit-review-modal.tsx",
+  "src/features/crm/components/client-card-drawer.tsx",
+  "src/features/home/components/visual-search-modal.tsx",
+  "src/features/media/components/avatar-editor.tsx",
+  "src/features/media/components/crop-picker.tsx",
+  "src/features/media/components/login-hero-image-manager.tsx",
+  "src/features/media/components/portfolio-editor.tsx",
+  "src/features/model-offers/components/client-model-applications-page.tsx",
+  "src/features/notifications/components/notifications-center-page.tsx",
+  "src/features/notifications/components/studio-invite-cards.tsx",
+  "src/features/partners/components/partnership-form.tsx",
+  "src/features/public-profile/master/components/package-booking-flow.tsx",
+  "src/features/public-studio/components/studio-package-flow.tsx",
+  "src/features/reviews/components/report-review-modal.tsx",
+  "src/features/reviews/components/review-form.tsx",
+  "src/lib/billing/use-plan-features.ts",
+  "src/lib/hooks/use-telegram-status.ts",
 ] as const;
 
 describe("FIX-C8 · поверхности решают через общий чокпоинт", () => {
@@ -274,8 +472,13 @@ describe("FIX-C8 · поверхности решают через общий ч
         "импортирует чокпоинт — значит решает про серверную строку сама",
     ).toBe(true);
 
+    // 29.09 · 11: форма ВЫЗОВА, а не имя — оставшаяся строка импорта после
+    // замены вызова своей строкой держала проверку зелёной (проба в
+    // `address-refusal-passthrough.test.ts`). Слепая форма — файловая
+    // гранулярность: второй сайт того же файла, всё ещё зовущий помощник,
+    // амнистирует первый.
     expect(
-      /\bserverMessageOr\s*\(|\bserverMessageOr\b/.test(code),
+      /\bserverMessage(?:Or|Of)\s*\(/.test(code),
       `${file}: решение «показать серверное или своё» не принимается — ` +
         "курируемая строка сервера на этой поверхности гибнет",
     ).toBe(true);

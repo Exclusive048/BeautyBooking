@@ -116,6 +116,17 @@ async function incrWithWindow(
   const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
   if (count === 1) {
     await withRedisCommandTimeout("otp:expire", client.expire(key, windowSeconds));
+  } else {
+    // RATE-LIMIT-TTL-HEAL (29.09 доработки): срок окна ставится на первом
+    // инкременте, и если та команда не дошла (таймаут при brownout Redis,
+    // падение процесса между INCR и EXPIRE), ключ остаётся БЕЗ срока — лимит
+    // для этого адреса и маршрута не сбрасывается никогда. Замер на dev:
+    // `rl:publicApi:::1:GET:/api/media` — TTL −1, счётчик 152, 429 навсегда.
+    // На превышении срок досылается с `NX` (только если его нет): такой ключ
+    // живёт не дольше одного окна, а исправный окно не продлевает.
+    // Здесь — на каждом следующем инкременте: предел у вызывающих разный, а
+    // ключ без срока держал бы и бюджет выпуска кода, и потолок в час.
+    await withRedisCommandTimeout("otp:expire-heal", client.expire(key, windowSeconds, "NX"));
   }
   return count;
 }
@@ -219,6 +230,9 @@ export async function registerOtpVerifyFailure(phone: string, ip: string | null)
     const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
     if (count === 1) {
       await withRedisCommandTimeout("otp:expire", client.expire(key, OTP_VERIFY_LOCK_SECONDS));
+    } else {
+      // RATE-LIMIT-TTL-HEAL: счётчик неудач без срока не сбрасывался бы никогда.
+      await withRedisCommandTimeout("otp:expire-heal", client.expire(key, OTP_VERIFY_LOCK_SECONDS, "NX"));
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
       alertOtpRateLimitTriggered(ip, phone);
@@ -358,6 +372,9 @@ export async function registerOtpEmailVerifyFailure(email: string, ip: string | 
     const count = await withRedisCommandTimeout("otp:incr", client.incr(key));
     if (count === 1) {
       await withRedisCommandTimeout("otp:expire", client.expire(key, OTP_VERIFY_LOCK_SECONDS));
+    } else {
+      // RATE-LIMIT-TTL-HEAL: счётчик неудач без срока не сбрасывался бы никогда.
+      await withRedisCommandTimeout("otp:expire-heal", client.expire(key, OTP_VERIFY_LOCK_SECONDS, "NX"));
     }
     if (count >= OTP_VERIFY_FAIL_LIMIT) {
       alertOtpRateLimitTriggered(ip, email);

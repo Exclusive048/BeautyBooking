@@ -17,6 +17,7 @@ import type {
   StudioBookingsListData,
   StudioBookingsRangeCounts,
 } from "./types";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 const COMPLETED_STATUSES = [
   BookingStatus.CONFIRMED,
@@ -116,12 +117,10 @@ export async function listStudioBookings(input: {
   }
   const timezone = studio.provider.timezone;
 
-  const baseScope: Prisma.BookingWhereInput = {
-    OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
-  };
+  const baseScope: Prisma.BookingWhereInput = studioBookingsWhere(studio.id);
 
   const filters = input.filters;
-  const bounds = bookingsTimeRangeBounds(filters.range);
+  const bounds = bookingsTimeRangeBounds(filters.range, timezone);
   const whereRange: Prisma.BookingWhereInput = bounds.from
     ? { startAtUtc: { gte: bounds.from, lt: bounds.toExclusive ?? undefined } }
     : {};
@@ -148,9 +147,9 @@ export async function listStudioBookings(input: {
   // Range chip counts — parallel, ignore status/master/search so the
   // chips show "in this range total". This matches catalog convention
   // (chip count reflects the time slice).
-  const todayBounds = bookingsTimeRangeBounds("today");
-  const tomorrowBounds = bookingsTimeRangeBounds("tomorrow");
-  const weekBounds = bookingsTimeRangeBounds("week");
+  const todayBounds = bookingsTimeRangeBounds("today", timezone);
+  const tomorrowBounds = bookingsTimeRangeBounds("tomorrow", timezone);
+  const weekBounds = bookingsTimeRangeBounds("week", timezone);
 
   const [bookings, todayCount, tomorrowCount, weekCount, allCount] =
     await Promise.all([

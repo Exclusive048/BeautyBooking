@@ -2,22 +2,26 @@
 
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import { PRESS } from "@/components/ui/motion-classes";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { useStoriesViewer } from "@/features/home/stories-viewer-context";
 import {
   getViewedItemIds,
   isMasterFullyViewed,
 } from "@/features/home/stories-viewed-storage";
 import type { StoriesGroup, StoriesPayload } from "@/features/home/types/stories";
+import { cn } from "@/lib/cn";
 import { fetchJson } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const fetcher = (url: string) => fetchJson<StoriesPayload>(url);
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } },
+  visible: { transition: { staggerChildren: STAGGER, delayChildren: 0.08 } },
 };
 
 const itemVariants = {
@@ -25,7 +29,7 @@ const itemVariants = {
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.32, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
+    transition: MOTION.base,
   },
 };
 
@@ -39,8 +43,7 @@ function StoryRing({
   onSelect: (group: StoriesGroup) => void;
 }) {
   const T = UI_TEXT.homeFeed.stories;
-  const reduce = useReducedMotion();
-  const itemAnim = reduce ? undefined : itemVariants;
+  const itemAnim = itemVariants;
   const initials = group.providerName
     .split(" ")
     .map((w) => w[0])
@@ -49,51 +52,55 @@ function StoryRing({
     .toUpperCase();
 
   return (
-    <motion.button
-      type="button"
-      variants={itemAnim}
-      whileHover={reduce ? undefined : { scale: 1.04 }}
-      whileTap={reduce ? undefined : { scale: 0.95 }}
+    <m.div variants={itemAnim} className="w-[84px] shrink-0 snap-start sm:w-[92px]">
+    <Button
+      variant="wrapper"
       onClick={() => onSelect(group)}
       aria-label={`${T.cardLabel} ${group.providerName}`}
-      className="flex w-[84px] shrink-0 snap-start flex-col items-center gap-1.5 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/70 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page sm:w-[92px]"
+      className="w-full rounded-2xl focus-visible:ring-primary-glow/70 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page"
     >
-      <div className="relative">
-        <div
-          className={`flex h-16 w-16 items-center justify-center rounded-full p-[2.5px] sm:h-[72px] sm:w-[72px] ${
-            isViewed ? "bg-border-subtle p-[1px]" : "bg-brand-gradient"
-          }`}
-        >
-          <div className="relative h-full w-full overflow-hidden rounded-full bg-bg-card">
-            {group.avatarUrl ? (
-              <ResilientImage
-                src={group.avatarUrl}
-                alt=""
-                sizes="72px"
-                className="object-cover"
-              />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center bg-primary/10 text-sm font-semibold text-accent-text">
-                {initials || "?"}
-              </span>
-            )}
+      {/* Нажатие — классом на вложенном элементе: framer оставляет на кнопке
+          inline-transform после появления, и `active:` на ней не сработал бы
+          (29.09 доработки · 19). */}
+      <span className={cn("flex w-full flex-col items-center gap-1.5 transition-transform duration-200 ease-brand", PRESS)}>
+        <div className="relative">
+          <div
+            className={`flex h-16 w-16 items-center justify-center rounded-full p-[2.5px] sm:h-[72px] sm:w-[72px] ${
+              isViewed ? "bg-border-subtle p-[1px]" : "bg-brand-gradient"
+            }`}
+          >
+            <div className="relative h-full w-full overflow-hidden rounded-full bg-bg-card">
+              {group.avatarUrl ? (
+                <ResilientImage
+                  src={group.avatarUrl}
+                  alt=""
+                  sizes="72px"
+                  className="object-cover"
+                />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center bg-primary/10 text-sm font-semibold text-accent-text">
+                  {initials || "?"}
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Visual dot indicator for unviewed — supplements the gradient ring for color-blind users */}
+          {!isViewed ? (
+            <span
+              aria-hidden
+              className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-primary-magenta ring-2 ring-bg-page"
+            />
+          ) : null}
+          {!isViewed ? <span className="sr-only">{T.newWorksSr}</span> : null}
         </div>
 
-        {/* Visual dot indicator for unviewed — supplements the gradient ring for color-blind users */}
-        {!isViewed ? (
-          <span
-            aria-hidden
-            className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-primary-magenta ring-2 ring-bg-page"
-          />
-        ) : null}
-        {!isViewed ? <span className="sr-only">{T.newWorksSr}</span> : null}
-      </div>
-
-      <span className="line-clamp-1 max-w-full text-[11px] font-medium text-text-main sm:text-xs">
-        {group.providerName}
+        <span className="line-clamp-1 max-w-full text-[11px] font-medium text-text-main sm:text-xs">
+          {group.providerName}
+        </span>
       </span>
-    </motion.button>
+    </Button>
+    </m.div>
   );
 }
 
@@ -112,8 +119,7 @@ function RailSkeleton() {
 
 export function StoriesRail() {
   const { open, viewedRevision } = useStoriesViewer();
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
+  const container = containerVariants;
   const { data, isLoading, error } = useSWR<StoriesPayload>(
     "/api/feed/stories",
     fetcher,
@@ -154,15 +160,15 @@ export function StoriesRail() {
   }
 
   return (
-    <motion.section
+    <m.section
       data-testid="stories-rail"
-      initial={reduce ? false : { opacity: 0, y: -8 }}
-      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-      transition={reduce ? { duration: 0 } : { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+      initial={{ opacity: 0, y: -DISTANCE.nudge }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={MOTION.section}
       aria-label={T.railAria}
       className="-mx-4 sm:-mx-6"
     >
-      <motion.div
+      <m.div
         variants={container}
         initial="hidden"
         animate="visible"
@@ -176,7 +182,7 @@ export function StoriesRail() {
             onSelect={onSelect}
           />
         ))}
-      </motion.div>
-    </motion.section>
+      </m.div>
+    </m.section>
   );
 }

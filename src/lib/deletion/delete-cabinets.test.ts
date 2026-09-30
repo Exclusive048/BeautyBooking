@@ -175,7 +175,8 @@ describe("deleteStudioCabinet", () => {
     await deleteStudioCabinet(USER);
     const where = JSON.stringify(callsOf("booking", "count")[0]);
     expect(where).toContain('"studioId":"st"');
-    expect(where).toContain('"providerId":"prov-s"');
+    // 29.09 · 08: скоуп студии — только studioId (поверхность), без OR по providerId.
+    expect(where).not.toContain('"providerId":"prov-s"');
     expect(where).not.toContain("masterProviderId");
   });
 

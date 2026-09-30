@@ -6,6 +6,7 @@ import {
   notifyModelApplicationRejected,
 } from "@/lib/notifications/model-notifications";
 import { prisma } from "@/lib/prisma";
+import { buildOccupancyBookingWhere, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import { dateFromKey, minutesToTime, parseTime, timeToMinutes } from "@/lib/schedule/time";
 import { toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 
@@ -215,12 +216,13 @@ export async function computeAvailableTimeSlots(input: {
 
   const buffer = Math.max(0, Math.min(30, offer.master.bufferBetweenBookingsMin ?? 0));
 
+  // STUDIO-MASTER-PROFILES (этап 1): время занято по ЧЕЛОВЕКУ — запись в
+  // другом профиле того же мастера (личном или в студии) тоже закрывает окошко,
+  // иначе модель соглашалась на время, которое подтверждение потом отклонит 409.
+  const occupancyIds = await resolveOccupancyProviderIds(prisma, offer.masterId);
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [
-        { providerId: offer.masterId },
-        { masterProviderId: offer.masterId },
-      ],
+      ...buildOccupancyBookingWhere(occupancyIds),
       status: { in: ACTIVE_BOOKING_STATUSES as Prisma.EnumBookingStatusFilter["in"] },
       startAtUtc: { not: null, lt: dayEndUtc },
       endAtUtc: { not: null, gt: dayStartUtc },

@@ -4,7 +4,9 @@ import { getTelegramChatIdForUser } from "@/lib/notifications/recipients";
 import { isTelegramEnabled } from "@/lib/env";
 import { createTelegramSendJob } from "@/lib/queue/types";
 import { enqueue } from "@/lib/queue/queue";
-import { logError } from "@/lib/logging/logger";
+import { logError, logInfo } from "@/lib/logging/logger";
+import { filterUsersWithMarketingConsent } from "@/lib/legal/consent";
+import { isMarketingNotificationType } from "@/lib/notifications/marketing-types";
 import { sendPushToUser } from "@/lib/notifications/push/send";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +48,10 @@ const IMPORTANT_NOTIFICATION_TYPES = new Set<NotificationType>([
   "BOOKING_REMINDER_24H",
   "BOOKING_REMINDER_2H",
   "REVIEW_LEFT",
+  // SCHEDULE-PATTERNS-01 (этап 3): одно на дату окончания, а пропуск стоит
+  // пустого расписания — клиенты перестают видеть окошки.
+  "SCHEDULE_ENDING",
+  "STUDIO_SCHEDULE_ENDING",
 ]);
 
 async function enqueueTelegramMessage(userId: string, text: string): Promise<void> {
@@ -196,6 +202,21 @@ export function deliverExternalChannels(
 }
 
 export async function deliverNotification(input: DeliveryInput): Promise<void> {
+  // 29.09 доработки · 16 (ENFORCEMENT: ConsentType.MARKETING): рекламный тип
+  // (`notifications/marketing-types.ts`) без активного согласия на рекламу не
+  // создаётся ни в одном канале — ни записи в центре, ни пуша, ни почты. Это
+  // единственная точка: оба отправителя горящих окошек идут через неё, а прямой
+  // вызов `createNotification` с рекламным типом запрещает сторож
+  // `notifications/marketing-types.test.ts`. В лог — только тип и id, без
+  // телефона и имени.
+  if (isMarketingNotificationType(input.type)) {
+    const allowed = await filterUsersWithMarketingConsent([input.userId]);
+    if (!allowed.has(input.userId)) {
+      logInfo("notification.marketing.skipped", { type: input.type, userId: input.userId });
+      return;
+    }
+  }
+
   const record = await createNotification({
     userId: input.userId,
     type: input.type,

@@ -4,12 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   STATUS_BADGE_CLASS,
   getStatusTone,
 } from "../lib/status-display";
 import type { StudioMasterListItem } from "../server/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.studioCabinet.mastersV2;
 
@@ -48,8 +49,7 @@ export function MasterListItem({
   const tone = getStatusTone(master.status);
 
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       onClick={handleSelect}
       className={cn(
         "flex w-full items-start gap-3 rounded-xl border bg-bg-card p-3 text-left transition-all",
@@ -128,6 +128,6 @@ export function MasterListItem({
           {statusLabel(master.status)}
         </span>
       </div>
-    </button>
+    </Button>
   );
 }

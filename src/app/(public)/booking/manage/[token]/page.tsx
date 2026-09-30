@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AppError } from "@/lib/api/errors";
 import { getGuestManageView, resolveGuestManageScope } from "@/lib/bookings/guest-manage";
 import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   GuestManagePage,
   type GuestManagePageState,
@@ -43,6 +43,11 @@ export default async function GuestManageBookingPage({ params }: Props) {
             when: formatBookingWhenLabel(item.startAtUtc ? new Date(item.startAtUtc) : null, view.timezone),
             proposed: formatBookingWhenLabel(
               item.proposedStartAt ? new Date(item.proposedStartAt) : null,
+              view.timezone,
+            ),
+            // 29.09 доработки · 05: срок отзыва — тоже salon-tz с меткой.
+            reviewDeadline: formatBookingWhenLabel(
+              item.review.deadlineUtc ? new Date(item.review.deadlineUtc) : null,
               view.timezone,
             ),
           },

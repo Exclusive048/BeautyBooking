@@ -151,14 +151,22 @@ export type MasterModelOffersViewData = {
 const ACTIVE_STATUS = ModelOfferStatus.ACTIVE;
 
 export async function getMasterModelOffersView(input: {
+  /** Личный профиль: из его услуг создаются новые офферы. */
   masterProviderId: string;
+  /**
+   * STUDIO-MASTER-PROFILES (этап 4): профили, чьи офферы показывать, —
+   * личный и профили в студиях (студийные офферы перенесены на профиль в
+   * студии при разделении). По умолчанию — только личный.
+   */
+  offerMasterIds?: string[];
   filterOfferId: string | null;
   now?: Date;
 }): Promise<MasterModelOffersViewData> {
   const now = input.now ?? new Date();
+  const offerMasterIds = input.offerMasterIds?.length ? input.offerMasterIds : [input.masterProviderId];
 
   const offers = await prisma.modelOffer.findMany({
-    where: { masterId: input.masterProviderId },
+    where: { masterId: { in: offerMasterIds } },
     orderBy: [{ dateLocal: "asc" }, { timeRangeStartLocal: "asc" }, { id: "asc" }],
     select: {
       id: true,
@@ -224,7 +232,7 @@ export async function getMasterModelOffersView(input: {
     ? []
     : await prisma.masterService.findMany({
         where: {
-          masterProviderId: input.masterProviderId,
+          masterProviderId: { in: offerMasterIds },
           serviceId: { in: Array.from(referencedServiceIds) },
         },
         select: {
@@ -249,7 +257,7 @@ export async function getMasterModelOffersView(input: {
     ? []
     : await prisma.service.findMany({
         where: {
-          providerId: input.masterProviderId,
+          providerId: { in: offerMasterIds },
           id: { in: Array.from(referencedServiceIds) },
         },
         select: {

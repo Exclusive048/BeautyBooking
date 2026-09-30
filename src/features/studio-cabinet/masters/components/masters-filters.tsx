@@ -4,12 +4,12 @@ import { Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   StudioMasterFilter,
   StudioMastersCounts,
 } from "../server/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.studioCabinet.mastersV2.filters;
 
@@ -82,28 +82,12 @@ export function MastersFilters({
           className="pl-9"
         />
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border-subtle bg-bg-page p-1">
-        {TABS.map((tab) => {
-          const isActive = tab.id === filter;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilter(tab.id)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-bg-card text-text-main shadow-card"
-                  : "bg-transparent text-text-sec hover:text-text-main",
-              )}
-              aria-pressed={isActive}
-            >
-              {T.tabs[tab.labelKey]}
-              <span className="ml-1.5 text-xs text-text-sec">{countFor(tab.id)}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.tabsAria}
+        items={TABS.map((tab) => ({ id: tab.id, label: T.tabs[tab.labelKey], badge: countFor(tab.id) }))}
+        value={filter}
+        onChange={(id) => setFilter(id as StudioMasterFilter)}
+      />
     </div>
   );
 }

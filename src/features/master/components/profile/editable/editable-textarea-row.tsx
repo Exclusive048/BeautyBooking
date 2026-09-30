@@ -1,12 +1,12 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOf } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
 import { useAutosave } from "./use-autosave";
+import { InlineEditField, InlineEditPencil, InlineEditTextarea } from "@/components/ui/inline-edit";
 
 const T = UI_TEXT.cabinetMaster.profile.editable;
 
@@ -65,14 +65,15 @@ export function EditableTextareaRow({
   }, [value]);
 
   const autosave = useAutosave<string>(async (next) => {
-    const response = await fetch(apiPath, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [fieldKey]: next }),
-    });
-    if (!response.ok) {
+    try {
+      await fetchJsonWithAuth<unknown>(apiPath, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [fieldKey]: next }),
+      });
+    } catch (error) {
       setSavedValue(confirmedRef.current);
-      return { ok: false };
+      return { ok: false, message: serverMessageOf(error) };
     }
     confirmedRef.current = next;
     setSavedValue(next);
@@ -139,7 +140,7 @@ export function EditableTextareaRow({
         </div>
         {isEditing ? (
           <>
-            <textarea
+            <InlineEditTextarea
               id={inputId}
               ref={textareaRef}
               value={draft}
@@ -149,34 +150,33 @@ export function EditableTextareaRow({
               maxLength={maxLength}
               placeholder={placeholder}
               rows={4}
-              className="mt-1 block w-full resize-y border-0 border-b-2 border-primary bg-transparent py-1 text-sm leading-relaxed text-text-main outline-none focus:ring-0"
+              className="mt-1"
             />
             {counter ? (
               <p className="mt-1 font-mono text-[10px] text-text-sec">{counter}</p>
             ) : null}
           </>
         ) : (
-          <button
-            type="button"
+          <InlineEditField multiline
             onClick={enterEdit}
-            className={cn(
-              "mt-1 block w-full whitespace-pre-wrap text-left text-sm leading-relaxed",
-              isEmpty ? "italic text-text-sec" : "text-text-main"
-            )}
+            empty={isEmpty}
+            className="mt-1"
           >
             {isEmpty ? T.emptyValue : savedValue}
-          </button>
+          </InlineEditField>
         )}
+        {autosave.errorMessage ? (
+          <p role="alert" className="mt-1 text-xs text-danger-text">
+            {autosave.errorMessage}
+          </p>
+        ) : null}
       </div>
       {!isEditing ? (
-        <button
-          type="button"
+        <InlineEditPencil
           onClick={enterEdit}
           aria-label={T.editAriaLabel}
-          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </button>
+          className="mt-2"
+        />
       ) : null}
     </div>
   );

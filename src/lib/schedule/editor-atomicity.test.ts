@@ -36,7 +36,10 @@ const spies = vi.hoisted(() => ({
 function txClient() {
   const write = (name: string) => async (...args: unknown[]) => {
     spies.writesInsideTx(name, ...args);
-    if (name === "weeklyScheduleDay.createMany" && state.failOnWeeklyCreate) {
+    // SCHEDULE-PATTERNS-01: неделя пишется графиком — сбой вбрасывается в
+    // запись периода, самый чувствительный шаг (до него прежний период уже
+    // обрезан).
+    if (name === "schedulePattern.create" && state.failOnWeeklyCreate) {
       throw new Error("connection reset");
     }
     return { id: "x", count: 0 };
@@ -47,9 +50,11 @@ function txClient() {
     create: write(`${name}.create`),
     createMany: write(`${name}.createMany`),
     deleteMany: write(`${name}.deleteMany`),
-    findUnique: async () => ({ id: "cfg-1" }),
+    delete: write(`${name}.delete`),
+    findUnique: async () => ({ id: "cfg-1", timezone: "Europe/Moscow", days: [] }),
     findFirst: async () => null,
     findMany: async () => [],
+    count: async () => 0,
   });
   return {
     weeklyScheduleConfig: model("weeklyScheduleConfig"),
@@ -58,6 +63,7 @@ function txClient() {
     scheduleTemplateBreak: model("scheduleTemplateBreak"),
     scheduleOverride: model("scheduleOverride"),
     scheduleBreak: model("scheduleBreak"),
+    schedulePattern: model("schedulePattern"),
     provider: model("provider"),
     discountRule: model("discountRule"),
   };
@@ -75,9 +81,11 @@ function rootModel(name: string) {
     create: write("create"),
     createMany: write("createMany"),
     deleteMany: write("deleteMany"),
-    findUnique: async () => ({ id: "cfg-1" }),
+    delete: write("delete"),
+    findUnique: async () => ({ id: "cfg-1", timezone: "Europe/Moscow", days: [] }),
     findFirst: async () => null,
     findMany: async () => [],
+    count: async () => 0,
   };
 }
 
@@ -94,6 +102,7 @@ vi.mock("@/lib/prisma", () => ({
     scheduleTemplateBreak: rootModel("scheduleTemplateBreak"),
     scheduleOverride: rootModel("scheduleOverride"),
     scheduleBreak: rootModel("scheduleBreak"),
+    schedulePattern: rootModel("schedulePattern"),
     provider: rootModel("provider"),
     discountRule: rootModel("discountRule"),
   },
@@ -182,5 +191,18 @@ describe("LOGIC-12 · писатели не имеют доступа к кор�
     // законно — они вне этого среза.
     expect(writers).not.toMatch(/await prisma\./);
     expect(writers).toMatch(/tx: Prisma\.TransactionClient/);
+  });
+
+  it("SCHEDULE-PATTERNS-01: писатель графиков пишет только транзакционным клиентом", () => {
+    // Неделя «Часов» пишется графиком (`saveWeekAsPatternTx`), то есть тот же
+    // снапшот продолжается в `patterns.ts` / `patterns-core.ts`. Корневой
+    // клиент там допустим только в чтении для кабинета (`loadSchedulePlan`).
+    const patterns = readFileSync(join(SRC, "lib/schedule/patterns.ts"), "utf8");
+    const writers = patterns.slice(0, patterns.indexOf("// ─── Чтение для кабинета"));
+    expect(writers.length).toBeGreaterThan(0);
+    expect(writers).not.toMatch(/\bprisma\./);
+
+    const core = readFileSync(join(SRC, "lib/schedule/patterns-core.ts"), "utf8");
+    expect(core).not.toMatch(/from "@\/lib\/prisma"/);
   });
 });

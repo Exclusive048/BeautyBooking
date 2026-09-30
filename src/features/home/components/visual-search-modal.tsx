@@ -10,12 +10,14 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from "react";
+import { IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { VisualSearchHttpResponse } from "@/lib/visual-search/contracts";
 import { VISUAL_CATEGORY_LABELS } from "@/lib/visual-search/prompt";
+import { FileInput } from "@/components/ui/file-input";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -111,23 +113,14 @@ export function VisualSearchModal({ open, onClose }: Props) {
     try {
       const formData = new FormData();
       formData.append("image", selectedFile);
-      const res = await fetch("/api/visual-search", {
+      const data = await fetchJson<VisualSearchHttpResponse>("/api/visual-search", {
         method: "POST",
         body: formData,
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<VisualSearchHttpResponse> | null;
-
-      if (!res.ok || !json || !json.ok) {
-        setError(
-          json && !json.ok
-            ? json.error.message
-            : UI_TEXT.home.visualSearch.messages.searchFailed
-        );
-        return;
-      }
-      setResponse(json.data);
-    } catch {
-      setError(UI_TEXT.home.visualSearch.messages.searchFailed);
+      setResponse(data);
+    } catch (error) {
+      // Суточный потолок, лимит, неподходящий файл — дословно.
+      setError(serverMessageOr(error, UI_TEXT.home.visualSearch.messages.searchFailed));
     } finally {
       setIsSearching(false);
     }
@@ -183,7 +176,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
               className={[
                 "relative flex cursor-pointer flex-col items-center justify-center gap-3",
                 "rounded-2xl border-2 border-dashed py-9 px-6 text-center",
-                "transition-all duration-150 select-none",
+                "transition-all duration-200 select-none",
                 isDragging
                   ? "border-brand-accent/50 bg-brand-accent/5"
                   : "border-border-subtle bg-bg-input/40 hover:border-border-subtle/80 hover:bg-bg-input/70",
@@ -217,11 +210,9 @@ export function VisualSearchModal({ open, onClose }: Props) {
                 {UI_TEXT.home.visualSearch.fileRequirements}
               </p>
 
-              <input
+              <FileInput
                 ref={inputRef}
-                type="file"
                 accept="image/jpeg,image/png,image/webp"
-                className="hidden"
                 onChange={handleInputChange}
               />
             </div>
@@ -252,9 +243,9 @@ export function VisualSearchModal({ open, onClose }: Props) {
 
           {/* Error */}
           {error && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-red-500/15 bg-red-500/[0.06] px-3.5 py-2.5">
-              <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
-              <p className="text-xs leading-relaxed text-red-300/90">{error}</p>
+            <div className="flex items-start gap-2.5 rounded-xl border border-destructive/15 bg-destructive/[0.06] px-3.5 py-2.5">
+              <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
+              <p className="text-xs leading-relaxed text-danger-text">{error}</p>
             </div>
           )}
 
@@ -314,14 +305,14 @@ export function VisualSearchModal({ open, onClose }: Props) {
                         {item.matchingPhotos.slice(0, 3).map((photo, photoIndex) => (
                           <div
                             key={photo.assetId}
-                            className="aspect-square overflow-hidden"
+                            className="group aspect-square overflow-hidden"
                           >
                             <img
                               src={photo.url}
                               alt={UI_TEXT.home.visualSearch.resultPhotoAltTemplate
                                 .replace("{provider}", item.provider.name)
                                 .replace("{n}", String(photoIndex + 1))}
-                              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                              className={`h-full w-full object-cover ${IMAGE_ZOOM}`}
                             />
                           </div>
                         ))}

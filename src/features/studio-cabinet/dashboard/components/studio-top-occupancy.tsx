@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioOccupancyRow } from "../server/types";
 
 const T = UI_TEXT.studioCabinet.dashboardV2.topOccupancy;

@@ -13,7 +13,8 @@ import { Copy, MoreVertical, Trash2, type LucideIcon } from "lucide-react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.week.actionMenu;
 
@@ -125,7 +126,7 @@ export function DayActionMenu({
       <div
         ref={menuRef}
         role="menu"
-        className="fixed z-[9999] w-64 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
+        className="fixed z-popover w-64 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
         style={{ top: coords.top, left: coords.left }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -144,9 +145,8 @@ export function DayActionMenu({
 
   return (
     <>
-      <button
+      <Button variant="wrapper"
         ref={triggerRef}
-        type="button"
         aria-label={T.triggerAria}
         aria-expanded={open}
         onClick={(event) => {
@@ -156,7 +156,7 @@ export function DayActionMenu({
         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input/70 hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <MoreVertical className="h-4 w-4" aria-hidden />
-      </button>
+      </Button>
 
       {isHydrated && menuContent ? createPortal(menuContent, document.body) : null}
 
@@ -177,17 +177,16 @@ function MenuItem({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       role="menuitem"
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-bg-input/70",
-        variant === "danger" ? "text-red-600 dark:text-red-400" : "text-text-main",
+        variant === "danger" ? "text-danger-text" : "text-text-main",
       )}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       <span>{children}</span>
-    </button>
+    </Button>
   );
 }

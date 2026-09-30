@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatOfferDateShort } from "../lib/format";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.proposeTime;
@@ -55,18 +56,17 @@ export function ProposeTimeModal({
     setSelected(null);
     setError(null);
     setSlots([]);
-    void fetch(`/api/master/model-offers/${offerId}/time-slots`)
-      .then((response) => response.json())
-      .then((json) => {
+    // Чтение: отказ — своя строка (действия у мастера нет, кроме повтора), но
+    // не «свободного времени нет» — при сбое это было бы неправдой (29.09 · 11).
+    void fetchJsonWithAuth<{ slots?: typeof slots }>(`/api/master/model-offers/${offerId}/time-slots`)
+      .then((data) => {
         if (cancelled) return;
-        if (json?.ok && Array.isArray(json.data?.slots)) {
-          setSlots(json.data.slots);
-        } else {
-          setSlots([]);
-        }
+        setSlots(Array.isArray(data?.slots) ? data.slots : []);
       })
       .catch(() => {
-        if (!cancelled) setSlots([]);
+        if (cancelled) return;
+        setSlots([]);
+        setError(T.slotsLoadFailed);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -88,7 +88,7 @@ export function ProposeTimeModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/master/model-applications/${applicationId}/propose-time`,
         {
           method: "POST",
@@ -96,14 +96,10 @@ export function ProposeTimeModal({
           body: JSON.stringify({ proposedTimeLocal: selected }),
         }
       );
-      if (!response.ok) {
-        setError(T.errorPropose);
-        return;
-      }
       router.refresh();
       onClose();
-    } catch {
-      setError(T.errorPropose);
+    } catch (error) {
+      setError(serverMessageOr(error, T.errorPropose));
     } finally {
       setSaving(false);
     }
@@ -131,7 +127,7 @@ export function ProposeTimeModal({
         <p className="text-sm font-medium text-text-main">{T.slotsLabel}</p>
         {loading ? (
           <p className="text-sm text-text-sec">{T.slotsLoading}</p>
-        ) : slots.length === 0 ? (
+        ) : slots.length === 0 && error === T.slotsLoadFailed ? null : slots.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border-subtle bg-bg-card/60 px-4 py-3 text-sm italic text-text-sec">
             {T.slotsEmpty}
           </p>
@@ -140,9 +136,8 @@ export function ProposeTimeModal({
             {slots.map((slot) => {
               const active = selected === slot.startLocal;
               return (
-                <button
+                <Button variant="wrapper"
                   key={slot.startLocal}
-                  type="button"
                   onClick={() => setSelected(slot.startLocal)}
                   className={cn(
                     "rounded-lg border px-3 py-2 font-mono text-sm transition-colors",
@@ -153,7 +148,7 @@ export function ProposeTimeModal({
                   )}
                 >
                   {slot.startLocal}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -165,7 +160,7 @@ export function ProposeTimeModal({
       {error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-400/40 dark:bg-rose-950/40 dark:text-rose-300"
+          className="mt-4 rounded-xl border border-danger-border bg-danger-surface px-4 py-2 text-sm text-danger-text"
         >
           {error}
         </p>

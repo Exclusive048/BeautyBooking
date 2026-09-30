@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.publicStudio;
 

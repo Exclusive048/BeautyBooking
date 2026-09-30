@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { useToast } from "@/components/ui/toast";
+import { Button } from "@/components/ui/button";
+import { DismissLayer } from "@/components/ui/dismiss-layer";
 
 const ROW_T = UI_TEXT.cabinetMaster.servicesPage.row;
 const M = UI_TEXT.cabinetMaster.servicesPage.menu;
@@ -26,6 +30,7 @@ type Props = {
  */
 export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { confirm, modal: confirmModal } = useConfirm();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -41,16 +46,14 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
     setOpen(false);
     setBusy(true);
     try {
-      const response = await fetch(baseUrl, {
+      await fetchJsonWithAuth<unknown>(baseUrl, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isEnabled: !isEnabled }),
       });
-      if (!response.ok) {
-        window.alert(errorTexts.errorUpdate);
-        return;
-      }
       router.refresh();
+    } catch (error) {
+      toast.error(serverMessageOr(error, errorTexts.errorUpdate));
     } finally {
       setBusy(false);
     }
@@ -66,18 +69,16 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
     if (!ok) return;
     setBusy(true);
     try {
-      const response = await fetch(baseUrl, { method: "DELETE" });
-      if (!response.ok) {
-        const json = await response.json().catch(() => null);
-        const code = json?.error?.code;
-        if (itemType === "service" && code === "SERVICE_HAS_BOOKINGS") {
-          window.alert(SERVICE_T.errorHasBookings);
-        } else {
-          window.alert(errorTexts.errorDelete);
-        }
-        return;
-      }
+      await fetchJsonWithAuth<unknown>(baseUrl, { method: "DELETE" });
       router.refresh();
+    } catch (error) {
+      // У поверхности своя, более точная строка для записей на услуге —
+      // проверяется до общего решения (FIX-C8).
+      if (itemType === "service" && error instanceof ApiClientError && error.code === "SERVICE_HAS_BOOKINGS") {
+        toast.error(SERVICE_T.errorHasBookings);
+      } else {
+        toast.error(serverMessageOr(error, errorTexts.errorDelete));
+      }
     } finally {
       setBusy(false);
     }
@@ -85,8 +86,7 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
 
   return (
     <div className="relative shrink-0">
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((prev) => !prev);
@@ -96,15 +96,10 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
         className="flex h-7 w-7 items-center justify-center rounded-md text-text-sec transition-colors hover:bg-bg-input hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <MoreVertical className="h-3.5 w-3.5" aria-hidden />
-      </button>
+      </Button>
       {open ? (
         <>
-          <button
-            type="button"
-            aria-label={UI_TEXT.a11y.closeMenu}
-            className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setOpen(false)}
-          />
+          <DismissLayer label={UI_TEXT.a11y.closeMenu} onDismiss={() => setOpen(false)} className="z-10" />
           <ul className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-border-subtle bg-bg-card py-1 shadow-card">
             <Item
               icon={Pencil}
@@ -142,17 +137,16 @@ function Item({
 }) {
   return (
     <li>
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={onClick}
         className={cn(
           "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-bg-input",
-          destructive ? "text-rose-700 dark:text-rose-300" : "text-text-main"
+          destructive ? "text-danger-text" : "text-text-main"
         )}
       >
         <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
         {label}
-      </button>
+      </Button>
     </li>
   );
 }

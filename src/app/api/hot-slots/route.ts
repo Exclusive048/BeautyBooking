@@ -15,6 +15,7 @@ import { encodeCursor } from "@/lib/pagination/cursor";
 import * as cache from "@/lib/cache/cache";
 import { getClientIp } from "@/lib/http/ip";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 const hotSlotsQuerySchema = z.object({
@@ -244,7 +245,7 @@ export async function GET(req: Request) {
     // цена одного запроса на порядок выше обычного публичного чтения, а
     // варьируя `from`, можно промахиваться мимо кэша намеренно.
     const limitResult = await checkRateLimit(
-      `rl:hot-slots:feed:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       RATE_LIMITS.hotSlotsFeed,
     );
     if (limitResult.limited) {

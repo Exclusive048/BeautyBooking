@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ConversationList } from "@/features/chat/conversation-list/conversation-list";
 import { ChatWindow } from "@/features/chat/chat-window/chat-window";
 import { useConversations } from "@/features/chat/hooks/use-conversations";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
 import type { ChatPerspective } from "@/features/chat/types";
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar, CheckCircle2, Clock, MapPin, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ConfirmedBooking } from "@/features/booking/components/booking-flow/types";
@@ -77,8 +77,8 @@ export function SuccessPhase({ booking, onCancel }: Props) {
   return (
     <div className="space-y-5 p-5">
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-5 w-5 text-emerald-500" aria-hidden strokeWidth={2} />
-        <p className="text-[11px] font-medium uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+        <CheckCircle2 className="h-5 w-5 text-success-text" aria-hidden strokeWidth={2} />
+        <p className="text-[11px] font-medium uppercase tracking-wider text-success-text">
           {T.successEyebrow}
         </p>
       </div>
@@ -153,7 +153,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
                 setCancelling(false);
               }
             }}
-            className="w-full text-text-sec hover:text-rose-600"
+            className="w-full text-text-sec hover:text-danger-text"
           >
             {cancelling ? TF.calendarLoading : T.successCancelAuth}
           </Button>

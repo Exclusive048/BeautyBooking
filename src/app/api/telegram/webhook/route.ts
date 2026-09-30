@@ -6,6 +6,7 @@ import { handleTelegramWebhook } from "@/lib/telegram/webhook";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getClientIp } from "@/lib/http/ip";
 import { checkTelegramWebhookRateLimit } from "@/lib/telegram/webhookRateLimit";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { z } from "zod";
 
 const telegramWebhookBodySchema = z.record(z.string(), z.unknown());
@@ -28,9 +29,9 @@ export async function POST(req: Request) {
 
   const requestId = getRequestId(req);
   const ip = getClientIp(req);
-  const allowed = await checkTelegramWebhookRateLimit(ip);
-  if (!allowed) {
-    return fail("Слишком много запросов. Попробуйте позже.", 429, "RATE_LIMITED");
+  const refusal = resolveRateLimitRefusal(await checkTelegramWebhookRateLimit(req, ip));
+  if (refusal) {
+    return fail(refusal.message, refusal.status, refusal.code);
   }
 
   try {

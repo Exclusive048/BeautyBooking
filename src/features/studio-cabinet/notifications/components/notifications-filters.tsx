@@ -2,15 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { Select } from "@/components/ui/select";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   NotificationSort,
   StudioNotificationChip,
   StudioNotificationsChipCounts,
 } from "../lib/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.studioCabinet.notificationsV2.filters;
 
@@ -35,6 +37,7 @@ const CHIPS: Array<{ key: StudioNotificationChip; labelKey: keyof typeof T }> = 
 
 export function NotificationsFilters({ activeChip, sort, counts }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [, startTransition] = useTransition();
@@ -59,8 +62,11 @@ export function NotificationsFilters({ activeChip, sort, counts }: Props) {
     try {
       // Reuse existing bulk endpoint — `context=all` covers every channel
       // the studio admin sees (STUDIO + any spillover like SYSTEM).
-      await fetch("/api/notifications/read-all?context=all", { method: "POST" });
+      await fetchJsonWithAuth<unknown>("/api/notifications/read-all?context=all", { method: "POST" });
       startTransition(() => router.refresh());
+    } catch (error) {
+      // 29.09 · 11: раньше отказ не проверялся вовсе — тихий отказ.
+      toast.error(serverMessageOr(error, T.markAllReadFailed));
     } finally {
       setBusy(false);
     }
@@ -68,36 +74,12 @@ export function NotificationsFilters({ activeChip, sort, counts }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap gap-1.5">
-        {CHIPS.map((chip) => {
-          const active = activeChip === chip.key;
-          const count = counts[chip.key];
-          return (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => selectChip(chip.key)}
-              aria-pressed={active}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "border-primary/40 bg-primary/10 text-accent-text"
-                  : "border-border-subtle bg-bg-card text-text-sec hover:text-text-main",
-              )}
-            >
-              <span>{T[chip.labelKey]}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 font-mono text-[10px] tabular-nums",
-                  active ? "bg-primary/20 text-accent-text" : "bg-bg-input text-text-sec",
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.aria}
+        items={CHIPS.map((chip) => ({ id: chip.key, label: T[chip.labelKey], badge: counts[chip.key] }))}
+        value={activeChip}
+        onChange={(id) => selectChip(id as StudioNotificationChip)}
+      />
       <div className="ml-auto flex items-center gap-2">
         <Select
           value={sort}

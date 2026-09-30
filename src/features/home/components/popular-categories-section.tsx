@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
-import { UI_TEXT } from "@/lib/ui/text";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson } from "@/lib/http/client";
+import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Category = {
   id: string;
@@ -19,35 +20,33 @@ const LIMIT = 8;
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+  visible: { transition: { staggerChildren: STAGGER, delayChildren: 0.05 } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, scale: 0.94, y: 12 },
+  hidden: { opacity: 0, scale: 0.94, y: DISTANCE.rise },
   visible: {
     opacity: 1,
     scale: 1,
     y: 0,
-    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
+    transition: MOTION.section,
   },
 };
 
 export function PopularCategoriesSection() {
   const [categories, setCategories] = useState<Category[]>([]);
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
-  const item = reduce ? undefined : itemVariants;
+  const container = containerVariants;
+  const item = itemVariants;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: Category[] } | Category[]>
-          | null;
-        if (!res.ok || !json || !json.ok) return;
-        const payload = Array.isArray(json.data) ? json.data : (json.data?.categories ?? []);
+        const data = await fetchJson<{ categories: Category[] } | Category[]>(
+          "/api/catalog/global-categories?status=APPROVED",
+          { cache: "no-store" },
+        );
+        const payload = Array.isArray(data) ? data : (data?.categories ?? []);
         if (!cancelled) {
           setCategories(
             payload
@@ -56,7 +55,7 @@ export function PopularCategoriesSection() {
           );
         }
       } catch {
-        // silently ignore
+        // Витрина главной: без категорий блок просто не показывается.
       }
     })();
     return () => { cancelled = true; };
@@ -83,15 +82,15 @@ export function PopularCategoriesSection() {
         </Link>
       </div>
 
-      <motion.div
+      <m.div
         variants={container}
         initial="hidden"
         whileInView="visible"
-        viewport={{ once: true, margin: "-60px" }}
+        viewport={VIEWPORT_ONCE}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
       >
         {categories.map((cat) => (
-          <motion.div key={cat.id} variants={item}>
+          <m.div key={cat.id} variants={item}>
             <Link
               href={buildCatalogUrl({ globalCategoryId: cat.id })}
               className="group flex flex-col items-center gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"
@@ -109,9 +108,9 @@ export function PopularCategoriesSection() {
                 {cat.title}
               </span>
             </Link>
-          </motion.div>
+          </m.div>
         ))}
-      </motion.div>
+      </m.div>
     </section>
   );
 }

@@ -17,7 +17,8 @@ import {
   salonMinuteOfDay,
   toDateKey,
 } from "../lib/time-grid";
-import { resolveMasterWorkHours } from "@/lib/schedule/master-work-window";
+import { dayPlanHours, loadDayPlans } from "@/lib/schedule/day-plans";
+import { timeToMinutes } from "@/lib/schedule/time";
 import type {
   ScheduleBookingCell,
   ScheduleBreakCell,
@@ -29,6 +30,7 @@ import type {
   ScheduleWeekRow,
   StudioScheduleData,
 } from "./types";
+import { isStudioSurfaceBooking, studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 /**
  * Studio admin booking operations (create/move/cancel) are DIRECT —
@@ -121,8 +123,7 @@ async function buildDayData(
     prisma.booking.findMany({
       where: {
         OR: [
-          { studioId },
-          { providerId },
+          studioBookingsWhere(studioId),
           // STUDIO-MASTER-PROFILES (этап 4): после разделения личная запись
           // мастера — на его ЛИЧНОМ профиле (`studioId = null`), и клоз ниже
           // её уже не видит. Занятость человека общая, поэтому студия видит
@@ -198,7 +199,7 @@ async function buildDayData(
   // Та же развилка, что у права на управление (`auth/ownership.ts`): студия
   // управляет записью её поверхности (`studioId` либо её `providerId`).
   const isPersonalBooking = (b: { studioId: string | null; providerId: string }) =>
-    b.studioId !== studioId && b.providerId !== providerId;
+    !isStudioSurfaceBooking(b, studioId);
 
   const clientKeys = bookings
     .filter((booking) => !isPersonalBooking(booking))
@@ -208,7 +209,7 @@ async function buildDayData(
   if (clientKeys.length > 0) {
     const earliest = await prisma.booking.findMany({
       where: {
-        OR: [{ studioId }, { providerId }],
+        ...studioBookingsWhere(studioId),
         clientUserId: { in: clientKeys },
       },
       orderBy: { startAtUtc: "asc" },
@@ -309,16 +310,31 @@ async function buildDayData(
     if (instant.getTime() >= dayEnd.getTime()) return 24 * 60;
     return salonMinuteOfDay(instant, timeZone);
   };
-  const jsWeekday = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
-  const workHours = await Promise.all(
-    masters
-      .filter((master) => isStudioMasterActive(master))
-      .map((master) => resolveMasterWorkHours(master.id, jsWeekday, dateKey)),
-  );
+  // SCHEDULE-PATTERNS-01: часы мастеров — из движка одним пакетом (раньше —
+  // по два запроса на мастера мимо «Особых дней»). День с фиксированным
+  // временем хранится как 00:00–23:55; сетке нужны выбранные начала, а не сутки.
+  const dayPlans = await loadDayPlans({
+    providerIds: masters.filter((master) => isStudioMasterActive(master)).map((master) => master.id),
+    fromKey: dateKey,
+    toKeyExclusive: addDaysToDateKey(dateKey, 1),
+  });
   const gridMinutes: number[] = [];
-  for (const hours of workHours) {
-    if (!hours.isActive || hours.startMinutes === null || hours.endMinutes === null) continue;
-    gridMinutes.push(hours.startMinutes, hours.endMinutes);
+  for (const plans of dayPlans.values()) {
+    const plan = plans.get(dateKey);
+    if (!plan?.isWorking) continue;
+    if (plan.fixedStarts) {
+      const starts = plan.fixedStarts
+        .map((value) => timeToMinutes(value))
+        .filter((value): value is number => value !== null);
+      if (starts.length === 0) continue;
+      gridMinutes.push(Math.min(...starts), Math.min(24 * 60, Math.max(...starts) + 60));
+      continue;
+    }
+    const hours = dayPlanHours(plan);
+    const start = hours.start ? timeToMinutes(hours.start) : null;
+    const end = hours.end ? timeToMinutes(hours.end) : null;
+    if (start === null || end === null) continue;
+    gridMinutes.push(start, end);
   }
   for (const cell of [...bookingCells, ...breakCells]) {
     gridMinutes.push(
@@ -412,7 +428,7 @@ async function buildWeekData(
     }),
     prisma.booking.findMany({
       where: {
-        OR: [{ studioId }, { providerId }],
+        ...studioBookingsWhere(studioId),
         startAtUtc: { gte: weekStart, lt: weekEnd },
         status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
       },

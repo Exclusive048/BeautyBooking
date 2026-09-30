@@ -276,6 +276,23 @@ export function isSelfRevocable(consentType: ConsentType): boolean {
  * Версий может быть несколько, если документ бампался: активной остаётся та,
  * на которую пользователь соглашался последней.
  */
+/**
+ * 29.09 доработки · 16 — кто из получателей дал согласие на рекламу: одним
+ * запросом, любая АКТИВНАЯ строка `MARKETING` (`revokedAt: null`) любой версии
+ * документа (решение владельца 16.1: поднятие версии не выключает акции молча).
+ * Только чтение — писатель согласий по-прежнему один (инв. #37).
+ */
+export async function filterUsersWithMarketingConsent(userIds: readonly string[]): Promise<Set<string>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Set();
+  const rows = await prisma.userConsent.findMany({
+    where: { userId: { in: ids }, consentType: ConsentType.MARKETING, revokedAt: null },
+    select: { userId: true },
+    distinct: ["userId"],
+  });
+  return new Set(rows.map((row) => row.userId));
+}
+
 export async function getActiveConsent(
   userId: string,
   consentType: ConsentType,

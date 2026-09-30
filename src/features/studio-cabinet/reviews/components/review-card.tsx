@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Flag, MessageSquareReply } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { initialsOf } from "../lib/format";
 import type { StudioReviewItem } from "../lib/types";
 import { RatingStars } from "./rating-stars";
@@ -46,7 +46,7 @@ export function ReviewCard({ review, onReport }: Props) {
             <RatingStars value={review.rating} size="sm" />
             <span className="text-xs text-text-sec">{review.dateLabel}</span>
             {review.isReported ? (
-              <span className="rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-300">
+              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
                 {T.card.reportedBadge}
               </span>
             ) : null}
@@ -69,10 +69,11 @@ export function ReviewCard({ review, onReport }: Props) {
               {T.actions.reply}
             </Button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => onReport(review.id)}
-            disabled={review.isReported}
+          <Button variant="wrapper"
+            onClick={() => {
+              if (!review.isReported) onReport(review.id);
+            }}
+            aria-disabled={review.isReported || undefined}
             className={cn(
               "inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors",
               review.isReported
@@ -83,7 +84,7 @@ export function ReviewCard({ review, onReport }: Props) {
             title={review.isReported ? T.card.reportedBadge : T.actions.report}
           >
             <Flag className="h-4 w-4" aria-hidden />
-          </button>
+          </Button>
         </div>
       </header>
 

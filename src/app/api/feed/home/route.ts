@@ -7,6 +7,7 @@ import { homeFeedQuerySchema } from "@/lib/feed/schemas";
 import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { parseQuery } from "@/lib/validation";
 
@@ -21,7 +22,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      `rl:/api/feed/home:ip:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       RATE_LIMITS.feedHome,
     );
     if (rateLimit.limited) {

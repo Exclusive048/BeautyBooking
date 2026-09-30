@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
+import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
 import { SectionHeader } from "@/features/marketing/sections/section-header";
 import {
   FEATURE_ICONS,
@@ -24,10 +25,7 @@ type Props = {
   columns?: 2 | 3;
 };
 
-const EASE = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
-
 export function FeatureGrid({ eyebrow, title, description, features, columns = 3 }: Props) {
-  const reduce = useReducedMotion();
   return (
     <section className="py-16 lg:py-24">
       <div className="mx-auto max-w-[1280px] px-4">
@@ -39,7 +37,7 @@ export function FeatureGrid({ eyebrow, title, description, features, columns = 3
           }
         >
           {features.map((feature, idx) => (
-            <FeatureCard key={feature.title} {...feature} index={idx} reduce={reduce} />
+            <FeatureCard key={feature.title} {...feature} index={idx} />
           ))}
         </div>
       </div>
@@ -52,20 +50,17 @@ function FeatureCard({
   title,
   description,
   index,
-  reduce,
-}: Feature & { index: number; reduce: boolean | null }) {
+}: Feature & { index: number }) {
   const Icon = FEATURE_ICONS[iconName];
-  const initial = reduce ? undefined : { opacity: 0, y: 20 };
-  const whileInView = reduce ? undefined : { opacity: 1, y: 0 };
-  const transition = reduce
-    ? undefined
-    : { duration: 0.45, ease: EASE, delay: index * 0.05 };
+  const initial = { opacity: 0, y: DISTANCE.rise };
+  const whileInView = { opacity: 1, y: 0 };
+  const transition = { ...MOTION.section, delay: index * STAGGER };
 
   return (
-    <motion.div
+    <m.div
       initial={initial}
       whileInView={whileInView}
-      viewport={{ once: true, margin: "-80px" }}
+      viewport={VIEWPORT_ONCE}
       transition={transition}
     >
       <div className="mb-5 grid h-12 w-12 place-items-center rounded-xl bg-brand-gradient">
@@ -73,6 +68,6 @@ function FeatureCard({
       </div>
       <h3 className="mb-2 font-display text-xl text-text-main">{title}</h3>
       <p className="leading-relaxed text-text-sec">{description}</p>
-    </motion.div>
+    </m.div>
   );
 }

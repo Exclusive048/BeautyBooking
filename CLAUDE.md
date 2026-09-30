@@ -19,13 +19,13 @@
 Раскладка каталогов выводится из `ls src/`. Здесь — только то, что из структуры не видно:
 
 - `src/components/layout/app-shell-content.tsx` — global wrapper, выбирает full-width vs constrained по pathname
-- `src/lib/ui/text.ts` — **ЕДИНСТВЕННЫЙ** источник всех UI-текстов (`UI_TEXT`)
+- `src/lib/ui/text.ts` — **ЕДИНСТВЕННЫЙ** источник всех UI-текстов (`UI_TEXT`): барель над доменами `src/lib/ui/text/<домен>.ts` (строк в самом `text.ts` нет; новый ключ — в файл своего домена). Импорт — только `import * as UI_TEXT from "@/lib/ui/text"`: webpack везёт в браузер лишь домены, к которым модуль обращается `UI_TEXT.<домен>.…` (29.09 доработки · 18, PERF-02). `UI_TEXT` целиком (значением, аргументом, `UI_TEXT[…]`) в клиентском коде запрещено — отдаёт модулю все домены; сторожа — `src/lib/ui/text-client-graph.test.ts` и `scripts/check-client-text-bundle.mjs` (CI, по сборке)
 - `src/lib/schedule/editor.ts` (server-only) и `src/lib/schedule/editor-shared.ts` (client-safe) — граница для типов/нормализаторов расписания
 - `.claude/references/` — design references (`{page}.png` + `{page}.js`) для каждой страницы
 
 ## ВАЖНЫЕ ПРАВИЛА
 
-1. **UI-тексты** — ВСЕ строки только через `UI_TEXT` из `src/lib/ui/text.ts`. Хардкод запрещён.
+1. **UI-тексты** — ВСЕ строки только через `UI_TEXT` из `src/lib/ui/text.ts` (`import * as UI_TEXT`; ключи живут в `src/lib/ui/text/<домен>.ts`). Хардкод запрещён. Ключ для компонента шелла (layout, топбар, нижняя навигация, футер, границы ошибок) — только из маленьких доменов шелла (`nav`, `common`, `notifications`, `footer`…): иначе домен поедет на каждую страницу.
 2. **Логирование** — `logInfo()` / `logError()` из `src/lib/logging/logger.ts`. НЕ console.log.
 3. **API ответы** — `ok()` / `fail()` из `src/lib/api/response.ts`. Валидация через Zod.
 4. **Auth** — `requireAuth()` / `getSessionUser(req)` из `src/lib/auth/guards.ts`.

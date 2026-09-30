@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCitiesCounts,
   AdminCityStatusFilter,
 } from "@/features/admin-cabinet/cities/types";
+import { Tabs } from "@/components/ui/tabs";
 
 type Props = {
   status: AdminCityStatusFilter;
@@ -64,42 +64,20 @@ export function CitiesFilters({ status, search, counts }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">
-      <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-bg-input/60 p-1">
-        {STATUS_TABS.map((tab) => {
-          const active = status === tab.value;
-          return (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() =>
-                pushParams((params) => {
-                  if (tab.value === "all") params.delete("status");
-                  else params.set("status", tab.value);
-                  // Clear selection when changing tab so a hidden row
-                  // doesn't stay open on screen after filtering it out.
-                  params.delete("selected");
-                })
-              }
-              className={cn(
-                "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-sm transition-colors",
-                active
-                  ? "bg-bg-card text-text-main shadow-sm"
-                  : "text-text-sec hover:text-text-main",
-              )}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 font-mono text-[11px] tabular-nums",
-                  active ? "bg-bg-input text-text-main" : "text-text-sec/80",
-                )}
-              >
-                {counts[tab.countKey]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.statusAria}
+        items={STATUS_TABS.map((tab) => ({ id: tab.value, label: tab.label, badge: counts[tab.countKey] }))}
+        value={status}
+        onChange={(id) =>
+          pushParams((params) => {
+            if (id === "all") params.delete("status");
+            else params.set("status", id);
+            // Clear selection when changing tab so a hidden row
+            // doesn't stay open on screen after filtering it out.
+            params.delete("selected");
+          })
+        }
+      />
 
       <div className="relative min-w-[14rem] flex-1">
         <Search

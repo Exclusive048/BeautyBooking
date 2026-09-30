@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar } from "lucide-react";
 import { BookingRow } from "@/features/master/components/dashboard/booking-row";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 

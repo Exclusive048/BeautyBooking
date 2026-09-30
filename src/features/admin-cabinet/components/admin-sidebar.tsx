@@ -6,7 +6,7 @@ import { AdminLogo } from "@/features/admin-cabinet/components/admin-logo";
 import { AdminUserChip } from "@/features/admin-cabinet/components/admin-user-chip";
 import { ADMIN_NAV } from "@/features/admin-cabinet/config/admin-nav";
 import type { AdminPanelUser } from "@/features/admin-cabinet/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   user: AdminPanelUser;

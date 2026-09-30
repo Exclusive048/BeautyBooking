@@ -5,7 +5,7 @@ import type {
   ActiveOfferItem,
   AvailableServiceForOffer,
 } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatOfferDateHeading, formatRubles, pluralize } from "./lib/format";
 import { OfferActionsRow } from "./offer-actions-row";
 
@@ -125,7 +125,7 @@ export function OfferCard({ offer, variant = "active", services, now }: Props) {
           <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
           <span>{statsLabel}</span>
           {offer.counts.approvedWaitingClient > 0 ? (
-            <span className="text-xs text-amber-700 dark:text-amber-300">
+            <span className="text-xs text-warning-text">
               ·{" "}
               {T.approvedWaitingClientTemplate.replace(
                 "{count}",

@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 
 type RouteContext = {
@@ -27,7 +28,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     const limit = await checkRateLimit(
-      `rl:ai:suggest-description:${user.id}`,
+      routeRateLimitKey(req, "user", user.id),
       RATE_LIMITS.aiSuggestDescription,
     );
     if (limit.limited) {
@@ -69,7 +70,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     const suggestion = await suggestServiceDescription({
       name: service.title || service.name,
       category: service.globalCategory?.name ?? "",
-      price: service.price,
+      priceKopeks: service.price,
       durationMin: service.durationMin,
     });
 

@@ -64,11 +64,16 @@ export function getHeatmapTier(intensityPct: number): "empty" | "low" | "mid-low
 }
 
 const TIER_BG: Record<ReturnType<typeof getHeatmapTier>, string> = {
-  empty: "bg-bg-input/40 dark:bg-bg-input/30",
+  empty: "bg-bg-input/40",
+  // dark-ok: шкала теплокарты загрузки — данные, не статус
   low: "bg-rose-100 dark:bg-rose-500/15",
+  // dark-ok: шкала теплокарты загрузки — данные, не статус
   "mid-low": "bg-rose-200/80 dark:bg-rose-500/30",
+  // dark-ok: шкала теплокарты загрузки — данные, не статус
   mid: "bg-rose-300 dark:bg-rose-500/45",
+  // dark-ok: шкала теплокарты загрузки — данные, не статус
   "mid-high": "bg-rose-500/80 dark:bg-rose-500/70",
+  // dark-ok: шкала теплокарты загрузки — данные, не статус
   high: "bg-rose-700 dark:bg-rose-500/95",
 };
 

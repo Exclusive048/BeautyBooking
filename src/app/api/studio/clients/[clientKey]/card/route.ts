@@ -12,6 +12,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { ensureStudioRole } from "@/lib/studio/access";
 import { parseBody, parseQuery } from "@/lib/validation";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 type RouteContext = {
   params: Promise<{ clientKey: string }>;
@@ -50,7 +51,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     const data = await getClientCardData({
       providerId: studio.providerId,
       timeZone: studio.provider.timezone,
-      bookingWhere: { OR: [{ studioId: studio.id }, { providerId: studio.providerId }] },
+      bookingWhere: studioBookingsWhere(studio.id),
       clientKey: params.clientKey,
     });
     return jsonOk(data);

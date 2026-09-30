@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useRef, useState } from "react";
+import { AnimatePresence, m } from "framer-motion";
 import { ChevronDown, User, Settings, Shield, LogIn, Briefcase, Building2, UserCircle2, Check } from "lucide-react";
+import { AnchoredPortal } from "@/components/ui/anchored-portal";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/features/auth/components/logout-button";
 import type { CabinetKind } from "@/lib/auth/available-cabinets";
@@ -13,7 +14,8 @@ import {
   detectCurrentCabinet,
   hasProfessionalCabinet,
 } from "@/lib/auth/available-cabinets";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   userLabel: string;
@@ -38,9 +40,9 @@ const CABINET_ICON: Record<CabinetKind, typeof UserCircle2> = {
 };
 
 const CABINET_LABEL: Record<CabinetKind, string> = {
-  user: UI_TEXT.clientCabinet.switcher.client,
-  master: UI_TEXT.clientCabinet.switcher.master,
-  studio: UI_TEXT.clientCabinet.switcher.studio,
+  user: UI_TEXT.nav.cabinetSwitcher.client,
+  master: UI_TEXT.nav.cabinetSwitcher.master,
+  studio: UI_TEXT.nav.cabinetSwitcher.studio,
 };
 
 export function AuthUserMenu({
@@ -51,7 +53,6 @@ export function AuthUserMenu({
 }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const reduce = useReducedMotion();
   const pathname = usePathname() ?? "/";
   const currentCabinet = detectCurrentCabinet(pathname);
   const showSwitcher = availableCabinets.length > 1;
@@ -63,29 +64,6 @@ export function AuthUserMenu({
   const professionalLabel = hasProfessionalCabinet(availableCabinets)
     ? UI_TEXT.nav.professionalRoles
     : UI_TEXT.nav.becomeMaster;
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (!rootRef.current?.contains(target)) {
-        setOpen(false);
-      }
-    };
-
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onEscape);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onEscape);
-    };
-  }, [open]);
 
   const closeMenu = () => setOpen(false);
 
@@ -109,28 +87,32 @@ export function AuthUserMenu({
         aria-label={UI_TEXT.nav.userMenuAria}
       >
         <span className="max-w-[120px] truncate">{userLabel}</span>
-        <motion.span
-          animate={reduce ? undefined : { rotate: open ? 180 : 0 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.2 }}
+        <m.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={MOTION.micro}
           className="text-text-sec"
         >
           <ChevronDown className="h-4 w-4" aria-hidden />
-        </motion.span>
+        </m.span>
       </Button>
 
+      {/* 29.09 доработки · 21: меню — порталом (`z-popover`). Внутри шапки
+          (`sticky` + `backdrop-blur`) оно жило на уровне шапки и уходило под
+          нижнюю навигацию и cookie-уведомление, несмотря на `z-[100]`. */}
+      <AnchoredPortal open={open} anchorRef={rootRef} onDismiss={closeMenu} align="end">
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={reduce ? false : { opacity: 0, scale: 0.95, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -6 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-            className="absolute right-0 z-[100] mt-2 w-64 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
+          <m.div
+            initial={{ opacity: 0, scale: 0.95, y: -DISTANCE.nudge }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -DISTANCE.nudge, transition: MOTION.exit }}
+            transition={MOTION.micro}
+            className="w-64 rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
           >
             {showSwitcher ? (
               <div className="space-y-0.5 pb-1">
                 <div className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-                  {UI_TEXT.clientCabinet.switcher.label}
+                  {UI_TEXT.nav.cabinetSwitcher.label}
                 </div>
                 {availableCabinets.map((c) => {
                   const Icon = CABINET_ICON[c];
@@ -198,9 +180,10 @@ export function AuthUserMenu({
             <div className="mt-1 border-t border-border-subtle/60 pt-1" onClick={closeMenu}>
               <LogoutButton variant="ghost" className="w-full justify-start rounded-xl px-3 text-sm" />
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
+      </AnchoredPortal>
     </div>
   );
 }

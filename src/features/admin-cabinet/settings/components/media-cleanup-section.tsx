@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import { StatTile } from "@/features/admin-cabinet/settings/components/stat-tile";
 import type { MediaCleanupStatsView } from "@/features/admin-cabinet/settings/types";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { DISTANCE } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -22,7 +23,6 @@ export function MediaCleanupSection({ initial }: Props) {
   const [stats, setStats] = useState<MediaCleanupStatsView>(initial);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const reduce = useReducedMotion();
 
   const nothingToClean = stats.stalePendingCount === 0 && stats.brokenCount === 0;
   const disableButton = nothingToClean || status === "running";
@@ -31,22 +31,18 @@ export function MediaCleanupSection({ initial }: Props) {
     setStatus("running");
     setErrorMessage(null);
     try {
-      const res = await fetch("/api/admin/media/broken", { method: "POST" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{
+      const jsonData = await fetchJsonWithAuth<{
         stats: { stalePendingCount: number; brokenCount: number };
-      }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : t.runFailed);
-      }
+      }>("/api/admin/media/broken", { method: "POST" });
       setStats({
-        stalePendingCount: json.data.stats.stalePendingCount,
-        brokenCount: json.data.stats.brokenCount,
+        stalePendingCount: jsonData.stats.stalePendingCount,
+        brokenCount: jsonData.stats.brokenCount,
       });
       setStatus("done");
       window.setTimeout(() => setStatus((curr) => (curr === "done" ? "idle" : curr)), 2400);
     } catch (err) {
       setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : t.runFailed);
+      setErrorMessage(serverMessageOr(err, t.runFailed));
     }
   };
 
@@ -58,38 +54,38 @@ export function MediaCleanupSection({ initial }: Props) {
         <>
           <AnimatePresence mode="wait">
             {status === "running" ? (
-              <motion.span
+              <m.span
                 key="running"
-                initial={reduce ? false : { opacity: 0 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="flex items-center gap-1.5 text-xs text-text-sec"
               >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                 {t.runningCleanupLabel}
-              </motion.span>
+              </m.span>
             ) : status === "done" ? (
-              <motion.span
+              <m.span
                 key="done"
-                initial={reduce ? false : { opacity: 0, y: -4 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-                className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+                initial={{ opacity: 0, y: -DISTANCE.nudge }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-1.5 text-xs text-success-text"
               >
                 <Check className="h-3.5 w-3.5" aria-hidden />
                 {t.doneToast}
-              </motion.span>
+              </m.span>
             ) : status === "error" ? (
-              <motion.span
+              <m.span
                 key="error"
-                initial={reduce ? false : { opacity: 0 }}
-                animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-                exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-                className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-1.5 text-xs text-danger-text"
               >
                 <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
                 {errorMessage ?? t.runFailed}
-              </motion.span>
+              </m.span>
             ) : null}
           </AnimatePresence>
           <Button

@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
-import { UI_TEXT } from "@/lib/ui/text";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type FilterChipsProps = {
   availableToday: boolean;
@@ -75,16 +75,13 @@ export function FilterChips({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/catalog/global-categories?status=APPROVED", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as
-          | ApiResponse<{ categories: CatalogCategoryChip[] }>
-          | null;
-        if (!res.ok || !json || !json.ok || cancelled) {
-          if (!cancelled) setCategories([]);
-          return;
-        }
-        setCategories(json.data.categories);
+        const data = await fetchJson<{ categories: CatalogCategoryChip[] }>(
+          "/api/catalog/global-categories?status=APPROVED",
+          { cache: "no-store" },
+        );
+        if (!cancelled) setCategories(data.categories);
       } catch {
+        // Чтение справочника: без чипов категорий каталог работает.
         if (!cancelled) setCategories([]);
       }
     })();

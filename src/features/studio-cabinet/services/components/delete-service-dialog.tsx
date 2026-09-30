@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.servicesV2.deleteServiceDialog;
 const E = UI_TEXT.studioCabinet.servicesV2.errors;
@@ -37,25 +38,18 @@ export function DeleteServiceDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/studio/services/${serviceId}?studioId=${encodeURIComponent(studioId)}`,
         { method: "DELETE" },
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.deleteFailed);
-        return;
-      }
       onClose();
       // Drop the `?service=` query param so the panel resets after delete.
       const url = new URL(window.location.href);
       url.searchParams.delete("service");
       router.replace(url.pathname + url.search, { scroll: false });
       router.refresh();
-    } catch {
-      setError(E.deleteFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, E.deleteFailed));
     } finally {
       setSubmitting(false);
     }

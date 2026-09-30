@@ -37,6 +37,8 @@ export type PortfolioItemView = {
    * UI uses it for the crop endpoint; null when the item was created via
    * a raw URL upload (rare; old data path). */
   mediaAssetId: string | null;
+  /** Provider — владелец работы (`entityId` загрузки при замене фото). */
+  ownerProviderId: string;
   isPublic: boolean;
   globalCategoryId: string | null;
   globalCategoryName: string | null;
@@ -190,6 +192,7 @@ export async function getMasterPortfolioView(input: {
     id: item.id,
     mediaUrl: item.mediaUrl,
     mediaAssetId: extractMediaAssetIdFromUrl(item.mediaUrl),
+    ownerProviderId: item.masterId,
     isPublic: item.isPublic,
     globalCategoryId: item.globalCategoryId,
     globalCategoryName: item.globalCategory?.name ?? null,

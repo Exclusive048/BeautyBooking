@@ -1,5 +1,5 @@
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioReviewsStarBucket } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.stats;
@@ -9,11 +9,11 @@ type Props = {
 };
 
 const BAR_TONE: Record<number, string> = {
-  5: "bg-emerald-500/80",
-  4: "bg-emerald-400/70",
-  3: "bg-amber-400/70",
-  2: "bg-orange-400/70",
-  1: "bg-rose-500/70",
+  5: "bg-success/80",
+  4: "bg-success/70",
+  3: "bg-warning/70",
+  2: "bg-destructive/50",
+  1: "bg-destructive/70",
 };
 
 /**

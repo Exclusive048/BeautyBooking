@@ -25,7 +25,7 @@ export function NavLink({ href, label }: Props) {
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
+        "relative rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-200",
         isActive
           ? "text-text-main"
           : "text-text-sec hover:bg-muted/60 hover:text-text-main",

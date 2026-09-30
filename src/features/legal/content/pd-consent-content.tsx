@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LegalSection } from "@/features/legal/components/legal-layout";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * RKN-FIX-01 — «Согласие на обработку персональных данных».

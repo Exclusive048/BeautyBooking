@@ -3,7 +3,7 @@
 import { ImagePlus, Lock, Plus, Share2, UserPlus } from "lucide-react";
 import { QuickActionTile } from "@/features/master/components/dashboard/quick-action-tile";
 import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.quickActions;
 

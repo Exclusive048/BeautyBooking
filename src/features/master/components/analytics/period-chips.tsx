@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import type { MasterAnalyticsPeriodId } from "@/lib/master/analytics-period";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.analytics.period;
 
@@ -117,7 +117,7 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
             onClick={() => handleSelect(chip.id)}
             disabled={isLockedCustom}
             className={cn(
-              "h-8 rounded-lg px-3 text-sm font-medium transition-colors",
+              "rounded-lg px-3 text-sm font-medium transition-colors",
               isActive
                 ? "bg-bg-card text-text-main shadow-card"
                 : "border-transparent bg-transparent text-text-sec hover:text-text-main",
@@ -136,7 +136,7 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
         <div
           ref={popoverRef}
           role="dialog"
-          className="absolute left-0 top-[calc(100%+6px)] z-50 w-[300px] rounded-xl border border-border-subtle bg-bg-card p-3 shadow-card"
+          className="absolute left-0 top-[calc(100%+6px)] z-30 w-[300px] rounded-xl border border-border-subtle bg-bg-card p-3 shadow-card"
         >
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
             {T.customPickerHeading}

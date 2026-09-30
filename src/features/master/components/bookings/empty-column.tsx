@@ -1,5 +1,5 @@
 import { EmptyState } from "@/components/ui/empty-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * RES-28: колонка канбана переведена на общий `EmptyState`.

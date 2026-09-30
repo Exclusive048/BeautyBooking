@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 import type { CurrentPlanInfo, PlanFeatures } from "@/lib/billing/types";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 
 type SubscriptionScope = "MASTER" | "STUDIO";
 
@@ -18,13 +18,11 @@ type LimitFeatureKey = {
 const PLAN_LOAD_ERROR = "Не удалось загрузить тариф. Попробуйте ещё раз.";
 
 async function fetchCurrentPlan(url: string): Promise<CurrentPlanInfo> {
-  const res = await fetch(url, { cache: "no-store" });
-  const json = (await res.json().catch(() => null)) as ApiResponse<CurrentPlanInfo> | null;
-  if (!res.ok || !json || json.ok !== true) {
-    const message = json && json.ok === false ? json.error.message ?? PLAN_LOAD_ERROR : PLAN_LOAD_ERROR;
-    throw new Error(message);
+  try {
+    return await fetchJson<CurrentPlanInfo>(url, { cache: "no-store" });
+  } catch (error) {
+    throw new Error(serverMessageOr(error, PLAN_LOAD_ERROR));
   }
-  return json.data;
 }
 
 export function usePlanFeatures(scope?: SubscriptionScope) {

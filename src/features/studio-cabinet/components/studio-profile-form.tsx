@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SocialLinkPreview } from "@/components/ui/social-link-preview";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 type Props = {
@@ -85,9 +85,9 @@ export function StudioProfileForm({
   const addressInputId = useId();
   const addressStatusTone =
     addressStatus?.tone === "success"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-success-text"
       : addressStatus?.tone === "error"
-        ? "text-red-600 dark:text-red-400"
+        ? "text-danger-text"
         : "text-text-sec";
 
   const addressSuggestRootRef = useRef<HTMLDivElement | null>(null);
@@ -185,6 +185,7 @@ export function StudioProfileForm({
     <section className="lux-card rounded-[24px] p-5 md:p-6">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
+          <div className="-m-2 space-y-4 rounded-2xl p-2" data-guide="profile">
           <div className="space-y-2">
             <div className="text-xs font-medium text-text-label">{studioFormText.nameLabel}</div>
             <Input
@@ -218,8 +219,9 @@ export function StudioProfileForm({
               <span className="absolute bottom-2 right-3 text-xs text-text-sec">{description.length}/500</span>
             </div>
           </div>
+          </div>
 
-          <div className="space-y-2">
+          <div className="-m-2 space-y-2 rounded-2xl p-2" data-guide="address">
             <label htmlFor={addressInputId} className="block text-xs font-medium text-text-label">
               {studioFormText.addressLabel}
             </label>
@@ -228,10 +230,9 @@ export function StudioProfileForm({
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center">
                   <MapPin className="h-4 w-4 text-text-sec" />
                 </div>
-                <input
+                <Input
                   id={addressInputId}
                   ref={addressInputRef}
-                  type="text"
                   value={address}
                   onChange={(event) => onAddressChange(event.target.value)}
                   onKeyDown={handleAddressKeyDown}
@@ -244,7 +245,7 @@ export function StudioProfileForm({
                     setIsAddressSuggestOpen(false);
                   }}
                   placeholder={studioFormText.addressPlaceholder}
-                  className="lux-input h-11 w-full rounded-2xl pl-11 pr-4 text-sm text-text-main placeholder:text-text-placeholder outline-none"
+                  className="pl-11"
                 />
                 {isAddressSuggestOpen && addressSuggestions.length > 0 ? (
                   <div className="absolute z-30 mt-2 w-full rounded-2xl border border-border-subtle bg-bg-card p-2 shadow-card">

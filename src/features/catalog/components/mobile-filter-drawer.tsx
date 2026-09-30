@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { CatalogSidebar, type CatalogFilters } from "@/features/catalog/components/catalog-sidebar";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = CatalogFilters & {
   open: boolean;

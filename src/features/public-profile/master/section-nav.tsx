@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { scrollBehavior } from "@/lib/ui/scroll";
 import { Image as ImageIcon, Info, List, Star } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 type SectionId = "services" | "portfolio" | "reviews" | "about";
 
@@ -96,15 +97,14 @@ export function SectionNav() {
   return (
     <div
       ref={scrollerRef}
-      className="scrollbar-hide sticky top-0 z-20 -mx-4 snap-x overflow-x-auto border-b border-border-subtle bg-bg-page/90 px-4 scroll-px-4 backdrop-blur-md sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0"
+      className="scrollbar-hide sticky top-0 z-sticky -mx-4 snap-x overflow-x-auto border-b border-border-subtle bg-bg-page/90 px-4 scroll-px-4 backdrop-blur-md sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0"
     >
       <div className="flex min-w-max gap-1 py-1">
         {SECTIONS.map(({ id, label, Icon }) => {
           const isActive = active === id;
           return (
-            <button
+            <Button variant="wrapper" aria-current={isActive ? "true" : undefined}
               key={id}
-              type="button"
               data-section={id}
               onClick={() => scrollTo(id)}
               className={`relative inline-flex shrink-0 snap-start items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-colors duration-200 md:px-4 ${
@@ -119,7 +119,7 @@ export function SectionNav() {
                   className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-primary"
                 />
               ) : null}
-            </button>
+            </Button>
           );
         })}
       </div>

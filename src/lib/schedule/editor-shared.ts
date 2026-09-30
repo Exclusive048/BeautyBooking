@@ -31,6 +31,8 @@ import {
   HOT_SLOT_TRIGGER_HOURS,
 } from "@/lib/hot-slots/constants";
 import { parseDateKeyParts } from "@/lib/schedule/dateKey";
+import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
+import type { SchedulePlanDto } from "@/lib/schedule/patterns-shared";
 
 export type BreakDto = {
   start: string;
@@ -115,6 +117,12 @@ export type ScheduleEditorSnapshot = {
    * `Provider.bufferBetweenBookingsMin` — no schema addition. */
   bufferBetweenBookingsMin: number;
   weekSchedule: DayScheduleDto[];
+  /**
+   * SCHEDULE-PATTERNS-01 (этап 2): график мастера — действующий период,
+   * запланированные, «настроено до», палитра рабочих дней. Вкладка «Часы»
+   * показывает неделю, только если сегодня действует недельный график.
+   */
+  schedulePlan: SchedulePlanDto;
   exceptions: ScheduleExceptionDto[];
   templates: WeekTemplateDto[];
   bookingRules: BookingRulesDto;
@@ -173,7 +181,8 @@ export const WEEK_TEMPLATE_OPTIONS: WeekTemplateDto[] = [
  */
 export const BOOKING_RULE_LIMITS = {
   minHoursAhead: { min: 0, max: 168, fallback: 2 },
-  maxDaysAhead: { min: 1, max: 365, fallback: 90 },
+  // SCHEDULE-PATTERNS-01: запись открыта максимум на горизонт расписания (3 месяца).
+  maxDaysAhead: { min: 1, max: SCHEDULE_HORIZON_DAYS, fallback: 90 },
   freeCancelHours: { min: 0, max: 168, fallback: 24 },
   visibleSlotDays: { min: 1, max: 90, fallback: 30 },
   bufferMin: { min: 0, max: 30, fallback: 0 },

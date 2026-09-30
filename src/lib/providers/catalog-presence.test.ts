@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * из ТЕХ ЖЕ условий, что и предикат выдачи, а не из второй копии правила.
  *
  * @probe 2026-09-23 — в `catalogVisibleProviderWhere` убрано условие адреса
- * (`...CATALOG_PRESENCE_CONDITIONS.address`): красный «предикат — ровно
+ * (`...conditions.address`): красный «предикат — ровно
  * конъюнкция условий статуса». В `resolveCatalogPresence` порядок пробелов
  * заменён на обратный: красный «пробелы в порядке исправления». Возвращено —
  * зелёный.
@@ -16,7 +16,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: { provider: { count: providerCount } } 
 
 import { resolveCatalogPresence } from "@/lib/providers/catalog-presence";
 import {
-  CATALOG_PRESENCE_CONDITIONS,
+  catalogPresenceConditions,
   catalogVisibleProviderWhere,
 } from "@/lib/providers/catalog-visibility";
 
@@ -36,12 +36,14 @@ beforeEach(() => {
 
 describe("catalogVisibleProviderWhere", () => {
   it("предикат — ровно конъюнкция условий статуса", () => {
-    expect(catalogVisibleProviderWhere()).toEqual({
-      ...CATALOG_PRESENCE_CONDITIONS.hidden,
-      ...CATALOG_PRESENCE_CONDITIONS.address,
-      ...CATALOG_PRESENCE_CONDITIONS.schedule,
+    const now = new Date("2026-09-28T09:00:00Z");
+    const conditions = catalogPresenceConditions(now);
+    expect(catalogVisibleProviderWhere(now)).toEqual({
+      ...conditions.hidden,
+      ...conditions.address,
+      ...conditions.schedule,
     });
-    expect(Object.keys(catalogVisibleProviderWhere()).sort()).toEqual(["OR", "cityId", "isPublished"]);
+    expect(Object.keys(catalogVisibleProviderWhere(now)).sort()).toEqual(["OR", "cityId", "isPublished"]);
   });
 });
 

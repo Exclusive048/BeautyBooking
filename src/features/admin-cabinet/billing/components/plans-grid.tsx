@@ -3,18 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SubscriptionScope } from "@/lib/prisma-enums";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { PlanCardView } from "@/features/admin-cabinet/billing/components/plan-card";
 import {
   PlanEditDialog,
   type PlanEditValue,
 } from "@/features/admin-cabinet/billing/components/plan-edit-dialog";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminPlanCard,
   AdminPlanInheritanceCandidate,
 } from "@/features/admin-cabinet/billing/types";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.adminPanel.billing;
 
@@ -25,8 +25,6 @@ type Props = {
   candidates: AdminPlanInheritanceCandidate[];
 };
 
-type Toast = { kind: "success" | "error"; text: string } | null;
-
 /** Layout: groups plans by scope ("Master" row, "Studio" row) and
  * renders each group as a 3-column grid on `lg`, dropping to 2/1
  * on smaller viewports. Edit dialog state lives here so a single
@@ -34,8 +32,7 @@ type Toast = { kind: "success" | "error"; text: string } | null;
 export function PlansGrid({ plans, candidates }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState<AdminPlanCard | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
-  const reduce = useReducedMotion();
+  const toast = useToast();
 
   const masterPlans = plans.filter(
     (p) => p.scope === SubscriptionScope.MASTER,
@@ -44,49 +41,24 @@ export function PlansGrid({ plans, candidates }: Props) {
     (p) => p.scope === SubscriptionScope.STUDIO,
   );
 
-  const showToast = (text: string, kind: "success" | "error" = "success") => {
-    setToast({ kind, text });
-    window.setTimeout(() => setToast(null), 2400);
-  };
-
   const handleSubmit = async (value: PlanEditValue) => {
     if (!editing) return;
     try {
-      const res = await fetch(`/api/admin/billing/plans/${editing.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/admin/billing/plans/${editing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(value),
       });
-      if (!res.ok) throw new Error("save failed");
       setEditing(null);
-      showToast(T.toasts.planSaved);
+      toast.success(T.toasts.planSaved);
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     }
   };
 
   return (
     <div className="space-y-4">
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            role="status"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            className={cn(
-              "rounded-2xl border px-4 py-2.5 text-sm",
-              toast.kind === "success"
-                ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-red-300/40 bg-red-500/10 text-red-700 dark:text-red-300",
-            )}
-          >
-            {toast.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
       <PlanGroup
         label={T.plans.sectionMaster}
         plans={masterPlans}

@@ -9,7 +9,7 @@ import {
   resolveBookingRuntimeStatus,
   type BookingActor,
 } from "@/lib/bookings/flow";
-import { buildConflictScopeWhere, buildConflictWindowWhere, resolveConflictOccupancyIds } from "@/lib/bookings/booking-core";
+import { ensureNoConflicts } from "@/lib/bookings/booking-core";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
 import {
   assertBookingWindow,
@@ -20,7 +20,6 @@ import {
 import { resolveMasterWorkWindow } from "@/lib/schedule/master-work-window";
 import { resolveBookingDurationMin } from "@/lib/bookings/booking-duration";
 import { AppError } from "@/lib/api/errors";
-import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { confirmBooking } from "@/lib/bookings/confirmBooking";
 import { declineClientRescheduleRequest } from "@/lib/bookings/decline-reschedule";
@@ -35,19 +34,18 @@ function normalizeBufferMinutes(value: number | null | undefined): number {
   return Math.min(30, safe);
 }
 
-function shiftMinutes(date: Date, minutes: number): Date {
-  return new Date(date.getTime() + minutes * 60 * 1000);
-}
-
 function isValidDate(value: Date | null | undefined): value is Date {
   return value instanceof Date && !Number.isNaN(value.getTime());
 }
 
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-  return aStart < bEnd && aEnd > bStart;
-}
-
-async function ensureNoConflictsExcluding(
+/**
+ * Предложение переноса: занято ли время и не закрыто ли оно. Проверка —
+ * общая `ensureNoConflicts` (29.09 доработки · 14; до неё здесь жила копия
+ * запроса — сначала в дефектной парной форме LOGIC-01, потом на общем скоупе).
+ * Предложение ничего не пишет, поэтому вне транзакции; авторитетная проверка —
+ * при подтверждении (`confirmBooking`). Отказ — `Result`, как у остального пути.
+ */
+async function ensureRescheduleTimeFree(
   bookingId: string,
   providerId: string,
   masterProviderId: string | null,
@@ -55,44 +53,22 @@ async function ensureNoConflictsExcluding(
   endAtUtc: Date,
   bufferMin: number
 ): Promise<Result<null>> {
-  // LOGIC-01 (доделка FIX-A2): здесь жила ПЯТАЯ копия скоупа — в исходной
-  // дефектной форме `masterProviderId ? { providerId, masterProviderId } :
-  // { providerId }`, то есть ровно пара, которую фикс и убирал. Guard её не
-  // поймал, потому что исключения в `conflict-scope.test.ts` были ФАЙЛОВЫМИ, а
-  // `usecases.ts` числился «чтением списков броней» — одна легитимная выборка в
-  // файле амнистировала весь файл. Это тот же класс «список молча протух», от
-  // которого guard и защищает, воспроизведённый уровнем выше.
-  //
-  // Путь живой: `rescheduleBooking` — предложение переноса. Двойной брони он не
-  // давал (авторитетная проверка при ПРИМЕНЕНИИ стоит в `confirmBooking` и уже
-  // на общем скоупе), но кросс-скоупный конфликт не находился в момент
-  // предложения и всплывал 409-м у противоположной стороны при подтверждении.
-  const conflicts = await prisma.booking.findMany({
-    where: {
-      ...buildConflictScopeWhere({
-        providerId,
-        masterProviderId,
-        occupancyIds: await resolveConflictOccupancyIds(prisma, { providerId, masterProviderId }),
-      }),
-      ...buildConflictWindowWhere({ startAtUtc, endAtUtc, bufferMin }),
-      id: { not: bookingId },
-      status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-    },
-    select: { id: true, startAtUtc: true, endAtUtc: true },
-    take: 1,
-  });
-
-  const conflict = conflicts.find((b) => {
-    if (!b.startAtUtc || !b.endAtUtc) return false;
-    const itemStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
-    const itemEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
-    return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
-  });
-
-  if (conflict) {
-    return { ok: false, status: 409, message: "Это время уже занято. Выберите другое.", code: "SLOT_CONFLICT" };
+  try {
+    await ensureNoConflicts(prisma, {
+      providerId,
+      masterProviderId,
+      startAtUtc,
+      endAtUtc,
+      bufferMin,
+      excludeBookingId: bookingId,
+      message: "Это время уже занято. Выберите другое.",
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return { ok: false, status: 409, message: error.message, code: error.code };
+    }
+    throw error;
   }
-
   return { ok: true, data: null };
 }
 
@@ -306,7 +282,6 @@ export async function rescheduleBooking(input: {
   const localStart = resolveSalonLocalParts(input.startAtUtc, salonTz);
   const workWindow = await resolveMasterWorkWindow(
     booking.masterProviderId ?? booking.providerId,
-    localStart.weekday,
     localStart.dateKey,
   );
   try {
@@ -323,7 +298,10 @@ export async function rescheduleBooking(input: {
   }
 
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
-  const conflict = await ensureNoConflictsExcluding(
+  // BOOKING-FLOW-AUDIT-RESIDUALS: закрытое время (перерыв, блокировка) — та же
+  // проверка, что при создании и при подтверждении переноса; её делает
+  // `ensureNoConflicts` вместе с пересечением.
+  const conflict = await ensureRescheduleTimeFree(
     booking.id,
     booking.providerId,
     booking.masterProviderId ?? null,
@@ -332,23 +310,6 @@ export async function rescheduleBooking(input: {
     bufferMin
   );
   if (!conflict.ok) return conflict;
-
-  // BOOKING-FLOW-AUDIT-RESIDUALS: закрытое время (перерыв, блокировка) — та же
-  // проверка, что при создании и при подтверждении переноса. Без неё прямой
-  // запрос предлагал перенос в закрытое окно, и отказ всплывал только у другой
-  // стороны при подтверждении.
-  try {
-    await assertNoTimeBlockConflict(prisma, {
-      masterProviderId: booking.masterProviderId ?? booking.providerId,
-      startAtUtc: input.startAtUtc,
-      endAtUtc,
-    });
-  } catch (error) {
-    if (error instanceof AppError) {
-      return { ok: false, status: 409, message: error.message, code: error.code };
-    }
-    throw error;
-  }
 
   if (input.actor === "CLIENT" && booking.clientChangeRequestsCount >= BOOKING_CHANGE_REQUEST_LIMIT) {
     return {

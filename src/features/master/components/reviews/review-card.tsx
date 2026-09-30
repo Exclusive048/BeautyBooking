@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 import type { MasterReviewItem } from "@/lib/master/reviews-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatRelativeDate,
   getInitials,
@@ -71,7 +71,7 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
         </div>
 
         {review.isNew ? (
-          <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+          <span className="inline-flex items-center rounded-full bg-danger-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-danger-text">
             {T.newBadge}
           </span>
         ) : null}

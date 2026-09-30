@@ -1,5 +1,5 @@
 import type { ScheduleTimeBlockItem } from "@/lib/master/schedule.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   block: ScheduleTimeBlockItem;

@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, FileText, LifeBuoy, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs } from "@/components/ui/tabs";
 import { FAQAccordionItem } from "@/components/ui/faq-accordion";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { FAQ_DATA, type FaqCategory } from "./faq-data";
 
 const T = UI_TEXT.clientCabinet.faq;
@@ -79,23 +80,12 @@ export function ClientFaqPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="space-y-3">
           <div className="flex flex-wrap gap-1.5">
-            {CATEGORY_OPTIONS.map((opt) => {
-              const active = opt.value === category;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setCategory(opt.value)}
-                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
-                    active
-                      ? "bg-primary text-white"
-                      : "bg-bg-input text-text-sec hover:bg-bg-input/70 hover:text-text-main"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+            <Tabs
+              ariaLabel={T.categoryAria}
+              items={CATEGORY_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label }))}
+              value={category}
+              onChange={(id) => setCategory(id as CategoryOption)}
+            />
           </div>
 
           {filtered.length === 0 ? (

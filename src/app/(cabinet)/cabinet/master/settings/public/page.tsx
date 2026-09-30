@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { PublicSettingsClient } from "@/features/billing/components/public-settings-client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { personalMasterProviderWhere } from "@/lib/master/access";
 
 export const runtime = "nodejs";

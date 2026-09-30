@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDays } from "@/lib/utils/pluralize-days";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   daysLeft: number;
@@ -34,10 +34,10 @@ export function TrialEndingBanner({ daysLeft }: Props) {
   return (
     <div
       role="status"
-      className="border-b border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+      className="border-b border-warning/30 bg-warning/10 text-warning-text"
     >
       <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-3 px-4 py-3">
-        <AlertCircle className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+        <AlertCircle className="h-5 w-5 shrink-0 text-warning-text" aria-hidden />
         <div className="min-w-0 flex-1 text-sm">
           <span className="font-medium text-text-main">{title}</span>
           <span className="ml-2 text-text-sec">{T.bannerDescription}</span>
@@ -45,14 +45,13 @@ export function TrialEndingBanner({ daysLeft }: Props) {
         <Button asChild variant="primary" size="sm">
           <Link href="/pricing">{T.bannerCta}</Link>
         </Button>
-        <button
-          type="button"
+        <Button variant="wrapper"
           onClick={() => setDismissed(true)}
           aria-label={T.bannerDismiss}
-          className="rounded-md p-1 text-text-sec transition-colors hover:bg-amber-500/15 hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+          className="rounded-md p-1 text-text-sec transition-colors hover:bg-warning/15 hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning/40"
         >
           <X className="h-4 w-4" aria-hidden />
-        </button>
+        </Button>
       </div>
     </div>
   );

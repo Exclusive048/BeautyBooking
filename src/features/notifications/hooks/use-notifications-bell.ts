@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
 import {
   emitNotificationEvent,
   subscribeNotificationEvent,
   type NotificationBusEvent,
 } from "@/lib/notifications/client-bus";
 import type { NotificationEvent } from "@/lib/notifications/types";
+import { fetchJson } from "@/lib/http/client";
 
 type Options = {
   onEvent?: (event: NotificationEvent) => void;
@@ -62,15 +62,13 @@ export function useNotificationsBell(options: Options = {}) {
       // (account, billing, studio invites, client-side bookings) belong
       // here. Master operational events live in the master sidebar badge,
       // counted separately by the cabinet layout.
-      const res = await fetch("/api/notifications/unread-count?context=personal", {
+      const data = await fetchJson<UnreadResponse>("/api/notifications/unread-count?context=personal", {
         cache: "no-store",
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<UnreadResponse> | null;
-      if (!res.ok || !json || !json.ok) return;
-      setUnreadCount(json.data.count);
-      setHasUnread(json.data.hasUnread);
+      setUnreadCount(data.count);
+      setHasUnread(data.hasUnread);
     } catch {
-      // ignore
+      // Фон: счётчик колокольчика; следующий опрос повторит.
     } finally {
       inFlightRef.current = false;
       if (pendingRef.current) {

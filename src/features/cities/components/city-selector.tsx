@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnchoredPortal } from "@/components/ui/anchored-portal";
 import useSWR from "swr";
 import { ChevronDown } from "lucide-react";
 import { fetchJson } from "@/lib/http/client";
 import { getCurrentCitySlug, setCurrentCitySlug } from "@/lib/cities/client-city";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 type CityItem = {
   id: string;
@@ -39,17 +41,6 @@ export function CitySelector() {
     setCurrentSlug(getCurrentCitySlug());
   }, []);
 
-  // Click-outside handler.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [open]);
 
   const T = UI_TEXT.cities.selector;
   const cities = data?.items ?? [];
@@ -75,8 +66,7 @@ export function CitySelector() {
 
   return (
     <div ref={containerRef} className="relative">
-      <button
-        type="button"
+      <Button variant="wrapper"
         onClick={() => {
           if (!open) void mutate();
           setOpen((v) => !v);
@@ -88,34 +78,38 @@ export function CitySelector() {
       >
         <span className="max-w-[140px] truncate">{buttonLabel}</span>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           aria-hidden
         />
-      </button>
+      </Button>
 
+      {/* 29.09 доработки · 21: список — порталом (`z-popover`), иначе он
+          жил на уровне шапки и уходил под нижнюю навигацию. Клик вне и Escape
+          закрывают его там же. */}
+      <AnchoredPortal open={open && cities.length > 0} anchorRef={containerRef} onDismiss={() => setOpen(false)}>
       {open && cities.length > 0 ? (
         <ul
           role="listbox"
-          className="absolute left-0 top-full z-50 mt-2 max-h-[320px] min-w-[200px] overflow-y-auto rounded-xl border border-border-subtle bg-bg-card py-1 shadow-lg"
+          className="max-h-[320px] min-w-[200px] overflow-y-auto rounded-xl border border-border-subtle bg-bg-card py-1 shadow-lg"
         >
           {cities.map((city) => {
             const isCurrent = city.slug === currentSlug;
             return (
               <li key={city.id} role="option" aria-selected={isCurrent}>
-                <button
-                  type="button"
+                <Button variant="wrapper"
                   onClick={() => handleSelect(city.slug)}
                   className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60 ${
                     isCurrent ? "font-medium text-accent-text" : "text-text-main"
                   }`}
                 >
                   {city.name}
-                </button>
+                </Button>
               </li>
             );
           })}
         </ul>
       ) : null}
+      </AnchoredPortal>
     </div>
   );
 }

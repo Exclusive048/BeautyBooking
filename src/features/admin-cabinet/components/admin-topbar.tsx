@@ -10,7 +10,8 @@ import {
   type AdminCrumb,
 } from "@/features/admin-cabinet/config/admin-breadcrumbs";
 import { matchAdminNavItem } from "@/features/admin-cabinet/config/admin-nav";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   /** Opens the mobile drawer. Lives on the shell wrapper because the
@@ -67,16 +68,17 @@ export function AdminTopbar({ onOpenMobileNav }: Props) {
   const sublabel = current?.sublabel ?? "";
 
   return (
-    <header className="sticky top-[var(--topbar-h)] z-20 border-b border-border-subtle bg-bg-page/85 backdrop-blur-md">
+    <header className="sticky top-[var(--topbar-h)] z-sticky border-b border-border-subtle bg-bg-page/85 backdrop-blur-md">
       <div className="flex items-center gap-3 px-4 py-4 md:px-6 lg:px-8">
-        <button
-          type="button"
+        <Button
+          variant="icon"
+          size="icon"
           onClick={onOpenMobileNav}
           aria-label={UI_TEXT.adminPanel.mobile.openMenu}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border-subtle bg-bg-card text-text-sec shadow-sm transition-colors hover:text-text-main lg:hidden"
+          className="shrink-0 rounded-xl text-text-sec hover:text-text-main lg:hidden"
         >
           <Menu className="h-4 w-4" />
-        </button>
+        </Button>
 
         <div className="min-w-0 flex-1">
           <div className="mb-1">{renderCrumbs(crumbs)}</div>

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { BRAND_COLORS } from "@/lib/ui/brand-colors";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * APP-TIER-SPLIT-02 (2026-08-31) — ярус приложения в проде: один образ, два

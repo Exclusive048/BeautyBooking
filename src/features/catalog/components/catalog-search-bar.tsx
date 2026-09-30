@@ -6,7 +6,7 @@ import {
   ServiceSearchInput,
   type AutocompleteCategory,
 } from "@/features/catalog/components/service-search-input";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   serviceQuery: string;

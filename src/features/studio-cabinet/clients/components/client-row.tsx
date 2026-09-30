@@ -4,7 +4,7 @@ import type {
   StudioCabinetShellExtras,
 } from "@/features/studio-cabinet/schedule/server/shell-extras.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioClientRow } from "../lib/types";
 import { formatDaysAgo, initialsOf } from "../lib/format";
 import { ClientBookButton } from "./client-book-button";

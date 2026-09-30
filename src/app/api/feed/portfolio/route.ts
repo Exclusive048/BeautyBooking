@@ -7,6 +7,7 @@ import { portfolioFeedQuerySchema } from "@/lib/feed/schemas";
 import { parseQuery } from "@/lib/validation";
 import { getSessionUser } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { getClientIp } from "@/lib/http/ip";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
@@ -22,7 +23,7 @@ function feedPortfolioCacheKey(cursor: string | undefined, limit: number): strin
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      `rl:/api/feed/portfolio:ip:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       RATE_LIMITS.feedPortfolio,
     );
     if (rateLimit.limited) {

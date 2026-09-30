@@ -81,8 +81,9 @@ async function readStorageBytes(storageKey: string, mimeType: string): Promise<U
 
 async function markAssetAsUnrecognized(assetId: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
-    await tx.mediaAsset.update({
-      where: { id: assetId },
+    // 29.09 доработки · 16: удалённое за время индексации фото не трогаем.
+    await tx.mediaAsset.updateMany({
+      where: { id: assetId, deletedAt: null },
       data: {
         visualIndexed: true,
         visualIndexedAt: new Date(),
@@ -162,8 +163,12 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
     const mediaUrlSuffix = `/api/media/file/${asset.id}`;
 
     await prisma.$transaction(async (tx) => {
-      await tx.mediaAsset.update({
-        where: { id: asset.id },
+      // 29.09 доработки · 16 — гонка индексатора: `deletedAt` проверялся в начале,
+      // потом секунды шли запросы к Яндексу, и фото, удалённое за это время,
+      // получало эмбеддинг уже после удаления. Запись — только пока фото живо;
+      // `count === 0` — удалили, ни эмбеддинга, ни категории работы не пишем.
+      const written = await tx.mediaAsset.updateMany({
+        where: { id: asset.id, deletedAt: null },
         data: {
           // SEC-18: только поля, которые стратегия объявила фильтрами, и только
           // скаляры — остальное модель выдумала, а фильтрует по нему сырой SQL.
@@ -175,6 +180,7 @@ export async function indexMediaAsset(assetId: string): Promise<void> {
           visualIndexedAt: new Date(),
         },
       });
+      if (written.count === 0) return;
 
       if (mappedCategory) {
         const updatedPortfolioItems = await tx.portfolioItem.updateMany({

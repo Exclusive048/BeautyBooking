@@ -6,7 +6,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioNotificationsKpi } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.notificationsV2.kpis;

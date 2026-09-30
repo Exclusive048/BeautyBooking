@@ -44,8 +44,8 @@ export function CurrentTimeLine({
       className="pointer-events-none absolute inset-x-0 z-20 flex items-center"
       style={{ top }}
     >
-      <span className="h-2 w-2 -translate-x-1 rounded-full bg-red-500 shadow-sm" />
-      <span className="h-px flex-1 bg-red-500/80" />
+      <span className="h-2 w-2 -translate-x-1 rounded-full bg-destructive shadow-sm" />
+      <span className="h-px flex-1 bg-destructive/80" />
     </div>
   );
 }

@@ -22,7 +22,7 @@ import {
 } from "@/lib/master/schedule-utils";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
 

@@ -1,5 +1,6 @@
 import { Prisma, ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { MODEL_OFFER_VISIBLE_MASTER_WHERE } from "@/lib/model-offers/visibility";
 
 // Rule 12 (RULE-12-SWEEP): the public model-offer payload carries NO internal
 // CUIDs. The offer is addressed by `publicCode`, the master linked via
@@ -209,20 +210,17 @@ function toPublicItem(input: {
 }
 
 export async function listPublicModelOffers(input: PublicModelOffersQuery): Promise<PublicModelOffersResult> {
-  const masterWhere: Prisma.ProviderWhereInput = {
-    isPublished: true,
-    type: ProviderType.MASTER,
-  };
+  const cityWhere: Prisma.ProviderWhereInput = {};
   if (input.cityId) {
-    masterWhere.cityId = input.cityId;
+    cityWhere.cityId = input.cityId;
   } else if (input.city) {
-    masterWhere.address = { contains: input.city, mode: "insensitive" };
+    cityWhere.address = { contains: input.city, mode: "insensitive" };
   }
 
   const and: Prisma.ModelOfferWhereInput[] = [
     { status: "ACTIVE" },
     { dateLocal: { gte: todayDateString() } },
-    { master: masterWhere },
+    { master: { AND: [MODEL_OFFER_VISIBLE_MASTER_WHERE, cityWhere] } },
   ];
 
   if (input.categoryId) {
@@ -322,16 +320,15 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
 export async function getPublicModelOffer(code: string): Promise<PublicModelOfferItem | null> {
   if (!code) return null;
 
-  // TODO: replace $queryRaw with typed findFirst after `npx prisma generate` (migration 20260411180000)
-  const [codeRow] = await prisma.$queryRaw<Array<{ id: string }>>`
-    SELECT mo.id FROM "ModelOffer" mo
-    JOIN "Provider" p ON p.id = mo."masterId"
-    WHERE mo."publicCode" = ${code}
-      AND mo.status = 'ACTIVE'
-      AND mo."dateLocal" >= ${todayDateString()}
-      AND p."isPublished" = true
-      AND p.type = 'MASTER'
-    LIMIT 1`;
+  const codeRow = await prisma.modelOffer.findFirst({
+    where: {
+      publicCode: code,
+      status: "ACTIVE",
+      dateLocal: { gte: todayDateString() },
+      master: MODEL_OFFER_VISIBLE_MASTER_WHERE,
+    },
+    select: { id: true },
+  });
   if (!codeRow) return null;
 
   const offer = await prisma.modelOffer.findFirst({
@@ -445,8 +442,7 @@ export async function listModelOfferFilterCategories(): Promise<PublicModelOffer
 export async function listModelOfferCitySuggestions(): Promise<string[]> {
   const addresses = await prisma.provider.findMany({
     where: {
-      type: ProviderType.MASTER,
-      isPublished: true,
+      ...MODEL_OFFER_VISIBLE_MASTER_WHERE,
       address: { not: "" },
     },
     select: { address: true },

@@ -2,12 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   StudioAnalyticsPeriodId,
   StudioAnalyticsViewId,
 } from "../lib/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.studioCabinet.analyticsV2;
 
@@ -58,27 +58,12 @@ export function AnalyticsControls({ period, view, compare }: Props) {
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
           {T.periodLabel}
         </span>
-        <div className="flex flex-wrap gap-1">
-          {PERIODS.map((p) => {
-            const active = period === p.key;
-            return (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => updateParam("period", p.key === "30d" ? null : p.key)}
-                aria-pressed={active}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                  active
-                    ? "border-primary/40 bg-primary/10 text-accent-text"
-                    : "border-border-subtle bg-bg-card text-text-sec hover:text-text-main",
-                )}
-              >
-                {T.periods[p.labelKey]}
-              </button>
-            );
-          })}
-        </div>
+        <Tabs
+          ariaLabel={T.periodLabel}
+          items={PERIODS.map((p) => ({ id: p.key, label: T.periods[p.labelKey] }))}
+          value={period}
+          onChange={(id) => updateParam("period", id === "30d" ? null : id)}
+        />
         <label className="ml-auto inline-flex items-center gap-2 text-xs text-text-sec">
           <Checkbox
             size="sm"
@@ -88,27 +73,12 @@ export function AnalyticsControls({ period, view, compare }: Props) {
           {T.compare}
         </label>
       </div>
-      <div className="flex flex-wrap gap-1">
-        {VIEWS.map((v) => {
-          const active = view === v.key;
-          return (
-            <button
-              key={v.key}
-              type="button"
-              onClick={() => updateParam("view", v.key === "overview" ? null : v.key)}
-              aria-pressed={active}
-              className={cn(
-                "rounded-xl border px-4 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "border-primary/40 bg-primary/10 text-accent-text"
-                  : "border-border-subtle bg-bg-card text-text-main hover:bg-bg-input/60",
-              )}
-            >
-              {T.views[v.labelKey]}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        ariaLabel={T.viewsAria}
+        items={VIEWS.map((v) => ({ id: v.key, label: T.views[v.labelKey] }))}
+        value={view}
+        onChange={(id) => updateParam("view", id === "overview" ? null : id)}
+      />
     </div>
   );
 }

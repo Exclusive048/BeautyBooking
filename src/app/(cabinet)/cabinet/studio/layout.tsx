@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { SetupGuideHint } from "@/features/cabinet/setup-guide/setup-guide-hint";
 import { SubscriptionScope } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
@@ -14,7 +16,7 @@ import {
   isActiveTrial,
   trialDaysLeft,
 } from "@/lib/billing/get-current-subscription-row";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export default async function StudioCabinetLayout({
   children,
@@ -89,7 +91,7 @@ export default async function StudioCabinetLayout({
         </div>
 
         {/* Main content column — full width, padding only */}
-        <main data-testid="page-main" className="min-w-0 flex-1 px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:px-6 lg:px-8 lg:pb-8">
+        <main data-testid="page-main" className="guide-space min-w-0 flex-1 px-4 py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:px-6 lg:px-8 lg:pb-8">
           {trialActive && daysLeft > 0 ? (
             <div className="mb-4 flex justify-end">
               <TrialStatusBadge trialEndsAt={subscription.trialEndsAt.toISOString()} />
@@ -97,6 +99,11 @@ export default async function StudioCabinetLayout({
           ) : null}
           {children}
         </main>
+
+        {/* SETUP-GUIDE-01: подсказка шага «Первых шагов» (`?guide=`). */}
+        <Suspense fallback={null}>
+          <SetupGuideHint scope="studio" />
+        </Suspense>
 
         {/* Mobile bottom nav */}
         <StudioBottomNav counts={sidebarCounts} />

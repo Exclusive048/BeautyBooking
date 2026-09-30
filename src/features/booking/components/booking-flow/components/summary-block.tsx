@@ -1,5 +1,5 @@
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 
 const T = UI_TEXT.publicProfile.bookingWidget;

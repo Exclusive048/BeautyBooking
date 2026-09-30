@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SearchX } from "lucide-react";
 import { CatalogHeader } from "@/features/admin-cabinet/catalog/components/catalog-header";
 import { CatalogRowActions } from "@/features/admin-cabinet/catalog/components/catalog-row-actions";
@@ -12,14 +11,14 @@ import {
   type CreateDialogValue,
 } from "@/features/admin-cabinet/catalog/components/create-category-dialog";
 import { RejectConfirmDialog } from "@/features/admin-cabinet/catalog/components/reject-confirm-dialog";
-import { cn } from "@/lib/cn";
-import { fetchJson, serverMessageOr } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCategoryCounts,
   AdminCategoryParentOption,
   AdminCategoryRow,
 } from "@/features/admin-cabinet/catalog/types";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.adminPanel.catalog;
 
@@ -28,8 +27,6 @@ type Props = {
   parentOptions: AdminCategoryParentOption[];
   counts: AdminCategoryCounts;
 };
-
-type Toast = { kind: "success" | "error"; text: string } | null;
 
 /**
  * Client wrapper around the catalog table. Owns:
@@ -46,23 +43,17 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState<AdminCategoryRow[]>(initialRows);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const toast = useToast();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<AdminCategoryRow | null>(null);
   const [rejectTarget, setRejectTarget] = useState<AdminCategoryRow | null>(null);
-  const reduce = useReducedMotion();
 
   // Re-sync local state if the server-rendered list changes
   // (e.g. URL filter changed and the page re-rendered).
   if (rows !== initialRows && rows.length === 0) {
     // initial mount: keep server rows
   }
-
-  const showToast = (text: string, kind: "success" | "error" = "success") => {
-    setToast({ kind, text });
-    window.setTimeout(() => setToast(null), 2400);
-  };
 
   const patchRow = (id: string, patch: Partial<AdminCategoryRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -76,11 +67,11 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
       await fetchJson(`/api/admin/catalog/categories/${row.id}/approve`, {
         method: "POST",
       });
-      showToast(T.toasts.approved);
+      toast.success(T.toasts.approved);
       router.refresh();
     } catch (error) {
       patchRow(row.id, { status: prevStatus });
-      showToast(serverMessageOr(error, T.toasts.errorGeneric), "error");
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     } finally {
       setBusyId(null);
     }
@@ -97,13 +88,13 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
         body: JSON.stringify({ reason }),
       });
       setRejectTarget(null);
-      showToast(T.toasts.rejected);
+      toast.success(T.toasts.rejected);
       router.refresh();
     } catch (error) {
       // Причину отказа (например, «Категория уже отклонена. Обновите страницу.»)
       // показываем дословно — на неё администратор может отреагировать (FIX-C8).
       patchRow(row.id, { status: prevStatus });
-      showToast(serverMessageOr(error, T.toasts.errorGeneric), "error");
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     } finally {
       setBusyId(null);
     }
@@ -112,7 +103,7 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
   const handleSubmitDialog = async (value: CreateDialogValue) => {
     const isEdit = !!editing;
     try {
-      const res = await fetch(
+      await fetchJsonWithAuth<unknown>(
         isEdit
           ? `/api/admin/catalog/categories/${editing!.id}`
           : "/api/admin/catalog/categories",
@@ -125,44 +116,22 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
           }),
         },
       );
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const isCycle = text.includes("Circular") || text.includes("BAD_REQUEST");
-        showToast(isCycle ? T.toasts.cycleError : T.toasts.errorGeneric, "error");
-        return;
-      }
       setCreateOpen(false);
       setEditing(null);
-      showToast(isEdit ? T.toasts.updated : T.toasts.created);
+      toast.success(isEdit ? T.toasts.updated : T.toasts.created);
       // Reload server rows — count + new row will appear via refresh.
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      // «Категория не может быть вложена сама в себя.», «Родительская категория
+      // не найдена.» — отказы сервера дословно. Прежде клиент искал в тексте
+      // ответа слово «Circular», которого сервер не присылал никогда.
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     }
   };
 
   return (
     <div className="space-y-4">
       <CatalogHeader counts={counts} onAdd={() => setCreateOpen(true)} />
-
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            role="status"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            className={cn(
-              "rounded-2xl border px-4 py-2.5 text-sm",
-              toast.kind === "success"
-                ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-red-300/40 bg-red-500/10 text-red-700 dark:text-red-300",
-            )}
-          >
-            {toast.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
 
       <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
         {/* Mobile: cards stacked. Desktop: table. */}

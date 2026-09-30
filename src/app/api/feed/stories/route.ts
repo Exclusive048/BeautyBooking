@@ -4,6 +4,7 @@ import { tooManyRequests } from "@/lib/api/response";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getActiveStoriesGroups } from "@/lib/feed/stories.service";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { getClientIp } from "@/lib/http/ip";
 
@@ -12,7 +13,7 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      `rl:/api/feed/stories:ip:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       RATE_LIMITS.feedStories,
     );
     if (rateLimit.limited) {

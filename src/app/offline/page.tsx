@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export default function OfflinePage() {
   // PWA-RELOAD-01: единственная страница, которой перезагрузка по возврату сети

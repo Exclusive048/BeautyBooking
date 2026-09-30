@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Ban, MessageSquare, Pencil } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ReportReviewModal } from "@/features/reviews/components/report-review-modal";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ReviewReplyForm } from "./review-reply-form";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.reviews.card;
 
@@ -42,8 +43,7 @@ export function ReviewActionsIsland({
     <>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setReplyMode(true)}
             className={cn(
               "inline-flex items-center gap-1 transition-colors",
@@ -52,30 +52,29 @@ export function ReviewActionsIsland({
           >
             <ReplyIcon className="h-3.5 w-3.5" aria-hidden />
             {replyLabel}
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setReportOpen(true)}
             disabled={isReported}
             className={cn(
               "inline-flex items-center gap-1 transition-colors",
               isReported
                 ? "cursor-not-allowed text-text-sec/50"
-                : "text-text-sec hover:text-rose-600"
+                : "text-text-sec hover:text-danger-text"
             )}
           >
             <Ban className="h-3.5 w-3.5" aria-hidden />
             {isReported ? T.reportedLabel : T.reportCta}
-          </button>
+          </Button>
         </div>
 
         <span
           className={cn(
             "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
             hasReply
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-              : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+              ? "bg-success-surface text-success-text"
+              : "bg-warning-surface text-warning-text"
           )}
         >
           {hasReply ? T.answeredBadge : T.unansweredBadge}

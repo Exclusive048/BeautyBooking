@@ -5,7 +5,7 @@ import {
   getMasterPortfolioView,
   parsePortfolioFilter,
 } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { AddButton } from "./add-button";
 import { PortfolioEmptyState } from "./portfolio-empty-state";
 import { PortfolioFilterChips } from "./portfolio-filter-chips";

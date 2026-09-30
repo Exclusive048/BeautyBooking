@@ -104,6 +104,7 @@ import { seedShowcaseClient } from "./seed-showcase-client";
 import { seedShowcaseStudioClientBookings } from "./seed-showcase-studio-client-bookings";
 import { seedBillingFixtures } from "./seed-billing-fixtures";
 import { seedStudioQa } from "./seed-studio-qa";
+import { backfillWeeklySchedulePatterns } from "../../../src/lib/schedule/patterns-core";
 
 async function main() {
   // SEED-DEFUSE-01 — первой строкой, до любого обращения к БД (см. prisma/seeds/guard.ts).
@@ -154,6 +155,11 @@ async function main() {
   // fixture. Needs seedProviders (studio + team) and seedClients (a bookable
   // client), so it runs after both.
   const studioQaBookings = await seedStudioQa();
+
+  // SCHEDULE-PATTERNS-01: сиды пишут недели (`WeeklyScheduleConfig`); тем же
+  // шагом, что и пост-деплой, они становятся графиками — dev-БД после сида
+  // устроена как прод после деплоя.
+  await backfillWeeklySchedulePatterns(prisma);
 
   logSeed.summary({
     cities: cities.length,

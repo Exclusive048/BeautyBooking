@@ -1,5 +1,5 @@
 import { ErrorState } from "@/components/ui/error-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const t = UI_TEXT.pages.forbidden;
 

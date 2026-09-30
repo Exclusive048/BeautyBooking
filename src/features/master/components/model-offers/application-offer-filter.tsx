@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import type { OfferFilterOption } from "@/lib/master/model-offers-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatOfferDateShort } from "./lib/format";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.pendingSection;

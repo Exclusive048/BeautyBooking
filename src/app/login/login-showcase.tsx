@@ -14,7 +14,7 @@ import type { LucideIcon } from "lucide-react";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { PublicStats } from "@/lib/stats/public-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 // Marquee benefit cards — visual device only. Copy lives in UI_TEXT; the icons
 // are paired here by index (icons are not UI text). No invented person, quote
@@ -190,7 +190,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
       </div>
 
       {/* Plane 2 — twinkling sparkles, drifting at their own rate */}
-      <div ref={sparkRef} className="login-layer absolute inset-0 z-[1]" aria-hidden>
+      <div ref={sparkRef} className="login-layer absolute inset-0 z-1" aria-hidden>
         <svg
           className="login-spark"
           style={{ top: "16%", right: "12%", animationDelay: "0s" }}
@@ -227,7 +227,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
       </div>
 
       {/* Content */}
-      <div className="relative z-[2] flex h-full flex-col justify-between p-10">
+      <div className="relative z-2 flex h-full flex-col justify-between p-10">
         {/* Brand block — gradient iconmark + white wordmark over the dark
             stage. `textClassName="text-white"` overrides the wordmark's
             gradient text-clip so it stays readable on the burgundy backdrop;
@@ -323,7 +323,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
                 min-content width (259px + 239px against a 460px zone) and the
                 right column ran past the pane's edge, clipping its cards. */}
             <div
-              className="login-mq-zone relative z-[1] flex h-[224px] gap-4 overflow-hidden"
+              className="login-mq-zone relative z-1 flex h-[224px] gap-4 overflow-hidden"
               style={{
                 WebkitMaskImage:
                   "linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent)",

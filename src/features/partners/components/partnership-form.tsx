@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { isTelegramEnabled } from "@/lib/env.client";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { HoneypotField } from "@/components/ui/honeypot-field";
 
 const T = UI_TEXT.partners.form;
 
@@ -36,7 +38,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function PartnershipForm() {
   const consentId = useId();
-  const honeypotId = useId();
 
   const [kind, setKind] = useState<PartnershipKind | "">("");
   const [organizationName, setOrganizationName] = useState("");
@@ -74,7 +75,7 @@ export function PartnershipForm() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/support/partnership", {
+      await fetchJson<unknown>("/api/support/partnership", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -89,13 +90,10 @@ export function PartnershipForm() {
           honeypot,
         }),
       });
-
-      if (!res.ok) {
-        throw new Error("send_failed");
-      }
       setSubmitted(true);
-    } catch {
-      setGenericError(T.genericError);
+    } catch (error) {
+      // Лимит обращений и отказы проверки — дословно; обрыв сети — своя строка.
+      setGenericError(serverMessageOr(error, T.genericError));
     } finally {
       setSubmitting(false);
     }
@@ -119,22 +117,12 @@ export function PartnershipForm() {
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {/* Honeypot — visible to bots, hidden from real users.
           Position-absolute off-screen + aria-hidden + tabIndex -1. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute h-0 w-0 overflow-hidden opacity-0"
-        style={{ left: "-9999px" }}
-      >
-        <label htmlFor={honeypotId}>Leave this field empty</label>
-        <input
-          id={honeypotId}
-          type="text"
-          name="company_url"
-          value={honeypot}
-          onChange={(e) => setHoneypot(e.target.value)}
-          tabIndex={-1}
-          autoComplete="off"
-        />
-      </div>
+      <HoneypotField
+        name="company_url"
+        value={honeypot}
+        onChange={setHoneypot}
+        label={UI_TEXT.partners.form.honeypotLabel}
+      />
 
       <Field label={T.kind.label} error={errors.kind}>
         {(controlId) => (
@@ -280,14 +268,14 @@ export function PartnershipForm() {
           </span>
         </label>
         {errors.consent ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{errors.consent}</p>
+          <p className="text-sm text-danger-text">{errors.consent}</p>
         ) : null}
       </div>
 
       {genericError ? (
         <div
           role="alert"
-          className="rounded-xl border border-red-300/60 bg-red-50 p-3 text-sm text-red-900 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-200"
+          className="rounded-xl border border-danger-border bg-danger-surface p-3 text-sm text-danger-text"
         >
           {genericError}
         </div>
@@ -324,7 +312,7 @@ function Field({ label, error, children }: FieldProps) {
       </label>
       {children(controlId)}
       {error ? (
-        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-1 text-sm text-danger-text">{error}</p>
       ) : null}
     </div>
   );

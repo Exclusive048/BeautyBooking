@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.reportDialog;
 const E = UI_TEXT.studioCabinet.reviewsV2.toasts;
@@ -53,7 +54,7 @@ export function ReportReviewDialog({ reviewId, onClose }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/report`, {
+      await fetchJsonWithAuth<unknown>(`/api/reviews/${encodeURIComponent(reviewId)}/report`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -61,18 +62,11 @@ export function ReportReviewDialog({ reviewId, onClose }: Props) {
           comment: comment.trim() || undefined,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.error);
-        return;
-      }
       reset();
       onClose();
       router.refresh();
-    } catch {
-      setError(E.error);
+    } catch (error) {
+      setError(serverMessageOr(error, E.error));
     } finally {
       setSubmitting(false);
     }

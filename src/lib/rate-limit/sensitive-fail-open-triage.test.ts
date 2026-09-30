@@ -138,40 +138,22 @@ function routeEntry(route: string): string | null {
 }
 
 /**
- * FIX-B11 — детектор знал ОДИН механизм fail-closed из трёх.
+ * FIX-B11 — детектор знал ОДИН механизм fail-closed из трёх; с 29.09 доработки
+ * · 15 (RATE-LIMIT-MECHANISM-CONSOLIDATION) их два, и оба видны.
  *
- * Снимок `fail-open-mutating-routes.json` строился по ПУТИ: роут считался
- * fail-open, если не попадает под `SENSITIVE_ROUTE_PREFIXES`. Но рантайм решает
- * по КЛЮЧУ (`isSensitiveRouteKey`), а ключей три семейства:
+ * Рантайм решает по ключу (`isSensitiveRouteKey`), а ключ любого лимитера несёт
+ * шаблон пути последним (`lib/rate-limit/keys.ts`), поэтому снимок
+ * `fail-open-mutating-routes.json`, построенный по шаблону, совпадает с рантаймом:
+ * прежний второй механизм (префикс КЛЮЧА `SENSITIVE_KEY_PREFIXES`, из-за
+ * которого три гостевых booking-роута были ложными срабатываниями) удалён —
+ * эти пути теперь в точном списке `SENSITIVE_ROUTE_TEMPLATES` и из снимка ушли.
  *
- *  1. префикс пути          — тир прокси (`rl:<tier>:<ip>:<method>:<template>`);
- *  2. **префикс ключа**      — `SENSITIVE_KEY_PREFIXES`: роут со своим ключом
- *     (`rate:publicBooking:`, `rate:packageBook:`, `rate:studioPackageBook:`)
- *     fail-closed, хотя его путь ни под один префикс не подходит. Так три
- *     гостевых booking-роута — самые тревожные строки списка — оказались
- *     ложными срабатываниями: они давно fail-closed (SECURITY-EXPOSURE-AUDIT-01 · Y6);
- *  3. **fail-closed внутри модуля** — `lib/auth/otp-rate-limit.ts` не спрашивает
- *     `isSensitiveRouteKey` вовсе: любой отказ Redis он сам превращает в
- *     503 `RATE_LIMIT_UNAVAILABLE` / 429 (RES-11). Оба кабинетных email-роута
- *     ходят через него.
- *
- * Первые две проверки ВЫВОДЯТСЯ из исходника роута, а не перечисляются.
+ * Остаётся собственный механизм OTP-модуля: `lib/auth/otp-rate-limit.ts` не
+ * спрашивает `isSensitiveRouteKey` вовсе — любой отказ Redis он сам превращает
+ * в 503 `RATE_LIMIT_UNAVAILABLE` (RES-11). Его признак выводится из исходника.
  */
-const SENSITIVE_KEY_PREFIXES = [
-  "rate:createBooking:", "rate:publicBooking:", "rate:packageBook:", "rate:studioPackageBook:",
-  "rate:guestManage:",
-  "rl:categories:propose:", "rl:/api/me/delete", "rl:/api/cabinet/master/delete",
-  "rl:/api/cabinet/studio/delete", "rl:/api/bookings", "rl:/api/master/portfolio",
-  "rl:/api/studio", "rl:/api/studios", "rl:/api/reviews",
-];
-
 function isFailClosedByOwnMechanism(entry: string): boolean {
-  const source = readFileSync(entry, "utf8");
-  const usesSensitiveKey = [...source.matchAll(/`(rate:[^`$]*|rl:[^`$]*)/g)].some(([, key]) =>
-    SENSITIVE_KEY_PREFIXES.some((prefix) => key!.startsWith(prefix)),
-  );
-  const usesOtpLimiter = /otp-rate-limit/.test(source);
-  return usesSensitiveKey || usesOtpLimiter;
+  return /otp-rate-limit/.test(readFileSync(entry, "utf8"));
 }
 
 /**

@@ -1,3 +1,6 @@
+import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
+
 export type BookingsTimeRange = "today" | "tomorrow" | "week" | "all";
 
 export function parseBookingsTimeRange(value: unknown): BookingsTimeRange {
@@ -6,36 +9,30 @@ export function parseBookingsTimeRange(value: unknown): BookingsTimeRange {
     : "today";
 }
 
-function startOfUtcDay(value: Date): Date {
-  return new Date(
-    Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()),
-  );
-}
-
-function addUtcDays(value: Date, days: number): Date {
-  const next = new Date(value);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
 /**
- * Translates a time-range chip into a `{ from, toExclusive }` window
- * relative to "now". `"all"` returns null bounds — the caller should
- * skip the filter entirely. Bounds are UTC instants; the journal page
- * runs server-side so no timezone normalisation is needed here.
+ * Chip «Сегодня / Завтра / Неделя» → `{ from, toExclusive }`. `"all"` —
+ * без границ (фильтр не ставится).
+ *
+ * tz-источник — **salon-tz** (пояс студии, rule 17): сутки салона, а не UTC.
+ * Раньше границы брались по UTC-полуночи, и у студии в Екатеринбурге (GMT+5)
+ * запись на 03:00 завтрашнего дня попадала в «Сегодня», а с 00:00 до 05:00 по
+ * салону «Сегодня» показывало вчерашние записи (29.09 доработки · 02).
  */
 export function bookingsTimeRangeBounds(
   range: BookingsTimeRange,
+  timeZone: string,
   now: Date = new Date(),
 ): { from: Date | null; toExclusive: Date | null } {
-  const today = startOfUtcDay(now);
+  const todayKey = toLocalDateKey(now, timeZone);
+  const dayStart = (offset: number) =>
+    localDayRangeUtc(addDaysToDateKey(todayKey, offset), timeZone).startUtc;
   switch (range) {
     case "today":
-      return { from: today, toExclusive: addUtcDays(today, 1) };
+      return { from: dayStart(0), toExclusive: dayStart(1) };
     case "tomorrow":
-      return { from: addUtcDays(today, 1), toExclusive: addUtcDays(today, 2) };
+      return { from: dayStart(1), toExclusive: dayStart(2) };
     case "week":
-      return { from: today, toExclusive: addUtcDays(today, 7) };
+      return { from: dayStart(0), toExclusive: dayStart(7) };
     case "all":
     default:
       return { from: null, toExclusive: null };

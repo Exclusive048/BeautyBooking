@@ -7,7 +7,7 @@ import { ReviewRatingStars } from "@/features/admin-cabinet/reviews/components/r
 import { ReviewReportInfo } from "@/features/admin-cabinet/reviews/components/review-report-info";
 import { UserAvatar } from "@/features/admin-cabinet/users/components/user-avatar";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
 
 const T = UI_TEXT.adminPanel.reviews.card;
@@ -38,7 +38,7 @@ export function ReviewCard({ review, busy, onApprove, onDelete }: Props) {
     <article
       className={cn(
         "rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-card",
-        review.isReported && "ring-2 ring-red-500/25",
+        review.isReported && "ring-2 ring-destructive/25",
       )}
     >
       <div className="grid gap-4 lg:grid-cols-[1fr_180px_220px] lg:items-start">
@@ -53,13 +53,13 @@ export function ReviewCard({ review, busy, onApprove, onDelete }: Props) {
               <p className="flex items-center gap-2 text-sm font-medium text-text-main">
                 <span className="truncate">{review.authorDisplay}</span>
                 {review.isReported ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/[0.12] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-red-700 dark:text-red-300">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive/[0.12] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-danger-text">
                     <Flag className="h-2.5 w-2.5" aria-hidden />
                     {T.reportedBadge}
                   </span>
                 ) : null}
                 {review.isUrgent ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-white">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-white">
                     <AlertTriangle className="h-2.5 w-2.5" aria-hidden />
                     {T.urgentBadge}
                   </span>

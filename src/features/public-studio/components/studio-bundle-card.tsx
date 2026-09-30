@@ -2,7 +2,7 @@ import { Package, Clock, Sparkles } from "lucide-react";
 import type { StudioBundleView } from "@/features/public-studio/server/studio-packages.service";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { StudioPackageBookingButton } from "@/features/public-studio/components/studio-package-flow";
 
 type Props = {

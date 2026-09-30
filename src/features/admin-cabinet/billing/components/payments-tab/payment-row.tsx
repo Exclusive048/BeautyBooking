@@ -7,8 +7,9 @@ import {
   PAYMENT_STATUS_TONE_CLASS,
   paymentStatusDisplay,
 } from "@/features/admin-cabinet/billing/lib/payment-status";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.adminPanel.billing.payments;
 const M = UI_TEXT.adminPanel.billing.methodFallback;
@@ -60,16 +61,16 @@ export function PaymentTableRow({ payment, busy, onRefund }: Props) {
       </td>
       <td className="px-4 py-3 text-right align-top">
         {payment.isRefundable ? (
-          <button
-            type="button"
+          <Button
+            variant="wrapper"
             onClick={onRefund}
             disabled={busy}
             aria-label={T.refundButton}
             title={T.refundButton}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-bg-input text-text-sec transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-300"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-bg-input text-text-sec transition-colors hover:bg-destructive/10 hover:text-danger-text"
           >
             <Undo2 className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
       </td>
     </tr>

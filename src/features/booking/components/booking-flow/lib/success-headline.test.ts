@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildSuccessHeadline } from "@/features/booking/components/booking-flow/lib/success-headline";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { stripComments } from "@/lib/testing/source-scan";
 
 /**

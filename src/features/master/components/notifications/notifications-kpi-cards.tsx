@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Bell, Clock, Inbox, MailOpen } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { MasterNotificationsKpi } from "@/lib/master/notifications.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { pluralizeRu } from "./lib/group-by-day";
 
 const T = UI_TEXT.cabinetMaster.notifications.kpi;

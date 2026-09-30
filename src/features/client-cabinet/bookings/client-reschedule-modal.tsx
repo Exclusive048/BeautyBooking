@@ -6,8 +6,10 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { Notice } from "@/components/ui/notice";
 import { formatLocalHm } from "@/lib/schedule/timezone";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
@@ -34,11 +36,8 @@ type SlotsApiResponse = {
 };
 
 const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then(async (res) => {
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? "load_failed");
-    return json.data as SlotsApiResponse;
-  });
+  // Модаль работает и у гостя по ссылке «Управлять записью» — без ухода на вход.
+  fetchJson<SlotsApiResponse>(url, { credentials: "include" });
 
 function todayDateKey(): string {
   const d = new Date();
@@ -81,7 +80,11 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
       }`
     : null;
 
-  const { data: slotsData, isLoading: slotsLoading } = useSWR<SlotsApiResponse>(
+  const {
+    data: slotsData,
+    isLoading: slotsLoading,
+    error: slotsError,
+  } = useSWR<SlotsApiResponse>(
     slotsUrl,
     fetcher,
   );
@@ -120,7 +123,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
       const url = manageToken
         ? `/api/public/bookings/manage/${encodeURIComponent(manageToken)}/reschedule`
         : `/api/bookings/${booking.id}/reschedule`;
-      const res = await fetch(url, {
+      await fetchJson<unknown>(url, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -131,14 +134,10 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
           ...(manageToken ? { bookingId: booking.id } : {}),
         }),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setError(json?.error?.message ?? T.submitFailed);
-        return;
-      }
       onSuccess();
-    } catch {
-      setError(T.submitFailed);
+    } catch (error) {
+      // Лимит переносов, срок, занятое окошко — отказы сервера дословно.
+      setError(serverMessageOr(error, T.submitFailed));
     } finally {
       setSubmitting(false);
     }
@@ -189,6 +188,14 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
                 <div key={i} className="h-9 animate-pulse rounded-lg bg-bg-input/60" />
               ))}
             </div>
+          ) : slotsError ? (
+            // Раньше сбой загрузки выглядел как «Свободных окошек нет».
+            <div
+              role="alert"
+              className="rounded-xl border border-danger-border bg-danger-surface p-4 text-center text-sm text-danger-text"
+            >
+              {slotsError instanceof Error && slotsError.message ? slotsError.message : T.loadSlotsFailed}
+            </div>
           ) : slots.length === 0 ? (
             <div className="rounded-xl border border-border-subtle/60 bg-bg-input/40 p-4 text-center text-sm text-text-sec">
               {T.noSlots}
@@ -199,10 +206,11 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
                 const active = slot.startAtUtc === slotIso;
                 const time = formatLocalHm(new Date(slot.startAtUtc), salonTz);
                 return (
-                  <button
+                  <Button
                     key={slot.startAtUtc}
-                    type="button"
+                    variant="wrapper"
                     onClick={() => setSlotIso(slot.startAtUtc)}
+                    aria-pressed={active}
                     className={`rounded-lg border px-2 py-2 text-sm font-medium transition ${
                       active
                         ? "border-primary bg-primary text-white"
@@ -210,7 +218,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
                     }`}
                   >
                     {time}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -218,9 +226,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-rose-300/50 bg-rose-50/60 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-            {error}
-          </div>
+          <Notice tone="danger">{error}</Notice>
         ) : null}
 
         <div className="flex justify-end gap-2 pt-2">

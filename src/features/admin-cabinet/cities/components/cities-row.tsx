@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { CityTagBadge } from "@/features/admin-cabinet/cities/components/city-tag-badge";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCityRow } from "@/features/admin-cabinet/cities/types";
 
 type Props = {
@@ -54,7 +54,7 @@ export function CitiesRow({
               ) : null}
             </p>
             {isDuplicate ? (
-              <p className="mt-0.5 font-mono text-[11px] text-amber-600 dark:text-amber-400">
+              <p className="mt-0.5 font-mono text-[11px] text-warning-text">
                 {T.duplicateMarker.label}
               </p>
             ) : null}

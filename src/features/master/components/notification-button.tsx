@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   /** Total unread badge — see `getUnreadBadgeCount`. Hidden when 0. */

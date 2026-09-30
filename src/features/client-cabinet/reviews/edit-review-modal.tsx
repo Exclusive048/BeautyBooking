@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Star } from "lucide-react";
 import { FormDialog } from "@/components/ui/form-dialog";
+import { StarRatingInput } from "@/components/ui/star-rating-input";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ClientReviewItem } from "@/lib/client-cabinet/reviews.service";
 
 const T = UI_TEXT.clientCabinet.reviews;
-const FORM_T = UI_TEXT.clientCabinet.reviewForm;
+const FORM_T = UI_TEXT.reviews.form;
 
 type Props = {
   review: ClientReviewItem;
@@ -37,7 +38,7 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reviews/${review.id}`, {
+      await fetchJsonWithAuth<unknown>(`/api/reviews/${review.id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -46,19 +47,14 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
           text: text.trim() || undefined,
         }),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        const code = json?.error?.code;
-        if (code === "EDIT_WINDOW_EXPIRED") {
-          setError(T.editWindowHint);
-        } else {
-          setError(json?.error?.message ?? FORM_T.submitFailed);
-        }
-        return;
-      }
       onSuccess();
-    } catch {
-      setError(FORM_T.submitFailed);
+    } catch (error) {
+      // Окно правки истекло — своя подсказка поверхности; прочее — дословно.
+      if (error instanceof ApiClientError && error.code === "EDIT_WINDOW_EXPIRED") {
+        setError(T.editWindowHint);
+      } else {
+        setError(serverMessageOr(error, FORM_T.submitFailed));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -84,26 +80,9 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
 
       <div>
         <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
-          Оценка
+          {UI_TEXT.clientCabinet.reviews.ratingLabel}
         </div>
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setRating(n)}
-              className="p-1"
-              aria-label={`${n}`}
-            >
-              <Star
-                className={`h-7 w-7 transition ${
-                  n <= rating ? "fill-primary text-accent-text" : "text-text-sec/40"
-                }`}
-                aria-hidden
-              />
-            </button>
-          ))}
-        </div>
+        <StarRatingInput value={rating} onChange={setRating} />
       </div>
 
       <div className="space-y-1.5">
@@ -111,7 +90,7 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
           htmlFor="edit-review-text"
           className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
         >
-          Текст отзыва
+          {UI_TEXT.clientCabinet.reviews.textLabel}
         </label>
         <Textarea
           id="edit-review-text"

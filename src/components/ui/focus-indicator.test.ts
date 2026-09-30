@@ -31,32 +31,12 @@ const SRC = "src";
 /** Кому можно гасить кольцо утилитой `ring-0` — и чем фокус виден вместо него. */
 const RING_SUPPRESSED: { file: string; reason: string }[] = [
   {
-    file: "src/features/master/components/profile/editable/address-editor.tsx",
+    file: "src/components/ui/inline-edit.tsx",
     reason:
-      "inline-edit: индикатор — подчёркивание, зависящее от фокуса " +
-      "(`border-b-2 border-border-subtle focus:border-primary`); поле НЕ уходит " +
-      "из режима правки по blur, поэтому подчёркивание обязано быть условным",
-  },
-  {
-    file: "src/features/master/components/profile/editable/username-editable-row.tsx",
-    reason:
-      "inline-edit: подчёркивание на обёртке (внутри неё префикс «@»), " +
-      "условное через `focus-within:border-primary`; строку закрывают кнопки, " +
-      "а не blur",
-  },
-  {
-    file: "src/features/master/components/profile/editable/editable-field-row.tsx",
-    reason:
-      "inline-edit: `onBlur` → `setIsEditing(false)`, поле размонтируется " +
-      "вместе с потерей фокуса — расфокусированным не бывает",
-  },
-  {
-    file: "src/features/master/components/profile/editable/editable-textarea-row.tsx",
-    reason: "то же: `onBlur` закрывает режим правки",
-  },
-  {
-    file: "src/features/master/components/profile/editable/social-editable-row.tsx",
-    reason: "то же: `onBlur` закрывает режим правки",
+      "примитив inline-edit (29.09 доработки · 22): индикатор — подчёркивание; " +
+      "режим `focus` делает его условным (`focus:border-primary`) для полей, " +
+      "которые не уходят из правки по blur. Строки профиля мастера " +
+      "(`profile/editable/*`) гасили кольцо сами, пока не перешли на примитив",
   },
 ];
 
@@ -122,12 +102,15 @@ describe("UI-32 — индикатор фокуса не гасится молч
   it("оба условных подчёркивания реально зависят от фокуса", () => {
     // Пин сути фикса: у этих двух поле бывает видно расфокусированным, поэтому
     // безусловный `border-primary` индикатором не является.
+    // Адрес: поле не уходит из правки по blur — режим `underline="focus"`
+    // примитива (29.09 доработки · 22), подчёркивание условное в нём.
     const address = readFileSync(
       "src/features/master/components/profile/editable/address-editor.tsx",
       "utf8"
     );
-    expect(address).toContain("border-b-2 border-border-subtle");
-    expect(address).toContain("focus:border-primary");
+    expect(address).toContain('underline="focus"');
+    const primitive = readFileSync("src/components/ui/inline-edit.tsx", "utf8");
+    expect(primitive).toContain("border-b-2 border-border-subtle focus:border-primary");
 
     const username = readFileSync(
       "src/features/master/components/profile/editable/username-editable-row.tsx",

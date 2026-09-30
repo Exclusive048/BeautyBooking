@@ -140,8 +140,11 @@ describe("LOGIC-10 · три поверхности различают коды"
   ])("%s: DUPLICATE_REQUEST не отправляет пересобирать пакет", (file) => {
     const source = read(file);
     expect(source).toContain("fetchRetryingDuplicates");
-    expect(source).toContain(
-      'if (res.status === 409 && !(await isDuplicateRequestResponse(res)))',
+    // 29.09 · 11: ответ разбирает общий `readApiResponse`/`fetchJson`, и код
+    // отказа приходит в `ApiClientError.code` — пересборка пакета только на 409,
+    // который НЕ «тот же запрос ещё выполняется».
+    expect(source).toMatch(
+      /error\.status === 409 && error\.code !== "DUPLICATE_REQUEST"\) \{\s*setPhase\("build"\)/,
     );
   });
 

@@ -6,7 +6,8 @@ import { Search } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { Tabs } from "@/components/ui/tabs";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Input } from "@/components/ui/input";
 
 const T = UI_TEXT.cabinetMaster.bookings.toolbar;
 
@@ -66,13 +67,12 @@ export function BookingsToolbar({ initialSearch, initialTab, stats }: Props) {
             aria-hidden
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
           />
-          <input
-            type="text"
+          <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={T.searchPlaceholder}
             aria-label={T.searchPlaceholder}
-            className="h-10 w-full rounded-xl border border-border-subtle bg-bg-page pl-9 pr-3 text-sm text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="h-10 pl-9 pr-3"
           />
         </div>
 
@@ -85,7 +85,7 @@ export function BookingsToolbar({ initialSearch, initialTab, stats }: Props) {
           </span>
           <span className="text-text-sec">
             {T.statPending}:{" "}
-            <span className="font-medium tabular-nums text-amber-700 dark:text-amber-300">
+            <span className="font-medium tabular-nums text-warning-text">
               {formatRub(stats.pendingSum)}
             </span>
           </span>

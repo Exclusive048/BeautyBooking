@@ -3,7 +3,8 @@
 import { ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import type { CatalogSort } from "@/lib/catalog/schemas";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.catalog2.sort;
 
@@ -53,9 +54,8 @@ export function SortMenu({ value, onChange, compact = false }: Props) {
         {OPTIONS.map((opt) => {
           const active = opt.value === value;
           return (
-            <button
+            <Button variant="wrapper" aria-pressed={active}
               key={opt.value}
-              type="button"
               onClick={(e) => {
                 onChange(opt.value);
                 const detailsEl = e.currentTarget.closest("details");
@@ -70,7 +70,7 @@ export function SortMenu({ value, onChange, compact = false }: Props) {
             >
               <span>{opt.label}</span>
               {active ? <Check className="h-3.5 w-3.5 text-accent-text" aria-hidden /> : null}
-            </button>
+            </Button>
           );
         })}
       </div>

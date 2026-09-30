@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/button";
 
 type Variant = "primary" | "default";
 
@@ -79,8 +80,8 @@ export function QuickActionTile({
   }
 
   return (
-    <button type="button" onClick={"onClick" in rest ? rest.onClick : undefined} className={baseClass}>
+    <Button variant="wrapper" onClick={"onClick" in rest ? rest.onClick : undefined} className={baseClass}>
       {content}
-    </button>
+    </Button>
   );
 }

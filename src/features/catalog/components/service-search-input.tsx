@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/cn";
 import { formatReviews } from "@/lib/utils/pluralize-reviews";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Input } from "@/components/ui/input";
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 300;
@@ -123,15 +124,11 @@ export function ServiceSearchInput({
     const params = new URLSearchParams({ q: debouncedQuery });
     if (citySlug) params.set("citySlug", citySlug);
 
-    fetch(`/api/catalog/autocomplete?${params.toString()}`, { cache: "no-store" })
-      .then(async (res) => (await res.json().catch(() => null)) as ApiResponse<AutocompleteResponse> | null)
-      .then((json) => {
+    // Подсказки поиска: отказ — пустой список, поиск по Enter работает и так.
+    fetchJson<AutocompleteResponse>(`/api/catalog/autocomplete?${params.toString()}`, { cache: "no-store" })
+      .then((data) => {
         if (cancelled) return;
-        if (!json || !json.ok) {
-          setResults({ categories: [], providers: [] });
-          return;
-        }
-        setResults(json.data);
+        setResults(data);
         setOpen(true);
       })
       .catch(() => {
@@ -171,9 +168,8 @@ export function ServiceSearchInput({
         aria-hidden
         className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
       />
-      <input
+      <Input
         ref={inputRef}
-        type="text"
         inputMode="search"
         enterKeyHint="search"
         autoComplete="off"
@@ -199,11 +195,12 @@ export function ServiceSearchInput({
         }}
         placeholder={UI_TEXT.catalog2.searchBar.searchPlaceholder}
         aria-label={UI_TEXT.catalog2.searchBar.searchPlaceholder}
+        // 29.09 · 22: «поле» — общий вид `Input` (рамка и фокус `lux-input`),
+        // «в шапке» — поле без своей рамки внутри строки поиска.
+        variant={appearance === "field" ? "default" : "bare"}
         className={cn(
-          "h-11 w-full pl-9 text-base text-text-main placeholder:text-text-placeholder transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/30",
-          appearance === "field"
-            ? "rounded-full border border-border-control bg-bg-input pr-11"
-            : "rounded-xl bg-transparent pr-9",
+          "pl-9 text-base transition-shadow",
+          appearance === "field" ? "rounded-full pr-11" : "rounded-xl pr-9 focus:ring-2 focus:ring-primary/30",
         )}
       />
 
@@ -248,9 +245,8 @@ export function ServiceSearchInput({
                   {T.categoriesGroup}
                 </div>
                 {results.categories.map((cat) => (
-                  <button
+                  <Button variant="wrapper"
                     key={cat.id}
-                    type="button"
                     onClick={() => handleCategoryClick(cat)}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-input/70"
                   >
@@ -258,7 +254,7 @@ export function ServiceSearchInput({
                       <Palette className="h-3.5 w-3.5" aria-hidden />
                     </span>
                     <span className="text-sm text-text-main">{cat.name}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : null}
@@ -274,11 +270,10 @@ export function ServiceSearchInput({
                   {T.providersGroup}
                 </div>
                 {results.providers.map((p) => (
-                  <button
+                  <Button variant="wrapper"
                     // SEC-12: id из ответа убран; `publicUsername` уникален, а
                     // индекс страхует провайдера без него (кнопка disabled).
                     key={p.publicUsername ?? `provider-${p.name}`}
-                    type="button"
                     onClick={() => handleProviderClick(p)}
                     disabled={!p.publicUsername}
                     className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-bg-input/70 disabled:cursor-not-allowed disabled:opacity-50"
@@ -300,14 +295,14 @@ export function ServiceSearchInput({
                       <div className="truncate text-sm text-text-main">{p.name}</div>
                       {p.ratingCount > 0 ? (
                         <div className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
-                          <Star className="h-3 w-3 fill-amber-500 text-amber-500" aria-hidden />
+                          <Star className="h-3 w-3 fill-rating text-rating" aria-hidden />
                           <span className="tabular-nums">{p.ratingAvg.toFixed(1)}</span>
                           <span aria-hidden>·</span>
                           <span className="tabular-nums">{formatReviews(p.ratingCount)}</span>
                         </div>
                       ) : null}
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : null}

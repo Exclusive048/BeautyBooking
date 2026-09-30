@@ -2,6 +2,8 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { refreshAdvisorInsights } from "@/lib/advisor/cache";
@@ -17,13 +19,14 @@ export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
-    const allowed = await checkRateLimit(
-      `rate:advisorRefresh:${user.id}`,
-      ADVISOR_REFRESH_RATE_LIMIT.limit,
-      ADVISOR_REFRESH_RATE_LIMIT.windowSeconds
+    const refusal = resolveRateLimitRefusal(
+      await checkRateLimit(routeRateLimitKey(req, "user", user.id), {
+        maxRequests: ADVISOR_REFRESH_RATE_LIMIT.limit,
+        windowSeconds: ADVISOR_REFRESH_RATE_LIMIT.windowSeconds,
+      }),
     );
-    if (!allowed) {
-      return jsonFail(429, "Слишком много запросов. Попробуйте позже.", "RATE_LIMITED");
+    if (refusal) {
+      return jsonFail(refusal.status, refusal.message, refusal.code);
     }
     const masterId = await getCurrentMasterProviderId(user.id);
     const data = await refreshAdvisorInsights(masterId);

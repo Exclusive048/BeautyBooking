@@ -1,7 +1,7 @@
 "use client";
 
 import { FormDialog } from "@/components/ui/form-dialog";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.reviews.approveDialog;
 

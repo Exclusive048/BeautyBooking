@@ -4,7 +4,10 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { useToast } from "@/components/ui/toast";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.row;
 const E = UI_TEXT.cabinetMaster.servicesPage.reorder;
@@ -19,22 +22,21 @@ type Props = {
 
 export function ReorderControls({ itemId, endpoint, isFirst, isLast }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, setPending] = useState<"up" | "down" | null>(null);
 
   const move = async (direction: "up" | "down") => {
     if (pending) return;
     setPending(direction);
     try {
-      const response = await fetch(endpoint, {
+      await fetchJsonWithAuth<unknown>(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemId, direction }),
       });
-      if (!response.ok) {
-        window.alert(E.errorMessage);
-        return;
-      }
       router.refresh();
+    } catch (error) {
+      toast.error(serverMessageOr(error, E.errorMessage));
     } finally {
       setPending(null);
     }
@@ -72,8 +74,7 @@ function ArrowButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <Button variant="wrapper"
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
@@ -84,6 +85,6 @@ function ArrowButton({
       )}
     >
       {children}
-    </button>
+    </Button>
   );
 }

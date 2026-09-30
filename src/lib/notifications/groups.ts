@@ -67,6 +67,8 @@ export const MASTER_NOTIFICATION_TYPES: NotificationType[] = [
   NotificationType.HOT_SLOT_PUBLISHED,
   // Stats
   NotificationType.MASTER_WEEKLY_STATS,
+  // SCHEDULE-PATTERNS-01: настроенное расписание скоро кончится.
+  NotificationType.SCHEDULE_ENDING,
   // Chat — ambiguous; classifier filters by sender role
   NotificationType.CHAT_MESSAGE_RECEIVED,
   // Categories — master submitted them
@@ -92,10 +94,12 @@ export const PERSONAL_ONLY_TYPES: NotificationType[] = [
   NotificationType.STUDIO_INVITE_ACCEPTED,
   NotificationType.STUDIO_INVITE_REJECTED,
   NotificationType.STUDIO_MEMBER_LEFT,
+  NotificationType.STUDIO_MEMBER_REMOVED,
   NotificationType.STUDIO_SCHEDULE_REQUEST,
   NotificationType.STUDIO_SCHEDULE_APPROVED,
   NotificationType.STUDIO_SCHEDULE_REJECTED,
   NotificationType.STUDIO_DISBANDED,
+  NotificationType.STUDIO_SCHEDULE_ENDING,
   // Master cabinet deletion — kept personal so user still sees it after
   // the cabinet is gone (master surface itself becomes inaccessible).
   NotificationType.MASTER_CABINET_DELETED,

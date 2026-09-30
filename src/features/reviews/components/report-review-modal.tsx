@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FormDialog } from "@/components/ui/form-dialog";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type ReportReason = "SPAM" | "FAKE" | "OFFENSIVE" | "INAPPROPRIATE" | "OTHER";
 
@@ -16,15 +17,15 @@ type Props = {
 };
 
 const REASONS: { value: ReportReason; label: string }[] = [
-  { value: "SPAM", label: UI_TEXT.master.reviews.reportReasonSpam },
-  { value: "FAKE", label: UI_TEXT.master.reviews.reportReasonFake },
-  { value: "OFFENSIVE", label: UI_TEXT.master.reviews.reportReasonOffensive },
-  { value: "INAPPROPRIATE", label: UI_TEXT.master.reviews.reportReasonInappropriate },
-  { value: "OTHER", label: UI_TEXT.master.reviews.reportReasonOther },
+  { value: "SPAM", label: UI_TEXT.reviews.reportReasonSpam },
+  { value: "FAKE", label: UI_TEXT.reviews.reportReasonFake },
+  { value: "OFFENSIVE", label: UI_TEXT.reviews.reportReasonOffensive },
+  { value: "INAPPROPRIATE", label: UI_TEXT.reviews.reportReasonInappropriate },
+  { value: "OTHER", label: UI_TEXT.reviews.reportReasonOther },
 ];
 
 export function ReportReviewModal({ reviewId, open, onClose, onSuccess }: Props) {
-  const t = UI_TEXT.master.reviews;
+  const t = UI_TEXT.reviews;
   const [reason, setReason] = useState<ReportReason | "">("");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -43,19 +44,16 @@ export function ReportReviewModal({ reviewId, open, onClose, onSuccess }: Props)
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/report`, {
+      await fetchJson<unknown>(`/api/reviews/${encodeURIComponent(reviewId)}/report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason, comment: comment.trim() || undefined }),
       });
-      const json = (await res.json().catch(() => null)) as { ok: boolean; error?: { message: string } } | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok && json.error ? json.error.message : t.reportFailed);
-      }
       onSuccess();
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.reportFailed);
+      // «Вы уже пожаловались», лимит — дословно.
+      setError(serverMessageOr(err, t.reportFailed));
     } finally {
       setSubmitting(false);
     }

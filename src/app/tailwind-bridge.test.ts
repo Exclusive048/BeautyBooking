@@ -84,6 +84,14 @@ describe("UI-06 — мост токен ↔ класс", () => {
       // состояние «под курсором цвет не меняется вовсе», то есть отменит
       // ровно ту реакцию, ради которой пара и заведена.
       "accent-text-hover",
+      // 29.09 доработки · 23 (UI-27): «горящее окошко» и звёзды оценки —
+      // снятый мост вернёт их в палитру Tailwind (или в ничто).
+      "hot",
+      "hot-text",
+      "rating",
+      "info",
+      "decor-primary",
+      "decor-magenta",
     ];
     const keys = new Set(bridges().map((b) => b.key));
     for (const name of used) {

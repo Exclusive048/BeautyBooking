@@ -3,7 +3,7 @@ import { StudioServicesList } from "@/features/public-studio/studio-services-lis
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
@@ -24,7 +24,7 @@ export async function StudioServicesSection({ studioId }: Props) {
     isOwner = owner;
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("services-section", error, [`/api/providers/${studioId}`]);
+    logPublicStudioBlockError("services-section", error, ["getProviderProfile"]);
   }
 
   if (hasError) {

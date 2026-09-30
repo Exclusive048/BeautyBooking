@@ -6,7 +6,7 @@ import type { PublicBundleView } from "@/lib/master/public-profile-view.service"
 import { ServicesMenu } from "@/features/public-profile/master/services-menu";
 import { BundleCard } from "@/features/public-profile/master/components/bundle-card";
 import { useSelectedServices } from "@/features/public-profile/master/selected-services-context";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   services: ProviderServiceDto[];

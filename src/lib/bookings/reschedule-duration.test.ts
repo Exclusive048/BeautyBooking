@@ -56,7 +56,7 @@ describe("LOGIC-03 · перенос не доверяет клиентской 
   });
 
   it("проверка пересечений идёт по выведенному окну, а не по присланному", () => {
-    const conflictCall = body.slice(body.indexOf("ensureNoConflictsExcluding"));
+    const conflictCall = body.slice(body.indexOf("ensureRescheduleTimeFree("));
     expect(conflictCall).toContain("endAtUtc");
     expect(conflictCall.slice(0, 300)).not.toContain("input.endAtUtc");
   });

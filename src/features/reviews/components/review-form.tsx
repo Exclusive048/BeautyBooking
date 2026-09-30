@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
-import { cn } from "@/lib/cn";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ReviewDto, ReviewTagDto } from "@/lib/reviews/types";
-import type { ApiResponse } from "@/lib/types/api";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
+import { ChipButton } from "@/components/ui/chip-button";
+import { StarRatingInput } from "@/components/ui/star-rating-input";
 
 type Props = {
   bookingId: string;
   onSubmitted: (review: ReviewDto) => void;
   onCancel?: () => void;
+  /**
+   * Куда отправлять отзыв. По умолчанию — `/api/reviews` (клиент с сессией);
+   * гость по ссылке «Управлять записью» — `/api/public/bookings/manage/{token}/review`
+   * (29.09 доработки · 05). Тело то же (`createReviewSchema`).
+   */
+  submitUrl?: string;
 };
 
 type ReviewTagsResponse = {
@@ -23,48 +28,7 @@ type ReviewTagsResponse = {
 
 const MAX_TAGS_PER_GROUP = 3;
 
-function StarRating({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}) {
-  const [hovered, setHovered] = useState(0);
-  const effective = hovered || value;
-  return (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => !disabled && onChange(star)}
-          onMouseEnter={() => !disabled && setHovered(star)}
-          onMouseLeave={() => setHovered(0)}
-          disabled={disabled}
-          aria-label={UI_TEXT.clientCabinet.reviewForm.starAria.replace(
-            "{star}",
-            String(star),
-          )}
-          className="p-1 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Star
-            className={cn(
-              "h-8 w-8 transition-colors",
-              star <= effective
-                ? "fill-amber-400 stroke-amber-400"
-                : "fill-none stroke-text-sec/30"
-            )}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ChipButton(props: {
+function TagChip(props: {
   tag: ReviewTagDto;
   selected: boolean;
   disabled?: boolean;
@@ -72,25 +36,15 @@ function ChipButton(props: {
 }) {
   const { tag, selected, disabled, onClick } = props;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-        selected
-          ? "border-primary bg-primary/10 text-accent-text"
-          : "border-border-subtle bg-bg-input text-text-sec hover:border-border hover:text-text-main"
-      )}
-    >
+    <ChipButton active={selected} onClick={onClick} disabled={disabled} className="gap-1">
       {tag.icon ? <span>{tag.icon}</span> : null}
       {tag.label}
-    </button>
+    </ChipButton>
   );
 }
 
-export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
-  const t = UI_TEXT.clientCabinet.reviewForm;
+export function ReviewForm({ bookingId, onSubmitted, onCancel, submitUrl = "/api/reviews" }: Props) {
+  const t = UI_TEXT.reviews.form;
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
   const [publicTags, setPublicTags] = useState<ReviewTagDto[]>([]);
@@ -109,17 +63,14 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
       try {
         setTagsLoading(true);
         setTagsError(null);
-        const res = await fetch("/api/reviews/tags", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<ReviewTagsResponse> | null;
-        if (!res.ok || !json || !json.ok) {
-          throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-        }
+        // Форма живёт и у гостя (ссылка «Управлять записью»): без ухода на вход.
+        const tags = await fetchJson<ReviewTagsResponse>("/api/reviews/tags", { cache: "no-store" });
         if (cancelled) return;
-        setPublicTags(json.data.publicTags);
-        setPrivateTags(json.data.privateTags);
+        setPublicTags(tags.publicTags);
+        setPrivateTags(tags.privateTags);
       } catch (loadError) {
         if (cancelled) return;
-        setTagsError(loadError instanceof Error ? loadError.message : t.loadTagsFailed);
+        setTagsError(serverMessageOr(loadError, t.loadTagsFailed));
       } finally {
         if (!cancelled) setTagsLoading(false);
       }
@@ -154,7 +105,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/reviews", {
+      const created = await fetchJson<{ review: ReviewDto }>(submitUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -165,27 +116,21 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
           privateTagIds: selectedPrivateTagIds,
         }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ review: ReviewDto }> | null;
-      if (!res.ok || !json || !json.ok) {
-        const fieldErrors = json && !json.ok ? json.error.fieldErrors : undefined;
-        const fieldMessage =
-          fieldErrors && typeof fieldErrors === "object"
-            ? Object.values(fieldErrors)
-                .map((v) => (Array.isArray(v) ? v.join(", ") : String(v)))
-                .find((v) => v.trim().length > 0)
-            : undefined;
-        throw new Error(
-          fieldMessage || (json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE)
-        );
-      }
-      onSubmitted(json.data.review);
+      onSubmitted(created.review);
       setText("");
       setRating(5);
       setSelectedPublicTagIds([]);
       setSelectedPrivateTagIds([]);
       setHint(null);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : t.submitFailed);
+      // Ошибка поля точнее общего отказа проверки — показываем её первой.
+      const fieldErrors = submitError instanceof ApiClientError ? submitError.fieldErrors : undefined;
+      const fieldMessage = fieldErrors
+        ? Object.values(fieldErrors)
+            .map((v) => (Array.isArray(v) ? v.join(", ") : String(v)))
+            .find((v) => v.trim().length > 0)
+        : undefined;
+      setError(fieldMessage || serverMessageOr(submitError, t.submitFailed));
     } finally {
       setLoading(false);
     }
@@ -197,7 +142,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
 
       {/* Star rating */}
       <div className="mt-3">
-        <StarRating value={rating} onChange={setRating} disabled={loading} />
+        <StarRatingInput value={rating} onChange={setRating} disabled={loading} size="lg" />
       </div>
 
       {/* Public tags */}
@@ -206,11 +151,11 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         {tagsLoading ? (
           <div className="mt-2 text-xs text-text-sec">{t.tagsLoading}</div>
         ) : tagsError ? (
-          <div className="mt-2 text-xs text-red-600">{tagsError}</div>
+          <div className="mt-2 text-xs text-danger-text">{tagsError}</div>
         ) : publicTags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {publicTags.map((tag) => (
-              <ChipButton
+              <TagChip
                 key={tag.id}
                 tag={tag}
                 selected={selectedPublicTagIds.includes(tag.id)}
@@ -250,7 +195,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
           {!tagsLoading ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {privateTags.map((tag) => (
-                <ChipButton
+                <TagChip
                   key={tag.id}
                   tag={tag}
                   selected={selectedPrivateTagIds.includes(tag.id)}
@@ -270,8 +215,8 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel }: Props) {
         </div>
       ) : null}
 
-      {hint ? <div className="mt-2 text-xs text-amber-500">{hint}</div> : null}
-      {error ? <div className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</div> : null}
+      {hint ? <div className="mt-2 text-xs text-warning-text">{hint}</div> : null}
+      {error ? <div className="mt-2 text-sm text-danger-text">{error}</div> : null}
 
       <div className="mt-4 flex gap-2">
         <Button type="button" onClick={submit} disabled={!canSubmit}>

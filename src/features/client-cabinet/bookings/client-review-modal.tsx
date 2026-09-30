@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { Notice } from "@/components/ui/notice";
+import { StarRatingInput } from "@/components/ui/star-rating-input";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ClientBookingDTO } from "@/lib/client-cabinet/bookings.service";
 
-const T = UI_TEXT.clientCabinet.reviewForm;
+const T = UI_TEXT.reviews.form;
 const PAGE_T = UI_TEXT.clientCabinet.bookingsPage;
 
 type Props = {
@@ -35,7 +37,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/reviews", {
+      await fetchJsonWithAuth<unknown>("/api/reviews", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -45,14 +47,9 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
           text: text.trim() || undefined,
         }),
       });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setError(json?.error?.message ?? T.submitFailed);
-        return;
-      }
       onSuccess();
-    } catch {
-      setError(T.submitFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, T.submitFailed));
     } finally {
       setSubmitting(false);
     }
@@ -74,26 +71,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
           <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
             {PAGE_T.actionReview}
           </div>
-          <div className="flex items-center gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setRating(n)}
-                className="p-1"
-                aria-label={`${n}`}
-              >
-                <Star
-                  className={`h-7 w-7 transition ${
-                    n <= rating
-                      ? "fill-primary text-accent-text"
-                      : "text-text-sec/40"
-                  }`}
-                  aria-hidden
-                />
-              </button>
-            ))}
-          </div>
+          <StarRatingInput value={rating} onChange={setRating} />
         </div>
 
         <div className="space-y-1.5">
@@ -117,9 +95,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
         </div>
 
         {error ? (
-          <div className="rounded-xl border border-rose-300/50 bg-rose-50/60 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-            {error}
-          </div>
+          <Notice tone="danger">{error}</Notice>
         ) : null}
 
         <div className="flex justify-end gap-2 pt-2">

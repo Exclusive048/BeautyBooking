@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BellRing, Check } from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/cn";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type SubscriptionItem = {
   providerId: string;
@@ -38,10 +40,19 @@ type Props = {
  */
 export function HotSlotsSubscribeButton({ providerId, enabled, className }: Props) {
   const { user } = useMe();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 29.09 доработки · 16 (Ю1, вариант В): скидочные «горящие окошки» — реклама
+  // и приходят только с согласием на акции (38-ФЗ ст. 18). Нет согласия — рядом
+  // с кнопкой чекбокс; отметка идёт тем же писателем, что переключатель в
+  // настройках (`PATCH /api/me/consents/marketing`, инв. #37). `null` — ещё не
+  // знаем (или не удалось узнать): чекбокс не показываем.
+  const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const optInId = useId();
 
   useEffect(() => {
     if (!user || !enabled) return;
@@ -49,12 +60,13 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
     setLoading(true);
     void (async () => {
       try {
-        const data = await fetchJson<{ items: SubscriptionItem[] }>(
-          "/api/hot-slots/subscribe",
-          { cache: "no-store" },
-        );
+        const [data, consent] = await Promise.all([
+          fetchJson<{ items: SubscriptionItem[] }>("/api/hot-slots/subscribe", { cache: "no-store" }),
+          fetchJson<{ enabled: boolean }>("/api/me/consents/marketing", { cache: "no-store" }).catch(() => null),
+        ]);
         if (!cancelled) {
           setSubscribed(data.items.some((item) => item.providerId === providerId));
+          setMarketingConsent(consent ? consent.enabled : null);
         }
       } catch {
         // Начальное чтение состояния молчит намеренно: пользователь ничего не
@@ -77,14 +89,19 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
 
   const handleClick = async () => {
     if (!user) {
+      // Обычный переход на страницу входа — мягкой навигацией (29.09 · 06);
+      // после входа `login-client.tsx` сам делает полную загрузку.
       const next = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-      window.location.href = `/login?next=${next}`;
+      router.push(`/login?next=${next}`);
       return;
     }
     if (loading) return;
     setLoading(true);
     setError(null);
     try {
+      if (!subscribed && marketingConsent === false && marketingOptIn && !(await saveMarketingConsent())) {
+        return;
+      }
       await fetchJson("/api/hot-slots/subscribe", {
         method: subscribed ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,6 +125,36 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
     }
   };
 
+  // Отказ показывает свою строку и не бросает: подписка без согласия всё равно
+  // полезна («окошко освободилось» приходит по подписке).
+  async function saveMarketingConsent(): Promise<boolean> {
+    try {
+      await fetchJson("/api/me/consents/marketing", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
+      });
+      setMarketingConsent(true);
+      return true;
+    } catch (caught) {
+      setError(serverMessageOr(caught, UI_TEXT.publicProfile.slots.marketingOptInFailed));
+      return false;
+    }
+  }
+
+  // Уже подписан, а согласия нет: отметка сохраняется сразу (автосохранение).
+  const handleOptInChange = (next: boolean) => {
+    setMarketingOptIn(next);
+    if (!subscribed || !next || loading) return;
+    setLoading(true);
+    setError(null);
+    void saveMarketingConsent()
+      .then((saved) => {
+        if (!saved) setMarketingOptIn(false);
+      })
+      .finally(() => setLoading(false));
+  };
+
   const label = subscribed
     ? UI_TEXT.publicProfile.slots.unsubscribeHot
     : UI_TEXT.publicProfile.slots.subscribeHot;
@@ -127,10 +174,15 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
           "gap-1.5 rounded-xl",
           subscribed
             ? // Subscribed → neutral confirmation chip
-              "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60"
+              "border-success-border bg-success-surface text-success-text hover:brightness-95"
             : // Unsubscribed → brand-gradient CTA. Softer in dark mode
-              // so it doesn't overpower the aurora background.
-              "bg-brand-gradient text-white shadow-md hover:opacity-95 dark:from-rose-600/90 dark:to-rose-700/90",
+              // so it doesn't overpower the aurora background: the dark
+              // branch switches back to the variant's left-to-right gradient
+              // with rose stops (`bg-brand-gradient` is a fixed image, stops
+              // alone would not reach it — it only worked while `cn` was a
+              // plain join and the variant's gradient won by bundle order).
+              // dark-ok: единственная мягкая версия бренд-градиента на авроре тёмной темы
+              "bg-brand-gradient text-white shadow-md hover:opacity-95 dark:bg-gradient-to-r dark:from-rose-600/90 dark:to-rose-700/90",
           className,
         )}
       >
@@ -141,6 +193,21 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
         )}
         <span>{isLoadingPostMount ? UI_TEXT.publicProfile.slots.subscribeLoading : label}</span>
       </Button>
+      {user && marketingConsent === false ? (
+        <div className="flex max-w-[18rem] items-start gap-2 pt-1">
+          <Checkbox
+            id={optInId}
+            size="sm"
+            checked={marketingOptIn}
+            disabled={loading}
+            onChange={(event) => handleOptInChange(event.target.checked)}
+            className="mt-0.5"
+          />
+          <label htmlFor={optInId} className="cursor-pointer text-xs leading-snug text-text-sec">
+            {UI_TEXT.publicProfile.slots.marketingOptIn}
+          </label>
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="max-w-[16rem] text-xs leading-snug text-danger-text">
           {error}

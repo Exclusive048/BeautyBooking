@@ -6,6 +6,7 @@ import { parseQuery } from "@/lib/validation";
 import { searchCatalog } from "@/lib/catalog/catalog.service";
 import { catalogSearchQuerySchema } from "@/lib/catalog/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { getClientIp } from "@/lib/http/ip";
 import { getServerCity } from "@/lib/cities/server-city";
 
@@ -18,7 +19,7 @@ const CATALOG_SEARCH_RATE_LIMIT = {
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      `rl:/api/catalog/search:ip:${getClientIp(req)}`,
+      routeRateLimitKey(req, "ip", getClientIp(req)),
       CATALOG_SEARCH_RATE_LIMIT
     );
     if (rateLimit.limited) {

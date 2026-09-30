@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export function SettingsHeader() {
   const t = UI_TEXT.adminPanel.settings.header;

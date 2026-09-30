@@ -4,6 +4,8 @@ import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { ConversationThreadDto, ChatPerspective } from "@/features/chat/types";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 type State = {
   detail: ConversationThreadDto | null;
@@ -46,31 +48,22 @@ export function useConversationThread(input: {
     // SSE events. Initial-load loading is set in the initial state.
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "Europe/Moscow";
-      const res = await fetch(
+      const detail = await fetchJsonWithAuth<ConversationThreadDto>(
         `/api/chat/threads/${encodeURIComponent(conversationSlug)}?as=${perspective}`,
         {
           cache: "no-store",
           headers: { "x-tz": tz },
         },
       );
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: ConversationThreadDto }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        setState({
-          detail: null,
-          isLoading: false,
-          error: json && !json.ok ? json.error.message : "Не удалось загрузить переписку.",
-        });
-        return;
-      }
-      setState({ detail: json.data, isLoading: false, error: null });
-    } catch {
+      setState({ detail, isLoading: false, error: null });
+    } catch (error) {
       setState({
         detail: null,
         isLoading: false,
-        error: "Нет связи. Попробуйте ещё раз.",
+        error:
+          error instanceof ApiClientError
+            ? serverMessageOr(error, UI_TEXT.chat.errors.threadLoadFailed)
+            : UI_TEXT.chat.errors.offlineRetry,
       });
     }
   }, [conversationSlug, perspective]);
@@ -99,13 +92,13 @@ export function useConversationThread(input: {
   const markRead = useCallback(async () => {
     if (!conversationSlug) return;
     try {
-      const res = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/chat/threads/${encodeURIComponent(conversationSlug)}/read?as=${perspective}`,
         { method: "POST" },
       );
       // NAV-ATTENTION-01: число непрочитанных у вкладки «Сообщения» считает
       // серверный layout кабинета — после прочтения его надо перерисовать.
-      if (res.ok) startTransition(() => router.refresh());
+      startTransition(() => router.refresh());
     } catch {
       // Best-effort — UI re-fetches anyway on next focus.
     }

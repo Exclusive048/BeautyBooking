@@ -1,5 +1,5 @@
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { formatRelativeDate, formatRubles } from "./lib/format";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.stats;

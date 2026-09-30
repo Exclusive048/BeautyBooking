@@ -18,6 +18,9 @@ import {
   notifyRescheduleRequested,
 } from "@/lib/notifications/booking-notifications";
 import { prisma } from "@/lib/prisma";
+import { canLeaveReview, reviewWindowFor } from "@/lib/reviews/can-leave";
+import { createReview } from "@/lib/reviews/service";
+import type { ReviewDto } from "@/lib/reviews/types";
 
 /**
  * GUEST-MANAGE-LINK (2026-09-24, решение владельца) — управление записью по
@@ -96,6 +99,13 @@ export type GuestManageItem = {
   /** Кто выполняет — для выдачи окошек переноса (`/slots` исполнителя). */
   performerProviderId: string;
   serviceId: string;
+  /**
+   * 29.09 доработки · 05 — отзыв по ссылке. `canLeave` — то же правило, что у
+   * кабинета (`canLeaveReview`: окно после визита, автор — клиент записи);
+   * `left` — отзыв уже оставлен (в том числе удалённый — повторно нельзя);
+   * `deadlineUtc` — до какого момента можно оставить.
+   */
+  review: { canLeave: boolean; left: boolean; deadlineUtc: string | null };
 };
 
 export type GuestManageView = {
@@ -125,8 +135,10 @@ export async function getGuestManageView(scope: GuestManageScope, now: Date = ne
       providerId: true,
       masterProviderId: true,
       serviceId: true,
-      service: { select: { name: true, title: true } },
+      clientUserId: true,
+      service: { select: { name: true, title: true, durationMin: true } },
       serviceItems: { select: { titleSnapshot: true }, take: 1 },
+      review: { select: { id: true } },
       provider: {
         select: {
           name: true,
@@ -150,6 +162,8 @@ export async function getGuestManageView(scope: GuestManageScope, now: Date = ne
       endAtUtc: row.endAtUtc,
       now,
     });
+    const window = reviewWindowFor(row);
+    const left = row.review != null;
     return {
       bookingId: row.id,
       serviceTitle: row.serviceItems[0]?.titleSnapshot ?? row.service.title ?? row.service.name,
@@ -160,6 +174,11 @@ export async function getGuestManageView(scope: GuestManageScope, now: Date = ne
       canReschedule: status === "PENDING" || status === "CONFIRMED",
       performerProviderId: row.masterProviderId ?? row.providerId,
       serviceId: row.serviceId,
+      review: {
+        canLeave: !left && canLeaveReview({ booking: row, currentUserId: scope.clientUserId, nowUtc: now }),
+        left,
+        deadlineUtc: window?.deadline.toISOString() ?? null,
+      },
     };
   });
 
@@ -244,4 +263,32 @@ export async function rescheduleGuestBooking(
     });
   }
   return { id: result.data.id, status: result.data.status };
+}
+
+/**
+ * 29.09 доработки · 05 — отзыв гостя по ссылке. Проверки — те же, что у
+ * клиента в кабинете (`createReview`: окно, автор = клиент записи, самоотзыв,
+ * один отзыв на запись); здесь только право ссылки: запись — эта или услуга
+ * её пакета. Правки и удаления по ссылке нет (решение владельца 2026-09-29:
+ * предъявительская ссылка не переписывает опубликованное).
+ */
+export async function createGuestReview(
+  scope: GuestManageScope,
+  input: {
+    bookingId: string;
+    rating: number;
+    text?: string;
+    publicTagIds: string[];
+    privateTagIds: string[];
+  },
+): Promise<ReviewDto> {
+  if (!scope.bookingIds.includes(input.bookingId)) throw INVALID_LINK();
+  return createReview({
+    currentUserId: scope.clientUserId,
+    bookingId: input.bookingId,
+    rating: input.rating,
+    text: input.text,
+    publicTagIds: input.publicTagIds,
+    privateTagIds: input.privateTagIds,
+  });
 }

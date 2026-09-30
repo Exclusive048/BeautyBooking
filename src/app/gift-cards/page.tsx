@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Gift } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { InfoPageLayout } from "@/components/layout/info-page-layout";
 
 export const metadata: Metadata = {

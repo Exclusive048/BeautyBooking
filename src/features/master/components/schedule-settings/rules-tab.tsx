@@ -6,8 +6,8 @@ import type {
   HotSlotsDto,
   ScheduleEditorSnapshot,
 } from "@/lib/schedule/editor-shared";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { BookingWindowSection } from "./rules/booking-window-section";
 import { CancellationSection } from "./rules/cancellation-section";
 import { ConfirmationSection } from "./rules/confirmation-section";
@@ -55,22 +55,22 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch(endpoint, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingRules: value.bookingRules,
-          hotSlots: value.hotSlots,
-        }),
-      });
-      const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!response.ok || !json || !json.ok) {
-        const isGated = json && !json.ok && json.error.code === "FEATURE_GATE";
-        const message = isGated
-          ? T.errors.hotSlotsLocked
-          : json && !json.ok
-          ? json.error.message
-          : T.errors.save;
+      try {
+        await fetchJsonWithAuth<unknown>(endpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bookingRules: value.bookingRules,
+            hotSlots: value.hotSlots,
+          }),
+        });
+      } catch (error) {
+        // Горящие окошки закрыты тарифом — своя строка поверхности (с
+        // подсказкой про тариф) точнее серверной.
+        const message =
+          error instanceof ApiClientError && error.code === "FEATURE_GATE"
+            ? T.errors.hotSlotsLocked
+            : serverMessageOr(error, T.errors.save);
         return { ok: false, message };
       }
       return { ok: true };
@@ -81,7 +81,7 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-guide="rules">
       <BookingWindowSection
         rules={draft.bookingRules}
         onChange={(rules) => setDraft((prev) => ({ ...prev, bookingRules: rules }))}

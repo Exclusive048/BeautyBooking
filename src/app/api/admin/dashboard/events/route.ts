@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { fail, ok } from "@/lib/api/response";
 import { logError } from "@/lib/logging/logger";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { getAdminEvents } from "@/features/admin-cabinet/dashboard/server/events.service";
 
 export const dynamic = "force-dynamic";

@@ -14,6 +14,8 @@
  * next-pwa disables the SW).
  */
 
+import { fetchJson } from "@/lib/http/client";
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -56,7 +58,10 @@ async function getActiveRegistration(): Promise<ServiceWorkerRegistration | null
 async function syncSubscriptionToServer(subscription: PushSubscription): Promise<void> {
   const json = subscription.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return;
-  const res = await fetch("/api/notifications/push/subscribe", {
+  // PUSH-COVERAGE-01: ответ раньше игнорировался — несохранённая подписка
+  // давала тумблер «включено» без единого доставленного пуша. Отказ сервера
+  // (ApiClientError) всплывает в `requestAndSubscribe` как "error".
+  await fetchJson<unknown>("/api/notifications/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -64,10 +69,6 @@ async function syncSubscriptionToServer(subscription: PushSubscription): Promise
       keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
     }),
   });
-  // PUSH-COVERAGE-01: ответ раньше игнорировался — несохранённая подписка
-  // давала тумблер «включено» без единого доставленного пуша. Теперь отказ
-  // сервера всплывает в `requestAndSubscribe` как "error".
-  if (!res.ok) throw new Error(`push subscribe failed: ${res.status}`);
 }
 
 export type PushSubscribeResult =
@@ -147,7 +148,9 @@ export async function unsubscribeBrowserPush(): Promise<void> {
   } catch {
     // ignore — still drop the server row below
   }
-  await fetch("/api/notifications/push/unsubscribe", {
+  // Фон: подписка у браузера уже снята; отказ сервера ничего не меняет для
+  // человека (сервер чистит мёртвые подписки сам при отправке).
+  await fetchJson<unknown>("/api/notifications/push/unsubscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ endpoint }),

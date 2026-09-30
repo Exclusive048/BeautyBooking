@@ -8,7 +8,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type AdminNavItemKey =
   | "dashboard"

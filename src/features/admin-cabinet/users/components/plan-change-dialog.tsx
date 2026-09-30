@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { AccountType, PlanTier, SubscriptionScope } from "@/lib/prisma-enums";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatPlanName,
   formatScopeLabel,
@@ -175,9 +175,10 @@ export function PlanChangeDialog({
                 const isCurrent = plan.code === currentPlanCode;
                 return (
                   <li key={plan.code}>
-                    <button
-                      type="button"
+                    <Button
+                      variant="wrapper"
                       onClick={() => setSelectedPlanCode(plan.code)}
+                      aria-pressed={selected}
                       className={cn(
                         "flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition-colors",
                         selected
@@ -209,7 +210,7 @@ export function PlanChangeDialog({
                           {describePlan(plan)}
                         </p>
                       </div>
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
@@ -249,13 +250,13 @@ export function PlanChangeDialog({
           </div>
 
           {sameTier && currentPlanCode === selectedPlanCode ? (
-            <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-text">
               {T.sameTierWarning}
             </p>
           ) : null}
 
           {error ? (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="text-xs text-danger-text">
               {error}
             </p>
           ) : null}

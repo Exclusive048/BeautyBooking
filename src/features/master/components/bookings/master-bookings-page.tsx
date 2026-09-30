@@ -11,7 +11,7 @@ import {
   type KanbanFilters,
 } from "@/lib/master/bookings.service";
 import { verifyClientKeyToken } from "@/lib/master/client-key-token";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
 

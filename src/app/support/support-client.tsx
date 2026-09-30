@@ -17,7 +17,9 @@ import {
   getSupportAttachmentValidationMessage,
   validateSupportAttachmentMeta,
 } from "@/lib/support/attachment";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { FileInput } from "@/components/ui/file-input";
 
 type TicketType = "bug" | "suggestion";
 
@@ -138,36 +140,23 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
     }
 
     try {
-      const res = await fetch("/api/support/tickets", {
+      await fetchJson<unknown>("/api/support/tickets", {
         method: "POST",
         body: formData,
       });
-
-      // FIX-B18: роут переведён на конверт проекта, поэтому текст лежит в
-      // `error.message`, а не в `error`. Это единственный клиент, который
-      // читал старую форму (партнёрская форма тело отказа не смотрит вовсе),
-      // и без этой правки пользователь увидел бы дефолтную строку вместо
-      // курируемой — то есть регрессию, невидимую для сервера.
-      let payload: { ok?: boolean; error?: { message?: string } } | null = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-
-      if (res.status === 429) {
-        setError(UI_TEXT.pages.support.form.errorTooManyRequests);
-        return;
-      }
-
-      if (!res.ok || !payload?.ok) {
-        setError(payload?.error?.message ?? UI_TEXT.pages.support.form.errorSendFailed);
-        return;
-      }
-
       setSent(true);
-    } catch {
-      setError(UI_TEXT.pages.support.form.errorSendNetwork);
+    } catch (error) {
+      if (!(error instanceof ApiClientError)) {
+        // Запрос не дошёл до сервера — своя строка про сеть.
+        setError(UI_TEXT.pages.support.form.errorSendNetwork);
+      } else if (error.status === 429) {
+        // У поверхности своя, более точная строка про частые обращения.
+        setError(UI_TEXT.pages.support.form.errorTooManyRequests);
+      } else {
+        // FIX-B18: роут отвечает конвертом проекта — курируемая строка
+        // сервера дословно, без неё — своя.
+        setError(serverMessageOr(error, UI_TEXT.pages.support.form.errorSendFailed));
+      }
     } finally {
       setSending(false);
     }
@@ -176,7 +165,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
   if (sent) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-3xl dark:bg-emerald-950/40">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-success-surface text-3xl">
           {"\u2714\uFE0F"}
         </div>
         <div className="space-y-2">
@@ -242,7 +231,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
 
       <div className="space-y-2">
         <label htmlFor="title" className="block text-sm font-medium text-text-main">
-          {UI_TEXT.pages.support.form.titleLabel} <span className="text-red-500">*</span>
+          {UI_TEXT.pages.support.form.titleLabel} <span className="text-danger-text">*</span>
         </label>
         <Input
           id="title"
@@ -260,7 +249,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
 
       <div className="space-y-2">
         <label htmlFor="description" className="block text-sm font-medium text-text-main">
-          {UI_TEXT.pages.support.form.descriptionLabel} <span className="text-red-500">*</span>
+          {UI_TEXT.pages.support.form.descriptionLabel} <span className="text-danger-text">*</span>
         </label>
         <Textarea
           id="description"
@@ -359,11 +348,9 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
             </div>
           )}
         </div>
-        <input
+        <FileInput
           ref={fileRef}
-          type="file"
           accept="image/*,video/mp4"
-          className="hidden"
           onChange={handleFileChange}
         />
       </div>
@@ -392,7 +379,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
       </label>
 
       {error ? (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
+        <div role="alert" className="rounded-xl border border-danger-border bg-danger-surface px-4 py-3 text-sm text-danger-text">{error}</div>
       ) : null}
 
       <Button

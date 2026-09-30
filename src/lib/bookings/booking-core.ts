@@ -5,14 +5,14 @@ import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { dateFromKey } from "@/lib/schedule/time";
 import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
 import {
-  assertAcceptsNewClient,
-  assertBookingWindow,
+  stricterAcceptNewClients,
   stricterBookingWindow,
 } from "@/lib/bookings/policy-enforcement";
 import { buildPriorBookingsWhere } from "@/lib/bookings/prior-bookings-where";
 import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
 import { normalizeOccupancyIds, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import type { BookingTx } from "@/lib/bookings/booking-transaction";
+import { clearClientWindow, type BookingTimeClearance } from "@/lib/bookings/booking-time-policy";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { studioAcceptsBookings, STUDIO_NOT_ACCEPTING_MESSAGE } from "@/lib/studio/accepts-bookings";
 
@@ -66,6 +66,11 @@ export type BookingCoreContext = {
   endAtUtc: Date;
   bufferMin: number;
   shouldAutoConfirm: boolean;
+  /**
+   * 29.09 доработки · 07 — разрешение на время для `createBookingRow`: окно
+   * записи и «новые клиенты» проверены здесь (`clearClientWindow`).
+   */
+  timeClearance: BookingTimeClearance;
 };
 
 function parseSlotStartAtUtc(slotLabel: string, timezone: string): Date | null {
@@ -207,6 +212,22 @@ export function buildConflictWindowWhere(input: {
   } as const;
 }
 
+/**
+ * Проверка пересечения перед записью брони — ЕДИНСТВЕННАЯ (29.09 доработки · 14).
+ * Её зовут создание (воронка, ручная запись, пакеты, кабинет студии,
+ * подтверждение модель-оффера), предложение переноса, подтверждение переноса
+ * и перенос администратором студии; до консолидации пять из них держали копию
+ * запроса и своего `overlaps`, и копии расходились (окно, клиент чтения
+ * занятости, проверка закрытого времени).
+ *
+ * - `excludeBookingId` — своя строка при переносе: бронь ещё занимает старое
+ *   окно, и сдвиг, пересекающий его, не конфликт;
+ * - `message` — текст 409 поверхности (у каждого пути свой, сохранён дословно);
+ * - занятость (`resolveConflictOccupancyIds`) читается ТЕМ ЖЕ клиентом, что и
+ *   брони: внутри транзакции это часть её набора чтения (инв. #11, #31);
+ * - закрытое время (`assertNoTimeBlockConflict`) — здесь же, владельцем блока
+ *   считается исполнитель.
+ */
 export async function ensureNoConflicts(
   db: ConflictCheckClient,
   input: {
@@ -215,12 +236,15 @@ export async function ensureNoConflicts(
     startAtUtc: Date;
     endAtUtc: Date;
     bufferMin: number;
+    excludeBookingId?: string;
+    message?: string;
   }
 ): Promise<void> {
   const occupancyIds = await resolveConflictOccupancyIds(db, input);
   const conflicts = await db.booking.findMany({
     where: {
       ...buildConflictScopeWhere({ ...input, occupancyIds }),
+      ...(input.excludeBookingId ? { id: { not: input.excludeBookingId } } : {}),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       ...buildConflictWindowWhere(input),
     },
@@ -237,7 +261,8 @@ export async function ensureNoConflicts(
 
   if (conflict) {
     throw new AppError(
-      "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
+      input.message ??
+        "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
       409,
       "SLOT_CONFLICT"
     );
@@ -325,6 +350,7 @@ export async function resolveBookingCore(input: {
         baseDurationMin: true,
         price: true,
         basePrice: true,
+        provider: { select: { type: true } },
       },
     }),
   ]);
@@ -357,7 +383,9 @@ export async function resolveBookingCore(input: {
   // продавала студийные), и такая запись становилась ЛИЧНОЙ — без `studioId`,
   // невидимой журналу, выручке и клиентам студии.
   if (service.providerId !== provider.id) {
-    if (provider.type === ProviderType.MASTER && provider.studioId && service.providerId === provider.studioId) {
+    // Услуга студии на профиле мастера — подсказать, где записаться. С этапа 4
+    // у личного профиля `studioId` пуст, поэтому признак — владелец услуги.
+    if (provider.type === ProviderType.MASTER && service.provider?.type === ProviderType.STUDIO) {
       throw new AppError(
         "Эта услуга оказывается в студии — запишитесь на странице студии.",
         400,
@@ -386,6 +414,8 @@ export async function resolveBookingCore(input: {
             // BOOKING-WINDOW-STRICTER: окно записи мастера участвует наравне со студийным.
             minBookingHoursAhead: true,
             maxBookingDaysAhead: true,
+            // 29.09 доработки · 07: и «новые клиенты» — строже из двух.
+            acceptNewClients: true,
           },
         })
       : null;
@@ -476,14 +506,15 @@ export async function resolveBookingCore(input: {
   // BOOKING-WINDOW-STRICTER (решение владельца 2026-09-24): на услугу студии —
   // более строгое из окон студии и мастера (мастер загружен выше). Своя услуга
   // мастера — окно его профиля.
-  assertBookingWindow(startAtUtc, stricterBookingWindow(provider, master), now);
-  if (!provider.acceptNewClients) {
+  const acceptNewClients = stricterAcceptNewClients(provider, master);
+  let priorBookingsCount: number | null = null;
+  if (!acceptNewClients.acceptNewClients) {
     // BOOKING-WIDGET-FOUNDATION-A: guests (clientUserId === null) are
     // treated as new clients with zero priors — `acceptNewClients=false`
     // therefore blocks them just like a brand-new signed-in user. This
     // is the same UX intent as the existing rule, no special carve-out
     // for anonymous bookings.
-    const priorBookingsCount = input.clientUserId
+    priorBookingsCount = input.clientUserId
       ? await prisma.booking.count({
           // FIX-7: never emit `{ masterProviderId: undefined }` inside the OR —
           // that made Prisma drop the key → `{}` → a match-all clause that
@@ -495,8 +526,14 @@ export async function resolveBookingCore(input: {
           }),
         })
       : 0;
-    assertAcceptsNewClient(provider, priorBookingsCount);
   }
+  const timeClearance = clearClientWindow({
+    startAtUtc,
+    window: stricterBookingWindow(provider, master),
+    acceptNewClients,
+    priorBookingsCount,
+    now,
+  });
 
   const availabilityProviderId = resolvedMasterProviderId ?? provider.id;
   const availabilityTimezone = master?.timezone ?? provider.timezone;
@@ -560,5 +597,6 @@ export async function resolveBookingCore(input: {
     endAtUtc,
     bufferMin,
     shouldAutoConfirm,
+    timeClearance,
   };
 }

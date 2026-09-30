@@ -1,6 +1,5 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,8 +9,9 @@ import {
   normalizeUsernameInput,
   validateUsername,
 } from "@/lib/publicUsername";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { InlineEditField, InlineEditInput, InlineEditPencil } from "@/components/ui/inline-edit";
 
 const T = UI_TEXT.cabinetMaster.profile.header;
 const EDIT_T = UI_TEXT.cabinetMaster.profile.editable;
@@ -88,28 +88,20 @@ export function UsernameEditableRow({ value }: Props) {
     setSubmitting(true);
     setServerError(null);
     try {
-      const response = await fetch(ENDPOINT, {
+      await fetchJsonWithAuth<unknown>(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: trimmed }),
       });
-      const json = (await response.json().catch(() => null)) as
-        | ApiResponse<unknown>
-        | null;
-      if (!response.ok || !json || !json.ok) {
-        if (response.status === 409) {
-          setServerError(T.usernameErrorTaken);
-        } else if (json && !json.ok && json.error.message) {
-          setServerError(json.error.message);
-        } else {
-          setServerError(T.usernameErrorGeneric);
-        }
-        return;
-      }
       setIsEditing(false);
       startTransition(() => router.refresh());
-    } catch {
-      setServerError(T.usernameErrorGeneric);
+    } catch (error) {
+      // Занятый адрес — своя, более точная строка поверхности; прочее — дословно.
+      if (error instanceof ApiClientError && error.status === 409) {
+        setServerError(T.usernameErrorTaken);
+      } else {
+        setServerError(serverMessageOr(error, T.usernameErrorGeneric));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +124,7 @@ export function UsernameEditableRow({ value }: Props) {
     : showValidationError
       ? validation.reason
       : T.usernameHint;
-  const hintTone = serverError || showValidationError ? "text-red-600" : "text-text-sec";
+  const hintTone = serverError || showValidationError ? "text-danger-text" : "text-text-sec";
 
   return (
     <div className="group flex items-start gap-3 border-b border-border-subtle py-3 last:border-0">
@@ -156,7 +148,7 @@ export function UsernameEditableRow({ value }: Props) {
                 ничего. */}
             <div className="flex items-baseline gap-1 border-b-2 border-border-subtle py-1 focus-within:border-primary">
               <span className="shrink-0 text-sm text-text-sec">{T.usernamePrefix}</span>
-              <input
+              <InlineEditInput underline="none"
                 id={inputId}
                 ref={inputRef}
                 value={draft}
@@ -167,7 +159,7 @@ export function UsernameEditableRow({ value }: Props) {
                 spellCheck={false}
                 autoCapitalize="none"
                 autoCorrect="off"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-text-main outline-none focus:ring-0"
+                className="w-auto min-w-0 flex-1 py-0"
               />
             </div>
             <p className={cn("font-mono text-[11px]", hintTone)}>
@@ -200,13 +192,10 @@ export function UsernameEditableRow({ value }: Props) {
             </div>
           </div>
         ) : (
-          <button
-            type="button"
+          <InlineEditField
             onClick={enterEdit}
-            className={cn(
-              "mt-1 block w-full break-all text-left text-sm",
-              !isValueSet && "italic text-text-sec",
-            )}
+            empty={!isValueSet}
+            className="mt-1 break-all"
           >
             {isValueSet ? (
               <>
@@ -216,19 +205,16 @@ export function UsernameEditableRow({ value }: Props) {
             ) : (
               T.usernameNotSet
             )}
-          </button>
+          </InlineEditField>
         )}
       </div>
 
       {!isEditing ? (
-        <button
-          type="button"
+        <InlineEditPencil
           onClick={enterEdit}
           aria-label={EDIT_T.editAriaLabel}
-          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </button>
+          className="mt-2"
+        />
       ) : null}
 
       {confirmModal}

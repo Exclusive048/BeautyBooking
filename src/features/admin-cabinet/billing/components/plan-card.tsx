@@ -8,7 +8,7 @@ import {
   tierLabel,
 } from "@/features/admin-cabinet/billing/lib/plan-display";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPlanCard } from "@/features/admin-cabinet/billing/types";
 
 const T = UI_TEXT.adminPanel.billing.plans;
@@ -73,7 +73,7 @@ export function PlanCardView({ plan, onEdit }: Props) {
             <span className="mx-1.5 text-text-sec/40" aria-hidden>
               ·
             </span>
-            <span className="text-amber-600 dark:text-amber-400">
+            <span className="text-warning-text">
               {T.inactiveBadge}
             </span>
           </>
@@ -86,7 +86,7 @@ export function PlanCardView({ plan, onEdit }: Props) {
             <li key={`${feature.title}-${index}`} className="flex items-start gap-2">
               <span
                 aria-hidden
-                className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-success/15 text-success-text"
               >
                 <Check className="h-2.5 w-2.5" />
               </span>

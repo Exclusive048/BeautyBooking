@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { normalizeSocialLink, type SocialKind } from "@/lib/providers/social-links";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FEAT-PROVIDER-SOCIALS — live preview / validation line shown under a VK or

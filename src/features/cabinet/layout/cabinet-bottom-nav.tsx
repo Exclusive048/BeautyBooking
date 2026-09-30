@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Calendar, Heart, Send, User, Star } from "lucide-react";
 import { BottomTab, BottomTabBar } from "@/components/layout/bottom-tab-bar";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * NAV-ATTENTION-01 — что ждёт действия клиента: перенос, предложенный мастером

@@ -5,9 +5,8 @@ import Link from "next/link";
 import { CheckCircle2, ExternalLink, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type VkStatus = {
   linked: boolean;
@@ -22,10 +21,6 @@ type Props = {
    * пользователю секцию не показываем — ссылка вела бы в профиль без кнопки. */
   connectAvailable: boolean;
 };
-
-function getErrorMessage<T>(json: ApiResponse<T> | null, fallback: string) {
-  return json && !json.ok ? json.error.message ?? fallback : fallback;
-}
 
 /**
  * VK-COMMUNITY-NOTIFY-01 — «Уведомления ВКонтакте» в общих настройках.
@@ -49,11 +44,8 @@ export function VkNotificationsSection({ connectAvailable }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
-    const res = await fetchWithAuth("/api/integrations/vk/status", { cache: "no-store" });
-    const json = (await res.json().catch(() => null)) as ApiResponse<VkStatus> | null;
-    if (!res.ok || !json || !json.ok) throw new Error(getErrorMessage(json, t.loadFailed));
-    return json.data;
-  }, [t.loadFailed]);
+    return fetchJsonWithAuth<VkStatus>("/api/integrations/vk/status", { cache: "no-store" });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +54,7 @@ export function VkNotificationsSection({ connectAvailable }: Props) {
         if (!cancelled) setStatus(data);
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : t.loadFailed);
+        if (!cancelled) setError(serverMessageOr(e, t.loadFailed));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -91,16 +83,14 @@ export function VkNotificationsSection({ connectAvailable }: Props) {
     setError(null);
     setSaving(true);
     try {
-      const res = await fetchWithAuth("/api/integrations/vk/settings", {
+      const data = await fetchJsonWithAuth<{ enabled: boolean }>("/api/integrations/vk/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ enabled: boolean }> | null;
-      if (!res.ok || !json || !json.ok) throw new Error(getErrorMessage(json, t.updateFailed));
-      setStatus((prev) => (prev ? { ...prev, enabled: json.data.enabled } : prev));
+      setStatus((prev) => (prev ? { ...prev, enabled: data.enabled } : prev));
     } catch (e) {
-      setError(e instanceof Error ? e.message : t.updateFailed);
+      setError(serverMessageOr(e, t.updateFailed));
     } finally {
       setSaving(false);
     }

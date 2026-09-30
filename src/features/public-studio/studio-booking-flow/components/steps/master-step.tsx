@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Sparkles, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMaster, SlotItem } from "@/features/booking/lib/studio-booking";
 import { MasterAvatar } from "../master-avatar";
 
@@ -70,7 +70,7 @@ export function MasterStep({
               aria-pressed={selectedMasterId === ANY_MASTER_ID}
             >
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-amber-400/60 to-primary/60 text-white" aria-hidden>
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-accent/60 to-primary/60 text-white" aria-hidden>
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">

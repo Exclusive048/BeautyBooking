@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Camera, List, Map as MapIcon, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -33,8 +33,9 @@ import type { CatalogSort } from "@/lib/catalog/schemas";
 import type { AvailabilitySearchResponse } from "@/lib/search-by-time/types";
 import { getCurrentCitySlug } from "@/lib/cities/client-city";
 import { scrollBehavior } from "@/lib/ui/scroll";
-import { UI_TEXT } from "@/lib/ui/text";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * PERF-17 — карта каталога и модалка визуального поиска лежали статическими
@@ -51,17 +52,17 @@ import type { ApiResponse } from "@/lib/types/api";
  * переключение в режим карты не прыгает.
  */
 const CatalogMap = dynamic(
-  () => import("@/features/catalog/components/catalog-map").then((m) => m.CatalogMap),
+  () => import("@/features/catalog/components/catalog-map").then((mod) => mod.CatalogMap),
   { ssr: false, loading: () => <Skeleton className="absolute inset-0 h-full w-full rounded-none" /> },
 );
 
 const CatalogMapCarousel = dynamic(
-  () => import("@/features/catalog/components/catalog-map-carousel").then((m) => m.CatalogMapCarousel),
+  () => import("@/features/catalog/components/catalog-map-carousel").then((mod) => mod.CatalogMapCarousel),
   { ssr: false, loading: () => null },
 );
 
 const VisualSearchModal = dynamic(
-  () => import("@/features/home/components/visual-search-modal").then((m) => m.VisualSearchModal),
+  () => import("@/features/home/components/visual-search-modal").then((mod) => mod.VisualSearchModal),
   { ssr: false, loading: () => null },
 );
 
@@ -241,7 +242,6 @@ export default function CatalogPageClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const reduce = useReducedMotion();
 
   const serviceQuery = searchParams.get("serviceQuery") ?? "";
   const serviceId = searchParams.get("serviceId") ?? "";
@@ -441,12 +441,8 @@ export default function CatalogPageClient({
         params.set("lng", String(userLocation.lng));
       }
 
-      const res = await fetch(`/api/catalog/search?${params.toString()}`, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<CatalogSearchData> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.catalog.loadFailed);
-      }
-      return json.data;
+      const jsonData = await fetchJson<CatalogSearchData>(`/api/catalog/search?${params.toString()}`, { cache: "no-store" });
+      return jsonData;
     },
     [
       date,
@@ -537,15 +533,11 @@ export default function CatalogPageClient({
       if (hot) params.set("hot", "true");
       if (entityType !== "all") params.set("entityType", entityType);
 
-      const res = await fetch(`/api/search/availability?${params.toString()}`, {
+      const jsonData = await fetchJson<AvailabilitySearchData>(`/api/search/availability?${params.toString()}`, {
         cache: "no-store",
         signal,
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<AvailabilitySearchData> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : UI_TEXT.catalog.timeSearch.loadFailed);
-      }
-      return json.data;
+      return jsonData;
     },
     [
       date,
@@ -573,7 +565,7 @@ export default function CatalogPageClient({
         const next = await requestCatalog(nextMapSearch);
         setData(next);
       } catch (e) {
-        setError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
+        setError(serverMessageOr(e, UI_TEXT.catalog.loadFailed));
         setData({ items: [], nextCursor: null });
       } finally {
         setLoading(false);
@@ -589,7 +581,7 @@ export default function CatalogPageClient({
       const next = await requestCatalog();
       setData(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : UI_TEXT.catalog.loadFailed);
+      setError(serverMessageOr(e, UI_TEXT.catalog.loadFailed));
       setData({ items: [], nextCursor: null });
     } finally {
       setLoading(false);
@@ -611,7 +603,7 @@ export default function CatalogPageClient({
       setAvailabilityData(next);
     } catch (e) {
       if (controller.signal.aborted || requestId !== availabilityRequestIdRef.current) return;
-      setAvailabilityError(e instanceof Error ? e.message : UI_TEXT.catalog.timeSearch.loadFailed);
+      setAvailabilityError(serverMessageOr(e, UI_TEXT.catalog.timeSearch.loadFailed));
       setAvailabilityData({ items: [] });
     } finally {
       if (!controller.signal.aborted && requestId === availabilityRequestIdRef.current) {
@@ -836,7 +828,7 @@ export default function CatalogPageClient({
     // сайта, и двойной отступ съедал у карточки 32px из 375.
     <div className="mx-auto w-full max-w-7xl pb-24 sm:px-6 lg:px-8 lg:pb-8 lg:pt-4">
       {/* Десктоп: одна строка поиска в карточке, липкая под шапкой сайта. */}
-      <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 mb-6 hidden bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:block lg:px-8">
+      <div className="sticky top-[var(--topbar-h)] z-sticky -mx-4 mb-6 hidden bg-bg-page/80 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:block lg:px-8">
         <CatalogSearchBar
           serviceQuery={draftServiceQuery}
           citySlug={citySlug}
@@ -853,7 +845,7 @@ export default function CatalogPageClient({
       {/* Телефон, режим списка: компактная липкая шапка. В режиме карты тот же
           узел переезжает наверх полноэкранного слоя. */}
       {view === "list" ? (
-        <div className="sticky top-[var(--topbar-h)] z-20 -mx-4 mb-3 border-b border-border-subtle/60 bg-bg-page/90 px-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:hidden">
+        <div className="sticky top-[var(--topbar-h)] z-sticky -mx-4 mb-3 border-b border-border-subtle/60 bg-bg-page/90 px-4 backdrop-blur-md sm:-mx-6 sm:px-6 lg:hidden">
           {mobileHeader}
         </div>
       ) : null}
@@ -970,7 +962,7 @@ export default function CatalogPageClient({
           ) : null}
 
           {!currentLoading && !currentError && view === "list" && currentItems.length > 0 ? (
-            <motion.div
+            <m.div
               data-testid="catalog-list"
               // CATALOG-CARD-OVERFLOW: колонка обязана быть ЯВНОЙ (`grid-cols-1`
               // = `minmax(0, 1fr)`). Неявная колонка сетки — `auto`, и она
@@ -981,21 +973,21 @@ export default function CatalogPageClient({
               className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3"
               initial="hidden"
               animate="visible"
-              variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+              variants={{ hidden: {}, visible: { transition: { staggerChildren: STAGGER } } }}
             >
               {timeModeActive
                 ? availabilityData.items.map((item, index) => (
-                    <motion.div
+                    <m.div
                       key={item.publicUsername ?? index}
-                      variants={reduce ? undefined : { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                      variants={{ hidden: { opacity: 0, y: DISTANCE.rise }, visible: { opacity: 1, y: 0, transition: MOTION.base } }}
                     >
                       <ProviderResultCard item={item} />
-                    </motion.div>
+                    </m.div>
                   ))
                 : data.items.map((item, index) => (
-                    <motion.div
+                    <m.div
                       key={item.publicUsername ?? index}
-                      variants={reduce ? undefined : { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } } }}
+                      variants={{ hidden: { opacity: 0, y: DISTANCE.rise }, visible: { opacity: 1, y: 0, transition: MOTION.base } }}
                     >
                       <CatalogCard
                         item={item}
@@ -1004,9 +996,9 @@ export default function CatalogPageClient({
                         initialFavorited={item.publicUsername ? favoriteSet.has(item.publicUsername) : false}
                         onLoginRequired={() => setLoginModalOpen(true)}
                       />
-                    </motion.div>
+                    </m.div>
                   ))}
-            </motion.div>
+            </m.div>
           ) : null}
 
           {/* Режим карты. На телефоне — слой на весь экран между шапкой сайта и
@@ -1017,7 +1009,7 @@ export default function CatalogPageClient({
               промахивалась, и в щель просвечивала страница. С `lg` — карточка в
               потоке рядом с сайдбаром. */}
           {!currentError && view === "map" ? (
-            <div className="fixed inset-x-0 bottom-[var(--bottom-nav-h,4rem)] top-[var(--topbar-h)] z-30 flex flex-col overflow-hidden bg-bg-page lg:static lg:bottom-auto lg:top-auto lg:z-auto lg:h-[680px] lg:rounded-2xl lg:border lg:border-border-subtle">
+            <div className="fixed inset-x-0 bottom-[var(--bottom-nav-h,4rem)] top-[var(--topbar-h)] z-float flex flex-col overflow-hidden bg-bg-page lg:static lg:bottom-auto lg:top-auto lg:z-auto lg:h-[680px] lg:rounded-2xl lg:border lg:border-border-subtle">
               <div className="relative z-20 shrink-0 border-b border-border-subtle/60 bg-bg-page px-4 sm:px-6 lg:hidden">
                 {mobileHeader}
               </div>
@@ -1081,7 +1073,7 @@ export default function CatalogPageClient({
       {/* Телефон, режим списка: переключатель на карту — плавающая кнопка над
           нижней навигацией, как у приложений с картой в выдаче. */}
       {view === "list" ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-h,4rem)+1rem)] z-30 flex justify-center lg:hidden">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-h,4rem)+1rem)] z-float flex justify-center lg:hidden">
           <Button
             variant="primary"
             size="md"

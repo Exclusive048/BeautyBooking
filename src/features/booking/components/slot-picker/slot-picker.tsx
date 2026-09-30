@@ -4,7 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const SLOT_ROW_HEIGHT = 44;
 const SLOT_LIST_MAX_HEIGHT = 320;
@@ -234,7 +234,11 @@ const SlotButton = memo(function SlotButton({
         active
           ? "border-primary/70 bg-gradient-to-r from-primary via-primary-hover to-primary-magenta text-accent-foreground"
           : isHot
-            ? "border-amber-300/60 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+            ? // Статусные токены (UI-26/27), а не `amber-200`: та палитра
+              // рассчитана на тёмный фон и в светлой теме нечитаема. Пока `cn`
+              // был плоским join, эти классы проигрывали варианту `secondary`
+              // и «горячее» окошко выглядело обычным (29.09 доработки · 12).
+              "border-warning-border bg-warning-surface text-warning-text hover:brightness-95"
             : "border-border-subtle bg-bg-input text-text-main hover:bg-elevated",
         disabled && "cursor-not-allowed opacity-60",
         className
@@ -243,7 +247,7 @@ const SlotButton = memo(function SlotButton({
       <span className="inline-flex items-center gap-2">
         {timeText}
         {hotLabel ? (
-          <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
+          <span className="rounded-full border border-warning-border px-2 py-0.5 text-[10px] font-semibold">
             {hotLabel}
           </span>
         ) : null}

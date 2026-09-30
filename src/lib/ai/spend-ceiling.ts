@@ -55,7 +55,7 @@
 
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * Суточные потолки ПЛАТНЫХ ВЫЗОВОВ на поверхность.

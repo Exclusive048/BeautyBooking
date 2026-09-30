@@ -4,9 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth } from "@/lib/http/client";
+import { ChipButton } from "@/components/ui/chip-button";
 
 const T = UI_TEXT.cabinetMaster.reviews.reply;
 
@@ -51,16 +51,11 @@ export function ReviewReplyForm({ reviewId, initialText, onCancel, onSaved }: Pr
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`/api/reviews/${reviewId}/reply`, {
+      await fetchJsonWithAuth<unknown>(`/api/reviews/${reviewId}/reply`, {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: trimmed }),
       });
-      const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!response.ok || !json || !json.ok) {
-        const message = json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE;
-        throw new Error(message);
-      }
       onSaved();
       startTransition(() => router.refresh());
     } catch (err) {
@@ -92,20 +87,18 @@ export function ReviewReplyForm({ reviewId, initialText, onCancel, onSaved }: Pr
 
       <div className="flex flex-wrap gap-1.5">
         {T.quickReplies.map((snippet) => (
-          <button
+          <ChipButton
             key={snippet}
-            type="button"
             onClick={() => appendQuick(snippet)}
             disabled={busy}
-            className="inline-flex items-center rounded-full border border-border-subtle bg-bg-card px-2.5 py-1 text-xs text-text-main transition-colors hover:border-primary/40 hover:text-accent-text disabled:cursor-not-allowed disabled:opacity-50"
           >
             {snippet}
-          </button>
+          </ChipButton>
         ))}
       </div>
 
       {error ? (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-xs text-danger-text">{error}</p>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-end gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import {
@@ -16,13 +17,15 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { Card } from "@/components/ui/card";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatRussianPhoneInput,
   formatRussianPhoneInputOnChange,
@@ -48,6 +51,8 @@ import {
   type PhoneVerifyProviders,
 } from "@/features/cabinet/components/phone-verify-actions";
 import { PhoneVerifyNotice } from "@/features/cabinet/components/phone-verify-notice";
+import { SetupGuideProfileCard } from "@/features/cabinet/setup-guide/setup-guide-profile-card";
+import type { SetupGuideDto } from "@/lib/onboarding/setup-guide-shared";
 import { TelegramConnectModal } from "./modals/telegram-connect-modal";
 import { isTelegramEnabled } from "@/lib/env.client";
 
@@ -76,28 +81,28 @@ type Props = {
   vkAuthEnabled?: boolean;
   /** PHONE-OAUTH-PROOF-01: server-resolved `isYandexAuthEnabled` — кнопка «Подтвердить через Яндекс ID». */
   yandexAuthEnabled?: boolean;
+  /** SETUP-GUIDE-01: «Первые шаги» кабинетов мастера / студии; пусто — раздела нет. */
+  setupGuides?: SetupGuideDto[];
 };
 
 const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then(async (res) => {
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? "load_failed");
-    return json.data as ProfileDTO;
-  });
+  fetchJsonWithAuth<ProfileDTO>(url);
 
 type TelegramConnectToast = { tone: "success" | "error"; text: string };
+
+const profileText = UI_TEXT.clientCabinet.profile;
 
 // FIX-24 (Item 2b): map the redirect-mode connect result (`?telegram=…`) to a toast.
 function telegramConnectResult(value: string | null): TelegramConnectToast | null {
   switch (value) {
     case "connected":
-      return { tone: "success", text: "Telegram подключён." };
+      return { tone: "success", text: profileText.telegramConnected };
     case "conflict":
-      return { tone: "error", text: "Этот Telegram-аккаунт уже привязан к другому аккаунту." };
+      return { tone: "error", text: profileText.telegramConflict };
     case "unconfigured":
-      return { tone: "error", text: "Подключение Telegram временно недоступно. Попробуйте позже." };
+      return { tone: "error", text: profileText.telegramUnconfigured };
     case "error":
-      return { tone: "error", text: "Не удалось подключить Telegram. Попробуйте ещё раз." };
+      return { tone: "error", text: profileText.telegramConnectFailed };
     default:
       return null;
   }
@@ -106,8 +111,8 @@ function telegramConnectResult(value: string | null): TelegramConnectToast | nul
 /**
  * FIX-D1 — исход стартовой ноги VK → текст. Близнец `telegramConnectResult`
  * выше и намеренно той же формы: оба читают флаг, который навигация оставила в
- * адресе, и оба обязаны это делать в ИНИЦИАЛИЗАТОРЕ состояния, а не в эффекте
- * (`react-hooks/set-state-in-effect`; эффект остаётся только чистить адрес).
+ * адресе. С 29.09 доработки · 10 итог показывает общий тост из эффекта, который
+ * и чистит адрес (состояния страницы тост не трогает).
  */
 function vkConnectFailureMessage(value: string | null): string | null {
   switch (value) {
@@ -127,38 +132,39 @@ export function ClientProfilePage({
   emailEnabled = false,
   vkAuthEnabled = false,
   yandexAuthEnabled = false,
+  setupGuides = [],
 }: Props) {
   const { data, mutate, isLoading, error } = useSWR<ProfileDTO>(
     "/api/cabinet/user/profile",
     fetcher,
   );
   const searchParams = useSearchParams();
-  // FIX-D1: отказ подключения VK показывается на этой же странице — см.
-  // `vkConnectFailureMessage`. Через инициализатор, а не эффектом.
-  const [stubMessage, setStubMessage] = useState<string | null>(() =>
-    vkConnectFailureMessage(searchParams.get("vk")),
-  );
+  const toast = useToast();
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [tgModalOpen, setTgModalOpen] = useState(false);
 
-  // FIX-24 (Item 2b): the Telegram connect flow is now a redirect that lands
-  // back here with `?telegram=<result>`. Read it once on mount, surface a toast,
-  // and strip the param so a refresh doesn't re-show it (replaceState only — no
-  // setState in the effect). The connected state itself re-renders from fresh
-  // SSR/SWR data after the full-navigation round-trip.
-  const [tgResult, setTgResult] = useState(() =>
-    telegramConnectResult(searchParams.get("telegram")),
-  );
-  const tgUrlCleaned = useRef(false);
+  // FIX-24 (Item 2b) / FIX-D1: подключение Telegram и отказ подключения VK
+  // возвращаются сюда флагом в адресе (`?telegram=` / `?vk=`). Прочитать один
+  // раз, показать общим тостом (29.09 доработки · 10 — прежние плавающие плашки
+  // садились на нижнюю навигацию телефона) и снять флаг, чтобы обновление
+  // страницы не показало итог повторно. Ref переживает двойной вызов эффекта в
+  // StrictMode. Состояние «подключено» приходит свежими данными после
+  // полной навигации.
+  const navResultShown = useRef(false);
   useEffect(() => {
-    if (tgUrlCleaned.current) return;
-    tgUrlCleaned.current = true;
-    // FIX-D1: чистим оба флага навигации — telegram и vk, — иначе обновление
-    // страницы показывало бы уже показанный отказ повторно.
+    if (navResultShown.current) return;
+    navResultShown.current = true;
+    const vkFailure = vkConnectFailureMessage(searchParams.get("vk"));
+    if (vkFailure) toast.error(vkFailure);
+    const tgResult = telegramConnectResult(searchParams.get("telegram"));
+    if (tgResult) {
+      if (tgResult.tone === "success") toast.success(tgResult.text);
+      else toast.error(tgResult.text);
+    }
     if (searchParams.get("telegram") || searchParams.get("vk")) {
       window.history.replaceState(null, "", window.location.pathname);
     }
-  }, [searchParams]);
+  }, [searchParams, toast]);
 
 
   const { status, errorMessage, scheduleSave } = useProfileAutosave({
@@ -217,22 +223,32 @@ export function ClientProfilePage({
   }
 
   async function handleTelegramUnlink() {
-    const res = await fetch("/api/auth/telegram/unlink", {
-      method: "POST",
-      credentials: "include",
-    });
-    if (res.ok) void mutate();
+    try {
+      await fetchJsonWithAuth<unknown>("/api/auth/telegram/unlink", {
+        method: "POST",
+        credentials: "include",
+      });
+      void mutate();
+    } catch (error) {
+      toast.error(serverMessageOr(error, profileText.unlinkFailed));
+    }
   }
 
   async function handleVkUnlink() {
-    const res = await fetch("/api/auth/vk/unlink", {
-      method: "POST",
-      credentials: "include",
-    });
-    if (res.ok) void mutate();
+    try {
+      await fetchJsonWithAuth<unknown>("/api/auth/vk/unlink", {
+        method: "POST",
+        credentials: "include",
+      });
+      void mutate();
+    } catch (error) {
+      // «Это единственный способ входа» и т.п. — дословно (раньше молча).
+      toast.error(serverMessageOr(error, profileText.unlinkFailed));
+    }
   }
 
   function handleVkConnect() {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- route handler OAuth (редирект к VK), не страница
     window.location.href = "/api/auth/vk/start";
   }
 
@@ -267,47 +283,10 @@ export function ClientProfilePage({
           onVkUnlink={handleVkUnlink}
         />
 
-        <DangerZoneCard
-          onDelete={() =>
-            setStubMessage("Удаление аккаунта скоро появится")
-          }
-        />
+        {setupGuides.length > 0 ? <SetupGuideProfileCard guides={setupGuides} /> : null}
 
-        {stubMessage ? (
-          <div
-            role="status"
-            className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-border-subtle bg-bg-card px-4 py-2 text-sm text-text-main shadow-card"
-          >
-            {stubMessage}
-            <button
-              type="button"
-              onClick={() => setStubMessage(null)}
-              className="ml-3 text-text-sec hover:text-text-main"
-            >
-              ×
-            </button>
-          </div>
-        ) : null}
+        <DangerZoneCard />
 
-        {tgResult ? (
-          <div
-            role="status"
-            className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border px-4 py-2 text-sm shadow-card ${
-              tgResult.tone === "success"
-                ? "border-emerald-300/60 bg-emerald-50/90 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "border-rose-300/60 bg-rose-50/90 text-rose-800 dark:border-rose-400/30 dark:bg-rose-950/40 dark:text-rose-200"
-            }`}
-          >
-            {tgResult.text}
-            <button
-              type="button"
-              onClick={() => setTgResult(null)}
-              className="ml-3 opacity-70 hover:opacity-100"
-            >
-              ×
-            </button>
-          </div>
-        ) : null}
       </div>
 
       <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
@@ -417,8 +396,8 @@ function SaveStatusIndicator({
 }) {
   if (status === "idle") return null;
   const config = {
-    saving: { color: "text-amber-600 dark:text-amber-400", label: T.saveStatus.saving },
-    saved: { color: "text-emerald-600 dark:text-emerald-400", label: T.saveStatus.saved },
+    saving: { color: "text-warning-text", label: T.saveStatus.saving },
+    saved: { color: "text-success-text", label: T.saveStatus.saved },
     error: { color: "text-danger-text", label: T.saveStatus.error },
   }[status];
   // FIX-C8: на ошибке индикатор печатает курируемую строку сервера, если она
@@ -800,7 +779,12 @@ function ConnectRow({
 /* Danger zone                                                                */
 /* -------------------------------------------------------------------------- */
 
-function DangerZoneCard({ onDelete }: { onDelete: () => void }) {
+/**
+ * Удаление аккаунта живёт в настройках (одно на все роли, с подтверждением) —
+ * карточка ведёт туда, к якорю секции. Раньше здесь была заглушка «скоро
+ * появится», хотя удаление давно работало.
+ */
+function DangerZoneCard() {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-3.5">
@@ -813,12 +797,12 @@ function DangerZoneCard({ onDelete }: { onDelete: () => void }) {
           </div>
         </div>
         <Button
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+          asChild
+          variant="wrapper"
+          size="none"
+          className="inline-flex h-9 items-center justify-center rounded-2xl px-3 text-sm font-medium text-danger-text transition-colors hover:bg-danger-surface"
         >
-          {T.danger.cardCta}
+          <Link href="/cabinet/settings#delete-account">{T.danger.cardCta}</Link>
         </Button>
       </div>
     </Card>

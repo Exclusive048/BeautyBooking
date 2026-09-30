@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SectionShell } from "./section-shell";
 
 const T = UI_TEXT.cabinetMaster.profile.portfolio;

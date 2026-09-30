@@ -2,7 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ServiceHeader } from "@/features/booking/components/booking-flow/components/service-header";
 import { DateGrid } from "@/features/booking/components/booking-flow/components/date-grid";
 import { TimeGrid } from "@/features/booking/components/booking-flow/components/time-grid";

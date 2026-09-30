@@ -1,6 +1,6 @@
 import { Scissors } from "lucide-react";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioPopularService } from "../server/types";
 
 const T = UI_TEXT.studioCabinet.dashboardV2.popularServices;

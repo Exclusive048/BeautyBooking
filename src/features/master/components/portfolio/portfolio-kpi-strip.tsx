@@ -1,7 +1,7 @@
 import { EyeOff, ImageIcon, Sparkles } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { PortfolioKpi } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.kpi;
 

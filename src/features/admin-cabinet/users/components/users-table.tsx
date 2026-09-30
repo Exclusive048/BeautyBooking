@@ -2,7 +2,6 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { UsersEmpty } from "@/features/admin-cabinet/users/components/users-empty";
 import {
@@ -13,16 +12,15 @@ import {
   PlanChangeDialog,
   type PlanChangeValue,
 } from "@/features/admin-cabinet/users/components/plan-change-dialog";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminBillingPlanOption,
   AdminUserRow,
 } from "@/features/admin-cabinet/users/types";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.adminPanel.users;
-
-type Toast = { kind: "success" | "error"; text: string } | null;
 
 type Props = {
   rows: AdminUserRow[];
@@ -41,25 +39,16 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<AdminUserRow[]>(initialRows);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [toast, setToast] = useState<Toast>(null);
+  const toast = useToast();
   const [, startTransition] = useTransition();
-  const reduce = useReducedMotion();
 
   const [planTarget, setPlanTarget] = useState<AdminUserRow | null>(null);
-
-  const showToast = useCallback(
-    (text: string, kind: "success" | "error" = "success") => {
-      setToast({ kind, text });
-      window.setTimeout(() => setToast(null), 2400);
-    },
-    [],
-  );
 
   const handlePlanChange = async (value: PlanChangeValue) => {
     if (!planTarget) return;
     setBusyId(planTarget.id);
     try {
-      const res = await fetch(`/api/admin/users/${planTarget.id}/plan`, {
+      await fetchJsonWithAuth<unknown>(`/api/admin/users/${planTarget.id}/plan`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -68,7 +57,6 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
           reason: value.reason || undefined,
         }),
       });
-      if (!res.ok) throw new Error("plan change failed");
       // Optimistic local update — full data comes back via refresh().
       setRows((prev) =>
         prev.map((r) =>
@@ -84,10 +72,10 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
         ),
       );
       setPlanTarget(null);
-      showToast(T.toasts.planChanged);
+      toast.success(T.toasts.planChanged);
       router.refresh();
-    } catch {
-      showToast(T.toasts.errorGeneric, "error");
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
     } finally {
       setBusyId(null);
     }
@@ -105,25 +93,6 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
 
   return (
     <div className="space-y-3">
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            role="status"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            className={cn(
-              "rounded-2xl border px-4 py-2.5 text-sm",
-              toast.kind === "success"
-                ? "border-emerald-300/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-red-300/40 bg-red-500/10 text-red-700 dark:text-red-300",
-            )}
-          >
-            {toast.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
       <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
         <div className="hidden md:block">
           <table className="w-full">

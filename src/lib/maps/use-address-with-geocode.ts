@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
 
 export type AddressCoords = { lat: number; lng: number };
 export type GeoStatus = "idle" | "resolving" | "error";
@@ -119,17 +119,13 @@ export function useAddressWithGeocode() {
       const trimmed = value.trim();
       if (!trimmed) return null;
       const params = new URLSearchParams({ q: trimmed });
-      const res = await fetch(`/api/address/geocode?${params.toString()}`, {
-        cache: "no-store",
-        signal,
-      });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ coords: AddressCoords | null }>
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error("Geocode failed");
-      }
-      const coords = json.data.coords;
+      // Отказ геокодера — состояние `geoStatus: "error"` с подсказкой формы
+      // (координаты нужны для сохранения; причину уточнит сервер при сохранении).
+      const data = await fetchJson<{ coords: AddressCoords | null }>(
+        `/api/address/geocode?${params.toString()}`,
+        { cache: "no-store", signal },
+      );
+      const coords = data?.coords;
       if (
         !coords ||
         !Number.isFinite(coords.lat) ||
@@ -211,21 +207,15 @@ export function useAddressWithGeocode() {
             q: trimmed,
             limit: String(SUGGEST_LIMIT),
           });
-          const res = await fetch(`/api/address/suggest?${params.toString()}`, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
-          const json = (await res.json().catch(() => null)) as
-            | ApiResponse<{ suggestions: AddressSuggestion[] }>
-            | null;
-          if (!res.ok || !json || !json.ok) {
-            throw new Error("Suggest failed");
-          }
+          const data = await fetchJson<{ suggestions: AddressSuggestion[] }>(
+            `/api/address/suggest?${params.toString()}`,
+            { cache: "no-store", signal: controller.signal },
+          );
           if (controller.signal.aborted) return;
           if (suggestRequestIdRef.current !== requestId) return;
           if (!isMountedRef.current) return;
 
-          const items = Array.isArray(json.data.suggestions) ? json.data.suggestions : [];
+          const items = Array.isArray(data?.suggestions) ? data.suggestions : [];
           const normalized = items
             .map((item) => ({
               value: typeof item?.value === "string" ? item.value.trim() : "",
@@ -236,14 +226,15 @@ export function useAddressWithGeocode() {
           setActiveIndex(-1);
           setSuggestOpen(normalized.length > 0);
           setSuggestError(null);
-        } catch {
+        } catch (error) {
           if (controller.signal.aborted) return;
           if (suggestRequestIdRef.current !== requestId) return;
           if (!isMountedRef.current) return;
           setSuggestions([]);
           setActiveIndex(-1);
           setSuggestOpen(false);
-          setSuggestError(SUGGEST_UNAVAILABLE_MESSAGE);
+          // 29.09 · 11: лимит (429) и недоступный сервис (503) — дословно.
+          setSuggestError(serverMessageOr(error, SUGGEST_UNAVAILABLE_MESSAGE));
         } finally {
           if (controller.signal.aborted) return;
           if (suggestRequestIdRef.current !== requestId) return;

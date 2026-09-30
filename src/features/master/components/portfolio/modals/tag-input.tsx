@@ -4,7 +4,9 @@ import { X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { PortfolioTagOption } from "@/lib/master/portfolio-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
+import { InlineEditInput } from "@/components/ui/inline-edit";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.edit;
 
@@ -88,18 +90,17 @@ export function TagInput({ value, options, onChange, inputId }: Props) {
               className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-accent-text"
             >
               <span>{option.name}</span>
-              <button
-                type="button"
+              <Button variant="wrapper"
                 onClick={() => remove(id)}
                 aria-label={UI_TEXT.a11y.removeItem(option.name)}
                 className="text-accent-text/60 hover:text-accent-text"
               >
                 <X className="h-3 w-3" aria-hidden />
-              </button>
+              </Button>
             </span>
           );
         })}
-        <input
+        <InlineEditInput underline="none"
           id={inputId}
           ref={inputRef}
           value={query}
@@ -111,7 +112,7 @@ export function TagInput({ value, options, onChange, inputId }: Props) {
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={handleKeyDown}
           placeholder={value.length === 0 ? T.tagsPlaceholder : ""}
-          className="flex-1 min-w-[120px] bg-transparent text-sm text-text-main outline-none"
+          className="w-auto min-w-[120px] flex-1 py-0"
         />
       </div>
 
@@ -123,14 +124,13 @@ export function TagInput({ value, options, onChange, inputId }: Props) {
             <ul className="max-h-48 overflow-auto">
               {matches.map((option) => (
                 <li key={option.id}>
-                  <button
-                    type="button"
+                  <Button variant="wrapper"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => add(option.id)}
                     className="block w-full px-3 py-2 text-left text-sm text-text-main hover:bg-bg-input"
                   >
                     {option.name}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

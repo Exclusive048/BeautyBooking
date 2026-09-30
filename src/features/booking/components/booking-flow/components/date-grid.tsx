@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 const WEEKDAYS_SHORT = T.weekdaysShort;
@@ -131,20 +133,13 @@ export function DateGrid({
       );
       url.searchParams.set("from", fromKey);
       url.searchParams.set("limit", String(14));
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { days: Array<{ date: string }> } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        setError(T.daysLoadFailed);
-        return;
-      }
+      const data = await fetchJson<{ days: Array<{ date: string }> }>(url.toString(), { cache: "no-store" });
       const set = new Set<string>();
-      for (const day of json.data.days) set.add(day.date);
+      for (const day of data.days) set.add(day.date);
       setWorkingDays(set);
-    } catch {
-      setError(T.daysLoadFailed);
+    } catch (error) {
+      // Лимит запросов (429) — дословно; прочее — строка полосы дней.
+      setError(serverMessageOr(error, T.daysLoadFailed));
     } finally {
       setLoading(false);
     }
@@ -177,8 +172,7 @@ export function DateGrid({
           {T.dateLabel}
         </div>
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0 || loading}
             className={cn(
@@ -190,9 +184,8 @@ export function DateGrid({
             aria-label={T.prevWeek}
           >
             <ChevronLeft className="h-3 w-3" aria-hidden strokeWidth={2} />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button variant="wrapper"
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1 || loading}
             className={cn(
@@ -204,7 +197,7 @@ export function DateGrid({
             aria-label={T.nextWeek}
           >
             <ChevronRight className="h-3 w-3" aria-hidden strokeWidth={2} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -214,9 +207,8 @@ export function DateGrid({
           const isDisabled =
             !cell.isWorkingDay || (minDateKey ? cell.dateKey < minDateKey : false);
           return (
-            <button
+            <Button variant="wrapper" aria-pressed={isSelected}
               key={cell.dateKey}
-              type="button"
               disabled={isDisabled}
               onClick={() => !isDisabled && onSelect(cell.dateKey)}
               className={cn(
@@ -232,7 +224,7 @@ export function DateGrid({
                 {cell.weekdayShort}
               </span>
               <span className="text-base font-semibold">{cell.dayOfMonth}</span>
-            </button>
+            </Button>
           );
         })}
       </div>

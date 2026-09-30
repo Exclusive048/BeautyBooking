@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import type { PlanFeatures } from "@/lib/billing/types";
 import { billingUpgradeHref, type BillingScope } from "@/lib/billing/upgrade-href";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.billing.featureGate;
 
@@ -27,15 +28,12 @@ type PlanWithFeatures = {
 };
 
 type PlansResponse = {
-  ok: true;
-  data: {
-    plans: Record<string, PlanWithFeatures[]>;
-  };
+  plans: Record<string, PlanWithFeatures[]>;
 };
 
-async function fetchPlans(url: string): Promise<PlansResponse> {
-  const res = await fetch(url, { cache: "no-store" });
-  return res.json();
+/** Чтение каталога тарифов для подсказки «нужен тариф …»: не прочитали — подсказки нет. */
+function fetchPlans(url: string): Promise<PlansResponse> {
+  return fetchJson<PlansResponse>(url, { cache: "no-store" });
 }
 
 /**
@@ -51,7 +49,7 @@ function requiredTierLabel(
   feature: BooleanFeatureKey,
   scope: string
 ): string | null {
-  const plans = plansData?.data?.plans?.[scope];
+  const plans = plansData?.plans?.[scope];
   if (!plans) return null;
   const sorted = [...plans].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const plan of sorted) {

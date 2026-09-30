@@ -2,10 +2,20 @@ import { addDaysToDateKey, compareDateKeys } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import type { DayPlan } from "@/lib/schedule/types";
 
-export const PUBLISH_HORIZON_WEEKS = 6;
+/**
+ * SCHEDULE-PATTERNS-01 (решение владельца 2026-09-28): расписание настраивается
+ * и открыто для записи максимум на 3 месяца вперёд. Одно число на всё — горизонт
+ * публикации дней, потолок «Максимум вперёд» в правилах записи
+ * (`BOOKING_RULE_LIMITS`) и окно записи (`latestBookableUtc`).
+ *
+ * До этого горизонт был 6 недель и ни с чем не был связан: в «Видимости» можно
+ * было выбрать 90 дней, в правилах — до 365, а всё дальше 42-го дня молча
+ * оставалось закрытым.
+ */
+export const SCHEDULE_HORIZON_DAYS = 92;
 
 /**
- * Rolling 42-day publish horizon anchored to **now**, not last schedule edit.
+ * Rolling publish horizon (`SCHEDULE_HORIZON_DAYS`) anchored to **now**, not last schedule edit.
  *
  * `changeAtUtc` remains in the signature because callers thread it through
  * `scheduleVersion` for cache invalidation — but the horizon itself rolls
@@ -18,7 +28,7 @@ export function resolvePublishedUntilLocal(input: {
   timeZone: string;
 }): string {
   const baseKey = toLocalDateKey(input.nowUtc, input.timeZone);
-  return addDaysToDateKey(baseKey, PUBLISH_HORIZON_WEEKS * 7);
+  return addDaysToDateKey(baseKey, SCHEDULE_HORIZON_DAYS);
 }
 
 export function applyPublishHorizon(input: {

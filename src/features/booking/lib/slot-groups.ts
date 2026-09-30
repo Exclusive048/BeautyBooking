@@ -1,7 +1,7 @@
 import type { SlotGroup } from "@/features/booking/model/types";
 import { timeToMinutes } from "@/lib/schedule/time";
 import type { SlotItem } from "@/features/booking/lib/studio-booking";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export function groupSlotsByDayPeriod(slots: SlotItem[]): SlotGroup[] {
   const t = UI_TEXT.publicProfile.slots;

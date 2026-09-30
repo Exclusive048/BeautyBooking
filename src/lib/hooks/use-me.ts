@@ -3,8 +3,7 @@
 import { useCallback } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { usePathname } from "next/navigation";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
-import type { ApiResponse } from "@/lib/types/api";
+import { fetchJsonWithAuth } from "@/lib/http/client";
 import type { MeIdentity } from "@/lib/users/me";
 
 export type MeUser = MeIdentity;
@@ -15,10 +14,13 @@ const AUTH_PAGES = new Set(["/login", "/logout"]);
 export const ME_SWR_KEY = "/api/me";
 
 const fetcher = async (url: string): Promise<{ user: MeUser | null } | null> => {
-  const res = await fetchWithAuth(url, { cache: "no-store" });
-  const json = (await res.json().catch(() => null)) as ApiResponse<{ user: MeUser | null }> | null;
-  if (!res.ok || !json || json.ok !== true) return null;
-  return json.data;
+  // Фон: личность для шапки и меню. Не прочитали — `null`, как у гостя;
+  // сообщение здесь было бы шумом на каждой странице.
+  try {
+    return await fetchJsonWithAuth<{ user: MeUser | null }>(url, { cache: "no-store" });
+  } catch {
+    return null;
+  }
 };
 
 export function useMe() {

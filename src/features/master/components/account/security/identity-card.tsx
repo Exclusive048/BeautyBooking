@@ -1,7 +1,7 @@
 import { Phone } from "lucide-react";
 import { EditableFieldRow } from "@/features/master/components/profile/editable/editable-field-row";
 import type { MasterAccountIdentity } from "@/lib/master/account-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.security;
 const TC = UI_TEXT.cabinetMaster.profile.contacts;

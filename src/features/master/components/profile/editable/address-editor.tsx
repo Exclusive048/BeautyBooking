@@ -1,12 +1,13 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, fetchJsonWithAuth, serverMessageOf, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
 import { useAutosave } from "./use-autosave";
+import { Button } from "@/components/ui/button";
+import { InlineEditField, InlineEditInput, InlineEditPencil } from "@/components/ui/inline-edit";
 
 const T_EDIT = UI_TEXT.cabinetMaster.profile.editable;
 const T_LOC = UI_TEXT.cabinetMaster.profile.location;
@@ -49,6 +50,8 @@ export function AddressEditor({ value }: Props) {
   /** Последний подтверждённый сервером адрес — точка отката при отказе. */
   const confirmedRef = useRef(value);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  /** Отказ подсказок (лимит 429 / сервис недоступен 503) — дословно (29.09 · 11). */
+  const [suggestError, setSuggestError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const fetchSeqRef = useRef(0);
   const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,18 +69,21 @@ export function AddressEditor({ value }: Props) {
 
   const autosave = useAutosave<{ address: string; lat: number; lng: number }>(
     async (next) => {
-      const response = await fetch("/api/master/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: next.address,
-          geoLat: next.lat,
-          geoLng: next.lng,
-        }),
-      });
-      if (!response.ok) {
+      try {
+        await fetchJsonWithAuth<unknown>("/api/master/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            address: next.address,
+            geoLat: next.lat,
+            geoLng: next.lng,
+          }),
+        });
+      } catch (error) {
+        // Откат оптимистичного адреса; содержательный отказ сервера — дословно,
+        // иначе чип напечатает канон.
         setSavedValue(confirmedRef.current);
-        return { ok: false };
+        return { ok: false, message: serverMessageOf(error) };
       }
       confirmedRef.current = next.address;
       return { ok: true };
@@ -114,22 +120,25 @@ export function AddressEditor({ value }: Props) {
     }
     if (query.trim().length < 2) {
       setSuggestions([]);
+      setSuggestError(null);
       return;
     }
     const seq = ++fetchSeqRef.current;
     fetchTimerRef.current = setTimeout(() => {
-      void fetch(`/api/address/suggest?q=${encodeURIComponent(query.trim())}&limit=6`)
-        .then((response) => response.json())
-        .then((json) => {
+      void fetchJson<{ suggestions?: Suggestion[] }>(
+        `/api/address/suggest?q=${encodeURIComponent(query.trim())}&limit=6`,
+      )
+        .then((data) => {
           if (seq !== fetchSeqRef.current) return;
-          if (json?.ok && Array.isArray(json.data?.suggestions)) {
-            setSuggestions(json.data.suggestions as Suggestion[]);
-          } else {
-            setSuggestions([]);
-          }
+          setSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
+          setSuggestError(null);
         })
-        .catch(() => {
-          if (seq === fetchSeqRef.current) setSuggestions([]);
+        .catch((error: unknown) => {
+          if (seq !== fetchSeqRef.current) return;
+          setSuggestions([]);
+          // 429 «подождите» и 503 «сервис недоступен» — разные советы, оба
+          // видны при вводе; обрыв сети — своя строка.
+          setSuggestError(serverMessageOr(error, T_LOC.addressSuggestFailed));
         });
     }, SUGGEST_DEBOUNCE_MS);
   };
@@ -185,7 +194,7 @@ export function AddressEditor({ value }: Props) {
         </div>
         {isEditing ? (
           <div className="relative mt-1">
-            <input
+            <InlineEditInput underline="focus"
               id={inputId}
               ref={inputRef}
               value={draft}
@@ -206,64 +215,65 @@ export function AddressEditor({ value }: Props) {
               // только выбор подсказки, Escape или сохранение), то есть оно
               // может стоять расфокусированным на экране — а сплошной primary
               // выглядел одинаково и с фокусом, и без.
-              className="block w-full border-0 border-b-2 border-border-subtle bg-transparent py-1 text-sm text-text-main outline-none focus:border-primary focus:ring-0"
+              
             />
             {open && suggestions.length > 0 ? (
               <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-bg-card py-1 shadow-card">
                 {suggestions.map((suggestion, index) => (
                   <li key={`${suggestion.value}-${index}`}>
-                    <button
-                      type="button"
+                    <Button variant="wrapper"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => void pickSuggestion(suggestion)}
                       className="block w-full px-3 py-2 text-left text-sm text-text-main hover:bg-bg-input"
                     >
                       {suggestion.value}
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
             ) : null}
-            {open && suggestions.length === 0 && draft.trim().length >= 2 ? (
+            {open && suggestError ? (
+              <p role="alert" className="mt-1 text-xs text-danger-text">
+                {suggestError}
+              </p>
+            ) : open && suggestions.length === 0 && draft.trim().length >= 2 ? (
               <p className="mt-1 text-xs text-text-sec">{T_LOC.addressSuggestEmpty}</p>
             ) : null}
           </div>
         ) : (
-          <button
-            type="button"
+          <InlineEditField
             onClick={enterEdit}
-            className={cn(
-              "mt-1 block w-full text-left text-sm",
-              isEmpty ? "italic text-text-sec" : "text-text-main"
-            )}
+            empty={isEmpty}
+            className="mt-1"
           >
             {isEmpty ? T_EDIT.emptyValue : savedValue}
-          </button>
+          </InlineEditField>
         )}
+        {autosave.errorMessage ? (
+          <p role="alert" className="mt-1 text-xs text-danger-text">
+            {autosave.errorMessage}
+          </p>
+        ) : null}
       </div>
       {!isEditing ? (
-        <button
-          type="button"
+        <InlineEditPencil
           onClick={enterEdit}
           aria-label={T_EDIT.editAriaLabel}
-          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </button>
+          className="mt-2"
+        />
       ) : null}
     </div>
   );
 }
 
 async function geocodeAddress(query: string): Promise<{ lat: number; lng: number } | null> {
+  // Тихо осознанно: сервер при сохранении геокодирует адрес сам и отвечает за
+  // итог — его отказ дойдёт через чип автосохранения.
   try {
-    const response = await fetch(`/api/address/geocode?q=${encodeURIComponent(query)}`);
-    if (!response.ok) return null;
-    const json = await response.json();
-    if (json?.ok && json.data?.coords) {
-      return json.data.coords as { lat: number; lng: number };
-    }
-    return null;
+    const data = await fetchJson<{ coords?: { lat: number; lng: number } | null }>(
+      `/api/address/geocode?q=${encodeURIComponent(query)}`,
+    );
+    return data?.coords ?? null;
   } catch {
     return null;
   }

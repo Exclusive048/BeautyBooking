@@ -7,8 +7,9 @@ import { Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { UI_TEXT } from "@/lib/ui/text";
-import { buildSchedulePayloadPreview } from "../lib/payload-display";
+import * as UI_TEXT from "@/lib/ui/text";
+import type { ScheduleRequestReview } from "@/lib/schedule/schedule-changes-shared";
+import { buildReviewPreview, buildSchedulePayloadPreview } from "../lib/payload-display";
 import { ApproveDialog } from "./approve-dialog";
 import { PayloadPreview } from "./payload-preview";
 import { RejectDialog } from "./reject-dialog";
@@ -22,6 +23,7 @@ type Props = {
     updatedAt: string;
     provider: { id: string; name: string };
     payload: unknown;
+    review: ScheduleRequestReview | null;
   };
 };
 
@@ -58,6 +60,7 @@ export function RequestCard({ request }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const preview = buildSchedulePayloadPreview(request.payload);
+  const review = request.review ? buildReviewPreview(request.review) : null;
   const isPendingRequest = request.status === ScheduleChangeRequestStatus.PENDING;
 
   function refresh() {
@@ -80,7 +83,7 @@ export function RequestCard({ request }: Props) {
             {statusBadge(request.status)}
           </div>
 
-          <PayloadPreview preview={preview} />
+          <PayloadPreview preview={preview} review={review} />
 
           {request.comment ? (
             <div className="rounded-lg border border-border-subtle bg-bg-input/40 px-3 py-2">

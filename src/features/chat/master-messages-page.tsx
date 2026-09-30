@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { ChatShell } from "@/features/chat/chat-shell";
 import { getSessionUser } from "@/lib/auth/session";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster;
 const C = UI_TEXT.chat;

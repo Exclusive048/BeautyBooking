@@ -3,12 +3,36 @@ import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { loadDayPlans } from "@/lib/schedule/day-plans";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
 import { resolveRangeWithCompare, type AnalyticsRange } from "@/features/analytics/domain/date-range";
 import { getBookingsFunnel } from "@/features/analytics/domain/bookings";
 import { getDashboardKpi } from "@/features/analytics/domain/kpi";
 import { getAtRiskClients, getNewVsReturning } from "@/features/analytics/domain/clients";
 import type { MasterStats } from "@/lib/advisor/types";
+
+/**
+ * SCHEDULE-PATTERNS-01 (этап 1): рабочих дней в неделю — среднее по двум
+ * ближайшим неделям по движку, а не число строк недели. С графиком 2/2 или
+ * чередованием недель «строк» нет, а с отпуском строки врали и раньше.
+ */
+const WORKING_DAYS_SAMPLE_WEEKS = 2;
+
+async function countWorkingDaysPerWeek(providerId: string, timezone: string): Promise<number> {
+  const fromKey = toLocalDateKey(new Date(), timezone);
+  const plans = (
+    await loadDayPlans({
+      providerIds: [providerId],
+      fromKey,
+      toKeyExclusive: addDaysToDateKey(fromKey, WORKING_DAYS_SAMPLE_WEEKS * 7),
+    })
+  ).get(providerId);
+  let working = 0;
+  for (const plan of plans?.values() ?? []) {
+    if (plan.isWorking) working += 1;
+  }
+  return Math.round(working / WORKING_DAYS_SAMPLE_WEEKS);
+}
 
 const NO_SHOW_WINDOW_DAYS = 90;
 const DEAD_SLOTS_WINDOW_DAYS = 60;
@@ -127,9 +151,7 @@ export async function collectMasterStats(providerId: string): Promise<MasterStat
     prisma.review.count({
       where: { targetType: "provider", targetId: provider.id, ...ACTIVE_REVIEW_FILTER },
     }),
-    prisma.weeklyScheduleDay.count({
-      where: { isActive: true, config: { providerId: provider.id } },
-    }),
+    countWorkingDaysPerWeek(provider.id, provider.timezone),
     provider.studioId
       ? Promise.resolve(0)
       : prisma.service.count({

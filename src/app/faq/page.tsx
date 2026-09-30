@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FAQItem } from "@/features/faq/components/faq-item";
 import { FAQ_DATA } from "@/features/faq/content/faq-content";
 import { safeJsonLd } from "@/lib/seo/schema";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export const metadata: Metadata = {
   title: "Часто спрашивают",

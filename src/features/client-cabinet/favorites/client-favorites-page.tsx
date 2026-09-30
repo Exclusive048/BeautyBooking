@@ -13,11 +13,15 @@ import {
   Star,
   User,
 } from "lucide-react";
+import { PRESS } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { useToast } from "@/components/ui/toast";
 import { Card } from "@/components/ui/card";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { moneyRUBFromKopeks } from "@/lib/format";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   FavoriteCardDTO,
   FavoritesEnrichedPayload,
@@ -35,13 +39,10 @@ const T = UI_TEXT.clientCabinet.favorites;
 type TabKey = "masters" | "studios";
 
 const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then(async (res) => {
-    const json = await res.json();
-    if (!json.ok) throw new Error(json.error?.message ?? "load_failed");
-    return json.data as FavoritesEnrichedPayload;
-  });
+  fetchJsonWithAuth<FavoritesEnrichedPayload>(url);
 
 export function ClientFavoritesPage() {
+  const toast = useToast();
   const { data, mutate, isLoading, error } = useSWR<FavoritesEnrichedPayload>(
     "/api/cabinet/user/favorites",
     fetcher,
@@ -69,16 +70,16 @@ export function ClientFavoritesPage() {
     );
 
     try {
-      const res = await fetch("/api/favorites/toggle", {
+      await fetchJsonWithAuth<unknown>("/api/favorites/toggle", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerId }),
       });
-      if (!res.ok) throw new Error("toggle_failed");
       await mutate();
-    } catch {
-      // Rollback to previous state
+    } catch (error) {
+      // Откат — и слово о нём (29.09 · 11): карточка вернулась не просто так.
+      toast.error(serverMessageOr(error, T.removeFailed));
       await mutate(
         { masters: previousMasters, studios: previousStudios },
         false,
@@ -154,65 +155,23 @@ function FavoritesTabs({
   studiosCount: number;
 }) {
   return (
-    <div className="inline-flex w-fit items-center gap-1 rounded-2xl border border-border-subtle bg-bg-card p-1">
-      <TabButton
-        active={tab === "masters"}
-        onClick={() => onChange("masters")}
-        icon={User}
-        label="Мастера"
-        count={mastersCount}
-      />
-      <TabButton
-        active={tab === "studios"}
-        onClick={() => onChange("studios")}
-        icon={Home}
-        label="Студии"
-        count={studiosCount}
-      />
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: typeof User;
-  label: string;
-  count: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition ${
-        active
-          ? "bg-brand-gradient text-white"
-          : "text-text-sec hover:text-text-main"
-      }`}
-    >
-      <Icon className="h-4 w-4" aria-hidden />
-      <span>{label}</span>
-      <span
-        className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] ${
-          active ? "bg-white/25 text-white" : "bg-bg-input text-text-sec"
-        }`}
-      >
-        {count}
-      </span>
-    </button>
+    <SegmentedTabs<TabKey>
+      value={tab}
+      onChange={onChange}
+      ariaLabel={T.tabsAria}
+      className="w-full sm:w-80"
+      options={[
+        { value: "masters", label: T.tabMasters, icon: <User className="h-4 w-4" aria-hidden />, badge: mastersCount },
+        { value: "studios", label: T.tabStudios, icon: <Home className="h-4 w-4" aria-hidden />, badge: studiosCount },
+      ]}
+    />
   );
 }
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
-  { value: "recent", label: "Сначала недавние" },
-  { value: "rating", label: "По рейтингу" },
-  { value: "visits", label: "По числу визитов" },
+  { value: "recent", label: T.sortRecent },
+  { value: "rating", label: T.sortRating },
+  { value: "visits", label: T.sortVisits },
 ];
 
 function FavoritesSortBar({
@@ -226,26 +185,14 @@ function FavoritesSortBar({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="text-sm text-text-sec">{count} в избранном</div>
-      <div className="ml-auto flex flex-wrap gap-1.5">
-        {SORT_OPTIONS.map((opt) => {
-          const active = opt.value === sort;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onChange(opt.value)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                active
-                  ? "border-primary/40 bg-bg-input text-accent-text"
-                  : "border-border-subtle bg-bg-card text-text-sec hover:border-border-subtle/80"
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
+      <div className="text-sm text-text-sec">{T.countLabel(count)}</div>
+      <SegmentedTabs<SortOption>
+        value={sort}
+        onChange={onChange}
+        ariaLabel={T.sortAria}
+        className="ml-auto w-full sm:w-auto"
+        options={SORT_OPTIONS}
+      />
     </div>
   );
 }
@@ -441,14 +388,14 @@ function PhotoBlock({
 
 function UnfavoriteButton({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="wrapper"
       onClick={onClick}
       aria-label={T.removeFromFavoritesAria}
-      className="absolute right-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-bg-card/95 text-accent-text shadow-card backdrop-blur transition hover:scale-105"
+      className={`absolute right-2.5 top-2.5 grid h-9 w-9 place-items-center rounded-full bg-bg-card/95 text-accent-text shadow-card backdrop-blur transition ${PRESS}`}
     >
       <Heart className="h-4 w-4 fill-current" aria-hidden />
-    </button>
+    </Button>
   );
 }
 

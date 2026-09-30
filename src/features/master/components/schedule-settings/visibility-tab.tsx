@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import type { ScheduleEditorSnapshot, VisibilityDto } from "@/lib/schedule/editor-shared";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { useSaveStatus } from "./save-status-provider";
 import { useAutoSave } from "./use-auto-save";
-import { useScheduleEndpoint } from "./schedule-endpoint-context";
+import { useIsStudioProfileSchedule, useScheduleEndpoint } from "./schedule-endpoint-context";
 import { NewClientsSection } from "./visibility/new-clients-section";
 import { SlotVisibilitySection } from "./visibility/slot-visibility-section";
 
@@ -29,19 +29,19 @@ export function VisibilityTab({ initialSnapshot }: Props) {
 
   // STUDIO-MASTER-PROFILES: личное расписание или профиля в студии.
   const endpoint = useScheduleEndpoint();
+  const studioProfile = useIsStudioProfileSchedule();
   useAutoSave({
     value: draft,
     baseline,
     save: async (value) => {
-      const response = await fetch(endpoint, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visibility: value }),
-      });
-      const json = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!response.ok || !json || !json.ok) {
-        const message = json && !json.ok ? json.error.message : T.errors.save;
-        return { ok: false, message };
+      try {
+        await fetchJsonWithAuth<unknown>(endpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visibility: value }),
+        });
+      } catch (error) {
+        return { ok: false, message: serverMessageOr(error, T.errors.save) };
       }
       return { ok: true };
     },
@@ -52,7 +52,7 @@ export function VisibilityTab({ initialSnapshot }: Props) {
 
   return (
     <div className="space-y-6">
-      <SlotVisibilitySection visibility={draft} onChange={setDraft} />
+      <SlotVisibilitySection visibility={draft} onChange={setDraft} showPublished={!studioProfile} />
       <NewClientsSection
         acceptNewClients={draft.acceptNewClients}
         onChange={(next) => setDraft((prev) => ({ ...prev, acceptNewClients: next }))}

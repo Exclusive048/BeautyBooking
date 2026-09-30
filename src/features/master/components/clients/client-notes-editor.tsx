@@ -4,9 +4,8 @@ import { Pencil, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.notes;
 
@@ -81,7 +80,7 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
+      const data = await fetchJsonWithAuth<{ card: { notes: string | null } }>(
         `/api/master/clients/${encodeURIComponent(clientKey)}/card`,
         {
           method: "PATCH",
@@ -90,18 +89,12 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
           body: JSON.stringify({ notes: trimmed.length > 0 ? trimmed : null }),
         },
       );
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ card: { notes: string | null } }>
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
-      const serverValue = json.data.card.notes ?? "";
+      const serverValue = data.card.notes ?? "";
       setSaved(serverValue);
       setDraft(serverValue);
       setMode("read");
     } catch (err) {
-      setError(err instanceof Error ? err.message : T.saveError);
+      setError(serverMessageOr(err, T.saveError));
       // Revert draft preview to the last-saved value so the user can
       // retry from a clean baseline without losing what they typed.
       setDraft(nextValue);
@@ -120,17 +113,15 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
           {T.heading}
         </p>
         {mode === "read" ? (
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={startEdit}
             className="inline-flex items-center gap-1 text-xs text-text-sec transition-colors hover:text-text-main"
           >
             <Pencil className="h-3 w-3" aria-hidden />
             {T.editLabel}
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button variant="wrapper"
             onClick={cancelEdit}
             disabled={saving}
             className="inline-flex items-center gap-1 text-xs text-text-sec transition-colors hover:text-text-main disabled:opacity-60"
@@ -138,7 +129,7 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
           >
             <X className="h-3 w-3" aria-hidden />
             {T.cancelLabel}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -172,7 +163,7 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
             <span
               className={
                 isOverLimit
-                  ? "text-xs text-rose-600 dark:text-rose-300"
+                  ? "text-xs text-danger-text"
                   : "text-xs text-text-sec/70"
               }
             >
@@ -202,7 +193,7 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
             </div>
           </div>
           {error ? (
-            <p className="text-xs text-rose-600 dark:text-rose-300" role="alert">
+            <p className="text-xs text-danger-text" role="alert">
               {error}
             </p>
           ) : null}

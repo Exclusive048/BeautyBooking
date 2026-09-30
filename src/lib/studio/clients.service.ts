@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { PdAccessActorType } from "@prisma/client";
 import { buildFilterFingerprint, recordPdAccess } from "@/lib/audit/pd-access";
 import type { Prisma } from "@prisma/client";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 export type ClientCardSummary = {
   id: string;
@@ -102,7 +103,7 @@ export async function getStudioClients(input: ClientsPageInput): Promise<StudioC
 
   const bookings = await prisma.booking.findMany({
     where: {
-      OR: [{ studioId: studio.id }, { providerId: studio.providerId }],
+      ...studioBookingsWhere(studio.id),
       status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
       // PERF-06: окно на входе группировки (см. crm/clients-window.ts) —
       // без него страница из 50 клиентов требовала всех броней арендатора.

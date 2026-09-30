@@ -2,7 +2,7 @@ import { getProvider } from "@/features/public-profile/master/server/provider-qu
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { BookingSectionClient } from "@/features/public-profile/master/sections/booking-section-client";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
@@ -25,7 +25,7 @@ export async function BookingSection({ providerId, initialSlotStartAt }: Props) 
     }
   } catch (error) {
     hasError = true;
-    logPublicBlockError("master-booking", error, [`/api/providers/${providerId}`]);
+    logPublicBlockError("master-booking", error, ["getProviderProfile"]);
   }
 
   if (hasError) {

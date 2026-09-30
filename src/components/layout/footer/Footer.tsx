@@ -1,13 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { BrandLogo } from "@/components/brand/brand-logo";
-import { FooterCTA } from "@/components/layout/footer/FooterCTA";
+import { FooterCTA, type FooterModelOfferMetrics } from "@/components/layout/footer/FooterCTA";
 import { FooterColumn, type FooterLinkItem } from "@/components/layout/footer/FooterColumn";
 import { FooterCopyright } from "@/components/layout/footer/FooterCopyright";
 import { FooterSocials } from "@/components/layout/footer/FooterSocials";
 import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
+import { formatModelOfferCount } from "@/lib/model-offers/offer-count";
 import { getPublicModelOfferStats } from "@/lib/model-offers/public-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const APP_ROOT = path.join(process.cwd(), "src", "app");
 
@@ -64,6 +65,13 @@ export async function Footer() {
   const { about, clients, masters, support } = buildFooterLinks();
   // FOOTER-HONEST-METRICS: живые числа карточки «Для моделей» (кэш 15 мин).
   const modelOfferStats = await getPublicModelOfferStats();
+  const modelOffers: FooterModelOfferMetrics =
+    modelOfferStats && modelOfferStats.activeCount > 0
+      ? {
+          activeLabel: formatModelOfferCount(modelOfferStats.activeCount),
+          averageDiscountPercent: modelOfferStats.averageDiscountPercent,
+        }
+      : null;
 
   return (
     <footer
@@ -74,7 +82,7 @@ export async function Footer() {
     >
       <div className="mx-auto max-w-[1280px] px-4 py-12 md:py-16">
         {/* CTA Banner */}
-        <FooterCTA modelOfferStats={modelOfferStats} />
+        <FooterCTA modelOffers={modelOffers} />
 
         {/* Main grid */}
         <div className="mt-12 grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,3fr)]">

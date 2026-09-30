@@ -1,5 +1,7 @@
 import { SubscriptionScope } from "@prisma/client";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { SetupGuideHint } from "@/features/cabinet/setup-guide/setup-guide-hint";
 import { ManualBookingProvider } from "@/features/master/components/manual-booking/manual-booking-provider";
 import { MasterSidebar } from "@/features/master/components/master-sidebar";
 import { MasterBottomNav } from "@/features/master/components/master-bottom-nav";
@@ -16,7 +18,7 @@ import { getUnreadBadgeCount } from "@/lib/notifications/badge";
 import { getUnansweredReviewsCountForMaster } from "@/lib/reviews/counts";
 import { countUnreadChatMessages } from "@/lib/chat/conversation-aggregator";
 import { prisma } from "@/lib/prisma";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { personalMasterProviderWhere, getMasterWorkProfiles } from "@/lib/master/access";
 
 /**
@@ -116,10 +118,15 @@ export async function MasterCabinetShell({
             единственный работающий зазор — этот. */}
         <main
           data-testid="page-main"
-          className="min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+          className="guide-space min-w-0 flex-1 pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
         >
           {children}
         </main>
+
+        {/* SETUP-GUIDE-01: подсказка шага «Первых шагов» (`?guide=`). */}
+        <Suspense fallback={null}>
+          <SetupGuideHint scope="master" />
+        </Suspense>
 
         <MasterBottomNav
           pendingBookingsCount={pendingBookings}

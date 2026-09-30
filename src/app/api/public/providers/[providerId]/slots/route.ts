@@ -93,7 +93,21 @@ export async function GET(
     });
     if (!provider) {
       const candidate = await resolveProviderBySlugOrId({ key: p.providerId, select: providerSelect });
-      if (candidate && (await isActiveMasterOfPublishedStudio(candidate.id))) provider = candidate;
+      if (candidate && (await isActiveMasterOfPublishedStudio(candidate.id))) {
+        provider = candidate;
+      } else if (candidate) {
+        // Перенос СУЩЕСТВУЮЩЕЙ записи: студия скрыта или мастер в ней на паузе —
+        // новых записей нет, а существующие переносятся как прежде
+        // (STUDIO-HIDDEN-MASTER-SERVICES, STUDIO-PAUSE-SPLIT-01). До разделения
+        // исполнителем был опубликованный личный профиль, и это работало само;
+        // у профиля в студии страницы нет. Пускаем только сторону переносимой
+        // записи — то же право, что проверяется ниже (сессия клиента или
+        // подписанная ссылка гостя; чужому — 401/404 без окошек).
+        const exclusionBookingId = url.searchParams.get("excludeBookingId");
+        if (exclusionBookingId && (await resolveRescheduleExclusion(req, candidate.id, exclusionBookingId))) {
+          provider = candidate;
+        }
+      }
     }
     if (!provider || provider.type !== "MASTER") {
       return fail("Мастер не найден.", 404, "MASTER_NOT_FOUND");

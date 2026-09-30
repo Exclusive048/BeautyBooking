@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { citySlugFromName, normalizeCityName } from "@/lib/cities/normalize";
+import { timezoneForRegions } from "@/lib/cities/region-timezone";
 import { geocodeWithLocality } from "@/lib/cities/yandex-locality";
 
 export type DetectCityResult =
@@ -90,7 +91,9 @@ export async function detectCityFromAddress(
     };
   }
 
-  // 3. AUTO-CREATE.
+  // 3. AUTO-CREATE. Пояс — по субъекту РФ из ответа геокодера; раньше любой
+  //    новый город получал Москву (Самара, Хабаровск…), и окошки съезжали.
+  const timezone = timezoneForRegions(geo.regions ?? []) ?? DEFAULT_TIMEZONE;
   try {
     city = await prisma.city.create({
       data: {
@@ -99,16 +102,19 @@ export async function detectCityFromAddress(
         nameGenitive: null,
         latitude: geo.geoLat,
         longitude: geo.geoLng,
-        timezone: DEFAULT_TIMEZONE,
+        timezone,
         isActive: true,
         sortOrder: 100,
         autoCreated: true,
       },
     });
+    // Адрес в лог не пишется: это персональные данные мастера, а для
+    // диагностики довольно города и выбранного пояса.
     logInfo("city.auto_created", {
       citySlug: slug,
       cityName: normalizedName,
-      triggerAddress: address,
+      timezone,
+      regions: geo.regions ?? [],
     });
     return {
       ok: true,

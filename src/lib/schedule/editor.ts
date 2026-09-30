@@ -1,18 +1,14 @@
 import "server-only"; // GUARDRAILS-01: documented server boundary (client-safe helpers live in editor-shared.ts)
-import { ScheduleMode, type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import {
-  AUTO_TEMPLATE_PREFIX,
-  buildDefaultWeekSchedule,
-  mapTemplateForDay,
   normalizeBufferMin,
   normalizeExceptionInput,
   normalizeFixedSlotTimes,
   normalizeSlotStepMin,
   normalizeWeekScheduleInput,
   parseDateKeyToUtcStart,
-  signatureHash,
   WEEK_TEMPLATE_OPTIONS,
   type BookingRulesDto,
   type BreakDto,
@@ -27,8 +23,8 @@ import {
   type VisibilityDto,
 } from "@/lib/schedule/editor-shared";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
+import { loadSchedulePlan, readWeekRepresentation, saveWeekAsPatternTx } from "@/lib/schedule/patterns";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
-import { SCHEDULE_OVERRIDE_PICK_ORDER } from "@/lib/schedule/override-order";
 
 /**
  * Server-only orchestration for schedule edits. The pure types/helpers
@@ -49,177 +45,48 @@ export * from "@/lib/schedule/editor-shared";
 const LATE_CANCEL_ACTIONS: readonly LateCancelAction[] = ["none", "reminder", "fine"];
 const SLOT_PRECISIONS: readonly SlotPrecision[] = ["exact", "today_free", "date_only"];
 
+/**
+ * SCHEDULE-PATTERNS-01 (этап 2): неделя вкладки «Часы» пишется ГРАФИКОМ
+ * (`patterns.ts`): с сегодняшнего дня действует новая неделя, прошлые дни
+ * остаются с прежней. Неизменённая неделя не пишется вовсе — снапшот шлёт её
+ * при сохранении любой вкладки. `WeeklyScheduleConfig` больше не пишется:
+ * у профиля с графиком это история до переноса.
+ */
 async function saveWeekSchedule(
   tx: Prisma.TransactionClient,
   providerId: string,
   weekSchedule: DayScheduleDto[]
 ): Promise<void> {
-  const config = await tx.weeklyScheduleConfig.upsert({
-    where: { providerId },
-    update: {},
-    create: { providerId },
-    select: { id: true },
-  });
-
-  const signatures = new Map<
-    string,
-    { name: string; startLocal: string; endLocal: string; breaks: BreakDto[] }
-  >();
-  const signatureOrder: string[] = [];
-  for (const day of weekSchedule) {
-    if (!day.isWorkday) continue;
-    const mapped = mapTemplateForDay(day);
-    // Title is part of the signature so two days with the same time but
-    // different break titles ("Обед" vs "Перерыв") get distinct templates
-    // — matches user intent of distinguishing recurring breaks by label.
-    const signatureBreaks = mapped.breaks.map((entry) => ({
-      start: entry.start,
-      end: entry.end,
-      title: entry.title ?? null,
-    }));
-    const signature = `${mapped.startLocal}|${mapped.endLocal}|${JSON.stringify(signatureBreaks)}`;
-    if (signatures.has(signature)) continue;
-    signatures.set(signature, {
-      name: `${AUTO_TEMPLATE_PREFIX}${signatureHash(signature)}`,
-      startLocal: mapped.startLocal,
-      endLocal: mapped.endLocal,
-      breaks: mapped.breaks,
-    });
-    signatureOrder.push(signature);
-  }
-
-  const templateIdBySignature = new Map<string, string>();
-  for (const signature of signatureOrder) {
-    const item = signatures.get(signature);
-    if (!item) continue;
-    const template = await tx.scheduleTemplate.upsert({
-      where: { providerId_name: { providerId, name: item.name } },
-      update: { startLocal: item.startLocal, endLocal: item.endLocal, color: null },
-      create: {
-        providerId,
-        name: item.name,
-        startLocal: item.startLocal,
-        endLocal: item.endLocal,
-        color: null,
-      },
-      select: { id: true },
-    });
-    templateIdBySignature.set(signature, template.id);
-    await tx.scheduleTemplateBreak.deleteMany({ where: { templateId: template.id } });
-    if (item.breaks.length > 0) {
-      await tx.scheduleTemplateBreak.createMany({
-        data: item.breaks.map((entry, index) => ({
-          templateId: template.id,
-          startLocal: entry.start,
-          endLocal: entry.end,
-          sortOrder: index,
-          title: entry.title ?? null,
-        })),
-      });
-    }
-  }
-
-  const rows: Array<{
-    configId: string;
-    weekday: number;
-    templateId: string | null;
-    isActive: boolean;
-    scheduleMode: ScheduleMode;
-    fixedSlotTimes: string[];
-  }> = weekSchedule.map((day) => {
-    if (!day.isWorkday) {
-      return {
-        configId: config.id,
-        weekday: day.dayOfWeek + 1,
-        templateId: null,
-        isActive: false,
-        scheduleMode: day.scheduleMode,
-        fixedSlotTimes: day.fixedSlotTimes,
-      };
-    }
-    const mapped = mapTemplateForDay(day);
-    const signatureBreaks = mapped.breaks.map((entry) => ({
-      start: entry.start,
-      end: entry.end,
-      title: entry.title ?? null,
-    }));
-    const signature = `${mapped.startLocal}|${mapped.endLocal}|${JSON.stringify(signatureBreaks)}`;
-    const templateId = templateIdBySignature.get(signature) ?? null;
-    return {
-      configId: config.id,
-      weekday: day.dayOfWeek + 1,
-      templateId,
-      isActive: Boolean(templateId),
-      scheduleMode: day.scheduleMode,
-      fixedSlotTimes: day.fixedSlotTimes,
-    };
-  });
-
-  await tx.weeklyScheduleDay.deleteMany({ where: { configId: config.id } });
-  if (rows.length > 0) {
-    await tx.weeklyScheduleDay.createMany({ data: rows });
-  }
-  await tx.weeklyScheduleConfig.update({ where: { id: config.id }, data: {} });
-
-  const usedAutoTemplateIds = new Set(Array.from(templateIdBySignature.values()));
-  await tx.scheduleTemplate.deleteMany({
-    where: {
-      providerId,
-      name: { startsWith: AUTO_TEMPLATE_PREFIX },
-      id: { notIn: Array.from(usedAutoTemplateIds) },
-    },
-  });
+  await saveWeekAsPatternTx(tx, providerId, weekSchedule);
 }
 
-async function saveException(
+/** «Особый день»: свои часы (или выходной) на дату. Экспорт — для календаря (этап 3). */
+export async function saveScheduleExceptionTx(
   tx: Prisma.TransactionClient,
   providerId: string,
   input: EditorExceptionInput,
 ): Promise<void> {
   const date = parseDateKeyToUtcStart(input.date);
-  const existing = await tx.scheduleOverride.findFirst({
-    where: { providerId, date },
-    // LOGIC-11: писатель обязан править ТУ ЖЕ строку, которую читают
-    // потребители, иначе правка уходит в невидимый дубль.
-    orderBy: SCHEDULE_OVERRIDE_PICK_ORDER,
-    select: { id: true },
+  const fields = {
+    kind: input.isWorkday ? ("TIME_RANGE" as const) : ("OFF" as const),
+    isDayOff: !input.isWorkday,
+    isWorkday: input.isWorkday,
+    startLocal: input.isWorkday ? input.startTime : null,
+    endLocal: input.isWorkday ? input.endTime : null,
+    templateId: null,
+    isActive: null,
+    scheduleMode: input.scheduleMode,
+    fixedSlotTimes: input.scheduleMode === "FIXED" ? input.fixedSlotTimes : [],
+    note: input.note,
+  };
+
+  // SCHEDULE-PATTERNS-01: строка на дату одна (`@@unique([providerId, date])`),
+  // поэтому правка — upsert по этому ключу, а не «найти, потом создать».
+  await tx.scheduleOverride.upsert({
+    where: { providerId_date: { providerId, date } },
+    update: fields,
+    create: { providerId, date, ...fields },
   });
-
-  const kind = input.isWorkday ? "TIME_RANGE" : "OFF";
-  const isDayOff = !input.isWorkday;
-
-  if (existing) {
-    await tx.scheduleOverride.update({
-      where: { id: existing.id },
-      data: {
-        kind,
-        isDayOff,
-        isWorkday: input.isWorkday,
-        startLocal: input.isWorkday ? input.startTime : null,
-        endLocal: input.isWorkday ? input.endTime : null,
-        templateId: null,
-        isActive: null,
-        scheduleMode: input.scheduleMode,
-        fixedSlotTimes: input.scheduleMode === "FIXED" ? input.fixedSlotTimes : [],
-        note: input.note,
-      },
-    });
-  } else {
-    await tx.scheduleOverride.create({
-      data: {
-        providerId,
-        date,
-        kind,
-        isDayOff,
-        isWorkday: input.isWorkday,
-        startLocal: input.isWorkday ? input.startTime : null,
-        endLocal: input.isWorkday ? input.endTime : null,
-        scheduleMode: input.scheduleMode,
-        fixedSlotTimes: input.scheduleMode === "FIXED" ? input.fixedSlotTimes : [],
-        note: input.note,
-      },
-    });
-  }
 
   await tx.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date } });
   if (input.isWorkday && input.scheduleMode === "FLEXIBLE" && input.breaks.length > 0) {
@@ -235,7 +102,8 @@ async function saveException(
   }
 }
 
-async function removeExceptionByDate(
+/** Снять правку даты: день снова идёт по графику. */
+export async function removeScheduleExceptionTx(
   tx: Prisma.TransactionClient,
   providerId: string,
   dateKey: string,
@@ -243,6 +111,99 @@ async function removeExceptionByDate(
   const date = parseDateKeyToUtcStart(dateKey);
   await tx.scheduleBreak.deleteMany({ where: { providerId, kind: "OVERRIDE", date } });
   await tx.scheduleOverride.deleteMany({ where: { providerId, date } });
+}
+
+/**
+ * «Особые дни» так, как их видит редактор. Одна функция на чтение снапшота и
+ * на сравнение при записи (`applyScheduleSnapshotTx`): запись сравнивает
+ * присланное именно с этим видом, поэтому неизменённый день не переписывается.
+ *
+ * День, покрашенный в календаре рабочим днём палитры (`TEMPLATE`, этап 3),
+ * показывается часами, перерывами и режимом шаблона — режим записи с этапа 2
+ * живёт на шаблоне, а не на строке исключения.
+ */
+export async function readScheduleExceptionsTx(
+  db: Prisma.TransactionClient,
+  providerId: string,
+  timezone: string,
+): Promise<ScheduleExceptionDto[]> {
+  const [overrides, overrideBreaks] = await Promise.all([
+    db.scheduleOverride.findMany({
+      where: { providerId },
+      orderBy: { date: "asc" },
+      select: {
+        id: true,
+        date: true,
+        kind: true,
+        isDayOff: true,
+        isWorkday: true,
+        startLocal: true,
+        endLocal: true,
+        scheduleMode: true,
+        fixedSlotTimes: true,
+        note: true,
+        template: {
+          select: {
+            startLocal: true,
+            endLocal: true,
+            scheduleMode: true,
+            fixedSlotTimes: true,
+            breaks: {
+              select: { startLocal: true, endLocal: true, sortOrder: true, title: true },
+            },
+          },
+        },
+      },
+    }),
+    db.scheduleBreak.findMany({
+      where: { providerId, kind: "OVERRIDE", date: { not: null } },
+      select: { date: true, startLocal: true, endLocal: true },
+      orderBy: [{ date: "asc" }, { startLocal: "asc" }],
+    }),
+  ]);
+
+  const overrideBreaksByDate = new Map<string, BreakDto[]>();
+  for (const row of overrideBreaks) {
+    if (!row.date) continue;
+    const key = toLocalDateKey(row.date, timezone);
+    const list = overrideBreaksByDate.get(key) ?? [];
+    list.push({ start: row.startLocal, end: row.endLocal, title: null });
+    overrideBreaksByDate.set(key, list);
+  }
+
+  return overrides.map((row) => {
+    const dateKey = toLocalDateKey(row.date, timezone);
+    const isWorkday = row.isWorkday ?? !row.isDayOff;
+    const template = row.kind === "TEMPLATE" ? row.template : null;
+    const fixedSlotTimes = normalizeFixedSlotTimes(
+      template && template.scheduleMode === "FIXED" ? template.fixedSlotTimes : row.fixedSlotTimes,
+    );
+    const scheduleMode = template
+      ? template.scheduleMode
+      : row.scheduleMode ?? (fixedSlotTimes.length > 0 ? "FIXED" : "FLEXIBLE");
+    const templateBreaks =
+      row.template?.breaks
+        .slice()
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((item) => ({
+          start: item.startLocal,
+          end: item.endLocal,
+          title: item.title ?? null,
+        })) ?? [];
+    const breaks = row.kind === "TEMPLATE" ? templateBreaks : overrideBreaksByDate.get(dateKey) ?? [];
+
+    return {
+      id: row.id,
+      note: row.note ?? null,
+      date: dateKey,
+      isWorkday,
+      scheduleMode,
+      startTime: row.kind === "TEMPLATE" ? row.template?.startLocal ?? null : row.startLocal,
+      endTime: row.kind === "TEMPLATE" ? row.template?.endLocal ?? null : row.endLocal,
+      breaks: isWorkday && scheduleMode === "FLEXIBLE" ? breaks : [],
+      fixedSlotTimes,
+    };
+  });
 }
 
 export async function buildScheduleSnapshot(providerId: string): Promise<ScheduleEditorSnapshot> {
@@ -279,124 +240,13 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
     },
   });
 
-  const [config, overrides, overrideBreaks] = await Promise.all([
-    prisma.weeklyScheduleConfig.findUnique({
-      where: { providerId },
-      select: {
-        days: {
-          orderBy: { weekday: "asc" },
-          select: {
-            weekday: true,
-            isActive: true,
-            scheduleMode: true,
-            fixedSlotTimes: true,
-            template: {
-              select: {
-                startLocal: true,
-                endLocal: true,
-                breaks: {
-                  select: { startLocal: true, endLocal: true, sortOrder: true, title: true },
-                },
-              },
-            },
-          },
-        },
-      },
-    }),
-    prisma.scheduleOverride.findMany({
-      where: { providerId },
-      orderBy: { date: "asc" },
-      select: {
-        id: true,
-        date: true,
-        kind: true,
-        isDayOff: true,
-        isWorkday: true,
-        startLocal: true,
-        endLocal: true,
-        scheduleMode: true,
-        fixedSlotTimes: true,
-        note: true,
-        template: {
-          select: {
-            startLocal: true,
-            endLocal: true,
-            breaks: {
-              select: { startLocal: true, endLocal: true, sortOrder: true, title: true },
-            },
-          },
-        },
-      },
-    }),
-    prisma.scheduleBreak.findMany({
-      where: { providerId, kind: "OVERRIDE", date: { not: null } },
-      select: { date: true, startLocal: true, endLocal: true },
-      orderBy: [{ date: "asc" }, { startLocal: "asc" }],
-    }),
+  const todayKey = toLocalDateKey(new Date(), provider.timezone);
+  const [{ week: weekSchedule }, schedulePlan, exceptions] = await Promise.all([
+    // SCHEDULE-PATTERNS-01: неделя «Часов» — из графика, действующего сегодня.
+    readWeekRepresentation(prisma, providerId, todayKey),
+    loadSchedulePlan(providerId),
+    readScheduleExceptionsTx(prisma, providerId, provider.timezone),
   ]);
-
-  const weekSchedule = buildDefaultWeekSchedule();
-  for (const day of config?.days ?? []) {
-    const index = day.weekday - 1;
-    if (index < 0 || index > 6) continue;
-    const templateBreaks =
-      day.template?.breaks
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map((item) => ({
-          start: item.startLocal,
-          end: item.endLocal,
-          title: item.title ?? null,
-        })) ?? [];
-    weekSchedule[index] = {
-      dayOfWeek: index,
-      isWorkday: Boolean(day.isActive && day.template),
-      scheduleMode: day.scheduleMode,
-      startTime: day.template?.startLocal ?? weekSchedule[index].startTime,
-      endTime: day.template?.endLocal ?? weekSchedule[index].endTime,
-      breaks: templateBreaks,
-      fixedSlotTimes: normalizeFixedSlotTimes(day.fixedSlotTimes),
-    };
-  }
-
-  const overrideBreaksByDate = new Map<string, BreakDto[]>();
-  for (const row of overrideBreaks) {
-    if (!row.date) continue;
-    const key = toLocalDateKey(row.date, provider.timezone);
-    const list = overrideBreaksByDate.get(key) ?? [];
-    list.push({ start: row.startLocal, end: row.endLocal, title: null });
-    overrideBreaksByDate.set(key, list);
-  }
-
-  const exceptions: ScheduleExceptionDto[] = overrides.map((row) => {
-    const dateKey = toLocalDateKey(row.date, provider.timezone);
-    const isWorkday = row.isWorkday ?? !row.isDayOff;
-    const scheduleMode =
-      row.scheduleMode ??
-      (normalizeFixedSlotTimes(row.fixedSlotTimes).length > 0 ? "FIXED" : "FLEXIBLE");
-    const templateBreaks =
-      row.template?.breaks
-        .slice()
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map((item) => ({
-          start: item.startLocal,
-          end: item.endLocal,
-          title: item.title ?? null,
-        })) ?? [];
-    const breaks = row.kind === "TEMPLATE" ? templateBreaks : overrideBreaksByDate.get(dateKey) ?? [];
-
-    return {
-      id: row.id,
-      note: row.note ?? null,
-      date: dateKey,
-      isWorkday,
-      scheduleMode,
-      startTime: row.kind === "TEMPLATE" ? row.template?.startLocal ?? null : row.startLocal,
-      endTime: row.kind === "TEMPLATE" ? row.template?.endLocal ?? null : row.endLocal,
-      breaks: isWorkday && scheduleMode === "FLEXIBLE" ? breaks : [],
-      fixedSlotTimes: normalizeFixedSlotTimes(row.fixedSlotTimes),
-    };
-  });
 
   const lateCancelAction: LateCancelAction = LATE_CANCEL_ACTIONS.includes(
     provider.lateCancelAction as LateCancelAction
@@ -439,6 +289,7 @@ export async function buildScheduleSnapshot(providerId: string): Promise<Schedul
     slotStepMin: normalizeSlotStepMin(provider.slotStepMin),
     bufferBetweenBookingsMin: normalizeBufferMin(provider.bufferBetweenBookingsMin),
     weekSchedule,
+    schedulePlan,
     exceptions,
     templates: WEEK_TEMPLATE_OPTIONS,
     bookingRules,
@@ -542,7 +393,11 @@ async function applyProviderAndDiscountRule(
 
 export type ScheduleSnapshotInput = {
   weekSchedule: DayScheduleDto[];
-  exceptions: Array<Omit<ScheduleExceptionDto, "id">>;
+  /**
+   * Полный список «Особых дней». Не передан — правки дат не трогаются
+   * (календарь пишет их сам, `calendar.ts`).
+   */
+  exceptions?: Array<Omit<ScheduleExceptionDto, "id">>;
   slotStepMin?: number;
   bufferBetweenBookingsMin?: number;
   bookingRules?: BookingRulesDto;
@@ -559,10 +414,21 @@ export type ScheduleSnapshotInput = {
  */
 export const SCHEDULE_SNAPSHOT_TX_OPTIONS = { timeout: 20_000, maxWait: 10_000 } as const;
 
+function exceptionSignature(input: Omit<ScheduleExceptionDto, "id">): string {
+  return JSON.stringify(normalizeExceptionInput(input));
+}
+
 /**
  * Применение снапшота внутри ЧУЖОЙ транзакции. Инвалидацию кэша НЕ делает —
  * её обязан сделать вызывающий после коммита (до коммита сбрасывать нечего, а
  * откат оставил бы кэш вычищенным под старые данные).
+ *
+ * SCHEDULE-PATTERNS-01 (этап 3): «Особые дни» пишутся РАЗНИЦЕЙ. Раньше каждое
+ * сохранение любой вкладки переписывало все исключения заново — а день,
+ * покрашенный в календаре рабочим днём палитры (`TEMPLATE`), при такой
+ * перезаписи терял связь с шаблоном и становился копией его часов (режим
+ * «Фиксированное время» при этом терялся вовсе). Теперь пишется только дата,
+ * чей вид изменился, и удаляется только дата, которой в списке больше нет.
  */
 export async function applyScheduleSnapshotTx(
   tx: Prisma.TransactionClient,
@@ -570,29 +436,29 @@ export async function applyScheduleSnapshotTx(
   input: ScheduleSnapshotInput
 ): Promise<void> {
   const weekSchedule = normalizeWeekScheduleInput(input.weekSchedule as unknown);
-  const normalizedExceptions = input.exceptions
-    .map((item) => normalizeExceptionInput(item))
-    .sort((left, right) => left.date.localeCompare(right.date));
 
   await applyProviderAndDiscountRule(tx, providerId, input);
 
   await saveWeekSchedule(tx, providerId, weekSchedule);
 
-  const existing = await tx.scheduleOverride.findMany({
-    where: { providerId },
-    select: { date: true },
-  });
-  const existingDateKeys = new Set(existing.map((item) => item.date.toISOString().slice(0, 10)));
-  const nextDateKeys = new Set<string>();
+  if (!input.exceptions) return;
 
-  for (const item of normalizedExceptions) {
-    await saveException(tx, providerId, item);
+  const provider = await tx.provider.findUnique({ where: { id: providerId }, select: { timezone: true } });
+  if (!provider) throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
+  const current = await readScheduleExceptionsTx(tx, providerId, provider.timezone);
+  const currentByDate = new Map(current.map((item) => [item.date, exceptionSignature(item)]));
+
+  const nextDateKeys = new Set<string>();
+  for (const raw of input.exceptions) {
+    const item = normalizeExceptionInput(raw);
     nextDateKeys.add(item.date);
+    if (currentByDate.get(item.date) === JSON.stringify(item)) continue;
+    await saveScheduleExceptionTx(tx, providerId, item);
   }
 
-  for (const key of existingDateKeys) {
-    if (!nextDateKeys.has(key)) {
-      await removeExceptionByDate(tx, providerId, key);
+  for (const dateKey of currentByDate.keys()) {
+    if (!nextDateKeys.has(dateKey)) {
+      await removeScheduleExceptionTx(tx, providerId, dateKey);
     }
   }
 }

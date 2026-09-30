@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.profile.sidebar;
 
@@ -23,7 +23,7 @@ export function CompletionCard({ percent }: Props) {
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-input">
         <div
-          className="h-full rounded-full bg-primary transition-[width] duration-300"
+          className="h-full rounded-full bg-primary transition-[width] duration-200"
           style={{ width: `${safe}%` }}
         />
       </div>

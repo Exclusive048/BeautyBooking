@@ -1,6 +1,6 @@
 import { Crown } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type PlanTier = "FREE" | "PRO" | "PREMIUM";
 

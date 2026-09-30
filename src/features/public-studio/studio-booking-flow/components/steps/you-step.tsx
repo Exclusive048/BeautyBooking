@@ -5,10 +5,11 @@ import { ArrowLeft, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
 import type { BookingUser } from "@/features/booking/lib/studio-booking";
+import { Switch } from "@/components/ui/switch";
 
 type Props = {
   me: BookingUser | null;
@@ -139,24 +140,7 @@ export function YouStep({
       ) : null}
 
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border-subtle bg-bg-card p-4">
-        <span
-          className={`relative mt-0.5 inline-flex h-6 w-11 flex-shrink-0 rounded-full border transition ${
-            silentMode ? "border-primary/70 bg-primary/25" : "border-border-subtle bg-muted/20"
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={silentMode}
-            onChange={(event) => onSilentChange(event.target.checked)}
-            className="sr-only"
-          />
-          <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${
-              silentMode ? "left-6" : "left-0.5"
-            }`}
-            aria-hidden
-          />
-        </span>
+        <Switch checked={silentMode} onCheckedChange={onSilentChange} className="mt-0.5 shrink-0" />
         <span className="min-w-0">
           <span className="block text-sm font-medium text-text">{UI_TEXT.bookingWidget.youStep.silentLabel}</span>
           <span className="mt-1 block text-xs text-text-muted">{UI_TEXT.bookingWidget.youStep.silentHint}</span>

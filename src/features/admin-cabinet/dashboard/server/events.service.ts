@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   formatRublesFromKopeks,
   maskLastName,

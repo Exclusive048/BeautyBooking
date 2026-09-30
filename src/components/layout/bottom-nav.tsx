@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useId, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import {
   ArrowDownUp,
   Building2,
@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
 import { useActiveRole, type ActiveRole } from "@/lib/hooks/use-active-role";
-import { UI_TEXT } from "@/lib/ui/text";
+import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { BECOME_MASTER_HREF, shouldOfferBecomeMaster } from "@/lib/auth/available-cabinets";
 import { Button } from "@/components/ui/button";
@@ -114,7 +115,6 @@ function RoleSwitcherDrawer({
 }) {
   const { activeRole, setRole, availableRoles, hasMaster, hasStudio } = useActiveRole();
   const router = useRouter();
-  const reduce = useReducedMotion();
   const sheetRef = useRef<HTMLDivElement>(null);
   const sheetTitleId = useId();
 
@@ -136,28 +136,28 @@ function RoleSwitcherDrawer({
     <AnimatePresence>
       {open ? (
         <>
-          <motion.div
+          <m.div
             key="overlay"
-            initial={reduce ? false : { opacity: 0 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.18 }}
-            className="fixed inset-0 z-[49] bg-black/40 backdrop-blur-[2px] lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={MOTION.micro}
+            className="fixed inset-0 z-scrim bg-black/40 backdrop-blur-[2px] lg:hidden"
             onClick={onClose}
             aria-hidden="true"
           />
-          <motion.div
+          <m.div
             key="drawer"
-            initial={reduce ? false : { y: "100%" }}
-            animate={reduce ? { y: 0 } : { y: 0 }}
-            exit={reduce ? { y: "100%" } : { y: "100%" }}
-            transition={reduce ? { duration: 0 } : { type: "spring", damping: 30, stiffness: 340 }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={SPRING_SHEET}
             ref={sheetRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={sheetTitleId}
             tabIndex={-1}
-            className="fixed inset-x-0 bottom-0 z-50 rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-modal rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {/* Handle */}
@@ -249,10 +249,10 @@ function RoleSwitcherDrawer({
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
               >
                 <LogOut className="h-4 w-4 shrink-0" />
-                {UI_TEXT.auth.logout}
+                {UI_TEXT.nav.logout}
               </a>
             </div>
-          </motion.div>
+          </m.div>
         </>
       ) : null}
     </AnimatePresence>

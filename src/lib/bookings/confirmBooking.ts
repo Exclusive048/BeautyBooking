@@ -1,11 +1,11 @@
 import { Prisma, type BookingStatus } from "@prisma/client";
+import { assertNotInPast } from "@/lib/bookings/policy-enforcement";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import type { BookingStatusUpdateDto } from "@/lib/bookings/dto";
 import { resolveBookingRuntimeStatus, type BookingActor } from "@/lib/bookings/flow";
 import { invalidateSlotsForBookingMove } from "@/lib/bookings/slot-invalidation";
-import { assertNoTimeBlockConflict } from "@/lib/schedule/time-blocks";
-import { buildConflictScopeWhere, resolveConflictOccupancyIds } from "@/lib/bookings/booking-core";
+import { ensureNoConflicts } from "@/lib/bookings/booking-core";
 import { applyBookingTransition } from "@/lib/bookings/transition";
 import { bookingTransaction } from "@/lib/bookings/booking-transaction";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
@@ -14,14 +14,6 @@ import {
   emitBookingRescheduledSystemMessage,
 } from "@/lib/chat/system-messages";
 import { logError } from "@/lib/logging/logger";
-
-function shiftMinutes(date: Date, minutes: number): Date {
-  return new Date(date.getTime() + minutes * 60 * 1000);
-}
-
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-  return aStart < bEnd && aEnd > bStart;
-}
 
 function isValidDate(value: Date | null | undefined): value is Date {
   return value instanceof Date && !Number.isNaN(value.getTime());
@@ -119,11 +111,11 @@ export async function confirmBooking(
     // в понедельник предложил вторник, клиент нажал «Подтвердить» в среду),
     // переносило запись в прошлое: будущий визит исчезал, а бронь тут же
     // показывалась завершённой.
-    if (isValidDate(startAtUtc) && startAtUtc.getTime() <= Date.now()) {
-      throw new AppError(
+    if (isValidDate(startAtUtc)) {
+      assertNotInPast(
+        startAtUtc,
+        new Date(),
         "Предложенное время уже прошло. Предложите новое время или оставьте прежнее.",
-        409,
-        "CONFLICT",
       );
     }
   } else {
@@ -135,17 +127,6 @@ export async function confirmBooking(
   }
 
   const bufferMin = await resolveBufferMinutes(booking.providerId, booking.masterProviderId);
-  // LOGIC-01: скоуп конфликта — из общего билдера («время мастера — это время
-  // мастера»), а не собственная пара `(providerId, masterProviderId)`. Пара
-  // не видела брони того же мастера, созданные под другим `providerId`.
-  const conflictWhere = buildConflictScopeWhere({
-    providerId: booking.providerId,
-    masterProviderId: booking.masterProviderId,
-    occupancyIds: await resolveConflictOccupancyIds(prisma, booking),
-  });
-
-  const bufferedStart = bufferMin ? shiftMinutes(startAtUtc, -bufferMin) : startAtUtc;
-  const bufferedEnd = bufferMin ? shiftMinutes(endAtUtc, bufferMin) : endAtUtc;
 
   // FIX-R2-01-B: the conflict re-check now runs INSIDE the move transaction
   // under Serializable isolation, mirroring `createBooking` /
@@ -157,45 +138,27 @@ export async function confirmBooking(
   // conflict-detection READ and the WRITE must share one Serializable
   // snapshot. The exclude-self filter (`id: { not: booking.id }`) is
   // preserved — a reschedule still holds its OLD slot at approval time, so
-  // the moved booking must not conflict with its own row. `ensureNoConflicts`
-  // is intentionally NOT adopted here: it has no exclude-self, so a shift
-  // overlapping the booking's own current slot would falsely conflict.
+  // the moved booking must not conflict with its own row — `excludeBookingId`
+  // of the shared `ensureNoConflicts` (29.09 доработки · 14: the copy that
+  // lived here read the occupancy set with `prisma` OUTSIDE the transaction;
+  // the shared check reads it with `tx`, as part of the Serializable snapshot).
   let updated: { id: string; status: BookingStatus };
   try {
     updated = await bookingTransaction(
       async (tx) => {
-        const conflicts = await tx.booking.findMany({
-          where: {
-            ...conflictWhere,
-            id: { not: booking.id },
-            status: { notIn: ["REJECTED", "CANCELLED", "NO_SHOW"] },
-            startAtUtc: { not: null, lt: bufferedEnd },
-            endAtUtc: { not: null, gt: bufferedStart },
-          },
-          select: { id: true, startAtUtc: true, endAtUtc: true },
-          take: 1,
-        });
-
-        const conflict = conflicts.find((b) => {
-          if (!b.startAtUtc || !b.endAtUtc) return false;
-          const itemStart = bufferMin ? shiftMinutes(b.startAtUtc, -bufferMin) : b.startAtUtc;
-          const itemEnd = bufferMin ? shiftMinutes(b.endAtUtc, bufferMin) : b.endAtUtc;
-          return overlaps(startAtUtc, endAtUtc, itemStart, itemEnd);
-        });
-        if (conflict) {
-          throw new AppError("Это время уже занято. Выберите другое.", 409, "SLOT_CONFLICT");
-        }
-
-        // FIX-TIMEBLOCK-ENFORCEMENT-01: confirming a reschedule applies the
-        // proposed time — it must not land the booking inside a TimeBlock. Owner
-        // is the performing master (`masterProviderId`, or `providerId` for solo).
-        // Only the moving side pays this: for a plain PENDING→CONFIRMED the time
-        // is unchanged, but re-checking is harmless (a block created under an
-        // existing booking is surfaced here rather than silently confirmed).
-        await assertNoTimeBlockConflict(tx, {
-          masterProviderId: booking.masterProviderId ?? booking.providerId,
+        // LOGIC-01: скоуп — общий билдер («время мастера — это время мастера»).
+        // FIX-TIMEBLOCK-ENFORCEMENT-01: подтверждение применяет предложенное
+        // время — оно не должно лечь в закрытое окно; проверку делает та же
+        // функция (для простого PENDING→CONFIRMED время не меняется, повтор
+        // безвреден: блок, созданный поверх записи, всплывёт здесь).
+        await ensureNoConflicts(tx, {
+          providerId: booking.providerId,
+          masterProviderId: booking.masterProviderId,
           startAtUtc,
           endAtUtc,
+          bufferMin,
+          excludeBookingId: booking.id,
+          message: "Это время уже занято. Выберите другое.",
         });
 
         // LOGIC-02: переход только из ТОГО статуса, который был прочитан и

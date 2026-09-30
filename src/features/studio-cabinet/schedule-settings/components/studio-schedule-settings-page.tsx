@@ -1,5 +1,5 @@
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { StudioScheduleSettingsBody } from "./studio-schedule-settings-body";
 
 const T = UI_TEXT.studioCabinet.scheduleSettings;

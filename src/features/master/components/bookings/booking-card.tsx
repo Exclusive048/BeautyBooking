@@ -8,7 +8,7 @@ import { WorkContextBadge } from "@/features/master/components/work-context-badg
 import { canMarkNoShow } from "@/lib/bookings/flow";
 import type { ColumnId, KanbanBookingItem } from "@/lib/master/bookings.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.card;
 
@@ -65,18 +65,18 @@ export function BookingCard({ booking, column, showWorkContext = false }: Props)
           )}
         </div>
         {column === "pending" && booking.isNewClient ? (
-          <Badge variant="warning" className="shrink-0 text-[10px]">
+          <Badge variant="warning" className="shrink-0">
             {T.newBadge}
           </Badge>
         ) : null}
         {column === "today" ? (
-          <Badge variant="success" className="shrink-0 text-[10px]">
+          <Badge variant="success" className="shrink-0">
             {T.inProgressBadge}
           </Badge>
         ) : null}
         {column === "cancelled" && booking.rawStatus === "NO_SHOW" ? (
           // NO-SHOW-UI: неявка — не отмена; без бейджа карточка выглядела отменой.
-          <Badge variant="muted" className="shrink-0 text-[10px]">
+          <Badge variant="muted" className="shrink-0">
             {T.noShowBadge}
           </Badge>
         ) : null}

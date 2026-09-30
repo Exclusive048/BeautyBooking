@@ -23,7 +23,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { hasStudioAdminAccess } from "@/lib/auth/studio-guards";
 import { getSiteLogoAsset } from "@/lib/media/queries";
 import { prisma } from "@/lib/prisma";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { TopbarAuthButton } from "@/components/layout/topbar-auth-button";
 import { BecomeMasterShortcut } from "@/components/layout/become-master-shortcut";

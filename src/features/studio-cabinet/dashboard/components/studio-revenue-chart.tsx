@@ -2,14 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { BarChart3 } from "lucide-react";
-import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import {
   STUDIO_DASHBOARD_PERIODS,
   type StudioDashboardPeriodId,
 } from "../lib/period-options";
 import type { StudioRevenueChartData } from "../server/types";
+import { Tabs } from "@/components/ui/tabs";
 
 const T = UI_TEXT.studioCabinet.dashboardV2.revenueChart;
 
@@ -37,13 +38,11 @@ export function StudioRevenueChart({
     }
     setError(null);
     startTransition(() => {
-      void fetch(`/api/studio/dashboard/revenue?period=${next}`)
-        .then((response) => {
-          if (!response.ok) throw new Error("HTTP error");
-          return response.json();
-        })
-        .then((body: { data: StudioRevenueChartData }) => {
-          setData(body.data);
+      // Чтение графика: отказ — своя строка поверхности (действия, кроме
+      // повтора, нет).
+      void fetchJsonWithAuth<StudioRevenueChartData>(`/api/studio/dashboard/revenue?period=${next}`)
+        .then((data) => {
+          setData(data);
         })
         .catch(() => {
           setError(T.error);
@@ -70,29 +69,20 @@ export function StudioRevenueChart({
             <span className="text-xs text-text-sec">{T.totalLabel}</span>
           </div>
         </div>
-        <div className="inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-bg-page p-1">
-          {STUDIO_DASHBOARD_PERIODS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => handlePeriodChange(option.id)}
-              disabled={isPending && option.id !== period}
-              className={cn(
-                "h-8 rounded-lg px-3 text-sm font-medium transition-colors",
-                option.id === period
-                  ? "bg-bg-card text-text-main shadow-card"
-                  : "bg-transparent text-text-sec hover:text-text-main",
-              )}
-              aria-pressed={option.id === period}
-            >
-              {T.periodSelector[option.id]}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          ariaLabel={T.periodAria}
+          items={STUDIO_DASHBOARD_PERIODS.map((option) => ({
+            id: option.id,
+            label: T.periodSelector[option.id],
+            disabled: isPending && option.id !== period,
+          }))}
+          value={period}
+          onChange={(id) => handlePeriodChange(id as StudioDashboardPeriodId)}
+        />
       </header>
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+        <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
           {error}
         </div>
       ) : data.points.length === 0 ? (
@@ -116,7 +106,7 @@ export function StudioRevenueChart({
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-bg-input">
                   <div
-                    className="h-full rounded-full bg-brand-gradient transition-all duration-300"
+                    className="h-full rounded-full bg-brand-gradient transition-all duration-200"
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>

@@ -1,4 +1,6 @@
 import { NotificationType } from "@prisma/client";
+import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
+import { listStudioMasterProfiles } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
 import * as cache from "@/lib/cache/cache";
 import {
@@ -8,7 +10,8 @@ import {
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { getAppPublicUrl } from "@/lib/telegram/config";
 import { logError, logInfo } from "@/lib/logging/logger";
-import { UI_TEXT } from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const DEDUP_KEY_PREFIX = "weekly-stats:sent";
 const DEDUP_TTL_SECONDS = 7 * 24 * 60 * 60; // 8 days
@@ -53,14 +56,19 @@ function buildMotivation(
   return UI_TEXT.notifications.weeklyStats.motivationDecline;
 }
 
+/**
+ * Записи и выручка за неделю по ВСЕМ рабочим профилям мастера (личный + профили
+ * в студиях) — то же правило, что у главной кабинета (`masterPerformedBookingWhere`).
+ * Выручка — в копейках.
+ */
 async function getWeekStats(
-  providerId: string,
+  providerIds: string[],
   start: Date,
   end: Date
-): Promise<{ bookings: number; revenue: number }> {
+): Promise<{ bookings: number; revenueKopeks: number }> {
   const rows = await prisma.booking.findMany({
     where: {
-      providerId,
+      ...masterPerformedBookingWhere(providerIds),
       status: "FINISHED",
       startAtUtc: { gte: start, lt: end },
     },
@@ -70,7 +78,7 @@ async function getWeekStats(
   });
 
   const bookings = rows.length;
-  const revenue = rows.reduce(
+  const revenueKopeks = rows.reduce(
     (sum, b) =>
       sum +
       b.serviceItems.reduce(
@@ -80,7 +88,7 @@ async function getWeekStats(
     0
   );
 
-  return { bookings, revenue };
+  return { bookings, revenueKopeks };
 }
 
 async function processOneMaster(input: {
@@ -98,7 +106,9 @@ async function processOneMaster(input: {
   if (!isFirst) return;
 
   const { weekStart: ws, weekEnd: we } = getWeekBounds(weekStart);
-  const { bookings, revenue } = await getWeekStats(providerId, ws, we);
+  const studioProfiles = await listStudioMasterProfiles(ownerUserId);
+  const profileIds = [providerId, ...studioProfiles.map((profile) => profile.id)];
+  const { bookings, revenueKopeks } = await getWeekStats(profileIds, ws, we);
 
   if (bookings === 0) {
     await cache.del(dedupKey);
@@ -106,10 +116,10 @@ async function processOneMaster(input: {
   }
 
   const { prevStart, prevEnd } = getPreviousWeekBounds(ws);
-  const prev = await getWeekStats(providerId, prevStart, prevEnd);
+  const prev = await getWeekStats(profileIds, prevStart, prevEnd);
 
   const title = UI_TEXT.notifications.weeklyStats.title;
-  const body = UI_TEXT.notifications.weeklyStats.body(bookings, revenue);
+  const body = UI_TEXT.notifications.weeklyStats.body(bookings, UI_FMT.priceLabel(revenueKopeks));
   const motivation = buildMotivation(bookings, prev.bookings > 0 ? prev.bookings : null);
   const fullBody = `${body}. ${motivation}`;
 
@@ -126,7 +136,7 @@ async function processOneMaster(input: {
       providerId,
       weekStart: ws.toISOString(),
       bookings,
-      revenue,
+      revenueKopeks,
     },
     bookingId: null,
     pushUrl,
@@ -154,8 +164,13 @@ export async function runWeeklyStatsJob(now = new Date()): Promise<void> {
   try {
     while (true) {
       const providers = await prisma.provider.findMany({
+        // Один раз на человека — по ЛИЧНОМУ профилю (у него `MasterProfile`);
+        // записи профилей в студиях считаются внутри. Профиль в студии всегда
+        // `isPublished = false`, и раньше мастер, работающий только через
+        // студию, сводки не получал вовсе.
         where: {
           type: "MASTER",
+          masterProfile: { isNot: null },
           isPublished: true,
           ownerUserId: { not: null },
         },

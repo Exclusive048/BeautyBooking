@@ -2,9 +2,9 @@
 
 import { useErrorBoundaryReport } from "@/hooks/use-error-boundary-report";
 import { ErrorState } from "@/components/ui/error-state";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
-const t = UI_TEXT.pages.error;
+const t = UI_TEXT.errorPages.error;
 
 /**
  * RES-06 — корневой error boundary для роутов ВНЕ групп.

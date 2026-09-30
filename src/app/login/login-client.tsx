@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import VkLoginButton from "@/components/auth/vk-login-button";
@@ -22,7 +22,8 @@ import {
   type ConsentFlags,
 } from "@/lib/legal/consent-flags";
 import type { PublicStats } from "@/lib/stats/public-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { LoginShowcase, formatStatNumber } from "./login-showcase";
 
 const RESEND_TIMEOUT = 60;
@@ -88,16 +89,16 @@ function safeNext(nextRaw: string | null) {
 // ---------- Animation variants (framer-motion — enter / step) ----------
 
 const stepVariants = {
-  enter: { opacity: 0, x: 22 },
+  enter: { opacity: 0, x: DISTANCE.rise },
   center: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
+    transition: MOTION.base,
   },
   exit: {
     opacity: 0,
-    x: -16,
-    transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as [number, number, number, number] },
+    x: -DISTANCE.rise,
+    transition: MOTION.exit,
   },
 };
 
@@ -140,7 +141,7 @@ export default function LoginClient({
     return null;
   }, [searchParams]);
   const reduce = useReducedMotion();
-  const stepAnim = reduce ? undefined : stepVariants;
+  const stepAnim = stepVariants;
 
   // AUTH-GATE-01: open on whichever OTP channel is actually available. The
   // page only renders this component when at least one method is on, so with
@@ -347,6 +348,8 @@ export default function LoginClient({
       // `loading` stays true through the beat so the form is inert meanwhile.
       window.setTimeout(
         () => {
+          // Полная загрузка, а не роутер: новая сессия должна дойти до серверной
+          // шапки корневого layout — мягкая навигация её не перерисует.
           window.location.replace(target);
         },
         reduce ? 0 : SUCCESS_HOLD_MS,
@@ -412,12 +415,12 @@ export default function LoginClient({
   const ctaShine = (
     <span
       aria-hidden
-      className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
+      className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-500 ease-brand group-hover:translate-x-full motion-reduce:hidden"
     />
   );
 
   return (
-    <div className="min-h-[100dvh] overflow-y-auto bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-20 lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
+    <div className="min-h-[100dvh] overflow-y-auto bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-sticky lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
       {/* LOGIN-WOW-01 — `lg:items-center`, not `items-stretch`: the brand pane
           is capped at `max-h-[760px]`, and a stretch item that cannot stretch
           falls back to START alignment. On any viewport taller than the cap
@@ -443,19 +446,19 @@ export default function LoginClient({
               first impression for a blank screen. The form's motion language
               is interaction-driven instead: step transitions, the tab thumb,
               the CTA shine, the field focus-lift and the OTP choreography. */}
-          <div className="relative z-[1] w-full max-w-[400px]">
+          <div className="relative z-1 w-full max-w-[400px]">
 
             {/* Mobile brand hint — compact full BrandLogo + tagline. The brand
                 stage itself stays desktop-only (it is decorative and would push
                 the form below the fold), so the live-stat pill is the one piece
                 of it that also earns its place on a phone. */}
             <div className="mb-6 lg:hidden">
-              {/* `dark:text-text-main`: the wordmark's default brand-gradient
-                  text-clip is burgundy in BOTH themes, so on the dark page
-                  (#1F1417) its tail («…дом») sank into the background. The
-                  dark: variant outranks the base `text-transparent`, so light
-                  keeps the gradient and dark gets a legible cream. */}
-              <BrandLogo variant="full" size="sm" href={null} textClassName="dark:text-text-main" />
+              {/* `bg-wordmark`: the wordmark's default brand-gradient text-clip
+                  is burgundy in BOTH themes, so on the dark page (#1F1417) its
+                  tail («…дом») sank into the background. The token keeps the
+                  gradient in light and fills a legible cream in dark
+                  (`--wordmark-fill`, 29.09 доработки · 23). */}
+              <BrandLogo variant="full" size="sm" href={null} textClassName="bg-wordmark" />
               <p className="mt-1 font-mono text-[10px] tracking-[0.08em] text-text-sec">
                 {UI_TEXT.brand.tagline}
               </p>
@@ -501,18 +504,18 @@ export default function LoginClient({
             {/* Error block */}
             <AnimatePresence mode="wait">
               {errorText ? (
-                <motion.div
+                <m.div
                   key={`error-${shakeKey}`}
-                  initial={reduce ? false : { opacity: 0, y: -6 }}
-                  animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.18 }}
+                  initial={{ opacity: 0, y: -DISTANCE.nudge }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -DISTANCE.nudge }}
+                  transition={MOTION.micro}
                   role="alert"
                   aria-live="polite"
-                  className="mb-4 rounded-2xl border border-red-300/70 bg-red-50/80 p-3 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300"
+                  className="mb-4 rounded-2xl border border-danger-border bg-danger-surface p-3 text-sm text-danger-text"
                 >
                   {errorText}
-                </motion.div>
+                </m.div>
               ) : null}
             </AnimatePresence>
 
@@ -550,7 +553,7 @@ export default function LoginClient({
             {otpEnabled ? (
             <AnimatePresence mode="wait" initial={false}>
               {step === "input" ? (
-                <motion.div
+                <m.div
                   key={`input-step-${mode}`}
                   variants={stepAnim}
                   initial="enter"
@@ -632,9 +635,9 @@ export default function LoginClient({
                       </>
                     )}
                   </Button>
-                </motion.div>
+                </m.div>
               ) : (
-                <motion.div
+                <m.div
                   key="otp-step"
                   variants={stepAnim}
                   initial="enter"
@@ -678,29 +681,28 @@ export default function LoginClient({
                     className="group relative w-full overflow-hidden rounded-full"
                   >
                     {otpState === "success" ? (
-                      <motion.span
+                      <m.span
                         className="inline-flex items-center gap-2"
-                        initial={reduce ? false : { opacity: 0, scale: 0.94 }}
+                        initial={{ opacity: 0, scale: 0.94 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        transition={reduce ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                        transition={MOTION.base}
                       >
                         <Check className="h-4 w-4" aria-hidden />
                         {T.codeAccepted}
-                      </motion.span>
+                      </m.span>
                     ) : loading ? (
                       T.verifying
                     ) : (
                       <>
                         {ctaShine}
-                        {UI_TEXT.auth.login}
+                        {UI_TEXT.nav.login}
                         <Check className="h-4 w-4" aria-hidden />
                       </>
                     )}
                   </Button>
 
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <button
-                      type="button"
+                    <Button variant="wrapper"
                       onClick={goBackToInput}
                       disabled={loading}
                       data-testid="login-back"
@@ -708,7 +710,7 @@ export default function LoginClient({
                     >
                       <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
                       {mode === "email" ? T.changeEmail : T.changePhoneNumber}
-                    </button>
+                    </Button>
 
                     {resendTimer > 0 ? (
                       <span className="text-sm tabular-nums text-text-sec">
@@ -717,18 +719,17 @@ export default function LoginClient({
                         {T.resendCodeSeconds}
                       </span>
                     ) : (
-                      <button
-                        type="button"
+                      <Button variant="wrapper"
                         onClick={resendCode}
                         disabled={loading}
                         data-testid="login-resend"
                         className="text-sm font-medium text-accent-text transition-colors hover:text-accent-text-hover disabled:pointer-events-none disabled:opacity-50"
                       >
                         {T.resendCode}
-                      </button>
+                      </Button>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
             ) : null}

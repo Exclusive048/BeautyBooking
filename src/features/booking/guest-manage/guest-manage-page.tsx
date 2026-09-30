@@ -3,14 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarClock, MapPin, UserRound } from "lucide-react";
+import { CalendarClock, MapPin, Star, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ClientRescheduleModal } from "@/features/client-cabinet/bookings/client-reschedule-modal";
+import { ReviewForm } from "@/features/reviews/components/review-form";
 import type { GuestManageItem, GuestManageView } from "@/lib/bookings/guest-manage";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.guestManage;
 
@@ -19,7 +21,7 @@ export type GuestManagePageState =
       kind: "ok";
       view: GuestManageView;
       /** Подписи времени — salon-tz с меткой зоны, посчитаны на сервере. */
-      whenLabels: Record<string, { when: string | null; proposed: string | null }>;
+      whenLabels: Record<string, { when: string | null; proposed: string | null; reviewDeadline: string | null }>;
     }
   | { kind: "account" }
   | { kind: "invalid" };
@@ -48,6 +50,10 @@ export function GuestManagePage({ token, state }: Props) {
   const [rescheduleItem, setRescheduleItem] = useState<GuestManageItem | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 29.09 доработки · 05: какая услуга сейчас в форме отзыва и какие уже отправлены
+  // (до `router.refresh()` сервер ещё отдаёт прежнее `review.canLeave`).
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [reviewedIds, setReviewedIds] = useState<string[]>([]);
 
   if (state.kind !== "ok") {
     const isAccount = state.kind === "account";
@@ -71,26 +77,18 @@ export function GuestManagePage({ token, state }: Props) {
     setCancelling(true);
     setError(null);
     try {
-      const res = await fetch(`/api/public/bookings/manage/${encodeURIComponent(token)}/cancel`, {
+      await fetchJson<unknown>(`/api/public/bookings/manage/${encodeURIComponent(token)}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true }
-        | { ok: false; error?: { message?: string } }
-        | null;
-      if (!res.ok || !json?.ok) {
-        // Отказы действенные (дедлайн отмены, запись уже началась) — показываем
-        // серверную строку, она говорит, что именно не так.
-        setError((json && !json.ok ? json.error?.message : null) || T.cancelFailed);
-        return;
-      }
       setConfirmOpen(false);
       setNotice(T.cancelled);
       router.refresh();
-    } catch {
-      setError(T.cancelFailed);
+    } catch (error) {
+      // Отказы действенные (дедлайн отмены, запись уже началась) — показываем
+      // серверную строку, она говорит, что именно не так.
+      setError(serverMessageOr(error, T.cancelFailed));
     } finally {
       setCancelling(false);
     }
@@ -106,7 +104,7 @@ export function GuestManagePage({ token, state }: Props) {
       </div>
 
       <Card>
-        <CardContent className="divide-y divide-border-subtle p-0">
+        <CardContent className="divide-y divide-border-subtle p-0 md:p-0">
           {view.items.map((item) => {
             const labels = whenLabels[item.bookingId];
             return (
@@ -128,6 +126,40 @@ export function GuestManagePage({ token, state }: Props) {
                   <Button variant="secondary" size="sm" onClick={() => setRescheduleItem(item)}>
                     {T.reschedule}
                   </Button>
+                ) : null}
+                {item.review.left || reviewedIds.includes(item.bookingId) ? (
+                  <p className="flex items-center gap-2 text-sm text-success-text" data-testid="guest-manage-review-done">
+                    <Star className="h-4 w-4 shrink-0" aria-hidden strokeWidth={1.6} />
+                    {T.reviewDone}
+                  </p>
+                ) : item.review.canLeave ? (
+                  reviewingId === item.bookingId ? (
+                    <ReviewForm
+                      bookingId={item.bookingId}
+                      submitUrl={`/api/public/bookings/manage/${encodeURIComponent(token)}/review`}
+                      onCancel={() => setReviewingId(null)}
+                      onSubmitted={() => {
+                        setReviewingId(null);
+                        setReviewedIds((prev) => [...prev, item.bookingId]);
+                        router.refresh();
+                      }}
+                    />
+                  ) : (
+                    <div className="space-y-2 rounded-xl border border-border-subtle bg-bg-input/40 p-3">
+                      <p className="text-sm font-medium text-text-main">{T.reviewTitle}</p>
+                      {labels?.reviewDeadline ? (
+                        <p className="text-xs text-text-sec">{T.reviewDeadline.replace("{when}", labels.reviewDeadline)}</p>
+                      ) : null}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setReviewingId(item.bookingId)}
+                        data-testid="guest-manage-review"
+                      >
+                        {T.reviewCta}
+                      </Button>
+                    </div>
+                  )
                 ) : null}
               </div>
             );

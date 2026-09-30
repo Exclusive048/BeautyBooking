@@ -9,7 +9,8 @@ import {
   OperatorSlotPicker,
   type OperatorSlot,
 } from "@/features/booking/components/operator-slot-picker";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleMasterColumn } from "../../server/types";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.moveDialog;
@@ -81,7 +82,7 @@ export function MoveBookingDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(
+      await fetchJsonWithAuth<unknown>(
         `/api/studio/bookings/${bookingId}/move`,
         {
           method: "PATCH",
@@ -96,17 +97,10 @@ export function MoveBookingDialog({
           }),
         },
       );
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.move);
-        return;
-      }
       onClose();
       router.refresh();
-    } catch {
-      setError(E.move);
+    } catch (error) {
+      setError(serverMessageOr(error, E.move));
     } finally {
       setSubmitting(false);
     }
@@ -156,7 +150,7 @@ export function MoveBookingDialog({
             {!masters
               .find((m) => m.id === masterId)
               ?.serviceIds.includes(bookingServiceId) ? (
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+              <p className="mt-1 text-xs text-warning-text">
                 {T.masterIncompatibleHint}
               </p>
             ) : null}
@@ -183,7 +177,7 @@ export function MoveBookingDialog({
         ) : null}
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

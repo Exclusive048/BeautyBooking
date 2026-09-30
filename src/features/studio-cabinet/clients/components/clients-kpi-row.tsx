@@ -1,7 +1,7 @@
 import { Crown, Heart, Moon, TrendingUp, Users, type LucideIcon } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioClientsKpis } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.clientsV2.kpis;

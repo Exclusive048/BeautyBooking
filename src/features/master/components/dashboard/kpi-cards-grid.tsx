@@ -4,7 +4,7 @@ import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
 import { WorkContextRevenueSplit } from "@/features/master/components/work-context-revenue";
 import type { RevenueSplit } from "@/lib/bookings/work-context";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const formatRub = (kopeks: number) => UI_FMT.priceLabel(kopeks);
 

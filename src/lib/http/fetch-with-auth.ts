@@ -45,6 +45,7 @@ export async function fetchWithAuth(input: RequestInfo | URL, init?: RequestInit
   const outcome = await triggerRefresh();
   if (outcome === "unauthorized") {
     if (typeof window !== "undefined") {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- модуль без роутера; вход устарел, стейт прежней сессии сбрасывается
       window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
     }
     return res;

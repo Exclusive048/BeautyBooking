@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Flame, Clock } from "lucide-react";
-import { motion, useReducedMotion } from "framer-motion";
-import { UI_TEXT } from "@/lib/ui/text";
+import { m } from "framer-motion";
+import { fetchJson } from "@/lib/http/client";
+import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
 import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
-import type { ApiResponse } from "@/lib/types/api";
 
 type HotSlotItem = {
   id: string;
@@ -73,35 +74,32 @@ function calcDiscountedPrice(kopeks: number, type: "PERCENT" | "FIXED", value: n
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
+  visible: { transition: { staggerChildren: STAGGER, delayChildren: 0.04 } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: DISTANCE.rise },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.38, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] },
+    transition: MOTION.section,
   },
 };
 
 export function HotSlotsPreview() {
   const [slots, setSlots] = useState<HotSlotItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
-  const itemAnim = reduce ? undefined : itemVariants;
+  const container = containerVariants;
+  const itemAnim = itemVariants;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/hot-slots?limit=4", { cache: "no-store" });
-        const json = (await res.json().catch(() => null)) as ApiResponse<{ items: HotSlotItem[] }> | null;
-        if (!res.ok || !json || !json.ok) return;
-        if (!cancelled) setSlots(json.data.items ?? []);
+        const data = await fetchJson<{ items: HotSlotItem[] }>("/api/hot-slots?limit=4", { cache: "no-store" });
+        if (!cancelled) setSlots(data.items ?? []);
       } catch {
-        // silently ignore
+        // Витрина главной: без горящих окошек блок просто не показывается.
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -116,7 +114,7 @@ export function HotSlotsPreview() {
     <section className="space-y-5">
       <div className="flex items-end justify-between">
         <div className="flex items-center gap-2">
-          <Flame className="h-5 w-5 text-orange-500" />
+          <Flame className="h-5 w-5 text-hot" />
           <div>
             <h2 className="text-2xl font-bold text-text-main sm:text-3xl">
               {UI_TEXT.home.hotSlotsPreview.title}
@@ -131,11 +129,11 @@ export function HotSlotsPreview() {
         </Link>
       </div>
 
-      <motion.div
+      <m.div
         variants={container}
         initial="hidden"
         whileInView="visible"
-        viewport={{ once: true, margin: "-60px" }}
+        viewport={VIEWPORT_ONCE}
         className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         {slots.map((item) => {
@@ -152,7 +150,7 @@ export function HotSlotsPreview() {
             : `/providers/${item.provider.id}`;
 
           return (
-            <motion.div
+            <m.div
               key={item.id}
               variants={itemAnim}
               className="flex flex-col gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/90 p-4"
@@ -167,7 +165,7 @@ export function HotSlotsPreview() {
                     <p className="truncate text-xs text-text-sec">{item.provider.address}</p>
                   ) : null}
                 </Link>
-                <span className="shrink-0 rounded-full bg-orange-500/10 px-2.5 py-1 text-xs font-bold text-orange-600 dark:text-orange-400">
+                <span className="shrink-0 rounded-full bg-hot/10 px-2.5 py-1 text-xs font-bold text-hot-text">
                   {discountLabel}
                 </span>
               </div>
@@ -205,10 +203,10 @@ export function HotSlotsPreview() {
                   {UI_TEXT.home.hotSlotsPreview.book}
                 </Link>
               </Button>
-            </motion.div>
+            </m.div>
           );
         })}
-      </motion.div>
+      </m.div>
     </section>
   );
 }

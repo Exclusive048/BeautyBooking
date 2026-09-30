@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { ArrowRight, Sparkles, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import type { PublicModelOfferStats } from "@/lib/model-offers/public-stats";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, VIEWPORT_ONCE } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const MASTERS_HREF = "/become-master";
 const MODELS_HREF = "/models";
@@ -22,18 +22,17 @@ type CardMetric = { value: string; label: string };
 
 type CardTone = "brand" | "soft";
 
-function pluralizeOffers(count: number): string {
-  const t = UI_TEXT.models.list;
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  const template =
-    mod10 === 1 && mod100 !== 11
-      ? t.countLabelOne
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-        ? t.countLabelFew
-        : t.countLabelMany;
-  return template.replace("{count}", String(count));
-}
+/**
+ * Метрики карточки «Для моделей», готовые к показу. Строку с числом собирает
+ * `Footer` на сервере (`formatModelOfferCount`): склонение живёт в домене
+ * `models`, и клиентский компонент шелла не должен везти его в браузер на
+ * каждую страницу (29.09 доработки · 18). `null` — предложений нет или
+ * статистика недоступна.
+ */
+export type FooterModelOfferMetrics = {
+  activeLabel: string;
+  averageDiscountPercent: number | null;
+} | null;
 
 /**
  * FOOTER-HONEST-METRICS (2026-09-15): метрики карточки «Для моделей» — живые
@@ -42,12 +41,12 @@ function pluralizeOffers(count: number): string {
  * вовсе. Число вместе с существительным («12 предложений»), потому что голое
  * «12» под подписью «сейчас» читается хуже, а склонение уже есть у `/models`.
  */
-function buildModelMetrics(stats: PublicModelOfferStats | null): CardMetric[] {
-  if (!stats || stats.activeCount <= 0) return [];
+function buildModelMetrics(offers: FooterModelOfferMetrics): CardMetric[] {
+  if (!offers) return [];
   const t = UI_TEXT.footer.ctaModels;
-  const metrics: CardMetric[] = [{ value: pluralizeOffers(stats.activeCount), label: t.metricOffersLabel }];
-  if (stats.averageDiscountPercent !== null && stats.averageDiscountPercent > 0) {
-    metrics.push({ value: `−${stats.averageDiscountPercent}%`, label: t.metricDiscountLabel });
+  const metrics: CardMetric[] = [{ value: offers.activeLabel, label: t.metricOffersLabel }];
+  if (offers.averageDiscountPercent !== null && offers.averageDiscountPercent > 0) {
+    metrics.push({ value: `−${offers.averageDiscountPercent}%`, label: t.metricDiscountLabel });
   }
   return metrics;
 }
@@ -66,15 +65,14 @@ function buildModelMetrics(stats: PublicModelOfferStats | null): CardMetric[] {
  *
  * Mobile: stack vertically. Desktop: 2-col grid on `lg+`.
  */
-export function FooterCTA({ modelOfferStats }: { modelOfferStats: PublicModelOfferStats | null }) {
-  const reduce = useReducedMotion();
-  const modelMetrics = buildModelMetrics(modelOfferStats);
+export function FooterCTA({ modelOffers }: { modelOffers: FooterModelOfferMetrics }) {
+  const modelMetrics = buildModelMetrics(modelOffers);
   return (
-    <motion.div
-      initial={reduce ? false : { opacity: 0, y: 24 }}
-      whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={reduce ? { duration: 0 } : { duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    <m.div
+      initial={{ opacity: 0, y: DISTANCE.rise }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={VIEWPORT_ONCE}
+      transition={MOTION.section}
       className="grid gap-5 lg:grid-cols-2"
     >
       <CTACard
@@ -91,7 +89,7 @@ export function FooterCTA({ modelOfferStats }: { modelOfferStats: PublicModelOff
         href={MODELS_HREF}
         metrics={modelMetrics}
       />
-    </motion.div>
+    </m.div>
   );
 }
 

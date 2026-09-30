@@ -3,7 +3,7 @@
 import { MapPin } from "lucide-react";
 import { CityDuplicateBanner } from "@/features/admin-cabinet/cities/components/city-duplicate-banner";
 import { CityEditForm } from "@/features/admin-cabinet/cities/components/city-edit-form";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCityRow,
   AdminDuplicateGroup,

@@ -1,8 +1,8 @@
 "use client";
 
 import { Check, Zap } from "lucide-react";
-import { UI_TEXT } from "@/lib/ui/text";
-import { ModeCard } from "../components/mode-card";
+import * as UI_TEXT from "@/lib/ui/text";
+import { ModeCard } from "@/components/ui/mode-card";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.rules.confirmation;
 

@@ -2,7 +2,7 @@ import { BarChart3, Calendar, Star, Wallet, type LucideIcon } from "lucide-react
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { DeltaTone } from "../lib/format-delta";
 import type { StudioKpis } from "../server/types";
 

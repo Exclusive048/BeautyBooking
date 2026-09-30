@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleWeekData } from "../../server/types";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.weekView;

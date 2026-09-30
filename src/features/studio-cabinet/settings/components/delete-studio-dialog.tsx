@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.settingsV2.danger;
 const TX = UI_TEXT.studioCabinet.settingsV2.toasts;
@@ -47,23 +48,15 @@ export function DeleteStudioDialog({ studioName, open, onClose }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/cabinet/studio/delete", { method: "DELETE" });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string; code?: string } }
-          | null;
-        const code = body?.error?.code;
-        if (code === "ACTIVE_BOOKINGS") {
-          setError(T.activeBookingsError);
-        } else {
-          setError(body?.error?.message ?? TX.error);
-        }
-        return;
-      }
+      await fetchJsonWithAuth<unknown>("/api/cabinet/studio/delete", { method: "DELETE" });
       // Studio gone — bounce the user out of the studio cabinet entirely.
       router.replace("/cabinet");
-    } catch {
-      setError(TX.error);
+    } catch (error) {
+      if (error instanceof ApiClientError && error.code === "ACTIVE_BOOKINGS") {
+        setError(T.activeBookingsError);
+      } else {
+        setError(serverMessageOr(error, TX.error));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -87,7 +80,7 @@ export function DeleteStudioDialog({ studioName, open, onClose }: Props) {
         {error ? (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300"
+            className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text"
           >
             {error}
           </div>

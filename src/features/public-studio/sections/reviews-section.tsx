@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { StudioReviewsSectionClient } from "@/features/public-studio/sections/reviews-section-client";
@@ -8,67 +7,40 @@ import {
 } from "@/features/public-profile/master/reviews-constants";
 import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
-import { serverApiFetch } from "@/lib/api/server-fetch";
-import type { ClientBooking } from "@/lib/bookings/dto";
+import { emptyOnRefusal } from "@/features/public-profile/master/server/refusal";
+import { getViewer } from "@/features/public-profile/master/server/viewer";
+import { findReviewableBookingId, listReviews } from "@/lib/reviews/service";
 import type { ReviewDto } from "@/lib/reviews/types";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   studioId: string;
 };
-
-function reviewsPreviewPath(studioId: string): string {
-  return (
-    `/api/reviews?targetType=studio&targetId=${encodeURIComponent(studioId)}` +
-    `&limit=${reviewsProbeLimit(REVIEWS_PREVIEW_LIMIT)}&offset=0`
-  );
-}
 
 /**
  * STUDIO-REVIEWS-NO-LOADMORE: те же размеры и та же n+1-проба, что у мастера
  * (`reviews-constants.ts`): лишняя строка — только сигнал «есть ещё», в выдачу
  * она не попадает. Счётчик `Provider.reviews` на этот вопрос не отвечает.
  */
-async function fetchReviews(studioId: string): Promise<{ reviews: ReviewDto[]; hasMore: boolean }> {
-  const json = await serverApiFetch<{ reviews: ReviewDto[] }>(reviewsPreviewPath(studioId));
-  if (!json.ok) return { reviews: [], hasMore: false };
-  const batch = json.data.reviews ?? [];
+async function fetchReviews(
+  studioId: string,
+  viewer: Awaited<ReturnType<typeof getViewer>>,
+): Promise<{ reviews: ReviewDto[]; hasMore: boolean }> {
+  const batch = await emptyOnRefusal<ReviewDto[]>(
+    () =>
+      listReviews({
+        targetType: "studio",
+        targetId: studioId,
+        limit: reviewsProbeLimit(REVIEWS_PREVIEW_LIMIT),
+        offset: 0,
+        currentUser: viewer,
+      }),
+    [],
+  );
   return {
     reviews: batch.slice(0, REVIEWS_PREVIEW_LIMIT),
     hasMore: batch.length > REVIEWS_PREVIEW_LIMIT,
   };
-}
-
-async function buildCookieHeader(): Promise<string | null> {
-  const store = await cookies();
-  const entries = store.getAll();
-  if (!entries.length) return null;
-  const header = entries.map(({ name, value }) => `${name}=${value}`).join("; ");
-  return header || null;
-}
-
-async function fetchCanReviewBookingId(providerId: string): Promise<string | null> {
-  const cookieHeader = await buildCookieHeader();
-  const headers = cookieHeader ? { cookie: cookieHeader } : undefined;
-
-  const bookingsJson = await serverApiFetch<{ bookings: ClientBooking[] }>(
-    "/api/me/bookings",
-    headers ? { headers } : undefined
-  );
-  if (!bookingsJson.ok) return null;
-
-  const ownBookings = bookingsJson.data.bookings.filter((booking) => booking.provider.id === providerId);
-  for (const booking of ownBookings) {
-    const canLeaveJson = await serverApiFetch<{ canLeave: boolean }>(
-      `/api/reviews/can-leave?bookingId=${encodeURIComponent(booking.id)}`,
-      headers ? { headers } : undefined
-    );
-    if (canLeaveJson.ok && canLeaveJson.data.canLeave) {
-      return booking.id;
-    }
-  }
-
-  return null;
 }
 
 export async function StudioReviewsSection({ studioId }: Props) {
@@ -79,11 +51,18 @@ export async function StudioReviewsSection({ studioId }: Props) {
   let hasError = false;
 
   try {
-    studio = await getStudioProfile(studioId);
+    const [studioResult, sessionUser] = await Promise.all([
+      getStudioProfile(studioId),
+      getViewer(),
+    ]);
+    studio = studioResult;
     if (studio) {
+      // Гостю запись для отзыва не ищется вовсе (раньше — запрос с ответом 401).
       const result = await Promise.all([
-        fetchReviews(studio.id),
-        fetchCanReviewBookingId(studio.id),
+        fetchReviews(studio.id, sessionUser),
+        sessionUser
+          ? findReviewableBookingId({ currentUserId: sessionUser.id, providerId: studio.id })
+          : Promise.resolve(null),
       ]);
       reviews = result[0].reviews;
       hasMoreReviews = result[0].hasMore;
@@ -91,11 +70,7 @@ export async function StudioReviewsSection({ studioId }: Props) {
     }
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("reviews-section", error, [
-      `/api/providers/${studioId}`,
-      reviewsPreviewPath(studioId),
-      "/api/me/bookings",
-    ]);
+    logPublicStudioBlockError("reviews-section", error, ["getProviderProfile", "listReviews", "findReviewableBookingId"]);
   }
 
   if (hasError) {

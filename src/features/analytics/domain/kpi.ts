@@ -3,12 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getDayOfWeek, toLocalDateKey } from "@/lib/schedule/timezone";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
 import type { AnalyticsRange } from "@/features/analytics/domain/date-range";
-import {
-  buildScopeWhere,
-  buildStartAtRange,
-  countWeekdaysInRange,
-  diffMinutes,
-} from "@/features/analytics/domain/helpers";
+import { buildScopeWhere, buildStartAtRange } from "@/features/analytics/domain/helpers";
+import { addDaysToDateKey, listDateKeysInclusive } from "@/lib/schedule/dateKey";
+import { dayPlanWorkMinutes, loadDayPlans } from "@/lib/schedule/day-plans";
 import { STATUS_CONFIRMED, STATUS_OCCUPANCY } from "@/features/analytics/domain/status-map";
 
 type KpiMetric = {
@@ -106,7 +103,8 @@ function buildSnapshot(input: {
   }>;
   range: AnalyticsRange;
   timeZone: string;
-  weeklyCapacityMinutes: number[];
+  /** Ёмкость ЭТОГО периода по дням недели, минуты (см. `capacityByWeekdayInRange`). */
+  capacityByWeekday: number[];
 }): Snapshot {
   const now = new Date();
   let revenue = 0;
@@ -151,11 +149,7 @@ function buildSnapshot(input: {
   const cancellationRate = totalCreated > 0 ? cancelled / totalCreated : 0;
   const noShowRate = totalCreated > 0 ? noShow / totalCreated : 0;
 
-  const weekdayCounts = countWeekdaysInRange(input.range, input.timeZone);
-  const totalCapacity = input.weeklyCapacityMinutes.reduce(
-    (sum, minutes, idx) => sum + minutes * weekdayCounts[idx],
-    0
-  );
+  const totalCapacity = input.capacityByWeekday.reduce((sum, minutes) => sum + minutes, 0);
   const totalBooked = occupancyByWeekday.reduce((sum, minutes) => sum + minutes, 0);
   const occupancyRate = totalCapacity > 0 ? totalBooked / totalCapacity : 0;
 
@@ -172,32 +166,53 @@ function buildSnapshot(input: {
   };
 }
 
-async function loadWeeklyCapacityMinutes(context: AnalyticsContext): Promise<number[]> {
-  const rows = await prisma.weeklyScheduleDay.findMany({
-    where: context.scope === "MASTER"
-      ? {
-          config: { providerId: context.providerId },
-          isActive: true,
-          templateId: { not: null },
-        }
-      : {
-          config: context.masterFilterId
-            ? { providerId: context.masterFilterId }
-            : { provider: { studioId: context.providerId, type: ProviderType.MASTER } },
-          isActive: true,
-          templateId: { not: null },
-        },
-    select: {
-      weekday: true,
-      template: { select: { startLocal: true, endLocal: true } },
-    },
-  });
+/**
+ * SCHEDULE-PATTERNS-01 (этап 1) — ёмкость в минутах на КАЖДУЮ дату периода по
+ * движку (`loadDayPlans`): неделя, «Особые дни» (отпуск, свои часы), перерывы.
+ * Раньше ёмкость была «часы шаблона недели × число таких дней недели в
+ * периоде»: отпуск считался рабочим временем, перерывы — тоже, а график с
+ * чередованием или датами (этап 2) так не выражается вовсе. День в режиме
+ * «Фиксированное время» ёмкости в минутах не имеет и считается нулём.
+ */
+async function loadCapacityByDate(
+  context: AnalyticsContext,
+  range: { fromKey: string; toKey: string },
+): Promise<Map<string, number>> {
+  const providerIds =
+    context.scope === "MASTER"
+      ? [context.providerId]
+      : context.masterFilterId
+        ? [context.masterFilterId]
+        : (
+            await prisma.provider.findMany({
+              where: { studioId: context.providerId, type: ProviderType.MASTER },
+              select: { id: true },
+            })
+          ).map((provider) => provider.id);
 
+  const plans = await loadDayPlans({
+    providerIds,
+    fromKey: range.fromKey,
+    toKeyExclusive: addDaysToDateKey(range.toKey, 1),
+  });
+  const totals = new Map<string, number>();
+  for (const byDate of plans.values()) {
+    for (const [dateKey, plan] of byDate) {
+      totals.set(dateKey, (totals.get(dateKey) ?? 0) + (dayPlanWorkMinutes(plan) ?? 0));
+    }
+  }
+  return totals;
+}
+
+/** Ёмкость периода по дням недели (0 = вс … 6 = сб — как у `occupancyByWeekday`). */
+function capacityByWeekdayInRange(
+  capacityByDate: Map<string, number>,
+  range: { fromKey: string; toKey: string },
+): number[] {
   const totals = Array.from({ length: 7 }, () => 0);
-  for (const row of rows) {
-    if (!row.template) continue;
-    const weekday = row.weekday === 7 ? 0 : row.weekday;
-    totals[weekday] += diffMinutes(row.template.startLocal, row.template.endLocal);
+  for (const dateKey of listDateKeysInclusive(range.fromKey, range.toKey)) {
+    const weekday = new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();
+    totals[weekday] += capacityByDate.get(dateKey) ?? 0;
   }
   return totals;
 }
@@ -235,12 +250,13 @@ export async function getDashboardKpi(input: {
     },
   });
 
-  const weeklyCapacityMinutes = await loadWeeklyCapacityMinutes(input.context);
+  const capacityByDate = await loadCapacityByDate(input.context, combinedRange);
+  const currentCapacity = capacityByWeekdayInRange(capacityByDate, input.range);
   const current = buildSnapshot({
     bookings,
     range: input.range,
     timeZone: input.context.timeZone,
-    weeklyCapacityMinutes,
+    capacityByWeekday: currentCapacity,
   });
 
   const previous = input.prevRange
@@ -248,7 +264,7 @@ export async function getDashboardKpi(input: {
         bookings,
         range: input.prevRange,
         timeZone: input.context.timeZone,
-        weeklyCapacityMinutes,
+        capacityByWeekday: capacityByWeekdayInRange(capacityByDate, input.prevRange),
       })
     : null;
 
@@ -264,9 +280,8 @@ export async function getDashboardKpi(input: {
   };
 
   const weekdayLabels = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
-  const weekdayCounts = countWeekdaysInRange(input.range, input.context.timeZone);
   const occupancy: OccupancyPoint[] = current.occupancyByWeekday.map((bookedMinutes, idx) => {
-    const capacityMinutes = weeklyCapacityMinutes[idx] * weekdayCounts[idx];
+    const capacityMinutes = currentCapacity[idx];
     const rate = capacityMinutes > 0 ? bookedMinutes / capacityMinutes : null;
     return {
       weekday: idx,

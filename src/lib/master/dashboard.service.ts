@@ -5,7 +5,10 @@ import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope
 import { getPendingBookingsForMaster, type PendingBookingRow } from "@/lib/bookings/master-pending-list";
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { getUnansweredReviewsForMaster, type UnansweredReviewRow } from "@/lib/reviews/unanswered-list";
-import { getDayOfWeek } from "@/lib/schedule/timezone";
+import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
+import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import { dayPlanHours, loadDayPlans } from "@/lib/schedule/day-plans";
+import { timeToMinutes } from "@/lib/schedule/time";
 import {
   BOOKING_WORK_CONTEXT_SELECT,
   resolveBookingWorkContext,
@@ -183,47 +186,32 @@ async function resolveTodayWorkingWindow(args: {
   timezone: string;
   now: Date;
 }): Promise<{ start: Date | null; end: Date | null }> {
-  // Read the WeeklyScheduleConfig for today's weekday and combine the
-  // template start/end (HH:mm) with today's date in UTC. Override-aware
-  // routing lives in the schedule engine; for the dashboard's "free slot
-  // hint" we rely on the template — close enough, and avoids pulling the
-  // full ScheduleEngine into the layout's render path.
-  // QA-112: resolve "today" in the PROVIDER's timezone (not the server's UTC
-  // day) and use the WeeklyScheduleDay ISO convention (1=Mon … 7=Sun). The old
-  // `getUTCDay()` (0=Sun … 6=Sat) both ignored the provider tz AND never matched
-  // a Sunday row (stored as weekday 7, not 0) → capacity rendered "0ч". ISO
-  // mapping also aligns with the seed convention fixed in QA-116.
-  const jsWeekday = getDayOfWeek(args.now, args.timezone);
-  const weekday = jsWeekday === 0 ? 7 : jsWeekday;
-  const config = await prisma.weeklyScheduleConfig.findUnique({
-    where: { providerId: args.providerId },
-    select: {
-      days: {
-        where: { weekday, isActive: true },
-        select: {
-          template: { select: { startLocal: true, endLocal: true } },
-        },
-      },
-    },
+  // SCHEDULE-PATTERNS-01 (этап 1): часы на сегодня — из движка (`loadDayPlans`):
+  // выходной или отпуск на сегодня («Особый день») дашборд раньше не видел,
+  // он читал только недельный шаблон. Заодно исправлен пояс: «10:00» шаблона
+  // собиралось через `setUTCHours`, то есть как 10:00 UTC, и у московского
+  // мастера подсказка свободного окошка уезжала на 3 часа (rule 17, salon-tz).
+  const todayKey = toLocalDateKey(args.now, args.timezone);
+  const plans = await loadDayPlans({
+    providerIds: [args.providerId],
+    fromKey: todayKey,
+    toKeyExclusive: addDaysToDateKey(todayKey, 1),
+    now: args.now,
   });
-  const day = config?.days[0];
-  if (!day?.template) return { start: null, end: null };
+  const plan = plans.get(args.providerId)?.get(todayKey);
+  // День «Фиксированное время» хранится как 00:00–23:55: ни ёмкость в часах,
+  // ни «свободно с … до …» из него не выводятся.
+  if (!plan || plan.fixedStarts) return { start: null, end: null };
+  const hours = dayPlanHours(plan);
+  if (!hours.start || !hours.end) return { start: null, end: null };
 
-  const today = new Date(args.now);
-  today.setUTCHours(0, 0, 0, 0);
-  const buildLocal = (hhmm: string): Date | null => {
-    const [hStr, mStr] = hhmm.split(":");
-    const h = Number.parseInt(hStr ?? "", 10);
-    const m = Number.parseInt(mStr ?? "", 10);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-    const d = new Date(today);
-    d.setUTCHours(h, m, 0, 0);
-    return d;
+  const dayForLocal = dateFromLocalDateKey(todayKey, args.timezone);
+  const toInstant = (hhmm: string): Date | null => {
+    const minutes = timeToMinutes(hhmm);
+    if (minutes === null) return null;
+    return toUtcFromLocalDateTime(dayForLocal, Math.floor(minutes / 60), minutes % 60, args.timezone);
   };
-  return {
-    start: buildLocal(day.template.startLocal),
-    end: buildLocal(day.template.endLocal),
-  };
+  return { start: toInstant(hours.start), end: toInstant(hours.end) };
 }
 
 /**

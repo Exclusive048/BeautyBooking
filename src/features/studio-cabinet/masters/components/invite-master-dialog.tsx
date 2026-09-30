@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.mastersV2.inviteDialog;
 const E = UI_TEXT.studioCabinet.mastersV2.errors;
@@ -61,7 +62,7 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/studio/masters", {
+      await fetchJsonWithAuth<unknown>("/api/studio/masters", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -71,18 +72,11 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
           title: trimmedTagline,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.inviteFailed);
-        return;
-      }
       reset();
       onClose();
       router.refresh();
-    } catch {
-      setError(E.inviteFailed);
+    } catch (error) {
+      setError(serverMessageOr(error, E.inviteFailed));
     } finally {
       setSubmitting(false);
     }

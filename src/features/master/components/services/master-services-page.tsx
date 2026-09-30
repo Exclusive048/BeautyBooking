@@ -7,7 +7,7 @@ import {
   getMasterServicesView,
   parseServicesFilter,
 } from "@/lib/master/services-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { AddBundleButton } from "./add-bundle-button";
 import { AddServiceButton } from "./add-service-button";
 import { ServicesCategorizedList } from "./services-categorized-list";

@@ -2,10 +2,14 @@
 
 import { useId, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, m } from "framer-motion";
+import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/button";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 export type ModalSurfaceSize = "sm" | "md" | "lg" | "xl" | "full";
 
@@ -33,6 +37,17 @@ type Props = {
    * Optional footer slot rendered below children. New API.
    */
   footer?: ReactNode;
+  /**
+   * Закрепить подвал внизу экрана, пока окно длиннее экрана: кнопки шагов
+   * длинной формы (часы по дням на телефоне) не уезжают за прокрутку.
+   */
+  stickyFooter?: boolean;
+  /**
+   * На телефоне (до `sm`) — во весь экран: шапка с крестиком закреплена
+   * сверху, подвал прижат к низу с отступом под «домашнюю полоску»; с `sm`
+   * окно прежнее. Для окон, где главное — фото и длинная форма (портфолио).
+   */
+  fullScreenOnMobile?: boolean;
   /**
    * Modal width. Default `lg` = the original `max-w-2xl` behaviour
    * so existing callers keep their layout. Use `className` to
@@ -97,6 +112,8 @@ export function ModalSurface({
   title,
   header,
   footer,
+  stickyFooter = false,
+  fullScreenOnMobile = false,
   size = "lg",
   initialFocusRef,
   children,
@@ -104,13 +121,9 @@ export function ModalSurface({
 }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
-  // MODAL-A11Y-BATCH-A: respect OS-level prefers-reduced-motion.
-  // framer-motion's useReducedMotion returns true when the user has
-  // requested reduced motion. We collapse the entrance/exit to a
-  // simple opacity fade and zero scale/translate so vestibular-
-  // sensitive users + battery-conscious mobile users get an instant,
-  // motion-free open. Default users see the original animation.
-  const shouldReduceMotion = useReducedMotion();
+  // MODAL-A11Y-BATCH-A: prefers-reduced-motion уважается централизованно —
+  // `MotionConfig reducedMotion="user"` (MotionProvider) гасит масштаб и сдвиг,
+  // оставляя прозрачность (29.09 доработки · 19).
 
   // MODAL-A11Y-BATCH-A + UI-13: весь контракт диалога одним вызовом —
   // Escape, блокировка прокрутки фона, WCAG SC 2.4.3 (Focus Order) и
@@ -127,69 +140,106 @@ export function ModalSurface({
 
   const headerTitle = header?.title ?? title ?? null;
   const ariaLabelledBy = headerTitle ? titleId : undefined;
+  const fullScreen = fullScreenOnMobile;
+
+  const heading = header ? (
+    <header className={cn("flex items-start gap-3", !fullScreen && "mb-4")}>
+      {header.icon ? (
+        <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-accent-text">
+          {header.icon}
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <h3 id={titleId} className="font-display text-lg font-semibold text-text-main">
+          {header.title}
+        </h3>
+        {header.subtitle ? <p className="mt-1 text-sm text-text-sec">{header.subtitle}</p> : null}
+      </div>
+    </header>
+  ) : title ? (
+    <h3 id={titleId} className={cn("text-base font-semibold text-text-main", !fullScreen && "mb-3")}>
+      {title}
+    </h3>
+  ) : null;
 
   const node = (
     <AnimatePresence>
       {open ? (
-        <motion.div
+        <m.div
           key="modal"
           role="dialog"
           aria-modal="true"
           aria-labelledby={ariaLabelledBy}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/50"
+          className="fixed inset-0 z-modal overflow-y-auto bg-black/50"
           onClick={onClose}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: shouldReduceMotion ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
+          transition={MOTION.micro}
         >
-          <div className="flex min-h-full items-start justify-center p-4 sm:items-center">
-            <motion.section
+          <div
+            className={cn(
+              "flex min-h-full items-start justify-center sm:items-center",
+              fullScreen ? "sm:p-4" : "p-4",
+            )}
+          >
+            <m.section
               ref={panelRef}
               onClick={(event) => event.stopPropagation()}
-              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 8 }}
-              animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
-              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: 4 }}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+              initial={{ opacity: 0, scale: 0.97, y: DISTANCE.nudge }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: DISTANCE.nudge, transition: MOTION.exit }}
+              transition={MOTION.base}
               className={cn(
-                "relative my-6 w-full rounded-[24px] border border-border-subtle bg-bg-card p-5 shadow-hover",
+                fullScreen
+                  ? // Телефон: страница во весь экран, без рамки и скругления;
+                    // с `sm` — прежняя карточка.
+                    "relative flex min-h-[100dvh] w-full flex-col bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:my-6 sm:block sm:min-h-0 sm:rounded-[24px] sm:border sm:border-border-subtle sm:p-5 sm:shadow-hover"
+                  : "relative my-6 w-full rounded-[24px] border border-border-subtle bg-bg-card p-5 shadow-hover",
                 SIZE_CLASS[size],
                 className,
               )}
               tabIndex={-1}
+              data-fullscreen-mobile={fullScreen || undefined}
             >
-              {header ? (
-                <header className="mb-4 flex items-start gap-3">
-                  {header.icon ? (
-                    <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-accent-text">
-                      {header.icon}
-                    </span>
-                  ) : null}
-                  <div className="min-w-0 flex-1">
-                    <h3
-                      id={titleId}
-                      className="font-display text-lg font-semibold text-text-main"
-                    >
-                      {header.title}
-                    </h3>
-                    {header.subtitle ? (
-                      <p className="mt-1 text-sm text-text-sec">{header.subtitle}</p>
-                    ) : null}
-                  </div>
-                </header>
-              ) : title ? (
-                <h3
-                  id={titleId}
-                  className="mb-3 text-base font-semibold text-text-main"
-                >
-                  {title}
-                </h3>
-              ) : null}
+              {fullScreen ? (
+                <div className="sticky top-0 z-10 -mx-5 mb-4 flex items-start gap-3 border-b border-border-subtle bg-bg-card px-5 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:static sm:mx-0 sm:mb-3 sm:border-b-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
+                  <div className="min-w-0 flex-1 pt-2 sm:pt-0">{heading}</div>
+                  <Button
+                    type="button"
+                    variant="icon"
+                    size="icon"
+                    aria-label={UI_TEXT.common.close}
+                    onClick={onClose}
+                    className="shrink-0 sm:hidden"
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </Button>
+                </div>
+              ) : (
+                heading
+              )}
               {children}
-              {footer ? <div className="mt-5 flex justify-end gap-2">{footer}</div> : null}
-            </motion.section>
+              {footer ? (
+                <div
+                  className={cn(
+                    "flex justify-end gap-2",
+                    fullScreen
+                      ? stickyFooter
+                        ? // Телефон: подвал прижат к низу экрана и виден при прокрутке.
+                          "sticky bottom-0 z-10 -mx-5 mt-auto -mb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] border-t border-border-subtle bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:-mb-5 sm:mt-5 sm:rounded-b-[24px] sm:py-4"
+                        : "mt-auto pt-5 sm:mt-5 sm:pt-0"
+                      : stickyFooter
+                        ? "sticky bottom-0 z-10 -mx-5 mt-5 -mb-5 rounded-b-[24px] border-t border-border-subtle bg-bg-card px-5 py-4"
+                        : "mt-5",
+                  )}
+                >
+                  {footer}
+                </div>
+              ) : null}
+            </m.section>
           </div>
-        </motion.div>
+        </m.div>
       ) : null}
     </AnimatePresence>
   );

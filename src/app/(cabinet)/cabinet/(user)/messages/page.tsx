@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { HeaderBlock } from "@/components/ui/header-block";
 import { ChatShell } from "@/features/chat/chat-shell";
 import { getSessionUser } from "@/lib/auth/session";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const C = UI_TEXT.chat;
 

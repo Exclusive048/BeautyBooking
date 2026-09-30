@@ -10,9 +10,9 @@ import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { cn } from "@/lib/cn";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
-import { UI_TEXT } from "@/lib/ui/text";
+import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { providerPublicUrl } from "@/lib/public-urls";
-import type { ApiResponse } from "@/lib/types/api";
 import {
   formatAvailability,
   normalizeSlotPrecision,
@@ -106,35 +106,29 @@ export function CatalogCard({
     if (favoritePending) return;
 
     // Optimistic flip — orchestrator sees the new state immediately, network
-    // happens after. Roll back on any non-2xx (the surface message comes
-    // from UI_TEXT, never the API body, to keep wording consistent).
+    // happens after. Roll back on any refusal: протухший вход — окно входа,
+    // лимит — своя строка поверхности, прочее — строка сервера либо своя
+    // (29.09 · 11).
     const next = !favorited;
     setFavorited(next);
     setFavoritePending(true);
     try {
-      const res = await fetch("/api/favorites/toggle", {
+      const data = await fetchJson<{ favorited: boolean }>("/api/favorites/toggle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerUsername: item.publicUsername }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | ApiResponse<{ favorited: boolean }>
-        | null;
-
-      if (!res.ok || !json || !json.ok) {
-        setFavorited(!next);
-        if (res.status === 429) {
-          setFavoriteError(UI_TEXT.catalog2.favoriteToggle.errorRateLimited);
-        } else {
-          setFavoriteError(UI_TEXT.catalog2.favoriteToggle.errorGeneric);
-        }
-        return;
-      }
       // Reconcile with the server's view in case of a race.
-      setFavorited(json.data.favorited);
-    } catch {
+      setFavorited(data.favorited);
+    } catch (error) {
       setFavorited(!next);
-      setFavoriteError(UI_TEXT.catalog2.favoriteToggle.errorGeneric);
+      if (error instanceof ApiClientError && error.status === 401) {
+        onLoginRequired?.();
+      } else if (error instanceof ApiClientError && error.status === 429) {
+        setFavoriteError(UI_TEXT.common.favoriteToggle.errorRateLimited);
+      } else {
+        setFavoriteError(serverMessageOr(error, UI_TEXT.common.favoriteToggle.errorGeneric));
+      }
     } finally {
       setFavoritePending(false);
     }
@@ -216,8 +210,8 @@ export function CatalogCard({
           size="none"
           aria-label={
             favorited
-              ? UI_TEXT.catalog2.favoriteToggle.removeAria
-              : UI_TEXT.catalog2.favoriteToggle.addAria
+              ? UI_TEXT.common.favoriteToggle.removeAria
+              : UI_TEXT.common.favoriteToggle.addAria
           }
           aria-pressed={favorited}
           title={favoriteError ?? TC.saveTooltip}
@@ -225,7 +219,7 @@ export function CatalogCard({
           onClick={handleFavoriteToggle}
           className={cn(
             "absolute right-3 top-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-bg-card/80 backdrop-blur-sm transition-colors hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/40",
-            favorited ? "text-rose-500 hover:text-rose-600" : "text-text-sec hover:text-rose-500",
+            favorited ? "text-accent-text hover:text-accent-text-hover" : "text-text-sec hover:text-accent-text",
             favoritePending && "opacity-60",
           )}
         >
@@ -275,7 +269,7 @@ export function CatalogCard({
                 </span>
               ) : (
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs text-text-sec">
-                  <Star className="h-3 w-3 fill-amber-500 text-amber-500" aria-hidden />
+                  <Star className="h-3 w-3 fill-rating text-rating" aria-hidden />
                   <span className="font-semibold tabular-nums text-text-main">
                     {item.ratingAvg.toFixed(1)}
                   </span>
@@ -306,7 +300,7 @@ export function CatalogCard({
             <span
               className={
                 availability.tone === "available"
-                  ? "inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+                  ? "inline-flex items-center gap-1.5 text-xs text-success-text"
                   : "inline-flex items-center gap-1.5 text-xs text-text-sec"
               }
             >
@@ -314,7 +308,7 @@ export function CatalogCard({
                 aria-hidden
                 className={
                   availability.tone === "available"
-                    ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+                    ? "h-1.5 w-1.5 rounded-full bg-success"
                     : "h-1.5 w-1.5 rounded-full bg-text-sec/40"
                 }
               />

@@ -1,4 +1,4 @@
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioNotificationsData } from "../lib/types";
 import { NotificationsFeed } from "./notifications-feed";
 import { NotificationsFilters } from "./notifications-filters";
@@ -37,7 +37,7 @@ export function StudioNotificationsPage({ data }: Props) {
         sort={data.sort}
         counts={data.chipCounts}
       />
-      <NotificationsFeed groups={data.groups} />
+      <NotificationsFeed groups={data.groups} timeZone={data.timeZone} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Building2, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { BookingWorkContext } from "@/lib/bookings/work-context";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.workContext;
 
@@ -51,7 +51,7 @@ export function WorkContextBadge({ context, variant = "badge", showLabel = true 
   return (
     <Badge
       variant={context.kind === "STUDIO" ? "info" : "default"}
-      className="min-w-0 max-w-full gap-1 px-2 py-0.5 text-[10px] leading-tight"
+      className="min-w-0 max-w-full gap-1 px-2 py-0.5 leading-tight"
       title={label}
     >
       <Icon className="h-3 w-3 shrink-0" aria-hidden />

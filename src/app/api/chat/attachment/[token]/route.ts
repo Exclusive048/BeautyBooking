@@ -6,7 +6,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { verifyChatAttachmentToken } from "@/lib/media/private-delivery";
 import { getMediaFile } from "@/lib/media/service";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type RouteContext = {
   params: Promise<{ token: string }>;

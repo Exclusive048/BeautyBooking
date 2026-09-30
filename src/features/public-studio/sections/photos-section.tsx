@@ -2,32 +2,25 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import type { MediaAssetDto } from "@/lib/media/types";
-import { UI_TEXT } from "@/lib/ui/text";
-import { serverApiFetch } from "@/lib/api/server-fetch";
+import * as UI_TEXT from "@/lib/ui/text";
+import {
+  getStudioPortfolio,
+} from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 
 type Props = {
   studioId: string;
 };
 
-async function fetchStudioPortfolio(studioId: string): Promise<MediaAssetDto[]> {
-  const path = `/api/media?entityType=STUDIO&entityId=${encodeURIComponent(studioId)}&kind=PORTFOLIO`;
-  const json = await serverApiFetch<{ assets: MediaAssetDto[] }>(path);
-  if (!json.ok) return [];
-  return json.data.assets ?? [];
-}
-
 export async function StudioPhotosSection({ studioId }: Props) {
   let portfolio: MediaAssetDto[] = [];
   let hasError = false;
 
   try {
-    portfolio = await fetchStudioPortfolio(studioId);
+    portfolio = await getStudioPortfolio(studioId);
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("photos-section", error, [
-      `/api/media?entityType=STUDIO&entityId=${encodeURIComponent(studioId)}&kind=PORTFOLIO`,
-    ]);
+    logPublicStudioBlockError("photos-section", error, ["listMediaAssets"]);
   }
 
   if (hasError) {

@@ -6,7 +6,7 @@ import { logInfo } from "@/lib/logging/logger";
 export async function suggestServiceDescription(input: {
   name: string;
   category: string;
-  price: number;
+  priceKopeks: number;
   durationMin: number;
 }): Promise<string | null> {
   await assertAiFeaturesEnabled();

@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCategoryCounts } from "@/features/admin-cabinet/catalog/types";
 
 type Props = {
@@ -37,7 +37,7 @@ export function CatalogHeader({ counts, onAdd }: Props) {
               ·
             </span>
             <span>
-              <span className="tabular-nums text-amber-600 dark:text-amber-400">
+              <span className="tabular-nums text-warning-text">
                 {counts.pending}
               </span>{" "}
               {T.header.captionPending}

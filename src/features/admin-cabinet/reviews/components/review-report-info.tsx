@@ -1,6 +1,6 @@
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { reportReasonLabel } from "@/features/admin-cabinet/reviews/lib/report-reason-display";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
 
 const T = UI_TEXT.adminPanel.reviews.card;
@@ -28,8 +28,8 @@ export function ReviewReportInfo({ review }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl bg-red-500/[0.08] p-3">
-      <div className="flex items-center gap-1.5 text-red-700 dark:text-red-300">
+    <div className="flex flex-col gap-1.5 rounded-xl bg-destructive/[0.08] p-3">
+      <div className="flex items-center gap-1.5 text-danger-text">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="font-mono text-[10px] uppercase tracking-[0.08em]">
           {T.reportLabel}

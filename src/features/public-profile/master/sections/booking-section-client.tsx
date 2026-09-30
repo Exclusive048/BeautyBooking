@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { useSelectedServices } from "@/features/public-profile/master/selected-services-context";
 import { BOOKING_OPEN_SHEET_EVENT } from "@/features/public-profile/master/mobile-booking-cta";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { Card, CardContent } from "@/components/ui/card";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { BookingFlowStepper } from "@/features/booking/components/booking-flow/booking-flow-stepper";
@@ -63,7 +63,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
   if (studioBookingHref && !provider.sellsOwnServices) {
     return (
       <Card>
-        <CardContent className="space-y-3 p-5">
+        <CardContent className="space-y-3 p-5 md:p-5">
           <div className="text-sm font-semibold text-text-main">{tP.studioBookingTitle}</div>
           <div className="text-sm text-text-sec">{tP.studioBookingDescription}</div>
           <Link

@@ -35,7 +35,33 @@ function buildPhoneCandidates(phone: string): string[] {
   return Array.from(candidates);
 }
 
+/**
+ * 29.09 доработки · 04: транзакция Serializable, и одновременная запись в
+ * студию к этому мастеру может её оборвать (P2034). Раньше это уходило 500-й;
+ * теперь — действенный 409 «обновите и повторите».
+ */
 export async function transferMasterOutOfStudio(
+  masterId: string,
+  studioProviderId: string,
+  transferServices: boolean,
+  actor: StudioLeaveActor
+): Promise<{ transferredServices: number; revokedInviteIds: string[] }> {
+  try {
+    return await runTransferMasterOutOfStudio(masterId, studioProviderId, transferServices, actor);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      throw new AppError(
+        "Данные мастера изменились. Обновите страницу и попробуйте ещё раз.",
+        409,
+        "CONFLICT",
+        { reason: "SERIALIZATION_CONFLICT" },
+      );
+    }
+    throw error;
+  }
+}
+
+async function runTransferMasterOutOfStudio(
   masterId: string,
   studioProviderId: string,
   transferServices: boolean,

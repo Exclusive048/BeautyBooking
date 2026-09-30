@@ -195,16 +195,6 @@
 /api/payments/yookassa/webhook
 /api/profiles/master
 /api/profiles/studio
-/api/provider/schedule/overrides
-/api/provider/schedule/overrides/{date}
-/api/provider/schedule/status
-/api/provider/schedule/submit-request
-/api/provider/schedule/templates
-/api/provider/schedule/templates/{id}
-/api/provider/schedule/weekly
-/api/providers/me
-/api/providers/me/appointments
-/api/providers/me/settings
 /api/providers/{id}/masters
 /api/public/bookings
 /api/public/bookings/{id}
@@ -213,7 +203,6 @@
 /api/public/providers/{providerId}/review-summary
 /api/public/providers/{providerId}/slots
 /api/public/services/{id}/booking-config
-/api/public/stats
 /api/reviews/tags
 /api/reviews/{id}/suggest-reply
 /api/search/availability
@@ -231,7 +220,6 @@
 /api/studio/service-packages/{id}
 /api/studio/services/{id}/booking-config
 /api/studio/services/{id}/unassign-master
-/api/studios/{id}/leave
 /api/studios/{id}/masters
 /api/studios/{id}/masters/{masterId}/schedule/buffer
 /api/studios/{id}/masters/{masterId}/schedule/overrides

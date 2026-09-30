@@ -9,6 +9,7 @@ import { getMasterContext } from "@/lib/master/profile.service";
 import { resolveMasterAccess } from "@/lib/model-offers/access";
 import { createModelOfferSchema, normalizePrice, normalizeRequirements } from "@/lib/model-offers/schemas";
 import { prisma } from "@/lib/prisma";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { parseBody, parseQuery } from "@/lib/validation";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { cursorPage } from "@/lib/api/pagination";
@@ -443,6 +444,11 @@ export async function POST(req: Request) {
       }
 
       const master = await resolveMasterAccess(masterService.masterProviderId, user.id);
+      // 29.09 доработки · 07: оффер на прошедшую дату не создаётся — подтвердить
+      // его всё равно нельзя («не в прошлом», решение владельца). Дата — салона.
+      if (body.dateLocal < toLocalDateKey(new Date(), master.timezone)) {
+        return jsonFail(400, "Эта дата уже прошла. Выберите сегодня или позже.", "DATE_INVALID");
+      }
       const availableMasterServices = await prisma.masterService.findMany({
         where: {
           masterProviderId: master.id,

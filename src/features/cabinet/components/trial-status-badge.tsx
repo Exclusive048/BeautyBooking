@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Clock, Sparkles } from "lucide-react";
 import { pluralizeDays } from "@/lib/utils/pluralize-days";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   /** Trial end timestamp as ISO string. */
@@ -49,7 +49,7 @@ export function TrialStatusBadge({ trialEndsAt }: Props) {
   const isUrgent = daysLeft <= URGENT_THRESHOLD_DAYS;
   const Icon = isUrgent ? Clock : Sparkles;
   const className = isUrgent
-    ? "inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
+    ? "inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1 text-xs font-medium text-warning-text"
     : "inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-accent-text";
 
   return (

@@ -10,6 +10,7 @@ import type {
   StudioMasterListItem,
   StudioMastersListData,
 } from "./types";
+import { studioBookingsWhere } from "@/lib/studio/booking-scope";
 
 const COMPLETED_STATUSES = [
   BookingStatus.CONFIRMED,
@@ -118,10 +119,7 @@ export async function loadStudioMastersList(input: {
     }),
     prisma.booking.findMany({
       where: {
-        OR: [
-          { studioId: studio.id },
-          { providerId: studio.providerId },
-        ],
+        ...studioBookingsWhere(studio.id),
         startAtUtc: { gte: periodStart, lt: periodEnd },
         status: { in: COMPLETED_STATUSES },
       },

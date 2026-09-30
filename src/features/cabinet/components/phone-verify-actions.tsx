@@ -3,7 +3,7 @@
 import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { VkIcon } from "@/components/ui/vk-icon";
 
 export type PhoneVerifyProviders = { vk: boolean; yandex: boolean };

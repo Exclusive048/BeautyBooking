@@ -6,7 +6,7 @@ import { SlotBubblesRow } from "@/features/search-by-time/components/slot-bubble
 import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { providerPublicUrl } from "@/lib/public-urls";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
 type Props = {

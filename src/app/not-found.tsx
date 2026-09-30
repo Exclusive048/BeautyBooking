@@ -1,30 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
-const t = UI_TEXT.pages.notFound;
+const t = UI_TEXT.errorPages.notFound;
 
 const containerVariants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.08 } },
+  visible: { transition: { staggerChildren: STAGGER } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: DISTANCE.rise },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.32, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] },
+    transition: MOTION.base,
   },
 };
 
 export default function NotFound() {
-  const reduce = useReducedMotion();
-  const container = reduce ? undefined : containerVariants;
-  const item = reduce ? undefined : itemVariants;
+  const container = containerVariants;
+  const item = itemVariants;
   return (
     <div className="relative flex min-h-[80dvh] items-center justify-center overflow-hidden px-4 py-16">
       {/* Ambient gradient blobs */}
@@ -37,37 +37,37 @@ export default function NotFound() {
         className="pointer-events-none absolute left-1/3 top-2/3 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-magenta/[0.06] blur-[80px]"
       />
 
-      <motion.div
+      <m.div
         className="relative z-10 text-center"
         variants={container}
         initial="hidden"
         animate="visible"
       >
         {/* Giant 404 */}
-        <motion.div variants={item} className="select-none">
+        <m.div variants={item} className="select-none">
           <span className="bg-gradient-to-r from-primary via-primary-hover to-primary-magenta bg-clip-text text-[120px] font-black leading-none tracking-tighter text-transparent sm:text-[160px]">
             404
           </span>
-        </motion.div>
+        </m.div>
 
         {/* Title */}
-        <motion.h1
+        <m.h1
           variants={item}
           className="-mt-2 text-2xl font-bold text-text-main sm:text-3xl"
         >
           {t.title}
-        </motion.h1>
+        </m.h1>
 
         {/* Subtitle */}
-        <motion.p
+        <m.p
           variants={item}
           className="mx-auto mt-3 max-w-sm text-base leading-relaxed text-text-sec"
         >
           {t.subtitle}
-        </motion.p>
+        </m.p>
 
         {/* Actions */}
-        <motion.div
+        <m.div
           variants={item}
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
@@ -77,8 +77,8 @@ export default function NotFound() {
           <Button variant="secondary" asChild>
             <Link href="/catalog">{t.goCatalog}</Link>
           </Button>
-        </motion.div>
-      </motion.div>
+        </m.div>
+      </m.div>
     </div>
   );
 }

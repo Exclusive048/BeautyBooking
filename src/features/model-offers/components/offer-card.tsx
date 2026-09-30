@@ -3,7 +3,7 @@ import { Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { PublicModelOfferItem } from "@/lib/model-offers/public.service";
 
 type Props = { offer: PublicModelOfferItem };
@@ -79,7 +79,7 @@ export function OfferCard({ offer }: Props) {
           <p className="truncate font-medium text-text-main">{master.name}</p>
           {master.ratingCount > 0 ? (
             <div className="flex items-center gap-1 text-xs text-text-sec">
-              <Star className="h-3 w-3 fill-current text-amber-500" aria-hidden />
+              <Star className="h-3 w-3 fill-current text-rating" aria-hidden />
               <span className="tabular-nums">{master.ratingAvg.toFixed(1)}</span>
               <span aria-hidden>·</span>
               <span className="tabular-nums">{master.ratingCount}</span>

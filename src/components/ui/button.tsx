@@ -12,7 +12,8 @@ export type ButtonVariant =
   | "inverted";
 export type ButtonSize = "sm" | "md" | "lg" | "icon" | "none";
 
-type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+/** `ref` — обычный проп (React 19): кнопка закрытия получает фокус программно. */
+type Props = React.ComponentProps<"button"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   asChild?: boolean;
@@ -35,9 +36,11 @@ const variants: Record<ButtonVariant, string> = {
   // near-white in dark and disappears on the white pill. `text-primary` is the
   // sanctioned fixed-light-fill pairing (burgundy in both themes: #720808 light
   // / #7A102C dark — never flips light). Own dedicated variant (not `secondary`
-  // + a className override) so no competing `text-text-main` is injected: `cn`
-  // is a plain join, so an override does NOT reliably win over the variant token
-  // (FIX-ROUND-02). Use on brand-gradient / burgundy surfaces.
+  // + a className override): the pairing is a design decision, not a per-site
+  // patch. Historically also a necessity — while `cn` was a plain join the
+  // override lost to the variant token by bundle order (FIX-ROUND-02); since
+  // 29.09 · 12 `cn` is tailwind-merge and the caller's class wins. Use on
+  // brand-gradient / burgundy surfaces.
   inverted:
     "border border-transparent bg-white text-primary hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
   // UI-25: токен `destructive` (мост в tailwind.config), не `bg-red-600` —
@@ -49,28 +52,17 @@ const variants: Record<ButtonVariant, string> = {
   icon:
     "border border-border-control bg-bg-input text-text-main hover:bg-bg-card focus-visible:ring-2 focus-visible:ring-primary-glow/45",
   // UI-26 (AUDIT-CAMPAIGN-02 п.8, область `components`): `wrapper` — вариант
-  // «без хрома», и он обязан НИЧЕГО не заливать. Раньше он объявлял
-  // `bg-transparent text-inherit hover:bg-transparent`, и это молча перебивало
-  // заливку вызывающего: `cn` — плоский join, поэтому побеждает не порядок
-  // классов в атрибуте, а порядок правил в бандле, а Tailwind печатает утилиты
-  // одной группы ПО АЛФАВИТУ. Замер на боевом бандле: `.bg-bg-card` строка 3991,
-  // `.bg-bg-input` 4028, `.bg-primary/10` 4414 — все РАНЬШЕ `.bg-transparent`
-  // 4632; в hover-секции `.hover:bg-bg-card` 7684 и `.hover:bg-bg-input` 7693
-  // раньше `.hover:bg-transparent` 7815. То есть побеждал вариант, всегда.
-  // Цена была не теоретической — три живые поверхности рендерились без фона:
-  // карточки типа обращения на `/support` (там вдобавок гасился и `.lux-card`:
-  // authored-слой идёт до утилит), шапка группы слотов в `slot-picker` (и
-  // заливка, и её hover), плитка портфолио на публичном профиле мастера.
-  // Рантайм-проба до правки: computed `background-color: rgba(0, 0, 0, 0)` при
-  // `class`, содержащем `lux-card` и `bg-bg-card` одновременно.
-  // Удалённые три декларации — избыточны, а не полезны: Tailwind preflight уже
-  // задаёт `button { background-color: transparent; color: inherit }` и
-  // `a { color: inherit }` (проверено в собранном CSS), поэтому «без хрома»
-  // получается само, БЕЗ утилит, которые нечего не добавляют и всё перебивают.
-  // Остаётся только фокус-кольцо — единственное, что вариант реально даёт.
-  // ⚠️ Тот же класс ловушки жив в остальных вариантах (`ghost`/`icon` несут
-  // `bg-transparent`, `ghost` — ещё и `text-text-main`): вызывающий с
-  // собственной заливкой обязан брать `wrapper`, а не `ghost`.
+  // «без хрома», и он НИЧЕГО не заливает. Прежние `bg-transparent text-inherit
+  // hover:bg-transparent` избыточны: Tailwind preflight уже задаёт
+  // `button { background-color: transparent; color: inherit }` и
+  // `a { color: inherit }`. Остаётся только фокус-кольцо.
+  // История: пока `cn` был плоским join (до 29.09 · 12), эти три утилиты
+  // перебивали заливку вызывающего по порядку правил в бандле, и три живые
+  // поверхности рендерились без фона (`/support`, `slot-picker`, портфолио).
+  // Сейчас `cn` — tailwind-merge, и класс вызывающего побеждает у любого
+  // варианта; `wrapper` всё равно правильный выбор для кнопки со своей заливкой
+  // или своим цветом текста — у `ghost` свой hover и `text-text-main`, и
+  // собирать поверх них чужую палитру значит переопределять половину варианта.
   wrapper: "focus-visible:ring-2 focus-visible:ring-primary-glow/35",
 };
 
@@ -85,18 +77,17 @@ const sizes: Record<ButtonSize, string> = {
   // 48px; «−2px» давал бы 42 и НЕ дотягивал до 44 — проверено замером.
   // `relative` скоупится СЮДА, а не в DEFAULT_BASE: у произвольной кнопки могут
   // быть absolute-дети, заякоренные на дальнего предка, и глобальный relative их
-  // переякорил бы. ⚠️ icon-кнопке нельзя давать `absolute` в className:
-  // `.relative` в CSS-слое позже и победит (cn — плоский join без
-  // tailwind-merge); позиционирование — на обёртке (единственный такой сайт —
-  // share-profile-section, сирота).
+  // переякорил бы. `absolute` в className icon-кнопки теперь побеждает
+  // `relative` (`cn` — tailwind-merge, 29.09 · 12), и after-зона остаётся
+  // заякоренной: absolute-элемент тоже содержащий блок для своего ::after.
   icon: "relative h-10 w-10 p-0 text-sm after:absolute after:-inset-1 after:content-['']",
   none: "",
 };
 
 const WRAPPER_BASE =
-  "transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none";
+  "transition-all duration-200 disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none";
 const DEFAULT_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-all duration-300 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none";
+  "inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-all duration-200 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none";
 
 export function Button({
   className,

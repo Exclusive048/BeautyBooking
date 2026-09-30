@@ -6,7 +6,7 @@ import {
 } from "@/features/master/lib/time-greeting";
 import { pickAdvice, type AdviceContext } from "@/features/master/lib/dashboard-advice";
 import { formatLocalHm } from "@/lib/schedule/timezone";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.hero;
 

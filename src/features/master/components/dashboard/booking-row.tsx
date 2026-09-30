@@ -6,7 +6,7 @@ import { isBookingPastConfirmWindow } from "@/lib/bookings/action-state";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 
@@ -52,7 +52,7 @@ export function BookingRow({ booking, timezone, showWorkContext = false }: Props
         aria-hidden
         className={`w-1 shrink-0 rounded-full ${
           booking.isPending
-            ? "bg-amber-500"
+            ? "bg-warning"
             : booking.isCurrent
               ? "bg-brand-gradient"
               : "bg-primary/40"
@@ -72,7 +72,7 @@ export function BookingRow({ booking, timezone, showWorkContext = false }: Props
               {booking.clientName}
             </p>
             {booking.isPending ? (
-              <Badge variant="warning" className="shrink-0 text-[10px]">
+              <Badge variant="warning" className="shrink-0">
                 {T.pendingBadge}
               </Badge>
             ) : null}

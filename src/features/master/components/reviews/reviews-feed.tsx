@@ -1,7 +1,7 @@
 import { Star } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { MasterReviewItem } from "@/lib/master/reviews-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ReviewCard } from "./review-card";
 
 const T = UI_TEXT.cabinetMaster.reviews.empty;

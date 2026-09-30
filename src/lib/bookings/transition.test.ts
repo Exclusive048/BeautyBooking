@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { stripComments } from "@/lib/testing/source-scan";
+import { bookingStatusWrite, STATUS_WRITE_MARK } from "@/lib/testing/booking-guards";
+import { hasMark, scanPrismaCalls, type PrismaCallSite } from "@/lib/testing/prisma-calls";
 
 /**
  * LOGIC-02 — все пять переходов статуса брони читали статус СНАРУЖИ, а писали
@@ -117,68 +118,48 @@ describe("applyBookingTransition — LOGIC-02", () => {
  * ровно так же, как появились эти пять. Guard обходит дерево и требует, чтобы
  * любая запись статуса брони шла через общий примитив.
  */
-describe("LOGIC-02 · шестой переход не пройдёт молча", () => {
+describe("LOGIC-02 · запись статуса брони — только через applyBookingTransition", () => {
   const PROJECT_ROOT = resolve(__dirname, "..", "..", "..");
 
   /**
-   * Подпись перехода: запись поля `status` в `booking.update`.
+   * 29.09 доработки · 14 (UPDATE-MANY-STATUS-WRITE) — сторож по месту вызова на
+   * общем AST-разборщике (`lib/testing/prisma-calls.ts` + правила
+   * `lib/testing/booking-guards.ts`) вместо регекспа
+   * `/booking\.update\(\{[\s\S]{0,400}?status:/`. Регексп не видел
+   * `updateMany`, `upsert`, аргумент, собранный заранее, и делегат в переменной,
+   * а расширить его до `update(?:Many)?` было нельзя — он краснел на
+   * `reminders.ts`, где `status:` попадал в окно из соседнего запроса.
    *
-   * 🔴 **FIX-C6 — рассмотрен на перевод в тип и ОСТАВЛЕН детектором.** Решение
-   * измерено, а не заявлено; эскиз прогонялся против компилятора.
+   * Правило: для `booking.update | updateMany | upsert` (у `upsert` —
+   * `update` и `create`) `data`, разрешённая до литералов (идентификатор — до
+   * инициализатора в той же функции, `?:` — обе ветки, спред литерала —
+   * развёрнут), с ключом `status` допустима только в `transition.ts`.
+   * Неразрешимая `data` (параметр, вызов, спред неизвестного) и непроверяемый
+   * сайт (`const b = tx.booking; b.update(…)`, `tx["booking"]`) — нарушение, если
+   * на инструкции нет `// booking-status-write-ok: <причина>`.
    *
-   * Что получилось бы. Сузить `data` у делегата так, чтобы `status` не
-   * принимался, **технически возможно**:
+   * FIX-C6 рассматривал перевод в тип (сузить `data` у делегата) и отказался по
+   * замеру: рукописное зеркало генерённых дженериков Prisma на три метода,
+   * сообщение компилятора без имени поля, и сторож всё равно нужен для пулового
+   * клиента. Решение в силе.
    *
-   *     update<T extends Prisma.BookingUpdateArgs & { data: { status?: never } }>(
-   *       args: Prisma.SelectSubset<T, Prisma.BookingUpdateArgs>,
-   *     ): Prisma.Prisma__BookingClient<Prisma.BookingGetPayload<T>>
+   * Слепые формы: делегат, полученный из функции ДРУГОГО модуля (`getDb().booking`
+   * виден, но `const d = getDelegate(); d.update(…)` — нет); аргумент, собранный в
+   * другом модуле и переданный параметром, разрешается в «неразрешимо» и требует
+   * отметку — то есть не слеп, а громок; сырой SQL (`$executeRaw` с
+   * `UPDATE "Booking"`).
    *
-   * Замер: легитимная запись пути переноса (`studio move` — время + мастер)
-   * компилируется, `data: { status: … }` отвергается, и **форма обхода тоже**
-   * (аргумент, собранный заранее, отвергается вместе с прямым вызовом).
-   *
-   * Почему всё-таки нет — три причины, и первая решающая:
-   *
-   *   1. **Это не одна подмена, а мирроринг генерённых дженериков.** Правило
-   *      про `status` живёт в `data`, поэтому сузить надо КАЖДЫЙ метод, который
-   *      принимает `data`: `update`, `updateMany`, `upsert`. Каждый —
-   *      рукописная копия сигнатуры, приколоченная к ВНУТРЕННИМ типам Prisma
-   *      (`SelectSubset`, `Prisma__BookingClient`). Проект Prisma пинит
-   *      (CLAUDE.md rule 6) и её генерённые внутренности за API не держит:
-   *      патч-бамп 6.19.x переименует такой тип — и билд упадёт в месте, не
-   *      имеющем отношения к причине. Сравните со стоимостью соседних трёх
-   *      конверсий: `Omit<Delegate, "create">` и бренд — это НЕ повторение
-   *      сигнатуры, они переживают любой бамп.
-   *   2. **Сообщение компилятора не называет ни поля, ни правила.** Замеренное
-   *      дословно: «Type 'string' is not assignable to type 'undefined'», а на
-   *      форме с собранным аргументом — стена внутренних типов Prisma
-   *      (`Without<…> & BookingUncheckedUpdateInput`, ~500 символов). Человек,
-   *      который в это упрётся, не узнает, что ему нужен
-   *      `applyBookingTransition`.
-   *   3. **Детектор всё равно остаётся** — у пулового `prisma` методы никуда не
-   *      деваются, иначе сам примитив не смог бы писать. То есть это была бы
-   *      конверсия, которая не удаляет сторожа и не демотирует его, а лишь
-   *      добавляет хрупкости.
-   *
-   * ⚠️ **Чего этот детектор НЕ видит** (записано, чтобы «зелено» читалось как
-   * «известных форм нет»):
-   *
-   *   - `const args = {…}; tx.booking.update(args)` — аргумент собран заранее,
-   *     ровно та форма, что победила все пять сторожей кампании;
-   *   - **`updateMany`** — шаблон требует `update(` вплотную к `{`, поэтому
-   *     `booking.updateMany({ …, data: { status } })` невидим. 🔴 Расширить
-   *     шаблон до `update(?:Many)?` НЕЛЬЗЯ дёшево: замерено — он начинает
-   *     краснеть на `reminders.ts`, где `status:` попадает в 400-символьное
-   *     окно из соседнего запроса. Окно — эвристика близости, а не структурный
-   *     признак, и файловое изъятие под неё запрещено правилом 3
-   *     GUARD-INTEGRITY. Дыра названа и вынесена в отчёт;
-   *   - извлечение делегата в переменную (`const b = tx.booking`).
+   * @probe 2026-09-29 — A/B на `lib/bookings/reminders.ts` (по одной оси):
+   *        (1) в одну ветку `?:` его `data` добавлен `status: "REJECTED"` —
+   *        красный «status пишет только примитив» (`reminders.ts:229`) и
+   *        контроль «reminders.ts … чист»;
+   *        (2) тот же `status` через `const args = { where, data: { ...data,
+   *        status } }; tx.booking.updateMany(args)` — красный (`reminders.ts:230`);
+   *        (3) `const b = tx.booking; b.updateMany(…)` — красный «неразрешимое
+   *        и непроверяемое — только с отметкой» (делегат в переменной);
+   *        исходный файл — зелёный (контроль: на нём сгорел регексп).
    */
-  const STATUS_WRITE = /booking\.update\(\{[\s\S]{0,400}?status:/;
-
-  const WAIVED: Record<string, string> = {
-    "src/lib/bookings/transition.ts": "сам примитив",
-  };
+  const PRIMITIVE = "src/lib/bookings/transition.ts";
 
   function walk(relDir: string): string[] {
     const out: string[] = [];
@@ -194,25 +175,52 @@ describe("LOGIC-02 · шестой переход не пройдёт молча
     return out;
   }
 
-  // FIX-C6 (GUARD-INTEGRITY правило 6): разбор — через общий посимвольный
-  // сканер. Свой `.replace(/\/\//…)` в сторожах не писать, а работать по сырому
-  // тексту тоже нельзя: `status:` в комментарии внутри 400-символьного окна
-  // даёт ложный красный.
-  const writers = walk("src").filter((rel) =>
-    STATUS_WRITE.test(stripComments(readFileSync(resolve(PROJECT_ROOT, rel), "utf8"))),
+  const parsed = walk("src")
+    .map((rel) => ({ rel, text: readFileSync(resolve(PROJECT_ROOT, rel), "utf8") }))
+    .filter((f) => /booking\b/.test(f.text))
+    .map((f) => scanPrismaCalls(f.rel, f.text, "booking"));
+  const writes = parsed.flatMap((p) =>
+    p.calls
+      .map((site) => ({ site, verdict: bookingStatusWrite(site) }))
+      .filter((w): w is { site: PrismaCallSite; verdict: string } => w.verdict !== null),
   );
+  const where = (site: { file: string; line: number }) => `${site.file}:${site.line}`;
 
-  it("каждая запись статуса идёт через applyBookingTransition", () => {
-    const unguarded = writers.filter((rel) => rel in WAIVED === false);
+  it("обход не вакуумный; reminders.ts разрешается до литералов и чист", () => {
+    expect(writes.length).toBeGreaterThanOrEqual(5);
+    const reminders = writes.filter((w) => w.site.file === "src/lib/bookings/reminders.ts");
+    expect(reminders.length).toBeGreaterThan(0);
+    expect(reminders.map((w) => w.verdict)).toEqual(reminders.map(() => "clean"));
+  });
+
+  it("status пишет только примитив", () => {
+    const offenders = writes
+      .filter((w) => w.verdict === "status" && w.site.file !== PRIMITIVE)
+      .filter((w) => !hasMark(w.site.marks, STATUS_WRITE_MARK))
+      .map((w) => where(w.site));
     expect(
-      unguarded,
-      `Файл пишет статус брони напрямую через booking.update. Переход обязан идти ` +
-        `через applyBookingTransition — иначе вернётся LOGIC-02 (чужой переход затирается): ` +
-        `${unguarded.join(", ")}`,
+      offenders,
+      `Запись статуса брони мимо applyBookingTransition — вернётся LOGIC-02 (чужой переход затирается): ${offenders.join(", ")}`,
     ).toEqual([]);
   });
 
-  it("все пути записи статуса переведены на примитив", () => {
+  it("неразрешимое и непроверяемое — только с отметкой на инструкции", () => {
+    const unresolved = writes
+      .filter((w) => w.verdict.startsWith("unresolved") && w.site.file !== PRIMITIVE)
+      .filter((w) => !hasMark(w.site.marks, STATUS_WRITE_MARK))
+      .map((w) => `${where(w.site)} (${w.verdict})`);
+    const uncheckable = parsed
+      .flatMap((p) => p.uncheckable)
+      .filter((u) => !hasMark(u.marks, STATUS_WRITE_MARK))
+      .map((u) => `${where(u)} (${u.reason})`);
+    expect(
+      [...unresolved, ...uncheckable],
+      `Разборщик не может доказать, что здесь не пишется status. Разверните data в литерал ` +
+        `или отметьте инструкцию «// ${STATUS_WRITE_MARK}: <причина>»`,
+    ).toEqual([]);
+  });
+
+  it("все пути перехода зовут примитив", () => {
     for (const rel of [
       "src/lib/bookings/confirmBooking.ts",
       "src/lib/bookings/decline-reschedule.ts",
@@ -227,7 +235,8 @@ describe("LOGIC-02 · шестой переход не пройдёт молча
       "src/lib/bookings/expire-pending.ts",
     ]) {
       const source = readFileSync(resolve(PROJECT_ROOT, rel), "utf8");
-      expect(source, rel).toContain("applyBookingTransition");
+      // форма вызова, а не имя (импорт имени не доказывает перехода)
+      expect(source, rel).toContain("applyBookingTransition(");
     }
   });
 });

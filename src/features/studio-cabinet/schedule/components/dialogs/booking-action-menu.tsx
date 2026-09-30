@@ -8,7 +8,8 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleBookingCell, ScheduleMasterColumn } from "../../server/types";
 import {
   bookingDecisionUrl,
@@ -80,21 +81,13 @@ export function BookingActionMenu({
     setRsBusy(decision);
     setRsError(null);
     try {
-      const response = await fetch(bookingDecisionUrl(bookingId, decision), {
+      await fetchJsonWithAuth<unknown>(bookingDecisionUrl(bookingId, decision), {
         method: "POST",
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setRsError(body?.error?.message ?? fallbackError);
-        setRsBusy(null);
-        return;
-      }
       startTransition(() => router.refresh());
       handleClose();
-    } catch {
-      setRsError(fallbackError);
+    } catch (error) {
+      setRsError(serverMessageOr(error, fallbackError));
       setRsBusy(null);
     }
   }
@@ -149,8 +142,8 @@ export function BookingActionMenu({
             ) : null}
 
             {isPendingClientReschedule(booking) && booking.proposedStartAtUtc ? (
-              <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-950/40">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-900 dark:text-amber-200">
+              <div className="space-y-2 rounded-lg border border-warning-border bg-warning-surface p-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-warning-text">
                   <RefreshCw className="h-3.5 w-3.5" aria-hidden />
                   {T.reschedule.title}
                 </div>
@@ -159,7 +152,7 @@ export function BookingActionMenu({
                     26.07 → 28.07) can't be accepted as if it were same-day.
                     Salon-tz (studio calendar surface) with an explicit
                     «(город, GMT+N)» label — rule 17. */}
-                <div className="space-y-0.5 text-sm tabular-nums text-amber-900 dark:text-amber-100">
+                <div className="space-y-0.5 text-sm tabular-nums text-warning-text">
                   <p>
                     <span className="opacity-70">{T.reschedule.currentLabel}:</span>{" "}
                     {UI_FMT.dateTimeShort(booking.startAtUtc, { timeZone: timezone })}
@@ -204,7 +197,7 @@ export function BookingActionMenu({
                 {rsError ? (
                   <p
                     role="alert"
-                    className="text-xs text-rose-600 dark:text-rose-400"
+                    className="text-xs text-danger-text"
                   >
                     {rsError}
                   </p>

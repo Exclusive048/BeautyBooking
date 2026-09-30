@@ -1,6 +1,6 @@
 import { LoginHeroImageManager } from "@/features/media/components/login-hero-image-manager";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * PERF-25: серверный компонент — граница у `<LoginHeroImageManager>`,

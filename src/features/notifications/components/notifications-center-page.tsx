@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { m, AnimatePresence, LazyMotion, type Variants } from "framer-motion";
 import {
   Bell,
   BellOff,
@@ -16,10 +16,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { Switch } from "@/components/ui/switch";
 import { StudioInviteCards } from "@/features/notifications/components/studio-invite-cards";
 import { useActiveRole } from "@/lib/hooks/use-active-role";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import {
   PROFESSIONAL_GROUPS,
   centerGroupForType,
@@ -34,53 +34,17 @@ import {
   shouldRefreshInvitesForEvent,
 } from "@/lib/notifications/presentation";
 import type { NotificationEvent } from "@/lib/notifications/types";
-import type { ApiResponse } from "@/lib/types/api";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
-import { DEFAULT_ERROR_MESSAGE } from "@/lib/http/client";
+import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { Tabs } from "@/components/ui/tabs";
 
 // NOTIFICATIONS-REDESIGN-01: was `"all" | "master" | "studio" | "system" |
 // "invites"` — channel buckets offered identically to every viewer. Now a
 // semantic group (or "all"); invites are a conditional section, not a tab.
 type FilterKey = "all" | CenterNotificationGroup;
-
-/**
- * Filter pill with a count, matching the `clientNotif` reference (type pills
- * carrying their own counts, active one filled with `primary`). Tokens only.
- */
-function FilterPill({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      data-testid="notifications-filter-pill"
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border-subtle bg-bg-card text-text-main hover:bg-bg-input"
-      }`}
-    >
-      {label}
-      <span
-        className={`tabular-nums text-xs ${active ? "text-primary-foreground/75" : "text-text-sec"}`}
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
 
 /** Display order of the filter pills — most actionable first, «Система» last. */
 const GROUP_ORDER: readonly CenterNotificationGroup[] = [
@@ -159,12 +123,12 @@ function resolveBookingStatusMeta(status: string | undefined): { label: string; 
     case "CONFIRMED":
       return {
         label: t.confirmed,
-        className: "border border-emerald-500/35 bg-emerald-500/10 text-emerald-300",
+        className: "border border-success/35 bg-success/10 text-success-text",
       };
     case "REJECTED":
       return {
         label: t.rejected,
-        className: "border border-rose-500/35 bg-rose-500/10 text-rose-300",
+        className: "border border-destructive/35 bg-destructive/10 text-danger-text",
       };
     case "CANCELLED":
       return {
@@ -284,31 +248,21 @@ function getNotificationIcon(type: string): LucideIcon {
   return Bell;
 }
 
-const listVariants: Variants = {
-  hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.04, delayChildren: 0.05 },
-  },
+// Лента может быть длинной — строки появляются разом, без ступенек: шаг
+// `STAGGER` на сорок уведомлений растянул бы появление на три секунды.
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: DISTANCE.rise },
+  visible: { opacity: 1, y: 0, transition: MOTION.base },
 };
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.25,
-      ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
-    },
-  },
-};
+// Плавная перестройка ленты при фильтре — `layout` у строки, а layout-проекции
+// нет в лёгком наборе шелла (`domAnimation`). Полный набор приезжает отдельным
+// чанком только на этой странице (29.09 доработки · 19).
+const loadDomMax = () => import("@/components/providers/motion-dom-max").then((mod) => mod.default);
 
 export function NotificationsCenterPage({ initialData }: Props) {
   const t = UI_TEXT.notificationsCenter;
   const viewerTimeZone = useViewerTimeZoneContext();
-  const reduce = useReducedMotion();
-  const listAnim = reduce ? undefined : listVariants;
-  const itemAnim = reduce ? undefined : itemVariants;
   const [filter, setFilter] = useState<FilterKey>("all");
   const [invites, setInvites] = useState(initialData.invites);
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
@@ -317,8 +271,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   // The app's existing role source (session-backed) — not a new role concept.
   const { hasMaster, hasStudio } = useActiveRole();
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
-  const [actionNotice, setActionNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const actionNoticeTimerRef = useRef<number | null>(null);
+  const toast = useToast();
   const bookingActionText = t.bookingActions;
 
   const emitBellRefresh = (notificationId?: string) => {
@@ -337,31 +290,22 @@ export function NotificationsCenterPage({ initialData }: Props) {
     setInvitesCount(initialData.invites.length);
   }, [initialData.invites]);
 
-  useEffect(() => {
-    return () => {
-      if (actionNoticeTimerRef.current !== null) {
-        window.clearTimeout(actionNoticeTimerRef.current);
-      }
-    };
-  }, []);
-
-  const showActionNotice = useCallback((tone: "success" | "error", text: string) => {
-    if (actionNoticeTimerRef.current !== null) {
-      window.clearTimeout(actionNoticeTimerRef.current);
-    }
-    setActionNotice({ tone, text });
-    actionNoticeTimerRef.current = window.setTimeout(() => {
-      setActionNotice(null);
-      actionNoticeTimerRef.current = null;
-    }, 3000);
-  }, []);
+  // 29.09 доработки · 10: итог действий над записью — общий тост (раньше —
+  // своя плашка на 3 с в потоке страницы, невидимая после прокрутки).
+  const showActionNotice = useCallback(
+    (tone: "success" | "error", text: string) => {
+      if (tone === "success") toast.success(text);
+      else toast.error(text);
+    },
+    [toast],
+  );
 
   // Unchanged contract: same optimistic flip, same `/api/notifications/read-all`
   // POST, same `emitBellRefresh()` so the global bell re-reads its count.
   // Extracted from the mount effect only so the explicit «Прочитать все» button
   // can reuse it — schedule-requests stay untouched (they aren't Notification
   // rows and have no read state).
-  const markAllRead = useCallback(async () => {
+  const markAllRead = useCallback(async (options?: { announceFailure?: boolean }) => {
     setNotifications((current) =>
       current.map((note) =>
         note.id.startsWith("schedule-request:")
@@ -373,14 +317,16 @@ export function NotificationsCenterPage({ initialData }: Props) {
             }
       )
     );
+    // Фоновая пометка при открытии страницы (эффект ниже) — тихая: сообщение
+    // звучало бы при каждом открытии. Отказ по нажатию «Прочитать все» —
+    // сообщается (29.09 доработки · 10).
     try {
-      await fetchWithAuth("/api/notifications/read-all", { method: "POST" });
-      emitBellRefresh();
-    } catch {
-      // Ignore errors on mark-all.
-      emitBellRefresh();
+      await fetchJsonWithAuth<unknown>("/api/notifications/read-all", { method: "POST" });
+    } catch (error) {
+      if (options?.announceFailure) toast.error(serverMessageOr(error, t.markAllReadFailed));
     }
-  }, []);
+    emitBellRefresh();
+  }, [t.markAllReadFailed, toast]);
 
   // PRESERVED behaviour (NOTIFICATIONS-REDESIGN-01): auto-mark-all-read on
   // mount. This mirrors the already-redesigned client cabinet page ("opening
@@ -401,24 +347,23 @@ export function NotificationsCenterPage({ initialData }: Props) {
           : note
       )
     );
+    // Фоновая пометка (открытие карточки, переход по действию) — тихая
+    // осознанно: отказ здесь не мешает ни чтению, ни действию.
     try {
-      await fetchWithAuth(`/api/notifications/${noteId}/read`, { method: "POST" });
+      await fetchJsonWithAuth<unknown>(`/api/notifications/${noteId}/read`, { method: "POST" });
       emitBellRefresh(noteId);
     } catch {
-      // Ignore errors on mark read.
       emitBellRefresh(noteId);
     }
   };
 
   const reloadCenterData = useCallback(async () => {
-    const res = await fetchWithAuth("/api/notifications/center", { cache: "no-store" });
-    const json = (await res.json().catch(() => null)) as ApiResponse<NotificationCenterData> | null;
-    if (!res.ok || !json || !json.ok) {
-      throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-    }
-    setInvites(json.data.invites);
-    setNotifications(json.data.notifications);
-    setInvitesCount(json.data.invites.length);
+    const data = await fetchJsonWithAuth<NotificationCenterData>("/api/notifications/center", {
+      cache: "no-store",
+    });
+    setInvites(data.invites);
+    setNotifications(data.notifications);
+    setInvitesCount(data.invites.length);
     emitBellRefresh();
   }, []);
 
@@ -430,13 +375,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
     }
     setActionPendingId(noteId);
     try {
-      const res = await fetchWithAuth(`/api/bookings/${booking.bookingId}/confirm`, {
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${booking.bookingId}/confirm`, {
         method: "POST",
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       setNotifications((current) =>
         current.map((note) => {
           if (note.id !== noteId) return note;
@@ -475,15 +416,11 @@ export function NotificationsCenterPage({ initialData }: Props) {
     }
     setActionPendingId(noteId);
     try {
-      const res = await fetchWithAuth(`/api/bookings/${booking.bookingId}/cancel`, {
+      await fetchJsonWithAuth<unknown>(`/api/bookings/${booking.bookingId}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: UI_TEXT.notifications.declineReason }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<unknown> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(json && !json.ok ? json.error.message : DEFAULT_ERROR_MESSAGE);
-      }
       setNotifications((current) =>
         current.map((note) => {
           if (note.id !== noteId) return note;
@@ -625,7 +562,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
             variant="secondary"
             size="sm"
             className="rounded-lg"
-            onClick={() => void markAllRead()}
+            onClick={() => void markAllRead({ announceFailure: true })}
             data-testid="notifications-mark-all"
           >
             <CheckCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
@@ -638,25 +575,21 @@ export function NotificationsCenterPage({ initialData }: Props) {
           there's more than one thing to choose between. */}
       {availableFilters.length > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div
-            className="-mx-1 flex flex-nowrap gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide"
-            data-testid="notifications-filters"
-          >
-            <FilterPill
-              label={t.filters.all}
-              count={visibleTotal}
-              active={filter === "all"}
-              onClick={() => setFilter("all")}
+          <div className="min-w-0 max-w-full" data-testid="notifications-filters">
+            <Tabs
+              ariaLabel={t.filters.aria}
+              items={[
+                { id: "all", label: t.filters.all, badge: visibleTotal, testId: "notifications-filter-pill" },
+                ...availableFilters.map((group) => ({
+                  id: group,
+                  label: t.filters[group],
+                  badge: groupCounts.get(group) ?? 0,
+                  testId: "notifications-filter-pill",
+                })),
+              ]}
+              value={filter}
+              onChange={(id) => setFilter(id as typeof filter)}
             />
-            {availableFilters.map((group) => (
-              <FilterPill
-                key={group}
-                label={t.filters[group]}
-                count={groupCounts.get(group) ?? 0}
-                active={filter === group}
-                onClick={() => setFilter(group)}
-              />
-            ))}
           </div>
           <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-text-sec">
             <Switch
@@ -670,25 +603,6 @@ export function NotificationsCenterPage({ initialData }: Props) {
         </div>
       ) : null}
 
-      {/* Action notice toast */}
-      <AnimatePresence>
-        {actionNotice ? (
-          <motion.div
-            key="action-notice"
-            initial={reduce ? false : { opacity: 0, y: -6 }}
-            animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={reduce ? { duration: 0 } : { duration: 0.2 }}
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              actionNotice.tone === "success"
-                ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
-                : "border-rose-500/35 bg-rose-500/10 text-rose-300"
-            }`}
-          >
-            {actionNotice.text}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
 
       {/* Invites — conditional section. NOTIFICATIONS-REDESIGN-01: this card
           used to render for every visitor on «Все», showing a permanent «Нет
@@ -717,11 +631,11 @@ export function NotificationsCenterPage({ initialData }: Props) {
       {/* Notifications timeline. Always rendered now — «Приглашения» is no
           longer a tab that replaces the feed, it's a section above it. */}
       {visibleNotifications.length > 0 ? (
-          <motion.div
+        <LazyMotion features={loadDomMax}>
+          <m.div
             className="space-y-2"
             initial="hidden"
             animate="visible"
-            variants={listAnim}
             data-testid="notifications-list"
           >
             <AnimatePresence>
@@ -741,14 +655,14 @@ export function NotificationsCenterPage({ initialData }: Props) {
                 const Icon = getNotificationIcon(note.type);
 
                 return (
-                  <motion.article
+                  <m.article
                     key={note.id}
                     layout
-                    variants={itemAnim}
+                    variants={itemVariants}
                     data-testid="notification-row"
                     data-group={centerGroupForType(note.type)}
                     data-unread={isUnread ? "true" : "false"}
-                    exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+                    exit={{ opacity: 0, scale: 0.97, transition: MOTION.exit }}
                     className={`relative flex gap-3 rounded-2xl border p-4 transition-colors ${
                       isUnread
                         ? "border-primary/20 bg-primary/5"
@@ -856,16 +770,17 @@ export function NotificationsCenterPage({ initialData }: Props) {
                             variant="secondary"
                             onClick={(event) => event.stopPropagation()}
                           >
-                            <Link href={note.openHref}>{t.openAction}</Link>
+                            <Link href={note.openHref}>{UI_TEXT.notifications.openAction}</Link>
                           </Button>
                         </div>
                       ) : null}
                     </div>
-                  </motion.article>
+                  </m.article>
                 );
               })}
             </AnimatePresence>
-          </motion.div>
+          </m.div>
+        </LazyMotion>
       ) : (
         // Empty state — one line + one action, per convention. «Показать все»
         // only appears when a filter/toggle is what's hiding things; with a

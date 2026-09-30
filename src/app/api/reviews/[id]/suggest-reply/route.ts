@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { reviewIdParamSchema } from "@/lib/reviews/schemas";
 import { decodePublicId } from "@/lib/public-id";
@@ -30,7 +31,7 @@ export async function POST(req: Request, ctx: RouteContext) {
     }
 
     const limit = await checkRateLimit(
-      `rl:ai:suggest-reply:${user.id}`,
+      routeRateLimitKey(req, "user", user.id),
       RATE_LIMITS.aiSuggestReply,
     );
     if (limit.limited) {

@@ -11,8 +11,8 @@ import { resolvePlanPrice } from "@/lib/billing/pricing";
 import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
 import { cn } from "@/lib/cn";
 import { dateRU, moneyRUBFromKopeks } from "@/lib/format";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type SubscriptionScope = "MASTER" | "STUDIO";
 type PeriodMonths = 1 | 3 | 6 | 12;
@@ -202,14 +202,14 @@ function ActiveFeaturesPanel({
                 .filter((item) => item.enabled)
                 .map((item) => (
                   <li key={item.key} className="flex items-start gap-2">
-                    <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
-                      <Check className="h-2.5 w-2.5 text-emerald-500" />
+                    <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-success/15">
+                      <Check className="h-2.5 w-2.5 text-success-text" />
                     </span>
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-text-main leading-snug">
                         {item.title}
                         {item.limitValue === null ? (
-                          <span className="ml-1.5 text-[10px] text-emerald-500 font-normal">
+                          <span className="ml-1.5 text-[10px] text-success-text font-normal">
                             ({UI_TEXT.billing.currentFeatures.unlimitedValue})
                           </span>
                         ) : item.limitValue !== undefined ? (
@@ -267,25 +267,14 @@ export function BillingPage({ scope }: BillingPageProps) {
     setLoading(true);
     setError(null);
     try {
-      const [plansRes, statusRes] = await Promise.all([
-        fetch("/api/billing/plans", { cache: "no-store" }),
-        fetch("/api/billing/status", { cache: "no-store" }),
+      const [plansData, statusData] = await Promise.all([
+        fetchJsonWithAuth<PlansResponse>("/api/billing/plans", { cache: "no-store" }),
+        fetchJsonWithAuth<StatusResponse>("/api/billing/status", { cache: "no-store" }),
       ]);
-
-      const plansJson = (await plansRes.json().catch(() => null)) as ApiResponse<PlansResponse> | null;
-      const statusJson = (await statusRes.json().catch(() => null)) as ApiResponse<StatusResponse> | null;
-
-      if (!plansRes.ok || !plansJson || !plansJson.ok) {
-        throw new Error(plansJson && !plansJson.ok ? plansJson.error.message : "Не удалось загрузить тарифы.");
-      }
-      if (!statusRes.ok || !statusJson || !statusJson.ok) {
-        throw new Error(statusJson && !statusJson.ok ? statusJson.error.message : "Не удалось загрузить подписки.");
-      }
-
-      setPlans(plansJson.data);
-      setStatus(statusJson.data);
+      setPlans(plansData);
+      setStatus(statusData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить тарифы. Попробуйте ещё раз.");
+      setError(serverMessageOr(err, UI_TEXT.billing.page.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -306,7 +295,7 @@ export function BillingPage({ scope }: BillingPageProps) {
     setBusyScope(selectedScope);
     setError(null);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const checkout = await fetchJsonWithAuth<{ confirmationUrl?: string; mode?: string }>("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -317,20 +306,14 @@ export function BillingPage({ scope }: BillingPageProps) {
           returnUrl: `${window.location.origin}${selectedScope === "STUDIO" ? "/cabinet/studio/billing" : "/cabinet/master/billing"}`,
         }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { confirmationUrl?: string; mode?: string } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !("ok" in json) || !json.ok) {
-        throw new Error(json && "error" in json ? json.error.message : "Не удалось создать оплату.");
-      }
-      if (json.data.confirmationUrl) {
-        window.location.href = json.data.confirmationUrl;
+      if (checkout.confirmationUrl) {
+        window.location.href = checkout.confirmationUrl;
         return;
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось создать оплату.");
+      // «Идёт стартовая акция» (409) и прочие отказы — дословно.
+      setError(serverMessageOr(err, UI_TEXT.billing.page.checkoutFailed));
     } finally {
       setBusyScope(null);
     }
@@ -344,7 +327,7 @@ export function BillingPage({ scope }: BillingPageProps) {
     setBusyScope(sub.scope);
     setError(null);
     try {
-      const res = await fetch("/api/billing/checkout", {
+      const checkout = await fetchJsonWithAuth<{ confirmationUrl?: string; mode?: string }>("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -354,22 +337,13 @@ export function BillingPage({ scope }: BillingPageProps) {
           returnUrl: `${window.location.origin}${sub.scope === "STUDIO" ? "/cabinet/studio/billing" : "/cabinet/master/billing"}`,
         }),
       });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { confirmationUrl?: string; mode?: string } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !("ok" in json) || !json.ok) {
-        throw new Error(
-          json && "error" in json ? json.error.message : UI_TEXT.billing.priceOptIn.acceptFailed
-        );
-      }
-      if (json.data.confirmationUrl) {
-        window.location.href = json.data.confirmationUrl;
+      if (checkout.confirmationUrl) {
+        window.location.href = checkout.confirmationUrl;
         return;
       }
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : UI_TEXT.billing.priceOptIn.acceptFailed);
+      setError(serverMessageOr(err, UI_TEXT.billing.priceOptIn.acceptFailed));
     } finally {
       setBusyScope(null);
     }
@@ -379,29 +353,18 @@ export function BillingPage({ scope }: BillingPageProps) {
     setBusyScope(selectedScope);
     setError(null);
     try {
-      const res = await fetch("/api/billing/auto-renew", {
+      await fetchJsonWithAuth<{ autoRenew: boolean }>("/api/billing/auto-renew", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scope: selectedScope, autoRenew: nextValue }),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<{ autoRenew: boolean }> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(
-          json && !json.ok
-            ? json.error.message
-            : nextValue
-              ? UI_TEXT.billing.autoRenew.enableFailed
-              : UI_TEXT.billing.autoRenew.disableFailed
-        );
-      }
       await load();
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : nextValue
-            ? UI_TEXT.billing.autoRenew.enableFailed
-            : UI_TEXT.billing.autoRenew.disableFailed
+        serverMessageOr(
+          err,
+          nextValue ? UI_TEXT.billing.autoRenew.enableFailed : UI_TEXT.billing.autoRenew.disableFailed,
+        ),
       );
     } finally {
       setBusyScope(null);
@@ -447,7 +410,7 @@ export function BillingPage({ scope }: BillingPageProps) {
       </header>
 
       {error ? (
-        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-400/40 dark:bg-red-950/40 dark:text-red-300">{error}</div>
+        <div role="alert" className="rounded-2xl border border-danger-border bg-danger-surface p-4 text-sm text-danger-text">{error}</div>
       ) : null}
 
       {launchPromo ? (
@@ -461,7 +424,7 @@ export function BillingPage({ scope }: BillingPageProps) {
       ) : null}
 
       {subscription?.pendingPriceOptIn && subscription.pendingPriceKopeks !== null ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-200 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-warning-border bg-warning-surface p-4 text-sm text-warning-text sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="font-semibold">{UI_TEXT.billing.priceOptIn.bannerTitle}</div>
             <p className="mt-0.5">
@@ -561,7 +524,7 @@ export function BillingPage({ scope }: BillingPageProps) {
                     <span
                       className={cn(
                         "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                        isSelected ? "bg-white/20 text-white" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                        isSelected ? "bg-white/20 text-white" : "bg-success/15 text-success-text"
                       )}
                     >
                       {UI_TEXT.billing.period.savingsBadge(savings)}
@@ -612,7 +575,7 @@ export function BillingPage({ scope }: BillingPageProps) {
                           <span className="text-sm text-text-sec line-through">
                             {moneyRUBFromKopeks(baseMonthlyPriceKopeks)}
                           </span>
-                          <span className="text-xs font-semibold text-emerald-500">
+                          <span className="text-xs font-semibold text-success-text">
                             {UI_TEXT.billing.period.savingsBadge(savingsPct)}
                           </span>
                         </div>

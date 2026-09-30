@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { m } from "framer-motion";
 import { X, ZoomIn } from "lucide-react";
+import { HOVER_LIFT, IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJson } from "@/lib/http/client";
+import { MOTION, STAGGER } from "@/lib/ui/motion";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type PortfolioItemPreview = {
   id: string;
@@ -36,7 +39,6 @@ export function PortfolioStrip({ items }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<PortfolioDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const reduce = useReducedMotion();
 
   function closeViewer() {
     setSelectedId(null);
@@ -54,18 +56,17 @@ export function PortfolioStrip({ items }: Props) {
 
     let cancelled = false;
     async function loadDetail() {
-      const res = await fetch(`/api/portfolio/${selectedId}`, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { item: PortfolioDetail } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!cancelled && res.ok && json && json.ok) {
-        setSelectedItem(json.data.item);
-        return;
-      }
-      if (!cancelled) {
-        setSelectedItem(null);
-        setError(UI_TEXT.publicProfile.portfolio.viewError);
+      try {
+        const data = await fetchJson<{ item: PortfolioDetail }>(`/api/portfolio/${selectedId}`, {
+          cache: "no-store",
+        });
+        if (!cancelled) setSelectedItem(data.item);
+      } catch {
+        // Чтение: своя строка просмотра (раньше обрыв сети не ловился вовсе).
+        if (!cancelled) {
+          setSelectedItem(null);
+          setError(UI_TEXT.publicProfile.portfolio.viewError);
+        }
       }
     }
 
@@ -83,18 +84,18 @@ export function PortfolioStrip({ items }: Props) {
           {UI_TEXT.publicProfile.portfolio.empty}
         </div>
       ) : (
-        <motion.div
+        <m.div
           className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3"
           initial="hidden"
           animate="visible"
-          variants={reduce ? undefined : { hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: STAGGER } } }}
         >
           {items.map((item) => (
-            <motion.div
+            <m.div
               key={item.id}
-              variants={reduce ? undefined : {
+              variants={{
                 hidden: { opacity: 0, scale: 0.95 },
-                visible: { opacity: 1, scale: 1, transition: { duration: 0.28, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
+                visible: { opacity: 1, scale: 1, transition: MOTION.base },
               }}
             >
               <Button
@@ -104,11 +105,11 @@ export function PortfolioStrip({ items }: Props) {
                   setSelectedItem(null);
                   setSelectedId(item.id);
                 }}
-                className="group w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card"
+                className={`group w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 text-left hover:shadow-card ${HOVER_LIFT}`}
               >
                 <div className="relative aspect-square overflow-hidden">
                   {item.visualSearchReady ? (
-                    <div className="absolute left-2 top-2 z-10 rounded-full bg-emerald-600/90 px-2 py-1 text-[11px] font-semibold text-white">
+                    <div className="absolute left-2 top-2 z-10 rounded-full bg-success/90 px-2 py-1 text-[11px] font-semibold text-white">
                       {UI_TEXT.publicProfile.portfolio.indexedBadge}
                     </div>
                   ) : null}
@@ -117,7 +118,7 @@ export function PortfolioStrip({ items }: Props) {
                     alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
                     sizes="(max-width: 640px) 50vw, 33vw"
                     quality={90}
-                    className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                    className={`object-cover ${IMAGE_ZOOM}`}
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/25 group-hover:opacity-100">
                     <ZoomIn className="h-6 w-6 text-white drop-shadow" aria-hidden />
@@ -127,9 +128,9 @@ export function PortfolioStrip({ items }: Props) {
                   {item.primaryServiceTitle ?? item.caption ?? item.masterName}
                 </div>
               </Button>
-            </motion.div>
+            </m.div>
           ))}
-        </motion.div>
+        </m.div>
       )}
 
       {/* OVERLAY-PORTAL-REFACTOR-01: was a hand-rolled `fixed inset-0` lightbox.
@@ -138,16 +139,15 @@ export function PortfolioStrip({ items }: Props) {
           by ModalSurface; gains role="dialog"/aria-modal, focus-trap,
           scroll-lock + Escape close — all previously absent. */}
       <ModalSurface open={Boolean(selectedId)} onClose={closeViewer} size="xl">
-        <button
-          type="button"
+        <Button variant="wrapper"
           onClick={closeViewer}
           aria-label={UI_TEXT.publicProfile.portfolio.close}
           className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-bg-input transition hover:bg-bg-card"
         >
           <X className="h-4 w-4 text-text-sec" aria-hidden />
-        </button>
+        </Button>
 
-        {error ? <div className="py-6 text-center text-sm text-rose-500">{error}</div> : null}
+        {error ? <div className="py-6 text-center text-sm text-danger-text">{error}</div> : null}
 
         {!error && !selectedItem ? (
           <div className="flex min-h-[240px] items-center justify-center text-sm text-text-sec">

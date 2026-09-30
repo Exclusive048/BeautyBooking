@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import { scrollBehavior } from "@/lib/ui/scroll";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type PhotoCarouselProps = {
   photos: string[];
@@ -126,7 +126,7 @@ export function PhotoCarousel({
               <span
                 key={`${src}-${dotIndex}`}
                 className={cn(
-                  "h-1.5 rounded-full shadow-sm transition-all duration-300",
+                  "h-1.5 rounded-full shadow-sm transition-all duration-200",
                   dotIndex === index ? "w-4 bg-white" : "w-1.5 bg-white/60",
                 )}
               />

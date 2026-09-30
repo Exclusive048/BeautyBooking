@@ -4,7 +4,7 @@ import { KpiCard } from "@/features/master/components/dashboard/kpi-card";
 import { WorkContextRevenueSplit } from "@/features/master/components/work-context-revenue";
 import type { ScheduleKpi } from "@/lib/master/schedule.service";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.schedule.kpi;
 

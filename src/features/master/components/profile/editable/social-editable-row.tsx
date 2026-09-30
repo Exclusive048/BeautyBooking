@@ -1,17 +1,17 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { cn } from "@/lib/cn";
 import { SocialLinkPreview } from "@/components/ui/social-link-preview";
 import {
   normalizeSocialLink,
   socialDisplayLabel,
   type SocialKind,
 } from "@/lib/providers/social-links";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOf } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { SaveStatusChip } from "./save-status-chip";
 import { useAutosave } from "./use-autosave";
+import { InlineEditField, InlineEditInput, InlineEditPencil } from "@/components/ui/inline-edit";
 
 const T = UI_TEXT.social;
 
@@ -43,12 +43,16 @@ export function SocialEditableRow({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const autosave = useAutosave<string>(async (next) => {
-    const response = await fetch("/api/master/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [fieldKey]: next || null }),
-    });
-    if (!response.ok) return { ok: false };
+    try {
+      await fetchJsonWithAuth<unknown>("/api/master/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [fieldKey]: next || null }),
+      });
+    } catch (error) {
+      // «Ссылка должна вести на …» (INVALID_SOCIAL_LINK) — дословно.
+      return { ok: false, message: serverMessageOf(error) };
+    }
     return { ok: true };
   });
 
@@ -124,7 +128,7 @@ export function SocialEditableRow({
         </div>
         {isEditing ? (
           <>
-            <input
+            <InlineEditInput
               id={inputId}
               ref={inputRef}
               value={draft}
@@ -133,32 +137,31 @@ export function SocialEditableRow({
               onKeyDown={handleKeyDown}
               maxLength={200}
               placeholder={placeholder}
-              className="mt-1 block w-full border-0 border-b-2 border-primary bg-transparent py-1 text-sm text-text-main outline-none focus:ring-0"
+              className="mt-1"
             />
             <SocialLinkPreview kind={kind} value={draft} />
           </>
         ) : (
-          <button
-            type="button"
+          <InlineEditField
             onClick={enterEdit}
-            className={cn(
-              "mt-1 block w-full text-left text-sm",
-              isEmpty ? "italic text-text-sec" : "text-text-main",
-            )}
+            empty={isEmpty}
+            className="mt-1"
           >
             {isEmpty ? T.notSet : displayLabel}
-          </button>
+          </InlineEditField>
         )}
+        {autosave.errorMessage ? (
+          <p role="alert" className="mt-1 text-xs text-danger-text">
+            {autosave.errorMessage}
+          </p>
+        ) : null}
       </div>
       {!isEditing ? (
-        <button
-          type="button"
+        <InlineEditPencil
           onClick={enterEdit}
           aria-label={T.editAria}
-          className="mt-2 shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden />
-        </button>
+          className="mt-2"
+        />
       ) : null}
     </div>
   );

@@ -8,10 +8,10 @@ import { CropPicker } from "@/features/media/components/crop-picker";
 import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-bar";
 import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-profile-form";
 import { StudioProfileHero } from "@/features/studio-cabinet/components/studio-profile-hero";
-import { fetchWithAuth } from "@/lib/http/fetch-with-auth";
 import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
-import type { ApiResponse } from "@/lib/types/api";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
+import { FileInput } from "@/components/ui/file-input";
 
 /**
  * LEGACY-STUDIO-SETTINGS-PORT-AND-RETIRE — the studio profile + media
@@ -114,17 +114,12 @@ export function ProfileMediaEditor({ providerId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchWithAuth(`/api/studios/${providerId}`, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
-      if (!res.ok || !json || !json.ok) {
-        throw new Error(
-          // UI-17: фолбэк — курируемая строка, а не «Ошибка API: 500».
-          // HTTP-статус пользователю ничего не сообщает; ниже этот же `catch`
-          // и так подставляет `loadFailed`, когда ошибка не несёт сообщения.
-          json && !json.ok ? json.error.message : t.loadFailed,
-        );
-      }
-      const studio = json.data.studio;
+      // UI-17: без серверной строки — курируемая `loadFailed`, а не «Ошибка
+      // API: 500» (решает `serverMessageOr` в `catch` ниже).
+      const loaded = await fetchJsonWithAuth<StudioProfileData>(`/api/studios/${providerId}`, {
+        cache: "no-store",
+      });
+      const studio = loaded.studio;
       setName(studio.name);
       setTagline(studio.tagline ?? "");
       setDescription(studio.description ?? "");
@@ -146,7 +141,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
       setBannerAssetId(studio.bannerAssetId ?? null);
       setTimezone(studio.timezone || null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.loadFailed);
+      setError(serverMessageOr(err, t.loadFailed));
     } finally {
       setLoading(false);
     }
@@ -207,32 +202,18 @@ export function ProfileMediaEditor({ providerId }: Props) {
         payload.geoLng = addressCoords.lng;
       }
 
-      const res = await fetchWithAuth(`/api/studios/${providerId}`, {
+      const saved = await fetchJsonWithAuth<StudioProfileData>(`/api/studios/${providerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const json = (await res.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
-      if (!res.ok || !json || !json.ok) {
-        const errorValue = json && !json.ok ? (json as { error?: unknown }).error : null;
-        const message =
-          typeof errorValue === "string"
-            ? errorValue
-            : errorValue &&
-                typeof errorValue === "object" &&
-                "message" in errorValue &&
-                typeof (errorValue as { message?: unknown }).message === "string"
-              ? String((errorValue as { message?: unknown }).message)
-              : t.saveFailed;
-        throw new Error(message);
-      }
-      setIsPublished(json.data.studio.isPublished);
+      setIsPublished(saved.studio.isPublished);
       // Сервер мог пересчитать зону по новому адресу — показываем результат
       // сразу, а не до следующей загрузки страницы.
-      setTimezone(json.data.studio.timezone || null);
+      setTimezone(saved.studio.timezone || null);
       markSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.saveFailed);
+      setError(serverMessageOr(err, t.saveFailed));
     } finally {
       setSaving(false);
     }
@@ -249,37 +230,23 @@ export function ProfileMediaEditor({ providerId }: Props) {
       formData.set("entityId", providerId);
       formData.set("kind", "PORTFOLIO");
 
-      const uploadRes = await fetchWithAuth("/api/media", { method: "POST", body: formData });
-      const uploadJson = (await uploadRes.json().catch(() => null)) as ApiResponse<{
-        asset: { id: string };
-      }> | null;
-      if (!uploadRes.ok || !uploadJson || !uploadJson.ok) {
-        throw new Error(
-          uploadJson && !uploadJson.ok
-            ? uploadJson.error.message
-            : t.uploadBannerFailed,
-        );
-      }
+      const uploaded = await fetchJsonWithAuth<{ asset: { id: string } }>("/api/media", {
+        method: "POST",
+        body: formData,
+      });
 
-      const saveRes = await fetchWithAuth(`/api/studios/${providerId}`, {
+      const saved = await fetchJsonWithAuth<StudioProfileData>(`/api/studios/${providerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bannerAssetId: uploadJson.data.asset.id }),
+        body: JSON.stringify({ bannerAssetId: uploaded.asset.id }),
       });
-      const saveJson = (await saveRes.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
-      if (!saveRes.ok || !saveJson || !saveJson.ok) {
-        throw new Error(
-          saveJson && !saveJson.ok
-            ? saveJson.error.message
-            : t.uploadBannerFailed,
-        );
-      }
-      setBannerUrl(saveJson.data.studio.bannerUrl);
-      setBannerAssetId(saveJson.data.studio.bannerAssetId ?? null);
+      setBannerUrl(saved.studio.bannerUrl);
+      setBannerAssetId(saved.studio.bannerAssetId ?? null);
       setPickingBannerFocal(true);
       markSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.uploadBannerFailed);
+      // Квота хранилища, лимит портфолио, неподходящий файл — дословно.
+      setError(serverMessageOr(err, t.uploadBannerFailed));
     } finally {
       setSaving(false);
     }
@@ -290,25 +257,17 @@ export function ProfileMediaEditor({ providerId }: Props) {
     setError(null);
     setSaved(false);
     try {
-      const saveRes = await fetchWithAuth(`/api/studios/${providerId}`, {
+      const saved = await fetchJsonWithAuth<StudioProfileData>(`/api/studios/${providerId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bannerAssetId: null }),
       });
-      const saveJson = (await saveRes.json().catch(() => null)) as ApiResponse<StudioProfileData> | null;
-      if (!saveRes.ok || !saveJson || !saveJson.ok) {
-        throw new Error(
-          saveJson && !saveJson.ok
-            ? saveJson.error.message
-            : t.uploadBannerFailed,
-        );
-      }
-      setBannerUrl(saveJson.data.studio.bannerUrl);
-      setBannerAssetId(saveJson.data.studio.bannerAssetId ?? null);
+      setBannerUrl(saved.studio.bannerUrl);
+      setBannerAssetId(saved.studio.bannerAssetId ?? null);
       setPickingBannerFocal(false);
       markSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.uploadBannerFailed);
+      setError(serverMessageOr(err, t.uploadBannerFailed));
     } finally {
       setSaving(false);
     }
@@ -344,23 +303,26 @@ export function ProfileMediaEditor({ providerId }: Props) {
   return (
     <div className="space-y-6">
       {error ? (
-        <div className="rounded-2xl bg-rose-500/10 p-4 text-sm text-rose-600 dark:text-rose-300">
+        <div className="rounded-2xl bg-destructive/10 p-4 text-sm text-danger-text">
           {error}
         </div>
       ) : null}
 
-      <StudioProfileHero
-        bannerUrl={bannerUrl}
-        avatar={avatarNode}
-        studioName={name}
-        subtitle={UI_TEXT.studio.profile.subtitle}
-        isPublished={isPublished}
-        onTogglePublished={setIsPublished}
-        onEditBanner={() => bannerInputRef.current?.click()}
-        onRemoveBanner={bannerUrl ? () => void removeBanner() : undefined}
-        onEditFocal={bannerUrl ? () => setPickingBannerFocal(true) : undefined}
-        isBusy={saving}
-      />
+      {/* SETUP-GUIDE-01: шаг «Профиль студии» подсвечивает шапку. */}
+      <div data-guide="profile" className="rounded-2xl">
+        <StudioProfileHero
+          bannerUrl={bannerUrl}
+          avatar={avatarNode}
+          studioName={name}
+          subtitle={UI_TEXT.studio.profile.subtitle}
+          isPublished={isPublished}
+          onTogglePublished={setIsPublished}
+          onEditBanner={() => bannerInputRef.current?.click()}
+          onRemoveBanner={bannerUrl ? () => void removeBanner() : undefined}
+          onEditFocal={bannerUrl ? () => setPickingBannerFocal(true) : undefined}
+          isBusy={saving}
+        />
+      </div>
 
       <StudioProfileForm
         name={name}
@@ -390,11 +352,9 @@ export function ProfileMediaEditor({ providerId }: Props) {
         onVkChange={setVk}
       />
 
-      <input
+      <FileInput
         ref={bannerInputRef}
-        type="file"
         accept="image/png,image/jpeg,image/webp"
-        className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0] ?? null;
           if (file) {

@@ -94,6 +94,8 @@ export const NOT_A_CLASS = new Set([
   // Ключи localStorage — совпали с пространством `mr-*` (margin-right).
   "mr-stories-viewed",
   "mr-stories-viewed-items",
+  // Плашка «Разрешите акции мастеров» (29.09 доработки · 16) — «скрыть» на устройстве.
+  "mr-marketing-banner-dismissed",
   // Якорь раздела справки (`href="#fixed-vs-flexible"`), совпал с `fixed`.
   "fixed-vs-flexible",
 ]);

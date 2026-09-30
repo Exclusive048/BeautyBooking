@@ -10,16 +10,16 @@ type Props = {
 };
 
 const SUBLABEL_TONE: Record<ReviewsKpiTone, string> = {
-  ok: "text-emerald-600 dark:text-emerald-400",
-  warn: "text-amber-600 dark:text-amber-400",
-  danger: "text-red-600 dark:text-red-400",
+  ok: "text-success-text",
+  warn: "text-warning-text",
+  danger: "text-danger-text",
   neutral: "text-text-sec",
 };
 
 const DOT_TONE: Record<ReviewsKpiTone, string> = {
-  ok: "bg-emerald-500",
-  warn: "bg-amber-500",
-  danger: "bg-red-500",
+  ok: "bg-success",
+  warn: "bg-warning",
+  danger: "bg-destructive",
   neutral: "bg-text-sec/40",
 };
 

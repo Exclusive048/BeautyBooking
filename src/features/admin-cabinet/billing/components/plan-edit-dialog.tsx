@@ -16,11 +16,12 @@ import { PlanFeaturesEditor } from "@/features/admin-cabinet/billing/components/
 import type { PlanFeatureOverrides } from "@/lib/billing/features";
 import { resolvePlanPrice } from "@/lib/billing/pricing";
 import { findOrphanedOfferedPeriod } from "@/lib/billing/price-active-guard";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminPlanCard,
   AdminPlanInheritanceCandidate,
 } from "@/features/admin-cabinet/billing/types";
+import { Select } from "@/components/ui/select";
 
 const T = UI_TEXT.adminPanel.billing.editDialog;
 
@@ -279,12 +280,11 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                   <span className="mb-1.5 block text-xs font-medium text-text-sec">
                     {T.fields.inheritsFromLabel}
                   </span>
-                  <select
+                  <Select
                     value={inheritsFromPlanId ?? ""}
                     onChange={(event) =>
                       setInheritsFromPlanId(event.target.value || null)
                     }
-                    className="w-full rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary/40"
                   >
                     <option value="">{T.fields.inheritsFromNone}</option>
                     {parentCandidates.map((cand) => (
@@ -292,7 +292,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                         {cand.code} · {cand.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <span className="mt-1 block text-xs text-text-sec/70">
                     {T.fields.inheritsFromHint}
                   </span>
@@ -345,7 +345,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                           <span
                             className={
                               effective === null
-                                ? "text-red-600 dark:text-red-400"
+                                ? "text-danger-text"
                                 : "text-text-main"
                             }
                           >
@@ -360,7 +360,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                 </div>
                 <p className="text-[11px] text-text-sec/70">{T.fields.priceActiveHint}</p>
                 {orphanedPeriod !== null ? (
-                  <p role="alert" className="text-xs text-amber-600 dark:text-amber-400">
+                  <p role="alert" className="text-xs text-warning-text">
                     {T.errorPriceLastActive.replace("{months}", String(orphanedPeriod))}
                   </p>
                 ) : null}
@@ -378,7 +378,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
           )}
 
           {error ? (
-            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+            <p role="alert" className="text-xs text-danger-text">
               {error}
             </p>
           ) : null}

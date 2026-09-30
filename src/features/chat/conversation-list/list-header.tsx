@@ -2,8 +2,9 @@
 
 import { Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective } from "@/features/chat/types";
+import { Input } from "@/components/ui/input";
 
 const T = UI_TEXT.chat;
 
@@ -42,12 +43,12 @@ export function ListHeader({
           className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-sec"
           strokeWidth={1.8}
         />
-        <input
+        <Input
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder={T.list.searchPlaceholder}
-          className="w-full rounded-lg border border-border-subtle bg-bg-input py-1.5 pl-8 pr-3 text-sm text-text-main outline-none transition placeholder:text-text-placeholder focus:border-primary"
+          className="h-9 rounded-lg py-1.5 pl-8 pr-3"
         />
       </label>
 

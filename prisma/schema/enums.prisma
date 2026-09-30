@@ -157,6 +157,17 @@ enum ChatSenderType {
 
 // === Schedule ===
 
+// SCHEDULE-PATTERNS-01 (этап 2): как мастер описал свой график. Движку всё
+// равно — для него это последовательность дней от даты отсчёта; вид нужен
+// интерфейсу, чтобы показать «2 через 2», а не «цикл из 4 дней».
+enum SchedulePatternKind {
+  WEEK
+
+  WEEKS
+
+  CYCLE
+}
+
 enum ScheduleMode {
   FLEXIBLE
 
@@ -254,10 +265,15 @@ enum NotificationType {
   STUDIO_INVITE_ACCEPTED
   STUDIO_INVITE_REJECTED
   STUDIO_MEMBER_LEFT
+  // 29.09 доработки · 04 (решение владельца): студия исключила мастера — ему.
+  STUDIO_MEMBER_REMOVED
   STUDIO_SCHEDULE_REQUEST
   STUDIO_SCHEDULE_APPROVED
   STUDIO_SCHEDULE_REJECTED
   STUDIO_DISBANDED
+  // SCHEDULE-STUDIO-PROFILE-CALENDAR: расписание мастера в студии скоро
+  // кончится — владельцу студии (для личного профиля — `SCHEDULE_ENDING`).
+  STUDIO_SCHEDULE_ENDING
   MASTER_CABINET_DELETED
   MODEL_NEW_APPLICATION
   MODEL_APPLICATION_RECEIVED
@@ -293,6 +309,9 @@ enum NotificationType {
   BILLING_PAYMENT_REFUNDED
   REVIEW_DELETED_BY_ADMIN
   SUBSCRIPTION_GRANTED_BY_ADMIN
+  // SCHEDULE-PATTERNS-01 (этап 3): настроенное расписание скоро кончится, а
+  // автопродление выключено — после конца клиенты не увидят окошек.
+  SCHEDULE_ENDING
 }
 
 // === Media ===

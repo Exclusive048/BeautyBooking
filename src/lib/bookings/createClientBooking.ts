@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { scheduleBookingRemindersSafe } from "@/lib/bookings/reminders";
 import { logInfo } from "@/lib/logging/logger";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, type RateLimitKey } from "@/lib/rate-limit";
 import { resolveRateLimitRefusal } from "@/lib/rate-limit/refusal";
 import { BookingSource, MediaEntityType, ProviderType } from "@prisma/client";
 import { mapPrismaBookingConflict } from "@/lib/bookings/prisma-conflict";
@@ -27,6 +27,8 @@ import { resolveBookingExtras, type BookingAnswerPayload } from "@/lib/bookings/
 export async function createClientBooking(
   userId: string,
   data: {
+    /** Ключ лимита создания — строит роут (29.09 доработки · 15). */
+    rateLimitKey: RateLimitKey;
     providerId: string;
     serviceId: string;
     hotSlotId?: string | null;
@@ -62,7 +64,7 @@ export async function createClientBooking(
   try {
     // FIX-C11: как в `createBooking` — причина отказа различима (503 против 429).
     const refusal = resolveRateLimitRefusal(
-      await checkRateLimit(`rate:createBooking:${userId}`, {
+      await checkRateLimit(data.rateLimitKey, {
         maxRequests: CREATE_BOOKING_RATE_LIMIT.limit,
         windowSeconds: CREATE_BOOKING_RATE_LIMIT.windowSeconds,
       })
@@ -81,6 +83,7 @@ export async function createClientBooking(
       endAtUtc,
       bufferMin,
       shouldAutoConfirm,
+      timeClearance,
     } = await resolveBookingCore({
       providerId: data.providerId,
       serviceId: data.serviceId,
@@ -131,6 +134,7 @@ export async function createClientBooking(
           });
 
           const created = await createBookingRow(tx, {
+            timePolicy: timeClearance,
             data: {
               providerId: data.providerId,
               serviceId: data.serviceId,

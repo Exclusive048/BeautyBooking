@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { formatLocalHm } from "@/lib/schedule/timezone";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 import { salonInputToUtcIso, salonLocalDatetimeInput } from "@/lib/schedule/datetime-input";
 import type {
   ScheduleBreakCell,
@@ -94,7 +95,7 @@ export function ManageBreaksDialog({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/api/studio/blocks", {
+      await fetchJsonWithAuth<unknown>("/api/studio/blocks", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -106,17 +107,10 @@ export function ManageBreaksDialog({
           note: note.trim() || undefined,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: { message?: string } }
-          | null;
-        setError(body?.error?.message ?? E.breakCreate);
-        return;
-      }
       setNote("");
       router.refresh();
-    } catch {
-      setError(E.breakCreate);
+    } catch (error) {
+      setError(serverMessageOr(error, E.breakCreate));
     } finally {
       setSubmitting(false);
     }
@@ -125,17 +119,13 @@ export function ManageBreaksDialog({
   function handleDelete(blockId: string) {
     startDelete(async () => {
       try {
-        const response = await fetch(
+        await fetchJsonWithAuth<unknown>(
           `/api/studio/blocks/${blockId}?studioId=${encodeURIComponent(studioId)}`,
           { method: "DELETE" },
         );
-        if (!response.ok) {
-          setError(E.breakDelete);
-          return;
-        }
         router.refresh();
-      } catch {
-        setError(E.breakDelete);
+      } catch (error) {
+        setError(serverMessageOr(error, E.breakDelete));
       }
     });
   }
@@ -182,15 +172,14 @@ export function ManageBreaksDialog({
                         </p>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
+                    <Button variant="wrapper"
                       onClick={() => handleDelete(entry.id)}
                       disabled={deleting}
-                      className="inline-grid h-7 w-7 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-card hover:text-red-600"
+                      className="inline-grid h-7 w-7 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-card hover:text-danger-text"
                       aria-label={T.removeButton}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
@@ -266,7 +255,7 @@ export function ManageBreaksDialog({
         </section>
 
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="rounded-lg border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger-text">
             {error}
           </div>
         ) : null}

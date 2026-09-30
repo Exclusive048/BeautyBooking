@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { isProduction } from "@/lib/env.client";
 
 /**
@@ -82,7 +82,7 @@ export function PWAUpdatePrompt() {
   if (!isProduction || !visible) return null;
 
   return (
-    <div className="fixed left-3 right-3 top-3 z-50 pt-[var(--safe-area-inset-top)]">
+    <div className="fixed left-3 right-3 top-3 z-prompt pt-[var(--safe-area-inset-top)]">
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-card px-4 py-3 shadow-card">
         <div className="text-sm text-text-main">{UI_TEXT.pwa.update.title}</div>
         <div className="flex items-center gap-2">

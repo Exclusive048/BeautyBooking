@@ -91,13 +91,18 @@ export function buildPlanEditedSummary(diff: PlanEditDiff): string | null {
   return `В вашем тарифе кое-что изменилось — ${parts.join("; ")}.`;
 }
 
+/**
+ * `accessUntilLabel` — дата конца доступа, уже отформатированная в поясе
+ * кабинета получателя с меткой зоны (`formatBillingDeadlineLabel`, rule 17):
+ * у серверного сообщения нет зрителя, а часы контейнера — не часы получателя.
+ */
 export function buildSubscriptionCancelledByAdminBody(opts: {
   planName: string;
-  accessUntil: Date | null;
+  accessUntilLabel: string | null;
   reason?: string | null;
 }): string {
-  const tail = opts.accessUntil
-    ? `Доступ сохранится до ${formatDateRu(opts.accessUntil)}.`
+  const tail = opts.accessUntilLabel
+    ? `Доступ сохранится до ${opts.accessUntilLabel}.`
     : "Доступ сохранится до конца оплаченного периода.";
   return withReason(
     `Подписка «${opts.planName}» отменена администратором. ${tail}`,
@@ -126,14 +131,6 @@ export function buildReviewDeletedByAdminBody(opts: {
     ? `Ваш отзыв о «${target}» удалён администратором.`
     : "Ваш отзыв удалён администратором.";
   return withReason(head, opts.reason);
-}
-
-function formatDateRu(date: Date): string {
-  return date.toLocaleDateString("ru-RU", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
 }
 
 /** Push payload bodies must fit comfortably in the OS notification

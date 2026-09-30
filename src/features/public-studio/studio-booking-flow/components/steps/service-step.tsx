@@ -5,7 +5,7 @@ import { Search, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import { servicesPerformedBy, type StudioMaster } from "@/features/booking/lib/studio-booking";
 import { groupServicesByCategory } from "@/lib/providers/group-services";

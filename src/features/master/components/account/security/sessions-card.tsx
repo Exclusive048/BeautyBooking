@@ -4,9 +4,11 @@ import { LogOut, Monitor } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { useConfirm } from "@/hooks/use-confirm";
 import type { MasterAccountSessions } from "@/lib/master/account-view.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.account.security;
 
@@ -38,6 +40,7 @@ type Props = {
  */
 export function SessionsCard({ sessions }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { confirm, modal: confirmModal } = useConfirm();
   const [revoking, setRevoking] = useState(false);
 
@@ -51,7 +54,7 @@ export function SessionsCard({ sessions }: Props) {
   const handleRevoke = async () => {
     if (revoking) return;
     if (!sessions.hasOthers) {
-      window.alert(T.revokeOthersOnlyCurrent);
+      toast.info(T.revokeOthersOnlyCurrent);
       return;
     }
     const ok = await confirm({
@@ -61,21 +64,19 @@ export function SessionsCard({ sessions }: Props) {
     if (!ok) return;
     setRevoking(true);
     try {
-      const response = await fetch("/api/master/account/sessions/revoke-others", {
-        method: "POST",
-      });
-      if (!response.ok) {
-        window.alert(T.revokeOthersError);
-        return;
-      }
-      const json = await response.json().catch(() => null);
-      const revokedCount: number = json?.data?.revokedCount ?? 0;
+      const data = await fetchJsonWithAuth<{ revokedCount?: number }>(
+        "/api/master/account/sessions/revoke-others",
+        { method: "POST" },
+      );
+      const revokedCount: number = data?.revokedCount ?? 0;
       // The current session was just re-issued — reload so the page
       // picks up fresh cookies + updated session count.
-      window.alert(
+      toast.success(
         T.revokeOthersSuccessTemplate.replace("{count}", String(Math.max(0, revokedCount - 1)))
       );
       router.refresh();
+    } catch (error) {
+      toast.error(serverMessageOr(error, T.revokeOthersError));
     } finally {
       setRevoking(false);
     }

@@ -3,7 +3,7 @@
 import { Bell } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { usePushOptIn } from "@/features/cabinet/hooks/use-push-opt-in";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 /**
  * FIX-EXP-NOTIFICATIONS (EXP-027/028): the manual push on/off control.
@@ -57,7 +57,7 @@ export function PushNotificationsSection() {
           )}
 
           {error ? (
-            <div role="alert" className="mt-2 text-xs text-red-500">
+            <div role="alert" className="mt-2 text-xs text-danger-text">
               {error}
             </div>
           ) : null}

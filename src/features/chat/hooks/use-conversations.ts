@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { ConversationListItemDto, ChatPerspective } from "@/features/chat/types";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type State = {
   conversations: ConversationListItemDto[];
@@ -28,27 +30,19 @@ export function useConversations(perspective: ChatPerspective): State & {
 
   const fetchList = useCallback(async () => {
     try {
-      const res = await fetch(`/api/chat/conversations?as=${perspective}`, {
-        cache: "no-store",
-      });
-      const json = (await res.json().catch(() => null)) as
-        | { ok: true; data: { conversations: ConversationListItemDto[] } }
-        | { ok: false; error: { message: string } }
-        | null;
-      if (!res.ok || !json || !json.ok) {
-        setState({
-          conversations: [],
-          isLoading: false,
-          error: json && !json.ok ? json.error.message : "Не удалось загрузить переписки.",
-        });
-        return;
-      }
-      setState({ conversations: json.data.conversations, isLoading: false, error: null });
-    } catch {
+      const data = await fetchJsonWithAuth<{ conversations: ConversationListItemDto[] }>(
+        `/api/chat/conversations?as=${perspective}`,
+        { cache: "no-store" },
+      );
+      setState({ conversations: data.conversations, isLoading: false, error: null });
+    } catch (error) {
       setState({
         conversations: [],
         isLoading: false,
-        error: "Нет связи. Обновите страницу.",
+        error:
+          error instanceof ApiClientError
+            ? serverMessageOr(error, UI_TEXT.chat.errors.listLoadFailed)
+            : UI_TEXT.chat.errors.offlineReload,
       });
     }
   }, [perspective]);

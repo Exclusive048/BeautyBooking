@@ -12,7 +12,8 @@ import { RescheduleModal } from "@/features/master/components/schedule/reschedul
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
 import { serverMessageOr } from "@/lib/http/client";
 import type { DashboardBooking } from "@/lib/master/dashboard.service";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
+import { Button } from "@/components/ui/button";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 const TC = UI_TEXT.cabinetMaster.bookings.card;
@@ -144,21 +145,23 @@ export function BookingRowActions({ booking }: Props) {
         ) : null}
 
         {!isTerminal && !isAwaitingChangeResponse ? (
-          <button
-            type="button"
+          <Button variant="wrapper"
             aria-label={T.rescheduleAction}
             title={isPastModifyWindow ? T.modifyWindowExpiredTooltip : T.rescheduleAction}
-            className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-sec`}
-            onClick={() => setRescheduleOpen(true)}
-            disabled={isPastModifyWindow}
+            // Подсказка объясняет, почему нельзя, — поэтому aria-disabled, а не
+            // disabled: у выключенной Button нет наведения, и title не видно.
+            className={`${ICON_BUTTON} aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-text-sec`}
+            onClick={() => {
+              if (!isPastModifyWindow) setRescheduleOpen(true);
+            }}
+            aria-disabled={isPastModifyWindow || undefined}
           >
             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
 
         {canNoShow ? (
-          <button
-            type="button"
+          <Button variant="wrapper"
             aria-label={TC.noShow}
             title={TC.noShow}
             className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
@@ -166,20 +169,22 @@ export function BookingRowActions({ booking }: Props) {
             disabled={noShow.busy}
           >
             <UserX className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
 
         {!isTerminal ? (
-          <button
-            type="button"
+          <Button variant="wrapper"
             aria-label={T.cancelAction}
             title={isPastModifyWindow ? T.modifyWindowExpiredTooltip : T.cancelAction}
-            className={`${ICON_BUTTON} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-sec`}
-            onClick={() => void handleCancel()}
-            disabled={cancelling || isPastModifyWindow}
+            className={`${ICON_BUTTON} aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent aria-disabled:hover:text-text-sec`}
+            onClick={() => {
+              if (!isPastModifyWindow) void handleCancel();
+            }}
+            disabled={cancelling}
+            aria-disabled={isPastModifyWindow || undefined}
           >
             <X className="h-3.5 w-3.5" aria-hidden />
-          </button>
+          </Button>
         ) : null}
       </div>
 

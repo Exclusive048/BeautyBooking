@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { CityTagBadge } from "@/features/admin-cabinet/cities/components/city-tag-badge";
 import { cn } from "@/lib/cn";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminDuplicateGroup } from "@/features/admin-cabinet/cities/types";
 
 const T = UI_TEXT.adminPanel.cities.duplicateGroupsModal;
@@ -50,7 +50,7 @@ export function DuplicateGroupsModal({
                       className={cn(
                         "flex items-center justify-between gap-3 rounded-xl border p-3",
                         c.isCanonical
-                          ? "border-emerald-500/30 bg-emerald-500/10"
+                          ? "border-success/30 bg-success/10"
                           : "border-border-subtle bg-bg-input/40",
                       )}
                     >
@@ -60,7 +60,7 @@ export function DuplicateGroupsModal({
                           <p className="flex items-center gap-1.5 text-sm font-medium text-text-main">
                             <span className="truncate">{c.name}</span>
                             {c.isCanonical ? (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-emerald-700 dark:text-emerald-300">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-success-text">
                                 <Check className="h-2.5 w-2.5" aria-hidden />
                                 {T.canonicalBadge}
                               </span>

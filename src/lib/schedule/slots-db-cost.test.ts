@@ -24,6 +24,7 @@ const prismaMock = vi.hoisted(() => ({
   scheduleTemplate: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleOverride: { findMany: vi.fn(), aggregate: vi.fn() },
   scheduleBreak: { findMany: vi.fn(), aggregate: vi.fn() },
+  schedulePattern: { findMany: vi.fn(), aggregate: vi.fn() },
   $transaction: vi.fn(),
 }));
 
@@ -129,11 +130,13 @@ function primeEmptyScheduleReads(): void {
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null } },
     { _max: { updatedAt: null }, _count: 0 },
+    { _max: { updatedAt: null }, _count: 0 },
   ]);
   prismaMock.weeklyScheduleConfig.findUnique.mockResolvedValue(null);
   prismaMock.scheduleTemplate.findMany.mockResolvedValue([]);
   prismaMock.scheduleOverride.findMany.mockResolvedValue([]);
   prismaMock.scheduleBreak.findMany.mockResolvedValue([]);
+  prismaMock.schedulePattern.findMany.mockResolvedValue([]);
   prismaMock.booking.findMany.mockResolvedValue([]);
   prismaMock.timeBlock.findMany.mockResolvedValue([]);
 }
@@ -147,6 +150,7 @@ function dbCallCount(): number {
     prismaMock.scheduleTemplate.findMany.mock.calls.length +
     prismaMock.scheduleOverride.findMany.mock.calls.length +
     prismaMock.scheduleBreak.findMany.mock.calls.length +
+    prismaMock.schedulePattern.findMany.mock.calls.length +
     prismaMock.$transaction.mock.calls.length
   );
 }
@@ -180,6 +184,7 @@ describe("PERF-04 · слот-кэш экономит обращения к БД
     expect(prismaMock.scheduleTemplate.findMany).not.toHaveBeenCalled();
     expect(prismaMock.scheduleOverride.findMany).not.toHaveBeenCalled();
     expect(prismaMock.scheduleBreak.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.schedulePattern.findMany).not.toHaveBeenCalled();
     expect(prismaMock.booking.findMany).not.toHaveBeenCalled();
     expect(prismaMock.timeBlock.findMany).not.toHaveBeenCalled();
   });

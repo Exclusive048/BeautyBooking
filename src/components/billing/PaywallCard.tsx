@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 type PaywallCardProps = {
   feature?: string;

@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
@@ -8,8 +9,9 @@ import {
   parseTab,
 } from "@/lib/master/clients-view.service";
 import { CRM_CLIENTS_WINDOW_MONTHS } from "@/lib/crm/clients-window";
+import { extractClientIp } from "@/lib/http/ip";
 import { prisma } from "@/lib/prisma";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 import { ClientsKpiCards } from "./clients-kpi-cards";
 import { ClientsPaneClient } from "./clients-pane-client";
 import { ClientsSearchInput } from "./search-input";
@@ -57,6 +59,8 @@ export async function MasterClientsPage({ searchParams }: Props) {
 
   const data = await getMasterClientsView({
     providerId: provider.id,
+    actorUserId: user.id,
+    actorIp: extractClientIp({ headers: await headers() }),
     // STUDIO-MASTER-PROFILES (этап 4): клиенты всех профилей мастера.
     workProfiles: await getMasterWorkProfiles(user.id),
     timezone: provider.timezone,

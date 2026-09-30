@@ -4,7 +4,7 @@ import { Check, Image as ImageIcon, Layers, MapPin, Pencil, Phone, User } from "
 import { useEffect, useId, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { ProfileSectionId } from "@/lib/master/profile-completion";
-import { UI_TEXT } from "@/lib/ui/text";
+import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.profile;
 
@@ -103,7 +103,7 @@ export function SectionNav({ bySection }: Props) {
                 <span className="flex-1 truncate">{item.label}</span>
                 {isComplete ? (
                   <Check
-                    className="h-3.5 w-3.5 shrink-0 text-emerald-700 dark:text-emerald-300"
+                    className="h-3.5 w-3.5 shrink-0 text-success-text"
                     aria-hidden
                   />
                 ) : null}
