@@ -78,8 +78,16 @@ export async function generateViewport(): Promise<Viewport> {
   return resolveViewport((await headers()).get("user-agent"));
 }
 
+const SITE_URL = (env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru").replace(/\/+$/, "");
+
 export const metadata: Metadata = {
-  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL ?? "https://masterryadom.ru"),
+  metadataBase: new URL(SITE_URL),
+  // SEO-01: подтверждение прав в Яндекс Вебмастере и Google Search Console —
+  // мета-тег появляется, только когда код задан в env.
+  verification: {
+    ...(env.GOOGLE_SITE_VERIFICATION ? { google: env.GOOGLE_SITE_VERIFICATION } : {}),
+    ...(env.YANDEX_SITE_VERIFICATION ? { yandex: env.YANDEX_SITE_VERIFICATION } : {}),
+  },
   title: {
     default: UI_TEXT.meta.title,
     template: `%s | ${UI_TEXT.brand.name}`,
@@ -158,21 +166,41 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * SEO-01: разметка сайта для поисковиков — организация (логотип и название в
+ * выдаче) и сайт с поиском по каталогу (строка поиска прямо в результатах).
+ * Адрес — из env, а не литерал: на стенде с другим доменом разметка не
+ * указывает на чужой сайт.
+ */
 const SITE_JSON_LD = {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "МастерРядом",
-  url: "https://masterryadom.ru",
-  description: "Маркетплейс онлайн-записи к мастерам красоты",
-  applicationCategory: "LifestyleApplication",
-  operatingSystem: "Web, iOS, Android",
-  inLanguage: "ru",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "RUB",
-    description: "Бесплатная запись для клиентов",
-  },
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: UI_TEXT.brand.name,
+      url: SITE_URL,
+      logo: `${SITE_URL}/brand/icon-512.png`,
+      ...(env.NEXT_PUBLIC_VK_COMMUNITY_URL ? { sameAs: [env.NEXT_PUBLIC_VK_COMMUNITY_URL] } : {}),
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: UI_TEXT.brand.name,
+      url: SITE_URL,
+      description: UI_TEXT.meta.description,
+      inLanguage: "ru",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${SITE_URL}/catalog?serviceQuery={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

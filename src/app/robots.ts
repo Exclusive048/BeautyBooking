@@ -20,9 +20,14 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/u/", "/c/"],
+        // SEO-01: `/api/og/` — картинка превью профиля для выдачи и соцсетей;
+        // более длинное правило побеждает `disallow: /api/`. Страницы `/c/`
+        // закрыты `noindex`, поэтому из `allow` убраны.
+        allow: ["/", "/u/", "/api/og/"],
         disallow: [
           "/api/",
+          "/booking/manage/",
+          "/clients/",
           "/admin/",
           "/cabinet/",
           "/auth/",

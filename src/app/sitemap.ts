@@ -17,9 +17,12 @@ function buildStaticRoutes(baseUrl: string): MetadataRoute.Sitemap {
     { url: `${baseUrl}/how-it-works`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${baseUrl}/how-to-book`, changeFrequency: "monthly", priority: 0.4 },
     { url: `${baseUrl}/faq`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/help`, changeFrequency: "monthly", priority: 0.4 },
+    { url: `${baseUrl}/partners`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${baseUrl}/support`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${baseUrl}/privacy`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${baseUrl}/terms`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${baseUrl}/consent`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }
 

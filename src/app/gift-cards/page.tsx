@@ -6,6 +6,8 @@ import { InfoPageLayout } from "@/components/layout/info-page-layout";
 export const metadata: Metadata = {
   title: UI_TEXT.pages.giftCards.title,
   description: UI_TEXT.pages.giftCards.description,
+  // SEO-01: страница-заглушка «скоро» — тонкий контент не индексируется.
+  robots: { index: false, follow: true },
 };
 
 export default function GiftCardsPage() {
