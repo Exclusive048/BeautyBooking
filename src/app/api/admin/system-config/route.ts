@@ -11,18 +11,24 @@ import { logInfo } from "@/lib/logging/logger";
 import { clearVisualSearchEnabledCache } from "@/lib/visual-search/config";
 import { VISUAL_SEARCH_TOGGLE_DEFAULT } from "@/lib/visual-search/enabled";
 import { clearTelegramEnabledCache } from "@/lib/telegram/feature";
+import {
+  clearWelcomeDialogEnabledCache,
+  WELCOME_DIALOG_DEFAULT,
+} from "@/lib/onboarding/welcome-dialog";
 
 const updateSchema = z.object({
   onlinePaymentsEnabled: z.boolean().optional(),
   visualSearchEnabled: z.boolean().optional(),
   legalDraftMode: z.boolean().optional(),
   telegramEnabled: z.boolean().optional(),
+  welcomeDialogEnabled: z.boolean().optional(),
 }).refine(
   (value) =>
     value.onlinePaymentsEnabled !== undefined ||
     value.visualSearchEnabled !== undefined ||
     value.legalDraftMode !== undefined ||
-    value.telegramEnabled !== undefined,
+    value.telegramEnabled !== undefined ||
+    value.welcomeDialogEnabled !== undefined,
   { message: "At least one setting is required" },
 );
 
@@ -40,6 +46,9 @@ const FLAG_DEFAULTS = {
   // when the env is off — applied in `getTelegramEnabled()` / `getSystemFlags()`,
   // not here. This raw value is what the audit diff records.
   telegramEnabled: true,
+  // WELCOME-DIALOG-01: приветствие этапа тестирования — включено, пока
+  // владелец не выключит.
+  welcomeDialogEnabled: WELCOME_DIALOG_DEFAULT,
 } as const;
 
 function parseFlag(value: unknown, fallback: boolean): boolean {
@@ -47,7 +56,7 @@ function parseFlag(value: unknown, fallback: boolean): boolean {
 }
 
 async function readAllFlags() {
-  const [onlinePayments, visualSearch, legalDraft, telegram] = await Promise.all([
+  const [onlinePayments, visualSearch, legalDraft, telegram, welcomeDialog] = await Promise.all([
     prisma.systemConfig.findUnique({
       where: { key: "onlinePaymentsEnabled" },
       select: { value: true },
@@ -64,6 +73,10 @@ async function readAllFlags() {
       where: { key: "telegramEnabled" },
       select: { value: true },
     }),
+    prisma.systemConfig.findUnique({
+      where: { key: "welcomeDialogEnabled" },
+      select: { value: true },
+    }),
   ]);
 
   // Raw stored values (the env hard ceiling is applied at read-for-display /
@@ -73,6 +86,7 @@ async function readAllFlags() {
     visualSearchEnabled: parseFlag(visualSearch?.value, FLAG_DEFAULTS.visualSearchEnabled),
     legalDraftMode: parseFlag(legalDraft?.value, FLAG_DEFAULTS.legalDraftMode),
     telegramEnabled: parseFlag(telegram?.value, FLAG_DEFAULTS.telegramEnabled),
+    welcomeDialogEnabled: parseFlag(welcomeDialog?.value, FLAG_DEFAULTS.welcomeDialogEnabled),
   };
 }
 
@@ -206,6 +220,32 @@ export async function PATCH(req: Request) {
           context: auditContext,
         });
       }
+
+      if (parsed.data.welcomeDialogEnabled !== undefined &&
+          parsed.data.welcomeDialogEnabled !== before.welcomeDialogEnabled) {
+        await tx.systemConfig.upsert({
+          where: { key: "welcomeDialogEnabled" },
+          update: { value: parsed.data.welcomeDialogEnabled },
+          create: { key: "welcomeDialogEnabled", value: parsed.data.welcomeDialogEnabled },
+        });
+        changed.welcomeDialogEnabled = {
+          before: before.welcomeDialogEnabled,
+          after: parsed.data.welcomeDialogEnabled,
+        };
+        await createAdminAuditLog({
+          tx,
+          adminUserId: auth.user.id,
+          action: "SETTINGS_FLAG_TOGGLED",
+          targetType: "system_config",
+          targetId: "welcomeDialogEnabled",
+          details: {
+            key: "welcomeDialogEnabled",
+            value: parsed.data.welcomeDialogEnabled,
+            prevValue: before.welcomeDialogEnabled,
+          },
+          context: auditContext,
+        });
+      }
     });
 
     if (changed.visualSearchEnabled) {
@@ -216,6 +256,9 @@ export async function PATCH(req: Request) {
     }
     if (changed.telegramEnabled) {
       await clearTelegramEnabledCache();
+    }
+    if (changed.welcomeDialogEnabled) {
+      await clearWelcomeDialogEnabledCache();
     }
 
     if (Object.keys(changed).length > 0) {

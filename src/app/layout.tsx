@@ -21,6 +21,7 @@ import { PWAInstallPrompt } from "@/components/pwa/install-prompt";
 import { DevServiceWorkerReset } from "@/components/pwa/dev-sw-reset";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ToastProvider } from "@/components/ui/toast";
+import { WelcomeGate } from "@/components/onboarding/welcome-gate";
 import { CookieNotice } from "@/components/layout/cookie-notice";
 import { PushManager } from "@/components/pwa/push-manager";
 import { SWRProvider } from "@/components/providers/swr-provider";
@@ -246,6 +247,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <ToastProvider>
               <AppShell>{children}</AppShell>
               <BottomNav authEnabled={authEnabled} sessionHint={sessionHint} />
+              {/* WELCOME-DIALOG-01: приветствие этапа тестирования, один раз. */}
+              <WelcomeGate />
             </ToastProvider>
             {cookieNoticeAcknowledged ? null : <CookieNotice />}
             <PushManager />

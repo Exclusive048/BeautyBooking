@@ -126,6 +126,12 @@ model UserProfile {
   // toggle requests permission + subscribes). Gates delivery in sendPushToUser.
   pushNotificationsEnabled Boolean @default(false)
 
+  // WELCOME-DIALOG-01: когда человек закрыл приветствие этапа тестирования.
+  // `null` — ещё не видел: окно показывается один раз после регистрации, пока
+  // включён флаг `welcomeDialogEnabled`. Существующим аккаунтам миграция
+  // проставила дату — окно только для новых регистраций.
+  welcomeSeenAt DateTime?
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 

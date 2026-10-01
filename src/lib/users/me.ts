@@ -1,4 +1,5 @@
 import * as cache from "@/lib/cache/cache";
+import { getWelcomeDialogEnabled, isWelcomePending } from "@/lib/onboarding/welcome-dialog";
 import { prisma } from "@/lib/prisma";
 
 export type MeIdentity = {
@@ -18,6 +19,12 @@ export type MeIdentity = {
    */
   emailVerified?: boolean;
   pushNotificationsEnabled: boolean;
+  /**
+   * WELCOME-DIALOG-01: показать приветствие этапа тестирования. Опциональное
+   * по той же причине, что `emailVerified`: старый кадр кэша поля не несёт, и
+   * `undefined` значит «не показывать».
+   */
+  welcomePending?: boolean;
 };
 
 export const ME_CACHE_TTL_SECONDS = 30;
@@ -39,21 +46,25 @@ export async function invalidateMeIdentityCache(userId: string): Promise<void> {
 }
 
 export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | null> {
-  const profile = await prisma.userProfile.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      roles: true,
-      displayName: true,
-      phone: true,
-      email: true,
-      externalPhotoUrl: true,
-      emailNotificationsEnabled: true,
-      emailVerifiedAt: true,
-      pushNotificationsEnabled: true,
-      isDeleted: true,
-    },
-  });
+  const [profile, welcomeEnabled] = await Promise.all([
+    prisma.userProfile.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        roles: true,
+        displayName: true,
+        phone: true,
+        email: true,
+        externalPhotoUrl: true,
+        emailNotificationsEnabled: true,
+        emailVerifiedAt: true,
+        pushNotificationsEnabled: true,
+        welcomeSeenAt: true,
+        isDeleted: true,
+      },
+    }),
+    getWelcomeDialogEnabled(),
+  ]);
 
   if (!profile || profile.isDeleted) return null;
   return {
@@ -66,5 +77,6 @@ export async function getMeIdentityFromDb(userId: string): Promise<MeIdentity | 
     emailNotificationsEnabled: profile.emailNotificationsEnabled,
     emailVerified: profile.emailVerifiedAt !== null,
     pushNotificationsEnabled: profile.pushNotificationsEnabled,
+    welcomePending: isWelcomePending(welcomeEnabled, profile.welcomeSeenAt),
   };
 }
