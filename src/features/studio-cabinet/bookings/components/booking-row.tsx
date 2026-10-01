@@ -20,6 +20,7 @@ import {
 } from "../lib/source-display";
 import type { StudioBookingRow } from "../server/types";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.bookingsV2;
 
@@ -120,14 +121,14 @@ export function BookingRow({
               {row.client.displayName}
             </span>
             {row.client.isNewClient ? (
-              <span className="rounded-full border border-success-border bg-success-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-success-text">
+              <Badge size="xs" variant="success">
                 {T.client.newBadge}
-              </span>
+              </Badge>
             ) : null}
             {row.client.isVip ? (
-              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text">
+              <Badge size="xs" variant="warning">
                 {T.client.vipBadge}
-              </span>
+              </Badge>
             ) : null}
           </div>
           {row.client.phone ? (

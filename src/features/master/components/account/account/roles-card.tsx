@@ -31,7 +31,7 @@ export function RolesCard({ roles }: Props) {
           <IdCard className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.rolesActiveLabel}
           </p>
           <ul className="mt-1.5 flex flex-wrap gap-1.5">

@@ -137,7 +137,7 @@ export function ManageBreaksDialog({
 
         {/* Existing breaks list */}
         <section className="space-y-2">
-          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.existingTitle}
           </p>
           {breaks.length === 0 ? (
@@ -189,7 +189,7 @@ export function ManageBreaksDialog({
 
         {/* Add break form */}
         <section className="space-y-3 border-t border-border-subtle pt-4">
-          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.addTitle}
           </p>
 

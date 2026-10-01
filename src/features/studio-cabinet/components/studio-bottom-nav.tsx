@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
+import { CountBadge } from "@/components/ui/count-badge";
 
 type Props = {
   counts: StudioSidebarCounts;
@@ -143,14 +144,7 @@ export function StudioBottomNav({ counts }: Props) {
                       <span className="text-2xs font-medium leading-tight">
                         {T.nav.items[item.labelKey]}
                       </span>
-                      {badge > 0 ? (
-                        <span
-                          aria-hidden
-                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-semibold text-white"
-                        >
-                          {badge > 9 ? "9+" : badge}
-                        </span>
-                      ) : null}
+                      <CountBadge count={badge} max={9} className="absolute right-2 top-2" />
                     </Link>
                   );
                 })}

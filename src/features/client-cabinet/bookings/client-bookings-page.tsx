@@ -276,7 +276,7 @@ export function ClientBookingsPage() {
         <div className="space-y-8" data-testid="bookings-list">
           {months.map((month) => (
             <section key={month.key}>
-              <div className="mb-3 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+              <div className="mb-3 eyebrow">
                 {month.label}
               </div>
               <ul className="space-y-3">
@@ -606,7 +606,7 @@ function DateBadge({
       }`}
     >
       <span
-        className={`font-mono text-3xs uppercase tracking-[0.18em] ${
+        className={`eyebrow ${
           highlight ? "text-white/80" : "text-text-sec"
         }`}
       >

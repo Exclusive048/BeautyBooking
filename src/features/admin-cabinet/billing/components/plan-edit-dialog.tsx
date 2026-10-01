@@ -207,7 +207,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
           {activeTab === "main" ? (
             <div className="space-y-5">
               <section className="rounded-2xl border border-border-subtle bg-bg-input/40 p-3">
-                <p className="mb-2 font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <p className="mb-2 eyebrow">
                   {T.sections.identity}
                 </p>
                 <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
@@ -222,7 +222,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
               </section>
 
               <section className="space-y-3">
-                <p className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <p className="eyebrow">
                   {T.sections.main}
                 </p>
                 <label className="block">
@@ -269,7 +269,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
               </section>
 
               <section className="space-y-2">
-                <p className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <p className="eyebrow">
                   {T.sections.inheritance}
                 </p>
                 <label className="block">
@@ -296,7 +296,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
               </section>
 
               <section className="space-y-3">
-                <p className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <p className="eyebrow">
                   {T.sections.prices}
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

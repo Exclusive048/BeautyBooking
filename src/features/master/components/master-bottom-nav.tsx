@@ -29,6 +29,7 @@ import { cn } from "@/lib/cn";
 import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
+import { CountBadge } from "@/components/ui/count-badge";
 
 const t = UI_TEXT.master.bookingsPage;
 const tNav = UI_TEXT.master.topbar.nav;
@@ -182,14 +183,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                     >
                       <Icon className="h-5 w-5" aria-hidden />
                       <span className="text-2xs font-medium leading-tight">{item.label}</span>
-                      {count > 0 ? (
-                        <span
-                          aria-hidden
-                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-semibold tabular-nums text-primary-foreground"
-                        >
-                          {count > 99 ? "99+" : count}
-                        </span>
-                      ) : null}
+                      <CountBadge count={count} className="absolute right-2 top-2" />
                     </Link>
                   );
                 })}

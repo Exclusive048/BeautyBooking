@@ -27,14 +27,14 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
         <table className="min-w-full">
           <thead className="bg-bg-input/40">
             <tr>
-              <th className="sticky left-0 z-10 min-w-[200px] bg-bg-input/40 px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="sticky left-0 z-10 min-w-[200px] bg-bg-input/40 px-3 py-2 text-left eyebrow">
                 {T.masterColumn}
               </th>
               {week.days.map((day) => (
                 <th
                   key={day.dateKey}
                   className={cn(
-                    "px-3 py-2 text-center font-mono text-3xs uppercase tracking-wide",
+                    "px-3 py-2 text-center eyebrow",
                     day.isToday ? "text-accent-text" : "text-text-sec",
                   )}
                 >

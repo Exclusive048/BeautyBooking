@@ -126,7 +126,7 @@ function ReadonlyRow({
     <li className="flex items-center gap-3 py-3">
       <Icon className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {label}
         </p>
         <p

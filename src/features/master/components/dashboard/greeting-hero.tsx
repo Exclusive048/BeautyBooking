@@ -88,7 +88,7 @@ export function GreetingHero({ firstName, now, context, nextBooking, timezone }:
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-3xs uppercase tracking-[0.18em] text-white/70">
+              <p className="eyebrow text-white/70">
                 {T.nextClientLabel}
               </p>
               <p className="truncate text-sm font-medium">{nextBooking.clientName}</p>

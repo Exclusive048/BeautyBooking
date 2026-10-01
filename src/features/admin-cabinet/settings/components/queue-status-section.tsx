@@ -122,7 +122,7 @@ export function QueueStatusSection({ initial }: Props) {
 
       {snapshot.deadJobs.length > 0 ? (
         <div className="mt-1">
-          <p className="mb-2 font-mono text-2xs uppercase tracking-[0.12em] text-text-sec">
+          <p className="mb-2 eyebrow text-2xs">
             {t.deadJobsTitle}
           </p>
           <ul className="space-y-2">

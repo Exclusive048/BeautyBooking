@@ -144,6 +144,7 @@ colors: {
 | Карточка-переключатель режима | `<ModeCard active title description icon onClick>` |
 | Карточка | `<Card>`, `<CardHeader>`, `<CardContent>` |
 | Бейдж | `<Badge variant="default|success|warning|danger|info|muted" size="md|xs">` (`xs` — плашка состояния в строке: моно 10px, прописные, `tracking-wide`, `px-2 py-0.5`; цвет — только из варианта) |
+| Счётчик над пунктом нижней навигации | `<CountBadge count max className>` (кружок 16px, 10px, `aria-hidden`; положение — у вызывающего) |
 | Переключатель | `<Switch>` |
 | Чекбокс | `<Checkbox size="sm|md">` |
 | Вкладки и фильтры списка | `<Tabs items value onChange ariaLabel>` (item: `badge` — счётчик, `icon`, `disabled`, `testId`) для 4+ вариантов или со счётчиком; `<SegmentedTabs options value onChange ariaLabel disabled>` для 2–3 вариантов (option: `badge`, `icon`). Один вид во всех кабинетах (решение 22.2) |

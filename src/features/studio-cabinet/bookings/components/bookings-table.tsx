@@ -43,25 +43,25 @@ export function BookingsTable({ studioId, rows, masters, timezone, isFiltered }:
         <table className="w-full min-w-[920px] text-sm">
           <thead>
             <tr className="bg-bg-input/40">
-              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left eyebrow">
                 {T.colWhen}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left eyebrow">
                 {T.colMaster}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left eyebrow">
                 {T.colClient}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left eyebrow">
                 {T.colService}
               </th>
-              <th className="px-3 py-2 text-right font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-right eyebrow">
                 {T.colPrice}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left eyebrow">
                 {T.colSource}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left eyebrow">
                 {T.colStatus}
               </th>
               <th className="w-10 px-2 py-2" aria-hidden />

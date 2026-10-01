@@ -27,7 +27,7 @@ export function ServicesHeader({
     <>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="mb-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="mb-1 eyebrow">
             {T.caption
               .replace("{services}", String(servicesCount))
               .replace("{categories}", String(categoriesCount))}

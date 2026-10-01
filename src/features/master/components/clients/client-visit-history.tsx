@@ -24,7 +24,7 @@ export function ClientVisitHistory({ visits }: Props) {
   if (visits.length === 0) {
     return (
       <section className="py-4">
-        <p className="mb-2 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="mb-2 eyebrow">
           {T.heading}
         </p>
         <p className="text-sm italic text-text-sec">{T.empty}</p>
@@ -34,7 +34,7 @@ export function ClientVisitHistory({ visits }: Props) {
 
   return (
     <section className="py-4">
-      <p className="mb-3 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="mb-3 eyebrow">
         {T.heading}
       </p>
       <ul className="space-y-1.5">

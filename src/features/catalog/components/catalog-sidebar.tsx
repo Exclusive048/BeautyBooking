@@ -200,7 +200,7 @@ export function CatalogSidebar({
   // visually quiet so the actual filter controls draw the eye.
   const sectionClass = "pb-6 border-b border-border-subtle last:border-b-0 last:pb-0";
   const labelClass =
-    "mb-3 font-mono text-2xs font-medium uppercase tracking-[0.18em] text-text-sec";
+    "mb-3 eyebrow text-2xs font-medium";
 
   return (
     <div className="space-y-6">
@@ -264,7 +264,7 @@ export function CatalogSidebar({
 
       <section className={sectionClass}>
         <div className="mb-3 flex items-center justify-between">
-          <div className="font-mono text-2xs font-medium uppercase tracking-[0.18em] text-text-sec">
+          <div className="eyebrow text-2xs font-medium">
             {UI_TEXT.catalog.sidebar.rating}
           </div>
           <span className="font-mono text-sm tabular-nums text-text-main">

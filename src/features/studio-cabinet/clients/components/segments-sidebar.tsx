@@ -40,7 +40,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
 
   return (
     <aside className="space-y-2 rounded-2xl border border-border-subtle bg-bg-card p-4 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)]">
-      <h2 className="px-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <h2 className="px-1 eyebrow">
         {T.title}
       </h2>
       <ul className="space-y-1">

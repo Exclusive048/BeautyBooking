@@ -145,7 +145,7 @@ export function ScheduleHeader({
       <header className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="mb-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+            <p className="mb-1 eyebrow">
               {caption}
             </p>
             <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
@@ -227,7 +227,7 @@ export function ScheduleHeader({
             {T.refresh}
           </Button>
           {refreshedAt ? (
-            <span className="font-mono text-3xs uppercase tracking-wide text-text-sec">
+            <span className="eyebrow">
               {T.refreshedAtTemplate.replace("{time}", refreshedAt)}
             </span>
           ) : null}

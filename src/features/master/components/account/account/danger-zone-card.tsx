@@ -67,7 +67,7 @@ export function DangerZoneCard() {
             className="h-4 w-4 text-danger-text"
             aria-hidden
           />
-          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-danger-text">
+          <p className="eyebrow text-danger-text">
             {T.dangerZoneHeading}
           </p>
         </header>

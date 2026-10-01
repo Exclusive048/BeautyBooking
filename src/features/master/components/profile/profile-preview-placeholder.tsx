@@ -12,7 +12,7 @@ const T = UI_TEXT.cabinetMaster.profile.preview;
 export function ProfilePreviewPlaceholder() {
   return (
     <div className="space-y-3">
-      <p className="px-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="px-1 eyebrow">
         {T.eyebrow}
       </p>
       <div className="rounded-2xl border border-dashed border-border-subtle bg-bg-card/60 p-6 text-center">

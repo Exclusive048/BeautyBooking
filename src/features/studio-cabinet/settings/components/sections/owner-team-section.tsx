@@ -2,6 +2,7 @@ import { Crown, Shield } from "lucide-react";
 import * as UI_TEXT from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
 import type { StudioOwnerTeamData, StudioTeamMember } from "../../lib/types";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.settingsV2.ownerTeam;
 
@@ -65,15 +66,9 @@ function TeamRow({ member, accent }: { member: StudioTeamMember; accent: "owner"
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-semibold text-text-main">{member.displayName}</span>
-          <span
-            className={
-              accent === "owner"
-                ? "rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text"
-                : "rounded-full border border-info-border bg-info-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-info-text"
-            }
-          >
+          <Badge size="xs" variant={accent === "owner" ? "warning" : "info"}>
             {accent === "owner" ? T.roleOwner : T.roleAdmin}
-          </span>
+          </Badge>
           {member.isCurrentUser ? (
             <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-accent-text">
               {T.youChip}

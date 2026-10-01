@@ -200,7 +200,7 @@ export function PlanFeaturesEditor({
               groupIndex > 0 ? "border-t border-border-subtle/60 pt-5" : "",
             )}
           >
-            <h4 className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+            <h4 className="eyebrow">
               {groupName}
             </h4>
             <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">

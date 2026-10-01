@@ -745,7 +745,7 @@ export default function LoginClient({
             {otpEnabled && hasSocialProviders ? (
               <div className="my-6 flex items-center gap-3">
                 <div className="h-px flex-1 bg-border-subtle" />
-                <span className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <span className="eyebrow">
                   {T.socialDividerLabel}
                 </span>
                 <div className="h-px flex-1 bg-border-subtle" />

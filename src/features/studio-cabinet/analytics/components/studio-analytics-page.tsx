@@ -33,7 +33,7 @@ export function StudioAnalyticsPage({ data }: Props) {
   return (
     <div className="space-y-5 lg:space-y-6">
       <header className="min-w-0">
-        <p className="mb-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="mb-1 eyebrow">
           {T.header.caption.replace("{days}", String(days))}
         </p>
         <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">

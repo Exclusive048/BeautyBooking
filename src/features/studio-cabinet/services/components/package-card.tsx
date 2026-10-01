@@ -11,6 +11,7 @@ import type {
 import { DeletePackageDialog } from "./delete-package-dialog";
 import { PackageModal } from "./package-modal";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.servicesV2.package;
 
@@ -42,9 +43,9 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
               </span>
               <h3 className="font-display text-base text-text-main">{pkg.name}</h3>
               {!pkg.isEnabled ? (
-                <span className="rounded-full border border-border-subtle bg-bg-card px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-text-sec">
+                <Badge size="xs" variant="muted">
                   {T.pausedBadge}
-                </span>
+                </Badge>
               ) : null}
             </div>
             <div className="flex shrink-0 gap-1">
@@ -66,7 +67,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
           </header>
 
           <div>
-            <p className="mb-1.5 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+            <p className="mb-1.5 eyebrow">
               {T.componentsLabel.replace("{count}", String(pkg.components.length))}
             </p>
             <ul className="space-y-1">

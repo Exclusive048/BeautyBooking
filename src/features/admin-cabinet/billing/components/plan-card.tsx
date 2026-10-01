@@ -41,7 +41,7 @@ export function PlanCardView({ plan, onEdit }: Props) {
       ) : null}
 
       <header>
-        <p className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+        <p className="eyebrow">
           {tierAndScopeLabel(plan.tier, plan.scope)}
         </p>
         <h3 className="mt-1 font-display text-lg text-text-main">{plan.name}</h3>

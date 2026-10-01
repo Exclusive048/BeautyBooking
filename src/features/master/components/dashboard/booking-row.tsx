@@ -43,7 +43,7 @@ export function BookingRow({ booking, timezone, showWorkContext = false }: Props
         <p className="font-display text-base text-text-main">
           {formatLocalHm(booking.startAtUtc, timezone)}
         </p>
-        <p className="font-mono text-3xs uppercase tracking-[0.1em] text-text-sec">
+        <p className="eyebrow">
           до {formatLocalHm(booking.endAtUtc, timezone)}
         </p>
       </div>

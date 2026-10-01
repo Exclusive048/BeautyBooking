@@ -442,7 +442,7 @@ function Field({
     <div>
       <label
         htmlFor={controlId}
-        className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
+        className="eyebrow"
       >
         {label}
       </label>

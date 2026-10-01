@@ -138,7 +138,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
     <>
       <div className="space-y-4 rounded-2xl border border-border-subtle bg-bg-card p-5">
         <header>
-          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.caption.replace("{id}", detail.id.slice(-6).toUpperCase())}
           </p>
           <h2 className="mt-1 font-display text-lg font-semibold text-text-main">

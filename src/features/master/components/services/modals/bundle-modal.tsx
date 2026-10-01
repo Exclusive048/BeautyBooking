@@ -193,7 +193,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
 
         <div>
           <div className="flex items-baseline gap-2">
-            <label className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+            <label className="eyebrow">
               {T.servicesLabel}
             </label>
             <span className="text-3xs text-text-sec">· {T.servicesHint}</span>
@@ -236,7 +236,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         <div>
           <label
             htmlFor={discountValueId}
-            className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
+            className="eyebrow"
           >
             {T.discountLabel}
           </label>
@@ -361,7 +361,7 @@ function Field({
     <div>
       <label
         htmlFor={controlId}
-        className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
+        className="eyebrow"
       >
         {label}
       </label>

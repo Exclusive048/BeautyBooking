@@ -10,7 +10,7 @@ export function TipCard() {
       <div className="flex items-start gap-2">
         <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-text" aria-hidden />
         <div>
-          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.tipEyebrow}
           </p>
           <p className="mt-1 text-xs leading-relaxed text-text-sec">{T.tipBody}</p>

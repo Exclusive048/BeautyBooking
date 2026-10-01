@@ -11,6 +11,7 @@ import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
 import { Button } from "@/components/ui/button";
 import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.adminPanel.billing.subs;
 const M = UI_TEXT.adminPanel.billing.methodFallback;
@@ -46,7 +47,7 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
           {row.user.displayName}
         </p>
         {row.status !== SubscriptionStatus.ACTIVE ? (
-          <p className="mt-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text">
+          <p className="mt-0.5 eyebrow text-warning-text">
             {STATUS_LABEL[row.status]}
           </p>
         ) : null}
@@ -61,7 +62,7 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
           {formatPlanName(row.plan.tier, row.plan.scope)}
         </span>
         {row.isTrial ? (
-          <p className="mt-0.5 font-mono text-3xs uppercase tracking-wide text-text-sec">
+          <p className="mt-0.5 eyebrow">
             trial
           </p>
         ) : null}
@@ -83,16 +84,9 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
         {row.paymentMethodDisplay ?? M}
       </td>
       <td className="px-4 py-3 align-top">
-        <span
-          className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-3xs uppercase tracking-wide",
-            row.autoRenew
-              ? "bg-success/[0.12] text-success-text"
-              : "bg-bg-input text-text-sec",
-          )}
-        >
+        <Badge size="xs" variant={row.autoRenew ? "success" : "muted"}>
           {row.autoRenew ? T.autoRenewOn : T.autoRenewOff}
-        </span>
+        </Badge>
       </td>
       <td className="px-4 py-3 text-right align-top">
         {cancelable ? (

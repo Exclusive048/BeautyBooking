@@ -25,7 +25,7 @@ export function ApplicationPhotos({ photos }: Props) {
   }
   return (
     <div className="space-y-1.5">
-      <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="eyebrow">
         {T.photosLabel}
       </p>
       <div className="flex flex-wrap gap-2">

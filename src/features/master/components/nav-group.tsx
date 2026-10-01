@@ -15,7 +15,7 @@ type Props = {
 export function NavGroup({ label, children, first = false }: Props) {
   return (
     <section className={first ? "space-y-1" : "mt-6 space-y-1"}>
-      <p className="px-3 pb-2 font-mono text-3xs font-medium uppercase tracking-[0.18em] text-text-sec">
+      <p className="px-3 pb-2 eyebrow font-medium">
         {label}
       </p>
       <ul className="space-y-0.5">{children}</ul>

@@ -20,7 +20,7 @@ export function StudioNotificationsPage({ data }: Props) {
   return (
     <div className="space-y-5 lg:space-y-6">
       <header className="min-w-0">
-        <p className="mb-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="mb-1 eyebrow">
           {H.caption
             .replace("{unread}", String(data.kpi.unreadCount))
             .replace("{total}", String(data.kpi.totalCount))}

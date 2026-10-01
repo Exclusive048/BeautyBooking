@@ -35,7 +35,7 @@ export function ClientsView({ data }: Props) {
                   key={slice.key}
                   className="rounded-xl border border-border-subtle bg-bg-input/30 p-3"
                 >
-                  <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+                  <p className="eyebrow">
                     {slice.label}
                   </p>
                   <p className="mt-1 font-display text-lg font-bold tabular-nums text-text-main">
@@ -60,7 +60,7 @@ export function ClientsView({ data }: Props) {
           {clients && clients.topClients.length > 0 ? (
             <table className="mt-3 w-full text-left">
               <thead>
-                <tr className="bg-bg-input/40 text-3xs font-mono uppercase tracking-[0.12em] text-text-sec">
+                <tr className="bg-bg-input/40 eyebrow">
                   <th className="px-3 py-2.5">{T.colClient}</th>
                   <th className="px-3 py-2.5 text-right">{T.colVisits}</th>
                   <th className="px-3 py-2.5 text-right">{T.colLifetime}</th>

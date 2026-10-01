@@ -79,7 +79,7 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
       </div>
 
       <div>
-        <div className="mb-1.5 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <div className="mb-1.5 eyebrow">
           {UI_TEXT.clientCabinet.reviews.ratingLabel}
         </div>
         <StarRatingInput value={rating} onChange={setRating} />
@@ -88,7 +88,7 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
       <div className="space-y-1.5">
         <label
           htmlFor="edit-review-text"
-          className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
+          className="eyebrow"
         >
           {UI_TEXT.clientCabinet.reviews.textLabel}
         </label>

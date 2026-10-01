@@ -7,6 +7,7 @@ import { CityTagBadge } from "@/features/admin-cabinet/cities/components/city-ta
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminDuplicateGroup } from "@/features/admin-cabinet/cities/types";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.adminPanel.cities.duplicateGroupsModal;
 
@@ -38,7 +39,7 @@ export function DuplicateGroupsModal({
                 key={group.groupId}
                 className="rounded-2xl border border-border-subtle bg-bg-card p-4"
               >
-                <p className="mb-3 font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <p className="mb-3 eyebrow">
                   {group.reason === "normalize"
                     ? T.reasonNormalize
                     : T.reasonGeo}
@@ -60,10 +61,10 @@ export function DuplicateGroupsModal({
                           <p className="flex items-center gap-1.5 text-sm font-medium text-text-main">
                             <span className="truncate">{c.name}</span>
                             {c.isCanonical ? (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-success/15 px-1.5 py-0.5 font-mono text-3xs uppercase tracking-[0.08em] text-success-text">
+                              <Badge size="xs" variant="success" className="gap-0.5">
                                 <Check className="h-2.5 w-2.5" aria-hidden />
                                 {T.canonicalBadge}
-                              </span>
+                              </Badge>
                             ) : null}
                           </p>
                           <p className="font-mono text-2xs text-text-sec">

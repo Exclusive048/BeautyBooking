@@ -241,7 +241,7 @@ export function ServiceSearchInput({
           <div className="max-h-[420px] overflow-y-auto">
             {results.categories.length > 0 ? (
               <div className="p-2">
-                <div className="px-2 pb-1 pt-1.5 font-mono text-3xs font-medium uppercase tracking-[0.18em] text-text-sec">
+                <div className="px-2 pb-1 pt-1.5 eyebrow font-medium">
                   {T.categoriesGroup}
                 </div>
                 {results.categories.map((cat) => (
@@ -266,7 +266,7 @@ export function ServiceSearchInput({
                   results.categories.length > 0 ? "border-t border-border-subtle/50" : "",
                 )}
               >
-                <div className="px-2 pb-1 pt-1.5 font-mono text-3xs font-medium uppercase tracking-[0.18em] text-text-sec">
+                <div className="px-2 pb-1 pt-1.5 eyebrow font-medium">
                   {T.providersGroup}
                 </div>
                 {results.providers.map((p) => (

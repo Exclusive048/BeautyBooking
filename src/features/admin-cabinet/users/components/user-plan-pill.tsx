@@ -48,12 +48,12 @@ export function UserPlanPill({ plan, onClick, disabled }: Props) {
     >
       <span>{formatPlanName(plan.tier, plan.scope)}</span>
       {plan.isTrial ? (
-        <span className="font-mono text-3xs uppercase tracking-wider text-text-sec">
+        <span className="eyebrow">
           · {T.trial}
         </span>
       ) : null}
       {isPastDue ? (
-        <span className="font-mono text-3xs uppercase tracking-wider text-warning-text">
+        <span className="eyebrow text-warning-text">
           · {T.pastDue}
         </span>
       ) : null}

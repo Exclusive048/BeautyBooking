@@ -43,7 +43,7 @@ export function SettingsNav({ active, canDanger }: Props) {
 
   return (
     <aside className="rounded-2xl border border-border-subtle bg-bg-card p-3 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)]">
-      <p className="mb-2 px-2 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="mb-2 px-2 eyebrow">
         {T.sectionsLabel}
       </p>
       <ul className="space-y-1">

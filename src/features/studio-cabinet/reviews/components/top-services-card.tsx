@@ -16,7 +16,7 @@ type Props = {
 export function TopServicesCard({ services }: Props) {
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
-      <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="eyebrow">
         {T.topServicesTitle}
       </p>
       {services.length === 0 ? (

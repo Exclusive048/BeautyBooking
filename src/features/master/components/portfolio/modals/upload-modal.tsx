@@ -295,7 +295,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         <div>
           <label
             htmlFor={defaultCategorySelectId}
-            className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
+            className="eyebrow"
           >
             {T.defaultCategoryLabel}
           </label>

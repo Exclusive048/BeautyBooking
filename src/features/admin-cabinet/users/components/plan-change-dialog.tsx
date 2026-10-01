@@ -17,6 +17,7 @@ import type {
   AdminBillingPlanOption,
   AdminUserRow,
 } from "@/features/admin-cabinet/users/types";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.adminPanel.users.planChange;
 
@@ -201,9 +202,9 @@ export function PlanChangeDialog({
                         <p className="flex items-center gap-2 text-sm font-medium text-text-main">
                           {plan.name}
                           {isCurrent ? (
-                            <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs uppercase text-text-sec">
+                            <Badge size="xs" variant="muted">
                               {T.currentLabel}
-                            </span>
+                            </Badge>
                           ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-text-sec">

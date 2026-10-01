@@ -67,7 +67,7 @@ export function NotificationCard({ item, timeZone }: Props) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+            <span className="eyebrow">
               {config.label}
             </span>
             <span className="text-2xs text-text-sec/80">{timeLabel}</span>

@@ -244,7 +244,7 @@ export function OperatorSlotPicker({
   return (
     <div className="space-y-3" data-testid="operator-slot-picker">
       <div>
-        <p className="mb-2 font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">{T.dateLabel}</p>
+        <p className="mb-2 eyebrow text-2xs">{T.dateLabel}</p>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {dateKeys.map((dateKey) => (
             <Chip
@@ -266,7 +266,7 @@ export function OperatorSlotPicker({
       </div>
 
       <div>
-        <p className="mb-2 font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="mb-2 eyebrow text-2xs">
           {T.timeLabel}
           {zoneLabel ? <span className="ml-1 normal-case tracking-normal">{zoneLabel}</span> : null}
         </p>

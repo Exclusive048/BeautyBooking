@@ -24,7 +24,7 @@ const BAR_TONE: Record<number, string> = {
 export function RatingDistributionCard({ distribution }: Props) {
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
-      <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="eyebrow">
         {T.distributionTitle}
       </p>
       <ul className="mt-3 space-y-2">

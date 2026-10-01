@@ -140,7 +140,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-3xs uppercase tracking-[0.12em] text-text-muted">
+          <div className="eyebrow text-text-muted">
             {UI_TEXT.bookingWidget.hero.studioLabel}
             {studio.publicUsername ? ` · @${studio.publicUsername}` : ""}
           </div>
@@ -171,7 +171,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
               className="h-10 w-10 text-sm"
             />
             <div className="text-xs leading-tight">
-              <div className="font-mono text-3xs uppercase tracking-[0.06em] text-text-muted">
+              <div className="eyebrow text-text-muted">
                 {UI_TEXT.bookingWidget.hero.bookingToMaster}
               </div>
               <div className="text-sm font-semibold text-text">{prefilledMaster.name}</div>

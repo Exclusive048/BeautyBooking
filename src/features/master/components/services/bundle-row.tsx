@@ -15,6 +15,7 @@ import { RowMenu } from "./row-menu";
 import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { Badge } from "@/components/ui/badge";
 
 const ROW = UI_TEXT.cabinetMaster.servicesPage.row;
 const T = UI_TEXT.cabinetMaster.servicesPage.bundleRow;
@@ -60,9 +61,9 @@ export function BundleRow({ bundle, allServices }: Props) {
             </p>
           </Button>
           {!bundle.isEnabled ? (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-mono text-3xs uppercase tracking-[0.18em] text-muted-foreground">
+            <Badge size="xs" variant="muted">
               {ROW.bundleDisabledBadge}
-            </span>
+            </Badge>
           ) : null}
           {bundle.hasDisabledComponent ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-3xs text-warning-text">

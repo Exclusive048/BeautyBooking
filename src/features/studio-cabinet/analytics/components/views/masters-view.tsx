@@ -34,7 +34,7 @@ export function MastersView({ data }: Props) {
         ) : (
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-bg-input/40 text-3xs font-mono uppercase tracking-[0.12em] text-text-sec">
+              <tr className="bg-bg-input/40 eyebrow">
                 <th className="px-3 py-2.5">{T.colMaster}</th>
                 <th className="px-3 py-2.5 text-right">{T.colBookings}</th>
                 <th className="px-3 py-2.5 text-right">{T.colRevenue}</th>

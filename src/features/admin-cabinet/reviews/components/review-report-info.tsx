@@ -31,7 +31,7 @@ export function ReviewReportInfo({ review }: Props) {
     <div className="flex flex-col gap-1.5 rounded-xl bg-destructive/[0.08] p-3">
       <div className="flex items-center gap-1.5 text-danger-text">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span className="font-mono text-3xs uppercase tracking-[0.08em]">
+        <span className="eyebrow text-danger-text">
           {T.reportLabel}
         </span>
       </div>

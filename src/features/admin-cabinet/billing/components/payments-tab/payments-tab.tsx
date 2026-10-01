@@ -151,7 +151,7 @@ function PaymentsGroup({
 }) {
   return (
     <section>
-      <h3 className="mb-2 font-mono text-2xs uppercase tracking-[0.12em] text-text-sec">
+      <h3 className="mb-2 eyebrow text-2xs">
         {title}
       </h3>
       <div

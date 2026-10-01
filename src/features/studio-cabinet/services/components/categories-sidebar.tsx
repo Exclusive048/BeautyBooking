@@ -9,6 +9,7 @@ import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioServiceCategoryRow } from "../lib/types";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.servicesV2.categories;
 
@@ -114,12 +115,9 @@ export function CategoriesSidebar({
                       {category.title}
                     </span>
                     {category.status === "PENDING" ? (
-                      <span
-                        className="shrink-0 rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text"
-                        title={T.pendingHint}
-                      >
+                      <Badge size="xs" variant="warning" className="shrink-0" title={T.pendingHint}>
                         {T.pendingBadge}
-                      </span>
+                      </Badge>
                     ) : null}
                   </span>
                   <span

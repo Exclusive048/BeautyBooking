@@ -14,7 +14,7 @@ export function AnnouncementsSection() {
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5">
       <header className="mb-4 flex items-center justify-between gap-3">
         <h2 className="font-display text-lg text-text-main">{T.title}</h2>
-        <span className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <span className="eyebrow">
           {T.from}
         </span>
       </header>

@@ -112,7 +112,7 @@ export function ProposeTimeModal({
       </p>
 
       <div className="mt-4 rounded-xl border border-border-subtle bg-bg-input/40 px-4 py-3">
-        <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {T.offerLabel}
         </p>
         <p className="mt-0.5 text-sm text-text-main">

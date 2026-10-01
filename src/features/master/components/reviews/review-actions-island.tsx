@@ -7,6 +7,7 @@ import { ReportReviewModal } from "@/features/reviews/components/report-review-m
 import * as UI_TEXT from "@/lib/ui/text";
 import { ReviewReplyForm } from "./review-reply-form";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.cabinetMaster.reviews.card;
 
@@ -69,16 +70,9 @@ export function ReviewActionsIsland({
           </Button>
         </div>
 
-        <span
-          className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-3xs uppercase tracking-wider",
-            hasReply
-              ? "bg-success-surface text-success-text"
-              : "bg-warning-surface text-warning-text"
-          )}
-        >
+        <Badge size="xs" variant={hasReply ? "success" : "warning"}>
           {hasReply ? T.answeredBadge : T.unansweredBadge}
-        </span>
+        </Badge>
       </div>
 
       {replyMode ? (

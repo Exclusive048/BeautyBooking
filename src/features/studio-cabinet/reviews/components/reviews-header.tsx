@@ -16,7 +16,7 @@ type Props = {
 export function ReviewsHeader({ totalReviews, unansweredCount }: Props) {
   return (
     <header className="min-w-0">
-      <p className="mb-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+      <p className="mb-1 eyebrow">
         {T.caption
           .replace("{total}", String(totalReviews))
           .replace("{noReply}", String(unansweredCount))}

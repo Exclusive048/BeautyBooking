@@ -20,7 +20,7 @@ export function DayHeader({ day }: Props) {
     >
       <p
         className={cn(
-          "mb-1 font-mono text-3xs uppercase tracking-[0.18em]",
+          "mb-1 eyebrow",
           day.isToday ? "text-accent-text" : "text-text-sec",
         )}
       >

@@ -124,7 +124,7 @@ export function CabinetSidebar({
       <div className="glass-panel rounded-[26px] p-4 lg:sticky lg:top-6">
         <div className="flex flex-col gap-5">
           <div className="space-y-0.5">
-            <div className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+            <div className="eyebrow">
               {UI_TEXT.clientCabinet.nav.sectionEyebrow}
             </div>
             <div className="truncate text-base font-semibold text-text-main">
@@ -135,7 +135,7 @@ export function CabinetSidebar({
           <nav aria-label={UI_TEXT.a11y.cabinetSections} className="space-y-4">
             {NAV_GROUPS.map((group) => (
               <div key={group.label} className="space-y-1">
-                <div className="px-2 font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+                <div className="px-2 eyebrow">
                   {group.label}
                 </div>
                 {group.items.map((item) => {

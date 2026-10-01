@@ -102,7 +102,7 @@ export function OfferCard({ offer, variant = "active", services, now }: Props) {
       ) : null}
 
       <div className="mt-4 space-y-1.5">
-        <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {T.requirementsHeading}
         </p>
         {offer.requirements.length > 0 ? (

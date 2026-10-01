@@ -93,7 +93,7 @@ function PlanGroup({
   if (plans.length === 0) return null;
   return (
     <section>
-      <h2 className="mb-3 font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
+      <h2 className="mb-3 eyebrow">
         {label}
       </h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 lg:gap-4">

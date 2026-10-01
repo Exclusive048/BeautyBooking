@@ -55,7 +55,7 @@ export function MasterDetailWeekSchedule({
             >
               <p
                 className={cn(
-                  "font-mono text-3xs uppercase tracking-wide",
+                  "eyebrow",
                   cell.isToday ? "text-accent-text" : "text-text-sec",
                 )}
               >

@@ -138,7 +138,7 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
           role="dialog"
           className="absolute left-0 top-[calc(100%+6px)] z-30 w-[300px] rounded-xl border border-border-subtle bg-bg-card p-3 shadow-card"
         >
-          <p className="mb-2 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <p className="mb-2 eyebrow">
             {T.customPickerHeading}
           </p>
           <div className="flex items-end gap-2">

@@ -71,7 +71,7 @@ function ConsentRow({
             cares that the marketing box is visibly not a condition. */}
         <span
           className={cn(
-            "mt-1 block font-mono text-3xs uppercase tracking-[0.08em]",
+            "mt-1 block eyebrow",
             required ? "text-accent-text/80" : "text-text-sec/60",
           )}
         >

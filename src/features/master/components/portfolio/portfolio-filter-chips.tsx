@@ -78,7 +78,7 @@ export function PortfolioFilterChips({
 
       {categories.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <span className="eyebrow">
             {T.byCategoryLabel}
           </span>
           <CategoryChip

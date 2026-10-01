@@ -150,7 +150,7 @@ export function AttentionSection({
           ) : null}
         </div>
         {hasTasks ? (
-          <span className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
+          <span className="eyebrow">
             {T.sortLabel}
           </span>
         ) : null}
