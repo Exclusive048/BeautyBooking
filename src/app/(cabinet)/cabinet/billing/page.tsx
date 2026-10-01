@@ -75,7 +75,7 @@ export default async function Page({ searchParams }: PageProps) {
         <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 lg:px-8">
           {masterContext.studioId ? (
             <section className="space-y-4">
-              <div className="lux-card rounded-[24px] p-6">
+              <div className="lux-card rounded-3xl p-6">
                 <h1 className="text-2xl font-semibold text-text-main">Тариф управляется студией</h1>
                 <p className="mt-2 text-sm text-text-sec">
                   Вы работаете в составе студии, поэтому управление тарифом выполняет студия.

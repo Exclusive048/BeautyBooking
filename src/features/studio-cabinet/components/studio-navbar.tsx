@@ -74,7 +74,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
     // полоса держала 56px экрана ПОСТОЯННО ради одного названия студии — поверх
     // 57px глобальной шапки. Разделы на мобильном несёт `StudioBottomNav`.
     <div className="z-sticky w-full px-4 lg:sticky lg:top-[var(--topbar-h)]">
-      <div className="glass-panel mx-auto flex h-14 w-full max-w-6xl items-center justify-between rounded-[24px] px-4">
+      <div className="glass-panel mx-auto flex h-14 w-full max-w-6xl items-center justify-between rounded-3xl px-4">
         <div className="flex items-baseline gap-2">
           <Link
             href={publicHref}

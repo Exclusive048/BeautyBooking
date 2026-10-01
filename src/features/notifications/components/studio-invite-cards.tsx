@@ -112,7 +112,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
         {items.map((invite) => (
           <div
             key={invite.id}
-            className="rounded-[22px] border border-border-subtle/80 bg-bg-card p-4 shadow-card"
+            className="rounded-3xl border border-border-subtle/80 bg-bg-card p-4 shadow-card"
           >
             <div className="flex items-start gap-3">
               <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-bg-input">

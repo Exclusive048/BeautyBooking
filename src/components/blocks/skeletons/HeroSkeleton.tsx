@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 export function HeroSkeleton() {
   return (
-    <section className="overflow-hidden rounded-[32px] border border-border-subtle/70 bg-bg-card shadow-hover">
+    <section className="overflow-hidden rounded-3xl border border-border-subtle/70 bg-bg-card shadow-hover">
       <div className="relative h-[280px] md:h-[340px]">
         <Skeleton className="h-full w-full rounded-none" />
         <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 md:px-6 md:pb-6">

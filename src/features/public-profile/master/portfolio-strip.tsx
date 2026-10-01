@@ -77,7 +77,7 @@ export function PortfolioStrip({ items }: Props) {
   }, [selectedId]);
 
   return (
-    <section className="lux-card rounded-[28px] p-5">
+    <section className="lux-card rounded-3xl p-5">
       <h2 className="text-lg font-semibold text-text-main">{UI_TEXT.publicProfile.portfolio.title}</h2>
       {items.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/70 p-4 text-sm text-text-sec">

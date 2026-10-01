@@ -284,7 +284,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
                 which are translucent, so it reads THROUGH them: that is the
                 layering, not a backdrop the cards merely cover. */}
             <div
-              className="login-plate absolute -inset-x-1 -inset-y-3 overflow-hidden rounded-[32px] ring-1 ring-white/10"
+              className="login-plate absolute -inset-x-1 -inset-y-3 overflow-hidden rounded-3xl ring-1 ring-white/10"
               // Same top/bottom fade as the card marquee, so the plate dissolves
               // into the aurora instead of ending on a hard rectangle edge.
               style={{

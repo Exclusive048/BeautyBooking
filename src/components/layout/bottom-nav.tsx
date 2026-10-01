@@ -157,7 +157,7 @@ function RoleSwitcherDrawer({
             aria-modal="true"
             aria-labelledby={sheetTitleId}
             tabIndex={-1}
-            className="fixed inset-x-0 bottom-0 z-modal rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-modal rounded-t-3xl border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {/* Handle */}

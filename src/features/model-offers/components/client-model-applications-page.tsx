@@ -191,7 +191,7 @@ export function ClientModelApplicationsPage() {
   );
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загружаем заявки...</div>;
+    return <div className="lux-card rounded-3xl p-5 text-sm text-text-sec">Загружаем заявки...</div>;
   }
 
   if (error) {
@@ -204,7 +204,7 @@ export function ClientModelApplicationsPage() {
 
   if (!hasItems) {
     return (
-      <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">
+      <div className="lux-card rounded-3xl p-5 text-sm text-text-sec">
         Пока нет заявок на модель.{" "}
         <Link href="/models" className="underline">
           Перейти к предложениям
@@ -235,7 +235,7 @@ export function ClientModelApplicationsPage() {
           <article
             key={item.id}
             className={[
-              "lux-card rounded-[22px] p-4 transition-all",
+              "lux-card rounded-3xl p-4 transition-all",
               isHighlighted ? "ring-2 ring-primary/35" : "",
             ]
               .join(" ")

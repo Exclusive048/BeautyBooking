@@ -386,11 +386,11 @@ export function BillingPage({ scope }: BillingPageProps) {
   }, [scopePlans, status, scope]);
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загружаем…</div>;
+    return <div className="lux-card rounded-3xl p-5 text-sm text-text-sec">Загружаем…</div>;
   }
 
   if (!scopePlans) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Тарифы пока не загрузились. Обновите страницу.</div>;
+    return <div className="lux-card rounded-3xl p-5 text-sm text-text-sec">Тарифы пока не загрузились. Обновите страницу.</div>;
   }
 
   const subscription = status?.subscriptions[scope] ?? null;

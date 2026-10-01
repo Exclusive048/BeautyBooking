@@ -194,8 +194,8 @@ export function ModalSurface({
                 fullScreen
                   ? // Телефон: страница во весь экран, без рамки и скругления;
                     // с `sm` — прежняя карточка.
-                    "relative flex min-h-[100dvh] w-full flex-col bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:my-6 sm:block sm:min-h-0 sm:rounded-[24px] sm:border sm:border-border-subtle sm:p-5 sm:shadow-hover"
-                  : "relative my-6 w-full rounded-[24px] border border-border-subtle bg-bg-card p-5 shadow-hover",
+                    "relative flex min-h-[100dvh] w-full flex-col bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:my-6 sm:block sm:min-h-0 sm:rounded-3xl sm:border sm:border-border-subtle sm:p-5 sm:shadow-hover"
+                  : "relative my-6 w-full rounded-3xl border border-border-subtle bg-bg-card p-5 shadow-hover",
                 SIZE_CLASS[size],
                 className,
               )}
@@ -227,10 +227,10 @@ export function ModalSurface({
                     fullScreen
                       ? stickyFooter
                         ? // Телефон: подвал прижат к низу экрана и виден при прокрутке.
-                          "sticky bottom-0 z-10 -mx-5 mt-auto -mb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] border-t border-border-subtle bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:-mb-5 sm:mt-5 sm:rounded-b-[24px] sm:py-4"
+                          "sticky bottom-0 z-10 -mx-5 mt-auto -mb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] border-t border-border-subtle bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:-mb-5 sm:mt-5 sm:rounded-b-3xl sm:py-4"
                         : "mt-auto pt-5 sm:mt-5 sm:pt-0"
                       : stickyFooter
-                        ? "sticky bottom-0 z-10 -mx-5 mt-5 -mb-5 rounded-b-[24px] border-t border-border-subtle bg-bg-card px-5 py-4"
+                        ? "sticky bottom-0 z-10 -mx-5 mt-5 -mb-5 rounded-b-3xl border-t border-border-subtle bg-bg-card px-5 py-4"
                         : "mt-5",
                   )}
                 >

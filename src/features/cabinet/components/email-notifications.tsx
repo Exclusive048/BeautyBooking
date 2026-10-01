@@ -79,7 +79,7 @@ export function EmailNotificationsSection() {
 
   return (
     <>
-      <div className="lux-card rounded-[20px] p-4">
+      <div className="lux-card rounded-2xl p-4">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-bg-input">
             <Mail className="h-4 w-4 text-text-sec" aria-hidden />

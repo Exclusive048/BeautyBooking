@@ -182,7 +182,7 @@ export function StudioProfileForm({
   );
 
   return (
-    <section className="lux-card rounded-[24px] p-5 md:p-6">
+    <section className="lux-card rounded-3xl p-5 md:p-6">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="-m-2 space-y-4 rounded-2xl p-2" data-guide="profile">

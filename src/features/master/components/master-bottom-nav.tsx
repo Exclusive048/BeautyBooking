@@ -150,7 +150,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
               aria-modal="true"
               aria-labelledby={sheetTitleId}
               tabIndex={-1}
-              className="fixed inset-x-0 bottom-0 z-modal rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
+              className="fixed inset-x-0 bottom-0 z-modal rounded-t-3xl border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
               <div className="flex justify-center pt-3 pb-1">

@@ -44,49 +44,16 @@ import { stripComments } from "@/lib/testing/source-scan";
  *       с `- "src/components/ui/card.tsx": 1` — уменьшение тоже красное.
  *   (5) правило `.eyebrow` вырезано из `globals.css`: красный «правило .eyebrow
  *       живёт в слое компонентов».
- *   (6) в `message-bubble.tsx` снята константа под маркером `type-ok`, маркер
- *       оставлен: см. ниже, после этапа 6.
+ *   (6) после этапа 6 (FROZEN пуст): в `message-bubble.tsx` составной радиус
+ *       под маркером `type-ok` заменён ступенями, маркер оставлен — красный
+ *       «каждый маркер type-ok стоит над сайтом»
+ *       (`+ "src/features/chat/chat-window/message-bubble.tsx:117"`).
+ *   (7) там же маркер удалён, радиус оставлен — красный «только в FROZEN»
+ *       (`+ "src/features/chat/chat-window/message-bubble.tsx": 1`).
  *   Возвращено — 7/7 зелёные.
  */
 
-// Этап 6 (радиусы) ещё впереди: 55 произвольных радиусов в 34 файлах. Мелких
-// размеров здесь нет — их сняли этапы 1–5.
-const FROZEN: Record<string, number> = {
-  "src/app/(cabinet)/cabinet/billing/page.tsx": 1,
-  "src/app/blog/page.tsx": 2,
-  "src/app/gift-cards/page.tsx": 1,
-  "src/app/login/login-showcase.tsx": 1,
-  "src/app/support/support-client.tsx": 2,
-  "src/components/blocks/skeletons/HeroSkeleton.tsx": 1,
-  "src/components/blocks/skeletons/PortfolioSkeleton.tsx": 1,
-  "src/components/blocks/skeletons/ServicesSkeleton.tsx": 1,
-  "src/components/layout/bottom-nav.tsx": 1,
-  "src/components/ui/card.tsx": 1,
-  "src/components/ui/faq-accordion.tsx": 1,
-  "src/components/ui/modal-surface.tsx": 4,
-  "src/features/billing/components/billing-page.tsx": 2,
-  "src/features/booking/components/booking-flow/booking-flow-stepper.tsx": 1,
-  "src/features/cabinet/components/email-notifications.tsx": 1,
-  "src/features/cabinet/components/push-notifications.tsx": 1,
-  "src/features/cabinet/components/vk-notifications.tsx": 1,
-  "src/features/cabinet/layout/cabinet-sidebar.tsx": 1,
-  "src/features/chat/chat-window/message-bubble.tsx": 14,
-  "src/features/home/components/hot-slots-preview.tsx": 1,
-  "src/features/home/components/popular-categories-section.tsx": 1,
-  "src/features/master/components/master-bottom-nav.tsx": 1,
-  "src/features/model-offers/components/client-model-applications-page.tsx": 3,
-  "src/features/notifications/components/notifications-center-page.tsx": 1,
-  "src/features/notifications/components/studio-invite-cards.tsx": 1,
-  "src/features/public-profile/master/hero-block.tsx": 1,
-  "src/features/public-profile/master/portfolio-strip.tsx": 1,
-  "src/features/public-profile/master/sections/booking-section-client.tsx": 1,
-  "src/features/public-profile/master/services-menu.tsx": 1,
-  "src/features/search-by-time/components/provider-result-card.tsx": 1,
-  "src/features/studio-cabinet/components/studio-bottom-nav.tsx": 1,
-  "src/features/studio-cabinet/components/studio-navbar.tsx": 1,
-  "src/features/studio-cabinet/components/studio-profile-form.tsx": 1,
-  "src/features/studio-cabinet/components/studio-profile-hero.tsx": 1,
-};
+const FROZEN: Record<string, number> = {};
 
 const SIZE = /(?<![\w\[-])(?:[\w-]+:)*text-\[(?:length:)?(\d+(?:\.\d+)?)(px|rem)\]/g;
 const STYLE_SIZE = /\bfontSize\s*:\s*["']?(\d+(?:\.\d+)?)(px|rem)?["']?/g;

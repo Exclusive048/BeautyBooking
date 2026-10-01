@@ -93,7 +93,7 @@ export function PopularCategoriesSection() {
           <m.div key={cat.id} variants={item}>
             <Link
               href={buildCatalogUrl({ globalCategoryId: cat.id })}
-              className="group flex flex-col items-center gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"
+              className="group flex flex-col items-center gap-3 rounded-2xl border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"
             >
               {cat.icon ? (
                 <span className="text-3xl" aria-hidden>

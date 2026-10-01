@@ -614,7 +614,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
           «add a phone» prompt was unreachable advice aimed at the wrong surface. */}
       {showInvites ? (
         <div
-          className="rounded-[22px] border border-border-subtle bg-bg-card p-5 shadow-card md:p-6"
+          className="rounded-3xl border border-border-subtle bg-bg-card p-5 shadow-card md:p-6"
           data-testid="notifications-invites"
         >
           <h2 className="mb-3 text-sm font-semibold text-text-main">{t.invitesTitle}</h2>

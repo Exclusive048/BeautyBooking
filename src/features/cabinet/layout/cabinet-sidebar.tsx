@@ -121,7 +121,7 @@ export function CabinetSidebar({
 
   return (
     <aside className="w-full lg:w-[248px] lg:shrink-0">
-      <div className="glass-panel rounded-[26px] p-4 lg:sticky lg:top-6">
+      <div className="glass-panel rounded-3xl p-4 lg:sticky lg:top-6">
         <div className="flex flex-col gap-5">
           <div className="space-y-0.5">
             <div className="eyebrow">

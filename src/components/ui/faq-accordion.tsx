@@ -13,7 +13,7 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
   const reduce = useReducedMotion();
 
   return (
-    <div className="lux-card rounded-[16px] bg-bg-card">
+    <div className="lux-card rounded-2xl bg-bg-card">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-4 p-5 text-left font-medium text-sm text-text-main"
