@@ -26,7 +26,11 @@ export type ScheduleDayChange = { date: string; action: CalendarPaintAction };
 
 export type ScheduleChangesPayload = {
   format: typeof SCHEDULE_CHANGES_FORMAT;
-  /** Новая неделя из вкладки «Часы» (с сегодняшнего дня); `null` — не менялась. */
+  /**
+   * Новая неделя (с сегодняшнего дня); `null` — не менялась. Слала её вкладка
+   * «Часы», убранная SCHEDULE-HOURS-TAB-REMOVAL (2026-10-01); поле оставлено —
+   * открытые заявки с неделей одобряются как раньше.
+   */
   week: DayScheduleDto[] | null;
   /** Новый график из пошагового окна; `null` — не менялся. С `week` взаимоисключающи. */
   pattern: PatternChangeRequestBody | null;
