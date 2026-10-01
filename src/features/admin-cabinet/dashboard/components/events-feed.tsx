@@ -97,6 +97,16 @@ export function EventsFeed({ initial, initialNextBefore }: Props) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
+  // ADMIN-EVENTS-EXPORT: отказ выгрузки возвращает на дашборд с ?eventsExport=.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("eventsExport")) return;
+    toast.error(T.exportFailed);
+    params.delete("eventsExport");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, [toast]);
+
   const loadMore = useCallback(async () => {
     if (nextBefore === null || loadingMore) return;
     setLoadingMore(true);
@@ -148,7 +158,9 @@ export function EventsFeed({ initial, initialNextBefore }: Props) {
             ))}
           </Select>
           <Button asChild variant="secondary" size="sm">
-            <a href={`/api/admin/dashboard/events/export?days=${exportDays}`} download>
+            {/* Без `download`: файл отдаёт Content-Disposition, а отказ —
+                редирект на дашборд, который иначе скачался бы как HTML. */}
+            <a href={`/api/admin/dashboard/events/export?days=${exportDays}`}>
               <Download className="h-3.5 w-3.5" aria-hidden />
               {T.exportCta}
             </a>

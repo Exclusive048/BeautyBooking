@@ -301,7 +301,10 @@ describe("FIX-B18 · производный пин: набор навигаци�
     // каждый исход держит тип `OAuthStartNavigation`
     // (`api/auth/oauth-start-navigation.test.ts`). Query-строка (`?verifyPhone=1`)
     // роут не меняет — сравнение идёт по пути.
+    // ADMIN-EVENTS-EXPORT: выгрузка истории событий в Excel — отказ ведёт на
+    // дашборд (`?eventsExport=`) или на вход.
     const FROZEN = [
+      "/api/admin/dashboard/events/export",
       "/api/auth/vk/start",
       "/api/auth/yandex/start",
       "/api/auth/telegram/link",
@@ -323,7 +326,10 @@ describe("FIX-B18 · производный пин: набор навигаци�
     expect(
       downloadRoutes.map(rel),
       "набор download-роутов изменился — проверьте форму их отказов",
-    ).toEqual(["src/app/api/bookings/[id]/ics/route.ts"]);
+    ).toEqual([
+      "src/app/api/admin/dashboard/events/export/route.ts",
+      "src/app/api/bookings/[id]/ics/route.ts",
+    ]);
 
     const envelopeAnswering = downloadRoutes
       .filter((file) => !routeAnswersWithNavigation(readFileSync(file, "utf8")))
