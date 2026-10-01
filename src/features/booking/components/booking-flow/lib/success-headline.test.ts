@@ -114,3 +114,28 @@ describe("FIX-C3 · студийный вариант — корректен П�
     expect(studio).toMatch(/success\.masterName \|\| UI_TEXT\.bookingWidget\.summary\.anyMaster/);
   });
 });
+
+describe("DEV-SCENARIO-01 · неподтверждённая запись — не «ждёт вас»", () => {
+  it("PENDING и NEW: заголовок о подтверждении, а не «ждёт вас»", () => {
+    for (const status of ["PENDING", "NEW"]) {
+      const headline = buildSuccessHeadline("Анна Соколова", status);
+      expect(headline).toBe("Анна Соколова подтвердит запись");
+      expect(headline).not.toContain("ждёт вас");
+    }
+    expect(buildSuccessHeadline("", "PENDING")).toBe(
+      UI_TEXT.publicProfile.bookingWidget.successPendingHeadlineFallback,
+    );
+  });
+
+  it("CONFIRMED — «ждёт вас»", () => {
+    expect(buildSuccessHeadline("Анна Соколова", "CONFIRMED")).toBe("Анна Соколова ждёт вас");
+  });
+
+  it("на экране нет обещания «подтверждение отправлено»", () => {
+    const phase = readFileSync(
+      join(process.cwd(), "src/features/booking/components/booking-flow/phases/success-phase.tsx"),
+      "utf8",
+    );
+    expect(phase).not.toContain("successConfirmationSentTo");
+  });
+});

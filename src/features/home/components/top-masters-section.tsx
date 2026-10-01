@@ -88,7 +88,7 @@ function MasterCard({ master }: { master: TopMaster }) {
             <Badge className="absolute left-3 top-3 gap-1 border-0 bg-bg-card/95 px-2 py-1 text-text-main shadow-sm backdrop-blur-sm">
               <Star className="h-3 w-3 fill-primary text-accent-text" aria-hidden />
               <span className="font-mono text-xs font-semibold tabular-nums">
-                {master.ratingAvg.toFixed(1)}
+                {UI_FMT.decimal(master.ratingAvg, 1)}
               </span>
               {master.reviewsCount > 0 ? (
                 <>

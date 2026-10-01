@@ -404,9 +404,9 @@ export function BookingFlowStepper({
         return;
       }
 
-      let created: { booking: { id: string }; manageUrl?: string | null };
+      let created: { booking: { id: string; status?: string }; manageUrl?: string | null };
       try {
-        created = await readApiResponse<{ booking: { id: string }; manageUrl?: string | null }>(res);
+        created = await readApiResponse<{ booking: { id: string; status?: string }; manageUrl?: string | null }>(res);
       } catch (error) {
         setSubmitError(serverMessageOr(error, UI_TEXT.publicProfile.booking.submitFailed));
         return;
@@ -417,7 +417,8 @@ export function BookingFlowStepper({
       // /api/public/bookings/[id] for the masked phone etc.
       const fallbackConfirmation: ConfirmedBooking = {
         id: created.booking.id,
-        status: "PENDING",
+        // Статус — из ответа: у мастера с автоподтверждением запись сразу CONFIRMED.
+        status: created.booking.status ?? "PENDING",
         startAtUtc: state.selectedSlot.startAtUtc,
         endAtUtc: state.selectedSlot.endAtUtc,
         serviceName,

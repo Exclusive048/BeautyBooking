@@ -119,8 +119,7 @@ export type ScheduleEditorSnapshot = {
   weekSchedule: DayScheduleDto[];
   /**
    * SCHEDULE-PATTERNS-01 (этап 2): график мастера — действующий период,
-   * запланированные, «настроено до», палитра рабочих дней. Вкладка «Часы»
-   * показывает неделю, только если сегодня действует недельный график.
+   * запланированные, «настроено до», палитра рабочих дней.
    */
   schedulePlan: SchedulePlanDto;
   exceptions: ScheduleExceptionDto[];

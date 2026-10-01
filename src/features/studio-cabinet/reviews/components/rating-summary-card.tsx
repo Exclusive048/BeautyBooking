@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { RatingStars } from "./rating-stars";
 
 const T = UI_TEXT.studioCabinet.reviewsV2.stats;
@@ -16,7 +17,7 @@ type Props = {
  * mislead studio owners about month-over-month trends.
  */
 export function RatingSummaryCard({ averageRating, totalReviews, positivePercent }: Props) {
-  const value = averageRating.toFixed(2);
+  const value = UI_FMT.decimal(averageRating, 2);
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
       <p className="eyebrow">

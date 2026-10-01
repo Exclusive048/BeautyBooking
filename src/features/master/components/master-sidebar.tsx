@@ -174,6 +174,9 @@ export function MasterSidebar({
             href: HREF.schedule,
             label: T.nav.items.schedule,
             icon: CalendarDays,
+            // Под /schedule живут «Настройки расписания» — свой пункт меню;
+            // по префиксу на них подсвечивались бы оба (DEV-SCENARIO-01).
+            exact: true,
           })}
           {renderItem({
             href: HREF.scheduleSettings,

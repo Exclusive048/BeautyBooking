@@ -10,6 +10,7 @@ import { LegalConsentGroup } from "@/features/auth/components/legal-consent-grou
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
 import type { BookingUser } from "@/features/booking/lib/studio-booking";
 import { Switch } from "@/components/ui/switch";
+import { formatRussianPhoneInput } from "@/lib/phone/input-format";
 
 type Props = {
   me: BookingUser | null;
@@ -115,7 +116,7 @@ export function YouStep({
         <div className="space-y-3 rounded-xl border border-border-subtle bg-bg-card p-4 text-sm">
           <div>
             <div className="font-semibold text-text">{me.displayName ?? me.phone ?? "—"}</div>
-            {me.phone ? <div className="text-text-muted">{me.phone}</div> : null}
+            {me.phone ? <div className="text-text-muted">{formatRussianPhoneInput(me.phone)}</div> : null}
           </div>
           {/* BOOKING-AUTH-NO-PHONE-01: у вошедшего по почте/VK/Яндексу телефона
               в профиле нет, а без него запись отклоняется. Раньше поля не было

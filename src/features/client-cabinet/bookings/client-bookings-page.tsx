@@ -543,6 +543,13 @@ function BookingRow({
           </div>
         ) : null}
 
+        {booking.cancelReason ? (
+          <p className="text-xs text-text-sec">
+            <span className="font-medium text-text-main">{T.cancelReasonLabel}</span>{" "}
+            <span className="break-words">{booking.cancelReason}</span>
+          </p>
+        ) : null}
+
         {booking.status === "CHANGE_REQUESTED" && booking.proposedStartAt ? (
           <RescheduleProposal
             booking={booking}

@@ -43,6 +43,12 @@ export type ClientBookingDTO = {
    * нужно знать об этом заранее, чтобы предложить отмену пакета.
    */
   bookingPackageId: string | null;
+  /**
+   * DEV-SCENARIO-01: причина, которую мастер или студия обязаны указать при
+   * отмене, — адресована клиенту. Только при отмене стороной провайдера: свою
+   * причину клиент знает, у системной отмены её нет.
+   */
+  cancelReason: string | null;
   /** Maps action shows when address exists and viewing is master-on-site */
   isOnSite: boolean;
   address: string | null;
@@ -103,6 +109,8 @@ export async function listClientBookings(
       proposedEndAt: true,
       actionRequiredBy: true,
       bookingPackageId: true,
+      cancelledBy: true,
+      cancelReason: true,
       slotLabel: true,
       providerId: true,
       service: {
@@ -221,6 +229,8 @@ export async function listClientBookings(
         r.status === "CHANGE_REQUESTED" && r.proposedEndAt ? r.proposedEndAt.toISOString() : null,
       actionRequiredBy: r.status === "CHANGE_REQUESTED" ? (r.actionRequiredBy ?? null) : null,
       bookingPackageId: r.bookingPackageId ?? null,
+      cancelReason:
+        group === "cancelled" && r.cancelledBy === "PROVIDER" ? r.cancelReason?.trim() || null : null,
       isOnSite: !!address,
       address,
       provider: {

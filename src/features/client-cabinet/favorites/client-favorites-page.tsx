@@ -22,6 +22,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import type {
   FavoriteCardDTO,
   FavoritesEnrichedPayload,
@@ -230,7 +231,7 @@ function FavMasterCard({
         <div className="flex items-center gap-1.5 text-xs">
           <Star className="h-3.5 w-3.5 fill-primary text-accent-text" aria-hidden />
           <span className="font-mono font-semibold text-text-main">
-            {data.rating > 0 ? data.rating.toFixed(1) : "—"}
+            {data.rating > 0 ? UI_FMT.decimal(data.rating, 1) : "—"}
           </span>
           {data.reviewsCount > 0 ? (
             <span className="text-text-sec">({data.reviewsCount})</span>
@@ -296,7 +297,7 @@ function FavStudioCard({
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <Star className="h-3.5 w-3.5 fill-primary text-accent-text" aria-hidden />
           <span className="font-mono font-semibold text-text-main">
-            {data.rating > 0 ? data.rating.toFixed(1) : "—"}
+            {data.rating > 0 ? UI_FMT.decimal(data.rating, 1) : "—"}
           </span>
           {data.reviewsCount > 0 ? (
             <span className="text-text-sec">({data.reviewsCount})</span>

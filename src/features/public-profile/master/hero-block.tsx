@@ -17,6 +17,7 @@ import type {
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import { DISTANCE, MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Props = {
   view: MasterPublicProfileView;
@@ -187,13 +188,20 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
               className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
             >
               <span className="inline-flex items-center gap-1.5 text-text-main">
-                <Star
-                  className="h-4 w-4 fill-rating text-rating"
-                  aria-hidden
-                  strokeWidth={1.5}
-                />
-                <strong className="font-semibold">{provider.rating.toFixed(1)}</strong>
-                <span className="text-text-sec">· {provider.reviews}</span>
+                {provider.reviews > 0 ? (
+                  <>
+                    <Star
+                      className="h-4 w-4 fill-rating text-rating"
+                      aria-hidden
+                      strokeWidth={1.5}
+                    />
+                    <strong className="font-semibold">{UI_FMT.decimal(provider.rating, 1)}</strong>
+                    <span className="text-text-sec">· {provider.reviews}</span>
+                  </>
+                ) : (
+                  // Без отзывов «0,0 · 0» читалось бы как нулевая оценка (DEV-SCENARIO-01).
+                  <span className="text-text-sec">{T.noReviewsYet}</span>
+                )}
               </span>
 
               {provider.address ? (

@@ -237,9 +237,11 @@ export async function notifyBookingCreated(
   const serviceName = resolveServiceLabel(booking.service);
   const whenLabel = bookingWhenLabel(booking);
   const title = "У вас новая запись";
+  // Пол клиента неизвестен: «Елена записался» — ошибка согласования, поэтому
+  // глагол согласуется со словом «клиент», а не с именем (DEV-SCENARIO-01).
   const created = whenLabel
-    ? `${booking.clientName} записался на ${serviceName} ${whenLabel}`
-    : `${booking.clientName} записался на ${serviceName}`;
+    ? `Клиент ${booking.clientName} записался на ${serviceName} ${whenLabel}`
+    : `Клиент ${booking.clientName} записался на ${serviceName}`;
   // PENDING-EXPIRY: без подтверждения запись отменится сама — сторона
   // провайдера должна знать срок заранее, а не из уведомления об отмене.
   const body =
@@ -339,9 +341,12 @@ export async function notifyCancelledByMaster(
   const byStudio = isCancelledByStudioSide(booking, options.actorUserId);
   const title = byStudio ? "Запись отменена студией" : "Запись отменена мастером";
   const who = byStudio ? `Студия «${booking.provider.name}» отменила` : "Мастер отменил";
-  const body = whenLabel
+  const base = whenLabel
     ? `${who} запись на ${serviceName} ${whenLabel}.`
     : `${who} запись на ${serviceName}.`;
+  // DEV-SCENARIO-01: причину мастер обязан указать — она адресована клиенту.
+  const reason = booking.cancelReason?.trim();
+  const body = reason ? `${base} Причина: ${reason}` : base;
 
   await deliverNotification({
     userId: clientUserId,
@@ -483,8 +488,8 @@ export async function notifyCancelledByClient(booking: BookingWithRelations): Pr
   const whenLabel = bookingWhenLabel(booking);
   const title = "Запись отменена клиентом";
   const body = whenLabel
-    ? `${booking.clientName} отменил запись на ${serviceName} ${whenLabel}.`
-    : `${booking.clientName} отменил запись на ${serviceName}.`;
+    ? `Клиент ${booking.clientName} отменил запись на ${serviceName} ${whenLabel}.`
+    : `Клиент ${booking.clientName} отменил запись на ${serviceName}.`;
 
   const payload = buildBookingPayload(booking);
   await Promise.all(
@@ -619,11 +624,11 @@ export async function notifyRescheduleAnswered(
   const body =
     answer === "accepted"
       ? whenLabel
-        ? `${booking.clientName} подтвердил перенос: ${serviceName} ${whenLabel}.`
-        : `${booking.clientName} подтвердил перенос: ${serviceName}.`
+        ? `Клиент ${booking.clientName} подтвердил перенос: ${serviceName} ${whenLabel}.`
+        : `Клиент ${booking.clientName} подтвердил перенос: ${serviceName}.`
       : whenLabel
-        ? `${booking.clientName} не принял перенос — ${serviceName} остаётся ${whenLabel}.`
-        : `${booking.clientName} не принял перенос — ${serviceName} остаётся на прежнее время.`;
+        ? `Клиент ${booking.clientName} не принял перенос — ${serviceName} остаётся ${whenLabel}.`
+        : `Клиент ${booking.clientName} не принял перенос — ${serviceName} остаётся на прежнее время.`;
 
   const payload = buildBookingPayload(booking);
   await Promise.all(

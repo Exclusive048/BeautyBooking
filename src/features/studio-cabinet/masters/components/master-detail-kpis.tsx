@@ -53,7 +53,7 @@ export function MasterDetailKpis({ detail }: { detail: StudioMasterDetail }) {
     {
       icon: Star,
       label: T.rating,
-      value: detail.metrics.rating.toFixed(1),
+      value: UI_FMT.decimal(detail.metrics.rating, 1),
       unit: "★",
       sublabel: T.reviewsTemplate.replace(
         "{count}",

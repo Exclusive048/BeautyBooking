@@ -12,6 +12,7 @@ import { moneyRUBFromKopeks } from "@/lib/format";
 import { providerPublicUrl } from "@/lib/public-urls";
 import { scrollBehavior } from "@/lib/ui/scroll";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const TM = UI_TEXT.catalog.map;
 const TC = UI_TEXT.catalog2.card;
@@ -223,7 +224,7 @@ function MapCard({
           {hasRating ? (
             <span className="inline-flex items-center gap-1">
               <Star className="h-3 w-3 fill-rating text-rating" aria-hidden />
-              <span className="font-semibold tabular-nums text-text-main">{point.ratingAvg.toFixed(1)}</span>
+              <span className="font-semibold tabular-nums text-text-main">{UI_FMT.decimal(point.ratingAvg, 1)}</span>
               <span className="tabular-nums">({point.reviewsCount})</span>
             </span>
           ) : (

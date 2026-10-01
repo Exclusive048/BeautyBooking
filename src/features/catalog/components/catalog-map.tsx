@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { CatalogMapPoint } from "@/features/catalog/types";
 import * as UI_TEXT from "@/lib/ui/text";
 import { clientEnv } from "@/lib/env.client";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type MapSearchPayload = {
   bbox: string;
@@ -245,7 +246,7 @@ function loadYmaps(): Promise<YMapsApi> {
 
 function buildHintText(title: string, ratingAvg: number): string {
   if (Number.isFinite(ratingAvg) && ratingAvg > 0) {
-    return UI_TEXT.catalog.map.ratingHint(title, ratingAvg);
+    return UI_TEXT.catalog.map.ratingHint(title, UI_FMT.decimal(ratingAvg, 1));
   }
   return title;
 }

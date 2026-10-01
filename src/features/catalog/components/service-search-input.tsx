@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { formatReviews } from "@/lib/utils/pluralize-reviews";
 import { fetchJson } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { Input } from "@/components/ui/input";
 
 const MIN_QUERY_LENGTH = 2;
@@ -296,7 +297,7 @@ export function ServiceSearchInput({
                       {p.ratingCount > 0 ? (
                         <div className="mt-0.5 flex items-center gap-1 text-xs text-text-sec">
                           <Star className="h-3 w-3 fill-rating text-rating" aria-hidden />
-                          <span className="tabular-nums">{p.ratingAvg.toFixed(1)}</span>
+                          <span className="tabular-nums">{UI_FMT.decimal(p.ratingAvg, 1)}</span>
                           <span aria-hidden>·</span>
                           <span className="tabular-nums">{formatReviews(p.ratingCount)}</span>
                         </div>

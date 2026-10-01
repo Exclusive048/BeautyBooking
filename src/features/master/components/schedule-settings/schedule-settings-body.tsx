@@ -6,7 +6,6 @@ import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { BreaksTab } from "./breaks-tab";
-import { HoursTab } from "./hours-tab";
 import { RulesTab } from "./rules-tab";
 import { VisibilityTab } from "./visibility-tab";
 import { StudioApprovalBanner } from "./studio-approval-banner";
@@ -21,16 +20,20 @@ import {
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
-type TabId = "calendar" | "hours" | "breaks" | "rules" | "visibility";
+type TabId = "calendar" | "breaks" | "rules" | "visibility";
 
 /**
  * SCHEDULE-PATTERNS-01: «Особые дни» заменил календарь на 3 месяца (правка
  * любой даты — покраска дня). У профиля в студии он тот же, но покраска
  * копится в заявке студии (SCHEDULE-STUDIO-PROFILE-CALENDAR).
+ *
+ * Вкладки «Часы» нет (SCHEDULE-HOURS-TAB-REMOVAL, решение владельца
+ * 2026-10-01): повторяющуюся неделю задаёт окно «Настроить график» в карточке
+ * над вкладками (одинаковые или разные часы по дням, оба режима записи), даты —
+ * календарь, а «Шаг окошек» переехал в «Правила записи».
  */
 const TABS: TabItem[] = [
   { id: "calendar", label: T.tabs.calendar },
-  { id: "hours", label: T.tabs.hours },
   { id: "breaks", label: T.tabs.breaks },
   { id: "rules", label: T.tabs.rules },
   { id: "visibility", label: T.tabs.visibility },
@@ -49,9 +52,7 @@ type Props = {
 
 /**
  * Client wrapper for the schedule-settings tabs. Reads `?tab=` from the
- * URL and writes back via `router.replace` (no scroll jump). All five
- * tabs (Calendar, Hours, Breaks, Rules, Visibility) render real content
- * after 25-SETTINGS-C.
+ * URL and writes back via `router.replace` (no scroll jump).
  */
 export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioApproval }: Props) {
   const router = useRouter();
@@ -68,8 +69,9 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
 
   const defaultTab: TabId = "calendar";
   const raw = searchParams.get("tab");
-  // Старые ссылки на «Особые дни» ведут в календарь — он их заменил.
-  const requested = raw === "exceptions" ? "calendar" : raw;
+  // Старые ссылки на «Особые дни» и «Часы» ведут в календарь — их заменили
+  // календарь и окно графика.
+  const requested = raw === "exceptions" || raw === "hours" ? "calendar" : raw;
   const active: TabId = TABS.some((item) => item.id === requested) ? (requested as TabId) : defaultTab;
 
   const setTab = (next: string) => {
@@ -121,8 +123,6 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
             initialBrushTemplateId={calendarBrush}
             requestMode={studioProfile}
           />
-        ) : active === "hours" ? (
-          <HoursTab initialSnapshot={snapshot} onSnapshot={setSnapshot} />
         ) : active === "breaks" ? (
           <BreaksTab initialSnapshot={snapshot} />
         ) : active === "rules" ? (

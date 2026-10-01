@@ -47,7 +47,7 @@ export function ReviewsKpiRow({ data }: Props) {
   const ratingValue =
     data.averageRating.value === null
       ? T.noData
-      : data.averageRating.value.toFixed(1);
+      : UI_FMT.decimal(data.averageRating.value, 1);
 
   const deletedValue =
     data.deletedLastWeek === null

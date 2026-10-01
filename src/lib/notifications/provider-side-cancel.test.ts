@@ -151,3 +151,18 @@ describe("NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS · клиенту не припи�
     expect(delivered()[0]!.title).toBe("Запись отменена мастером");
   });
 });
+
+describe("DEV-SCENARIO-01 · причина отмены доходит до клиента", () => {
+  it("причина мастера — в тексте уведомления", async () => {
+    await notifyCancelledByMaster(
+      studioBooking({ cancelReason: "Заболела, переношу на следующую неделю" } as Partial<BookingWithRelations>),
+      { actorUserId: "marina" },
+    );
+    expect(delivered()[0]!.body).toContain("Причина: Заболела, переношу на следующую неделю");
+  });
+
+  it("без причины — без хвоста", async () => {
+    await notifyCancelledByMaster(studioBooking(), { actorUserId: "marina" });
+    expect(delivered()[0]!.body).not.toContain("Причина");
+  });
+});

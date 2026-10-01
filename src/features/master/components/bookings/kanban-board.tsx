@@ -1,11 +1,12 @@
 import { KanbanColumn } from "@/features/master/components/bookings/kanban-column";
 import type { ColumnId, KanbanData } from "@/lib/master/bookings.service";
+import { PENDING_EXPIRY_HOURS } from "@/lib/bookings/flow";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings.columns;
 
 const COLUMN_ORDER: Array<{ id: ColumnId; title: string; hint: string }> = [
-  { id: "pending", title: T.pending.title, hint: T.pending.hint },
+  { id: "pending", title: T.pending.title, hint: T.pending.hint(PENDING_EXPIRY_HOURS) },
   { id: "confirmed", title: T.confirmed.title, hint: T.confirmed.hint },
   { id: "today", title: T.today.title, hint: T.today.hint },
   { id: "done", title: T.done.title, hint: T.done.hint },

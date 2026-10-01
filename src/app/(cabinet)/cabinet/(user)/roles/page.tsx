@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveCatalogPresence, type CatalogPresence } from "@/lib/providers/catalog-presence";
 import { getMeProfile } from "@/lib/users/profile";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const masterCabinetHref = "/cabinet/master";
 const studioCabinetHref = "/cabinet/studio";
@@ -107,7 +108,7 @@ export default async function RolesPage() {
           : null,
         studioProvider.ratingCount
           ? UI_TEXT.cabinetRolesPage.ratingTemplate
-              .replace("{rating}", studioProvider.ratingAvg.toFixed(1))
+              .replace("{rating}", UI_FMT.decimal(studioProvider.ratingAvg, 1))
               .replace("{count}", String(studioProvider.ratingCount))
           : null,
       ].filter((item): item is string => Boolean(item))

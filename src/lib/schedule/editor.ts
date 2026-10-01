@@ -46,11 +46,13 @@ const LATE_CANCEL_ACTIONS: readonly LateCancelAction[] = ["none", "reminder", "f
 const SLOT_PRECISIONS: readonly SlotPrecision[] = ["exact", "today_free", "date_only"];
 
 /**
- * SCHEDULE-PATTERNS-01 (этап 2): неделя вкладки «Часы» пишется ГРАФИКОМ
+ * SCHEDULE-PATTERNS-01 (этап 2): неделя (`weekSchedule` в PATCH) пишется ГРАФИКОМ
  * (`patterns.ts`): с сегодняшнего дня действует новая неделя, прошлые дни
  * остаются с прежней. Неизменённая неделя не пишется вовсе — снапшот шлёт её
- * при сохранении любой вкладки. `WeeklyScheduleConfig` больше не пишется:
- * у профиля с графиком это история до переноса.
+ * при сохранении любой вкладки. Вкладки «Часы» нет с SCHEDULE-HOURS-TAB-REMOVAL
+ * (2026-10-01): интерфейс неделю больше не меняет, неделю задаёт окно графика.
+ * `WeeklyScheduleConfig` больше не пишется: у профиля с графиком это история
+ * до переноса.
  */
 async function saveWeekSchedule(
   tx: Prisma.TransactionClient,

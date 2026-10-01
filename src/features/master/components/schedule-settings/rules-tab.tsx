@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type {
-  BookingRulesDto,
-  HotSlotsDto,
-  ScheduleEditorSnapshot,
+import {
+  normalizeSlotStepMin,
+  type BookingRulesDto,
+  type HotSlotsDto,
+  type ScheduleEditorSnapshot,
+  type SlotStepMin,
 } from "@/lib/schedule/editor-shared";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -21,6 +23,7 @@ const T = UI_TEXT.cabinetMaster.scheduleSettings;
 type Draft = {
   bookingRules: BookingRulesDto;
   hotSlots: HotSlotsDto | null;
+  slotStepMin: SlotStepMin;
 };
 
 type Props = {
@@ -30,8 +33,8 @@ type Props = {
 };
 
 /**
- * Rules tab — booking window, confirmation mode, cancellation, hot slots.
- * Auto-saves to /api/cabinet/master/schedule (same endpoint as Hours tab).
+ * Rules tab — booking window (with slot step), confirmation mode,
+ * cancellation, hot slots. Auto-saves to /api/cabinet/master/schedule.
  *
  * On a feature-gate failure (non-PRO trying to enable hotSlots), the
  * server returns 403 with code FEATURE_GATE; we surface the localised
@@ -41,10 +44,12 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
   const [draft, setDraft] = useState<Draft>(() => ({
     bookingRules: initialSnapshot.bookingRules,
     hotSlots: initialSnapshot.hotSlots,
+    slotStepMin: normalizeSlotStepMin(initialSnapshot.slotStepMin),
   }));
   const [baseline, setBaseline] = useState<Draft>(() => ({
     bookingRules: initialSnapshot.bookingRules,
     hotSlots: initialSnapshot.hotSlots,
+    slotStepMin: normalizeSlotStepMin(initialSnapshot.slotStepMin),
   }));
 
   const { setStatus, setErrorMessage } = useSaveStatus();
@@ -62,6 +67,7 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
           body: JSON.stringify({
             bookingRules: value.bookingRules,
             hotSlots: value.hotSlots,
+            slotStepMin: value.slotStepMin,
           }),
         });
       } catch (error) {
@@ -85,6 +91,8 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
       <BookingWindowSection
         rules={draft.bookingRules}
         onChange={(rules) => setDraft((prev) => ({ ...prev, bookingRules: rules }))}
+        slotStepMin={draft.slotStepMin}
+        onSlotStepChange={(slotStepMin) => setDraft((prev) => ({ ...prev, slotStepMin }))}
       />
       <ConfirmationSection
         autoConfirm={draft.bookingRules.autoConfirm}

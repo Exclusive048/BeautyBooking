@@ -146,7 +146,7 @@ function KpiBar({
     { label: T.kpiTotal, value: kpi?.total ?? 0 },
     {
       label: T.kpiAverage,
-      value: kpi?.averageRating ? kpi.averageRating.toFixed(1) : "—",
+      value: kpi?.averageRating ? UI_FMT.decimal(kpi.averageRating, 1) : "—",
     },
     { label: T.kpiResponded, value: kpi?.respondedCount ?? 0 },
     { label: T.kpiPending, value: kpi?.pendingCount ?? 0 },

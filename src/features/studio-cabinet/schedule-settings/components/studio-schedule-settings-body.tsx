@@ -6,7 +6,6 @@ import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { MasterPicker } from "./master-picker";
-import { HoursTab } from "./hours-tab";
 import { RulesTab } from "./rules-tab";
 import { BreaksTab } from "./breaks-tab";
 import { VisibilityTab } from "./visibility-tab";
@@ -18,11 +17,12 @@ import { schedulePatternEndpoint } from "@/features/master/components/schedule-s
 const T = UI_TEXT.studioCabinet.scheduleSettings;
 
 // SCHEDULE-PATTERNS-01 (этап 3): «Особые дни» заменил календарь на 3 месяца.
-type TabId = "calendar" | "hours" | "rules" | "breaks" | "visibility";
+// «Часов» нет (SCHEDULE-HOURS-TAB-REMOVAL, 2026-10-01): неделю задаёт окно
+// «Настроить график» в карточке над вкладками, даты — календарь.
+type TabId = "calendar" | "rules" | "breaks" | "visibility";
 const DEFAULT_TAB: TabId = "calendar";
 const VALID: ReadonlySet<TabId> = new Set([
   "calendar",
-  "hours",
   "rules",
   "breaks",
   "visibility",
@@ -64,8 +64,8 @@ export function StudioScheduleSettingsBody({
   const searchParams = useSearchParams();
 
   const rawTab = searchParams.get("tab");
-  // Старые ссылки на «Особые дни» ведут в календарь — он их заменил.
-  const requested = rawTab === "exceptions" ? "calendar" : rawTab;
+  // Старые ссылки на «Особые дни» и «Часы» ведут в календарь.
+  const requested = rawTab === "exceptions" || rawTab === "hours" ? "calendar" : rawTab;
   const active: TabId =
     requested && VALID.has(requested as TabId) ? (requested as TabId) : DEFAULT_TAB;
 
@@ -91,7 +91,6 @@ export function StudioScheduleSettingsBody({
   const TAB_ITEMS: TabItem[] = [
     { id: "calendar", label: T.tabs.calendar },
     // Порядок — как в кабинете мастера: одни и те же вкладки на своих местах.
-    { id: "hours", label: T.tabs.hours },
     { id: "breaks", label: T.tabs.breaks },
     { id: "rules", label: T.tabs.rules },
     { id: "visibility", label: T.tabs.visibility },
@@ -183,12 +182,6 @@ function StudioMasterScheduleEditor({
             snapshot={snapshot}
             onSnapshot={setSnapshot}
             initialBrushTemplateId={calendarBrush}
-          />
-        ) : active === "hours" ? (
-          <HoursTab
-            studioId={studioId}
-            masterId={masterId}
-            initialSnapshot={snapshot}
           />
         ) : active === "rules" ? (
           <RulesTab

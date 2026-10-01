@@ -1,6 +1,7 @@
 import { Star } from "lucide-react";
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Size = "sm" | "md" | "lg";
 
@@ -36,7 +37,7 @@ export function StarsDisplay({ rating, size = "md", ariaLabel }: Props) {
   return (
     <span
       role="img"
-      aria-label={ariaLabel ?? UI_TEXT.a11y.ratingOutOfFive(safeRating.toFixed(1))}
+      aria-label={ariaLabel ?? UI_TEXT.a11y.ratingOutOfFive(UI_FMT.decimal(safeRating, 1))}
       className={cn("inline-flex items-center", GAP_CLASS[size])}
     >
       {Array.from({ length: 5 }).map((_, index) => {

@@ -107,7 +107,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-rating text-rating" aria-hidden />
-                      {offer.master.ratingAvg.toFixed(1)}
+                      {UI_FMT.decimal(offer.master.ratingAvg, 1)}
                       <span className="text-xs">({offer.master.ratingCount})</span>
                     </span>
                     {offer.master.city ? (

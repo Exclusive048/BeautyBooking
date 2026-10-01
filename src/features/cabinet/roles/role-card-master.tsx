@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type MasterActiveData = {
   name: string;
@@ -79,7 +80,7 @@ export function RoleCardMaster(props: Props) {
   const ratingCount = typeof data.ratingCount === "number" ? data.ratingCount : 0;
   const showRating = ratingAvg !== null && ratingCount > 0;
   const ratingLabel = showRating
-    ? UI_TEXT.cabinetRoles.master.reviewsTemplate(ratingAvg.toFixed(1), ratingCount)
+    ? UI_TEXT.cabinetRoles.master.reviewsTemplate(UI_FMT.decimal(ratingAvg, 1), ratingCount)
     : null;
 
   return (

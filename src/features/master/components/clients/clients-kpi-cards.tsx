@@ -42,7 +42,7 @@ export function ClientsKpiCards({ stats }: Props) {
       <StatTile
         icon={Repeat}
         label={T.frequencyLabel}
-        value={stats.avgFrequency.toFixed(1)}
+        value={UI_FMT.decimal(stats.avgFrequency, 1)}
         sublabel={T.frequencySubtext}
       />
       <StatTile

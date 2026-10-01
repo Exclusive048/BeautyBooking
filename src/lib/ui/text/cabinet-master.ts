@@ -53,7 +53,7 @@ export const cabinetMaster = {
   scheduleSettings: {
     breadcrumb: "Настройки расписания",
     title: "Настройки расписания",
-    subtitle: "Календарь, часы, перерывы и правила записи",
+    subtitle: "График, календарь, перерывы и правила записи",
     previewCta: "Посмотреть глазами клиента",
     studioApproval: {
       infoTemplate:
@@ -71,20 +71,10 @@ export const cabinetMaster = {
     },
     tabs: {
       calendar: "Календарь",
-      hours: "Часы",
       breaks: "Перерывы",
       rules: "Правила",
       visibility: "Видимость",
       soonHint: "Скоро",
-    },
-    mode: {
-      sectionTitle: "Режим",
-      flexibleLabel: "Часы работы и перерывы",
-      flexibleHint:
-        "Например: с 10:00 до 20:00 с обедом 13:00–14:00. Свободные окошки складываются сами — по длительности услуги.",
-      fixedLabel: "Фиксированное время",
-      fixedHint:
-        "Клиенты записываются только на выбранное вами время — например, 10:00, 13:00 и 16:00. Удобно для долгих процедур одной длительности.",
     },
     slotStep: {
       // COPY-BEAUTY-01 — «шаг слота / квант» заменены на язык мастера:
@@ -98,21 +88,9 @@ export const cabinetMaster = {
         "60": "1 час",
       },
     },
+    // Вкладки «Часы» нет (SCHEDULE-HOURS-TAB-REMOVAL, 2026-10-01): от недели
+    // остались подписи дней — их читает сводка графика (`describe-plan.ts`).
     week: {
-      sectionTitle: "Обычная неделя",
-      hint: "Повторяется каждую неделю. Конкретный день можно изменить во вкладке «Особые дни».",
-      startLabel: "Начало",
-      endLabel: "Конец",
-      breaksLabel: "Перерывы",
-      addBreak: "Перерыв",
-      removeBreakAria: "Убрать перерыв",
-      offLabel: "Выходной",
-      onLabel: "Рабочий",
-      fixedTimesLabel: "Время приёма",
-      fixedTimesEmpty: "Пока нет времени приёма — добавьте, например, 10:00",
-      addFixedTime: "Время",
-      removeFixedTimeAria: "Удалить время",
-      hoursLabel: "ч",
       days: {
         mon: "Пн",
         tue: "Вт",
@@ -121,22 +99,6 @@ export const cabinetMaster = {
         fri: "Пт",
         sat: "Сб",
         sun: "Вс",
-      },
-      // SCHEDULE-PATTERNS-01 (D3): неделя дат не знает — правка касается всех
-      // дней сразу (у мастера студии — после одобрения заявки). Прежнее «с
-      // понедельника» было неправдой; дата начала появится вместе с графиками
-      // по датам (этап 2).
-      footerDisclaimer:
-        "Неделя действует для всех будущих дней. Уже созданные записи не сдвинутся.",
-      actionMenu: {
-        triggerAria: "Действия с днём",
-        copyToWorkdays: "Скопировать на все рабочие дни",
-        copyToAll: "Скопировать на остальные дни",
-        clearDay: "Очистить день",
-        clearConfirmTitle: "Очистить день?",
-        clearConfirmMessage:
-          "Часы и перерывы этого дня очистятся. День станет выходным.",
-        clearConfirmCta: "Очистить",
       },
     },
     // SCHEDULE-PATTERNS-01 (этап 2): «график» — это чередование (решение
@@ -168,8 +130,6 @@ export const cabinetMaster = {
       studioProfileHint: "График работы в студии меняется заявкой: студия рассмотрит её и применит.",
       proposeCta: "Предложить график",
       requestSent: "Заявка отправлена — студия рассмотрит её.",
-      weekEditorHidden: (summary: string, cta: string) =>
-        `Сейчас действует график «${summary}». Чтобы изменить его, нажмите «${cta}» вверху страницы.`,
       saveError: "Не удалось сохранить. Попробуйте ещё раз.",
       endingNotificationLabel: "Расписание кончается",
       endingNotificationTitle: "Расписание скоро закончится",
@@ -307,7 +267,6 @@ export const cabinetMaster = {
       },
       hours: {
         title: "Часы работы",
-        hint: "Одинаковые во все рабочие дни. Разные часы по дням недели можно поправить во вкладке «Часы».",
         startLabel: "Начало",
         endLabel: "Конец",
         addBreak: "Добавить перерыв",
@@ -363,18 +322,6 @@ export const cabinetMaster = {
         clientFallback: "Клиент",
         manualNote:
           "Пока вы не отметите рабочие дни в календаре, записи на новые дни не будет. Уже созданные записи останутся.",
-      },
-    },
-    preview: {
-      title: "Как видит клиент",
-      hint: "Слева — ваши часы, справа — то же самое глазами клиента",
-      // Колонка дня узкая (7 в ряд): полное слово не помещалось под днём и
-      // наезжало на соседнюю колонку. Полное — в `title` сокращения.
-      empty: "Вых.",
-      emptyFull: "Выходной",
-      legend: {
-        working: "Рабочее время",
-        break: "Перерыв",
       },
     },
     placeholders: {
@@ -1643,7 +1590,7 @@ export const cabinetMaster = {
       freeTodaySlotOne: "окошко",
       freeTodaySlotFew: "окошка",
       freeTodaySlotMany: "окошек",
-      freeTodayAfterTemplate: "после {time}",
+      freeTodayAfterTemplate: "ближайшее в {time}",
       freeTodayNone: "нет окошек",
     },
     legend: {
@@ -1717,7 +1664,11 @@ export const cabinetMaster = {
       statConfirmed: "Подтверждено",
     },
     columns: {
-      pending: { title: "Ждут подтверждения", hint: "Ответьте в течение 30 минут" },
+      pending: {
+        title: "Ждут подтверждения",
+        // Срок — `PENDING_EXPIRY_HOURS`: без ответа запись отменяется сама.
+        hint: (hours: number) => `Без ответа за ${hours} ч запись отменится`,
+      },
       confirmed: { title: "Подтверждены", hint: "Готовы к визиту" },
       today: { title: "Сегодня", hint: "В работе" },
       done: { title: "Завершены", hint: "Запросить отзыв" },

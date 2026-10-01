@@ -1,6 +1,7 @@
 import { BookingStatus } from "@prisma/client";
 import { cache } from "react";
 import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
+import { countClientFreeSlotsToday } from "@/lib/master/free-today";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
@@ -178,48 +179,6 @@ function computeDisplayHourRange(input: {
 
 function parseInterval(s: string, e: string): { startMin: number; endMin: number } {
   return { startMin: hhmmToMinutes(s), endMin: hhmmToMinutes(e) };
-}
-
-/**
- * Free 30-minute slots inside today's working window after `now`, minus
- * existing bookings and time blocks. Used by the dashboard-style "Свободно
- * сегодня" KPI on the schedule page.
- */
-function computeFreeSlotsToday(input: {
-  today: ScheduleDay | undefined;
-  now: Date;
-  timeZone: string;
-}): { count: number; firstFreeAfter: string | null } {
-  if (!input.today || input.today.isOff) return { count: 0, firstFreeAfter: null };
-  const nowMin = minuteOfDay(input.now, input.timeZone);
-  let count = 0;
-  let firstFree: string | null = null;
-  const occupied: Array<{ startMin: number; endMin: number }> = [
-    ...input.today.bookings.map((b) => ({
-      startMin: b.startMinuteOfDay,
-      endMin: b.endMinuteOfDay,
-    })),
-    ...input.today.timeBlocks.map((tb) => ({
-      startMin: tb.startMinuteOfDay,
-      endMin: tb.endMinuteOfDay,
-    })),
-  ];
-
-  for (const w of input.today.workingIntervals) {
-    const slotStart = Math.max(w.startMin, nowMin);
-    for (let m = slotStart; m + 30 <= w.endMin; m += 30) {
-      const conflict = occupied.some((o) => m < o.endMin && m + 30 > o.startMin);
-      if (!conflict) {
-        count++;
-        if (firstFree === null) {
-          const hh = String(Math.floor(m / 60)).padStart(2, "0");
-          const mm = String(m % 60).padStart(2, "0");
-          firstFree = `${hh}:${mm}`;
-        }
-      }
-    }
-  }
-  return { count, firstFreeAfter: firstFree };
 }
 
 /**
@@ -438,12 +397,12 @@ export const getMasterScheduleWeek = cache(
       : 0;
     const totalWorkingHours = Math.round(totalWorkingMinutes / 60);
 
-    const today = days.find((d) => d.iso === todayIso);
-    const { count: freeSlotsToday, firstFreeAfter } = computeFreeSlotsToday({
-      today,
+    // DEV-SCENARIO-01: «Свободно сегодня» — окошки, которые клиент может
+    // забронировать прямо сейчас (`free-today.ts`), а не куски рабочего окна.
+    const { count: freeSlotsToday, firstFreeAt: firstFreeAfter } = await countClientFreeSlotsToday(
+      master.id,
       now,
-      timeZone: master.timezone,
-    });
+    );
 
     return {
       days,

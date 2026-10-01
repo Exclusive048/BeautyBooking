@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { sharedCacheControlFor } from "@/lib/api/cache-headers";
 import { prisma } from "@/lib/prisma";
 import { BRAND_COLORS, brandGradientCss, withAlpha } from "@/lib/ui/brand-colors";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 export const runtime = "nodejs";
 
@@ -103,7 +104,7 @@ export async function GET(req: Request) {
   const initials = getInitials(provider.name);
   const hasRating = provider.ratingCount > 0;
   const ratingText = hasRating
-    ? `${provider.ratingAvg.toFixed(1)} ★  ·  ${provider.ratingCount} отзывов`
+    ? `${UI_FMT.decimal(provider.ratingAvg, 1)} ★  ·  ${provider.ratingCount} отзывов`
     : "";
 
   return new ImageResponse(
