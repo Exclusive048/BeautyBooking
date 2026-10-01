@@ -298,7 +298,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
             <div>
               <p className="text-[11px] text-text-sec">{T.statsBookings}</p>
               <p className="mt-0.5 font-display text-base font-semibold tabular-nums text-text-main">
-                {detail.stats30d.bookingsCount.toLocaleString("ru-RU")}
+                {UI_FMT.count(detail.stats30d.bookingsCount)}
               </p>
             </div>
             <div>

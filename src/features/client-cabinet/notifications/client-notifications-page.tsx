@@ -28,6 +28,7 @@ import {
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { NotificationType } from "@prisma/client";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.clientCabinet.notifications;
 
@@ -409,10 +410,7 @@ function formatRelative(iso: string): string {
     if (h < 24) return `${h} ч назад`;
     const d = Math.floor(h / 24);
     if (d < 7) return `${d} дн назад`;
-    return date.toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "short",
-    });
+    return UI_FMT.date(date, "dayMonthShort", { timeZone: VIEWER_TZ });
   } catch {
     return iso;
   }

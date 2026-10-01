@@ -1,6 +1,7 @@
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatRelativeDate, formatRubles } from "./lib/format";
+import { formatRelativeDate } from "./lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.stats;
 
@@ -18,8 +19,8 @@ export function ClientDetailStats({ client, now }: Props) {
   return (
     <dl className="grid grid-cols-2 gap-4 border-b border-border-subtle py-4 lg:grid-cols-4">
       <Stat label={T.visits} value={client.visitsCount > 0 ? String(client.visitsCount) : "—"} />
-      <Stat label={T.ltv} value={formatRubles(client.totalAmount)} />
-      <Stat label={T.avgCheck} value={formatRubles(client.avgCheck)} />
+      <Stat label={T.ltv} value={UI_FMT.priceLabelOrDash(client.totalAmount)} />
+      <Stat label={T.avgCheck} value={UI_FMT.priceLabelOrDash(client.avgCheck)} />
       <Stat
         label={T.next}
         value={

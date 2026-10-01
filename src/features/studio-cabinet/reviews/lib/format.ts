@@ -1,3 +1,5 @@
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+
 /** Russian relative-date label for a Review timestamp. */
 export function formatReviewDateLabel(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
@@ -23,7 +25,7 @@ export function formatReviewDateLabel(iso: string, now: Date = new Date()): stri
   if (days < 60) return "месяц назад";
   const months = Math.floor(days / 30);
   if (months < 12) return `${months} мес. назад`;
-  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+  return UI_FMT.date(date, "dayMonthYearShort", { timeZone: VIEWER_TZ });
 }
 
 export function initialsOf(name: string): string {

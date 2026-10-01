@@ -13,7 +13,8 @@ describe("AI_PROMPTS.serviceDescription", () => {
       priceKopeks: 150_000,
       durationMin: 90,
     });
-    expect(prompt).toContain("Цена: 1500₽");
+    // 29.09 доработки · 24: цена — общим `UI_FMT.priceLabel` (неразрывный пробел перед ₽).
+    expect(prompt).toContain("Цена: 1\u00a0500\u00a0₽");
     expect(prompt).not.toContain("150000");
   });
 });

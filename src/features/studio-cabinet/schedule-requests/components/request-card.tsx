@@ -13,6 +13,8 @@ import { buildReviewPreview, buildSchedulePayloadPreview } from "../lib/payload-
 import { ApproveDialog } from "./approve-dialog";
 import { PayloadPreview } from "./payload-preview";
 import { RejectDialog } from "./reject-dialog";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 
 type Props = {
   request: {
@@ -43,18 +45,15 @@ function statusBadge(status: ScheduleChangeRequestStatus) {
 }
 
 function formatCreatedAt(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return UI_FMT.date(value, "dayMonthShortTime", { timeZone: VIEWER_TZ });
 }
 
 export function RequestCard({ request }: Props) {
   const router = useRouter();
+  // Часы зрителя — только после гидратации: сервер считает их в поясе
+  // контейнера, и первый клиентский рендер обязан совпасть с серверным
+  // (иначе «Hydration failed», 29.09 доработки · 24).
+  const hydrated = useIsHydrated();
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -77,7 +76,7 @@ export function RequestCard({ request }: Props) {
                 {request.provider.name}
               </div>
               <div className="mt-0.5 text-xs text-text-sec">
-                {T.submittedAt}: {formatCreatedAt(request.createdAt)}
+                {T.submittedAt}: {hydrated ? formatCreatedAt(request.createdAt) : null}
               </div>
             </div>
             {statusBadge(request.status)}

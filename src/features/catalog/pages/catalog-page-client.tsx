@@ -36,6 +36,7 @@ import { scrollBehavior } from "@/lib/ui/scroll";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 /**
  * PERF-17 — карта каталога и модалка визуального поиска лежали статическими
@@ -163,7 +164,7 @@ function pluralizeMasters(count: number): string {
 
 function resultsTitle(count: number): string {
   return TH.titleTemplate
-    .replace("{count}", count.toLocaleString("ru-RU"))
+    .replace("{count}", UI_FMT.count(count))
     .replace("{plural}", pluralizeMasters(count));
 }
 

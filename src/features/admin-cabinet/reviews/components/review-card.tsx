@@ -9,14 +9,9 @@ import { UserAvatar } from "@/features/admin-cabinet/users/components/user-avata
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.reviews.card;
-
-const DATE_FMT = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
 
 type Props = {
   review: AdminReviewRow;
@@ -66,7 +61,7 @@ export function ReviewCard({ review, busy, onApprove, onDelete }: Props) {
                 ) : null}
               </p>
               <p className="mt-0.5 font-mono text-[11px] tabular-nums text-text-sec">
-                {DATE_FMT.format(new Date(review.createdAt))}
+                {UI_FMT.date(review.createdAt, "dayMonthYearShort", { timeZone: VIEWER_TZ })}
               </p>
             </div>
           </div>

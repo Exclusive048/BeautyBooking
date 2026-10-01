@@ -11,6 +11,10 @@ export const common = {
   minutesShortLetter: "м",
   hoursShortLetter: "ч",
   currencyRub: "₽",
+  // 29.09 доработки · 24 (решение 24.1): сокращения крупных чисел — по-русски
+  // везде, «4,2 млн ₽», «12 тыс». Склеивает `UI_FMT.countShort` / `moneyShort`.
+  thousandShort: "тыс",
+  millionShort: "млн",
   requiredField: "Обязательное поле",
   namePlaceholder: "Имя",
   // FIX-NAME-HINT: подсказка под полем имени на ВСЕХ поверхностях записи —

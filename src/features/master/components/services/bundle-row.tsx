@@ -12,8 +12,9 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { BundleModal } from "./modals/bundle-modal";
 import { ReorderControls } from "./reorder-controls";
 import { RowMenu } from "./row-menu";
-import { formatDuration, formatRubles } from "./lib/format";
+import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const ROW = UI_TEXT.cabinetMaster.servicesPage.row;
 const T = UI_TEXT.cabinetMaster.servicesPage.bundleRow;
@@ -31,7 +32,7 @@ export function BundleRow({ bundle, allServices }: Props) {
   const discountLabel =
     bundle.discountType === DiscountType.PERCENT
       ? `−${bundle.discountValue}%`
-      : `−${formatRubles(bundle.discountValue)}`;
+      : `−${UI_FMT.priceLabelOrDash(bundle.discountValue)}`;
 
   return (
     <>
@@ -79,7 +80,7 @@ export function BundleRow({ bundle, allServices }: Props) {
 
         <div className="mt-3 ml-7 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-text-sec">
           <span>
-            {T.sumLabel}: <span className="text-text-main">{formatRubles(bundle.totalPrice)}</span>
+            {T.sumLabel}: <span className="text-text-main">{UI_FMT.priceLabelOrDash(bundle.totalPrice)}</span>
           </span>
           <span aria-hidden>·</span>
           <span className="text-success-text">
@@ -89,7 +90,7 @@ export function BundleRow({ bundle, allServices }: Props) {
           <span>
             {T.finalLabel}:{" "}
             <span className="text-sm font-medium text-text-main">
-              {formatRubles(bundle.finalPrice)}
+              {UI_FMT.priceLabelOrDash(bundle.finalPrice)}
             </span>
           </span>
           <span aria-hidden>·</span>

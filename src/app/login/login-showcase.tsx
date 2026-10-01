@@ -15,18 +15,12 @@ import { BrandLogo } from "@/components/brand/brand-logo";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { PublicStats } from "@/lib/stats/public-stats";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 // Marquee benefit cards — visual device only. Copy lives in UI_TEXT; the icons
 // are paired here by index (icons are not UI text). No invented person, quote
 // or rating (LOGIN-REDESIGN-01 marquee decision).
 const MARQUEE_ICONS: LucideIcon[] = [Zap, Wallet, Images, BellRing, CalendarClock, ShieldCheck];
-
-/** Shared with the mobile brand hint in `login-client.tsx`. */
-export function formatStatNumber(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  return new Intl.NumberFormat("ru-RU").format(value);
-}
 
 /**
  * Entrance stagger, expressed as delays for the CSS `.login-rise` class rather
@@ -249,7 +243,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
             >
               <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
               <span className="tabular-nums">
-                {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
+                {UI_FMT.countShort(stats.masters)} {T.socialProofMastersLabel}
               </span>
             </div>
           ) : null}

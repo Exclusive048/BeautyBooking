@@ -77,7 +77,7 @@ export function StudioKpiRow({ kpis }: { kpis: StudioKpis }) {
     {
       icon: Calendar,
       label: T.bookings.label,
-      value: kpis.bookingsCount.current.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.bookingsCount.current),
       sublabel: T.bookings.averageCheckTemplate.replace(
         "{amount}",
         formatRub(kpis.averageCheckKopeks),

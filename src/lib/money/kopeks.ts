@@ -53,3 +53,29 @@ export function rublesToKopeks(rubles: number): Kopeks {
 export function isKopeks(value: unknown): value is Kopeks {
   return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value);
 }
+
+/**
+ * Рубли, введённые человеком («3500» / «3500.50» / «3 500,50»), → копейки.
+ * `null` на мусоре — вызывающий показывает ошибку, а не подставляет ноль
+ * молча; пустая строка — 0. (Переехал из `admin-cabinet/billing/lib/kopeks.ts`,
+ * 29.09 доработки · 24.)
+ */
+export function parseRublesToKopeks(raw: string): number | null {
+  const cleaned = raw.replace(/\s+/g, "").replace(",", ".");
+  if (cleaned.length === 0) return 0;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 100);
+}
+
+/**
+ * Копейки → значение поля ввода в рублях («3500.5»): без разрядов и без «₽»,
+ * ровно то, что {@link parseRublesToKopeks} прочитает обратно в те же копейки.
+ * Отформатированную строку в поле класть нельзя: `Intl` ставит неразрывный
+ * пробел перед «₽», и `.replace(" ₽", "")` его не снимал — поле редактора
+ * тарифа заполнялось «3 500 ₽», а сохранение отвечало «неверная цена»
+ * (найдено 29.09 доработки · 24).
+ */
+export function kopeksToRublesInput(kopeks: number): string {
+  return String(kopeks / 100);
+}

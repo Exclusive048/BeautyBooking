@@ -3,8 +3,9 @@ import { ChevronRight, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatMinutes, formatRubles } from "../lib/format";
+import { formatMinutes } from "../lib/format";
 import { SectionShell } from "./section-shell";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.profile.services;
 
@@ -77,7 +78,7 @@ export function ServicesReadonlySection({ data }: Props) {
                         {formatMinutes(service.durationMin)}
                       </span>
                       <span className="font-mono text-sm font-medium text-text-main">
-                        {formatRubles(service.price)}
+                        {UI_FMT.priceLabelOrDash(service.price)}
                       </span>
                     </li>
                   ))}

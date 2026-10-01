@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioMaster, SlotItem } from "@/features/booking/lib/studio-booking";
 import { MasterAvatar } from "../master-avatar";
+import { UI_FMT } from "@/lib/ui/fmt";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 export const ANY_MASTER_ID = "__any__";
 
@@ -29,6 +32,15 @@ export function MasterStep({
   onBack,
 }: Props) {
   const available = masters.filter((m) => availabilityByMaster[m.id]?.serviceAvailable !== false);
+  const viewerTimeZone = useViewerTimeZoneContext();
+  // Ближайшее окошко — по часам САЛОНА, с меткой зоны, когда она расходится с
+  // зоной зрителя (rule 17; та же композиция, что у шага «Когда»).
+  const nextWindowLabel = (startAtUtc: string): string => {
+    const when = UI_FMT.date(startAtUtc, "dayMonthShortTime", { timeZone: salonTimeZone });
+    return zonesDifferForViewer({ iso: startAtUtc, salonTimeZone, viewerTimeZone })
+      ? `${when} ${formatZoneLabel({ iso: startAtUtc, timeZone: salonTimeZone })}`.trimEnd()
+      : when;
+  };
 
   return (
     <section className="space-y-4">
@@ -108,15 +120,8 @@ export function MasterStep({
                       {availabilityByMaster[master.id]?.slots[0] ? (
                         <div className="text-xs opacity-80">
                           {/* FIX-BATCH-C Defect 1: preview the next window in the
-                              SALON's timezone, consistent with steps 3-4 (was the
-                              browser's local zone via a tz-less toLocaleString). */}
-                          {new Date(availabilityByMaster[master.id]!.slots[0]!.startAtUtc).toLocaleString("ru-RU", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            timeZone: salonTimeZone,
-                          })}
+                              SALON's timezone, consistent with steps 3-4. */}
+                          {nextWindowLabel(availabilityByMaster[master.id]!.slots[0]!.startAtUtc)}
                         </div>
                       ) : null}
                     </div>

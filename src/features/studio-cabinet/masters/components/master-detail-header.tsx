@@ -16,6 +16,7 @@ import { EditMasterProfileDialog } from "./edit-master-profile-dialog";
 import { PauseMasterDialog } from "./pause-master-dialog";
 import { RemoveMasterDialog } from "./remove-master-dialog";
 import { RevokeInviteDialog } from "./revoke-invite-dialog";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail;
 
@@ -33,9 +34,7 @@ function statusLabel(status: StudioMasterDetail["status"]): string {
 }
 
 function formatJoinedDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("ru-RU", { year: "numeric", month: "long" });
+  return UI_FMT.date(iso, "monthYearLong", { timeZone: VIEWER_TZ });
 }
 
 export function MasterDetailHeader({

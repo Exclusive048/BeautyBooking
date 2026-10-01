@@ -200,6 +200,16 @@ colors: {
 - Ошибка: «Не удалось {действие}. Попробуйте ещё раз.»
 - Empty state: одна фраза + одна кнопка-действие. Не дрожать, не извиняться.
 
+### 8a. Даты, числа, деньги — только через `UI_FMT`
+
+> 29.09 доработки · 24 (UI-20). `Intl.*`, `toLocale*` и литерал «₽» вне `lib/ui/fmt.ts`, `lib/format.ts`, `lib/schedule/timezone.ts`, `lib/ui/zone-label.ts`, `lib/time/use-viewer-timezone.ts` валят `src/lib/ui/format-sites-inventory.test.ts`.
+
+- **Тексты не форматируют.** В `lib/ui/text/*` нет `Intl` и `toLocale`: функция текста принимает готовую строку (`weeklyStats.body(n, UI_FMT.priceLabel(kopeks))`). «₽» как слово («Цена, ₽») — в текстах можно.
+- **Деньги (копейки):** `UI_FMT.priceLabel` — «4 500 ₽», ноль — «0 ₽» (цена услуги «бесплатно»); `UI_FMT.priceLabelOrDash` — «—» для нуля и `null` (таблицы, KPI, история визитов); `UI_FMT.moneyShort` — «4,2 млн ₽» / «12 тыс ₽» (KPI, оси графиков); `moneyRUBFromKopeks` — точные суммы с копейками (возвраты, платежи). Перед «₽» — **неразрывный** пробел: его ставит хелпер, руками не собирать.
+- **Счётчики:** `UI_FMT.count` — «1 412»; `UI_FMT.countShort` — «1,2 тыс» / «4,2 млн»; `UI_FMT.decimal(n, k)` — ровно k знаков. Латинских «12K» / «1.2M» в продукте нет (решение 24.1).
+- **Даты:** у каждого формата пояс — обязательный аргумент: пояс салона/кабинета (rule 17, с меткой `formatZoneLabel`), `"UTC"` для ключей и осей, либо `VIEWER_TZ` — часы зрителя (только клиентский код; на сервере это часы контейнера, сторож краснеет). Формы — `UI_FMT.date(value, preset, { timeZone })`: `dayMonthShort` «29 сент.», `dayMonthLong` «29 сентября», `dayMonthYearLong`, `weekdayDayMonthShort` «пн, 29 сент.», `dayMonthShortTime` «29 сент., 14:30» и др. (список — `DATE_PRESETS` в `fmt.ts`); месяц словом — без ведущего нуля у дня. Дата-ключ салона `YYYY-MM-DD` — `UI_FMT.dateKey(key, preset)`, ключ из момента — `toLocalDateKey` / `toLocalMonthKey`.
+- **Часы зрителя в SSR-компоненте** (время суток, «пришло в 14:30») — показывать после гидратации (`useIsHydrated()`), иначе сервер в поясе контейнера и браузер расходятся.
+
 ---
 
 ## 9. Движение — служебное

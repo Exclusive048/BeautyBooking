@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FREE_SLOT_HORIZON_DAYS } from "@/lib/schedule/free-slot-keys-shared";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 /**
  * CATALOG-DATE-TIME-FILTER (2026-09-24) — блок «Когда» каталога: день
@@ -39,8 +40,6 @@ export const WHEN_TIME_PRESET_RANGES: Record<Exclude<WhenTimePreset, "custom">, 
 };
 
 const CUSTOM_DEFAULT = { from: "09:00", to: "12:00" };
-
-const SHORT_DATE_FMT = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short" });
 
 /** YYYY-MM-DD по часам зрителя. */
 export function viewerDateKey(date: Date): string {
@@ -75,7 +74,7 @@ export function whenFilterLabel(input: {
     const today = viewerDateKey(input.now);
     const tomorrow = viewerDateKey(addDays(input.now, 1));
     parts.push(
-      input.date === today ? TS.todayChip : input.date === tomorrow ? TS.tomorrowChip : SHORT_DATE_FMT.format(picked),
+      input.date === today ? TS.todayChip : input.date === tomorrow ? TS.tomorrowChip : UI_FMT.dateKey(input.date, "dayMonthShort"),
     );
   }
   if (input.timePreset && input.timePreset !== "custom") {
@@ -166,7 +165,7 @@ export function WhenFilter({ date, timePreset, timeFrom, timeTo, onChange }: Pro
         <div ref={containerRef} className="relative">
           <ChipButton active={isCustomDate} onClick={() => setCalendarOpen((open) => !open)}>
             <CalendarDays className="-ml-0.5 mr-1.5 h-3.5 w-3.5" aria-hidden />
-            {isCustomDate && picked ? SHORT_DATE_FMT.format(picked) : TS.calendarChip}
+            {isCustomDate && picked ? UI_FMT.dateKey(date, "dayMonthShort") : TS.calendarChip}
           </ChipButton>
           {calendarOpen ? (
             <div className="absolute left-0 top-full z-30 mt-2 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">

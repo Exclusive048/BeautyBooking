@@ -9,13 +9,13 @@ import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import * as UI_TEXT from "@/lib/ui/text";
 import {
-  formatRublesFromKopeks,
   maskLastName,
 } from "@/features/admin-cabinet/dashboard/server/shared";
 import type {
   AdminEventItem,
   AdminEventsResponse,
 } from "@/features/admin-cabinet/dashboard/types";
+import { moneyRUBFromKopeks } from "@/lib/format";
 
 const T = UI_TEXT.adminPanel.dashboard.feed;
 
@@ -158,7 +158,7 @@ export async function getAdminEvents(
       timeMs: b.createdAt.getTime(),
       primary: `${maskLastName(providerName)} → ${maskLastName(clientFull)}`,
       secondary: b.service?.name ?? "—",
-      amountText: priceKopeks ? formatRublesFromKopeks(priceKopeks) : null,
+      amountText: priceKopeks ? moneyRUBFromKopeks(priceKopeks) : null,
       amountTone: "neutral",
       dotTone: "ok",
     });
@@ -175,7 +175,7 @@ export async function getAdminEvents(
       primary: T.eventTypes.bookingCancel,
       secondary: c.service?.name ?? "—",
       amountText: priceKopeks
-        ? `${T.cancelPrefix}${formatRublesFromKopeks(priceKopeks)}`
+        ? `${T.cancelPrefix}${moneyRUBFromKopeks(priceKopeks)}`
         : null,
       amountTone: "negative",
       dotTone: "cancel",
@@ -224,7 +224,7 @@ export async function getAdminEvents(
       secondary: maskLastName(fullName),
       amountText:
         monthly !== null
-          ? `${formatRublesFromKopeks(monthly)}${T.perMonthSuffix}`
+          ? `${moneyRUBFromKopeks(monthly)}${T.perMonthSuffix}`
           : null,
       amountTone: "positive",
       dotTone: "sub",

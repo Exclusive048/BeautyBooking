@@ -208,10 +208,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
                 </a>
               ) : null}
 
-              <AvailabilityHintWrapper
-                hint={availability}
-                timezone={provider.timezone}
-              />
+              <AvailabilityHintWrapper hint={availability} />
             </m.div>
 
             {provider.categories.length > 0 ? (
@@ -279,12 +276,6 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
   );
 }
 
-function AvailabilityHintWrapper({
-  hint,
-  timezone,
-}: {
-  hint: AvailabilityHintData;
-  timezone: string;
-}) {
-  return <AvailabilityHint hint={hint} timezone={timezone} />;
+function AvailabilityHintWrapper({ hint }: { hint: AvailabilityHintData }) {
+  return <AvailabilityHint hint={hint} />;
 }

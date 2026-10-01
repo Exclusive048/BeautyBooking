@@ -32,7 +32,6 @@ type Props = {
   serviceName: string;
   servicePrice: number;
   serviceDurationMin: number;
-  providerTimezone: string;
   selectedDateKey: string | null;
   selectedSlot: BookingFlowSlot | null;
 
@@ -86,7 +85,6 @@ export function FormPhase({
   serviceName,
   servicePrice,
   serviceDurationMin,
-  providerTimezone,
   selectedDateKey,
   selectedSlot,
   clientName,
@@ -292,7 +290,6 @@ export function FormPhase({
         serviceDurationMin={serviceDurationMin}
         slot={selectedSlot}
         dateKey={selectedDateKey}
-        providerTimezone={providerTimezone}
       />
 
       {/* RKN-FIX-02 — directly above the CTA, so the act of consenting and the

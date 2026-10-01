@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AnalyticsContext } from "@/features/analytics/domain/guards";
 import { buildStudioScopeSql } from "@/features/analytics/domain/helpers";
+import { toLocalMonthKey } from "@/lib/schedule/timezone";
 
 type CohortRow = {
   cohortMonth: string;
@@ -26,16 +27,6 @@ type CohortResult = {
   cohorts: CohortSeries[];
   summary: CohortSummary;
 };
-
-function getLocalMonthKey(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(date);
-  const lookup = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  return `${lookup.year}-${lookup.month}`;
-}
 
 function monthIndex(monthKey: string): number {
   const [year, month] = monthKey.split("-").map(Number);
@@ -122,7 +113,7 @@ export async function getRetentionCohorts(input: {
 }): Promise<CohortResult> {
   const monthsBack = Math.max(1, Math.min(12, input.monthsBack));
   const now = new Date();
-  const currentMonth = getLocalMonthKey(now, input.context.timeZone);
+  const currentMonth = toLocalMonthKey(now, input.context.timeZone);
   const fromMonth = shiftMonthKey(currentMonth, -(monthsBack - 1));
   const fromUtc = new Date(`${fromMonth}-01T00:00:00.000Z`);
   const toUtcExclusive = new Date(now.getTime());
@@ -173,7 +164,7 @@ export async function getRevenueCohorts(input: {
 }): Promise<CohortResult> {
   const monthsBack = Math.max(1, Math.min(12, input.monthsBack));
   const now = new Date();
-  const currentMonth = getLocalMonthKey(now, input.context.timeZone);
+  const currentMonth = toLocalMonthKey(now, input.context.timeZone);
   const fromMonth = shiftMonthKey(currentMonth, -(monthsBack - 1));
   const fromUtc = new Date(`${fromMonth}-01T00:00:00.000Z`);
   const toUtcExclusive = new Date(now.getTime());

@@ -6,7 +6,7 @@ import type { AvailabilitySearchQuery } from "@/lib/search-by-time/schemas";
 import type { AvailabilityProviderItem, AvailabilitySearchResponse } from "@/lib/search-by-time/types";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { isDateKey } from "@/lib/schedule/dateKey";
-import { getLocalTimeParts } from "@/lib/schedule/timezone";
+import { getLocalTimeParts, isValidTimeZone } from "@/lib/schedule/timezone";
 import type { CatalogSmartTagPreset } from "@/lib/catalog/schemas";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { CARD_PHOTO_LIMIT, composeCardPhotos } from "@/lib/catalog/card-photos";
@@ -75,12 +75,7 @@ function formatTimeLabel(date: Date, timeZone: string): string {
 function resolveProviderTimezone(timezone: string | null | undefined): string {
   const candidate = timezone?.trim();
   const selected = candidate && candidate.length > 0 ? candidate : DEFAULT_SEARCH_TIMEZONE;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: selected }).format(new Date());
-    return selected;
-  } catch {
-    return DEFAULT_SEARCH_TIMEZONE;
-  }
+  return isValidTimeZone(selected) ? selected : DEFAULT_SEARCH_TIMEZONE;
 }
 
 function buildWhere(

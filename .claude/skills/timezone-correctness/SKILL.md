@@ -30,7 +30,12 @@ description: Авторитет по отображению времени и ч
 |---|---|---|
 | `formatLocalHm(date, timeZone)` | `src/lib/schedule/timezone.ts:72` | Единый entity-tz «HH:MM». `timeZone` **обязателен** (нет дефолта) — нельзя случайно отформатировать в UTC/host. |
 | `getLocalTimeParts` / `getDayOfWeek` / `toUtcFromLocalDateTime` / `toLocalDateKey` | `src/lib/schedule/timezone.ts` | tz-aware части / weekday / local→UTC / date-key в tz сущности. |
-| `UI_FMT.timeShort / dateTimeShort / dateShort(date, { timeZone })` | `src/lib/ui/fmt.ts:61` | date+time форматтеры, `timeZone` через опции. |
+| `UI_FMT.timeShort / dateTimeShort / dateShort(date, { timeZone })` | `src/lib/ui/fmt.ts` | date+time форматтеры. С 29.09 доработки · 24 `timeZone` **обязателен**: IANA-пояс либо `VIEWER_TZ` (явные часы зрителя). |
+| `UI_FMT.date(value, preset, { timeZone })` + `VIEWER_TZ` | `src/lib/ui/fmt.ts` (`DATE_PRESETS`) | Дата словами: «29 сент.», «пн, 29 сент.», «29 сент., 14:30», «29 сентября 2026 г.»… Пояс обязателен; `VIEWER_TZ` в модуле вне клиентского графа валит `billing/deadline-label.test.ts`. |
+| `UI_FMT.dateKey(key, preset)` | `src/lib/ui/fmt.ts` | Подпись даты-ключа салона `YYYY-MM-DD` (UTC-tech: полдень UTC + `timeZone: "UTC"`, без сдвига суток). |
+| `toLocalMonthKey(date, timeZone)` | `src/lib/schedule/timezone.ts` | Ключ `YYYY-MM` в поясе сущности (когорты, группировка по месяцам). |
+| `getViewerTimeZone()` | `src/lib/time/use-viewer-timezone.ts` | Единственный `resolvedOptions()` — пояс браузера (чат, `x-tz`). |
+| `formatBookingWhenLabel(date, timeZone)` | `src/lib/notifications/format-booking-when.ts` | Серверный текст уведомления: «29.09, 14:30 (Город, GMT+N)» — метка всегда. С 29.09 · 24 через него же идут `notifications/service.ts` (запись, напоминания) и оба модуля горящих окошек. |
 | `formatZoneLabel({ iso, timeZone, city })` + `zonesDifferForViewer({ iso, salonTimeZone, viewerTimeZone })` | `src/lib/ui/zone-label.ts:138/154` | Метка «(Екатеринбург, GMT+5)» + решение показывать её (когда зритель ≠ салон). DST-aware, RU/CIS город из `TZ_CITY_RU`. |
 | `utcIsoToSalonInput` / `salonInputToUtcIso` / `salonLocalDatetimeInput` | **`src/lib/schedule/datetime-input.ts`** | Единственный конвертер salon-local ↔ UTC для **`datetime-local`-ввода и prefill**. ⚠️ Переехал сюда из `features/studio-cabinet/schedule/lib/` (LOGIC-21) — мастерский quick-create не мог переиспользовать модуль из чужого слайса и оттого держал собственный host-локальный путь. Вторая копия появиться не должна. |
 
@@ -64,6 +69,11 @@ description: Авторитет по отображению времени и ч
 | **master quick-create** (клик по пустой ячейке сетки → `?prefillTime=` → модаль → отправка) | `master/…/schedule/empty-cells-overlay.tsx` (проп `timezone`, `salonInputToUtcIso`), `week-grid-column.tsx` (проп прокинут), `master/…/dashboard/manual-booking-modal.tsx` (`utcIsoToSalonInput` + `salonInputToUtcIso` + `toLocalDateKey` для дефолта), tz из `getMasterManualBookingData().timezone` = `Provider.timezone`. **LOGIC-21** |
 | studio move-booking dialog (`datetime-local`) | `studio-cabinet/…/dialogs/move-booking-dialog.tsx` — `utcIsoToSalonInput`/`salonInputToUtcIso` (round-trip UTC↔salon-local через `datetime-input.ts`; fallback `?? currentStartAtUtc` — never shift). TZ-DISPLAY-SALON-PARITY-01 (FIX-4) |
 | chat system-message booking-card | `chat-window/system-message.tsx:89-98` — `salonTz = card.timezone` (= `provider.timezone`, `ThreadBookingCardDto`); `formatLocalHm(…, salonTz)` + label. FIX-TZ-SYSTEM-MESSAGE |
+| главная кабинета мастера: приветствие и дата | `master/lib/time-greeting.ts` — `getTimeGreeting(now, tz)` / `formatHeroDate(now, tz)` в поясе кабинета (герой рендерится на сервере; `getHours()` давал часы контейнера). 29.09 · 24 |
+| баннер «сегодня» студии | `studio-cabinet/dashboard/…/studio-today-banner.tsx` — `UI_FMT.date(now, "weekdayDayMonthLong", { timeZone })` (серверный компонент, пояс студии). 29.09 · 00 / 24 |
+| главная: горящие окошки | `home/components/hot-slots-preview.tsx` — `UI_FMT.date/timeShort({ timeZone: provider.timezone })` + метка при расхождении. 29.09 · 24 |
+| запись в студию: превью ближайшего окошка у мастера | `public-studio/…/steps/master-step.tsx` — `UI_FMT.date(…, "dayMonthShortTime", { timeZone: salonTimeZone })` + метка. 29.09 · 24 |
+| отклик на модель-оффер: подтверждённое время | `model-offers/components/client-model-applications-page.tsx` — `offer.master.timezone` (из `/api/me/model-applications`) + `formatZoneLabel`. 29.09 · 24 |
 | catalog card «Ближайшее» (dormant) | `catalog/components/catalog-card.tsx` → `slot-precision-format.formatAvailability({ timeZone: item.timezone })` (из `catalog.service.searchCatalog`). `nextSlot` пока `null` → correct-when-lit. TZ-DISPLAY-SALON-PARITY-01 |
 
 ### 3b. VIEWER-TZ (намеренно) — **НЕ ПЕРЕВОРАЧИВАТЬ В SALON-TZ.** Это активити/относительные таймстемпы, не время записи.
@@ -73,9 +83,9 @@ description: Авторитет по отображению времени и ч
 | чат: таймстемп сообщения + группировка по дням | `chat-window/message-bubble.tsx:122`, `booking-chat.tsx:260`, `chat-window/day-separator.tsx:13` (tz из `chat-shell.tsx:41`) | «когда отправлено» — событие в жизни зрителя, не в салоне |
 | уведомления: время получения | studio `notification-card.tsx:14,30`, client `client-notifications-page.tsx:328` | активити-таймстемп |
 | отзыв: дата публикации | `client-reviews-page.tsx:295,420` (date-only) | coarse дата события |
-| приветствие «Доброе утро» | `master/lib/time-greeting.ts:6` — `getHours()` | стенные часы зрителя |
 | schedule-header «обновлено HH:MM» | `studio-cabinet/…/schedule-header.tsx:130` | момент refresh-действия админа |
-| coarse date-only | `studio-today-banner.tsx:21`, `master-detail-header.tsx:35` (member-since), legal-pages | грубая дата, не инстант записи |
+| coarse date-only | `master-detail-header.tsx` (member-since), админка (биллинг, отзывы, пользователи) | грубая дата, не инстант записи; `UI_FMT.date(…, { timeZone: VIEWER_TZ })` |
+| время суток по часам зрителя в SSR-компоненте | `admin-cabinet/dashboard/…/events-feed-item.tsx`, `…/payments-tab/payment-row.tsx`, `schedule-requests/…/request-card.tsx` | показывается после гидратации (`useIsHydrated()`): сервер считает в поясе контейнера → «Hydration failed» (найдено вживую 29.09 · 24) |
 | schedule-request: время подачи + payload-preview | `schedule-requests/…/request-card.tsx:46`; `payload-display.ts:57-88` | submission-время (активити); preview — tz-naive недельные «HH:MM» строки, не UTC-инстант |
 
 ### 3c. UTC-tech — внутреннее, не user-facing время записи

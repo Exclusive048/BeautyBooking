@@ -6,13 +6,13 @@ import { cn } from "@/lib/cn";
 import type { ClientListItemView } from "@/lib/master/clients-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
 import {
-  formatNumberShort,
   formatRelativeDate,
   getInitials,
   pickAvatarColor,
   pluralize,
 } from "./lib/format";
 import { Button } from "@/components/ui/button";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.clients.list;
 
@@ -87,7 +87,7 @@ export function ClientListItem({ client, selected, onSelect, now }: Props) {
 
       <div className="shrink-0 text-right">
         <p className="font-mono text-sm font-medium tabular-nums text-text-main">
-          {formatNumberShort(client.totalAmount)}
+          {UI_FMT.priceLabelOrDash(client.totalAmount)}
         </p>
         <p className="font-mono text-[10px] uppercase tracking-wider text-text-sec">{T.rowRevenueLabel}</p>
       </div>

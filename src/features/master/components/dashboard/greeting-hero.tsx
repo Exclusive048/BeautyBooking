@@ -41,8 +41,8 @@ type Props = {
  * swap for the in-app Advisor module.
  */
 export function GreetingHero({ firstName, now, context, nextBooking, timezone }: Props) {
-  const greeting = getTimeGreeting(now);
-  const dateLabel = formatHeroDate(now);
+  const greeting = getTimeGreeting(now, timezone);
+  const dateLabel = formatHeroDate(now, timezone);
   const advice = pickAdvice(context);
 
   return (

@@ -10,8 +10,9 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { ServiceModal } from "./modals/service-modal";
 import { ReorderControls } from "./reorder-controls";
 import { RowMenu } from "./row-menu";
-import { formatDuration, formatRubles } from "./lib/format";
+import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.row;
 
@@ -56,7 +57,7 @@ export function ServiceRow({ service, categories, onlinePaymentsAvailable }: Pro
           {formatDuration(service.durationMin)}
         </span>
         <span className="w-20 shrink-0 text-right font-mono text-sm font-medium text-text-main">
-          {formatRubles(service.price)}
+          {UI_FMT.priceLabelOrDash(service.price)}
         </span>
         <RowMenu
           itemId={service.id}

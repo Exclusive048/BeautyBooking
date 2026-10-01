@@ -542,7 +542,6 @@ export function BookingFlowStepper({
               serviceName={serviceName}
               servicePrice={servicePrice}
               serviceDurationMin={serviceDurationMin}
-              providerTimezone={providerTimezone}
               selectedDateKey={state.selectedDateKey}
               selectedSlot={state.selectedSlot}
               clientName={state.clientName}

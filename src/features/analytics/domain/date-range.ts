@@ -6,6 +6,7 @@ import {
   isDateKey,
   parseDateKeyParts,
 } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 export type AnalyticsPeriod = "today" | "week" | "month" | "quarter" | "custom";
 
@@ -37,19 +38,8 @@ function toDateKey(parts: DateParts): string {
 }
 
 function getLocalDateParts(date: Date, timeZone: string): DateParts {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = dtf.formatToParts(date);
-  const lookup = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  return {
-    year: Number(lookup.year),
-    month: Number(lookup.month),
-    day: Number(lookup.day),
-  };
+  const [year, month, day] = toLocalDateKey(date, timeZone).split("-").map(Number);
+  return { year: year!, month: month!, day: day! };
 }
 
 function resolvePresetRange(period: AnalyticsPeriod, timeZone: string): { fromKey: string; toKey: string } {

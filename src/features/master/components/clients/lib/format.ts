@@ -6,18 +6,7 @@
 
 import { pickAvatarTone } from "@/components/ui/avatar-tones";
 
-const RUBLE_FMT = new Intl.NumberFormat("ru-RU");
 const RU_PLURAL = new Intl.PluralRules("ru-RU");
-
-export function formatRubles(kopeks: number): string {
-  if (!Number.isFinite(kopeks) || kopeks <= 0) return "—";
-  return `${RUBLE_FMT.format(Math.round(kopeks / 100))} ₽`;
-}
-
-export function formatNumberShort(kopeks: number): string {
-  if (!Number.isFinite(kopeks) || kopeks <= 0) return "—";
-  return RUBLE_FMT.format(Math.round(kopeks / 100));
-}
 
 export function pluralize(n: number, one: string, few: string, many: string): string {
   const form = RU_PLURAL.select(n);

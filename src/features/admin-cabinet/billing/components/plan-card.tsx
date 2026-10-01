@@ -2,7 +2,6 @@
 
 import { Check, Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kopeks";
 import {
   tierAndScopeLabel,
   tierLabel,
@@ -10,9 +9,9 @@ import {
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPlanCard } from "@/features/admin-cabinet/billing/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.billing.plans;
-const COUNT_FMT = new Intl.NumberFormat("ru-RU");
 
 type Props = {
   plan: AdminPlanCard;
@@ -56,7 +55,7 @@ export function PlanCardView({ plan, onEdit }: Props) {
         ) : (
           <>
             <span className="font-display text-3xl font-semibold tabular-nums tracking-tight text-text-main">
-              {formatRublesFromKopeks(plan.primaryPricePerMonthKopeks)}
+              {UI_FMT.priceLabel(plan.primaryPricePerMonthKopeks)}
             </span>
             <span className="text-xs text-text-sec">{T.pricePerMonth}</span>
           </>
@@ -65,7 +64,7 @@ export function PlanCardView({ plan, onEdit }: Props) {
 
       <p className="mb-4 text-xs text-text-sec">
         <span className="tabular-nums text-text-main">
-          {COUNT_FMT.format(plan.activeSubscriptionsCount)}
+          {UI_FMT.count(plan.activeSubscriptionsCount)}
         </span>{" "}
         {T.activeCountSuffix}
         {!plan.isActive ? (

@@ -1,4 +1,5 @@
 import { pluralize } from "@/lib/utils/pluralize";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 // Genitive month names — the case required after the preposition «с»
 // ("с июня 2026"). `Intl.DateTimeFormat(month:"long")` without a day yields the
@@ -37,15 +38,7 @@ export function formatMemberSince(iso: string): string {
 
 export function formatConnectedAt(iso: string | null): string {
   if (!iso) return "";
-  try {
-    return new Intl.DateTimeFormat("ru-RU", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
+  return UI_FMT.date(iso, "dayMonthYearLong", { timeZone: VIEWER_TZ });
 }
 
 export function displayBirthday(iso: string | null, hideYear: boolean): string {

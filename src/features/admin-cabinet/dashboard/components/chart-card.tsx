@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminChartSeries } from "@/features/admin-cabinet/dashboard/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.dashboard.charts;
 
@@ -22,7 +23,6 @@ const VIEW_H = 200;
 const PAD_X = 24;
 const PAD_Y = 24;
 
-const COUNT_FMT = new Intl.NumberFormat("ru-RU");
 
 /** Shared chart primitive. Pure SVG — `stroke="currentColor"` / fills
  * via `text-*` tokens — so the colour automatically tracks the brand
@@ -76,7 +76,7 @@ export function ChartCard({
 
       <div className="mb-2 flex items-baseline gap-3">
         <span className="font-display text-2xl font-semibold tabular-nums tracking-tight text-text-main">
-          {COUNT_FMT.format(data.total)}
+          {UI_FMT.count(data.total)}
         </span>
       </div>
 
@@ -182,7 +182,7 @@ export function ChartCard({
                 textAnchor="middle"
                 className="fill-text-main font-mono text-[11px] font-semibold"
               >
-                {tooltipNoun}: {COUNT_FMT.format(data.points[hoverIdx]!.count)}
+                {tooltipNoun}: {UI_FMT.count(data.points[hoverIdx]!.count)}
               </text>
             </g>
           ) : null}

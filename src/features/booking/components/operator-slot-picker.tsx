@@ -65,17 +65,9 @@ type Props = {
   disabled?: boolean;
 };
 
-// Дата-ключ салона → «пн, 08 июл.». Якорь — полдень UTC, чтобы Y-M-D ключа
-// отрисовался как есть, без сдвига суток (тот же приём, что в окне переноса).
+// Дата-ключ салона → «пн, 8 июл.» (UI_FMT.dateKey: UTC-tech, без сдвига суток).
 function formatDateKeyLabel(dateKey: string): string {
-  const dt = new Date(`${dateKey}T12:00:00Z`);
-  if (Number.isNaN(dt.getTime())) return dateKey;
-  return dt.toLocaleDateString("ru-RU", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    timeZone: "UTC", // tz-ok: date-key label (salon-local), UTC-noon anchor
-  });
+  return UI_FMT.dateKey(dateKey, "weekdayDayMonthShort");
 }
 
 /**

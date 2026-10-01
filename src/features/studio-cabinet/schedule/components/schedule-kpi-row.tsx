@@ -25,7 +25,7 @@ export function ScheduleKpiRow({ kpis }: { kpis: ScheduleKpis }) {
     {
       icon: Calendar,
       label: T.bookingsToday,
-      value: kpis.bookingsCount.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.bookingsCount),
       sublabel: T.bookingsConfirmedTemplate.replace(
         "{count}",
         String(kpis.bookingsConfirmedCount),
@@ -50,7 +50,7 @@ export function ScheduleKpiRow({ kpis }: { kpis: ScheduleKpis }) {
     {
       icon: Clock,
       label: T.freeWindows,
-      value: kpis.freeWindowsCount.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.freeWindowsCount),
       sublabel: T.freeWindowsHint,
     },
   ];

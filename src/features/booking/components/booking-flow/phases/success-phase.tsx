@@ -21,36 +21,16 @@ type Props = {
 };
 
 function formatLongDateTime(iso: string, timezone: string): string {
-  const date = new Date(iso);
-  const weekday = new Intl.DateTimeFormat("ru-RU", {
-    weekday: "short",
-    timeZone: timezone,
-  })
-    .format(date)
-    .replace(".", "");
-  const dayMonth = new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    timeZone: timezone,
-  }).format(date);
-  const hm = new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: timezone,
-  }).format(date);
+  const weekday = UI_FMT.date(iso, "weekdayShort", { timeZone: timezone }).replace(".", "");
+  const dayMonth = UI_FMT.date(iso, "dayMonthLong", { timeZone: timezone });
+  const hm = UI_FMT.timeShort(iso, { timeZone: timezone });
   return `${weekday}, ${dayMonth} · ${hm}`;
 }
 
 function formatRange(startIso: string, endIso: string | null, timezone: string): string {
   if (!endIso) return formatLongDateTime(startIso, timezone);
   const long = formatLongDateTime(startIso, timezone);
-  const endTime = new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: timezone,
-  }).format(new Date(endIso));
+  const endTime = UI_FMT.timeShort(endIso, { timeZone: timezone });
   return `${long} — ${endTime}`;
 }
 

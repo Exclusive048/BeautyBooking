@@ -10,7 +10,7 @@ import type { SlotItem } from "@/features/booking/lib/studio-booking";
 import { todayKey, buildDateBounds } from "@/features/booking/lib/studio-booking";
 import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 
 type DayCell = {
   dateKey: string;
@@ -113,14 +113,7 @@ export function WhenStep({
     const day: SlotItem[] = [];
     const evening: SlotItem[] = [];
     for (const slot of slots) {
-      const date = new Date(slot.startAtUtc);
-      const hour = Number(
-        new Intl.DateTimeFormat("ru-RU", {
-          timeZone: salonTimeZone,
-          hour: "2-digit",
-          hour12: false,
-        }).format(date),
-      );
+      const { hour } = getLocalTimeParts(new Date(slot.startAtUtc), salonTimeZone);
       if (hour < 12) morning.push(slot);
       else if (hour < 16) day.push(slot);
       else evening.push(slot);

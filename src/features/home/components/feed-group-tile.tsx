@@ -15,6 +15,7 @@ import type { HomeFeedGroup } from "@/lib/feed/home-feed.service";
 import { MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import { COLLAGE_RATIO_CLASS, type CollageRatio } from "@/features/home/lib/collage-layout";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Props = {
   group: HomeFeedGroup;
@@ -26,10 +27,6 @@ type Props = {
 };
 
 const T = UI_TEXT.homeFeed.card;
-
-function formatPriceRub(kopeks: number): string {
-  return `${Math.round(kopeks / 100).toLocaleString("ru-RU")} ${UI_TEXT.common.currencyRub}`;
-}
 
 function fill(template: string, values: Record<string, string | number>): string {
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name] ?? ""));
@@ -61,7 +58,7 @@ export function FeedGroupTile({
   const current = group.works[Math.min(active, total - 1)] ?? group.works[0]!;
   const profileHref = group.authorPublicUsername ? `/u/${group.authorPublicUsername}` : null;
   const workCaption = formatWorkCaption(current.performerName, current.primaryServiceTitle);
-  const priceRub = current.totalPrice > 0 ? formatPriceRub(current.totalPrice) : null;
+  const priceRub = current.totalPrice > 0 ? UI_FMT.priceLabel(current.totalPrice) : null;
   const rating = group.authorRatingAvg > 0 ? group.authorRatingAvg.toFixed(1) : null;
   const isCarousel = total > 1;
 

@@ -258,7 +258,7 @@ export function PackageModal({
               className="w-32"
             />
             <span className="text-sm text-text-sec">
-              {discountType === DiscountType.PERCENT ? "%" : "₽"}
+              {discountType === DiscountType.PERCENT ? "%" : UI_TEXT.common.currencyRub}
             </span>
           </div>
         </div>

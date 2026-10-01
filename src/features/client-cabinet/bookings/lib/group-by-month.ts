@@ -1,4 +1,5 @@
 import type { ClientBookingDTO } from "@/lib/client-cabinet/bookings.service";
+import { toLocalMonthKey } from "@/lib/schedule/timezone";
 
 const MONTH_NAMES_RU = [
   "Январь",
@@ -26,18 +27,9 @@ export type MonthGroup = {
 // wrong month for a cross-zone viewer. Returns {year, monthIndex0} in salon tz.
 function salonYearMonth(iso: string, timeZone: string): { year: number; month0: number } {
   const date = new Date(iso);
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-    }).formatToParts(date);
-    const year = Number(parts.find((p) => p.type === "year")?.value ?? date.getFullYear());
-    const month0 = Number(parts.find((p) => p.type === "month")?.value ?? date.getMonth() + 1) - 1;
-    return { year, month0 };
-  } catch {
-    return { year: date.getFullYear(), month0: date.getMonth() };
-  }
+  if (Number.isNaN(date.getTime())) return { year: Number.NaN, month0: Number.NaN };
+  const [year, month] = toLocalMonthKey(date, timeZone).split("-").map(Number);
+  return { year: year!, month0: month! - 1 };
 }
 
 /**

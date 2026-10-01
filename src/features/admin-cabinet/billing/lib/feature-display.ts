@@ -2,6 +2,7 @@ import { SubscriptionScope } from "@prisma/client";
 import { FEATURE_CATALOG, type FeatureKey } from "@/lib/billing/feature-catalog";
 import type { PlanFeatures } from "@/lib/billing/features";
 import type { AdminPlanFeatureLine } from "@/features/admin-cabinet/billing/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 /**
  * Renders a list of human-readable feature lines for a plan card.
@@ -41,7 +42,7 @@ export function planFeatureLines(
       if (typeof raw === "number") {
         lines.push({
           title: def.title,
-          detail: new Intl.NumberFormat("ru-RU").format(raw),
+          detail: UI_FMT.count(raw),
         });
       }
       // raw === null means "unlimited" — skip, as it's not a card

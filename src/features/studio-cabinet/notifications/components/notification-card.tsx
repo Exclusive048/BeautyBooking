@@ -5,6 +5,7 @@ import { resolveCurrentWhenLabel } from "@/lib/notifications/current-when";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { NotificationCenterNotificationItem } from "../lib/types";
 import { NotificationActions } from "./notification-actions";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.studioCabinet.notificationsV2.card;
 
@@ -33,11 +34,7 @@ export function NotificationCard({ item, timeZone }: Props) {
   const payload = readNotificationPayload(item.payloadJson);
   // RESCHEDULE-CURRENT-TIME: живое время брони, если оно разошлось с текстом.
   const currentWhen = resolveCurrentWhenLabel(payload);
-  const timeLabel = new Date(item.createdAt).toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  });
+  const timeLabel = UI_FMT.timeShort(item.createdAt, { timeZone });
 
   const relatesParts: string[] = [];
   if (payload.clientName) relatesParts.push(payload.clientName);

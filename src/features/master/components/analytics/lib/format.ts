@@ -6,26 +6,11 @@
  * and small client islands (chips/toggle).
  */
 
-const NUMBER_FMT = new Intl.NumberFormat("ru-RU");
-
-export function formatRubles(kopeks: number | null): string {
-  if (kopeks === null || !Number.isFinite(kopeks) || kopeks <= 0) return "—";
-  return `${NUMBER_FMT.format(Math.round(kopeks / 100))} ₽`;
-}
-
-export function formatRublesShort(kopeks: number): string {
-  // Used on the line chart's y-axis ticks: "12K", "5K". Keeps tick
-  // labels readable when revenue is north of 100K rubles.
-  if (!Number.isFinite(kopeks) || kopeks <= 0) return "0";
-  const rubles = Math.round(kopeks / 100);
-  if (rubles >= 1_000_000) return `${(rubles / 1_000_000).toFixed(1)}M`;
-  if (rubles >= 1000) return `${Math.round(rubles / 1000)}K`;
-  return String(rubles);
-}
+import { UI_FMT } from "@/lib/ui/fmt";
 
 export function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return "—";
-  return NUMBER_FMT.format(Math.round(value));
+  return UI_FMT.count(Math.round(value));
 }
 
 export function formatPercent(

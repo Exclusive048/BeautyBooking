@@ -2,6 +2,7 @@ import { Users } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioTodayBannerData } from "../server/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Props = {
   data: StudioTodayBannerData;
@@ -24,12 +25,7 @@ function initialsOf(name: string): string {
  * её собственном кабинете.
  */
 function formatToday(now: Date, timeZone: string): string {
-  return now.toLocaleDateString("ru-RU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone,
-  });
+  return UI_FMT.date(now, "weekdayDayMonthLong", { timeZone });
 }
 
 export function StudioTodayBanner({ data, studioName }: Props) {

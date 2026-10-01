@@ -1,19 +1,14 @@
 import { BillingKpiCard } from "@/features/admin-cabinet/billing/components/billing-kpi-card";
 import {
-  formatRublesShort,
-  formatRublesFromKopeks,
-} from "@/features/admin-cabinet/billing/lib/kopeks";
-import {
   toneForFailureRate,
   toneForPending,
   tonefromDelta,
 } from "@/features/admin-cabinet/billing/lib/kpi-tone";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminBillingKpis } from "@/features/admin-cabinet/billing/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.billing.kpi;
-
-const COUNT_FMT = new Intl.NumberFormat("ru-RU");
 
 type Props = {
   data: AdminBillingKpis;
@@ -27,12 +22,12 @@ export function BillingKpiRow({ data }: Props) {
 
   const activeDelta =
     data.activeSubscriptions.deltaCount > 0
-      ? `+${COUNT_FMT.format(data.activeSubscriptions.deltaCount)} ${T.activeSubsDelta}`
+      ? `+${UI_FMT.count(data.activeSubscriptions.deltaCount)} ${T.activeSubsDelta}`
       : null;
 
   const pendingDelta =
     data.pendingPayments.count > 0
-      ? `${T.pendingSubtitle}: ${formatRublesFromKopeks(data.pendingPayments.totalKopeks)}`
+      ? `${T.pendingSubtitle}: ${UI_FMT.priceLabel(data.pendingPayments.totalKopeks)}`
       : null;
 
   const failedDelta =
@@ -44,25 +39,25 @@ export function BillingKpiRow({ data }: Props) {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
       <BillingKpiCard
         label={T.mrr}
-        value={formatRublesShort(data.mrr.valueKopeks)}
+        value={UI_FMT.moneyShort(data.mrr.valueKopeks)}
         delta={mrrDelta}
         tone={tonefromDelta(data.mrr.deltaPercent)}
       />
       <BillingKpiCard
         label={T.activeSubs}
-        value={COUNT_FMT.format(data.activeSubscriptions.count)}
+        value={UI_FMT.count(data.activeSubscriptions.count)}
         delta={activeDelta}
         tone={data.activeSubscriptions.deltaCount > 0 ? "ok" : "neutral"}
       />
       <BillingKpiCard
         label={T.pending}
-        value={COUNT_FMT.format(data.pendingPayments.count)}
+        value={UI_FMT.count(data.pendingPayments.count)}
         delta={pendingDelta}
         tone={toneForPending(data.pendingPayments.count)}
       />
       <BillingKpiCard
         label={T.failed7d}
-        value={COUNT_FMT.format(data.failedLast7Days.count)}
+        value={UI_FMT.count(data.failedLast7Days.count)}
         delta={failedDelta}
         tone={toneForFailureRate(data.failedLast7Days.percentOfAttempts)}
       />

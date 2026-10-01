@@ -3,6 +3,7 @@ import { ProviderType, type SubscriptionScope } from "@prisma/client";
 import { env } from "@/lib/env";
 import { personalMasterProviderWhere } from "@/lib/master/access";
 import { prisma } from "@/lib/prisma";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 /**
@@ -25,12 +26,7 @@ import { formatZoneLabel } from "@/lib/ui/zone-label";
  */
 export function formatBillingDeadlineLabel(date: Date | null, timeZone: string): string {
   if (!date) return "";
-  const label = date.toLocaleDateString("ru-RU", {
-    year: "numeric",
-    month: "long",
-    day: "2-digit",
-    timeZone,
-  });
+  const label = UI_FMT.date(date, "dayMonthYearLong", { timeZone });
   const zone = formatZoneLabel({ iso: date.toISOString(), timeZone });
   return zone ? `${label} ${zone}` : label;
 }

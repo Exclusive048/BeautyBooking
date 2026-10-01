@@ -64,9 +64,7 @@ function buildLoginUrl(nextPath: string): string {
 }
 
 function formatDateLabel(dateKey: string): string {
-  const parsed = new Date(`${dateKey}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return dateKey;
-  return parsed.toLocaleDateString("ru-RU", { day: "numeric", month: "short", weekday: "short" });
+  return UI_FMT.dateKey(dateKey, "weekdayDayMonthShort");
 }
 
 function newIdempotencyKey(): string {

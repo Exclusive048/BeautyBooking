@@ -81,7 +81,6 @@ export function SelectionPhase({
           serviceDurationMin={serviceDurationMin}
           slot={selectedSlot}
           dateKey={selectedDateKey}
-          providerTimezone={providerTimezone}
         />
       ) : null}
 

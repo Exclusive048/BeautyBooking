@@ -1,25 +1,9 @@
 import "server-only";
 
 /**
- * Server-side formatters and date helpers shared across the dashboard
- * services. Keeping them in one file means the same "currency in rubles"
- * / "tabular thousands" output renders identically in KPI, chart-summary
- * and event-feed contexts.
+ * Server-side date helpers shared across the dashboard services. Числа и
+ * деньги форматирует `UI_FMT` (29.09 доработки · 24).
  */
-
-const RUB = new Intl.NumberFormat("ru-RU", {
-  style: "currency",
-  currency: "RUB",
-  maximumFractionDigits: 0,
-});
-
-const RUB_DECIMAL = new Intl.NumberFormat("ru-RU", {
-  style: "currency",
-  currency: "RUB",
-  maximumFractionDigits: 1,
-});
-
-const COUNT_FMT = new Intl.NumberFormat("ru-RU");
 
 /** Returns `[startOfDayUtc, startOfNextDayUtc]` shifted by `daysAgo`. */
 export function utcDayRange(daysAgo = 0): { start: Date; end: Date } {
@@ -57,31 +41,6 @@ export function utcMonthRange(monthsAgo = 0): { start: Date; end: Date } {
     ),
   );
   return { start, end };
-}
-
-/** "1 412" — non-breaking thin-space thousands, locale-aware. */
-export function formatCount(value: number): string {
-  return COUNT_FMT.format(value);
-}
-
-/** "9 800 ₽" for kopeks input. Defensive against negatives — passes the
- * sign through (used for refund display in the events feed). */
-export function formatRublesFromKopeks(kopeks: number): string {
-  return RUB.format(kopeks / 100);
-}
-
-/** "4.2 млн ₽" — millions for the platform-revenue KPI tile. Falls back
- * to plain rubles below the million threshold so a freshly-launched
- * environment doesn't display "0.0 млн ₽". */
-export function formatRevenueShort(kopeks: number): string {
-  const rubles = kopeks / 100;
-  if (rubles >= 1_000_000) {
-    return `${RUB_DECIMAL.format(rubles / 1_000_000).replace("₽", "млн ₽")}`;
-  }
-  if (rubles >= 1_000) {
-    return `${RUB_DECIMAL.format(rubles / 1_000).replace("₽", "тыс ₽")}`;
-  }
-  return RUB.format(rubles);
 }
 
 /** Returns sign + percentage-change text, or `null` when previous period

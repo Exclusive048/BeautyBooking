@@ -12,6 +12,7 @@ import type {
   AdminChartPoint,
   AdminChartSeries,
 } from "@/features/admin-cabinet/dashboard/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -31,15 +32,9 @@ function bucketBy7Days(
   // день относительно СОБСТВЕННЫХ бакетов, молча. Это админская техническая
   // сводка, а не время записи, поэтому UTC здесь и есть правильный источник —
   // не salon-tz.
-  const labelFmt = new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    timeZone: "UTC", // tz-ok: UTC-tech — подпись обязана совпасть с UTC-бакетом
-  });
-  const dayLabel = new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    timeZone: "UTC", // tz-ok: UTC-tech — см. выше
-  });
+  // tz-ok: UTC-tech — подпись обязана совпасть с UTC-бакетом.
+  const label = (date: Date, preset: "dayMonthShort" | "dayOfMonth") =>
+    UI_FMT.date(date, preset, { timeZone: "UTC" });
 
   const points: AdminChartPoint[] = [];
   for (let i = 0; i < 7; i += 1) {
@@ -48,10 +43,10 @@ function bucketBy7Days(
       date: utcDateKey(date),
       label:
         i === 0
-          ? labelFmt.format(date) // oldest day gets a "DD month" label
+          ? label(date, "dayMonthShort") // oldest day gets a "DD month" label
           : i === 6
             ? UI_TEXT.adminPanel.dashboard.charts.todayLabel
-            : dayLabel.format(date), // mid-days get just the day number
+            : label(date, "dayOfMonth"), // mid-days get just the day number
       count: 0,
     });
   }

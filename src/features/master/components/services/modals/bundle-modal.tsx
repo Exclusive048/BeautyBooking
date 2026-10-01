@@ -18,8 +18,9 @@ import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { computeBundlePricing } from "../lib/compute-bundle-pricing";
 import { toKopeks } from "@/lib/money/kopeks";
-import { formatDuration, formatRubles } from "../lib/format";
+import { formatDuration } from "../lib/format";
 import { Select } from "@/components/ui/select";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.bundle;
 
@@ -221,7 +222,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
                           {formatDuration(service.durationMin)}
                         </span>
                         <span className="w-20 shrink-0 text-right font-mono text-sm text-text-main">
-                          {formatRubles(service.price)}
+                          {UI_FMT.priceLabelOrDash(service.price)}
                         </span>
                       </label>
                     </li>
@@ -266,7 +267,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
           <div className="rounded-xl border border-border-subtle bg-bg-input/50 p-4">
             <PreviewRow
               label={T.previewSumLabel}
-              value={formatRubles(pricing.totalPrice)}
+              value={UI_FMT.priceLabelOrDash(pricing.totalPrice)}
             />
             <PreviewRow
               label={
@@ -274,13 +275,13 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
                   ? `${T.previewDiscountLabel} ${numericDiscount}%`
                   : T.previewDiscountLabel
               }
-              value={`−${formatRubles(pricing.discountAmount)}`}
+              value={`−${UI_FMT.priceLabelOrDash(pricing.discountAmount)}`}
               accent="emerald"
             />
             <div className="mt-2 border-t border-border-subtle pt-2">
               <PreviewRow
                 label={T.previewFinalLabel}
-                value={formatRubles(pricing.finalPrice)}
+                value={UI_FMT.priceLabelOrDash(pricing.finalPrice)}
                 bold
               />
             </div>

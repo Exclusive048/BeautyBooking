@@ -65,7 +65,7 @@ export async function GET(req: Request) {
             requirements: true,
             extraBusyMin: true,
             master: {
-              select: { id: true, name: true, avatarUrl: true, publicUsername: true },
+              select: { id: true, name: true, avatarUrl: true, publicUsername: true, timezone: true },
             },
             masterService: {
               select: {
@@ -132,6 +132,8 @@ export async function GET(req: Request) {
               name: item.offer.master.name,
               avatarUrl: item.offer.master.avatarUrl ?? null,
               publicUsername: item.offer.master.publicUsername ?? null,
+              // Пояс салона: время подтверждённой записи показывается по нему (rule 17).
+              timezone: item.offer.master.timezone,
             },
             service: {
               id: service.id,

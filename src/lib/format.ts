@@ -27,23 +27,6 @@ export function moneyRUBPlainFromKopeks(valueKopeks: number) {
   }).format(value);
 }
 
-export function minutesToHuman(min: number) {
-  if (min < 60) return `${min} мин`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h} ч ${m} мин` : `${h} ч`;
-}
-
-export function dateTimeRU(d: Date) {
-  return new Intl.DateTimeFormat(LOCALE, {
-    year: "numeric",
-    month: "long",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}
-
 /**
  * ⚠️ **VIEWER-TZ. Только клиентские поверхности** (rule 17).
  *
@@ -66,9 +49,3 @@ export function dateRU(d: Date) {
   }).format(d);
 }
 
-export function timeRU(d: Date) {
-  return new Intl.DateTimeFormat(LOCALE, {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
-}

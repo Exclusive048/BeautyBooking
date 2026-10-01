@@ -35,7 +35,7 @@ export function BookingsKpiRow({ kpis }: { kpis: StudioBookingsKpis }) {
     {
       icon: Calendar,
       label: T.today,
-      value: kpis.todayCount.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.todayCount),
       sublabel: T.todayContext
         .replace("{completed}", String(kpis.todayCompleted))
         .replace("{upcoming}", String(kpis.todayUpcoming)),
@@ -43,7 +43,7 @@ export function BookingsKpiRow({ kpis }: { kpis: StudioBookingsKpis }) {
     {
       icon: AlertCircle,
       label: T.needsAction,
-      value: kpis.needsActionCount.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.needsActionCount),
       sublabel: T.needsActionContext.replace(
         "{count}",
         String(kpis.needsActionCount),
@@ -52,7 +52,7 @@ export function BookingsKpiRow({ kpis }: { kpis: StudioBookingsKpis }) {
     {
       icon: CalendarCheck,
       label: T.confirmed,
-      value: kpis.confirmedNext7Days.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.confirmedNext7Days),
       sublabel: T.confirmedContext,
     },
     {
@@ -64,7 +64,7 @@ export function BookingsKpiRow({ kpis }: { kpis: StudioBookingsKpis }) {
     {
       icon: UserX,
       label: T.noShow,
-      value: kpis.noShowLast7Days.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.noShowLast7Days),
       sublabel: T.noShowContext,
     },
   ];

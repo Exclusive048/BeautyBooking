@@ -1,13 +1,12 @@
+"use client";
+
 import { cn } from "@/lib/cn";
 import type {
   AdminEventDotTone,
   AdminEventItem,
 } from "@/features/admin-cabinet/dashboard/types";
-
-const TIME_FMT = new Intl.DateTimeFormat("ru-RU", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 
 const DOT_CLASS: Record<AdminEventDotTone, string> = {
   ok: "bg-success",
@@ -29,13 +28,17 @@ type Props = {
 
 export function EventsFeedItem({ event }: Props) {
   const date = new Date(event.timeMs);
+  // Часы зрителя — только после гидратации: сервер считает их в поясе
+  // контейнера, и первый клиентский рендер обязан совпасть с серверным
+  // (иначе «Hydration failed», 29.09 доработки · 24).
+  const hydrated = useIsHydrated();
   return (
     <li className="grid grid-cols-[44px_8px_1fr_auto] items-center gap-3 border-b border-border-subtle py-2.5 last:border-b-0">
       <time
         dateTime={event.timeIso}
         className="font-mono text-[11px] tabular-nums text-text-sec"
       >
-        {TIME_FMT.format(date)}
+        {hydrated ? UI_FMT.timeShort(date, { timeZone: VIEWER_TZ }) : null}
       </time>
       <span
         aria-hidden

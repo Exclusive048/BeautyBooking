@@ -9,6 +9,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
+import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 type RawStatus = "PENDING" | "REJECTED" | "APPROVED_WAITING_CLIENT" | "CONFIRMED" | "TIME_PROPOSED";
 type NormalizedStatus = "PENDING" | "REJECTED" | "TIME_PROPOSED" | "CONFIRMED";
@@ -35,6 +36,7 @@ type ModelApplicationItem = {
       name: string;
       avatarUrl: string | null;
       publicUsername: string | null;
+      timezone: string;
     };
     service: {
       id: string;
@@ -59,6 +61,7 @@ function statusMeta(
   proposedTimeLocal: string | null,
   confirmedStartAt: string | null,
   offerStatus: string,
+  salonTimeZone: string,
 ): {
   badge: string;
   badgeVariant: "warning" | "muted" | "info" | "success";
@@ -96,7 +99,10 @@ function statusMeta(
   return {
     badge: "Подтверждено",
     badgeVariant: "success",
-    description: confirmedStartAt ? `Время подтверждено · ${UI_FMT.dateTimeLong(confirmedStartAt)}` : "Время подтверждено",
+    // salon-tz с меткой зоны (rule 17): это время записи, а не момент события.
+    description: confirmedStartAt
+      ? `Время подтверждено · ${UI_FMT.dateTimeLong(confirmedStartAt, { timeZone: salonTimeZone })} ${formatZoneLabel({ iso: confirmedStartAt, timeZone: salonTimeZone })}`.trimEnd()
+      : "Время подтверждено",
   };
 }
 
@@ -219,6 +225,7 @@ export function ClientModelApplicationsPage() {
           item.proposedTimeLocal,
           item.confirmedStartAt,
           item.offer.status,
+          item.offer.master.timezone,
         );
         const normalizedStatus = normalizeStatus(item.status);
         const isHighlighted = highlightedId === item.id;

@@ -104,7 +104,7 @@ export function PlanCard({ plan, fallbackCode, highlighted = false }: Props) {
         </div>
       ) : plan.isFreePlan ? (
         <div className="mb-6">
-          <span className={`font-display text-4xl ${headingClass}`}>0 ₽</span>
+          <span className={`font-display text-4xl ${headingClass}`}>{UI_FMT.priceLabel(0)}</span>
           <span className={`ml-2 text-sm ${subTextClass}`}>{T.periods.free}</span>
         </div>
       ) : plan.prices.length === 0 ? (

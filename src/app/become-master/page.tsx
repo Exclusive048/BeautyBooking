@@ -14,6 +14,7 @@ import {
   type MarketingPlan,
 } from "@/lib/billing/marketing-pricing";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 export const metadata: Metadata = {
   title: "Стать мастером",
@@ -32,11 +33,6 @@ const PRICING_URL = "/pricing";
 
 const PRICING_PLACEHOLDER = UI_TEXT.pricing.periods.placeholder;
 
-function formatRubFromKopeks(kopeks: number): string {
-  const rub = Math.round(kopeks / 100);
-  return `${new Intl.NumberFormat("ru-RU").format(rub)} ₽`;
-}
-
 /**
  * Builds the teaser-shaped plan from a real BillingPlan (or a placeholder
  * stub when the admin hasn't configured the tier yet). Feature lists stay
@@ -49,7 +45,7 @@ function teaserPlanFromMarket(
 ): PricingPlan {
   // FREE — flat 0 ₽ навсегда regardless of admin config.
   if (curated.tier === "FREE") {
-    return { ...curated, price: "0 ₽", priceNote: UI_TEXT.pricing.periods.free };
+    return { ...curated, price: UI_FMT.priceLabel(0), priceNote: UI_TEXT.pricing.periods.free };
   }
 
   // Paid tier with no monthly price configured → graceful placeholder.
@@ -57,7 +53,7 @@ function teaserPlanFromMarket(
   if (!monthly) {
     return { ...curated, price: PRICING_PLACEHOLDER, priceNote: "в месяц" };
   }
-  return { ...curated, price: formatRubFromKopeks(monthly.priceKopeks), priceNote: "в месяц" };
+  return { ...curated, price: UI_FMT.priceLabel(monthly.priceKopeks), priceNote: "в месяц" };
 }
 
 export default async function BecomeMasterPage() {

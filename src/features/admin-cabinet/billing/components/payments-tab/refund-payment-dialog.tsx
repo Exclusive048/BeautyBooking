@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kopeks";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
 
@@ -51,7 +51,7 @@ export function RefundPaymentDialog({
       onSubmit={() => onConfirm(reason.trim())}
     >
       <p className="text-sm text-text-main">
-        {T.body.replace("{amount}", formatRublesFromKopeks(payment.amountKopeks))}
+        {T.body.replace("{amount}", moneyRUBFromKopeks(payment.amountKopeks))}
       </p>
       <div>
         <label

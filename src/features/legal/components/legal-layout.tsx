@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 export type LegalSection = { id: string; title: string };
 
@@ -139,7 +140,8 @@ function DraftBanner() {
 }
 
 function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+  // Дата редакции документа — ключ `YYYY-MM-DD` в `documents.ts` или момент:
+  // для ключа подпись по UTC (UTC-tech), иначе по часам читателя.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return UI_FMT.dateKey(iso, "dayMonthYearLong");
+  return UI_FMT.date(iso, "dayMonthYearLong", { timeZone: VIEWER_TZ });
 }

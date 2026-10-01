@@ -142,7 +142,37 @@ function serverDateSitesWithoutTimeZone(): string[] {
   return sites.sort();
 }
 
+/**
+ * 29.09 доработки · 24 — с переездом форматирования в `UI_FMT` пояс стал
+ * обязательным аргументом, а «часы зрителя» — явным значением `VIEWER_TZ`.
+ * В серверном модуле это то же «по часам контейнера», что и вызов без
+ * `timeZone`, только спрятанное в общий хелпер, — поэтому сам идентификатор
+ * в модулях вне клиентского графа запрещён.
+ *
+ * @probe 2026-10-01 — в `features/admin-cabinet/dashboard/server/kpis.service.ts`
+ * (`server-only`) добавлено `UI_FMT.date(new Date(), "dayMonthShort", { timeZone: VIEWER_TZ })`:
+ * покраснел «серверные модули не берут часы зрителя» — сайт
+ * `src/features/admin-cabinet/dashboard/server/kpis.service.ts :: VIEWER_TZ`.
+ * Возвращено — зелёный.
+ */
+function serverViewerTimeZoneSites(): string[] {
+  const { visited } = walkClientGraph();
+  const sites: string[] = [];
+  for (const file of listSourceFiles()) {
+    if (visited.has(file)) continue;
+    const source = stripComments(readFileSync(file, "utf8"));
+    if (/\bVIEWER_TZ\b/.test(source)) {
+      sites.push(`${relative(process.cwd(), file).split(sep).join("/")} :: VIEWER_TZ`);
+    }
+  }
+  return sites.sort();
+}
+
 describe("серверные модули форматируют дату с поясом (rule 17)", () => {
+  it("серверные модули не берут часы зрителя (VIEWER_TZ)", () => {
+    expect(serverViewerTimeZoneSites()).toEqual([]);
+  }, 30_000);
+
   it("серверные модули форматируют дату с поясом", () => {
     expect(serverDateSitesWithoutTimeZone()).toEqual([...SERVER_DATE_WITHOUT_TZ_ALLOWED].sort());
     // Обход всего графа импортов (как у PERF-11) — под нагрузкой дольше 5 с.
