@@ -15,14 +15,30 @@ const readApiMetrics = vi.fn();
 const readWorkerLiveness = vi.fn();
 
 vi.mock("@/lib/queue/queue", () => ({ getQueueStats: () => queueStats() }));
-vi.mock("@/lib/prisma", () => ({ prisma: { review: { count: () => reviewCount() } } }));
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    review: { count: () => reviewCount() },
+    aiSpendCounter: { findMany: async () => [{ meter: "review-reply", count: 450 }] },
+  },
+}));
 vi.mock("@/lib/monitoring/api-metrics", () => ({ readApiMetrics: () => readApiMetrics() }));
 vi.mock("@/lib/queue/worker-liveness", () => ({ readWorkerLiveness: () => readWorkerLiveness() }));
+const checkDatabase = vi.fn();
+const checkRedis = vi.fn();
+vi.mock("@/lib/health/probe", () => ({ checkDatabase: () => checkDatabase(), checkRedis: () => checkRedis() }));
+vi.mock("@/lib/notifications/notifier", () => ({
+  getNotificationsNotifierRuntimeStatus: () => ({ mode: "redis", ready: true, reason: null }),
+}));
+vi.mock("@/lib/vk/community", () => ({ getVkCommunityAdminView: async () => ({ configured: true, mismatch: false }) }));
 
 import type { ApiMetricsSnapshot } from "@/lib/monitoring/api-metrics";
 import {
+  buildAiSpendStat,
   buildApiUptimeStat,
+  buildDependencyStat,
+  buildErrorRateStat,
   buildP95Stat,
+  formatUptime,
   buildWorkerStat,
   formatAgo,
   getAdminHealth,
@@ -56,19 +72,41 @@ describe("getAdminHealth", () => {
     reviewCount.mockResolvedValue(0);
     readApiMetrics.mockResolvedValue(metrics());
     readWorkerLiveness.mockResolvedValue({ state: "alive", lastPingAgoMs: 12_000 });
+    checkDatabase.mockResolvedValue("ok");
+    checkRedis.mockResolvedValue("ok");
   });
 
-  it("порядок строк: uptime, p95, воркер, очередь, мёртвые, жалобы, SMS", async () => {
-    const { stats } = await getAdminHealth();
-    expect(stats.map((s) => s.key)).toEqual([
-      "apiUptime",
-      "p95",
-      "worker",
-      "queuePending",
-      "queueDead",
-      "complaintsOpen",
-      "smsBalance",
+  it("порядок строк и группы (ADMIN-HEALTH-02)", async () => {
+    const { stats, checkedAt } = await getAdminHealth();
+    expect(stats.map((s) => `${s.section}:${s.key}`)).toEqual([
+      "platform:apiUptime",
+      "platform:p95",
+      "platform:errorRate",
+      "platform:database",
+      "platform:redis",
+      "platform:process",
+      "queue:worker",
+      "queue:queuePending",
+      "queue:queueProcessing",
+      "queue:queueDead",
+      "queue:realtime",
+      "integrations:email",
+      "integrations:push",
+      "integrations:payments",
+      "integrations:smsBalance",
+      "integrations:vk",
+      "integrations:aiSpend",
+      "moderation:complaintsOpen",
     ]);
+    expect(Number.isNaN(Date.parse(checkedAt))).toBe(false);
+  });
+
+  it("БД недоступна — красная строка", async () => {
+    checkDatabase.mockResolvedValue("down");
+    const { stats } = await getAdminHealth();
+    const db = stats.find((s) => s.key === "database");
+    expect(db?.tone).toBe("error");
+    expect(db?.valueText).toBe("Недоступна");
   });
 
   it("здоровая система — всё зелёное, кроме заведомо не подключённого SMS", async () => {
@@ -175,5 +213,34 @@ describe("buildWorkerStat / formatAgo", () => {
     const stat = buildWorkerStat(null);
     expect(stat.tone).toBe("neutral");
     expect(stat.hint).toContain("Redis");
+  });
+});
+
+describe("ADMIN-HEALTH-02 · новые строки", () => {
+  it("доля 5xx: 1 % — warn, 5 % — error, без запросов — нейтрально", () => {
+    expect(buildErrorRateStat(metrics({ latency: { requests: 100, errors5xx: 1 } })).tone).toBe("warn");
+    expect(buildErrorRateStat(metrics({ latency: { requests: 100, errors5xx: 5 } })).tone).toBe("error");
+    expect(buildErrorRateStat(metrics({ latency: { requests: 100, errors5xx: 0 } })).valueText).toBe("0,0 %");
+    expect(buildErrorRateStat(metrics({ latency: { requests: 0, errors5xx: 0 } })).tone).toBe("neutral");
+  });
+
+  it("задержка зависимости: 200 мс — warn, 1000 мс — error; Redis без настройки — warn", () => {
+    expect(buildDependencyStat("database", { state: "ok", ms: 12 }).valueText).toBe("Работает · 12 мс");
+    expect(buildDependencyStat("database", { state: "ok", ms: 250 }).tone).toBe("warn");
+    expect(buildDependencyStat("redis", { state: "ok", ms: 1200 }).tone).toBe("error");
+    expect(buildDependencyStat("redis", { state: "disabled", ms: 0 }).tone).toBe("warn");
+  });
+
+  it("расход ИИ — по самому загруженному потолку", () => {
+    expect(buildAiSpendStat({ "review-reply": 450 }, true).tone).toBe("warn");
+    expect(buildAiSpendStat({ "review-reply": 500 }, true).tone).toBe("error");
+    expect(buildAiSpendStat({}, true).tone).toBe("ok");
+    expect(buildAiSpendStat({}, false).valueText).toBe("ИИ не подключён");
+  });
+
+  it("время работы процесса", () => {
+    expect(formatUptime(5 * 60)).toBe("5 мин");
+    expect(formatUptime(3 * 3600 + 7 * 60)).toBe("3 ч 7 мин");
+    expect(formatUptime(2 * 86400 + 5 * 3600)).toBe("2 д 5 ч");
   });
 });
