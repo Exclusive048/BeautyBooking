@@ -166,6 +166,26 @@ describe("PERF-10 · single-flight", () => {
     expect(Date.now() - started).toBeLessThan(500);
   });
 
+  it("держатель снял замок без значения — проигравший считает сразу, а не ждёт до конца", async () => {
+    // 29.09 доработки · 30: победитель упал (ИИ отказал) — замок снят в `finally`,
+    // значения нет. Проигравший с долгим ожиданием не должен его отсиживать.
+    // @probe 2026-10-01: без проверки снятого замка в цикле — красный, тест
+    // отсидел все 5000 мс («держатель снял замок без значения…» 5004ms).
+    store.set(LOCK, "1");
+    setTimeout(() => store.delete(LOCK), 30);
+
+    const started = Date.now();
+    const value = await withSingleFlight<string>({
+      lockKey: LOCK,
+      waitMs: 5000,
+      read: async () => null,
+      compute: async () => "loser-computed",
+    });
+
+    expect(value).toBe("loser-computed");
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
   it("если значение появилось, пока ждали, — оно и возвращается, без второго счёта", async () => {
     store.set(LOCK, "1");
     let computes = 0;
