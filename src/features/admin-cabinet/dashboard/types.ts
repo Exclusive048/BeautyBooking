@@ -86,6 +86,8 @@ export type AdminEventItem = {
 
 export type AdminEventsResponse = {
   items: AdminEventItem[];
+  /** ADMIN-EVENTS-TABLE: `?before=` для следующей страницы; `null` — старше нет. */
+  nextBefore: number | null;
 };
 
 export type AdminHealthTone = "ok" | "warn" | "error" | "neutral";

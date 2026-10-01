@@ -50,6 +50,8 @@ export type PdAccessSurface =
   | "admin.billing.payments.list"
   /** Админ листает подписки — то же самое. */
   | "admin.billing.subscriptions.list"
+  /** Админ выгружает историю событий в Excel (имена с маской фамилии). */
+  | "admin.events.export"
   /** Мастер листает свою клиентскую базу (имена + телефоны). */
   | "master.clients.list"
   /** Студия листает свою клиентскую базу. */

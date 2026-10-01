@@ -5,6 +5,7 @@ import type {
   AdminEventDotTone,
   AdminEventItem,
 } from "@/features/admin-cabinet/dashboard/types";
+import { adminEventColumns } from "@/features/admin-cabinet/dashboard/lib/event-columns";
 import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
 
@@ -26,43 +27,40 @@ type Props = {
   event: AdminEventItem;
 };
 
+/** ADMIN-EVENTS-TABLE — строка таблицы «История событий». */
 export function EventsFeedItem({ event }: Props) {
-  const date = new Date(event.timeMs);
   // Часы зрителя — только после гидратации: сервер считает их в поясе
   // контейнера, и первый клиентский рендер обязан совпасть с серверным
   // (иначе «Hydration failed», 29.09 доработки · 24).
   const hydrated = useIsHydrated();
+  const columns = adminEventColumns(event);
   return (
-    <li className="grid grid-cols-[44px_8px_1fr_auto] items-center gap-3 border-b border-border-subtle py-2.5 last:border-b-0">
-      <time
-        dateTime={event.timeIso}
-        className="font-mono text-2xs tabular-nums text-text-sec"
-      >
-        {hydrated ? UI_FMT.timeShort(date, { timeZone: VIEWER_TZ }) : null}
-      </time>
-      <span
-        aria-hidden
-        className={cn(
-          "h-2 w-2 shrink-0 rounded-full",
-          DOT_CLASS[event.dotTone],
-        )}
-      />
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-text-main">
-          {event.primary}
-        </p>
-        <p className="truncate text-xs text-text-sec">{event.secondary}</p>
-      </div>
-      {event.amountText ? (
-        <span
-          className={cn(
-            "shrink-0 text-right text-sm font-semibold tabular-nums",
-            AMOUNT_CLASS[event.amountTone],
-          )}
-        >
-          {event.amountText}
+    <tr className="border-b border-border-subtle last:border-b-0 hover:bg-bg-input/40">
+      <td className="whitespace-nowrap py-1.5 pr-3 align-top">
+        <time dateTime={event.timeIso} className="font-mono text-2xs tabular-nums text-text-sec">
+          {hydrated ? UI_FMT.date(event.timeMs, "dayMonthNumericTime", { timeZone: VIEWER_TZ }) : null}
+        </time>
+      </td>
+      <td className="whitespace-nowrap py-1.5 pr-3 align-top text-xs text-text-main">
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT_CLASS[event.dotTone])} />
+          {columns.typeLabel}
         </span>
-      ) : null}
-    </li>
+      </td>
+      <td className="max-w-[16rem] truncate py-1.5 pr-3 align-top text-xs font-medium text-text-main" title={columns.description}>
+        {columns.description}
+      </td>
+      <td className="max-w-[12rem] truncate py-1.5 pr-3 align-top text-xs text-text-sec" title={columns.detail}>
+        {columns.detail}
+      </td>
+      <td
+        className={cn(
+          "whitespace-nowrap py-1.5 text-right align-top text-xs font-semibold tabular-nums",
+          AMOUNT_CLASS[event.amountTone],
+        )}
+      >
+        {event.amountText ?? ""}
+      </td>
+    </tr>
   );
 }

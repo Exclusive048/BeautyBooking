@@ -32,9 +32,12 @@ type FetchOpts = {
    * incremental polling — the client passes the largest `timeMs` it
    * has seen, the server returns just what came after. */
   sinceMs?: number;
+  /** ADMIN-EVENTS-TABLE: «Показать ещё» — только события старше этой отметки (unix ms). */
+  beforeMs?: number;
 };
 
-const MAX_PER_SOURCE = 20;
+/** Верхняя граница одной страницы: и выдачи, и выборки из каждого источника. */
+export const ADMIN_EVENTS_MAX_PAGE = 200;
 
 /** Union query that pulls the latest events from every source the
  * dashboard cares about, merges by timestamp, and trims to `limit`.
@@ -43,15 +46,24 @@ const MAX_PER_SOURCE = 20;
 export async function getAdminEvents(
   opts: FetchOpts = {},
 ): Promise<AdminEventsResponse> {
-  const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100);
+  const limit = Math.min(Math.max(opts.limit ?? 30, 1), ADMIN_EVENTS_MAX_PAGE);
   const sinceDate = opts.sinceMs ? new Date(opts.sinceMs) : null;
+  const beforeDate = opts.beforeMs ? new Date(opts.beforeMs) : null;
+  // ADMIN-EVENTS-TABLE: каждый источник отдаёт до `limit + 1` строк — иначе
+  // страница, где все события из одного источника, обрезалась бы на 20 и
+  // «Показать ещё» терял бы события. Лишняя строка говорит «есть дальше».
+  const MAX_PER_SOURCE = limit + 1;
+  const timeWhere =
+    sinceDate || beforeDate
+      ? { ...(sinceDate ? { gt: sinceDate } : {}), ...(beforeDate ? { lt: beforeDate } : {}) }
+      : undefined;
 
   const [bookings, cancellations, newUsers, subscriptions, complaints] =
     await Promise.all([
       // New bookings (excludes cancellations — they get their own bucket).
       prisma.booking.findMany({
         where: {
-          createdAt: sinceDate ? { gt: sinceDate } : undefined,
+          createdAt: timeWhere,
           status: {
             in: [
               BookingStatus.NEW,
@@ -77,9 +89,7 @@ export async function getAdminEvents(
       // right time.
       prisma.booking.findMany({
         where: {
-          cancelledAtUtc: sinceDate
-            ? { gt: sinceDate }
-            : { not: null },
+          cancelledAtUtc: timeWhere ?? { not: null },
           status: {
             in: [BookingStatus.CANCELLED, BookingStatus.REJECTED],
           },
@@ -95,7 +105,7 @@ export async function getAdminEvents(
       // New user registrations — split into master/client by roles.
       prisma.userProfile.findMany({
         where: {
-          createdAt: sinceDate ? { gt: sinceDate } : undefined,
+          createdAt: timeWhere,
           isDeleted: false,
         },
         orderBy: { createdAt: "desc" },
@@ -113,7 +123,7 @@ export async function getAdminEvents(
       prisma.userSubscription.findMany({
         where: {
           status: SubscriptionStatus.ACTIVE,
-          startedAt: sinceDate ? { gt: sinceDate } : undefined,
+          startedAt: timeWhere,
           plan: { code: { notIn: ["MASTER_FREE", "STUDIO_FREE"] } },
         },
         orderBy: { startedAt: "desc" },
@@ -136,7 +146,7 @@ export async function getAdminEvents(
       // "open complaint" until that's modelled.
       prisma.review.findMany({
         where: {
-          reportedAt: sinceDate ? { gt: sinceDate } : { not: null },
+          reportedAt: timeWhere ?? { not: null },
           ...ACTIVE_REVIEW_FILTER,
         },
         orderBy: { reportedAt: "desc" },
@@ -247,5 +257,40 @@ export async function getAdminEvents(
   }
 
   merged.sort((a, b) => b.timeMs - a.timeMs);
-  return { items: merged.slice(0, limit) };
+  const items = merged.slice(0, limit);
+  const hasMore = merged.length > limit;
+  return {
+    items,
+    nextBefore: hasMore && items.length > 0 ? items[items.length - 1]!.timeMs : null,
+  };
 }
+
+/** Выгрузка «Истории событий»: допустимые периоды, дни. */
+export const ADMIN_EVENTS_EXPORT_DAYS = [7, 30, 90] as const;
+export type AdminEventsExportDays = (typeof ADMIN_EVENTS_EXPORT_DAYS)[number];
+/** Потолок строк выгрузки — файл остаётся быстрым, а выгрузка ограниченной. */
+export const ADMIN_EVENTS_EXPORT_MAX_ROWS = 10_000;
+
+/**
+ * ADMIN-EVENTS-EXPORT — все события за период, страницами по
+ * `ADMIN_EVENTS_MAX_PAGE` от новых к старым, не больше
+ * `ADMIN_EVENTS_EXPORT_MAX_ROWS`. Возвращает и признак обрезки.
+ */
+export async function collectAdminEventsForExport(
+  days: AdminEventsExportDays,
+  now: Date = new Date(),
+): Promise<{ items: AdminEventItem[]; truncated: boolean }> {
+  const cutoffMs = now.getTime() - days * 24 * 60 * 60 * 1000;
+  const items: AdminEventItem[] = [];
+  let before: number | undefined = now.getTime() + 1;
+  while (before !== undefined && items.length < ADMIN_EVENTS_EXPORT_MAX_ROWS) {
+    const page = await getAdminEvents({ limit: ADMIN_EVENTS_MAX_PAGE, beforeMs: before, sinceMs: cutoffMs });
+    items.push(...page.items);
+    before = page.nextBefore ?? undefined;
+  }
+  return {
+    items: items.slice(0, ADMIN_EVENTS_EXPORT_MAX_ROWS),
+    truncated: items.length >= ADMIN_EVENTS_EXPORT_MAX_ROWS && before !== undefined,
+  };
+}
+

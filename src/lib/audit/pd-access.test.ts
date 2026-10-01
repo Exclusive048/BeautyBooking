@@ -180,6 +180,7 @@ describe("инструментирование: где след есть и гд
       "src/features/studio-cabinet/clients/server/clients-data.service.ts",
       "src/features/admin-cabinet/billing/server/payments.service.ts",
       "src/features/admin-cabinet/billing/server/subscriptions.service.ts",
+      "src/app/api/admin/dashboard/events/export/route.ts",
     ].map(read).join("\n");
 
     const unused = keys.filter((k) => !sources.includes(`"${k}"`));
