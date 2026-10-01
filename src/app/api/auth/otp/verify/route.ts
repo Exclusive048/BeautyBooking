@@ -7,7 +7,7 @@ import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { hashOtpCode } from "@/lib/auth/otp";
 import { checkOtpVerifyLock, clearOtpVerifyFailures, registerOtpVerifyFailure } from "@/lib/auth/otp-rate-limit";
 import { otpRateLimitFail } from "@/lib/auth/otp-rate-limit-response";
-import { classifyPhoneLoginTarget, isPhoneLoginRegistration } from "@/lib/auth/phone-claim";
+import { classifyPhoneLoginTarget, isPhoneLoginRegistration, PHONE_LOGIN_PROFILE_SELECT } from "@/lib/auth/phone-claim";
 import { resolvePhoneLoginProfile } from "@/lib/auth/phone-login-profile";
 import { otpVerifySchema } from "@/lib/auth/schemas";
 import { setSessionCookies } from "@/lib/auth/session";
@@ -96,7 +96,10 @@ export async function POST(req: Request) {
     // аккаунта (FOREIGN_CLAIM), и тогда доказавший владение получит СВЕЖИЙ
     // профиль, то есть это регистрация со всеми согласиями. Триаж один на оба
     // вопроса (гейт согласий + чей профиль) — `classifyPhoneLoginTarget`.
-    const existingProfile = await prisma.userProfile.findUnique({ where: { phone } });
+    const existingProfile = await prisma.userProfile.findUnique({
+      where: { phone },
+      select: PHONE_LOGIN_PROFILE_SELECT,
+    });
     const loginTarget = await classifyPhoneLoginTarget(existingProfile);
 
     // Server-side enforcement, not just UI gating: creating an account without

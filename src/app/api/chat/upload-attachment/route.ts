@@ -8,13 +8,10 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { uploadChatAttachmentAsset } from "@/lib/media/service";
 import {
-  MEDIA_ALLOWED_MIME_TYPES,
   MEDIA_MAX_FILE_SIZE_BYTES,
-  type AllowedMediaMimeType,
 } from "@/lib/media/types";
-import { fileTypeFromBuffer } from "file-type";
-import sharp from "sharp";
-import { capLongestSide, MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
+import { MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
+import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -78,39 +75,14 @@ export async function POST(req: Request) {
       return jsonFail(413, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
     }
 
-    const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
-    const detected = await fileTypeFromBuffer(rawBuffer);
-    if (!detected || !MEDIA_ALLOWED_MIME_TYPES.includes(detected.mime as AllowedMediaMimeType)) {
-      return jsonFail(415, "Неподдерживаемый формат изображения.", "MEDIA_INVALID_MIME");
-    }
-
-    let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
-    let outputBuffer: Buffer;
-
-    // PERF-07: без ресайза оригинал до 10 МБ уезжал прямо в браузер —
-    // `next/image` тут не применяется осознанно (роут отдачи держит
-    // cookie-auth + токен). Порог — см. `image-resize.ts`.
-    const resized = capLongestSide(sharp(rawBuffer), MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX);
-    if (detected.mime === "image/png") {
-      outputMime = "image/webp";
-      outputBuffer = await resized.webp({ quality: 90 }).toBuffer();
-    } else if (detected.mime === "image/jpeg") {
-      outputMime = "image/jpeg";
-      outputBuffer = await resized.jpeg({ quality: 90 }).toBuffer();
-    } else {
-      outputMime = "image/webp";
-      outputBuffer = await resized.webp({ quality: 90 }).toBuffer();
-    }
-
-    if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(400, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
-    }
-
-    const bytes = new Uint8Array(outputBuffer);
+    // MEDIA-UPLOAD-DEDUP: общий примитив — sniff по магическим байтам →
+    // allowlist → sharp re-encode с ограничением стороны → размер. Качество 90
+    // сохранено, чтобы пользователь видел ту же картинку, что и до сведения.
+    const upload = await readValidatedImageUpload(fileValue, { quality: 90, maxSidePx: MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX });
     const asset = await uploadChatAttachmentAsset(user, {
-      mimeType: outputMime,
-      sizeBytes: outputBuffer.length,
-      bytes,
+      mimeType: upload.mimeType,
+      sizeBytes: upload.sizeBytes,
+      bytes: upload.bytes,
       originalFilename: fileValue.name || "upload",
     });
 

@@ -114,6 +114,8 @@ describe("resolvePhoneLoginProfile (OTP-PHONE-LOGIN-RACE + PHONE-CLAIM-01 triage
         phoneVerifiedAt: expect.any(Date),
         roles: [AccountType.CLIENT],
       },
+      // SESSION-SELECT-LOGIN-PATHS: только поля входа, не вся строка профиля.
+      select: { id: true, phone: true, phoneVerifiedAt: true, roles: true },
     });
     // Behaviour preserved: fresh create does NOT trigger ensureClientRoleForUser.
     expect(ensureClientRole).not.toHaveBeenCalled();
@@ -148,7 +150,7 @@ describe("resolvePhoneLoginProfile (OTP-PHONE-LOGIN-RACE + PHONE-CLAIM-01 triage
 
     expect(result).toBe(winner);
     expect(userCreate).toHaveBeenCalledOnce();
-    expect(userFindUnique).toHaveBeenCalledWith({ where: { phone: "+79990000002" } });
+    expect(userFindUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { phone: "+79990000002" } }));
     expect(ensureClientRole).toHaveBeenCalledWith("u-winner", winner.roles);
   });
 

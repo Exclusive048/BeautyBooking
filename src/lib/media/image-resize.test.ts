@@ -138,14 +138,21 @@ describe("PERF-07 · загруженное изображение ограни�
 });
 
 /**
- * Три роута загрузки держат собственные инлайн-копии пайплайна (дедуп заведён
- * отдельно — `MEDIA-UPLOAD-DEDUP` в BACKLOG). Пятый путь, `readValidatedImageUpload`,
- * требует `maxSidePx` типом, поэтому его вызывающие проверяет компилятор. У
- * трёх копий такой защиты нет — обходим дерево, чтобы четвёртая появилась уже
- * с порогом.
+ * MEDIA-UPLOAD-DEDUP (2026-10-01): все роуты, сохраняющие загруженное фото,
+ * идут через `readValidatedImageUpload`, у которого `maxSidePx` обязателен
+ * типом. Собственный пайплайн (`sharp` / `file-type`) в роуте — снова копия
+ * без этой гарантии. Исключения — посайтово, с причиной.
+ *
+ * @probe 2026-10-01 — вернуть в `api/media/route.ts` импорт `sharp` → красный
+ *        «ни один роут не держит свой пайплайн загрузки».
  */
-describe("PERF-07 · guard — каждый инлайн-пайплайн загрузки ограничивает разрешение", () => {
+describe("PERF-07 · guard — роуты не держат собственный пайплайн загрузки", () => {
   const API_ROOT = resolve(__dirname, "..", "..", "app", "api");
+  const ALLOWED: Record<string, string> = {
+    // Фото запроса визуального поиска не сохраняется — его уменьшают в памяти
+    // перед отправкой модели; лимиты хранилища к нему не относятся.
+    "search/by-photo/route.ts": "фото запроса не сохраняется",
+  };
 
   function walk(dir: string): string[] {
     const out: string[] = [];
@@ -161,18 +168,15 @@ describe("PERF-07 · guard — каждый инлайн-пайплайн заг
     return out;
   }
 
-  const inlinePipelines = walk(API_ROOT).filter((file) =>
-    /sharp\(rawBuffer\)/.test(readFileSync(file, "utf8"))
-  );
+  const pipelines = walk(API_ROOT)
+    .filter((file) => /from "sharp"|from "file-type"/.test(readFileSync(file, "utf8")))
+    .map((file) => file.slice(API_ROOT.length + 1).split("\\").join("/"));
 
-  it("обход находит известные инлайн-копии", () => {
-    expect(inlinePipelines.length).toBe(3);
+  it("ни один роут не держит свой пайплайн загрузки", () => {
+    expect(pipelines.filter((rel) => !(rel in ALLOWED))).toEqual([]);
   });
 
-  it("каждая копия прогоняет буфер через capLongestSide", () => {
-    const unbounded = inlinePipelines.filter(
-      (file) => !/capLongestSide\(sharp\(rawBuffer\)/.test(readFileSync(file, "utf8"))
-    );
-    expect(unbounded).toEqual([]);
+  it("исключения не протухли", () => {
+    for (const rel of Object.keys(ALLOWED)) expect(pipelines).toContain(rel);
   });
 });

@@ -6,13 +6,10 @@ import { getSessionUser } from "@/lib/auth/session";
 import { mediaListQuerySchema, mediaUploadBodySchema } from "@/lib/media/schemas";
 import { listMediaAssets, uploadMediaAsset } from "@/lib/media/service";
 import {
-  MEDIA_ALLOWED_MIME_TYPES,
   MEDIA_MAX_FILE_SIZE_BYTES,
-  type AllowedMediaMimeType,
 } from "@/lib/media/types";
-import { fileTypeFromBuffer } from "file-type";
-import sharp from "sharp";
-import { capLongestSide, MEDIA_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
+import { MEDIA_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
+import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
 
 export const runtime = "nodejs";
 
@@ -76,50 +73,18 @@ export async function POST(req: Request) {
       return jsonFail(400, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
     }
 
-    const rawBuffer = Buffer.from(await fileValue.arrayBuffer());
-    const detected = await fileTypeFromBuffer(rawBuffer);
-    if (!detected || !MEDIA_ALLOWED_MIME_TYPES.includes(detected.mime as AllowedMediaMimeType)) {
-      return jsonFail(415, "Неподдерживаемый формат изображения.", "MEDIA_INVALID_MIME");
-    }
-
-    let outputMime: AllowedMediaMimeType = detected.mime as AllowedMediaMimeType;
-    let outputBuffer: Buffer;
-
-    // fix-02: quality 90 → 95. q90 introduced visible artefacts on
-    // high-detail beauty shots (nails, makeup close-ups). At q95 the
-    // re-encode is visually transparent on the master-facing
-    // surfaces, at the cost of ~30% larger files (storage is cheap).
-    // Visual search runs against an in-memory resize of the **stored
-    // original**, so embedding quality is unaffected by this bump.
-    // PERF-07: верхняя граница разрешения. Перекодирование тут было всегда,
-    // ресайза не было — в хранилище ложился оригинал до 10 МБ, и оптимизатор
-    // `next/image` тянул его из S3 на каждый промах своего кэша. Порог — из
-    // самой широкой поверхности показа портфолио, см. `image-resize.ts`.
-    const resized = capLongestSide(sharp(rawBuffer), MEDIA_MAX_IMAGE_SIDE_PX);
-    if (detected.mime === "image/png") {
-      outputMime = "image/webp";
-      outputBuffer = await resized.webp({ quality: 95 }).toBuffer();
-    } else if (detected.mime === "image/jpeg") {
-      outputMime = "image/jpeg";
-      outputBuffer = await resized.jpeg({ quality: 95 }).toBuffer();
-    } else {
-      outputMime = "image/webp";
-      outputBuffer = await resized.webp({ quality: 95 }).toBuffer();
-    }
-
-    if (outputBuffer.length <= 0 || outputBuffer.length > MEDIA_MAX_FILE_SIZE_BYTES) {
-      return jsonFail(400, "Файл слишком большой.", "MEDIA_FILE_TOO_LARGE");
-    }
-
-    const bytes = new Uint8Array(outputBuffer);
+    // MEDIA-UPLOAD-DEDUP: общий примитив — sniff по магическим байтам →
+    // allowlist → sharp re-encode с ограничением стороны → размер. Качество 95
+    // сохранено, чтобы пользователь видел ту же картинку, что и до сведения.
+    const upload = await readValidatedImageUpload(fileValue, { quality: 95, maxSidePx: MEDIA_MAX_IMAGE_SIDE_PX });
     const asset = await uploadMediaAsset(user, {
       entityType: parsedBody.data.entityType as MediaEntityType,
       entityId: parsedBody.data.entityId,
       kind: parsedBody.data.kind as MediaKind,
       replaceAssetId: parsedBody.data.replaceAssetId,
-      mimeType: outputMime,
-      sizeBytes: outputBuffer.length,
-      bytes,
+      mimeType: upload.mimeType,
+      sizeBytes: upload.sizeBytes,
+      bytes: upload.bytes,
       originalFilename: fileValue.name || "upload",
     });
 

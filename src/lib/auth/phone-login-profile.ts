@@ -1,9 +1,11 @@
-import { AccountType, Prisma, type UserProfile } from "@prisma/client";
+import { AccountType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import {
   classifyPhoneLoginTarget,
   releaseUnverifiedPhoneClaims,
+  PHONE_LOGIN_PROFILE_SELECT,
+  type PhoneLoginProfile,
   type PhoneLoginTarget,
 } from "@/lib/auth/phone-claim";
 import { logInfo } from "@/lib/logging/logger";
@@ -44,7 +46,7 @@ export async function resolvePhoneLoginProfile(
   normalizedPhone: string,
   target: PhoneLoginTarget,
   attempt = 0,
-): Promise<UserProfile> {
+): Promise<PhoneLoginProfile> {
   if (target.kind === "OWNER") {
     return withClientRole(target.profile);
   }
@@ -76,6 +78,7 @@ export async function resolvePhoneLoginProfile(
         phoneVerifiedAt: new Date(),
         roles: [AccountType.CLIENT],
       },
+      select: PHONE_LOGIN_PROFILE_SELECT,
     });
   } catch (error) {
     if (
@@ -86,6 +89,7 @@ export async function resolvePhoneLoginProfile(
       // Race: параллельный запрос успел занять номер. Перечитать И перетриажировать.
       const recovered = await prisma.userProfile.findUnique({
         where: { phone: normalizedPhone },
+        select: PHONE_LOGIN_PROFILE_SELECT,
       });
       if (recovered) {
         const recoveredTarget = await classifyPhoneLoginTarget(recovered);
@@ -101,7 +105,7 @@ export async function resolvePhoneLoginProfile(
  * returns the same array reference when CLIENT is already present, so this is
  * a no-op (no write) for a row that already has it.
  */
-async function withClientRole(profile: UserProfile): Promise<UserProfile> {
+async function withClientRole(profile: PhoneLoginProfile): Promise<PhoneLoginProfile> {
   const nextRoles = await ensureClientRoleForUser(profile.id, profile.roles);
   return nextRoles === profile.roles ? profile : { ...profile, roles: nextRoles };
 }

@@ -49,7 +49,7 @@ describe("гостевой профиль — канонический ключ 
   for (const input of ["+79991234567", "89991234567", "79991234567", "+7 (999) 123-45-67"]) {
     it(`«${input}» приводится к ${CANONICAL}`, async () => {
       await findOrCreateGuestUserByPhone({ phone: input });
-      expect(findUnique).toHaveBeenCalledWith({ where: { phone: CANONICAL } });
+      expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { phone: CANONICAL } }));
       expect(create.mock.calls[0]?.[0].data.phone).toBe(CANONICAL);
     });
   }
