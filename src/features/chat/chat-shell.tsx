@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Inbox, MessageSquare } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { ConversationList } from "@/features/chat/conversation-list/conversation-list";
@@ -9,6 +9,7 @@ import { useConversations } from "@/features/chat/hooks/use-conversations";
 import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
 import type { ChatPerspective } from "@/features/chat/types";
+import { getViewerTimeZone } from "@/lib/time/use-viewer-timezone";
 
 const T = UI_TEXT.chat;
 
@@ -36,31 +37,30 @@ export function ChatShell({ perspective }: Props) {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [mobileWindowOpen, setMobileWindowOpen] = useState(false);
 
-  const viewerTimezone = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Moscow";
-    } catch {
-      return "Europe/Moscow";
-    }
-  }, []);
+  const viewerTimezone = useMemo(() => getViewerTimeZone(), []);
 
   // Honor `?c=<slug>` from incoming notification click-throughs.
   // chat-url-fix replaced the previous `?key=<providerId:clientUserId>`
   // form so URLs no longer leak internal cuids.
-  useEffect(() => {
-    const hinted = searchParams.get("c");
+  // Состояние подстраивается при рендере, когда параметр сменился (приём React
+  // «adjusting state when a prop changes») — эффект с setState давал лишний
+  // каскадный рендер (react-hooks/set-state-in-effect).
+  const hinted = searchParams.get("c");
+  const [seenHint, setSeenHint] = useState<string | null>(null);
+  if (hinted !== seenHint) {
+    setSeenHint(hinted);
     if (hinted) {
       setActiveSlug(hinted);
       setMobileWindowOpen(true);
     }
-  }, [searchParams]);
+  }
 
-  // First-load auto-select: most recently active conversation.
-  useEffect(() => {
-    if (activeSlug) return;
-    if (conversations.length === 0) return;
-    setActiveSlug(conversations[0]?.slug ?? null);
-  }, [activeSlug, conversations]);
+  // First-load auto-select: most recently active conversation. Не поверх
+  // `?c=`: в одном рендере оба присваивания — и последнее выиграло бы у ссылки.
+  const firstSlug = conversations[0]?.slug ?? null;
+  if (!activeSlug && !hinted && firstSlug) {
+    setActiveSlug(firstSlug);
+  }
 
   function handlePick(slug: string) {
     setActiveSlug(slug);

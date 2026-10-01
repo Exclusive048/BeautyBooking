@@ -39,7 +39,7 @@ export function ServicesKpiRow({ kpis }: { kpis: StudioServicesKpis }) {
     {
       icon: Layers,
       label: T.total,
-      value: kpis.totalServices.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.totalServices),
       sublabel: T.totalContext.replace("{count}", String(kpis.totalCategories)),
     },
     {
@@ -60,7 +60,7 @@ export function ServicesKpiRow({ kpis }: { kpis: StudioServicesKpis }) {
     {
       icon: UserMinus,
       label: T.withoutMaster,
-      value: kpis.servicesWithoutMaster.toLocaleString("ru-RU"),
+      value: UI_FMT.count(kpis.servicesWithoutMaster),
       sublabel:
         kpis.servicesWithoutMaster === 0
           ? T.withoutMasterContext

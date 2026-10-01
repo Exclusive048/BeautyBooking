@@ -5,14 +5,9 @@ import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.billing.cancelDialog;
-
-const DATE_FMT = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
 
 type Props = {
   open: boolean;
@@ -45,7 +40,7 @@ export function CancelSubscriptionDialog({
   if (!subscription) return null;
 
   const until = subscription.currentPeriodEnd
-    ? DATE_FMT.format(new Date(subscription.currentPeriodEnd))
+    ? UI_FMT.date(subscription.currentPeriodEnd, "dayMonthYearLong", { timeZone: VIEWER_TZ })
     : null;
   const body = until
     ? T.body

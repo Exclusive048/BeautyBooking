@@ -40,7 +40,7 @@ export function MasterDetailKpis({ detail }: { detail: StudioMasterDetail }) {
     {
       icon: Calendar,
       label: T.bookings,
-      value: detail.metrics.bookings30d.toLocaleString("ru-RU"),
+      value: UI_FMT.count(detail.metrics.bookings30d),
       sublabel: T.bookingsSubtitle,
     },
     {

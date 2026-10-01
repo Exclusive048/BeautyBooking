@@ -1,13 +1,9 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
-
-const DATE_FORMATTER = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "short",
-});
 
 /**
  * Format a past ISO date as a short Russian relative-time string.
@@ -33,5 +29,5 @@ export function formatRelativeTime(iso: string, now: Date = new Date()): string 
     const n = Math.floor(diffMs / DAY_MS);
     return T.daysAgo.replace("{n}", String(n));
   }
-  return DATE_FORMATTER.format(target);
+  return UI_FMT.date(target, "dayMonthShort", { timeZone: VIEWER_TZ });
 }

@@ -61,7 +61,8 @@ describe("«Итоги недели»", () => {
     prismaMock.booking.findMany.mockResolvedValue(bookings([200_000, 250_000]));
     await runWeeklyStatsJob(MONDAY);
     const body = deliverNotification.mock.calls[0]?.[0]?.body ?? "";
-    expect(body).toMatch(/2 записи, 4\s500 ₽/u);
+    // 29.09 доработки · 24: перед ₽ — неразрывный пробел (решение 24.2).
+    expect(body).toMatch(/2 записи, 4\s500\u00a0₽/u);
     expect(body).not.toContain("450");
   });
 

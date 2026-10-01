@@ -22,6 +22,7 @@ import type {
 import { CreateBookingDialog } from "./dialogs/create-booking-dialog";
 import { ManageBreaksDialog } from "./dialogs/manage-breaks-dialog";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.header;
 const WEEKDAY_LONG_RU = [
@@ -128,10 +129,7 @@ export function ScheduleHeader({
     startRefresh(() => {
       router.refresh();
       setRefreshedAt(
-        new Date().toLocaleTimeString("ru-RU", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        UI_FMT.timeShort(new Date(), { timeZone: VIEWER_TZ }),
       );
     });
   };

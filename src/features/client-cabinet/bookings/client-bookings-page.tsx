@@ -44,6 +44,7 @@ import { groupBookingsByMonth } from "./lib/group-by-month";
 import { buildYandexMapsLink } from "./lib/maps-link";
 import { ClientRescheduleModal } from "./client-reschedule-modal";
 import { ClientReviewModal } from "./client-review-modal";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 const T = UI_TEXT.clientCabinet.bookingsPage;
 const STATUS_T = UI_TEXT.clientCabinet.booking;
@@ -593,17 +594,9 @@ function DateBadge({
   }
   // QA-107/FIX-22: render in the SALON's timezone (not the viewer's host tz).
   const d = new Date(isoStart);
-  const month = d
-    .toLocaleString("ru-RU", { month: "short", timeZone: timezone })
-    .toUpperCase()
-    .replace(".", "");
-  const day = d.toLocaleString("ru-RU", { day: "numeric", timeZone: timezone });
-  const time = d.toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: timezone,
-  });
+  const month = UI_FMT.date(d, "monthShort", { timeZone: timezone }).toUpperCase().replace(".", "");
+  const day = UI_FMT.date(d, "dayOfMonth", { timeZone: timezone });
+  const time = UI_FMT.timeShort(d, { timeZone: timezone });
   return (
     <div
       className={`flex w-20 shrink-0 flex-col items-center gap-0.5 rounded-2xl py-2 text-center sm:w-16 ${
@@ -956,13 +949,9 @@ function BookingsListSkeleton() {
 // tile matches the list row's salon-tz time (one number per booking, QA-107).
 function formatRelativeDateTime(iso: string, timeZone: string): string {
   const d = new Date(iso);
-  const time = d.toLocaleTimeString("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  });
-  // Salon-tz date key (en-CA → YYYY-MM-DD) for relative-day comparison.
-  const dayKey = (date: Date) => date.toLocaleDateString("en-CA", { timeZone });
+  const time = UI_FMT.timeShort(d, { timeZone });
+  // Salon-tz date key for relative-day comparison.
+  const dayKey = (date: Date) => toLocalDateKey(date, timeZone);
   const now = new Date();
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const bookingKey = dayKey(d);
@@ -970,7 +959,7 @@ function formatRelativeDateTime(iso: string, timeZone: string): string {
   if (bookingKey === dayKey(now)) return `Сегодня, ${time}`;
   if (bookingKey === dayKey(tomorrow)) return `Завтра, ${time}`;
   return (
-    d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", timeZone }) +
+    UI_FMT.date(d, "dayMonthShort", { timeZone }) +
     ", " +
     time
   );

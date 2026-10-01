@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope";
-import { getDayOfWeek, toLocalDateKey } from "@/lib/schedule/timezone";
+import { getDayOfWeek, toLocalDateKey, toLocalMonthKey } from "@/lib/schedule/timezone";
 import {
   addDaysToDateKey,
   dateFromLocalDateKey,
@@ -99,13 +99,7 @@ export function getBucketKey(date: Date, timeZone: string, granularity: Timeline
     return addDaysToDateKey(dateKey, -mondayOffset);
   }
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(date);
-  const lookup = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  return `${lookup.year}-${lookup.month}`;
+  return toLocalMonthKey(date, timeZone);
 }
 
 export function listBucketKeys(range: AnalyticsRange, timeZone: string, granularity: TimelineGranularity): string[] {

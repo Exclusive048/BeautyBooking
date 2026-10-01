@@ -2,7 +2,8 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { RevenueSection as RevenueSectionData } from "@/lib/master/analytics-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatPercent, formatRubles, formatRublesShort } from "./lib/format";
+import { formatPercent } from "./lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.analytics.revenue;
 
@@ -14,6 +15,11 @@ type Props = {
 const CHART_W = 1280;
 const CHART_H = 240;
 const PAD = 32;
+// Колонка подписей оси справа: «10,5 тыс ₽» (решение 24.1) длиннее прежнего
+// «11K» и не помещалась в поле PAD — SVG обрезал её по краю.
+const AXIS_W = 64;
+/** Правый край области графика (линии сетки и точки). */
+const PLOT_RIGHT = CHART_W - PAD - AXIS_W;
 
 /**
  * Revenue line chart card. Uses inline SVG so the bundle stays lean —
@@ -44,7 +50,7 @@ export function RevenueSection({ data, comparison }: Props) {
       Math.max(point.current, point.previous ?? 0)
     )
   );
-  const stepX = data.points.length > 1 ? (CHART_W - PAD * 2) / (data.points.length - 1) : 0;
+  const stepX = data.points.length > 1 ? (PLOT_RIGHT - PAD) / (data.points.length - 1) : 0;
 
   const toPath = (key: "current" | "previous"): string => {
     const segments: string[] = [];
@@ -80,13 +86,13 @@ export function RevenueSection({ data, comparison }: Props) {
           <h2 className="font-display text-lg text-text-main">{T.heading}</h2>
           <div className="mt-2 flex flex-wrap items-baseline gap-2">
             <span className="font-display text-2xl text-text-main">
-              {formatRubles(data.totalCurrent)}
+              {UI_FMT.priceLabelOrDash(data.totalCurrent)}
             </span>
             {showComparison && data.totalPrevious !== null ? (
               <>
                 <DeltaInline deltaPct={data.deltaPct} />
                 <span className="text-sm text-text-sec">
-                  {T.vsTemplate.replace("{value}", formatRubles(data.totalPrevious))}
+                  {T.vsTemplate.replace("{value}", UI_FMT.priceLabelOrDash(data.totalPrevious))}
                 </span>
               </>
             ) : null}
@@ -115,7 +121,7 @@ export function RevenueSection({ data, comparison }: Props) {
                 key={t}
                 x1={PAD}
                 y1={y}
-                x2={CHART_W - PAD}
+                x2={PLOT_RIGHT}
                 y2={y}
                 className="stroke-border-subtle"
                 strokeWidth="1"
@@ -128,11 +134,11 @@ export function RevenueSection({ data, comparison }: Props) {
             return (
               <text
                 key={`label-${t}`}
-                x={CHART_W - PAD + 6}
+                x={PLOT_RIGHT + 6}
                 y={y + 3}
                 className="fill-text-sec font-mono text-[10px]"
               >
-                {formatRublesShort(maxValue * t)}
+                {UI_FMT.moneyShort(maxValue * t)}
               </text>
             );
           })}

@@ -6,8 +6,9 @@ import type {
   AvailableServiceForOffer,
 } from "@/lib/master/model-offers-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatOfferDateHeading, formatRubles, pluralize } from "./lib/format";
+import { formatOfferDateHeading, pluralize } from "./lib/format";
 import { OfferActionsRow } from "./offer-actions-row";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.offerCard;
 const STATUS_T = T.status;
@@ -75,11 +76,11 @@ export function OfferCard({ offer, variant = "active", services, now }: Props) {
       </header>
 
       <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-display text-2xl text-text-main">{formatRubles(offer.offerPrice)}</span>
+        <span className="font-display text-2xl text-text-main">{UI_FMT.priceLabelOrDash(offer.offerPrice)}</span>
         {offer.discountPct !== null && offer.regularPrice !== null ? (
           <>
             <span className="text-sm text-text-sec line-through">
-              {T.regularPriceTemplate.replace("{price}", formatRubles(offer.regularPrice))}
+              {T.regularPriceTemplate.replace("{price}", UI_FMT.priceLabelOrDash(offer.regularPrice))}
             </span>
             <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
               {T.discountBadgeTemplate.replace("{percent}", String(offer.discountPct))}

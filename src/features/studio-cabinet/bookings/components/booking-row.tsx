@@ -50,11 +50,7 @@ function formatDateLabel(iso: string, timeZone: string): string {
   );
   if (dayKey === todayKey) return T.table.todayPrefix;
   if (dayKey === tomorrowKey) return T.table.tomorrowPrefix;
-  return date.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-    timeZone,
-  });
+  return UI_FMT.date(date, "dayMonthShort", { timeZone });
 }
 
 function statusLabel(status: StudioBookingRow["status"]): string {

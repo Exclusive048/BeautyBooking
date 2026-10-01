@@ -4,6 +4,7 @@ import { deliverNotification } from "@/lib/notifications/delivery";
 import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 import { dateFromLocalDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const applicationInclude = {
   offer: {
@@ -61,7 +62,7 @@ function offerRangeLabel(dateLocal: string, startLocal: string, endLocal: string
   const start = parseLocalTime(startLocal);
   if (!isDateKey(dateLocal) || !start) return `${dateLocal} ${startLocal}–${endLocal}`;
   const at = dateFromLocalDateKey(dateLocal, timeZone, start.hour, start.minute);
-  const day = at.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", timeZone });
+  const day = UI_FMT.dateShort(at.toISOString(), { timeZone });
   const zone = formatZoneLabel({ iso: at.toISOString(), timeZone });
   return `${day}, ${startLocal}–${endLocal}${zone ? ` ${zone}` : ""}`;
 }

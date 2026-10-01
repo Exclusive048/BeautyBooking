@@ -59,7 +59,8 @@ describe("QA-109 source guard — public surfaces don't format kopecks with a no
   const SITES: ReadonlyArray<{ file: string; marker: string }> = [
     { file: "src/features/catalog/components/catalog-card.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/catalog/components/catalog-map-carousel.tsx", marker: "moneyRUBFromKopeks(" },
-    { file: "src/features/catalog/components/histogram-slider.tsx", marker: "/ 100" },
+    // 29.09 доработки · 24: ÷100 — внутри общего `UI_FMT.priceLabel`.
+    { file: "src/features/catalog/components/histogram-slider.tsx", marker: "UI_FMT.priceLabel(" },
     { file: "src/features/client-cabinet/bookings/client-bookings-page.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/client-cabinet/favorites/client-favorites-page.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/chat/chat-window/system-message.tsx", marker: "moneyRUBFromKopeks(" },

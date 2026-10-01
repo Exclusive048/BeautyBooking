@@ -11,6 +11,9 @@
  * это доверенный канал, пользовательский текст — нет. Усечение решает другую
  * задачу: верхнюю границу стоимости запроса.
  */
+
+import { UI_FMT } from "@/lib/ui/fmt";
+
 const UNTRUSTED_OPEN = "<<<ДАННЫЕ>>>";
 const UNTRUSTED_CLOSE = "<<</ДАННЫЕ>>>";
 
@@ -93,8 +96,7 @@ ${UNTRUSTED_BLOCK_RULE}`,
       priceKopeks: number;
       durationMin: number;
     }): string {
-      const priceRub = Math.round(input.priceKopeks / 100);
-      return `Название: ${input.name}, Категория: ${input.category}, Цена: ${priceRub}₽, Время: ${input.durationMin} мин.`;
+      return `Название: ${input.name}, Категория: ${input.category}, Цена: ${UI_FMT.priceLabel(input.priceKopeks)}, Время: ${input.durationMin} мин.`;
     },
   },
 

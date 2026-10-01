@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { utcDateKey } from "@/features/admin-cabinet/dashboard/server/shared";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 /**
  * LOGIC-28 — точки admin-графика бакетируются строго по UTC (`utcDateKey` →
@@ -34,15 +35,11 @@ const INSTANTS = [
 
 describe("подписи точек графика — LOGIC-28", () => {
   it("подпись дня совпадает с днём UTC-бакета на границах суток", () => {
-    const dayLabel = new Intl.DateTimeFormat("ru-RU", {
-      day: "2-digit",
-      timeZone: "UTC",
-    });
-
+    // Тот же вызов, что в сервисе (29.09 доработки · 24: подписи — через UI_FMT).
     for (const iso of INSTANTS) {
       const date = new Date(iso);
-      const bucketDay = utcDateKey(date).slice(8, 10); // DD из YYYY-MM-DD
-      expect(dayLabel.format(date), iso).toBe(bucketDay);
+      const bucketDay = Number(utcDateKey(date).slice(8, 10)); // DD из YYYY-MM-DD
+      expect(UI_FMT.date(date, "dayOfMonth", { timeZone: "UTC" }), iso).toBe(String(bucketDay));
     }
   });
 
@@ -62,14 +59,15 @@ describe("подписи точек графика — LOGIC-28", () => {
     expect(["11", "12"]).toContain(ambient.format(midnight));
   });
 
-  it("сервис графиков задаёт timeZone во ВСЕХ форматтерах", () => {
+  it("сервис графиков задаёт timeZone UTC во ВСЕХ форматах дат", () => {
+    // 29.09 доработки · 24: своих `Intl.DateTimeFormat` в сервисе больше нет —
+    // подписи идут через `UI_FMT.date`, и пояс в каждом вызове обязан быть UTC.
     const source = readFileSync(CHARTS_SERVICE, "utf8");
-    const formatters = source.match(/new Intl\.DateTimeFormat\([\s\S]*?\}\)/g) ?? [];
-    expect(formatters.length).toBeGreaterThan(0);
-    for (const formatter of formatters) {
-      expect(formatter, "форматтер без timeZone — подпись разойдётся с бакетом").toMatch(
-        /timeZone:\s*"UTC"/
-      );
+    expect(source).not.toMatch(/Intl\.DateTimeFormat/);
+    const calls = source.match(/UI_FMT\.date\([\s\S]*?\}\)/g) ?? [];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call, "формат без UTC — подпись разойдётся с бакетом").toMatch(/timeZone:\s*"UTC"/);
     }
   });
 });

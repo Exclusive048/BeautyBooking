@@ -6,6 +6,7 @@ import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { ConversationThreadDto, ChatPerspective } from "@/features/chat/types";
 import * as UI_TEXT from "@/lib/ui/text";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { getViewerTimeZone } from "@/lib/time/use-viewer-timezone";
 
 type State = {
   detail: ConversationThreadDto | null;
@@ -47,7 +48,7 @@ export function useConversationThread(input: {
     // avoids a content flash on background refetches triggered by
     // SSE events. Initial-load loading is set in the initial state.
     try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "Europe/Moscow";
+      const tz = getViewerTimeZone();
       const detail = await fetchJsonWithAuth<ConversationThreadDto>(
         `/api/chat/threads/${encodeURIComponent(conversationSlug)}?as=${perspective}`,
         {

@@ -1,7 +1,8 @@
 import { Star } from "lucide-react";
 import type { ClientDetailView } from "@/lib/master/clients-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatNumberShort, formatShortDate } from "./lib/format";
+import { formatShortDate } from "./lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.clients.detail.history;
 
@@ -51,7 +52,7 @@ export function ClientVisitHistory({ visits }: Props) {
               {T.noRating}
             </span>
             <span className="shrink-0 font-mono text-xs font-medium text-text-main tabular-nums">
-              {formatNumberShort(visit.amount)} ₽
+              {UI_FMT.priceLabelOrDash(visit.amount)}
             </span>
           </li>
         ))}

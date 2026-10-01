@@ -9,7 +9,7 @@ import type { PlanTier } from "@/lib/billing/features";
 import { createScheduleContext } from "@/lib/schedule/engine-context";
 import { ScheduleEngine } from "@/lib/schedule/engine";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { formatLocalHm, toLocalDateKey } from "@/lib/schedule/timezone";
 import { normalizeSlotStepMin } from "@/lib/schedule/editor-shared";
 import { addDaysToDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { buildBookingOverlapWhere, bookingOverlapsRange } from "@/lib/schedule/overlap";
@@ -378,11 +378,5 @@ async function computeAvailabilityHint(
 }
 
 function formatLocalTime(utc: Date, timezone: string): string {
-  const formatter = new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: timezone,
-  });
-  return formatter.format(utc);
+  return formatLocalHm(utc, timezone);
 }

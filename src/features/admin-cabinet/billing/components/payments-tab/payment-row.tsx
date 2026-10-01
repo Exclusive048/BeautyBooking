@@ -2,7 +2,7 @@
 
 import { Undo2 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kopeks";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import {
   PAYMENT_STATUS_TONE_CLASS,
   paymentStatusDisplay,
@@ -10,16 +10,11 @@ import {
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
 import { Button } from "@/components/ui/button";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 
 const T = UI_TEXT.adminPanel.billing.payments;
 const M = UI_TEXT.adminPanel.billing.methodFallback;
-
-const DT_FMT = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 type Props = {
   payment: AdminPaymentRow;
@@ -31,6 +26,10 @@ type Props = {
  * Refund icon-button renders only when `isRefundable` (i.e. SUCCEEDED
  * + has YooKassa id). */
 export function PaymentTableRow({ payment, busy, onRefund }: Props) {
+  // Часы зрителя — только после гидратации: сервер считает их в поясе
+  // контейнера, и первый клиентский рендер обязан совпасть с серверным
+  // (иначе «Hydration failed», 29.09 доработки · 24).
+  const hydrated = useIsHydrated();
   const status = paymentStatusDisplay(payment.status);
   return (
     <tr className="hover:bg-bg-input/40">
@@ -38,13 +37,13 @@ export function PaymentTableRow({ payment, busy, onRefund }: Props) {
         {payment.displayId}
       </td>
       <td className="px-4 py-3 align-top text-xs tabular-nums text-text-sec">
-        {DT_FMT.format(new Date(payment.createdAt))}
+        {hydrated ? UI_FMT.date(payment.createdAt, "dayMonthShortTime", { timeZone: VIEWER_TZ }) : null}
       </td>
       <td className="px-4 py-3 align-top text-sm text-text-main">
         {payment.user?.displayName ?? M}
       </td>
       <td className="px-4 py-3 text-right align-top text-sm font-semibold tabular-nums text-text-main">
-        {formatRublesFromKopeks(payment.amountKopeks)}
+        {moneyRUBFromKopeks(payment.amountKopeks)}
       </td>
       <td className="px-4 py-3 align-top">
         <span

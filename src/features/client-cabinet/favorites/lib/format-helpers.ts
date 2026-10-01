@@ -1,4 +1,5 @@
 import { pluralize } from "@/lib/utils/pluralize";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 export function formatVisitsLabel(n: number): string {
   return `${n} ${pluralize(n, "визит", "визита", "визитов")}`;
@@ -9,15 +10,8 @@ export function formatMastersLabel(n: number): string {
 }
 
 export function formatLastVisit(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("ru-RU", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
+  // tz-ok: viewer — дата визита без пояса салона в данных карточки избранного.
+  return UI_FMT.date(iso, "dayMonthYearLong", { timeZone: VIEWER_TZ });
 }
 
 export type SortOption = "recent" | "rating" | "visits";

@@ -5,6 +5,7 @@ import {
   HOT_SLOT_PERCENT_VALUES,
   HOT_SLOT_TRIGGER_HOURS,
 } from "@/lib/hot-slots/constants";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const triggerHoursSchema = z
   .number()
@@ -43,7 +44,7 @@ export const hotSlotRuleSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["discountValue"],
-          message: `Фиксированная скидка должна быть от ${HOT_SLOT_FIXED_MIN} до ${HOT_SLOT_FIXED_MAX} ₽.`,
+          message: `Фиксированная скидка должна быть от ${UI_FMT.priceLabel(HOT_SLOT_FIXED_MIN * 100)} до ${UI_FMT.priceLabel(HOT_SLOT_FIXED_MAX * 100)}.`,
         });
       }
     }

@@ -1,3 +1,6 @@
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.chat;
@@ -6,26 +9,12 @@ const WEEKDAY_SHORT = T.weekdayShort;
 const MONTHS_GENITIVE = T.monthsGenitive;
 
 function sameLocalDay(a: Date, b: Date, timezone: string): boolean {
-  return localDateKey(a, timezone) === localDateKey(b, timezone);
-}
-
-export function localDateKey(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: timezone,
-  }).format(date);
+  return toLocalDateKey(a, timezone) === toLocalDateKey(b, timezone);
 }
 
 /** "10:42" — local HH:MM in the viewer's timezone. */
 export function formatTimeHm(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: timezone,
-  }).format(date);
+  return UI_FMT.timeShort(date, { timeZone: timezone });
 }
 
 /**
@@ -60,20 +49,15 @@ export function formatRowTime(isoOrDate: string | Date, timezone: string, now = 
 
 /** Day-separator label — "Сегодня", "Вчера", "Пятница, 9 мая". */
 export function formatDaySeparator(dateKey: string, timezone: string, now = new Date()): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const date = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
-  if (sameLocalDay(date, now, timezone)) return T.day.today;
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (sameLocalDay(date, yesterday, timezone)) return T.day.yesterday;
+  // `dateKey` — уже дата в поясе `timezone`: сравниваем ключи, а не моменты.
+  const todayKey = toLocalDateKey(now, timezone);
+  if (dateKey === todayKey) return T.day.today;
+  if (dateKey === addDaysToDateKey(todayKey, -1)) return T.day.yesterday;
 
-  const weekday = new Intl.DateTimeFormat("ru-RU", {
-    weekday: "long",
-    timeZone: timezone,
-  }).format(date);
-  const day = date.getUTCDate();
+  const [, m, d] = dateKey.split("-").map(Number);
+  const weekday = UI_FMT.dateKey(dateKey, "weekdayLong");
   const month = MONTHS_GENITIVE[(m ?? 1) - 1] ?? "";
-  return `${capitalize(weekday)}, ${day} ${month}`;
+  return `${capitalize(weekday)}, ${d ?? ""} ${month}`;
 }
 
 function jsWeekdayToIso(jsDay: number): number {

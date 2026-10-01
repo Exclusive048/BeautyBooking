@@ -2,12 +2,8 @@
  * so the wording stays consistent across the 5 dispatch sites and
  * so unit tests can pin down the reason-suffix / plurals behaviour. */
 
-const RUBLE = "₽";
-
-function formatRubles(kopeks: number): string {
-  const whole = Math.round(kopeks / 100);
-  return `${whole.toLocaleString("ru-RU")} ${RUBLE}`;
-}
+import { moneyRUBFromKopeks } from "@/lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 /** «1 месяц / 3 месяца / 12 месяцев» — Russian plural for months. */
 export function formatMonths(value: number): string {
@@ -77,7 +73,7 @@ export function buildPlanEditedSummary(diff: PlanEditDiff): string | null {
       const months = Number.parseInt(periodLabel, 10);
       const label = Number.isFinite(months) ? formatMonths(months) : period;
       parts.push(
-        `цена за ${label}: ${formatRubles(value.before)} → ${formatRubles(value.after)}`,
+        `цена за ${label}: ${UI_FMT.priceLabel(value.before)} → ${UI_FMT.priceLabel(value.after)}`,
       );
     }
   }
@@ -117,8 +113,8 @@ export function buildRefundBody(opts: {
 }): string {
   const method = opts.paymentMethodDisplay?.trim();
   const head = method
-    ? `Платёж на ${formatRubles(opts.amountKopeks)} возвращён на ${method}.`
-    : `Платёж на ${formatRubles(opts.amountKopeks)} возвращён.`;
+    ? `Платёж на ${moneyRUBFromKopeks(opts.amountKopeks)} возвращён на ${method}.`
+    : `Платёж на ${moneyRUBFromKopeks(opts.amountKopeks)} возвращён.`;
   return withReason(head, opts.reason);
 }
 

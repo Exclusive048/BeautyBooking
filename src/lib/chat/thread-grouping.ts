@@ -6,6 +6,7 @@
  * where breaks belong (different YYYY-MM-DD vs previous message).
  */
 import type { ChatSenderType } from "@prisma/client";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 /** Booking snapshot attached to a system message that pins a card. */
 export type ThreadBookingCard = {
@@ -103,11 +104,5 @@ export function injectDaySeparators(
 }
 
 function toDateKey(date: Date, timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: timezone,
-  }).format(date);
-  return parts; // en-CA → YYYY-MM-DD
+  return toLocalDateKey(date, timezone);
 }

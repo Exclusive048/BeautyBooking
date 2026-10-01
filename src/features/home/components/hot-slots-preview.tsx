@@ -9,6 +9,9 @@ import { DISTANCE, MOTION, STAGGER, VIEWPORT_ONCE } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
 import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
+import { UI_FMT } from "@/lib/ui/fmt";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 type HotSlotItem = {
   id: string;
@@ -37,34 +40,12 @@ type HotSlotItem = {
   } | null;
 };
 
-function formatSlotTime(startUtc: string, timezone: string): string {
-  try {
-    const d = new Date(startUtc);
-    return d.toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: timezone,
-    });
-  } catch {
-    return "";
-  }
-}
-
-function formatSlotDate(startUtc: string, timezone: string): string {
-  try {
-    const d = new Date(startUtc);
-    return d.toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "short",
-      timeZone: timezone,
-    });
-  } catch {
-    return "";
-  }
-}
-
-function formatPrice(kopeks: number): string {
-  return `${Math.round(kopeks / 100).toLocaleString("ru-RU")} ₽`;
+// salon-tz (rule 17): окошко показывается по часам салона, с меткой зоны,
+// когда она расходится с зоной зрителя.
+function formatSlotWhen(startUtc: string, salonTimeZone: string, viewerTimeZone: string): string {
+  const when = `${UI_FMT.date(startUtc, "dayMonthShort", { timeZone: salonTimeZone })}, ${UI_FMT.timeShort(startUtc, { timeZone: salonTimeZone })}`;
+  const showZone = zonesDifferForViewer({ iso: startUtc, salonTimeZone, viewerTimeZone });
+  return showZone ? `${when} ${formatZoneLabel({ iso: startUtc, timeZone: salonTimeZone })}`.trimEnd() : when;
 }
 
 function calcDiscountedPrice(kopeks: number, type: "PERCENT" | "FIXED", value: number): number {
@@ -89,6 +70,7 @@ const itemVariants = {
 export function HotSlotsPreview() {
   const [slots, setSlots] = useState<HotSlotItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const viewerTz = useViewerTimeZoneContext();
   const container = containerVariants;
   const itemAnim = itemVariants;
 
@@ -178,10 +160,10 @@ export function HotSlotsPreview() {
                     {discountedPrice !== null && originalPrice ? (
                       <>
                         <span className="text-sm font-bold tabular-nums text-text-main">
-                          {formatPrice(discountedPrice)}
+                          {UI_FMT.priceLabel(discountedPrice)}
                         </span>
                         <span className="text-xs tabular-nums text-text-sec line-through">
-                          {formatPrice(originalPrice)}
+                          {UI_FMT.priceLabel(originalPrice)}
                         </span>
                       </>
                     ) : null}
@@ -193,8 +175,7 @@ export function HotSlotsPreview() {
               <div className="flex items-center gap-1.5 text-xs text-text-sec">
                 <Clock className="h-3.5 w-3.5 shrink-0" />
                 <span>
-                  {formatSlotDate(item.slot.startAtUtc, item.provider.timezone)},{" "}
-                  {formatSlotTime(item.slot.startAtUtc, item.provider.timezone)}
+                  {formatSlotWhen(item.slot.startAtUtc, item.provider.timezone, viewerTz)}
                 </span>
               </div>
 

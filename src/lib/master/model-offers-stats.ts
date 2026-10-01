@@ -4,7 +4,6 @@
  * this module. The view-service composes these on top of the raw rows.
  */
 
-const RUBLE_FMT = new Intl.NumberFormat("ru-RU");
 const RU_PLURAL = new Intl.PluralRules("ru-RU");
 
 const MONTH_GENITIVE = [
@@ -68,11 +67,6 @@ export function formatOfferDate(dateLocal: string, now: Date = new Date()): stri
     return `${day} ${month} ${target.getFullYear()} · ${weekday}`;
   }
   return `${day} ${month} · ${weekday}`;
-}
-
-export function formatRubles(kopeks: number | null): string {
-  if (kopeks === null || !Number.isFinite(kopeks) || kopeks <= 0) return "—";
-  return `${RUBLE_FMT.format(Math.round(kopeks / 100))} ₽`;
 }
 
 export function pluralize(n: number, one: string, few: string, many: string): string {

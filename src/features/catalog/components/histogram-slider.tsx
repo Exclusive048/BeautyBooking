@@ -4,6 +4,7 @@ import { useId, useMemo } from "react";
 import type { CatalogPriceBucket } from "@/lib/catalog/catalog.service";
 import * as UI_TEXT from "@/lib/ui/text";
 import { RangeInput } from "@/components/ui/range-input";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Props = {
   /** Absolute min/max from the data set — slider domain. */
@@ -21,7 +22,7 @@ type Props = {
 // column, and the histogram buckets are built from kopecks). Only the displayed
 // chip label needs ÷100 — the slider value passed to onChange stays in kopecks.
 function formatRub(n: number): string {
-  return `${new Intl.NumberFormat("ru-RU").format(Math.round(n / 100))} ₽`;
+  return UI_FMT.priceLabel(n);
 }
 
 /**

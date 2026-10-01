@@ -76,17 +76,10 @@ function buildSalonDateKeys(salonTz: string, days: number): string[] {
   return keys;
 }
 
-// A salon-local date key (already tz-resolved) → its «Пн 08 июл» label. Anchored
-// at UTC noon so the key's Y-M-D renders as-is with no tz day-shift.
+// A salon-local date key (already tz-resolved) → its «пн, 8 июл.» label
+// (UI_FMT.dateKey: UTC-tech, the key's Y-M-D renders as-is).
 function formatDateLabel(dateKey: string): string {
-  const dt = new Date(`${dateKey}T12:00:00Z`);
-  if (Number.isNaN(dt.getTime())) return dateKey;
-  return dt.toLocaleDateString("ru-RU", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    timeZone: "UTC", // tz-ok: date-key label (salon-local), UTC-noon anchor
-  });
+  return UI_FMT.dateKey(dateKey, "weekdayDayMonthShort");
 }
 
 

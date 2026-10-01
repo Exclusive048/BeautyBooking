@@ -1,9 +1,10 @@
 import * as UI_TEXT from "@/lib/ui/text";
 import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
-import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 export type StudioMaster = {
   id: string;
@@ -154,18 +155,9 @@ export function buildDayOptions(
   const out: { key: string; label: string }[] = [];
   for (let i = 0; i < count; i += 1) {
     const key = addDaysToDateKey(first, i);
-    // Подпись строится из полудня салонного дня — так она не съезжает на
-    // соседние сутки ни при каком смещении зоны.
-    const noonUtc = dateFromLocalDateKey(key, timeZone, 12, 0);
-    out.push({
-      key,
-      label: noonUtc.toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "short",
-        weekday: "short",
-        timeZone,
-      }),
-    });
+    // Подпись — по самому ключу (UTC-tech): не съезжает на соседние сутки
+    // ни при каком смещении зоны.
+    out.push({ key, label: UI_FMT.dateKey(key, "weekdayDayMonthShort") });
   }
   return out;
 }

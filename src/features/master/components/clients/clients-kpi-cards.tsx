@@ -2,7 +2,7 @@ import { Heart, Repeat, Users, Wallet } from "lucide-react";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import type { ClientsKpi } from "@/lib/master/clients-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatRubles } from "./lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.clients.kpi;
 
@@ -36,8 +36,8 @@ export function ClientsKpiCards({ stats }: Props) {
         icon={Wallet}
         label={T.ltvLabel}
         labelTooltip={T.ltvLabelTooltip}
-        value={formatRubles(stats.totalLtv)}
-        sublabel={T.ltvSubtextTemplate.replace("{avg}", formatRubles(stats.avgLtv))}
+        value={UI_FMT.priceLabelOrDash(stats.totalLtv)}
+        sublabel={T.ltvSubtextTemplate.replace("{avg}", UI_FMT.priceLabelOrDash(stats.avgLtv))}
       />
       <StatTile
         icon={Repeat}

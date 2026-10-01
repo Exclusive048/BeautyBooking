@@ -8,6 +8,7 @@ import { searchCatalog, type CatalogProviderItem } from "@/lib/catalog/catalog.s
 import { logError } from "@/lib/logging/logger";
 import { providerPublicUrl } from "@/lib/public-urls";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type TopMaster = {
   // QA-103: no internal CUID — key/link off publicUsername.
@@ -48,10 +49,6 @@ async function loadTopMasters(): Promise<TopMaster[] | null> {
     logError("TopMastersSection: failed to load", { error: String(err) });
     return null;
   }
-}
-
-function formatPriceRub(kopeks: number): string {
-  return `${Math.round(kopeks / 100).toLocaleString("ru-RU")} ${UI_TEXT.common.currencyRub}`;
 }
 
 function MasterCard({ master }: { master: TopMaster }) {
@@ -117,7 +114,7 @@ function MasterCard({ master }: { master: TopMaster }) {
             <p className="text-sm text-text-sec">
               <span className="text-text-main">{master.primaryServiceTitle}</span>
               {" · "}
-              <span className="font-mono tabular-nums">от {formatPriceRub(master.primaryServicePrice)}</span>
+              <span className="font-mono tabular-nums">от {UI_FMT.priceLabel(master.primaryServicePrice)}</span>
             </p>
           ) : null}
         </div>

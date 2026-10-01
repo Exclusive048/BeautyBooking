@@ -1,3 +1,4 @@
+import { UI_FMT } from "@/lib/ui/fmt";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
 
 /**
@@ -16,13 +17,7 @@ import { formatZoneLabel } from "@/lib/ui/zone-label";
  */
 export function formatBookingWhenLabel(date: Date | null, timeZone: string): string | null {
   if (!date) return null;
-  const label = date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  });
+  const label = UI_FMT.date(date, "dayMonthNumericTime", { timeZone });
   const zone = formatZoneLabel({ iso: date.toISOString(), timeZone });
   return zone ? `${label} ${zone}` : label;
 }

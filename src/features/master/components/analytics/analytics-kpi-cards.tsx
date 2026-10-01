@@ -7,8 +7,8 @@ import {
   formatNumber,
   formatPercent,
   formatPercentPoints,
-  formatRubles,
 } from "./lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.analytics.kpi;
 
@@ -30,13 +30,13 @@ export function AnalyticsKpiCards({ kpi, comparison }: Props) {
     <StatTileGrid columns={4}>
       <KpiTile
         label={T.revenueLabel}
-        value={formatRubles(kpi.revenue.current)}
+        value={UI_FMT.priceLabelOrDash(kpi.revenue.current)}
         comparison={comparison}
         deltaPct={kpi.revenue.deltaPct}
         previousLabel={
           kpi.revenue.previous === null
             ? T.prevNoData
-            : T.prevTemplate.replace("{value}", formatRubles(kpi.revenue.previous))
+            : T.prevTemplate.replace("{value}", UI_FMT.priceLabelOrDash(kpi.revenue.previous))
         }
         previousIsNull={kpi.revenue.previous === null}
       />
@@ -54,13 +54,13 @@ export function AnalyticsKpiCards({ kpi, comparison }: Props) {
       />
       <KpiTile
         label={T.avgCheckLabel}
-        value={formatRubles(kpi.avgCheck.current)}
+        value={UI_FMT.priceLabelOrDash(kpi.avgCheck.current)}
         comparison={comparison}
         deltaPct={kpi.avgCheck.deltaPct}
         previousLabel={
           kpi.avgCheck.previous === null
             ? T.prevNoData
-            : T.prevTemplate.replace("{value}", formatRubles(kpi.avgCheck.previous))
+            : T.prevTemplate.replace("{value}", UI_FMT.priceLabelOrDash(kpi.avgCheck.previous))
         }
         previousIsNull={kpi.avgCheck.previous === null}
       />

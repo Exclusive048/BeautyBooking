@@ -5,10 +5,10 @@ import { useId, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import type { AvailableServiceForOffer } from "@/lib/master/model-offers-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatRubles } from "../lib/format";
 import { MAX_REQUIREMENTS, commitRequirementDraft } from "../lib/requirements";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.create;
 
@@ -91,7 +91,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
               service.regularPrice && service.regularPrice > 0
                 ? T.serviceMetaTemplate
                     .replace("{minutes}", String(service.durationMin))
-                    .replace("{price}", formatRubles(service.regularPrice))
+                    .replace("{price}", UI_FMT.priceLabelOrDash(service.regularPrice))
                 : T.serviceMetaNoPrice.replace("{minutes}", String(service.durationMin));
             return (
               <option key={service.id} value={service.id}>

@@ -18,6 +18,7 @@ import type {
   ThreadBookingCardDto,
   ThreadMessageDto,
 } from "@/features/chat/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.chat.card;
 
@@ -154,13 +155,5 @@ function BookingCard({
 // `card.timezone`, never the viewer's. The appointment TIME is formatted
 // separately via `formatLocalHm` (sanctioned salon-tz helper).
 function formatDate(iso: string, timezone: string): string {
-  try {
-    return new Intl.DateTimeFormat("ru-RU", {
-      timeZone: timezone,
-      day: "numeric",
-      month: "long",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
+  return UI_FMT.date(iso, "dayMonthLong", { timeZone: timezone });
 }

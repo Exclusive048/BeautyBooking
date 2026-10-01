@@ -7,10 +7,8 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import { useConfirm } from "@/hooks/use-confirm";
-import {
-  formatRublesPrecise,
-  parseRublesToKopeks,
-} from "@/features/admin-cabinet/billing/lib/kopeks";
+import { moneyRUBFromKopeks } from "@/lib/format";
+import { kopeksToRublesInput, parseRublesToKopeks } from "@/lib/money/kopeks";
 import { tierAndScopeLabel } from "@/features/admin-cabinet/billing/lib/plan-display";
 import { PlanFeaturesEditor } from "@/features/admin-cabinet/billing/components/plan-features-editor";
 import type { PlanFeatureOverrides } from "@/lib/billing/features";
@@ -55,9 +53,7 @@ const PERIODS: Array<1 | 3 | 6 | 12> = [1, 3, 6, 12];
 function priceForPeriod(plan: AdminPlanCard, months: number): string {
   const found = plan.prices.find((p) => p.periodMonths === months);
   if (!found) return "0";
-  return formatRublesPrecise(found.priceKopeks)
-    .replace(" ₽", "")
-    .replace(",", ".");
+  return kopeksToRublesInput(found.priceKopeks);
 }
 
 /**
@@ -351,7 +347,7 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                           >
                             {effective === null
                               ? T.fields.priceEffectiveNone
-                              : formatRublesPrecise(effective)}
+                              : moneyRUBFromKopeks(effective)}
                           </span>
                         </div>
                       </div>

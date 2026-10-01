@@ -11,19 +11,15 @@ type Props = {
   serviceDurationMin: number;
   slot: BookingFlowSlot | null;
   dateKey: string | null;
-  providerTimezone: string;
   compact?: boolean;
 };
 
-function formatDateLong(dateKey: string, timezone: string): string {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const date = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
-  const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short", timeZone: timezone })
-    .format(date)
-    .replace(".", "");
-  const day = date.getUTCDate();
+// `dateKey` — дата САЛОНА (`YYYY-MM-DD`), поэтому подпись — UTC-tech по ключу.
+function formatDateLong(dateKey: string): string {
+  const [, m, d] = dateKey.split("-").map(Number);
+  const weekday = UI_FMT.dateKey(dateKey, "weekdayShort").replace(".", "");
   const month = TF.monthsGenitive[(m ?? 1) - 1] ?? "";
-  return `${weekday} ${day} ${month}`;
+  return `${weekday} ${d ?? ""} ${month}`;
 }
 
 function resolveEffectivePrice(slot: BookingFlowSlot | null, fallback: number): number {
@@ -49,7 +45,6 @@ export function SummaryBlock({
   serviceDurationMin,
   slot,
   dateKey,
-  providerTimezone,
   compact,
 }: Props) {
   const effectivePrice = resolveEffectivePrice(slot, servicePrice);
@@ -66,7 +61,7 @@ export function SummaryBlock({
 
       <div className={compact ? "flex items-center justify-between gap-3" : "mt-1.5 flex items-center justify-between gap-3"}>
         <span className="text-text-sec">
-          {dateKey ? formatDateLong(dateKey, providerTimezone) : T.summaryDateTimePending}
+          {dateKey ? formatDateLong(dateKey) : T.summaryDateTimePending}
           {slotTime ? ` · ${slotTime}` : ""}
         </span>
         <span className="font-mono text-xs text-text-sec">

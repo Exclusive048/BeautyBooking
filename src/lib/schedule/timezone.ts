@@ -43,17 +43,16 @@ type DateParts = {
   second: number;
 };
 
-function partsFromDate(date: Date, timeZone: string): DateParts {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    throw new Error(
-      `Invalid date in partsFromDate: ${String(date)} (type=${typeof date}, value=${JSON.stringify(date)})`
-    );
-  }
-  // FIX-10 read-time guard: a bad stored tz (empty/garbage) would make the
-  // `Intl.DateTimeFormat` constructor throw `RangeError` → 500 on live
-  // calendar/booking surfaces. Write-time validation (schema) keeps new rows
-  // clean; this degrades a pre-existing bad row to the fallback. Client-safe →
-  // no `logError` here (rule 13); the schema rejection is the observable signal.
+/**
+ * Форматтер частей даты на пояс. Кэш — ради горячих циклов (аналитика,
+ * группировка записей по дням): конструктор `Intl.DateTimeFormat` на порядки
+ * дороже `formatToParts`. Битый пояс из данных кэшируется вместе с fallback.
+ */
+const partsFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function partsFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = partsFormatters.get(timeZone);
+  if (cached) return cached;
   const safeTimeZone = isValidTimeZone(timeZone) ? timeZone : FALLBACK_TIME_ZONE;
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone: safeTimeZone,
@@ -65,8 +64,22 @@ function partsFromDate(date: Date, timeZone: string): DateParts {
     second: "2-digit",
     hour12: false,
   });
+  partsFormatters.set(timeZone, dtf);
+  return dtf;
+}
 
-  const parts = dtf.formatToParts(date);
+function partsFromDate(date: Date, timeZone: string): DateParts {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    throw new Error(
+      `Invalid date in partsFromDate: ${String(date)} (type=${typeof date}, value=${JSON.stringify(date)})`
+    );
+  }
+  // FIX-10 read-time guard: a bad stored tz (empty/garbage) would make the
+  // `Intl.DateTimeFormat` constructor throw `RangeError` → 500 on live
+  // calendar/booking surfaces. Write-time validation (schema) keeps new rows
+  // clean; this degrades a pre-existing bad row to the fallback. Client-safe →
+  // no `logError` here (rule 13); the schema rejection is the observable signal.
+  const parts = partsFormatter(timeZone).formatToParts(date);
   const lookup = Object.fromEntries(parts.map((p) => [p.type, p.value]));
 
   return {
@@ -154,6 +167,14 @@ export function toLocalDateKey(date: Date | number | string, timeZone: string): 
   const month = String(parts.month).padStart(2, "0");
   const day = String(parts.day).padStart(2, "0");
   return `${parts.year}-${month}-${day}`;
+}
+
+/**
+ * Месяц момента времени в поясе `timeZone` — ключ `YYYY-MM` (UTC-tech-ключ
+ * группировки: когорты, «по месяцам»). Пояс обязателен, как у `toLocalDateKey`.
+ */
+export function toLocalMonthKey(date: Date | number | string, timeZone: string): string {
+  return toLocalDateKey(date, timeZone).slice(0, 7);
 }
 
 export function toLocalDateKeyExclusive(date: Date, timeZone: string): string {

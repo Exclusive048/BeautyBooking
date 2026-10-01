@@ -1,6 +1,6 @@
 import type { TopServiceItem } from "@/lib/master/analytics-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatRubles } from "./lib/format";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.analytics.topServices;
 
@@ -49,7 +49,7 @@ export function TopServicesSection({ services, periodLabel }: Props) {
                   · {service.bookings}
                 </span>
                 <span className="shrink-0 font-mono text-sm font-medium text-text-main">
-                  {formatRubles(service.revenue)}
+                  {UI_FMT.priceLabelOrDash(service.revenue)}
                 </span>
               </div>
               <div className="mt-1 ml-8 h-1 overflow-hidden rounded-full bg-bg-input">

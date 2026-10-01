@@ -8,12 +8,12 @@ import { readWorkerLiveness } from "@/lib/queue/worker-liveness";
 import type { WorkerLiveness } from "@/lib/queue/worker-liveness";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatCount } from "@/features/admin-cabinet/dashboard/server/shared";
 import type {
   AdminHealth,
   AdminHealthStat,
   AdminHealthTone,
 } from "@/features/admin-cabinet/dashboard/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.dashboard.health;
 
@@ -34,11 +34,6 @@ export const HEALTH_THRESHOLDS = {
   p95Ms: { warn: 500, error: 1500 },
   uptimeRatio: { warn: 0.995, error: 0.98 },
 } as const;
-
-const PERCENT_FMT = new Intl.NumberFormat("ru-RU", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
 
 function toneForRange(
   value: number,
@@ -77,28 +72,28 @@ export function buildApiUptimeStat(metrics: ApiMetricsSnapshot): AdminHealthStat
   const percent = uptime.ratio * 100;
   return {
     key: "apiUptime",
-    valueText: T.uptimeValue(PERCENT_FMT.format(percent)),
+    valueText: T.uptimeValue(UI_FMT.decimal(percent, 1)),
     tone: toneForFloor(
       uptime.ratio,
       HEALTH_THRESHOLDS.uptimeRatio.warn,
       HEALTH_THRESHOLDS.uptimeRatio.error,
     ),
-    hint: T.uptimeHint(formatCount(uptime.upMinutes), formatCount(uptime.observedMinutes)),
+    hint: T.uptimeHint(UI_FMT.count(uptime.upMinutes), UI_FMT.count(uptime.observedMinutes)),
   };
 }
 
 export function buildP95Stat(metrics: ApiMetricsSnapshot): AdminHealthStat {
   const { latency } = metrics;
   if (!latency.available) return unavailableStat("p95", T.noDataYetHint);
-  const hint = T.p95Hint(latency.windowMinutes, formatCount(latency.requests), formatCount(latency.errors5xx));
+  const hint = T.p95Hint(latency.windowMinutes, UI_FMT.count(latency.requests), UI_FMT.count(latency.errors5xx));
   if (latency.p95Ms === null) {
     return { key: "p95", valueText: T.p95NoTraffic, tone: "neutral", hint };
   }
   return {
     key: "p95",
     valueText: latency.saturated
-      ? T.p95ValueAbove(formatCount(latency.p95Ms))
-      : T.p95Value(formatCount(latency.p95Ms)),
+      ? T.p95ValueAbove(UI_FMT.count(latency.p95Ms))
+      : T.p95Value(UI_FMT.count(latency.p95Ms)),
     tone: toneForRange(
       latency.saturated ? Number.POSITIVE_INFINITY : latency.p95Ms,
       HEALTH_THRESHOLDS.p95Ms.warn,
@@ -152,7 +147,7 @@ export async function getAdminHealth(): Promise<AdminHealth> {
       valueText:
         queue.pending < 0
           ? T.metricUnavailable
-          : `${formatCount(queue.pending)} ${T.queuePendingSuffix}`,
+          : `${UI_FMT.count(queue.pending)} ${T.queuePendingSuffix}`,
       tone:
         queue.pending < 0
           ? "neutral"
@@ -166,7 +161,7 @@ export async function getAdminHealth(): Promise<AdminHealth> {
     {
       key: "queueDead",
       valueText:
-        queue.dead < 0 ? T.metricUnavailable : formatCount(queue.dead),
+        queue.dead < 0 ? T.metricUnavailable : UI_FMT.count(queue.dead),
       tone:
         queue.dead < 0
           ? "neutral"
@@ -175,7 +170,7 @@ export async function getAdminHealth(): Promise<AdminHealth> {
     },
     {
       key: "complaintsOpen",
-      valueText: formatCount(complaints),
+      valueText: UI_FMT.count(complaints),
       tone: toneForRange(
         complaints,
         HEALTH_THRESHOLDS.complaints.warn,

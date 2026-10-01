@@ -5,8 +5,6 @@ import { prisma } from "@/lib/prisma";
 import {
   computeAbsoluteDelta,
   computePercentDelta,
-  formatCount,
-  formatRevenueShort,
   utcLastNDays,
   utcMonthRange,
 } from "@/features/admin-cabinet/dashboard/server/shared";
@@ -14,6 +12,7 @@ import type {
   AdminKpi,
   AdminKpis,
 } from "@/features/admin-cabinet/dashboard/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 /**
  * KPI aggregations for the four headline tiles on `/admin`.
@@ -113,28 +112,28 @@ export async function getAdminKpis(): Promise<AdminKpis> {
   const items: AdminKpi[] = [
     {
       key: "registrations7d",
-      valueText: formatCount(reg7d),
+      valueText: UI_FMT.count(reg7d),
       rawValue: reg7d,
       deltaText: reg7dDelta.text,
       deltaSign: reg7dDelta.sign,
     },
     {
       key: "bookings1d",
-      valueText: formatCount(bookings24h),
+      valueText: UI_FMT.count(bookings24h),
       rawValue: bookings24h,
       deltaText: bookingsDelta.text,
       deltaSign: bookingsDelta.sign,
     },
     {
       key: "activeSubs",
-      valueText: formatCount(activeSubs),
+      valueText: UI_FMT.count(activeSubs),
       rawValue: activeSubs,
       deltaText: subsDelta.text,
       deltaSign: subsDelta.sign,
     },
     {
       key: "revenueMonth",
-      valueText: formatRevenueShort(revenueNowKopeks),
+      valueText: UI_FMT.moneyShort(revenueNowKopeks),
       rawValue: revenueNowKopeks,
       deltaText: revenueDelta.text,
       deltaSign: revenueDelta.sign,

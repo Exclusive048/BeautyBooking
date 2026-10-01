@@ -15,6 +15,7 @@ import {
 } from "@/lib/notifications/groups";
 import { getNotificationsNotifier } from "@/lib/notifications/notifier";
 import type { NotificationEvent } from "@/lib/notifications/types";
+import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -148,16 +149,10 @@ export function publishNotifications(events: NotificationRecord[]): void {
   }
 }
 
+// salon-tz с меткой зоны (rule 17): у серверного сообщения нет зрителя, с
+// чьей зоной можно сравнить, — тот же формат, что у `booking-notifications`.
 function formatDateLabel(date: Date | null, timezone: string): string | null {
-  if (!date) return null;
-  const label = date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  });
-  return label;
+  return formatBookingWhenLabel(date, timezone);
 }
 
 function resolveServiceLabel(service: { name: string; title: string | null }): string {

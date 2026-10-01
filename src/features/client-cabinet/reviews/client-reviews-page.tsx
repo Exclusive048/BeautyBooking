@@ -20,6 +20,7 @@ import type {
   PendingReviewBooking,
 } from "@/lib/client-cabinet/reviews.service";
 import { EditReviewModal } from "./edit-review-modal";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.clientCabinet.reviews;
 
@@ -405,13 +406,5 @@ function ReviewsListSkeleton() {
 }
 
 function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return iso;
-  }
+  return UI_FMT.date(iso, "dayMonthYearLong", { timeZone: VIEWER_TZ });
 }

@@ -1,6 +1,7 @@
 import { DiscountType, NotificationType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { deliverNotification } from "@/lib/notifications/delivery";
+import { formatBookingWhenLabel } from "@/lib/notifications/format-booking-when";
 
 const hotSlotInclude = {
   provider: {
@@ -23,14 +24,9 @@ function formatDiscount(type: DiscountType, value: number): string {
   return type === "PERCENT" ? `${value}%` : `${value} руб.`;
 }
 
+// salon-tz с меткой зоны (rule 17) — подписчик окошка может жить в другом поясе.
 function formatSlotLabel(startAtUtc: Date, timezone: string): string {
-  return startAtUtc.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  });
+  return formatBookingWhenLabel(startAtUtc, timezone) ?? "";
 }
 
 function resolveServiceLabel(service: { name: string; title: string | null } | null): string | null {

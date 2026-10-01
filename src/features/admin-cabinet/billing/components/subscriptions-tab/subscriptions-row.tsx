@@ -3,22 +3,17 @@
 import { PlanTier, SubscriptionStatus } from "@/lib/prisma-enums";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatRublesFromKopeks } from "@/features/admin-cabinet/billing/lib/kopeks";
+import { moneyRUBFromKopeks } from "@/lib/format";
 import {
   formatPlanName,
 } from "@/features/admin-cabinet/users/lib/plan-display";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
 import { Button } from "@/components/ui/button";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.billing.subs;
 const M = UI_TEXT.adminPanel.billing.methodFallback;
-
-const DATE_FMT = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
 
 const TIER_TONE: Record<PlanTier, string> = {
   [PlanTier.FREE]: "bg-bg-input text-text-sec",
@@ -73,16 +68,16 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
       </td>
       <td className="px-4 py-3 align-top text-sm tabular-nums text-text-sec">
         {row.currentPeriodStart
-          ? DATE_FMT.format(new Date(row.currentPeriodStart))
+          ? UI_FMT.date(row.currentPeriodStart, "dayMonthYearShort", { timeZone: VIEWER_TZ })
           : M}
       </td>
       <td className="px-4 py-3 align-top text-sm tabular-nums text-text-sec">
         {row.currentPeriodEnd
-          ? DATE_FMT.format(new Date(row.currentPeriodEnd))
+          ? UI_FMT.date(row.currentPeriodEnd, "dayMonthYearShort", { timeZone: VIEWER_TZ })
           : M}
       </td>
       <td className="px-4 py-3 text-right align-top text-sm font-semibold tabular-nums text-text-main">
-        {row.amountKopeks > 0 ? formatRublesFromKopeks(row.amountKopeks) : M}
+        {row.amountKopeks > 0 ? moneyRUBFromKopeks(row.amountKopeks) : M}
       </td>
       <td className="px-4 py-3 align-top text-xs text-text-sec">
         {row.paymentMethodDisplay ?? M}

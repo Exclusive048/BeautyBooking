@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import * as cache from "@/lib/cache/cache";
 import { listAvailabilitySlotsPaginated } from "@/lib/schedule/usecases";
 import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
-import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { formatLocalHm, toLocalDateKey } from "@/lib/schedule/timezone";
 import { logError } from "@/lib/logging/logger";
 
 const CACHE_KEY_PREFIX = "rebook";
@@ -212,12 +212,7 @@ async function findNextSlot(
     if (Number.isNaN(startUtc.getTime())) return null;
 
     const localDateKey = toLocalDateKey(startUtc, timezone);
-    const localTime = startUtc.toLocaleTimeString("ru-RU", {
-      timeZone: timezone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    const localTime = formatLocalHm(startUtc, timezone);
 
     return {
       startAtUtc: startUtc.toISOString(),

@@ -24,7 +24,8 @@ import {
 import type { PublicStats } from "@/lib/stats/public-stats";
 import { DISTANCE, MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
-import { LoginShowcase, formatStatNumber } from "./login-showcase";
+import { LoginShowcase } from "./login-showcase";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const RESEND_TIMEOUT = 60;
 const OTP_LENGTH = 6;
@@ -466,7 +467,7 @@ export default function LoginClient({
                 <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-[12px] text-text-sec">
                   <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
                   <span className="tabular-nums">
-                    {formatStatNumber(stats.masters)} {T.socialProofMastersLabel}
+                    {UI_FMT.countShort(stats.masters)} {T.socialProofMastersLabel}
                   </span>
                 </div>
               ) : null}

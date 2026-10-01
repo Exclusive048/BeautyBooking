@@ -4,9 +4,9 @@ import {
 } from "@/features/admin-cabinet/reviews/components/reviews-kpi-card";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewsKpis } from "@/features/admin-cabinet/reviews/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.adminPanel.reviews.kpi;
-const COUNT = new Intl.NumberFormat("ru-RU");
 
 type Props = {
   data: AdminReviewsKpis;
@@ -52,26 +52,26 @@ export function ReviewsKpiRow({ data }: Props) {
   const deletedValue =
     data.deletedLastWeek === null
       ? T.noData
-      : COUNT.format(data.deletedLastWeek.count);
+      : UI_FMT.count(data.deletedLastWeek.count);
   const deletedSub =
     data.deletedLastWeek === null
       ? null
       : T.deletedLastWeekContext.replace(
           "{total}",
-          COUNT.format(data.deletedLastWeek.totalReviews),
+          UI_FMT.count(data.deletedLastWeek.totalReviews),
         );
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
       <ReviewsKpiCard
         label={T.pendingReports}
-        value={COUNT.format(data.pendingReports.count)}
+        value={UI_FMT.count(data.pendingReports.count)}
         sublabel={pendingSub}
         tone={pendingTone}
       />
       <ReviewsKpiCard
         label={T.reviewsToday}
-        value={COUNT.format(data.reviewsToday.count)}
+        value={UI_FMT.count(data.reviewsToday.count)}
         sublabel={reviewsTodaySub}
         tone={reviewsTodayTone}
       />

@@ -10,6 +10,7 @@ import { buildCatalogUrl } from "@/features/catalog/lib/catalog-url";
 import { DISTANCE, MOTION, STAGGER } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { PublicStats } from "@/lib/stats/public-stats";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 const containerVariants = {
   hidden: {},
@@ -29,10 +30,6 @@ const itemVariants = {
 
 const STATS_MIN_MASTERS = 10;
 
-function formatNum(n: number): string {
-  return new Intl.NumberFormat("ru-RU").format(n);
-}
-
 type Props = {
   stats: PublicStats | null;
 };
@@ -46,7 +43,7 @@ export function HeroSection({ stats }: Props) {
 
   const showStats = stats !== null && stats.masters >= STATS_MIN_MASTERS;
   const eyebrowText = stats !== null && stats.masters >= STATS_MIN_MASTERS
-    ? `${T.eyebrow} · ${formatNum(stats.masters)} ${T.eyebrowMastersSuffix}`
+    ? `${T.eyebrow} · ${UI_FMT.count(stats.masters)} ${T.eyebrowMastersSuffix}`
     : T.eyebrow;
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -132,13 +129,13 @@ export function HeroSection({ stats }: Props) {
             <div className="flex items-center gap-0 divide-x divide-border-subtle">
               <div className="px-5 text-center first:pl-0 sm:px-7">
                 <span className="font-mono text-base font-semibold tabular-nums text-text-main">
-                  {formatNum(stats.bookings)}
+                  {UI_FMT.count(stats.bookings)}
                 </span>
                 <span className="ml-1.5 text-sm text-text-sec">{T.statsBookings}</span>
               </div>
               <div className="px-5 text-center last:pr-0 sm:px-7">
                 <span className="font-mono text-base font-semibold tabular-nums text-text-main">
-                  {formatNum(stats.services)}
+                  {UI_FMT.count(stats.services)}
                 </span>
                 <span className="ml-1.5 text-sm text-text-sec">услуг</span>
               </div>
