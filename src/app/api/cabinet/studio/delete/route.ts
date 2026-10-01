@@ -4,7 +4,7 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
-import { deleteStudioCabinet } from "@/lib/deletion/delete-studio";
+import { assertStudioCabinetDeletable, deleteStudioCabinet } from "@/lib/deletion/delete-studio";
 import { extractClientIp } from "@/lib/http/ip";
 
 export const runtime = "nodejs";
@@ -12,6 +12,14 @@ export const runtime = "nodejs";
 export async function DELETE(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
+
+  // DELETE-CABINET-REFUSAL-RATE-LIMIT: отказ «есть живые записи» — до лимита
+  // частоты, иначе он съедает единственную попытку в час.
+  try {
+    await assertStudioCabinetDeletable(auth.user.id);
+  } catch (error) {
+    return refusal(error);
+  }
 
   const ip = extractClientIp(req);
   const ipKey = routeRateLimitKey(req, "ip", ip ?? "unknown");
@@ -30,10 +38,14 @@ export async function DELETE(req: Request) {
     await deleteStudioCabinet(auth.user.id);
     return ok({ deleted: true });
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    if (appError.code === "ACTIVE_BOOKINGS") {
-      return fail("Есть активные записи", 409, "ACTIVE_BOOKINGS", appError.details);
-    }
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    return refusal(error);
   }
+}
+
+function refusal(error: unknown) {
+  const appError = error instanceof AppError ? error : toAppError(error);
+  if (appError.code === "ACTIVE_BOOKINGS") {
+    return fail("Есть активные записи", 409, "ACTIVE_BOOKINGS", appError.details);
+  }
+  return fail(appError.message, appError.status, appError.code, appError.details);
 }

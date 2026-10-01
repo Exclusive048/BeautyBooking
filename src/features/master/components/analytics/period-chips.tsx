@@ -104,7 +104,10 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
   };
 
   return (
-    <div className="relative inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-bg-page p-1">
+    // MOBILE-OVERFLOW-375: на 375 px пять чипов в строку давали 389 px —
+    // переносятся внутри рамки, а не выходят за экран. Полоса со скроллом здесь
+    // не годится: она обрезала бы всплывающий выбор своего периода.
+    <div className="relative inline-flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-border-subtle bg-bg-page p-1">
       {CHIPS.map((chip) => {
         const isActive = chip.id === active;
         const isLockedCustom = chip.id === "custom" && !customAvailable;
@@ -136,7 +139,7 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
         <div
           ref={popoverRef}
           role="dialog"
-          className="absolute left-0 top-[calc(100%+6px)] z-30 w-[300px] rounded-xl border border-border-subtle bg-bg-card p-3 shadow-card"
+          className="absolute left-0 top-[calc(100%+6px)] z-30 w-[min(300px,calc(100vw-2rem))] rounded-xl border border-border-subtle bg-bg-card p-3 shadow-card"
         >
           <p className="mb-2 eyebrow">
             {T.customPickerHeading}

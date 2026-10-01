@@ -9,8 +9,8 @@ import { UserAvatar } from "@/features/admin-cabinet/users/components/user-avata
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
-import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 import { Badge } from "@/components/ui/badge";
+import { ViewerDate } from "@/components/ui/viewer-date";
 
 const T = UI_TEXT.adminPanel.reviews.card;
 
@@ -62,7 +62,7 @@ export function ReviewCard({ review, busy, onApprove, onDelete }: Props) {
                 ) : null}
               </p>
               <p className="mt-0.5 font-mono text-2xs tabular-nums text-text-sec">
-                {UI_FMT.date(review.createdAt, "dayMonthYearShort", { timeZone: VIEWER_TZ })}
+                <ViewerDate value={review.createdAt} preset="dayMonthYearShort" />
               </p>
             </div>
           </div>

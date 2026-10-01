@@ -10,8 +10,8 @@ import {
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
 import { Button } from "@/components/ui/button";
-import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 import { Badge } from "@/components/ui/badge";
+import { ViewerDate } from "@/components/ui/viewer-date";
 
 const T = UI_TEXT.adminPanel.billing.subs;
 const M = UI_TEXT.adminPanel.billing.methodFallback;
@@ -69,12 +69,12 @@ export function SubscriptionsTableRow({ row, busy, onCancel }: Props) {
       </td>
       <td className="px-4 py-3 align-top text-sm tabular-nums text-text-sec">
         {row.currentPeriodStart
-          ? UI_FMT.date(row.currentPeriodStart, "dayMonthYearShort", { timeZone: VIEWER_TZ })
+          ? <ViewerDate value={row.currentPeriodStart} preset="dayMonthYearShort" />
           : M}
       </td>
       <td className="px-4 py-3 align-top text-sm tabular-nums text-text-sec">
         {row.currentPeriodEnd
-          ? UI_FMT.date(row.currentPeriodEnd, "dayMonthYearShort", { timeZone: VIEWER_TZ })
+          ? <ViewerDate value={row.currentPeriodEnd} preset="dayMonthYearShort" />
           : M}
       </td>
       <td className="px-4 py-3 text-right align-top text-sm font-semibold tabular-nums text-text-main">

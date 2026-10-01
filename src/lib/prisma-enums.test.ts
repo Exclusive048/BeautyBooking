@@ -25,7 +25,9 @@ import * as PrismaRuntime from "@prisma/client";
 
 import * as Mirrors from "./prisma-enums";
 
-describe("PERF-11 — @prisma/client не попадает в клиентский бандл", () => {
+// TEST-TIMEOUT-FLAKE: обход всего клиентского графа под параллельной нагрузкой
+// подходил к дефолтным 5 с (два красных из пяти полных прогонов).
+describe("PERF-11 — @prisma/client не попадает в клиентский бандл", { timeout: 30_000 }, () => {
   it("ни один модуль клиентского графа не импортирует @prisma/client значением", () => {
     const { visited, via } = walkClientGraph();
     expect(visited.size).toBeGreaterThan(200); // граф действительно обойден

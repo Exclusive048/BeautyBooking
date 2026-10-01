@@ -57,6 +57,31 @@ type StudioDeletionResult = {
   memberUserIds: string[];
 };
 
+async function assertNoBlockingStudioBookings(
+  db: Parameters<typeof countBlockingStudioBookings>[0],
+  studio: Parameters<typeof countBlockingStudioBookings>[1],
+): Promise<void> {
+  const activeCount = await countBlockingStudioBookings(db, studio);
+  if (activeCount > 0) {
+    throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", { count: activeCount });
+  }
+}
+
+/**
+ * DELETE-CABINET-REFUSAL-RATE-LIMIT — предпроверка для роута, ДО лимита
+ * частоты (см. `assertMasterCabinetDeletable`). Та же проверка повторяется в
+ * транзакции удаления.
+ */
+export async function assertStudioCabinetDeletable(userId: string): Promise<void> {
+  const studio = await prisma.studio.findFirst({
+    where: ownedStudioWhere(userId),
+    orderBy: { createdAt: "asc" },
+    select: { id: true, providerId: true },
+  });
+  if (!studio) return;
+  await assertNoBlockingStudioBookings(prisma, studio);
+}
+
 export async function deleteStudioCabinet(userId: string, options: CabinetDeletionOptions = {}): Promise<void> {
   // DELETION-02: снимок ДО транзакции (см. delete-master).
   const target = await prisma.studio.findFirst({
@@ -88,13 +113,7 @@ export async function deleteStudioCabinet(userId: string, options: CabinetDeleti
     // Прежний третий клоз (`masterProviderId in <мастера команды>`) ловил и
     // записи мастеров с их ЛИЧНЫХ страниц — студия их не видит, закрыть не
     // может, а удаление студии их не затрагивает.
-    const activeCount = await countBlockingStudioBookings(tx, studio);
-
-    if (activeCount > 0) {
-      throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", {
-        count: activeCount,
-      });
-    }
+    await assertNoBlockingStudioBookings(tx, studio);
 
     const memberships = await tx.studioMembership.findMany({
       where: { studioId: studio.id, status: MembershipStatus.ACTIVE },

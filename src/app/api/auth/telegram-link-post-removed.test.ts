@@ -40,7 +40,9 @@ const ROUTE_FILE = resolve(
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 
-describe("FIX-B18 · POST /api/auth/telegram/link удалён", () => {
+// TEST-TIMEOUT-FLAKE: динамический import() route-модуля под параллельной нагрузкой
+// подходил к дефолтным 5 с (два красных из пяти полных прогонов).
+describe("FIX-B18 · POST /api/auth/telegram/link удалён", { timeout: 30_000 }, () => {
   it("модуль экспортирует ровно GET — POST не вернулся", async () => {
     const mod: Record<string, unknown> = await import(ROUTE_MODULE);
     const exported = HTTP_METHODS.filter((method) => typeof mod[method] === "function");

@@ -1,4 +1,4 @@
-import { AccountType, NotificationType, ProviderType, StudioMemberRole, StudioRole } from "@prisma/client";
+import { type Prisma, AccountType, NotificationType, ProviderType, StudioMemberRole, StudioRole } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { removeProfessionalRoles } from "@/lib/auth/roles";
 import { MediaEntityType } from "@prisma/client";
@@ -25,6 +25,46 @@ export type CabinetDeletionOptions = {
 /** Интерактивная транзакция удаления — два десятка операций; дефолтных 5 с мало. */
 export const CABINET_DELETION_TX_TIMEOUT_MS = 30_000;
 
+type MasterDeletionDb = Pick<Prisma.TransactionClient, "provider" | "booking">;
+
+/**
+ * Живые записи, которые останавливают удаление кабинета мастера. Профили
+ * мастера в студиях — того же человека, без `MasterProfile` (STUDIO-MASTER-
+ * PROFILES, этап 4): кабинет удаляется целиком, иначе профиль в студии
+ * оставался бы активным и принимал записи от имени удалённого мастера.
+ */
+async function assertNoBlockingMasterBookings(db: MasterDeletionDb, userId: string, providerId: string) {
+  const studioProfiles = await db.provider.findMany({
+    where: { ownerUserId: userId, type: ProviderType.MASTER, masterProfile: { is: null } },
+    select: { id: true },
+  });
+  // DELETION-03: общий предикат живой записи (включая CHANGE_REQUESTED/PREPAID/STARTED).
+  let activeCount = await countBlockingMasterBookings(db, providerId);
+  for (const studioProfile of studioProfiles) {
+    activeCount += await countBlockingMasterBookings(db, studioProfile.id);
+  }
+  if (activeCount > 0) {
+    throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", { count: activeCount });
+  }
+  return { studioProfiles };
+}
+
+/**
+ * DELETE-CABINET-REFUSAL-RATE-LIMIT — предпроверка для роута, ДО лимита
+ * частоты (`destructiveDelete`, 1 в час): отказ ничего не разрушает, и тратить
+ * на него единственную попытку значило бы запереть на час владельца, который
+ * по подсказке закрыл записи и повторил. Та же проверка повторяется в
+ * транзакции удаления — гонку с новой записью предпроверка не закрывает.
+ */
+export async function assertMasterCabinetDeletable(userId: string): Promise<void> {
+  const masterProfile = await prisma.masterProfile.findUnique({
+    where: { userId },
+    select: { providerId: true },
+  });
+  if (!masterProfile) return;
+  await assertNoBlockingMasterBookings(prisma, userId, masterProfile.providerId);
+}
+
 export async function deleteMasterCabinet(userId: string, options: CabinetDeletionOptions = {}): Promise<void> {
   // DELETION-02: снимок ДО транзакции — после неё указателей на объекты уже не найти.
   const provider = await prisma.masterProfile.findUnique({
@@ -50,25 +90,7 @@ export async function deleteMasterCabinet(userId: string, options: CabinetDeleti
     }
 
     const providerId = masterProfile.providerId;
-    // STUDIO-MASTER-PROFILES (этап 4): профили мастера в студиях — того же
-    // человека, без `MasterProfile`. Кабинет мастера удаляется целиком: и
-    // личный профиль, и профили в студиях (иначе профиль в студии оставался бы
-    // активным и принимал записи от имени удалённого мастера).
-    const studioProfiles = await tx.provider.findMany({
-      where: { ownerUserId: userId, type: ProviderType.MASTER, masterProfile: { is: null } },
-      select: { id: true },
-    });
-    // DELETION-03: общий предикат живой записи (включая CHANGE_REQUESTED/PREPAID/STARTED).
-    let activeCount = await countBlockingMasterBookings(tx, providerId);
-    for (const studioProfile of studioProfiles) {
-      activeCount += await countBlockingMasterBookings(tx, studioProfile.id);
-    }
-
-    if (activeCount > 0) {
-      throw new AppError("Есть активные записи", 409, "ACTIVE_BOOKINGS", {
-        count: activeCount,
-      });
-    }
+    const { studioProfiles } = await assertNoBlockingMasterBookings(tx, userId, providerId);
 
     await Promise.all([
       // DELETION-02 (PROVIDER-DANGLING-ROWS): каскад НЕ сработает — строка
