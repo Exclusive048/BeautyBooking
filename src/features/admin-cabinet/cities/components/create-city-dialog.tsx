@@ -8,25 +8,9 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { citySlugFromName } from "@/lib/cities/normalize";
 import * as UI_TEXT from "@/lib/ui/text";
+import { RF_ADMIN_TIMEZONES, buildTimezoneOptions } from "@/lib/ui/timezone-options";
 
 const T = UI_TEXT.adminPanel.cities.createDialog;
-
-const TIMEZONE_OPTIONS = [
-  "Europe/Moscow",
-  "Europe/Kaliningrad",
-  "Europe/Samara",
-  "Europe/Volgograd",
-  "Asia/Yekaterinburg",
-  "Asia/Omsk",
-  "Asia/Novosibirsk",
-  "Asia/Krasnoyarsk",
-  "Asia/Irkutsk",
-  "Asia/Yakutsk",
-  "Asia/Vladivostok",
-  "Asia/Magadan",
-  "Asia/Kamchatka",
-  "Asia/Almaty",
-];
 
 export type CreateCityValue = {
   name: string;
@@ -174,9 +158,9 @@ export function CreateCityDialog({ open, onClose, onSubmit }: Props) {
             value={draft.timezone}
             onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}
           >
-            {TIMEZONE_OPTIONS.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
+            {buildTimezoneOptions(draft.timezone, RF_ADMIN_TIMEZONES).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </Select>

@@ -184,6 +184,8 @@ const ERROR_CODES = [
   "APP_PUBLIC_URL_MISSING",
   "TIME_RANGE_INVALID",
   "UNAUTHORIZED",
+  // 29.09 доработки · 28: пояс вне России (кроме неизменённого текущего).
+  "TIMEZONE_NOT_ALLOWED",
   "VALIDATION_ERROR",
   // Admin billing features editor (ADMIN-BILLING-FIX-B)
   "PARENT_NOT_FOUND",

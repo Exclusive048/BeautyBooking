@@ -194,7 +194,7 @@ ROLLBACK;
 
 Перед этапом B — отдельный снимок двух таблиц вне ротации семи снимков `deploy.yml`, **хранить 90 дней** (решение 17.2): `pg_dump -Fc -t '"WeeklyScheduleConfig"' -t '"WeeklyScheduleDay"'`. Проверка 1 ≠ 0 — этап B не начинать, разобрать `failed` из `deploy:post`.
 
-### B.2.2. Города вне России — инвентарь при выкладке фильтра страны (29.09 доработки · 27)
+### B.2.2. Города и пояса вне России — инвентарь при выкладке (29.09 доработки · 27–28)
 
 С фильтром страны новые адреса вне РФ не сохраняются (422 `ADDRESS_OUTSIDE_RUSSIA`), и уже заведённый не-РФ город новых адресов не принимает. Но **существующие** такие города и привязанных к ним провайдеров код не трогает (решение владельца 27.3): после деплоя прогнать инвентарь, найденные города выключить вручную в `/admin/cities` (`isActive = false`), мастерам написать. Только чтение:
 
@@ -203,6 +203,15 @@ BEGIN READ ONLY;
 SELECT c.slug, c.name, c.timezone, c."autoCreated", count(p.id) AS providers
 FROM "City" c LEFT JOIN "Provider" p ON p."cityId" = c.id
 GROUP BY c.id ORDER BY c."autoCreated" DESC, providers DESC;
+ROLLBACK;
+```
+
+Пояса (29.09 доработки · 28, решение 28.4 — провайдеров и города на поясах СНГ НЕ переводить, только знать, сколько их; выбрать такой пояс заново после деплоя нельзя):
+
+```sql
+BEGIN READ ONLY;
+SELECT timezone, count(*) FROM "Provider" GROUP BY 1 ORDER BY 2 DESC;
+SELECT timezone, count(*) FROM "City" GROUP BY 1 ORDER BY 2 DESC;
 ROLLBACK;
 ```
 

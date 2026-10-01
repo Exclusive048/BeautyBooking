@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { isValidTimeZone } from "@/lib/schedule/timezone";
+import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
+import * as UI_TEXT from "@/lib/ui/text";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { createAdminAuditLog } from "@/lib/audit/admin-audit";
@@ -67,6 +69,11 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       select: { id: true, name: true, autoCreated: true, timezone: true },
     });
     if (!existing) return fail("Город не найден.", 404, "NOT_FOUND");
+
+    // 29.09 доработки · 28: пояс — России или текущий без изменений (решение 28.3).
+    if (parsed.data.timezone !== undefined && !isSelectableTimeZone(parsed.data.timezone, existing.timezone)) {
+      return fail(UI_TEXT.cities.timezoneNotAllowed, 422, "TIMEZONE_NOT_ALLOWED");
+    }
 
     const data: Record<string, unknown> = {};
     if (parsed.data.name !== undefined) data.name = parsed.data.name.trim();

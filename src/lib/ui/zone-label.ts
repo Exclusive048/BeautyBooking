@@ -22,11 +22,10 @@
  */
 
 /**
- * IANA timezone → Russian city name for the zone label. Covers the RU/CIS
- * market's real timezones. An unmapped tz falls back to an offset-only label
- * («(GMT+5)») — still unambiguous, never wrong.
+ * Зоны России — блок словаря, из которого выводятся списки ВЫБОРА пояса
+ * (`timezone-options.ts`, 29.09 доработки · 28: выбрать можно только пояс РФ).
  */
-export const TZ_CITY_RU: Record<string, string> = {
+export const TZ_CITY_RF: Record<string, string> = {
   "Europe/Kaliningrad": "Калининград",
   "Europe/Moscow": "Москва",
   "Europe/Simferopol": "Симферополь",
@@ -54,7 +53,13 @@ export const TZ_CITY_RU: Record<string, string> = {
   "Asia/Ust-Nera": "Усть-Нера",
   "Asia/Kamchatka": "Петропавловск-Камчатский",
   "Asia/Anadyr": "Анадырь",
-  // CIS
+};
+
+/**
+ * Зоны СНГ — только для ПОДПИСЕЙ: у живых провайдеров и городов на таких зонах
+ * метка остаётся «(Алматы, GMT+5)», а выбрать такую зону заново нельзя.
+ */
+const TZ_CITY_CIS: Record<string, string> = {
   "Asia/Almaty": "Алматы",
   "Asia/Qyzylorda": "Кызылорда",
   "Asia/Aqtobe": "Актобе",
@@ -71,6 +76,13 @@ export const TZ_CITY_RU: Record<string, string> = {
   "Asia/Yerevan": "Ереван",
   "Asia/Baku": "Баку",
 };
+
+/**
+ * IANA timezone → Russian city name for the zone label. Covers the RU/CIS
+ * market's real timezones. An unmapped tz falls back to an offset-only label
+ * («(GMT+5)») — still unambiguous, never wrong.
+ */
+export const TZ_CITY_RU: Record<string, string> = { ...TZ_CITY_RF, ...TZ_CITY_CIS };
 
 function parseIso(iso: string | null | undefined): Date | null {
   if (!iso || !String(iso).trim()) return null;

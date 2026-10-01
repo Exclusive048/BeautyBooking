@@ -1,23 +1,27 @@
 /**
  * FIX-R2-02-A — curated IANA timezone options for the cabinet selector
  * (master + studio). Client-safe (Rule 13): only depends on the pure
- * {@link TZ_CITY_RU} label map, no server-only imports.
+ * {@link TZ_CITY_RF} label map, no server-only imports.
  *
- * The selector defaults to the city-derived `Provider.timezone` but a provider
- * may override it here. The list covers the RU/CIS market's real zones in
- * west→east order. `value` is the IANA id (what the engine resolves against);
- * `label` is the Russian city + IANA id so the choice is unambiguous.
+ * 29.09 доработки · 28 (решения владельца 28.1–28.4): ВЫБРАТЬ можно только
+ * пояс России; ПОДПИСЫВАТЬ время словарь `zone-label.ts` продолжает и для зон
+ * СНГ. Списки выводятся из блока РФ словаря (`TZ_CITY_RF`), поэтому зона СНГ в
+ * выбор не попадёт иначе как правкой словаря — это стережёт тест.
  *
- * If a provider already carries a timezone outside this curated set (e.g. an
- * admin set an exotic one), callers should prepend the current value so it
- * stays selectable — see {@link buildTimezoneOptions}.
+ * `value` — IANA id (по нему считает движок), `label` — город + id, чтобы
+ * выбор был однозначным. Текущая зона вне списка показывается первой
+ * ({@link buildTimezoneOptions}) — живой провайдер на `Asia/Almaty` её видит и
+ * не теряет (28.4), но выбрать её заново после смены нельзя.
  */
-import { TZ_CITY_RU } from "@/lib/ui/zone-label";
+import { TZ_CITY_RF, TZ_CITY_RU } from "@/lib/ui/zone-label";
 
 export type TimezoneOption = { value: string; label: string };
 
-/** Ordered west→east; mirrors the admin city tz list + key CIS zones. */
-const CURATED_TIMEZONES: string[] = [
+/**
+ * Кабинет мастера и студии: по одной зоне на каждое смещение РФ (UTC+2 … +12),
+ * запад → восток. 27 зон с одинаковыми смещениями только мешали бы выбору.
+ */
+export const RF_PICKER_TIMEZONES: readonly string[] = [
   "Europe/Kaliningrad",
   "Europe/Moscow",
   "Europe/Samara",
@@ -30,29 +34,43 @@ const CURATED_TIMEZONES: string[] = [
   "Asia/Vladivostok",
   "Asia/Magadan",
   "Asia/Kamchatka",
-  // CIS
-  "Asia/Almaty",
-  "Asia/Tashkent",
-  "Asia/Bishkek",
-  "Europe/Minsk",
 ];
 
+/**
+ * Админка городов (решение 28.2): все зоны РФ — город это справочник, и точная
+ * зона (`Europe/Volgograd`, `Asia/Novokuznetsk`) там уместна.
+ */
+export const RF_ADMIN_TIMEZONES: readonly string[] = Object.keys(TZ_CITY_RF);
+
+/** Подпись — по полному словарю: текущая зона СНГ (28.4) тоже «Алматы (Asia/Almaty)». */
 function toOption(tz: string): TimezoneOption {
   const city = TZ_CITY_RU[tz];
   return { value: tz, label: city ? `${city} (${tz})` : tz };
 }
 
-export const TIMEZONE_OPTIONS: TimezoneOption[] = CURATED_TIMEZONES.map(toOption);
+export const TIMEZONE_OPTIONS: TimezoneOption[] = RF_PICKER_TIMEZONES.map(toOption);
 
 /**
- * Returns the curated options, guaranteeing `current` is present + first-ish so
- * the selector always reflects the stored value even if it's outside the
- * curated set (never silently drops/loses the provider's actual tz).
+ * Опции списка, где текущая зона гарантированно есть — первой, если её нет в
+ * списке (никогда не теряем сохранённое значение провайдера или города).
  */
-export function buildTimezoneOptions(current: string | null | undefined): TimezoneOption[] {
+export function buildTimezoneOptions(
+  current: string | null | undefined,
+  list: readonly string[] = RF_PICKER_TIMEZONES,
+): TimezoneOption[] {
+  const options = list.map(toOption);
   const trimmed = current?.trim();
-  if (!trimmed || CURATED_TIMEZONES.includes(trimmed)) {
-    return TIMEZONE_OPTIONS;
-  }
-  return [toOption(trimmed), ...TIMEZONE_OPTIONS];
+  if (!trimmed || list.includes(trimmed)) return options;
+  return [toOption(trimmed), ...options];
+}
+
+/**
+ * Серверная проверка записи пояса (решение 28.3): зона России ИЛИ текущее
+ * значение без изменений — иначе сохранение других полей у провайдера на старой
+ * зоне СНГ начало бы падать. Условие «или текущее» требует знать текущее
+ * значение, поэтому проверка живёт в сервисах записи, а не в Zod-схеме.
+ */
+export function isSelectableTimeZone(next: string, current: string | null | undefined): boolean {
+  const trimmed = next.trim();
+  return RF_ADMIN_TIMEZONES.includes(trimmed) || trimmed === current?.trim();
 }

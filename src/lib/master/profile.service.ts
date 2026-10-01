@@ -10,6 +10,7 @@ import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib
 import { deleteAssetById } from "@/lib/media/service";
 import { logError } from "@/lib/logging/logger";
 import * as UI_TEXT from "@/lib/ui/text";
+import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
 
 // FEAT-PROVIDER-SOCIALS: normalize a raw social input into the value to store
@@ -400,6 +401,16 @@ export async function updateMasterProfile(
     typeof input.address === "string" ? input.address.trim() : undefined;
   const trimmedDistrict =
     typeof input.district === "string" ? input.district.trim() : undefined;
+
+  // 29.09 доработки · 28: пояс — только России или текущий без изменений
+  // (решение 28.3). Проверка до любой записи; текущее значение нужно, поэтому
+  // она здесь, а не в Zod-схеме.
+  if (typeof input.timezone === "string" && input.timezone.trim()) {
+    const current = await prisma.provider.findUnique({ where: { id: masterId }, select: { timezone: true } });
+    if (!isSelectableTimeZone(input.timezone, current?.timezone)) {
+      throw new AppError(UI_TEXT.cities.timezoneNotAllowed, 422, "TIMEZONE_NOT_ALLOWED");
+    }
+  }
 
   // 29.09 доработки · 27: город определяется ДО записи — адрес вне России не
   // сохраняется вовсе (422), а не пишется с пустым городом, молча выводя мастера
