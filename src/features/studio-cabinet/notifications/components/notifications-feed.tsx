@@ -26,7 +26,7 @@ export function NotificationsFeed({ groups, timeZone }: Props) {
     <div className="space-y-5">
       {groups.map((group) => (
         <section key={group.dayKey} className="space-y-2">
-          <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <h3 className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {group.label}
           </h3>
           <ul className="space-y-2">

@@ -49,7 +49,7 @@ function TileCard({ icon: Icon, label, value, unit, sublabel, delta }: Tile) {
       badge={
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold",
+            "rounded-full px-2 py-0.5 font-mono text-3xs font-semibold",
             DELTA_TONE[delta.tone],
           )}
         >

@@ -82,7 +82,7 @@ export function StudioNavbar({ studioName, publicHref, publicHint }: Props) {
           >
             {studioName}
           </Link>
-          {publicHint ? <span className="text-[11px] text-text-sec">{publicHint}</span> : null}
+          {publicHint ? <span className="text-2xs text-text-sec">{publicHint}</span> : null}
         </div>
 
         <nav aria-label={UI_TEXT.a11y.cabinetSections} className="hidden items-center gap-2 md:flex">

@@ -111,12 +111,12 @@ export function FeedGroupTile({
   const overlay = (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 via-black/25 to-transparent px-2 pb-1.5 pt-8 sm:px-2.5 sm:pb-2">
       {workCaption ? (
-        <p className="truncate text-[10px] leading-tight text-white/80 sm:text-xs">
+        <p className="truncate text-3xs leading-tight text-white/80 sm:text-xs">
           {workCaption}
         </p>
       ) : null}
       <div className="flex min-w-0 items-center gap-1">
-        <p className="min-w-0 flex-1 truncate text-[11px] font-medium leading-snug text-white sm:text-sm">
+        <p className="min-w-0 flex-1 truncate text-2xs font-medium leading-snug text-white sm:text-sm">
           {group.authorName}
         </p>
         {/* На телефоне плитка ~110px — рейтинг съедал бы имя автора. */}
@@ -128,7 +128,7 @@ export function FeedGroupTile({
         ) : null}
       </div>
       {priceRub ? (
-        <p className="truncate font-display text-[10px] italic leading-tight text-white/90 sm:text-xs">
+        <p className="truncate font-display text-3xs italic leading-tight text-white/90 sm:text-xs">
           {T.priceFrom} {priceRub}
         </p>
       ) : null}
@@ -176,7 +176,7 @@ export function FeedGroupTile({
       {surface}
 
       {isCarousel ? (
-        <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-black/25 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-white backdrop-blur-sm sm:left-2 sm:top-2 sm:text-[11px]">
+        <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-black/25 px-1.5 py-0.5 font-mono text-3xs tabular-nums text-white backdrop-blur-sm sm:left-2 sm:top-2 sm:text-2xs">
           {fill(T.worksCounter, { current: active + 1, total })}
         </span>
       ) : null}

@@ -140,13 +140,13 @@ export function StudioBottomNav({ counts }: Props) {
                       )}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
-                      <span className="text-[11px] font-medium leading-tight">
+                      <span className="text-2xs font-medium leading-tight">
                         {T.nav.items[item.labelKey]}
                       </span>
                       {badge > 0 ? (
                         <span
                           aria-hidden
-                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white"
+                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-semibold text-white"
                         >
                           {badge > 9 ? "9+" : badge}
                         </span>

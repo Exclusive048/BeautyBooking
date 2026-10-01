@@ -77,7 +77,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
                   ) : (
                     <span
                       aria-hidden
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-card text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-card text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
                     >
                       {initialsOf(master.name)}
                     </span>
@@ -86,7 +86,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
                     <div className="truncate text-sm font-semibold text-text-main">
                       {master.name}
                     </div>
-                    <div className="truncate text-[11px] text-text-sec">
+                    <div className="truncate text-2xs text-text-sec">
                       {master.serviceLabel
                         ? `${master.serviceLabel} · `
                         : ""}
@@ -105,7 +105,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
                 <div className="font-display text-sm font-semibold tabular-nums text-text-main">
                   {UI_FMT.priceLabel(master.revenueKopeks)}
                 </div>
-                <div className="mt-0.5 text-[11px] text-text-sec">
+                <div className="mt-0.5 text-2xs text-text-sec">
                   ★ {master.rating.toFixed(1)}
                 </div>
               </div>

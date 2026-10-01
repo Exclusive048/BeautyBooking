@@ -40,7 +40,7 @@ export function PeriodSelectorBar({
       />
       <ComparisonToggle checked={comparison} />
       <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <span className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
           {T.periodLabel}: {periodDisplay}
         </span>
       </div>

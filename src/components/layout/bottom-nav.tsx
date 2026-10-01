@@ -188,7 +188,7 @@ function RoleSwitcherDrawer({
             {/* Role list — only shown if 2+ roles */}
             {availableRoles.length > 1 ? (
               <div className="mx-4 mb-4 space-y-1 rounded-2xl border border-border-subtle bg-bg-input/50 p-2">
-                <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-sec">
+                <p className="px-2 pb-1 text-2xs font-semibold uppercase tracking-wide text-text-sec">
                   {t.activeRole}
                 </p>
                 {availableRoles.map((role) => {

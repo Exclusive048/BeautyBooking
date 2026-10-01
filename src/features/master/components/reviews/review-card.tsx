@@ -71,7 +71,7 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
         </div>
 
         {review.isNew ? (
-          <span className="inline-flex items-center rounded-full bg-danger-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-danger-text">
+          <span className="inline-flex items-center rounded-full bg-danger-surface px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-danger-text">
             {T.newBadge}
           </span>
         ) : null}

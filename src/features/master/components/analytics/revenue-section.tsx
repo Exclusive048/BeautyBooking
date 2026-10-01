@@ -136,7 +136,7 @@ export function RevenueSection({ data, comparison }: Props) {
                 key={`label-${t}`}
                 x={PLOT_RIGHT + 6}
                 y={y + 3}
-                className="fill-text-sec font-mono text-[10px]"
+                className="fill-text-sec font-mono text-3xs"
               >
                 {UI_FMT.moneyShort(maxValue * t)}
               </text>

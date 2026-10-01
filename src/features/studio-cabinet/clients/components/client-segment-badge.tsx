@@ -25,7 +25,7 @@ export function ClientSegmentBadge({ segment }: { segment: StudioClientPrimarySe
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide",
+        "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide",
         STYLES[segment],
       )}
     >

@@ -68,7 +68,7 @@ export function PlanCard({ plan }: Props) {
                   ? T.planActiveUntilTemplate.replace("{date}", periodLabel)
                   : T.planActiveIndefinite}
               </p>
-              <p className="mt-0.5 text-[11px] text-text-sec">
+              <p className="mt-0.5 text-2xs text-text-sec">
                 {plan.autoRenew ? T.planAutoRenewOn : T.planAutoRenewOff}
               </p>
             </>

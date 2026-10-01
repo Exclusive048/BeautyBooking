@@ -176,7 +176,7 @@ export function VkCommunitySection({ initial }: Props) {
           maxLength={512}
           disabled={busy || urlProblem !== null}
         />
-        <span className="text-[11px] text-text-sec">{t.tokenHint}</span>
+        <span className="text-2xs text-text-sec">{t.tokenHint}</span>
       </label>
     </SectionCard>
   );

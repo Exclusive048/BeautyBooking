@@ -77,7 +77,7 @@ function InsightCard({ insight }: { insight: Insight }) {
         />
         <p
           className={cn(
-            "font-mono text-[10px] uppercase tracking-[0.18em]",
+            "font-mono text-3xs uppercase tracking-[0.18em]",
             VARIANT_EYEBROW[insight.variant]
           )}
         >

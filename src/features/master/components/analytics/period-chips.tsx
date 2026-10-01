@@ -138,12 +138,12 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
           role="dialog"
           className="absolute left-0 top-[calc(100%+6px)] z-30 w-[300px] rounded-xl border border-border-subtle bg-bg-card p-3 shadow-card"
         >
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="mb-2 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {T.customPickerHeading}
           </p>
           <div className="flex items-end gap-2">
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-[11px] text-text-sec">{T.customFromLabel}</span>
+              <span className="text-2xs text-text-sec">{T.customFromLabel}</span>
               <Input
                 type="date"
                 value={fromValue}
@@ -154,7 +154,7 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
             </label>
             <span className="pb-2.5 text-sm text-text-sec">—</span>
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-[11px] text-text-sec">{T.customToLabel}</span>
+              <span className="text-2xs text-text-sec">{T.customToLabel}</span>
               <Input
                 type="date"
                 value={toValue}

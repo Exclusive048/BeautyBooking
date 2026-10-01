@@ -27,14 +27,14 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
         <table className="min-w-full">
           <thead className="bg-bg-input/40">
             <tr>
-              <th className="sticky left-0 z-10 min-w-[200px] bg-bg-input/40 px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="sticky left-0 z-10 min-w-[200px] bg-bg-input/40 px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.masterColumn}
               </th>
               {week.days.map((day) => (
                 <th
                   key={day.dateKey}
                   className={cn(
-                    "px-3 py-2 text-center font-mono text-[10px] uppercase tracking-wide",
+                    "px-3 py-2 text-center font-mono text-3xs uppercase tracking-wide",
                     day.isToday ? "text-accent-text" : "text-text-sec",
                   )}
                 >
@@ -59,7 +59,7 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                     ) : (
                       <span
                         aria-hidden
-                        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
                       >
                         {initials(row.master.name)}
                       </span>
@@ -72,7 +72,7 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                 {row.cells.map((cell) => (
                   <td key={cell.dateKey} className="px-2 py-2.5 text-center">
                     {cell.isDayOff ? (
-                      <abbr title={T.dayOffFull} className="font-mono text-[11px] text-text-sec/60 decoration-transparent">
+                      <abbr title={T.dayOffFull} className="font-mono text-2xs text-text-sec/60 decoration-transparent">
                         {T.dayOff}
                       </abbr>
                     ) : (

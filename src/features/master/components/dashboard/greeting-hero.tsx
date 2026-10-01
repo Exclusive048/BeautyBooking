@@ -88,7 +88,7 @@ export function GreetingHero({ firstName, now, context, nextBooking, timezone }:
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/70">
+              <p className="font-mono text-3xs uppercase tracking-[0.18em] text-white/70">
                 {T.nextClientLabel}
               </p>
               <p className="truncate text-sm font-medium">{nextBooking.clientName}</p>
@@ -98,7 +98,7 @@ export function GreetingHero({ firstName, now, context, nextBooking, timezone }:
             </div>
             <div aria-hidden className="h-8 w-px bg-white/20" />
             <div className="text-right">
-              <p className="text-[10px] text-white/70">{T.nextClientIn}</p>
+              <p className="text-3xs text-white/70">{T.nextClientIn}</p>
               <p className="font-display text-lg leading-none tabular-nums">
                 {Math.max(minutesUntil(nextBooking.startAtUtc, now), 0)}
                 <span className="ml-0.5 text-xs font-normal">{T.minutesShort}</span>

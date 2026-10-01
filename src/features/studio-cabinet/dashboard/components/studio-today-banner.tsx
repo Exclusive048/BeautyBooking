@@ -46,7 +46,7 @@ export function StudioTodayBanner({ data, studioName }: Props) {
       />
       <div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
         <div className="min-w-0">
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] opacity-75">
+          <div className="mb-2 font-mono text-3xs uppercase tracking-[0.18em] opacity-75">
             {today}
           </div>
           <h2 className="font-display text-2xl font-bold leading-tight md:text-3xl">
@@ -60,7 +60,7 @@ export function StudioTodayBanner({ data, studioName }: Props) {
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          <div className="font-mono text-[10px] uppercase tracking-[0.18em] opacity-70">
+          <div className="font-mono text-3xs uppercase tracking-[0.18em] opacity-70">
             {T.onShiftLabel}
           </div>
           <div className="flex items-center gap-3 rounded-xl bg-white/15 px-3.5 py-2.5 backdrop-blur">
@@ -71,7 +71,7 @@ export function StudioTodayBanner({ data, studioName }: Props) {
                 visibleMasters.map((master, index) => (
                   <span
                     key={master.id}
-                    className="inline-grid h-8 w-8 place-items-center rounded-full border-2 border-white/25 bg-white/20 text-[11px] font-bold"
+                    className="inline-grid h-8 w-8 place-items-center rounded-full border-2 border-white/25 bg-white/20 text-2xs font-bold"
                     style={{ marginLeft: index === 0 ? 0 : -10 }}
                     aria-label={master.name}
                   >

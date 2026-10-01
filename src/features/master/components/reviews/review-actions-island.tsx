@@ -71,7 +71,7 @@ export function ReviewActionsIsland({
 
         <span
           className={cn(
-            "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
+            "inline-flex items-center rounded-full px-2 py-0.5 font-mono text-3xs uppercase tracking-wider",
             hasReply
               ? "bg-success-surface text-success-text"
               : "bg-warning-surface text-warning-text"

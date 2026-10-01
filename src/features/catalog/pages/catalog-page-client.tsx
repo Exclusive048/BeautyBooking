@@ -795,7 +795,7 @@ export default function CatalogPageClient({
           {activeFilterCount > 0 ? (
             <span
               aria-hidden
-              className="pointer-events-none absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-semibold tabular-nums text-white ring-2 ring-bg-page"
+              className="pointer-events-none absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-2xs font-semibold tabular-nums text-white ring-2 ring-bg-page"
             >
               {activeFilterCount}
             </span>

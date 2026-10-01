@@ -349,7 +349,7 @@ export function RescheduleModal({
       <>
         <div className="space-y-4">
           <div>
-            <p className="mb-1 font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
+            <p className="mb-1 font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">
               {T.currentLabel}
             </p>
             <p className="text-sm text-text-main">
@@ -376,7 +376,7 @@ export function RescheduleModal({
           ) : context ? (
             <>
               <div>
-                <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
+                <p className="mb-2 font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">
                   {T.newDateLabel}
                 </p>
                 <div className="flex gap-2 overflow-x-auto pb-1">
@@ -401,7 +401,7 @@ export function RescheduleModal({
               </div>
 
               <div>
-                <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
+                <p className="mb-2 font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">
                   {T.newTimeLabel}
                 </p>
                 {slotsLoading ? (
@@ -422,7 +422,7 @@ export function RescheduleModal({
               </div>
 
               <div>
-                <label className="mb-1 block font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
+                <label className="mb-1 block font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">
                   {T.commentLabel}
                 </label>
                 <Textarea

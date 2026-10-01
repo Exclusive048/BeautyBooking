@@ -121,7 +121,7 @@ function KpiTile({
         comparison ? (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <TrendBadge deltaPct={deltaPct} deltaPp={deltaPp} previousIsNull={previousIsNull} />
-            <span className="text-[11px] text-text-sec">{previousLabel}</span>
+            <span className="text-2xs text-text-sec">{previousLabel}</span>
           </div>
         ) : null
       }
@@ -140,7 +140,7 @@ function TrendBadge({
 }) {
   if (previousIsNull) {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-text-sec">
+      <span className="inline-flex items-center gap-1 text-2xs text-text-sec">
         <Minus className="h-3 w-3" aria-hidden />
         —
       </span>
@@ -149,7 +149,7 @@ function TrendBadge({
   const value = deltaPp !== undefined && deltaPp !== null ? deltaPp : deltaPct ?? null;
   if (value === null) {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] text-text-sec">
+      <span className="inline-flex items-center gap-1 text-2xs text-text-sec">
         <Minus className="h-3 w-3" aria-hidden />
         —
       </span>
@@ -165,7 +165,7 @@ function TrendBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[11px]",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-mono text-2xs",
         isFlat && "bg-bg-input text-text-sec",
         isPositive && !isFlat && "bg-success-surface text-success-text",
         !isPositive && !isFlat && "bg-danger-surface text-danger-text"

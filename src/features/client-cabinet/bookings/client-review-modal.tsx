@@ -68,7 +68,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
         </div>
 
         <div>
-          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <div className="mb-1.5 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {PAGE_T.actionReview}
           </div>
           <StarRatingInput value={rating} onChange={setRating} />
@@ -77,7 +77,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
         <div className="space-y-1.5">
           <label
             htmlFor="review-text"
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
           >
             {T.title}
           </label>

@@ -34,7 +34,7 @@ export function ClientDetailStats({ client, now }: Props) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <dt className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
         {label}
       </dt>
       <dd className="mt-1 font-display text-lg text-text-main">{value}</dd>

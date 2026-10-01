@@ -44,7 +44,7 @@ export function AdminUserChip({ name, avatarUrl, role }: Props) {
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-text-main">{name}</p>
-        <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.08em] text-text-sec">
+        <p className="mt-0.5 truncate font-mono text-3xs uppercase tracking-[0.08em] text-text-sec">
           {ROLE_LABEL[role]}
         </p>
       </div>

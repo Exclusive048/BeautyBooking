@@ -906,7 +906,7 @@ function DayStrip({
           >
             <span>{WEEKDAY_SHORT[weekdayIndex(day.dateKey)]}</span>
             <span className="font-medium">{Number(day.dateKey.slice(8, 10))}</span>
-            {day.hours ? <span className="mt-0.5 text-[10px] leading-tight text-text-main/80">{day.hours}</span> : null}
+            {day.hours ? <span className="mt-0.5 text-3xs leading-tight text-text-main/80">{day.hours}</span> : null}
           </div>
         ))}
       </div>

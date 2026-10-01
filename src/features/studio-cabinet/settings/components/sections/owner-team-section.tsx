@@ -27,7 +27,7 @@ export function OwnerTeamSection({ team }: Props) {
         ) : (
           <p className="text-sm text-text-sec">{T.ownerMissing}</p>
         )}
-        <p className="text-[11px] text-text-sec">{T.transferHint}</p>
+        <p className="text-2xs text-text-sec">{T.transferHint}</p>
       </SectionCard>
 
       <SectionCard title={T.teamTitle} description={T.teamDesc}>
@@ -42,7 +42,7 @@ export function OwnerTeamSection({ team }: Props) {
             ))}
           </ul>
         )}
-        <p className="text-[11px] text-text-sec">{T.inviteHint}</p>
+        <p className="text-2xs text-text-sec">{T.inviteHint}</p>
       </SectionCard>
     </div>
   );
@@ -68,14 +68,14 @@ function TeamRow({ member, accent }: { member: StudioTeamMember; accent: "owner"
           <span
             className={
               accent === "owner"
-                ? "rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text"
-                : "rounded-full border border-info-border bg-info-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-info-text"
+                ? "rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text"
+                : "rounded-full border border-info-border bg-info-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-info-text"
             }
           >
             {accent === "owner" ? T.roleOwner : T.roleAdmin}
           </span>
           {member.isCurrentUser ? (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-text">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-accent-text">
               {T.youChip}
             </span>
           ) : null}

@@ -99,7 +99,7 @@ export function StudioServicesList({ studio, services, hideBooking }: Props) {
               <h3 className="font-display text-sm font-semibold text-text-main">
                 {group.categoryName ?? UI_TEXT.publicStudio.categoryOther}
               </h3>
-              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-[10px] text-text-sec">
+              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs text-text-sec">
                 {group.services.length}
               </span>
             </div>

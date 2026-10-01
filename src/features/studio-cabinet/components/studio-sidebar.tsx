@@ -70,7 +70,7 @@ export function StudioSidebar({ counts, user, studio }: Props) {
     <aside className="flex h-full w-64 shrink-0 flex-col" aria-label={T.nav.ariaLabel}>
       <div className="border-b border-border-subtle px-5 py-5">
         <BrandLogo variant="full" size="sm" href="/cabinet/studio" />
-        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="mt-1.5 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
           {T.appCaption}
         </p>
       </div>

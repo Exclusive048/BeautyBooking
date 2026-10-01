@@ -51,7 +51,7 @@ export function StudioBundleCard({ bundle, studioTimezone, masters, hideBooking 
 
         <div className="mb-3 flex items-end justify-between gap-3 border-t border-border-subtle/70 pt-3">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-text-sec">{T.finalPriceLabel}</div>
+            <div className="text-2xs uppercase tracking-wider text-text-sec">{T.finalPriceLabel}</div>
             <div className="font-display text-xl text-text-main">{UI_FMT.priceLabel(bundle.finalPrice)}</div>
             {savings ? (
               <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-accent-text">

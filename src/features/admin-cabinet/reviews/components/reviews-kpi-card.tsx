@@ -31,7 +31,7 @@ export function ReviewsKpiCard({ label, value, sublabel, tone }: Props) {
   return (
     <article className="rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-card">
       <div className="mb-3 flex items-center justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+        <span className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
           {label}
         </span>
         <span
@@ -43,11 +43,11 @@ export function ReviewsKpiCard({ label, value, sublabel, tone }: Props) {
         {value}
       </div>
       {sublabel ? (
-        <p className={cn("mt-1 font-mono text-[11px]", SUBLABEL_TONE[tone])}>
+        <p className={cn("mt-1 font-mono text-2xs", SUBLABEL_TONE[tone])}>
           {sublabel}
         </p>
       ) : (
-        <p className="mt-1 font-mono text-[11px] text-text-sec/60">—</p>
+        <p className="mt-1 font-mono text-2xs text-text-sec/60">—</p>
       )}
     </article>
   );

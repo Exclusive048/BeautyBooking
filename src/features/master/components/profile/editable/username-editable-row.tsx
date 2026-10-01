@@ -132,7 +132,7 @@ export function UsernameEditableRow({ value }: Props) {
         <div className="flex items-center gap-2">
           <label
             htmlFor={inputId}
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
           >
             {T.usernameLabel}
           </label>
@@ -162,11 +162,11 @@ export function UsernameEditableRow({ value }: Props) {
                 className="w-auto min-w-0 flex-1 py-0"
               />
             </div>
-            <p className={cn("font-mono text-[11px]", hintTone)}>
+            <p className={cn("font-mono text-2xs", hintTone)}>
               {hint}
             </p>
             {!serverError && validation.ok && isUnchanged ? (
-              <p className="font-mono text-[11px] text-text-sec">
+              <p className="font-mono text-2xs text-text-sec">
                 {T.usernameUnchangedHint}
               </p>
             ) : null}

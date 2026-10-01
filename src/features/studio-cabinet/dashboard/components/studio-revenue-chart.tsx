@@ -110,7 +110,7 @@ export function StudioRevenueChart({
                     style={{ width: `${barWidth}%` }}
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-text-sec">
+                <p className="mt-1 text-2xs text-text-sec">
                   {T.bookingsTemplate.replace(
                     "{count}",
                     String(point.bookingsCount),

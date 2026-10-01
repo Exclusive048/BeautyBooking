@@ -40,7 +40,7 @@ export function StepsBar({ active, done, scenarioB }: Props) {
             }`}
           >
             <span
-              className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg font-mono text-[11px] font-bold ${
+              className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg font-mono text-2xs font-bold ${
                 isDone
                   ? "bg-primary text-white"
                   : isActive
@@ -52,7 +52,7 @@ export function StepsBar({ active, done, scenarioB }: Props) {
               {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </span>
             <div className="min-w-0">
-              <div className="font-mono text-[10px] uppercase tracking-[0.08em] text-text-muted">
+              <div className="font-mono text-3xs uppercase tracking-[0.08em] text-text-muted">
                 {UI_TEXT.bookingWidget.steps.stepLabel.replace("{n}", String(i + 1))}
               </div>
               <div className={`truncate text-xs ${isActive || isDone ? "font-semibold text-text" : "text-text"} sm:text-sm`}>

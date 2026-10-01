@@ -92,7 +92,7 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-display text-xl text-text-main">{client.displayName}</h2>
             {isVip ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-[11px] font-medium text-warning-text">
+              <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-2xs font-medium text-warning-text">
                 <Crown className="h-3 w-3" aria-hidden />
                 VIP
               </span>
@@ -131,7 +131,7 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
               <span
                 key={status}
                 className={cn(
-                  "inline-flex cursor-help items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                  "inline-flex cursor-help items-center rounded-full px-2 py-0.5 text-2xs font-medium",
                   STATUS_TONES[status]
                 )}
                 title={STATUS_T.tooltips[status]}
@@ -142,7 +142,7 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
             {client.customTags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center rounded-full border border-border-subtle bg-bg-input px-2 py-0.5 text-[11px] text-text-main"
+                className="inline-flex items-center rounded-full border border-border-subtle bg-bg-input px-2 py-0.5 text-2xs text-text-main"
               >
                 {tag}
               </span>
@@ -157,7 +157,7 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
                 deleting them. */}
             {client.modelApplicationsCount > 0 ? (
               <span
-                className="inline-flex cursor-help items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[11px] font-medium text-white"
+                className="inline-flex cursor-help items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-2xs font-medium text-white"
                 title={T.modelApplicantTooltipTemplate
                   .replace("{count}", String(client.modelApplicationsCount))
                   .replace(
@@ -177,7 +177,7 @@ export function ClientDetailHeader({ client, onBack, now }: Props) {
             <Button variant="wrapper"
               aria-disabled
               title={T.addTagDisabled}
-              className="inline-flex cursor-not-allowed items-center gap-0.5 rounded-full border border-dashed border-border-subtle px-2 py-0.5 text-[11px] text-text-sec/60"
+              className="inline-flex cursor-not-allowed items-center gap-0.5 rounded-full border border-dashed border-border-subtle px-2 py-0.5 text-2xs text-text-sec/60"
             >
               <Plus className="h-3 w-3" aria-hidden />
               {T.addTagLabel}

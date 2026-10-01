@@ -200,7 +200,7 @@ export function PlanFeaturesEditor({
               groupIndex > 0 ? "border-t border-border-subtle/60 pt-5" : "",
             )}
           >
-            <h4 className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+            <h4 className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
               {groupName}
             </h4>
             <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
@@ -284,11 +284,11 @@ function BooleanFeatureRow({
           <p className="mt-0.5 text-xs text-text-sec">{description}</p>
         ) : null}
         {isInheritedOn ? (
-          <p className="mt-1 text-[11px] text-text-sec">
+          <p className="mt-1 text-2xs text-text-sec">
             {inheritedFromLabel(state, plansById)} · {TF.cannotDisableInherited}
           </p>
         ) : state.isOverridden ? (
-          <p className="mt-1 text-[11px] text-text-sec">
+          <p className="mt-1 text-2xs text-text-sec">
             {TF.overriddenForPlan}
           </p>
         ) : null}
@@ -366,10 +366,10 @@ function LimitFeatureRow({
           <p className="mt-0.5 text-xs text-text-sec">{description}</p>
         ) : null}
         {inheritedHint ? (
-          <p className="mt-1 text-[11px] text-text-sec">{inheritedHint}</p>
+          <p className="mt-1 text-2xs text-text-sec">{inheritedHint}</p>
         ) : null}
         {hint ? (
-          <p className="mt-1 text-[11px] text-text-sec">{hint}</p>
+          <p className="mt-1 text-2xs text-text-sec">{hint}</p>
         ) : null}
       </div>
 

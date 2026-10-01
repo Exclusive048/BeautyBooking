@@ -25,7 +25,7 @@ export function StudioTopOccupancy({ rows }: { rows: StudioOccupancyRow[] }) {
             <li key={row.id}>
               <div className="mb-1.5 flex items-baseline justify-between gap-3">
                 <div className="min-w-0">
-                  <span className="font-mono text-[10px] text-text-sec">#{index + 1}</span>
+                  <span className="font-mono text-3xs text-text-sec">#{index + 1}</span>
                   <span className="ml-2 text-sm font-semibold text-text-main">
                     {row.name}
                   </span>
@@ -40,7 +40,7 @@ export function StudioTopOccupancy({ rows }: { rows: StudioOccupancyRow[] }) {
                   style={{ width: `${row.percent}%` }}
                 />
               </div>
-              <p className="mt-1 text-[11px] text-text-sec">
+              <p className="mt-1 text-2xs text-text-sec">
                 {T.slotsTemplate
                   .replace("{booked}", String(row.bookingsCount))
                   .replace("{total}", String(row.capacity))}

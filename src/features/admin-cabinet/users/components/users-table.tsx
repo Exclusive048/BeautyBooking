@@ -97,7 +97,7 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
         <div className="hidden md:block">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border-subtle text-left text-[11px] uppercase tracking-wider text-text-sec">
+              <tr className="border-b border-border-subtle text-left text-2xs uppercase tracking-wider text-text-sec">
                 <th className="px-4 py-3 font-medium">{T.columns.user}</th>
                 <th className="px-4 py-3 font-medium">{T.columns.contact}</th>
                 <th className="px-4 py-3 font-medium">{T.columns.role}</th>

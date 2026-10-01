@@ -513,7 +513,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
               {proposing ? T.proposing : T.toReview}
             </Button>
           ) : null}
-          <p className="text-[11px] text-text-sec/80">{T.priceNote}</p>
+          <p className="text-2xs text-text-sec/80">{T.priceNote}</p>
         </div>
       ) : null}
 

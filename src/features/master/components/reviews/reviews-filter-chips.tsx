@@ -46,7 +46,7 @@ export function ReviewsFilterChips({ filterCounts, activeFilter }: Props) {
             {count > 0 ? (
               <span
                 className={cn(
-                  "font-mono text-[10px]",
+                  "font-mono text-3xs",
                   active ? "opacity-80" : "text-text-sec"
                 )}
               >

@@ -53,7 +53,7 @@ export function SidebarItem({
         <span
           aria-label={badgeAriaLabel ?? `${badge}`}
           className={cn(
-            "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-mono font-medium tabular-nums",
+            "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-2xs font-mono font-medium tabular-nums",
             active
               ? "bg-primary text-white"
               : "bg-bg-input text-text-sec"

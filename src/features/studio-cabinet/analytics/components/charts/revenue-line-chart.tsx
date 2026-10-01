@@ -79,7 +79,7 @@ export function RevenueLineChart({ data, compare }: Props) {
             </p>
           ) : null}
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-text-sec">
+        <div className="flex items-center gap-3 text-2xs text-text-sec">
           <span className="inline-flex items-center gap-1">
             <span className="h-1 w-3 rounded-full bg-primary" aria-hidden />
             {T.legendNow}

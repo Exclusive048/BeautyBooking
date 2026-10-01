@@ -310,7 +310,7 @@ export function ClientCardDrawer({
                       variant="ghost"
                       size="none"
                       onClick={() => void removePhoto(photo.id)}
-                      className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[11px] opacity-0 transition group-hover:opacity-100"
+                      className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-2xs opacity-0 transition group-hover:opacity-100"
                     >
                       ✖
                     </Button>

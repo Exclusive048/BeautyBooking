@@ -113,7 +113,7 @@ export function BookingCardActions({
   // buttons so the click doesn't hit the backend's «another side» 409.
   if (isInitiatorWaitingResponse) {
     return (
-      <div className="rounded-lg border border-warning-border bg-warning-surface px-2.5 py-1.5 text-[11px] text-warning-text">
+      <div className="rounded-lg border border-warning-border bg-warning-surface px-2.5 py-1.5 text-2xs text-warning-text">
         {T.card.awaitingClientResponse}
       </div>
     );
@@ -151,7 +151,7 @@ export function BookingCardActions({
           </Button>
         </div>
         {error ? (
-          <p className="text-[11px] text-danger-text">{error}</p>
+          <p className="text-2xs text-danger-text">{error}</p>
         ) : null}
       </div>
       {promptModal}

@@ -92,7 +92,7 @@ export function BookingActionButtons({ bookingId, isPastConfirmWindow = false }:
             {T.bookings.confirmAction}
           </Button>
         </div>
-        {error ? <p className="text-[11px] text-danger-text">{error}</p> : null}
+        {error ? <p className="text-2xs text-danger-text">{error}</p> : null}
       </div>
       {promptModal}
     </>

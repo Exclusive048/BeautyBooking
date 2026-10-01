@@ -268,13 +268,13 @@ export function TeamBoard({ studioId, initialBoard }: Props) {
                     className="sticky left-0 z-10 w-28 min-w-28 max-w-28 bg-bg-card px-2 py-1 text-left align-top sm:w-44 sm:min-w-44 sm:max-w-44"
                   >
                     <span className="block truncate text-sm font-medium text-text-main">{master.name}</span>
-                    <span className="block truncate text-[11px] font-normal text-text-sec">
+                    <span className="block truncate text-2xs font-normal text-text-sec">
                       {master.plan.current ? summarizePattern(master.plan.current, master.plan.templates) : T.noSchedule}
                     </span>
                     {/* Заданный вперёд график («2 через 2» с завтра) — иначе строка
                         показывает только то, что действует сегодня. */}
                     {master.plan.upcoming[0]?.startsOn ? (
-                      <span className="block truncate text-[11px] font-normal text-text-sec">
+                      <span className="block truncate text-2xs font-normal text-text-sec">
                         {PLAN_T.upcomingLabel(
                           UI_FMT.dateShort(`${master.plan.upcoming[0].startsOn}T12:00:00.000Z`, { timeZone: "UTC" }),
                           summarizePattern(master.plan.upcoming[0], master.plan.templates),
@@ -284,7 +284,7 @@ export function TeamBoard({ studioId, initialBoard }: Props) {
                     {/* Расписание кончается в ближайшую неделю — тем же правилом, что баннер мастера. */}
                     {isScheduleEndingSoon(master.plan) && master.plan.configuredUntil ? (
                       <span
-                        className="mt-0.5 block truncate text-[11px] font-medium text-warning-text"
+                        className="mt-0.5 block truncate text-2xs font-medium text-warning-text"
                         data-testid="team-board-ending-soon"
                       >
                         {T.endingSoon(
@@ -297,14 +297,14 @@ export function TeamBoard({ studioId, initialBoard }: Props) {
                         type="button"
                         variant="wrapper"
                         size="none"
-                        className="text-[11px] font-medium text-accent-text underline-offset-2 hover:underline"
+                        className="text-2xs font-medium text-accent-text underline-offset-2 hover:underline"
                         onClick={() => setWizardFor(master.id)}
                       >
                         {T.setScheduleCta}
                       </Button>
                       <Link
                         href={`/cabinet/studio/schedule/settings?master=${encodeURIComponent(master.id)}`}
-                        className="hidden text-[11px] text-text-sec underline-offset-2 hover:underline sm:inline"
+                        className="hidden text-2xs text-text-sec underline-offset-2 hover:underline sm:inline"
                       >
                         {T.settingsLink}
                       </Link>
@@ -460,7 +460,7 @@ function TeamCell({
       data-date={day.date}
       onClick={onClick}
       className={cn(
-        "relative flex h-11 w-11 flex-col items-center justify-center rounded-lg text-[10px] leading-tight transition-opacity",
+        "relative flex h-11 w-11 flex-col items-center justify-center rounded-lg text-3xs leading-tight transition-opacity",
         day.isWorking
           ? fill ?? "bg-bg-input ring-1 ring-inset ring-border-subtle"
           : "border border-dashed border-border-subtle",
@@ -473,7 +473,7 @@ function TeamCell({
       <span className="text-text-main">{hours}</span>
       {day.painted ? <span aria-hidden className="absolute left-1 top-1 h-1.5 w-1.5 rounded-full bg-accent-text" /> : null}
       {day.bookings > 0 ? (
-        <span aria-hidden className="absolute right-0.5 top-0.5 rounded-full bg-bg-card px-1 text-[9px] font-medium text-text-main">
+        <span aria-hidden className="absolute right-0.5 top-0.5 rounded-full bg-bg-card px-1 text-3xs font-medium text-text-main">
           {day.bookings}
         </span>
       ) : null}

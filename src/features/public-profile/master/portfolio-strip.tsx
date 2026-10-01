@@ -109,7 +109,7 @@ export function PortfolioStrip({ items }: Props) {
               >
                 <div className="relative aspect-square overflow-hidden">
                   {item.visualSearchReady ? (
-                    <div className="absolute left-2 top-2 z-10 rounded-full bg-success/90 px-2 py-1 text-[11px] font-semibold text-white">
+                    <div className="absolute left-2 top-2 z-10 rounded-full bg-success/90 px-2 py-1 text-2xs font-semibold text-white">
                       {UI_TEXT.publicProfile.portfolio.indexedBadge}
                     </div>
                   ) : null}

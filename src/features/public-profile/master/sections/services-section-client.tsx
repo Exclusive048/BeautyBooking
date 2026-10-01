@@ -54,7 +54,7 @@ export function ServicesSectionClient({
       {bundles.length > 0 ? (
         <section>
           <div className="mb-3">
-            <div className="text-[11px] uppercase tracking-wider text-text-sec">
+            <div className="text-2xs uppercase tracking-wider text-text-sec">
               {T.eyebrow}
             </div>
             <h2 className="font-display text-lg text-text-main">{T.heading}</h2>

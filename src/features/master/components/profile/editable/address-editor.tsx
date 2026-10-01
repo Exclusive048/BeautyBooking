@@ -186,7 +186,7 @@ export function AddressEditor({ value }: Props) {
         <div className="flex items-center gap-2">
           <label
             htmlFor={inputId}
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
           >
             {T_LOC.addressLabel}
           </label>

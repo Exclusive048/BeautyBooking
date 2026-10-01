@@ -29,7 +29,7 @@ export function BookingNoShowAction({ bookingId }: { bookingId: string }) {
           <UserX className="h-3.5 w-3.5" aria-hidden strokeWidth={1.8} />
           {T.noShow}
         </Button>
-        {error ? <p className="text-[11px] text-danger-text">{error}</p> : null}
+        {error ? <p className="text-2xs text-danger-text">{error}</p> : null}
       </div>
       {modal}
     </>

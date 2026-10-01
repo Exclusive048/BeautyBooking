@@ -126,7 +126,7 @@ function ReadonlyRow({
     <li className="flex items-center gap-3 py-3">
       <Icon className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
           {label}
         </p>
         <p
@@ -140,7 +140,7 @@ function ReadonlyRow({
       </div>
       {verified ? (
         <span
-          className="inline-flex items-center gap-1 rounded-full bg-success-surface px-2 py-0.5 text-[10px] text-success-text"
+          className="inline-flex items-center gap-1 rounded-full bg-success-surface px-2 py-0.5 text-3xs text-success-text"
           aria-label={T.verifiedLabel}
         >
           <BadgeCheck className="h-3 w-3" aria-hidden />

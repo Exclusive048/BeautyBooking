@@ -23,7 +23,7 @@ export function OverviewView({ data }: Props) {
             <h2 className="font-display text-base font-semibold text-text-main">
               {T.revenueChartTitle}
             </h2>
-            <span className="text-[11px] text-text-sec">
+            <span className="text-2xs text-text-sec">
               {data.compare
                 ? T.revenueCompare
                 : T.revenueNoCompare}
@@ -43,7 +43,7 @@ export function OverviewView({ data }: Props) {
             <h2 className="font-display text-base font-semibold text-text-main">
               {T.sourcesTitle}
             </h2>
-            <p className="text-[11px] text-text-sec">{T.sourcesDesc}</p>
+            <p className="text-2xs text-text-sec">{T.sourcesDesc}</p>
           </header>
           <SourcesDonut sources={overview.sources} />
         </section>
@@ -54,7 +54,7 @@ export function OverviewView({ data }: Props) {
               <h2 className="font-display text-base font-semibold text-text-main">
                 {T.hoursTitle}
               </h2>
-              <p className="text-[11px] text-text-sec">{T.hoursDesc}</p>
+              <p className="text-2xs text-text-sec">{T.hoursDesc}</p>
             </header>
             {overview.heatmap ? (
               <HoursHeatmap data={overview.heatmap} />

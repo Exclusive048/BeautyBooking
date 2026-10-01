@@ -169,7 +169,7 @@ export function WhenStep({
                   } ${!inBounds ? "opacity-40" : ""}`}
                 >
                   <span
-                    className={`font-mono text-[10px] uppercase tracking-wider ${
+                    className={`font-mono text-3xs uppercase tracking-wider ${
                       isSelected ? "text-white/90" : cell.isWeekend ? "text-accent-text" : "text-text-muted"
                     }`}
                   >
@@ -178,7 +178,7 @@ export function WhenStep({
                   <span className={`font-display text-lg font-semibold ${isSelected ? "text-white" : ""}`}>
                     {cell.day}
                   </span>
-                  <span className={`text-[10px] ${isSelected ? "text-white/80" : "text-text-muted"}`}>
+                  <span className={`text-3xs ${isSelected ? "text-white/80" : "text-text-muted"}`}>
                     {cell.month}
                   </span>
                 </Button>
@@ -253,7 +253,7 @@ function SlotGroup({
   if (slots.length === 0) return null;
   return (
     <div>
-      <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-text-muted">{label}</div>
+      <div className="mb-2 font-mono text-3xs uppercase tracking-[0.12em] text-text-muted">{label}</div>
       <div className="flex flex-wrap gap-2">
         {slots.map((slot) => {
           const isSelected = slot.label === selectedLabel;

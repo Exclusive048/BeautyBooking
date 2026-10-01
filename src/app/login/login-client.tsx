@@ -460,7 +460,7 @@ export default function LoginClient({
                   gradient in light and fills a legible cream in dark
                   (`--wordmark-fill`, 29.09 доработки · 23). */}
               <BrandLogo variant="full" size="sm" href={null} textClassName="bg-wordmark" />
-              <p className="mt-1 font-mono text-[10px] tracking-[0.08em] text-text-sec">
+              <p className="mt-1 font-mono text-3xs tracking-[0.08em] text-text-sec">
                 {UI_TEXT.brand.tagline}
               </p>
               {stats ? (
@@ -745,7 +745,7 @@ export default function LoginClient({
             {otpEnabled && hasSocialProviders ? (
               <div className="my-6 flex items-center gap-3">
                 <div className="h-px flex-1 bg-border-subtle" />
-                <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-text-sec">
+                <span className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
                   {T.socialDividerLabel}
                 </span>
                 <div className="h-px flex-1 bg-border-subtle" />

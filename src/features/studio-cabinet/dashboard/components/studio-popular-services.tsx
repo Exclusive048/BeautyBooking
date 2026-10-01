@@ -35,7 +35,7 @@ export function StudioPopularServices({
                 <div className="truncate text-sm font-semibold text-text-main">
                   {service.name}
                 </div>
-                <div className="mt-0.5 text-[11px] text-text-sec">
+                <div className="mt-0.5 text-2xs text-text-sec">
                   {T.countTemplate
                     .replace("{count}", String(service.bookingsCount))
                     .replace("{percent}", String(service.sharePercent))}

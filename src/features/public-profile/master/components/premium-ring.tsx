@@ -25,7 +25,7 @@ export function PremiumRing({ active, children }: Props) {
         {children}
       </div>
       <span
-        className="bg-brand-gradient absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white shadow-brand"
+        className="bg-brand-gradient absolute -bottom-1 -right-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-semibold uppercase tracking-wider text-white shadow-brand"
       >
         <Crown className="h-3 w-3" aria-hidden strokeWidth={2.4} />
         {UI_TEXT.publicProfile.hero.premiumBadge}

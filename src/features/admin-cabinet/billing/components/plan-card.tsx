@@ -34,14 +34,14 @@ export function PlanCardView({ plan, onEdit }: Props) {
       )}
     >
       {plan.isFeatured ? (
-        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
+        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2.5 py-0.5 font-mono text-3xs font-semibold uppercase tracking-[0.12em] text-white">
           <Sparkles className="h-2.5 w-2.5" aria-hidden />
           {T.featuredBadge}
         </span>
       ) : null}
 
       <header>
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+        <p className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
           {tierAndScopeLabel(plan.tier, plan.scope)}
         </p>
         <h3 className="mt-1 font-display text-lg text-text-main">{plan.name}</h3>

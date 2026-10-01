@@ -276,7 +276,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
                   )}
                 />
                 {entry.errorCode ? (
-                  <p className="mt-1 text-[10px] leading-snug text-danger-text">
+                  <p className="mt-1 text-3xs leading-snug text-danger-text">
                     {entry.errorCode === "size" ? T.errorSize : T.errorType}
                   </p>
                 ) : null}
@@ -295,7 +295,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         <div>
           <label
             htmlFor={defaultCategorySelectId}
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
           >
             {T.defaultCategoryLabel}
           </label>

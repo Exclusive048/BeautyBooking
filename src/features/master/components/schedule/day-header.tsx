@@ -20,7 +20,7 @@ export function DayHeader({ day }: Props) {
     >
       <p
         className={cn(
-          "mb-1 font-mono text-[10px] uppercase tracking-[0.18em]",
+          "mb-1 font-mono text-3xs uppercase tracking-[0.18em]",
           day.isToday ? "text-accent-text" : "text-text-sec",
         )}
       >
@@ -35,7 +35,7 @@ export function DayHeader({ day }: Props) {
           <span className="font-display text-base text-text-main">{day.dayNumber}</span>
         )}
         {!day.isToday ? (
-          <span className="text-[11px] text-text-sec">{day.monthShort}</span>
+          <span className="text-2xs text-text-sec">{day.monthShort}</span>
         ) : null}
       </div>
     </div>

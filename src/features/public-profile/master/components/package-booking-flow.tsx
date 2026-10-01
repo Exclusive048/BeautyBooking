@@ -472,7 +472,7 @@ export function PackageBookingFlow({
               {proposing ? T.proposing : T.toReview}
             </Button>
           ) : null}
-          <p className="text-[11px] text-text-sec/80">{T.startNote}</p>
+          <p className="text-2xs text-text-sec/80">{T.startNote}</p>
         </div>
       ) : null}
 

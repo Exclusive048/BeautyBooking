@@ -43,7 +43,7 @@ export function BookingRow({ booking, timezone, showWorkContext = false }: Props
         <p className="font-display text-base text-text-main">
           {formatLocalHm(booking.startAtUtc, timezone)}
         </p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-text-sec">
+        <p className="font-mono text-3xs uppercase tracking-[0.1em] text-text-sec">
           до {formatLocalHm(booking.endAtUtc, timezone)}
         </p>
       </div>
@@ -64,7 +64,7 @@ export function BookingRow({ booking, timezone, showWorkContext = false }: Props
           <div className="flex min-w-0 items-center gap-2">
             <span
               aria-hidden
-              className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec"
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec"
             >
               {initialsOf(booking.clientName)}
             </span>

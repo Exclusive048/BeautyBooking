@@ -213,7 +213,7 @@ export function PackageModal({
                     <span className="min-w-0 flex-1 truncate text-sm text-text-main">
                       {service.name}
                       {!service.isEnabled ? (
-                        <span className="ml-1 text-[10px] uppercase tracking-wide text-text-sec">
+                        <span className="ml-1 text-3xs uppercase tracking-wide text-text-sec">
                           ({T.disabledTag})
                         </span>
                       ) : null}
@@ -227,7 +227,7 @@ export function PackageModal({
               })}
             </div>
           )}
-          <p className="mt-1 text-[11px] text-text-sec">
+          <p className="mt-1 text-2xs text-text-sec">
             {T.minServicesHint}
           </p>
         </div>
@@ -284,7 +284,7 @@ export function PackageModal({
               {UI_FMT.priceLabel(pricing.finalPrice)}
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-text-sec">
+          <p className="mt-1 text-2xs text-text-sec">
             {T.previewDurationTemplate.replace(
               "{min}",
               String(pricing.totalDurationMin),
@@ -297,7 +297,7 @@ export function PackageModal({
             <p className="text-sm font-medium text-text-main">
               {T.isEnabledLabel}
             </p>
-            <p className="mt-0.5 text-[11px] text-text-sec">
+            <p className="mt-0.5 text-2xs text-text-sec">
               {T.isEnabledHint}
             </p>
           </div>

@@ -22,7 +22,7 @@ export function SaveStatusChip({ status, className }: Props) {
     <span
       aria-live="polite"
       className={cn(
-        "inline-flex items-center gap-1 text-[11px] transition-opacity duration-200",
+        "inline-flex items-center gap-1 text-2xs transition-opacity duration-200",
         visible ? "opacity-100" : "opacity-0",
         status === "saving" && "text-text-sec",
         status === "saved" && "text-success-text",

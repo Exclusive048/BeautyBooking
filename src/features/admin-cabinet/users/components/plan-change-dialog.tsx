@@ -201,7 +201,7 @@ export function PlanChangeDialog({
                         <p className="flex items-center gap-2 text-sm font-medium text-text-main">
                           {plan.name}
                           {isCurrent ? (
-                            <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-[10px] uppercase text-text-sec">
+                            <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs uppercase text-text-sec">
                               {T.currentLabel}
                             </span>
                           ) : null}

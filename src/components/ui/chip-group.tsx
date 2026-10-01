@@ -42,7 +42,7 @@ export function ChipGroup<T>({ value, onChange, options, size = "md", disabled =
             className={cn(
               "inline-flex items-center justify-center rounded-full font-medium transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-              size === "sm" ? "h-7 px-2.5 text-[11px]" : "h-8 px-3 text-xs",
+              size === "sm" ? "h-7 px-2.5 text-2xs" : "h-8 px-3 text-xs",
               active
                 ? "bg-primary text-white shadow-card"
                 : "border border-border-subtle bg-bg-card text-text-main hover:border-primary/40 hover:text-accent-text",

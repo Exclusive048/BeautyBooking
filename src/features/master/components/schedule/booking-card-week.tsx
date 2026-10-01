@@ -95,7 +95,7 @@ export function BookingCardWeek({
         height: heightPx - 4,
       }}
     >
-      <div className="flex items-center justify-between gap-2 font-mono text-[10px] leading-none tabular-nums opacity-90">
+      <div className="flex items-center justify-between gap-2 font-mono text-3xs leading-none tabular-nums opacity-90">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="truncate">
             {formatLocalHm(booking.startAtUtc, timezone)}–{formatLocalHm(booking.endAtUtc, timezone)}
@@ -123,7 +123,7 @@ export function BookingCardWeek({
         </p>
       ) : null}
       {showDetails ? (
-        <p className="flex items-baseline justify-between gap-2 text-[11px] leading-tight">
+        <p className="flex items-baseline justify-between gap-2 text-2xs leading-tight">
           <span className="truncate opacity-80">{booking.serviceTitle}</span>
           <span className="shrink-0 font-display text-xs leading-tight tabular-nums">
             {formatRub(booking.price)}

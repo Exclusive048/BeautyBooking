@@ -50,15 +50,15 @@ export function ServiceListItem({
             {service.name}
           </span>
           {!service.isActive ? (
-            <span className="rounded-full border border-border-subtle bg-bg-input px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec">
+            <span className="rounded-full border border-border-subtle bg-bg-input px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-text-sec">
               {T.pausedBadge}
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 text-[11px] text-text-sec">
+        <p className="mt-0.5 text-2xs text-text-sec">
           {T.bookingsTemplate.replace("{count}", String(service.bookings30d))}
         </p>
-        <div className="mt-2 flex items-center gap-3 text-[11px] text-text-sec">
+        <div className="mt-2 flex items-center gap-3 text-2xs text-text-sec">
           <span>
             {T.durationTemplate.replace("{min}", String(service.durationMin))}
           </span>
@@ -87,7 +87,7 @@ export function ServiceListItem({
               ) : (
                 <span
                   aria-hidden
-                  className="grid h-6 w-6 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec"
+                  className="grid h-6 w-6 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec"
                 >
                   {initials(master.displayName)}
                 </span>
@@ -96,7 +96,7 @@ export function ServiceListItem({
           ))}
         </div>
         {service.masters.length === 0 ? (
-          <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
+          <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text">
             {T.noMasterBadge}
           </span>
         ) : null}

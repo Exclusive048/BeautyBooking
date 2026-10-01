@@ -46,14 +46,14 @@ export function NotificationsSection({ data }: Props) {
           <span
             className={
               data.pushEnabled
-                ? "rounded-full border border-success-border bg-success-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-success-text"
-                : "rounded-full border border-border-subtle bg-bg-input px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec"
+                ? "rounded-full border border-success-border bg-success-surface px-2 py-0.5 font-mono text-3xs uppercase tracking-wide text-success-text"
+                : "rounded-full border border-border-subtle bg-bg-input px-2 py-0.5 font-mono text-3xs uppercase tracking-wide text-text-sec"
             }
           >
             {data.pushEnabled ? T.pushEnabled : T.pushDisabled}
           </span>
         </div>
-        <p className="text-[11px] text-text-sec">{T.pushHint}</p>
+        <p className="text-2xs text-text-sec">{T.pushHint}</p>
       </SectionCard>
 
       {/* FIX-TELEGRAM-KILLSWITCH: the entire Telegram card (header + control) is

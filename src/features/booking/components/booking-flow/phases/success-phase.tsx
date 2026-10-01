@@ -58,7 +58,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
     <div className="space-y-5 p-5">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="h-5 w-5 text-success-text" aria-hidden strokeWidth={2} />
-        <p className="text-[11px] font-medium uppercase tracking-wider text-success-text">
+        <p className="text-2xs font-medium uppercase tracking-wider text-success-text">
           {T.successEyebrow}
         </p>
       </div>

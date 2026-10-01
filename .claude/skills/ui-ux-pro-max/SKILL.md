@@ -104,6 +104,9 @@ colors: {
 - display-xl 72/1.0 · display-lg 48/1.05 · display-md 36/1.1
 - h1 32/1.15 · h2 24/1.25 · h3 18/1.4
 - body 16/1.6 · small 14/1.5 · mono 13/1.5
+- **ниже 12px — только ступени конфига** (29.09 доработки · 25, UI-22): `text-xs` 12 · `text-2xs` 11 · `text-3xs` 10. Высоту строки ступени не задают (строка без `lineHeight` — как прежний `text-[10px]`). `text-[Npx]` меньше 12px не пишется; меньше 10px не бывает вовсе (решение 25.1: 10px — только «бровь», плашка и счётчик; обычный текст — от 11px). Сторож — `src/lib/ui/type-scale-inventory.test.ts`.
+- **«Бровь»** — подпись над полем, шапка колонки, надзаголовок карточки: класс `eyebrow` (`globals.css`, слой компонентов: моно 10px, прописные, разрядка `0.18em`, `text-text-sec`). Размер и цвет вызывающего побеждают: `eyebrow text-2xs`, `eyebrow text-accent-text`. Своих `font-mono uppercase tracking-[…]` для подписи не собирать.
+- **Плашка состояния** («Неактивна», «VIP», «Есть ответ») — `<Badge size="xs" variant=…>`, не `<span className="rounded-full …">` (§6).
 
 ---
 
@@ -111,7 +114,7 @@ colors: {
 
 - **Шаг:** 4 px. Все отступы кратны 4. Tailwind `p-1` = 4 px, `p-4` = 16 px и т.д.
 - **Контейнер:** `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`
-- **Радиусы:** `rounded-lg` (12 px) — базовый. `rounded-xl/2xl` для крупных карточек. `rounded-full` — пилюли и переключатели. Острых углов в карточках и кнопках **не существует**.
+- **Радиусы — ступени Tailwind, своих в конфиге нет:** `rounded` 4 · `rounded-md` 6 · `rounded-lg` 8 · `rounded-xl` 12 (база полей и мелких карточек) · `rounded-2xl` 16 (карточки) · `rounded-3xl` 24 (крупные панели, шторки) · `rounded-full` — пилюли и переключатели. `rounded-[Npx]` не пишется (решение 25.3: 20 → `2xl`, 22–32 → `3xl`); единственное исключение — составной хвост пузыря чата, с маркером `// type-ok: <причина>` строкой выше. Острых углов в карточках и кнопках **не существует**.
 - **Тени:** всегда с прозрачностью бренда, не сплошной чёрный. `shadow-brand` = `0 12px 40px -8px rgba(114,8,8,0.20)`.
 
 ---
@@ -140,7 +143,7 @@ colors: {
 | Выбор из набора опций (правила, шаги) | `<ChipGroup value onChange options size>` |
 | Карточка-переключатель режима | `<ModeCard active title description icon onClick>` |
 | Карточка | `<Card>`, `<CardHeader>`, `<CardContent>` |
-| Бейдж | `<Badge variant="default|success|warning|danger|info|muted">` |
+| Бейдж | `<Badge variant="default|success|warning|danger|info|muted" size="md|xs">` (`xs` — плашка состояния в строке: моно 10px, прописные, `tracking-wide`, `px-2 py-0.5`; цвет — только из варианта) |
 | Переключатель | `<Switch>` |
 | Чекбокс | `<Checkbox size="sm|md">` |
 | Вкладки и фильтры списка | `<Tabs items value onChange ariaLabel>` (item: `badge` — счётчик, `icon`, `disabled`, `testId`) для 4+ вариантов или со счётчиком; `<SegmentedTabs options value onChange ariaLabel disabled>` для 2–3 вариантов (option: `badge`, `icon`). Один вид во всех кабинетах (решение 22.2) |
@@ -294,6 +297,7 @@ import { DISTANCE, MOTION, VIEWPORT_ONCE } from "@/lib/ui/motion";
 ## 14. Чеклист перед коммитом — UI
 
 - [ ] Все цвета через токены (`bg-primary`, не `bg-[#720808]`)
+- [ ] Нет `text-[Npx]` меньше 12px и `rounded-[Npx]` — только ступени (`text-2xs`/`text-3xs`, `eyebrow`, `Badge size="xs"`, `rounded-2xl`/`3xl`)
 - [ ] Все строки через `UI_TEXT`, не хардкод
 - [ ] Только shared-компоненты, нет локальных кнопок/инпутов
 - [ ] Светлая и тёмная темы проверены вручную

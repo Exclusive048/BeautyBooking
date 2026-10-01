@@ -168,7 +168,7 @@ export function DateGrid({
   return (
     <div>
       <div className="mb-2.5 flex items-center justify-between">
-        <div className="text-[11px] font-medium uppercase tracking-wider text-text-sec">
+        <div className="text-2xs font-medium uppercase tracking-wider text-text-sec">
           {T.dateLabel}
         </div>
         <div className="flex items-center gap-0.5">
@@ -220,7 +220,7 @@ export function DateGrid({
                     : "border-border-subtle bg-bg-card text-text-main hover:border-primary hover:bg-primary/5",
               )}
             >
-              <span className={cn("text-[10px] uppercase tracking-wide", isSelected ? "opacity-95" : "opacity-75")}>
+              <span className={cn("text-3xs uppercase tracking-wide", isSelected ? "opacity-95" : "opacity-75")}>
                 {cell.weekdayShort}
               </span>
               <span className="text-base font-semibold">{cell.dayOfMonth}</span>

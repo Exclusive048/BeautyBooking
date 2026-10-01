@@ -58,7 +58,7 @@ export function BundleCard({
 
         <div className="mb-3 flex items-end justify-between gap-3 border-t border-border-subtle/70 pt-3">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-text-sec">
+            <div className="text-2xs uppercase tracking-wider text-text-sec">
               {T.finalPriceLabel}
             </div>
             <div className="font-display text-xl text-text-main">
@@ -85,7 +85,7 @@ export function BundleCard({
             providerBufferMin={providerBufferMin}
           />
         ) : (
-          <p className="text-[11px] leading-relaxed text-text-sec/85">
+          <p className="text-2xs leading-relaxed text-text-sec/85">
             <span className="font-medium text-text-sec">{T.bookingComingSoon}.</span>{" "}
             {T.bookingComingSoonDesc}
           </p>

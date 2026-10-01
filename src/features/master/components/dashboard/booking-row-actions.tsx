@@ -190,7 +190,7 @@ export function BookingRowActions({ booking }: Props) {
 
       {/* UI-26/27: статусная поверхность — токен, не сырой `red-*`. */}
       {error || noShow.error ? (
-        <p className="mt-1 text-[11px] text-danger-text" role="alert">
+        <p className="mt-1 text-2xs text-danger-text" role="alert">
           {error ?? noShow.error}
         </p>
       ) : null}

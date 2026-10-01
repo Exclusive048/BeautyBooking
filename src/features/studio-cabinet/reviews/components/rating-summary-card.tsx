@@ -19,7 +19,7 @@ export function RatingSummaryCard({ averageRating, totalReviews, positivePercent
   const value = averageRating.toFixed(2);
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
         {T.avgTitle}
       </p>
       <div className="mt-2 flex items-baseline gap-2">

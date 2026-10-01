@@ -57,7 +57,7 @@ export function HeatmapSection({ data }: Props) {
               {HOURS.map((hour) => (
                 <th
                   key={hour}
-                  className="font-mono text-[10px] font-normal text-text-sec"
+                  className="font-mono text-3xs font-normal text-text-sec"
                 >
                   {hour}
                 </th>
@@ -71,7 +71,7 @@ export function HeatmapSection({ data }: Props) {
               const dow = weekdayIndexMonFirst === 6 ? 0 : weekdayIndexMonFirst + 1;
               return (
                 <tr key={label}>
-                  <td className="pr-2 text-right font-mono text-[10px] text-text-sec">
+                  <td className="pr-2 text-right font-mono text-3xs text-text-sec">
                     {label}
                   </td>
                   {HOURS.map((hour) => {
@@ -83,7 +83,7 @@ export function HeatmapSection({ data }: Props) {
                         <div
                           title={`${label} ${hour}:00 — ${count}`}
                           className={cn(
-                            "flex aspect-square items-center justify-center rounded-md font-mono text-[10px] transition-colors",
+                            "flex aspect-square items-center justify-center rounded-md font-mono text-3xs transition-colors",
                             getHeatmapBgClass(intensity),
                             getHeatmapTextClass(intensity)
                           )}
@@ -120,7 +120,7 @@ function Header() {
       <div>
         <h2 className="font-display text-base text-text-main">{T.heading}</h2>
         <p className="mt-0.5 text-xs text-text-sec">{T.subtitle}</p>
-        <p className="mt-1 text-[11px] italic text-text-sec/80">{T.labelHint}</p>
+        <p className="mt-1 text-2xs italic text-text-sec/80">{T.labelHint}</p>
       </div>
       <Legend />
     </div>
@@ -131,7 +131,7 @@ function Legend() {
   // Show 5 stops mirroring `getHeatmapTier` cut-points.
   const stops = [10, 30, 50, 70, 90];
   return (
-    <div className="flex items-center gap-2 text-[10px] text-text-sec">
+    <div className="flex items-center gap-2 text-3xs text-text-sec">
       <span>{T.legendLow}</span>
       <span className="flex gap-0.5">
         {stops.map((value) => (

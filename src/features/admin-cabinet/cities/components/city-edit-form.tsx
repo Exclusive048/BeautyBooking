@@ -108,7 +108,7 @@ export function CityEditForm({ city, onClose, onSave, onDelete }: Props) {
       <div className="flex items-center gap-3">
         <CityTagBadge tag={city.tag} />
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+          <p className="font-mono text-3xs uppercase tracking-[0.12em] text-text-sec">
             {T.caption}
           </p>
           <h2 className="truncate font-display text-lg text-text-main">

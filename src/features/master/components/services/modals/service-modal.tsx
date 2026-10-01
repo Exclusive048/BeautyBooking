@@ -250,7 +250,8 @@ export function ServiceModal({
           <Select
             id={controlId}
             value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) => setCategoryId(event.target.value)}
+
           >
             <option value="">{T.categoryNone}</option>
             {categoryList.map((category) => (
@@ -327,7 +328,8 @@ export function ServiceModal({
               <Select
                 id={controlId}
                 value={duration}
-                onChange={(event) => setDuration(Number(event.target.value))}
+                onChange={(event) => setDuration(Number(event.target.value))}
+
               >
                 {DURATION_OPTIONS.map((min) => (
                   <option key={min} value={min}>
@@ -440,7 +442,7 @@ function Field({
     <div>
       <label
         htmlFor={controlId}
-        className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+        className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
       >
         {label}
       </label>

@@ -230,7 +230,7 @@ export function DayGrid({
                           <div
                             key={booking.id}
                             title={T.cell.personalBookingHint}
-                            className="absolute z-10 overflow-hidden rounded-lg border border-dashed border-border-subtle bg-bg-input p-1.5 text-left text-[11px] leading-tight text-text-sec"
+                            className="absolute z-10 overflow-hidden rounded-lg border border-dashed border-border-subtle bg-bg-input p-1.5 text-left text-2xs leading-tight text-text-sec"
                             style={{
                               top: offsetPxFromMinute(salonMinuteOfDay(start, timezone), gridWindow),
                               height: durationPx(start, end),
@@ -238,7 +238,7 @@ export function DayGrid({
                               width,
                             }}
                           >
-                            <div className="font-mono text-[10px]">
+                            <div className="font-mono text-3xs">
                               {formatLocalHm(start, timezone)} —{" "}
                               {formatLocalHm(end, timezone)}
                             </div>
@@ -252,7 +252,7 @@ export function DayGrid({
                           data-focus-id={booking.id}
                           onClick={() => setActiveBooking(booking)}
                           className={cn(
-                            "absolute z-10 overflow-hidden rounded-lg p-1.5 text-left text-[11px] leading-tight transition-shadow hover:shadow-sm",
+                            "absolute z-10 overflow-hidden rounded-lg p-1.5 text-left text-2xs leading-tight transition-shadow hover:shadow-sm",
                             BOOKING_CELL_CLASS[booking.tone],
                           )}
                           style={{
@@ -270,7 +270,7 @@ export function DayGrid({
                               <RefreshCw className="h-3 w-3" aria-hidden />
                             </span>
                           ) : null}
-                          <div className="font-mono text-[10px]">
+                          <div className="font-mono text-3xs">
                             {formatLocalHm(start, timezone)} —{" "}
                             {formatLocalHm(end, timezone)}
                           </div>
@@ -281,7 +281,7 @@ export function DayGrid({
                             {booking.serviceTitle}
                           </div>
                           {booking.priceKopeks > 0 ? (
-                            <div className="mt-0.5 font-mono text-[10px] opacity-70">
+                            <div className="mt-0.5 font-mono text-3xs opacity-70">
                               {UI_FMT.priceLabel(booking.priceKopeks)}
                             </div>
                           ) : null}
@@ -344,7 +344,7 @@ function BreakCell({
   const end = new Date(entry.endAtUtc);
   return (
     <div
-      className="absolute left-1 right-1 z-1 flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-[11px] font-medium text-text-sec"
+      className="absolute left-1 right-1 z-1 flex items-center justify-center rounded-lg border border-dashed border-border-subtle bg-bg-input/60 text-2xs font-medium text-text-sec"
       style={{
         top: offsetPxFromMinute(salonMinuteOfDay(start, timezone), gridWindow),
         height: durationPx(start, end),

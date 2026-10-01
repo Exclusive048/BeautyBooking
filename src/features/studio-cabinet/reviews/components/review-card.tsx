@@ -46,7 +46,7 @@ export function ReviewCard({ review, onReport }: Props) {
             <RatingStars value={review.rating} size="sm" />
             <span className="text-xs text-text-sec">{review.dateLabel}</span>
             {review.isReported ? (
-              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
+              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text">
                 {T.card.reportedBadge}
               </span>
             ) : null}
@@ -94,7 +94,7 @@ export function ReviewCard({ review, onReport }: Props) {
 
       {review.reply ? (
         <div className="mt-3 rounded-xl border-l-2 border-primary/40 bg-bg-input/40 px-3 py-2.5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-text">
+          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-accent-text">
             {T.card.replyCaption}
           </p>
           <p className="mt-1 whitespace-pre-wrap text-sm text-text-main">{review.reply.text}</p>

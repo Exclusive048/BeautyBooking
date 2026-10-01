@@ -106,7 +106,7 @@ export function PromptModal({
         </p>
       ) : null}
 
-      <label className="mb-1 block font-mono text-[11px] uppercase tracking-[0.18em] text-text-sec">
+      <label className="mb-1 block font-mono text-2xs uppercase tracking-[0.18em] text-text-sec">
         {resolvedLabel}
       </label>
       <Textarea

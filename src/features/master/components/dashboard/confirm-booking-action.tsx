@@ -56,7 +56,7 @@ export function ConfirmBookingAction({ bookingId }: Props) {
         {busy ? T.confirmBookingBusy : T.confirmBookingCta}
       </Button>
       {error ? (
-        <p className="text-[11px] text-danger-text">{error}</p>
+        <p className="text-2xs text-danger-text">{error}</p>
       ) : null}
     </div>
   );

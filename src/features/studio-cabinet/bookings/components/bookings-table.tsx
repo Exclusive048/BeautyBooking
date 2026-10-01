@@ -43,25 +43,25 @@ export function BookingsTable({ studioId, rows, masters, timezone, isFiltered }:
         <table className="w-full min-w-[920px] text-sm">
           <thead>
             <tr className="bg-bg-input/40">
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colWhen}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colMaster}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colClient}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colService}
               </th>
-              <th className="px-3 py-2 text-right font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-right font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colPrice}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colSource}
               </th>
-              <th className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wide text-text-sec">
+              <th className="px-3 py-2 text-left font-mono text-3xs uppercase tracking-wide text-text-sec">
                 {T.colStatus}
               </th>
               <th className="w-10 px-2 py-2" aria-hidden />

@@ -80,7 +80,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
           {lastTime ? (
             <span
               className={cn(
-                "shrink-0 font-mono text-[11px]",
+                "shrink-0 font-mono text-2xs",
                 hasUnread ? "text-accent-text" : "text-text-sec",
               )}
             >
@@ -88,7 +88,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
             </span>
           ) : null}
         </div>
-        <p className="mt-px truncate text-[11.5px] text-text-sec">
+        <p className="mt-px truncate text-xs text-text-sec">
           {partner.roleSummary}
         </p>
         <div
@@ -104,7 +104,7 @@ export function ConversationRow({ conversation, isActive, onClick, viewerTimezon
             {conversation.lastMessage?.body ?? T.row.empty}
           </span>
           {hasUnread ? (
-            <span className="bg-brand-gradient inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 font-mono text-[10.5px] font-semibold text-white">
+            <span className="bg-brand-gradient inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1.5 font-mono text-3xs font-semibold text-white">
               {conversation.unreadCount}
             </span>
           ) : null}

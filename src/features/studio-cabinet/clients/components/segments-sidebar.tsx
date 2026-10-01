@@ -40,7 +40,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
 
   return (
     <aside className="space-y-2 rounded-2xl border border-border-subtle bg-bg-card p-4 lg:sticky lg:top-[calc(var(--topbar-h)+1rem)]">
-      <h2 className="px-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <h2 className="px-1 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
         {T.title}
       </h2>
       <ul className="space-y-1">
@@ -65,7 +65,7 @@ export function SegmentsSidebar({ selected, counts }: Props) {
                 </span>
                 <span
                   className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] tabular-nums",
+                    "shrink-0 rounded-full px-2 py-0.5 font-mono text-3xs tabular-nums",
                     active ? "bg-primary/20 text-accent-text" : "bg-bg-input text-text-sec",
                   )}
                 >

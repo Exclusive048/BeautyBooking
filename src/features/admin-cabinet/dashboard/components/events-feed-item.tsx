@@ -36,7 +36,7 @@ export function EventsFeedItem({ event }: Props) {
     <li className="grid grid-cols-[44px_8px_1fr_auto] items-center gap-3 border-b border-border-subtle py-2.5 last:border-b-0">
       <time
         dateTime={event.timeIso}
-        className="font-mono text-[11px] tabular-nums text-text-sec"
+        className="font-mono text-2xs tabular-nums text-text-sec"
       >
         {hydrated ? UI_FMT.timeShort(date, { timeZone: VIEWER_TZ }) : null}
       </time>

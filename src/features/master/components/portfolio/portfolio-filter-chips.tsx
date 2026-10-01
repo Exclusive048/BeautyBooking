@@ -64,7 +64,7 @@ export function PortfolioFilterChips({
               {count > 0 ? (
                 <span
                   className={cn(
-                    "font-mono text-[10px]",
+                    "font-mono text-3xs",
                     isActive ? "opacity-80" : "text-text-sec"
                   )}
                 >
@@ -78,7 +78,7 @@ export function PortfolioFilterChips({
 
       {categories.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <span className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {T.byCategoryLabel}
           </span>
           <CategoryChip

@@ -323,7 +323,7 @@ export function PortfolioEditor({
             </Button>
 
             {asset.id === effectiveCoverId ? (
-              <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-white shadow-card">
+              <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-3xs font-semibold text-white shadow-card">
                 <Star className="h-3 w-3 fill-current" aria-hidden />
                 {mediaText.coverBadge}
               </span>
@@ -337,7 +337,7 @@ export function PortfolioEditor({
                 disabled={busy}
                 aria-label={`${mediaText.makeCover}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
                 className={cn(
-                  "absolute left-2 inline-flex h-7 items-center gap-1 rounded-full border border-border-subtle bg-bg-card/90 px-2.5 text-[11px] font-medium text-text-main opacity-0 shadow-card transition hover:bg-bg-input focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
+                  "absolute left-2 inline-flex h-7 items-center gap-1 rounded-full border border-border-subtle bg-bg-card/90 px-2.5 text-2xs font-medium text-text-main opacity-0 shadow-card transition hover:bg-bg-input focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
                   // Над полосой подписи работы (STUDIO-PORTFOLIO-FEED), а не под ней.
                   captionsEnabled ? "bottom-12" : "bottom-2",
                 )}
@@ -356,7 +356,7 @@ export function PortfolioEditor({
                 onClick={() => setCaptionAssetId(asset.id)}
                 disabled={busy}
                 aria-label={`${mediaText.captionEditAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
-                className="absolute inset-x-0 bottom-0 flex min-h-[44px] items-end gap-1 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-1.5 pt-6 text-left text-[11px] font-medium text-white/90 hover:text-white"
+                className="absolute inset-x-0 bottom-0 flex min-h-[44px] items-end gap-1 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2 pb-1.5 pt-6 text-left text-2xs font-medium text-white/90 hover:text-white"
               >
                 <Tag className="mb-0.5 h-3 w-3 shrink-0" aria-hidden />
                 <span className="truncate">{captionFor(asset.id).label ?? mediaText.captionAdd}</span>

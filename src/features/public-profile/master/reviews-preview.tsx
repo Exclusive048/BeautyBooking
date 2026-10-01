@@ -74,7 +74,7 @@ function ReviewCard({
               <Flag className="h-3.5 w-3.5" aria-hidden />
             </Button>
           ) : review.reportedAt && currentUserId && !review.isOwnReview ? (
-            <span className="text-[10px] text-text-sec/50">{masterReviewText.reportedAt}</span>
+            <span className="text-3xs text-text-sec/50">{masterReviewText.reportedAt}</span>
           ) : null}
         </div>
       </div>
@@ -84,7 +84,7 @@ function ReviewCard({
           {review.publicTags.map((tag) => (
             <span
               key={tag.id}
-              className="rounded-full border border-border-subtle bg-bg-card px-2 py-1 text-[11px] text-text-sec"
+              className="rounded-full border border-border-subtle bg-bg-card px-2 py-1 text-2xs text-text-sec"
             >
               {tag.icon ? `${tag.icon} ` : ""}
               {tag.label}

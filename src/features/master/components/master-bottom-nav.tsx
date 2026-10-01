@@ -181,11 +181,11 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                       )}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
-                      <span className="text-[11px] font-medium leading-tight">{item.label}</span>
+                      <span className="text-2xs font-medium leading-tight">{item.label}</span>
                       {count > 0 ? (
                         <span
                           aria-hidden
-                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums text-primary-foreground"
+                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-semibold tabular-nums text-primary-foreground"
                         >
                           {count > 99 ? "99+" : count}
                         </span>
@@ -199,7 +199,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                   className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
                 >
                   <ExternalLink className="h-5 w-5" aria-hidden />
-                  <span className="text-[11px] font-medium leading-tight">{t.menuMyPage}</span>
+                  <span className="text-2xs font-medium leading-tight">{t.menuMyPage}</span>
                 </Link>
               </div>
             </m.div>

@@ -203,7 +203,7 @@ export function EditItemModal({
       >
         <div className="grid grid-cols-1 gap-5 md:grid-cols-[180px,1fr]">
           <div className="space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+            <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
               {T.photoLabel}
             </p>
             <div className="aspect-square overflow-hidden rounded-xl border border-border-subtle bg-bg-input">
@@ -250,7 +250,7 @@ export function EditItemModal({
             <div>
               <label
                 htmlFor={categorySelectId}
-                className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+                className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
               >
                 {T.categoryLabel}
               </label>
@@ -270,7 +270,7 @@ export function EditItemModal({
             </div>
 
             <div>
-              <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+              <label className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
                 {T.servicesLabel}
               </label>
               {services.length === 0 ? (
@@ -296,7 +296,7 @@ export function EditItemModal({
             <div>
               <label
                 htmlFor={tagsInputId}
-                className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+                className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
               >
                 {T.tagsLabel}
               </label>

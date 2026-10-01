@@ -155,7 +155,7 @@ export function BottomTab(props: BottomTabProps) {
         {badge > 0 ? (
           <span
             aria-hidden
-            className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none tabular-nums text-primary-foreground"
+            className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-3xs font-semibold leading-none tabular-nums text-primary-foreground"
           >
             {badge > 99 ? "99+" : badge}
           </span>
@@ -167,7 +167,7 @@ export function BottomTab(props: BottomTabProps) {
           />
         ) : null}
       </span>
-      <span className={cn("max-w-full truncate text-[10px] font-medium leading-normal transition-colors", tone)}>
+      <span className={cn("max-w-full truncate text-3xs font-medium leading-normal transition-colors", tone)}>
         {label}
       </span>
       {badge > 0 ? <span className="sr-only">{` (${badge})`}</span> : null}

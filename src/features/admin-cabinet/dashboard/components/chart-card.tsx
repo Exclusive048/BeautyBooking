@@ -166,7 +166,7 @@ export function ChartCard({
               x={PAD_X + i * stepX}
               y={VIEW_H + 16}
               textAnchor="middle"
-              className="fill-text-sec font-mono text-[10px]"
+              className="fill-text-sec font-mono text-3xs"
             >
               {p.label}
             </text>
@@ -180,7 +180,7 @@ export function ChartCard({
                 x={PAD_X + hoverIdx * stepX}
                 y={toY(data.points[hoverIdx]!.count) - 14}
                 textAnchor="middle"
-                className="fill-text-main font-mono text-[11px] font-semibold"
+                className="fill-text-main font-mono text-2xs font-semibold"
               >
                 {tooltipNoun}: {UI_FMT.count(data.points[hoverIdx]!.count)}
               </text>
@@ -201,7 +201,7 @@ function DeltaText({
 }) {
   if (data.deltaText === null || data.deltaSign === null) {
     return (
-      <span className="font-mono text-[11px] text-text-sec">
+      <span className="font-mono text-2xs text-text-sec">
         {T.todayLabel}
       </span>
     );
@@ -211,7 +211,7 @@ function DeltaText({
   return (
     <span
       className={cn(
-        "font-mono text-[11px] font-semibold",
+        "font-mono text-2xs font-semibold",
         isZero
           ? "text-text-sec"
           : isPositive

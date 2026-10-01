@@ -16,7 +16,7 @@ type Props = {
 export function UserAvatar({ userId, name, size = 8, className }: Props) {
   const hue = getAvatarHue(userId);
   const initials = initialsFromName(name);
-  const dim = size === 10 ? "h-10 w-10 text-sm" : "h-8 w-8 text-[11px]";
+  const dim = size === 10 ? "h-10 w-10 text-sm" : "h-8 w-8 text-2xs";
   return (
     <span
       aria-hidden

@@ -28,7 +28,7 @@ export function ReviewExistingReply({ text, repliedAt, authorName, authorSeed, n
       <div className="mb-1.5 flex items-center gap-2">
         <span
           className={cn(
-            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium",
+            "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-3xs font-medium",
             pickAvatarColor(authorSeed)
           )}
           aria-hidden

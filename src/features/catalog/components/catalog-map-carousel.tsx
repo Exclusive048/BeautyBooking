@@ -227,7 +227,7 @@ function MapCard({
               <span className="tabular-nums">({point.reviewsCount})</span>
             </span>
           ) : (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-accent-text">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-medium text-accent-text">
               {TC.newLabel}
             </span>
           )}

@@ -138,7 +138,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
     <>
       <div className="space-y-4 rounded-2xl border border-border-subtle bg-bg-card p-5">
         <header>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {T.caption.replace("{id}", detail.id.slice(-6).toUpperCase())}
           </p>
           <h2 className="mt-1 font-display text-lg font-semibold text-text-main">
@@ -215,7 +215,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
             <p className="text-sm font-medium text-text-main">
               {T.isActiveLabel}
             </p>
-            <p className="mt-0.5 text-[11px] text-text-sec">
+            <p className="mt-0.5 text-2xs text-text-sec">
               {T.isActiveHint}
             </p>
           </div>
@@ -269,7 +269,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
                     ) : (
                       <span
                         aria-hidden
-                        className="grid h-5 w-5 place-items-center rounded-full bg-bg-card text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                        className="grid h-5 w-5 place-items-center rounded-full bg-bg-card text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
                       >
                         {initials(master.displayName)}
                       </span>
@@ -296,13 +296,13 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <p className="text-[11px] text-text-sec">{T.statsBookings}</p>
+              <p className="text-2xs text-text-sec">{T.statsBookings}</p>
               <p className="mt-0.5 font-display text-base font-semibold tabular-nums text-text-main">
                 {UI_FMT.count(detail.stats30d.bookingsCount)}
               </p>
             </div>
             <div>
-              <p className="text-[11px] text-text-sec">{T.statsRevenue}</p>
+              <p className="text-2xs text-text-sec">{T.statsRevenue}</p>
               <p className="mt-0.5 font-display text-base font-semibold tabular-nums text-text-main">
                 {UI_FMT.priceLabel(detail.stats30d.revenueKopeks)}
               </p>

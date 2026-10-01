@@ -26,7 +26,7 @@ export function ClientsView({ data }: Props) {
             <h2 className="font-display text-base font-semibold text-text-main">
               {T.segmentsTitle}
             </h2>
-            <p className="text-[11px] text-text-sec">{T.segmentsDesc}</p>
+            <p className="text-2xs text-text-sec">{T.segmentsDesc}</p>
           </header>
           {clients && clients.segments.length > 0 ? (
             <ul className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -35,13 +35,13 @@ export function ClientsView({ data }: Props) {
                   key={slice.key}
                   className="rounded-xl border border-border-subtle bg-bg-input/30 p-3"
                 >
-                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+                  <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
                     {slice.label}
                   </p>
                   <p className="mt-1 font-display text-lg font-bold tabular-nums text-text-main">
                     {slice.count}
                   </p>
-                  <p className="text-[11px] text-text-sec">{slice.percent}%</p>
+                  <p className="text-2xs text-text-sec">{slice.percent}%</p>
                 </li>
               ))}
             </ul>
@@ -55,12 +55,12 @@ export function ClientsView({ data }: Props) {
             <h2 className="font-display text-base font-semibold text-text-main">
               {T.topClientsTitle}
             </h2>
-            <p className="text-[11px] text-text-sec">{T.topClientsDesc}</p>
+            <p className="text-2xs text-text-sec">{T.topClientsDesc}</p>
           </header>
           {clients && clients.topClients.length > 0 ? (
             <table className="mt-3 w-full text-left">
               <thead>
-                <tr className="bg-bg-input/40 text-[10px] font-mono uppercase tracking-[0.12em] text-text-sec">
+                <tr className="bg-bg-input/40 text-3xs font-mono uppercase tracking-[0.12em] text-text-sec">
                   <th className="px-3 py-2.5">{T.colClient}</th>
                   <th className="px-3 py-2.5 text-right">{T.colVisits}</th>
                   <th className="px-3 py-2.5 text-right">{T.colLifetime}</th>

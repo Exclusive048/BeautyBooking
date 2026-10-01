@@ -115,7 +115,7 @@ export function CategoriesSidebar({
                     </span>
                     {category.status === "PENDING" ? (
                       <span
-                        className="shrink-0 rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text"
+                        className="shrink-0 rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-warning-text"
                         title={T.pendingHint}
                       >
                         {T.pendingBadge}
@@ -124,7 +124,7 @@ export function CategoriesSidebar({
                   </span>
                   <span
                     className={cn(
-                      "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-mono tabular-nums",
+                      "shrink-0 rounded-full px-2 py-0.5 text-3xs font-mono tabular-nums",
                       active
                         ? "bg-primary/20 text-accent-text"
                         : "bg-bg-input text-text-sec",

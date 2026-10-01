@@ -104,7 +104,7 @@ export function HotSlotsSection({ hotSlots, onChange, isLocked }: Props) {
           <div className="min-w-0 flex-1">
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide",
                 enabled ? "bg-white/15 text-white" : "bg-bg-input text-text-sec"
               )}
             >

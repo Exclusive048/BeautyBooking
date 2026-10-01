@@ -106,7 +106,7 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
             <div className="space-y-1.5">
               <label
                 htmlFor="email-verify-input"
-                className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+                className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
               >
                 {T.emailLabel}
               </label>
@@ -155,7 +155,7 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
             <div className="space-y-1.5">
               <label
                 htmlFor="email-code-input"
-                className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+                className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec"
               >
                 {T.codeLabel}
               </label>

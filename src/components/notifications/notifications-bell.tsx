@@ -222,7 +222,7 @@ export function NotificationsBell({ ariaLabel }: Props) {
                     </Button>
                   </div>
                 ) : null}
-                <div className="mt-2 text-[11px] text-text-sec">
+                <div className="mt-2 text-2xs text-text-sec">
                   {UI_FMT.dateTimeLong(toast.createdAt, { timeZone: viewerTimeZone })}
                 </div>
               </div>

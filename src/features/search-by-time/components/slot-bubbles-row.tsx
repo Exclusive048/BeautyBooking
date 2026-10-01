@@ -48,7 +48,7 @@ export function SlotBubblesRow({ provider, serviceId, slots }: Props) {
             aria-label={UI_TEXT.a11y.bookAtSlot(slot.label)}
           >
             <span>{slot.label}</span>
-            {discount ? <span className="text-[10px] text-success-text">{discount}</span> : null}
+            {discount ? <span className="text-3xs text-success-text">{discount}</span> : null}
           </Link>
         );
       })}

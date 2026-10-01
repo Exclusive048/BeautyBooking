@@ -243,7 +243,7 @@ export function NotificationActions({ notificationId, type, payloadJson, openHre
           <Link
             key={link.href + link.label}
             href={link.href}
-            className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-card px-2.5 py-1 text-[11px] font-medium text-text-sec transition-colors hover:text-text-main"
+            className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-card px-2.5 py-1 text-2xs font-medium text-text-sec transition-colors hover:text-text-main"
           >
             <Icon className="h-3 w-3" aria-hidden />
             {link.label}

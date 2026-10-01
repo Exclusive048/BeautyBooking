@@ -137,7 +137,7 @@ export function ManageBreaksDialog({
 
         {/* Existing breaks list */}
         <section className="space-y-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {T.existingTitle}
           </p>
           {breaks.length === 0 ? (
@@ -167,7 +167,7 @@ export function ManageBreaksDialog({
                         {master?.name ?? "—"} · {range}
                       </p>
                       {entry.note ? (
-                        <p className="truncate text-[11px] text-text-sec">
+                        <p className="truncate text-2xs text-text-sec">
                           {entry.note}
                         </p>
                       ) : null}
@@ -189,7 +189,7 @@ export function ManageBreaksDialog({
 
         {/* Add break form */}
         <section className="space-y-3 border-t border-border-subtle pt-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="font-mono text-3xs uppercase tracking-[0.18em] text-text-sec">
             {T.addTitle}
           </p>
 

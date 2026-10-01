@@ -289,7 +289,7 @@ export function StudioProfileForm({
             <div className="text-sm text-text-main">
               {zoneLabel ?? studioFormText.timezoneUnknown}
             </div>
-            <p className="text-[11px] text-text-sec">{studioFormText.timezoneHint}</p>
+            <p className="text-2xs text-text-sec">{studioFormText.timezoneHint}</p>
           </div>
         </div>
 

@@ -217,7 +217,7 @@ export function AddServiceDialog({
                   setProposing(true);
                   setProposeError(null);
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-accent-text transition-colors hover:text-accent-text/80"
+                className="inline-flex items-center gap-1 text-2xs font-medium text-accent-text transition-colors hover:text-accent-text/80"
               >
                 <Plus className="h-3 w-3" aria-hidden />
                 {T.proposeCategory}
@@ -227,7 +227,7 @@ export function AddServiceDialog({
 
           {proposing ? (
             <div className="space-y-2 rounded-lg border border-border-subtle bg-bg-input/40 p-3">
-              <p className="text-[11px] text-text-sec">{T.proposeHint}</p>
+              <p className="text-2xs text-text-sec">{T.proposeHint}</p>
               <div className="flex items-start gap-2">
                 <Input
                   value={proposeName}

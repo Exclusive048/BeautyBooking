@@ -722,7 +722,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
                         </p>
                       ) : null}
 
-                      <span className="mt-1.5 inline-block rounded-md bg-bg-card px-2 py-0.5 text-[10px] text-text-sec">
+                      <span className="mt-1.5 inline-block rounded-md bg-bg-card px-2 py-0.5 text-3xs text-text-sec">
                         {channelLabel(note.channel)}
                       </span>
 
