@@ -66,21 +66,30 @@ const variants: Record<ButtonVariant, string> = {
   wrapper: "focus-visible:ring-2 focus-visible:ring-primary-glow/35",
 };
 
+// UI-29 — невидимая зона нажатия у маленьких кнопок: ≥44px по высоте
+// (WCAG 2.5.5 AAA / Apple HIG) БЕЗ визуальных изменений. `icon` — AUDIT-CAMPAIGN-02
+// п.5 (`cb3324b1`), `sm` — 29.09 доработки · 29 (решение 29.1, вариант «в»).
+//  - Зона — абсолютный `::after`, центрированный по вертикали (`top-1/2` +
+//    `-translate-y-1/2`), высотой с кнопку, но не ниже 44px (`min-h-11`). Формула
+//    «inset от краёв» (прежняя `-inset-1`) считается от высоты кнопки и на
+//    переопределённой на месте (`h-7`, `h-9` с рамкой) давала 34–42px.
+//  - `h-full` у абсолютного `::after` — высота PADDING-box: рамка 1px её
+//    уменьшает, `min-h-11` от этого не зависит.
+//  - По горизонтали `sm` не расширяется (ширина с текстом больше 44, соседи в
+//    ряду не заходят друг на друга), `icon` — на 4px от padding-box.
+//  - `relative` скоупится СЮДА, а не в DEFAULT_BASE: у произвольной кнопки могут
+//    быть absolute-дети, заякоренные на дальнего предка, и глобальный relative их
+//    переякорил бы. `absolute` в className побеждает `relative` (`cn` —
+//    tailwind-merge, 29.09 · 12), и зона остаётся заякоренной: абсолютный
+//    элемент тоже содержащий блок для своего `::after`. ⚠️ `static` и
+//    `overflow-*` в className зону ломают — сторож `button-hit-area.test.ts`.
+const HIT_AREA_Y = "after:absolute after:top-1/2 after:h-full after:min-h-11 after:-translate-y-1/2 after:content-['']";
+
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-9 px-3 text-sm",
+  sm: `relative h-9 px-3 text-sm after:inset-x-0 ${HIT_AREA_Y}`,
   md: "h-11 px-4 text-sm",
   lg: "h-12 px-5 text-base",
-  // UI-29 (AUDIT-CAMPAIGN-02 п.5): невидимая after-зона расширяет цель нажатия
-  // до ≥44px (WCAG 2.5.5/AAA) БЕЗ визуальных изменений (скриншот-приёмка
-  // байт-в-байт). ⚠️ inset у absolute-::after считается от PADDING-box: с 1px
-  // бордером (secondary/icon) −4px даёт 46px эффективных, без бордера (ghost) —
-  // 48px; «−2px» давал бы 42 и НЕ дотягивал до 44 — проверено замером.
-  // `relative` скоупится СЮДА, а не в DEFAULT_BASE: у произвольной кнопки могут
-  // быть absolute-дети, заякоренные на дальнего предка, и глобальный relative их
-  // переякорил бы. `absolute` в className icon-кнопки теперь побеждает
-  // `relative` (`cn` — tailwind-merge, 29.09 · 12), и after-зона остаётся
-  // заякоренной: absolute-элемент тоже содержащий блок для своего ::after.
-  icon: "relative h-10 w-10 p-0 text-sm after:absolute after:-inset-1 after:content-['']",
+  icon: `relative h-10 w-10 p-0 text-sm after:-inset-x-1 ${HIT_AREA_Y}`,
   none: "",
 };
 

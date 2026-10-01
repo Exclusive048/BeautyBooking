@@ -99,8 +99,9 @@ export function WindowHeader({
           <Button
             asChild
             variant="ghost"
-            size="sm"
+            size="icon"
             aria-label={T.header.call}
+            className="h-9 w-auto px-3"
           >
             <a href={`tel:${partner.phone}`}>
               <Phone className="h-4 w-4" aria-hidden strokeWidth={1.6} />

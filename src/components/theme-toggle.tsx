@@ -23,14 +23,14 @@ export function ThemeToggle() {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      size="icon"
       aria-label={UI_TEXT.common.toggleTheme}
       onClick={() => {
         if (!canToggle) return;
         const next: ThemeMode = isDark ? "light" : "dark";
         setTheme(next);
       }}
-      className="h-9 w-9 px-0"
+      className="h-9 w-9"
     >
       {icon}
     </Button>
