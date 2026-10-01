@@ -1,6 +1,11 @@
 /**
  * PWA-FIX-01 — справочные данные каталога, общие для боевого и тестового сида.
  *
+ * Категорий здесь больше нет (SYSTEM-CATEGORIES-01, 2026-10-01): фиксированный
+ * набор живёт в `src/lib/catalog/system-categories.ts` и приходит миграцией
+ * данных и шагом деплоя; прежние 12 категорий остались фикстурами `seed:test`
+ * (`test-data/seed-categories.ts`).
+ *
  * 🔴 Почему отдельный модуль, а не «взять из test-data»: города и категории —
  * это ПРОДУКТОВЫЙ справочник, а не фикстуры. Прод-БД после `migrate deploy`
  * пустая, и без этих строк продукт не работает по-настоящему: `/api/cities`
@@ -49,32 +54,3 @@ export const REFERENCE_CITIES: ReadonlyArray<ReferenceCity> = [
  * через /admin/cities по мере выхода на регион.
  */
 export const LAUNCH_CITY_SLUG = "moscow";
-
-export type ReferenceCategory = {
-  slug: string;
-  name: string;
-  icon: string | null;
-  parentSlug: string | null;
-  orderIndex: number;
-};
-
-/**
- * Верхнеуровневые категории кормят ряд пилюль на главной (`nails / hair /
- * brows / skin` мапятся на эти слаги дословно). Подкатегории дают более
- * глубокий фильтр и связь услуги через `globalCategoryId`.
- */
-export const REFERENCE_CATEGORIES: ReadonlyArray<ReferenceCategory> = [
-  { slug: "nails", name: "Маникюр и педикюр", icon: "💅", parentSlug: null, orderIndex: 1 },
-  { slug: "hair", name: "Парикмахерские услуги", icon: "💇", parentSlug: null, orderIndex: 2 },
-  { slug: "brows", name: "Брови и ресницы", icon: "👁️", parentSlug: null, orderIndex: 3 },
-  { slug: "skin", name: "Косметология и уход", icon: "✨", parentSlug: null, orderIndex: 4 },
-  { slug: "massage", name: "Массаж и СПА", icon: "💆", parentSlug: null, orderIndex: 5 },
-  { slug: "makeup", name: "Макияж", icon: "💄", parentSlug: null, orderIndex: 6 },
-
-  { slug: "manicure", name: "Маникюр", icon: null, parentSlug: "nails", orderIndex: 1 },
-  { slug: "pedicure", name: "Педикюр", icon: null, parentSlug: "nails", orderIndex: 2 },
-  { slug: "haircut", name: "Стрижка", icon: null, parentSlug: "hair", orderIndex: 1 },
-  { slug: "coloring", name: "Окрашивание", icon: null, parentSlug: "hair", orderIndex: 2 },
-  { slug: "lashes", name: "Наращивание ресниц", icon: null, parentSlug: "brows", orderIndex: 1 },
-  { slug: "browarchitect", name: "Оформление бровей", icon: null, parentSlug: "brows", orderIndex: 2 },
-];

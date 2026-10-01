@@ -17,9 +17,11 @@
  * легитимным в проде: `seed:plans`, `seed:review-tags`). Держать это свойство
  * обязательно: сид, умеющий заводить аккаунты, обязан уйти под гард.
  *
- * Идемпотентен: всё через `upsert` по естественному ключу. Повторный прогон
- * не создаёт дублей и не трогает то, что администратор поменял руками, кроме
- * полей самого справочника.
+ * Идемпотентен. Города — `upsert` по слагу (повтор возвращает поля справочного
+ * города). Категории — ТОЛЬКО досоздание фиксированного набора
+ * (`ensureSystemCategories`, SYSTEM-CATEGORIES-01): существующие строки, в том
+ * числе правленные админом, не меняются. Набор приходит и без этого скрипта —
+ * миграцией данных и шагом деплоя `deploy:post`; здесь он для ручного провижининга.
  *
  * Использование локально:
  *   npm run seed:reference                 # Москва + категории + FREE-планы
@@ -38,12 +40,9 @@
  *     (ратифицировано в `plan-seed.ts`); сид не должен перезатирать цену.
  *   · Теги отзывов — отдельный существующий скрипт `npm run seed:review-tags`.
  */
-import { CategoryStatus, PrismaClient } from "@prisma/client";
-import {
-  LAUNCH_CITY_SLUG,
-  REFERENCE_CATEGORIES,
-  REFERENCE_CITIES,
-} from "../prisma/seeds/reference/catalog-reference";
+import { PrismaClient } from "@prisma/client";
+import { LAUNCH_CITY_SLUG, REFERENCE_CITIES } from "../prisma/seeds/reference/catalog-reference";
+import { SYSTEM_CATEGORIES, ensureSystemCategories } from "../src/lib/catalog/system-categories";
 import { ensureFreePlans } from "../src/lib/billing/plan-seed";
 
 const prisma = new PrismaClient();
@@ -82,37 +81,11 @@ async function seedCities(all: boolean): Promise<number> {
 }
 
 async function seedCategories(): Promise<number> {
-  const slugToId = new Map<string, string>();
-
-  // Два прохода: сначала верхний уровень, чтобы у подкатегорий был `parentId`.
-  for (const pass of [null, "child"] as const) {
-    const batch = REFERENCE_CATEGORIES.filter((c) =>
-      pass === null ? c.parentSlug === null : c.parentSlug !== null,
-    );
-    for (const c of batch) {
-      const parentId = c.parentSlug ? (slugToId.get(c.parentSlug) ?? null) : null;
-      const fields = {
-        name: c.name,
-        icon: c.icon,
-        orderIndex: c.orderIndex,
-        parentId,
-        // APPROVED + visibleToAll — единственная комбинация, которую публичный
-        // каталог показывает (инв. #23); isSystem защищает от случайного
-        // скрытия админом.
-        status: CategoryStatus.APPROVED,
-        isSystem: true,
-        visibleToAll: true,
-      };
-      const row = await prisma.globalCategory.upsert({
-        where: { slug: c.slug },
-        update: fields,
-        create: { slug: c.slug, ...fields },
-      });
-      slugToId.set(row.slug, row.id);
-      console.log(`  ✓ категория ${c.name}${c.parentSlug ? ` (в «${c.parentSlug}»)` : ""}`);
-    }
+  const { created } = await ensureSystemCategories(prisma);
+  for (const c of SYSTEM_CATEGORIES) {
+    console.log(`  ${created.includes(c.slug) ? "✓ создана" : "· уже есть"} ${c.name} (${c.slug})`);
   }
-  return slugToId.size;
+  return created.length;
 }
 
 async function main(): Promise<void> {
@@ -136,7 +109,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `\nГотово: городов ${cities}, категорий ${categories}, FREE-планов ${plans.length}.`,
+    `\nГотово: городов ${cities}, категорий создано ${categories} из ${SYSTEM_CATEGORIES.length}, FREE-планов ${plans.length}.`,
   );
   console.log("Отдельно: npm run seed:review-tags — теги отзывов.");
   console.log("PRO/PREMIUM-тарифы заводятся в /admin/billing.\n");

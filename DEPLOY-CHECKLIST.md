@@ -43,10 +43,10 @@
 - [ ] **Справочники после первого `migrate deploy`** (PWA-FIX-01) — тем же приёмом, что миграции (образ `beautyhub-worker`, `/opt/app`):
       ```sh
       C="docker compose --env-file .env.production -f docker-compose.prod.yml"
-      $C --profile db run --rm --no-deps migrate npm run seed:reference    # Москва + 12 категорий + FREE-планы
+      $C --profile db run --rm --no-deps migrate npm run seed:reference    # Москва + FREE-планы (+ досоздание набора категорий)
       $C --profile db run --rm --no-deps migrate npm run seed:review-tags  # 17 тегов отзывов
       ```
-      Ожидается `Готово: городов 1, категорий 12, FREE-планов 2` и `Done. 17 tags upserted.` Оба идемпотентны (`upsert`), повтор безопасен. Все города вместо одной Москвы — `… npm run seed:reference -- --cities=all`. Тарифы (FREE/PRO/PREMIUM с ценами) руками заводить не нужно — их применяет шаг деплоя `npm run seed:plans` (BILLING-CATALOG-01).
+      Ожидается `Готово: городов 1, категорий создано 0 из 9, FREE-планов 2` и `Done. 17 tags upserted.` Оба идемпотентны, повтор безопасен. Категории каталога руками заводить не нужно: фиксированный набор из 9 приходит миграцией `20261001124736_system_categories` и шагом деплоя `deploy:post` (SYSTEM-CATEGORIES-01), сид их только досоздаёт и существующие не меняет — «создано 0» и есть норма. Все города вместо одной Москвы — `… npm run seed:reference -- --cities=all`. Тарифы (FREE/PRO/PREMIUM с ценами) руками заводить не нужно — их применяет шаг деплоя `npm run seed:plans` (BILLING-CATALOG-01).
       *🔴 `npm run` в контейнерах `web`/`api` НЕ работает и работать не будет: там standalone-бандл без `package.json`, `tsx` и исходников. Скрипты живут только в worker-образе — он и гоняет миграции. Образ обязан быть пересобран после 2026-09-01 (`$C --profile app build worker`), иначе внутри нет каталога `scripts/`.*
       *Пропуск шага не даёт ни одного симптома: пробы зелёные, страницы 200, а селектор города не рендерится, категорию услуги выбрать не из чего и «Тарифы» пусты (замер 2026-09-01). `seed:test` в проде запрещён гардом — он про аккаунты.*
 - [ ] Миграций **две**, порядок фиксирован: `20260324190000_init_squashed` (MIGRATION-SQUASH-01) → `20260831190000_phone_claim_verified_at` (PHONE-CLAIM-01; бэкфилл владения номером на пустой БД вырожден). Каждая — своя транзакция: падение откатывает только свою

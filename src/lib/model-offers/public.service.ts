@@ -395,13 +395,26 @@ export type PublicModelOfferFilterCategory = {
   name: string;
 };
 
+/**
+ * Служебная категория `hot` в фильтр не идёт. 🔴 Не `NOT: { visualSearchSlug: "hot" }`:
+ * в SQL `NOT (col = 'hot')` при `col IS NULL` — NULL, и строка отбрасывается, а
+ * `visualSearchSlug` пуст почти у всех категорий. Та форма оставляла 0 из 17
+ * категорий dev-базы (замер 2026-10-01, SYSTEM-CATEGORIES-01) — тот же дефект,
+ * что STUDIO-BUGS-FIX-A в `services-data.service.ts`.
+ */
+const NOT_HOT_CATEGORY_WHERE = {
+  OR: [{ visualSearchSlug: null }, { visualSearchSlug: { not: "hot" } }],
+} satisfies Prisma.GlobalCategoryWhereInput;
+
 async function listModelOfferCategoriesWithOffers(todayStr: string): Promise<PublicModelOfferFilterCategory[]> {
   return prisma.globalCategory.findMany({
     where: {
       status: "APPROVED",
       visibleToAll: true,
-      isSystem: false,
-      NOT: [{ visualSearchSlug: "hot" }],
+      // Без `isSystem: false` (SYSTEM-CATEGORIES-01): флаг стоит у всех
+      // категорий фиксированного набора и справочника, и фильтр отбрасывал их
+      // все — на /models не было ни одной пилюли при живых предложениях.
+      ...NOT_HOT_CATEGORY_WHERE,
       services: {
         some: {
           OR: [
@@ -431,8 +444,7 @@ export async function listModelOfferFilterCategories(): Promise<PublicModelOffer
     where: {
       status: "APPROVED",
       visibleToAll: true,
-      isSystem: false,
-      NOT: [{ visualSearchSlug: "hot" }],
+      ...NOT_HOT_CATEGORY_WHERE,
     },
     select: { id: true, name: true },
     orderBy: { name: "asc" },

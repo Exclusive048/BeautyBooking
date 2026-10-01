@@ -5,8 +5,9 @@ export async function listHomeCategories() {
   return prisma.globalCategory.findMany({
     where: {
       status: CategoryStatus.APPROVED,
-      isSystem: false,
-      NOT: [{ visualSearchSlug: "hot" }],
+      // Без `isSystem: false` и без `NOT: { visualSearchSlug: "hot" }`, который
+      // отбрасывает NULL, — см. `model-offers/public.service.ts` (SYSTEM-CATEGORIES-01).
+      OR: [{ visualSearchSlug: null }, { visualSearchSlug: { not: "hot" } }],
     },
     select: {
       id: true,
