@@ -190,12 +190,6 @@ export async function splitStudioMasterProfileTx(
         masterId: studioProfileId,
       },
     });
-    if (studioRowId) {
-      await tx.bookingServiceItem.updateMany({
-        where: { bookingId: { in: misattributedIds } },
-        data: { studioId: studioRowId },
-      });
-    }
   }
 
   // 6. Перерывы студии у мастера.

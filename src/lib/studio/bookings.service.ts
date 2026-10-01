@@ -291,7 +291,6 @@ export async function createStudioBooking(input: {
         await tx.bookingServiceItem.create({
           data: {
             bookingId: booking.id,
-            studioId: studio.id,
             serviceId: service.id,
             titleSnapshot: service.title?.trim() || service.name,
             priceSnapshot: price,

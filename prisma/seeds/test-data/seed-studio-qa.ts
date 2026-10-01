@@ -279,7 +279,6 @@ export async function seedStudioQa(): Promise<number> {
     await prisma.bookingServiceItem.create({
       data: {
         bookingId: booking.id,
-        studioId: studio.id,
         serviceId: service.id,
         titleSnapshot: service.name,
         priceSnapshot: service.price,

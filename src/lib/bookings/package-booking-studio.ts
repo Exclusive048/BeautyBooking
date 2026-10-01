@@ -379,7 +379,6 @@ async function createStudioPackageBookingUnguarded(
           await tx.bookingServiceItem.create({
             data: {
               bookingId: created.id,
-              studioId: pkg.studioId,
               serviceId: core.service.id,
               titleSnapshot: core.service.title?.trim() || core.service.name,
               priceSnapshot: split[i]!,

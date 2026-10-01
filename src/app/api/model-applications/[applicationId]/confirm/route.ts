@@ -291,7 +291,6 @@ export async function POST(req: Request, ctx: RouteContext) {
         await tx.bookingServiceItem.create({
           data: {
             bookingId: booking.id,
-            studioId: offerService.studioId ?? null,
             serviceId: offerService.id,
             titleSnapshot:
               offerService.title?.trim() ||
