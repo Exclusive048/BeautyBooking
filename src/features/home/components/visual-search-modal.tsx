@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import type { VisualSearchHttpResponse } from "@/lib/visual-search/contracts";
 import { VISUAL_CATEGORY_LABELS } from "@/lib/visual-search/prompt";
 import { FileInput } from "@/components/ui/file-input";
@@ -328,7 +329,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
                         <div className="mt-0.5 flex items-center gap-1">
                           <Star className="h-3 w-3 fill-brand-accent text-brand-accent" />
                           <span className="text-xs text-text-sec">
-                            {item.provider.ratingAvg.toFixed(1)}
+                            {UI_FMT.decimal(item.provider.ratingAvg, 1)}
                           </span>
                         </div>
                       </div>

@@ -32,6 +32,7 @@ export function SidebarItem({
       href={href}
       target={target}
       rel={target === "_blank" ? "noopener noreferrer" : undefined}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
         active

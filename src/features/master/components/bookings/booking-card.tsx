@@ -152,7 +152,7 @@ export function BookingCard({ booking, column, showWorkContext = false }: Props)
         <p className="mt-2 text-center text-xs text-text-sec">
           {T.reviewLabelTemplate.replace(
             "{rating}",
-            booking.reviewRating.toFixed(1),
+            UI_FMT.decimal(booking.reviewRating, 1),
           )}
         </p>
       ) : null}

@@ -98,7 +98,7 @@ export function StudioKpiRow({ kpis }: { kpis: StudioKpis }) {
     {
       icon: Star,
       label: T.rating.label,
-      value: kpis.averageRating.current.toFixed(1),
+      value: UI_FMT.decimal(kpis.averageRating.current, 1),
       unit: "★",
       sublabel: T.rating.subtitle.replace("{count}", String(kpis.ratingCount)),
       delta: kpis.averageRating.delta,

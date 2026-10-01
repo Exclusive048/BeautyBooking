@@ -12,6 +12,7 @@ import { moneyRUBFromKopeks } from "@/lib/format";
 import { hueFromId } from "@/lib/utils/hue-from-id";
 import { ApiClientError, fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { providerPublicUrl } from "@/lib/public-urls";
 import {
   formatAvailability,
@@ -53,7 +54,7 @@ type CatalogCardItem = {
 /** «850 м» → «0,9 км»; до 10 км — с десятой, дальше — целыми. */
 function formatDistanceKm(meters: number): string {
   const km = meters / 1000;
-  const value = km < 10 ? km.toFixed(1) : String(Math.round(km));
+  const value = km < 10 ? UI_FMT.decimal(km, 1) : String(Math.round(km));
   return `${value.replace(".", ",")} ${UI_TEXT.catalog2.card.distanceKm}`;
 }
 
@@ -271,7 +272,7 @@ export function CatalogCard({
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs text-text-sec">
                   <Star className="h-3 w-3 fill-rating text-rating" aria-hidden />
                   <span className="font-semibold tabular-nums text-text-main">
-                    {item.ratingAvg.toFixed(1)}
+                    {UI_FMT.decimal(item.ratingAvg, 1)}
                   </span>
                   <span aria-hidden>·</span>
                   {/* CATALOG-RANKING-01: число отзывов словом, не «(47)». */}

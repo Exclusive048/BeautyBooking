@@ -1,3 +1,5 @@
+import { UI_FMT } from "@/lib/ui/fmt";
+
 export type DeltaTone = "positive" | "negative" | "neutral";
 
 export type FormattedDelta = {
@@ -51,7 +53,7 @@ export function formatRatingDelta(current: number, previous: number): FormattedD
   if (diff === 0) return { text: "—", tone: "neutral" };
   const sign = diff > 0 ? "+" : "−";
   return {
-    text: `${sign}${Math.abs(diff).toFixed(1)}`,
+    text: `${sign}${UI_FMT.decimal(Math.abs(diff), 1)}`,
     tone: diff > 0 ? "positive" : "negative",
   };
 }

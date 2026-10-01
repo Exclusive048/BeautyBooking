@@ -106,7 +106,7 @@ export function StudioTopMasters({ masters }: { masters: StudioTopMasterRow[] })
                   {UI_FMT.priceLabel(master.revenueKopeks)}
                 </div>
                 <div className="mt-0.5 text-2xs text-text-sec">
-                  ★ {master.rating.toFixed(1)}
+                  ★ {UI_FMT.decimal(master.rating, 1)}
                 </div>
               </div>
             </li>

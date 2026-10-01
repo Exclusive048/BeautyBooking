@@ -60,7 +60,7 @@ export function MastersView({ data }: Props) {
                     {Math.round(row.occupancyRate * 100)}%
                   </td>
                   <td className="px-3 py-3 text-right text-sm tabular-nums text-text-sec">
-                    {row.reviewsCount > 0 ? `★ ${row.rating.toFixed(1)}` : "—"}
+                    {row.reviewsCount > 0 ? `★ ${UI_FMT.decimal(row.rating, 1)}` : "—"}
                   </td>
                 </tr>
               ))}

@@ -214,7 +214,7 @@ export const UI_FMT = {
   },
   ratingLabel(rating: number, count: number): string {
     if (count <= 0) return UI_TEXT.common.novice;
-    return `⭐ ${rating.toFixed(1)} (${count})`;
+    return `⭐ ${UI_FMT.decimal(rating, 1)} (${count})`;
   },
   durationLabel(minutes: number): string {
     if (minutes <= 0) return "0 мин";

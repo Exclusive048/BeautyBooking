@@ -59,7 +59,7 @@ export function FeedGroupTile({
   const profileHref = group.authorPublicUsername ? `/u/${group.authorPublicUsername}` : null;
   const workCaption = formatWorkCaption(current.performerName, current.primaryServiceTitle);
   const priceRub = current.totalPrice > 0 ? UI_FMT.priceLabel(current.totalPrice) : null;
-  const rating = group.authorRatingAvg > 0 ? group.authorRatingAvg.toFixed(1) : null;
+  const rating = group.authorRatingAvg > 0 ? UI_FMT.decimal(group.authorRatingAvg, 1) : null;
   const isCarousel = total > 1;
 
   const handleScroll = () => {

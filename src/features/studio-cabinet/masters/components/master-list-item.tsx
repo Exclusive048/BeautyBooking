@@ -109,7 +109,7 @@ export function MasterListItem({
             <>
               <span aria-hidden>·</span>
               <span>
-                ★ {master.metrics.rating.toFixed(1)}
+                ★ {UI_FMT.decimal(master.metrics.rating, 1)}
               </span>
             </>
           ) : null}

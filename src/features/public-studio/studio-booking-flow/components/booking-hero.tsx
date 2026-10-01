@@ -7,6 +7,7 @@ import type { ProviderProfileDto } from "@/lib/providers/dto";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { MasterAvatar } from "./master-avatar";
 
 type Props = {
@@ -103,7 +104,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
             <Star className="h-3 w-3 text-rating" aria-hidden />
             <span>
               {UI_TEXT.bookingWidget.hero.ratingLabel
-                .replace("{rating}", studio.rating.toFixed(1))
+                .replace("{rating}", UI_FMT.decimal(studio.rating, 1))
                 .replace("{reviews}", String(studio.reviews ?? 0))}
             </span>
           </div>

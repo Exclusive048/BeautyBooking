@@ -80,7 +80,7 @@ export function OfferCard({ offer }: Props) {
           {master.ratingCount > 0 ? (
             <div className="flex items-center gap-1 text-xs text-text-sec">
               <Star className="h-3 w-3 fill-current text-rating" aria-hidden />
-              <span className="tabular-nums">{master.ratingAvg.toFixed(1)}</span>
+              <span className="tabular-nums">{UI_FMT.decimal(master.ratingAvg, 1)}</span>
               <span aria-hidden>·</span>
               <span className="tabular-nums">{master.ratingCount}</span>
               <span>{T.reviewsLabel}</span>

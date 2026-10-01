@@ -6,6 +6,7 @@ import { getStudioProfile } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type Props = {
   studioId: string;
@@ -61,7 +62,7 @@ export async function StudioDetailsSection({ studioId }: Props) {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-text-muted">
-              <span className="font-semibold text-text">{studio.rating.toFixed(1)}</span>{" "}
+              <span className="font-semibold text-text">{UI_FMT.decimal(studio.rating, 1)}</span>{" "}
               <span>({studio.reviews} {UI_TEXT.publicStudio.reviewsCountLabel})</span>
             </div>
             <div className="text-sm text-text">

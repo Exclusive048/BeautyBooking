@@ -85,7 +85,7 @@ export const catalog = {
     geoError: "Не удалось определить местоположение. Попробуйте ещё раз.",
     searchArea: "Искать в этой области",
     myLocation: "Показать, где я",
-    ratingHint: (title: string, rating: number) => `${title} • Рейтинг ${rating.toFixed(1)}`,
+    ratingHint: (title: string, rating: string) => `${title} • Рейтинг ${rating}`,
     carouselAria: "Мастера на карте",
     missingTail: (count: number) =>
       `Ещё ${count} ${pluralize(count, "мастер", "мастера", "мастеров")} без адреса на карте`,

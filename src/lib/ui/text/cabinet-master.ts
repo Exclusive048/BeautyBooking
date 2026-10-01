@@ -1590,7 +1590,7 @@ export const cabinetMaster = {
       freeTodaySlotOne: "окошко",
       freeTodaySlotFew: "окошка",
       freeTodaySlotMany: "окошек",
-      freeTodayAfterTemplate: "после {time}",
+      freeTodayAfterTemplate: "ближайшее в {time}",
       freeTodayNone: "нет окошек",
     },
     legend: {
@@ -1664,7 +1664,11 @@ export const cabinetMaster = {
       statConfirmed: "Подтверждено",
     },
     columns: {
-      pending: { title: "Ждут подтверждения", hint: "Ответьте в течение 30 минут" },
+      pending: {
+        title: "Ждут подтверждения",
+        // Срок — `PENDING_EXPIRY_HOURS`: без ответа запись отменяется сама.
+        hint: (hours: number) => `Без ответа за ${hours} ч запись отменится`,
+      },
       confirmed: { title: "Подтверждены", hint: "Готовы к визиту" },
       today: { title: "Сегодня", hint: "В работе" },
       done: { title: "Завершены", hint: "Запросить отзыв" },

@@ -2,6 +2,7 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ReviewStats } from "@/lib/master/reviews-stats";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { pluralize } from "@/features/master/components/clients/lib/format";
 import { StarsDisplay } from "./stars-display";
 
@@ -40,15 +41,15 @@ export function ReviewsHeroCard({ stats }: Props) {
     trend === null
       ? null
       : trend > 0
-        ? T.hero.trendUpTemplate.replace("{value}", trend.toFixed(1))
-        : T.hero.trendDownTemplate.replace("{value}", trend.toFixed(1));
+        ? T.hero.trendUpTemplate.replace("{value}", UI_FMT.decimal(trend, 1))
+        : T.hero.trendDownTemplate.replace("{value}", UI_FMT.decimal(trend, 1));
 
   return (
     <article className="flex h-full flex-col justify-between rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6">
       <div>
         <div className="flex items-baseline gap-2">
           <span className="font-display text-5xl font-bold text-accent-text">
-            {stats.avgRating.toFixed(1)}
+            {UI_FMT.decimal(stats.avgRating, 1)}
           </span>
           <span className="text-lg text-text-sec">{T.hero.outOfFive}</span>
         </div>

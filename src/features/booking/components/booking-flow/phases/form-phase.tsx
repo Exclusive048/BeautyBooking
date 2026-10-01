@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
+import { formatRussianPhoneInput } from "@/lib/phone/input-format";
 import { PhoneInput } from "@/features/booking/components/booking-flow/components/phone-input";
 import { SummaryBlock } from "@/features/booking/components/booking-flow/components/summary-block";
 import { Footnote } from "@/features/booking/components/booking-flow/components/footnote";
@@ -145,7 +146,9 @@ export function FormPhase({
       {!meLoading && isAuthPhone ? (
         <div className="rounded-xl border border-border-subtle bg-bg-input/70 px-3 py-2.5 text-sm">
           <span className="text-text-sec">{TB.bookingOnPhone}</span>{" "}
-          <span className="font-semibold text-text-main">{me?.phone}</span>
+          <span className="font-semibold text-text-main">
+            {me?.phone ? formatRussianPhoneInput(me.phone) : null}
+          </span>
         </div>
       ) : (
         <PhoneInput

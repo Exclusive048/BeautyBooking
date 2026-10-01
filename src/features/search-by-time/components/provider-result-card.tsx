@@ -7,6 +7,7 @@ import type { AvailabilityProviderItem } from "@/lib/search-by-time/types";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import { providerPublicUrl } from "@/lib/public-urls";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
 type Props = {
@@ -51,7 +52,7 @@ export function ProviderResultCard({ item }: Props) {
             <div className="text-xs text-text-sec">
               {showNew
                 ? UI_TEXT.catalog.newLabel
-                : `${item.ratingAvg.toFixed(1)} • ${item.reviewsCount} ${UI_TEXT.catalog.reviewsLabel}`}
+                : `${UI_FMT.decimal(item.ratingAvg, 1)} • ${item.reviewsCount} ${UI_TEXT.catalog.reviewsLabel}`}
             </div>
           </div>
         </div>

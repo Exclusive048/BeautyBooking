@@ -234,6 +234,8 @@ export const clientCabinet = {
     actionReview: "Оставить отзыв",
     actionRebook: "Повторить",
     actionContact: "Связаться",
+    // Причина отмены, указанная мастером или студией.
+    cancelReasonLabel: "Причина отмены:",
     monthHeading: "{month}",
     salonTimeNote: "Время салона",
     empty: "Записей пока нет — самое время найти мастера.",

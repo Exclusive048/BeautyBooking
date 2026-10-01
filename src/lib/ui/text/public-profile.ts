@@ -36,6 +36,7 @@ export const publicProfile = {
     shareSuccess: "Ссылка скопирована",
     shareFailed: "Не удалось поделиться. Попробуйте ещё раз.",
     premiumBadge: "PREMIUM",
+    noReviewsYet: "Пока без отзывов",
     availableTodayTemplate: "Сегодня свободно с {time}",
     availableLaterTemplate: "Ближайшее окошко — {date}",
     availableNone: "Свободных окошек пока нет",
@@ -329,7 +330,14 @@ export const publicProfile = {
     errorNetwork: "Не удалось связаться с сервером. Попробуйте ещё раз.",
     successEyebrow: "Вы записаны",
     successHeadlineTemplate: "{name} ждёт вас",
-    successConfirmationSentTo: "Подтверждение отправлено на",
+    // Запись ждёт подтверждения мастера (PENDING / NEW): «ждёт вас» было бы неправдой.
+    successPendingEyebrow: "Запись отправлена",
+    successPendingHeadlineTemplate: "{name} подтвердит запись",
+    successPendingHeadlineFallback: "Мастер подтвердит запись",
+    successPendingNote: (hours: number) =>
+      `Если мастер не подтвердит её за ${hours} ч, запись отменится. Ответ придёт в уведомлениях.`,
+    // На номер ничего не отправляется (SMS только для кода входа) — это номер, на который записали.
+    successPhoneLabel: "Записали на номер",
     successGoToCabinet: "В личный кабинет",
     successCancelAuth: "Отменить запись",
     successCancelGuest: "Отменить — войдите в аккаунт",

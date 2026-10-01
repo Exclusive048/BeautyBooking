@@ -1,5 +1,6 @@
 import { pluralize } from "@/lib/utils/pluralize";
 import type { MasterStats } from "@/lib/advisor/types";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 export type AdvisorRule = {
   id: string;
@@ -76,7 +77,7 @@ export const ADVISOR_RULES: AdvisorRule[] = [
     title: "Низкий рейтинг услуги",
     message: (data) =>
       data.lowRatedService
-        ? `У услуги «${data.lowRatedService.name}» средняя оценка ${data.lowRatedService.rating.toFixed(1)}.`
+        ? `У услуги «${data.lowRatedService.name}» средняя оценка ${UI_FMT.decimal(data.lowRatedService.rating, 1)}.`
         : "У одной из услуг низкая оценка.",
     action: { label: "Отзывы", href: "/cabinet/master/reviews" },
   },

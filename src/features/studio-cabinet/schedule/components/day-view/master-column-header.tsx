@@ -1,5 +1,6 @@
 import { ResilientImage } from "@/components/ui/resilient-image";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import type { ScheduleMasterColumn } from "../../server/types";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.column;
@@ -36,7 +37,7 @@ export function MasterColumnHeader({ master }: { master: ScheduleMasterColumn })
         </p>
         {master.reviewsCount > 0 ? (
           <p className="mt-0.5 text-2xs text-text-sec">
-            {T.ratingTemplate.replace("{value}", master.rating.toFixed(1))}
+            {T.ratingTemplate.replace("{value}", UI_FMT.decimal(master.rating, 1))}
           </p>
         ) : null}
       </div>

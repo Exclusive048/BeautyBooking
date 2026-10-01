@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Calendar, CheckCircle2, Clock, MapPin, Receipt } from "lucide-react";
+import { ArrowRight, Calendar, CheckCircle2, Clock, Hourglass, MapPin, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { ConfirmedBooking } from "@/features/booking/components/booking-flow/types";
-import { buildSuccessHeadline } from "@/features/booking/components/booking-flow/lib/success-headline";
+import { PENDING_EXPIRY_HOURS } from "@/lib/bookings/flow";
+import {
+  buildSuccessHeadline,
+  isAwaitingConfirmation,
+} from "@/features/booking/components/booking-flow/lib/success-headline";
 import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
@@ -43,6 +48,7 @@ function formatRange(startIso: string, endIso: string | null, timezone: string):
  */
 export function SuccessPhase({ booking, onCancel }: Props) {
   const [cancelling, setCancelling] = useState(false);
+  const pending = isAwaitingConfirmation(booking.status);
   const viewerTz = useViewerTimeZoneContext();
   // QA-107/FIX-22: the confirmed time is the salon's local time; show the
   // explicit zone label when the viewer's zone differs.
@@ -57,15 +63,29 @@ export function SuccessPhase({ booking, onCancel }: Props) {
   return (
     <div className="space-y-5 p-5">
       <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-5 w-5 text-success-text" aria-hidden strokeWidth={2} />
-        <p className="text-2xs font-medium uppercase tracking-wider text-success-text">
-          {T.successEyebrow}
+        {pending ? (
+          <Hourglass className="h-5 w-5 text-warning-text" aria-hidden strokeWidth={2} />
+        ) : (
+          <CheckCircle2 className="h-5 w-5 text-success-text" aria-hidden strokeWidth={2} />
+        )}
+        <p
+          className={cn(
+            "text-2xs font-medium uppercase tracking-wider",
+            pending ? "text-warning-text" : "text-success-text",
+          )}
+        >
+          {pending ? T.successPendingEyebrow : T.successEyebrow}
         </p>
       </div>
 
-      <p className="font-display text-xl text-text-main">
-        {buildSuccessHeadline(booking.providerName)}
-      </p>
+      <div className="space-y-1">
+        <p className="font-display text-xl text-text-main">
+          {buildSuccessHeadline(booking.providerName, booking.status)}
+        </p>
+        {pending ? (
+          <p className="text-sm text-text-sec">{T.successPendingNote(PENDING_EXPIRY_HOURS)}</p>
+        ) : null}
+      </div>
 
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm text-text-main">
@@ -105,7 +125,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
 
       {booking.clientPhoneMasked ? (
         <div className="rounded-xl bg-bg-page p-3">
-          <p className="text-xs text-text-sec">{T.successConfirmationSentTo}</p>
+          <p className="text-xs text-text-sec">{T.successPhoneLabel}</p>
           <p className="mt-0.5 font-mono text-sm text-text-main">
             {booking.clientPhoneMasked}
           </p>
