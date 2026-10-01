@@ -111,7 +111,7 @@ export function AuthUserMenu({
           >
             {showSwitcher ? (
               <div className="space-y-0.5 pb-1">
-                <div className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+                <div className="px-3 py-1.5 eyebrow">
                   {UI_TEXT.nav.cabinetSwitcher.label}
                 </div>
                 {availableCabinets.map((c) => {

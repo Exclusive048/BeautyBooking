@@ -1284,25 +1284,6 @@ export const openApiSpec = {
           note: { type: "string", nullable: true },
         },
       },
-      StudioClientListItem: {
-        type: "object",
-        required: ["key", "displayName", "phone", "lastBookingAt", "lastServiceName", "visitsCount"],
-        properties: {
-          key: { type: "string" },
-          displayName: { type: "string" },
-          phone: { type: "string" },
-          lastBookingAt: { type: "string", format: "date-time" },
-          lastServiceName: { type: "string" },
-          visitsCount: { type: "integer" },
-        },
-      },
-      StudioClientsData: {
-        type: "object",
-        required: ["clients"],
-        properties: {
-          clients: { type: "array", items: { $ref: "#/components/schemas/StudioClientListItem" } },
-        },
-      },
       CreateTimeBlockInput: {
         type: "object",
         required: ["studioId", "masterId", "startAt", "endAt", "type"],
@@ -3528,21 +3509,6 @@ export const openApiSpec = {
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
           "409": errorResponse("Conflict"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/clients": {
-      get: {
-        summary: "Studio clients aggregated from bookings",
-        tags: ["studio", "clients"],
-        parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/StudioClientsData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Studio not found"),
           "500": errorResponse("Internal error"),
         },
       },

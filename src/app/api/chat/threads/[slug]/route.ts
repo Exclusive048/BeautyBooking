@@ -5,7 +5,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { resolveConversationSlug } from "@/lib/chat/conversation-slug";
 import { resolveConversationAccess } from "@/lib/chat/conversation-access";
-import { getConversationThread } from "@/lib/chat/conversation-aggregator";
+import { decodeThreadCursor, getConversationThread } from "@/lib/chat/conversation-aggregator";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
@@ -49,10 +49,18 @@ export async function GET(
 
     const tzHint = req.headers.get("x-tz") ?? undefined;
 
+    // 29.09 доработки · 31: «Показать раньше» — страница до курсора.
+    const beforeParam = url.searchParams.get("before");
+    const before = beforeParam ? decodeThreadCursor(beforeParam) : null;
+    if (beforeParam && !before) {
+      return jsonFail(400, "Не удалось загрузить сообщения. Обновите страницу.", "VALIDATION_ERROR");
+    }
+
     const detail = await getConversationThread({
       key,
       perspective,
       viewerTimezone: tzHint || "Europe/Moscow",
+      before,
     });
     if (!detail) {
       return jsonFail(404, "Переписка не найдена.", "NOT_FOUND");
@@ -61,6 +69,7 @@ export async function GET(
     return jsonOk({
       slug: detail.slug,
       thread: detail.thread,
+      olderCursor: detail.olderCursor,
       partner: detail.partner,
       perspective,
       canSend: access.canSend,

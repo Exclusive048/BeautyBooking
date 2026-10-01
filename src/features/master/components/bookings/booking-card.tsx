@@ -49,7 +49,7 @@ export function BookingCard({ booking, column, showWorkContext = false }: Props)
         ) : (
           <span
             aria-hidden
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
           >
             {initialsOf(booking.clientName)}
           </span>
@@ -59,9 +59,9 @@ export function BookingCard({ booking, column, showWorkContext = false }: Props)
             {booking.clientName}
           </p>
           {booking.visitTag ? (
-            <p className="truncate text-[11px] text-text-sec">{booking.visitTag}</p>
+            <p className="truncate text-2xs text-text-sec">{booking.visitTag}</p>
           ) : (
-            <p className="truncate text-[11px] text-text-sec">{T.guestClient}</p>
+            <p className="truncate text-2xs text-text-sec">{T.guestClient}</p>
           )}
         </div>
         {column === "pending" && booking.isNewClient ? (
@@ -107,7 +107,7 @@ export function BookingCard({ booking, column, showWorkContext = false }: Props)
       ) : null}
 
       {column === "cancelled" && booking.changeComment ? (
-        <p className="mb-2 line-clamp-2 text-[11px] text-text-sec">
+        <p className="mb-2 line-clamp-2 text-2xs text-text-sec">
           {booking.changeComment}
         </p>
       ) : null}

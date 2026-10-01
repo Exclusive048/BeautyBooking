@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 
 export function PortfolioSkeleton() {
   return (
-    <section className="lux-card rounded-[28px] p-5">
+    <section className="lux-card rounded-3xl p-5">
       <Skeleton className="h-6 w-44" />
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
         {Array.from({ length: 6 }).map((_, index) => (

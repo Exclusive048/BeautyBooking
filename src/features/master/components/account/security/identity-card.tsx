@@ -29,7 +29,7 @@ export function IdentityCard({ identity }: Props) {
         <li>
           <div className="flex items-start gap-3 py-3">
             <div className="min-w-0 flex-1">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+              <span className="eyebrow">
                 {T.phoneLabel}
               </span>
               <p className={phoneValue ? "mt-1 text-sm text-text-main" : "mt-1 text-sm italic text-text-sec"}>

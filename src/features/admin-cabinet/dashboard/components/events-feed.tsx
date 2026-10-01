@@ -136,7 +136,7 @@ export function EventsFeed({ initial }: Props) {
 
 function LiveBadge() {
   return (
-    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+    <span className="inline-flex items-center gap-1.5 eyebrow">
       <span
         aria-hidden
         className="h-1.5 w-1.5 animate-pulse rounded-full bg-success"

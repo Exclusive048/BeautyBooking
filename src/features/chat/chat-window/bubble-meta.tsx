@@ -15,7 +15,7 @@ export function BubbleMeta({ time, isMine, isRead }: Props) {
   return (
     <div
       className={cn(
-        "mt-0.5 flex items-center gap-1 px-1 font-mono text-[10.5px] text-text-sec",
+        "mt-0.5 flex items-center gap-1 px-1 font-mono text-2xs text-text-sec",
         isMine ? "justify-end" : "justify-start",
       )}
     >

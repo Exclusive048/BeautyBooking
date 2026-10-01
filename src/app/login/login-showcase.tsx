@@ -149,14 +149,14 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
               <span
                 className={
                   near
-                    ? "truncate text-[11px] text-white/60"
-                    : "truncate text-[10.5px] text-white/50"
+                    ? "truncate text-2xs text-white/60"
+                    : "truncate text-2xs text-white/50"
                 }
               >
                 {card.subtitle}
               </span>
               {card.badge ? (
-                <span className="ml-auto flex-none rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/75">
+                <span className="ml-auto flex-none rounded-full bg-white/10 px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-white/75">
                   {card.badge}
                 </span>
               ) : null}
@@ -229,7 +229,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
             legible on this pane pre-redesign). */}
         <div className="login-rise" style={{ animationDelay: RISE_DELAY.brand }}>
           <BrandLogo variant="full" size="md" href={null} textClassName="text-white" />
-          <p className="mt-1.5 font-mono text-[10px] tracking-[0.08em] text-white/60">
+          <p className="mt-1.5 font-mono text-3xs tracking-[0.08em] text-white/60">
             {UI_TEXT.brand.tagline}
           </p>
         </div>
@@ -284,7 +284,7 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
                 which are translucent, so it reads THROUGH them: that is the
                 layering, not a backdrop the cards merely cover. */}
             <div
-              className="login-plate absolute -inset-x-1 -inset-y-3 overflow-hidden rounded-[32px] ring-1 ring-white/10"
+              className="login-plate absolute -inset-x-1 -inset-y-3 overflow-hidden rounded-3xl ring-1 ring-white/10"
               // Same top/bottom fade as the card marquee, so the plate dissolves
               // into the aurora instead of ending on a hard rectangle edge.
               style={{

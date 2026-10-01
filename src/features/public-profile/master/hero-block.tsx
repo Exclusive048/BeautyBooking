@@ -88,7 +88,7 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
   }
 
   return (
-    <section className="aurora-bg relative overflow-hidden rounded-[28px] border border-border-subtle/70 bg-bg-card">
+    <section className="aurora-bg relative overflow-hidden rounded-3xl border border-border-subtle/70 bg-bg-card">
       <div className="relative px-5 py-6 md:px-8 md:py-8">
         <nav
           aria-label={UI_TEXT.a11y.breadcrumbs}

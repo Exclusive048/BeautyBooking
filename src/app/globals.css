@@ -550,6 +550,16 @@
   .histogram-slider-thumb:focus-visible::-moz-range-thumb {
     box-shadow: 0 0 0 4px rgb(var(--border-focus) / 0.28);
   }
+
+  /* 29.09 доработки · 25 (UI-22) — «бровь»: подпись над полем, шапка колонки,
+     надзаголовок карточки. Одна разрядка (0.18em, решение 25.2) вместо шести
+     разных. Слой компонентов собирается РАНЬШЕ утилит, поэтому цвет и размер
+     вызывающего побеждают: `eyebrow text-2xs` — подпись 11px,
+     `eyebrow text-accent-text` — акцентная. Плашка состояния — не «бровь»,
+     а `<Badge size="xs">`. */
+  .eyebrow {
+    @apply font-mono text-3xs uppercase tracking-[0.18em] text-text-sec;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -146,7 +146,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
               <p className="text-sm font-semibold leading-none text-text-main">
                 {UI_TEXT.home.visualSearch.modalTitle}
               </p>
-              <p className="mt-1 text-[11px] leading-none text-text-sec">
+              <p className="mt-1 text-2xs leading-none text-text-sec">
                 {UI_TEXT.home.visualSearch.modalSubtitle}
               </p>
             </div>
@@ -206,7 +206,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
               <span className="rounded-lg border border-border-subtle bg-bg-card px-3 py-1.5 text-xs font-medium text-text-main transition-colors hover:bg-bg-input">
                 {UI_TEXT.home.visualSearch.chooseFile}
               </span>
-              <p className="text-[11px] text-text-sec/60">
+              <p className="text-2xs text-text-sec/60">
                 {UI_TEXT.home.visualSearch.fileRequirements}
               </p>
 
@@ -282,7 +282,7 @@ export function VisualSearchModal({ open, onClose }: Props) {
               {/* Category label */}
               <div className="flex items-center gap-2">
                 <div className="h-px flex-1 bg-border-subtle" />
-                <span className="flex items-center gap-1.5 rounded-full border border-brand-accent/20 bg-brand-accent/[0.08] px-3 py-1 text-[11px] font-medium text-brand-accent">
+                <span className="flex items-center gap-1.5 rounded-full border border-brand-accent/20 bg-brand-accent/[0.08] px-3 py-1 text-2xs font-medium text-brand-accent">
                   <Sparkles className="h-3 w-3" />
                   {UI_TEXT.home.visualSearch.searchingCategory.replace(
                     "{category}",

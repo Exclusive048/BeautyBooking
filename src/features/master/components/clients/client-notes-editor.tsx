@@ -109,7 +109,7 @@ export function ClientNotesEditor({ clientKey, initialNotes }: Props) {
   return (
     <section className="border-b border-border-subtle py-4">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {T.heading}
         </p>
         {mode === "read" ? (

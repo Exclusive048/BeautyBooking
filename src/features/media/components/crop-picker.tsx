@@ -96,7 +96,7 @@ function CropPreview({
           style={{ ...cropAreaImageStyle(area), display: "block" }}
         />
       </div>
-      <span className="text-[11px] text-text-sec">{size}px</span>
+      <span className="text-2xs text-text-sec">{size}px</span>
     </div>
   );
 }

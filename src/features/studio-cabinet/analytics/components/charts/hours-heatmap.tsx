@@ -41,7 +41,7 @@ export function HoursHeatmap({ data }: Props) {
             {Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i).map((hour) => (
               <th
                 key={hour}
-                className="w-6 text-[10px] font-mono font-normal tabular-nums text-text-sec"
+                className="w-6 text-3xs font-mono font-normal tabular-nums text-text-sec"
               >
                 {hour}
               </th>
@@ -51,7 +51,7 @@ export function HoursHeatmap({ data }: Props) {
         <tbody>
           {WEEKDAY_LABELS.map((label, weekday) => (
             <tr key={weekday}>
-              <th className="w-8 text-right text-[10px] font-mono font-normal text-text-sec">
+              <th className="w-8 text-right text-3xs font-mono font-normal text-text-sec">
                 {label}
               </th>
               {Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i).map((hour) => {

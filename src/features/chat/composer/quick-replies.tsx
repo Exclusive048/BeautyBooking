@@ -19,7 +19,7 @@ export function QuickReplies({ perspective, onPick, onHide }: Props) {
     perspective === "master" ? T.quickReplies.master : T.quickReplies.client;
   return (
     <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-wider text-text-sec">
+      <span className="mr-1 inline-flex items-center gap-1 eyebrow">
         <Zap className="h-3 w-3" aria-hidden strokeWidth={1.8} />
         {T.quickReplies.eyebrow}
       </span>
@@ -30,7 +30,7 @@ export function QuickReplies({ perspective, onPick, onHide }: Props) {
       ))}
       <Button variant="wrapper"
         onClick={onHide}
-        className="ml-auto text-[11px] text-text-sec transition hover:text-text-main"
+        className="ml-auto text-2xs text-text-sec transition hover:text-text-main"
       >
         {T.quickReplies.hide}
       </Button>

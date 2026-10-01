@@ -258,7 +258,7 @@ function FavMasterCard({
             </Button>
           </Link>
           <Link href={profileHref}>
-            <Button variant="secondary" size="sm" aria-label={T.openProfileAria}>
+            <Button variant="secondary" size="icon" aria-label={T.openProfileAria} className="h-9 w-auto px-3">
               <Eye className="h-4 w-4" aria-hidden />
             </Button>
           </Link>
@@ -321,7 +321,7 @@ function FavStudioCard({
             </Button>
           </Link>
           <Link href={profileHref}>
-            <Button variant="secondary" size="sm" aria-label={T.aboutStudioAria}>
+            <Button variant="secondary" size="icon" aria-label={T.aboutStudioAria} className="h-9 w-auto px-3">
               <Eye className="h-4 w-4" aria-hidden />
             </Button>
           </Link>
@@ -401,7 +401,7 @@ function UnfavoriteButton({ onClick }: { onClick: () => void }) {
 
 function PremiumBadge() {
   return (
-    <div className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-white">
+    <div className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-black/70 px-2 py-1 font-mono text-3xs uppercase tracking-[0.18em] text-white">
       <Crown className="h-3 w-3" aria-hidden />
       PREMIUM
     </div>

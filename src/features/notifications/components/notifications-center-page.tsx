@@ -614,7 +614,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
           «add a phone» prompt was unreachable advice aimed at the wrong surface. */}
       {showInvites ? (
         <div
-          className="rounded-[22px] border border-border-subtle bg-bg-card p-5 shadow-card md:p-6"
+          className="rounded-3xl border border-border-subtle bg-bg-card p-5 shadow-card md:p-6"
           data-testid="notifications-invites"
         >
           <h2 className="mb-3 text-sm font-semibold text-text-main">{t.invitesTitle}</h2>
@@ -722,7 +722,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
                         </p>
                       ) : null}
 
-                      <span className="mt-1.5 inline-block rounded-md bg-bg-card px-2 py-0.5 text-[10px] text-text-sec">
+                      <span className="mt-1.5 inline-block rounded-md bg-bg-card px-2 py-0.5 text-3xs text-text-sec">
                         {channelLabel(note.channel)}
                       </span>
 

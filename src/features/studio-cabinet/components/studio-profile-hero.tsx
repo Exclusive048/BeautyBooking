@@ -36,7 +36,7 @@ export function StudioProfileHero({
   const publicationLabel = UI_TEXT.studio.profile.publicationLabel;
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-border-subtle bg-bg-card shadow-card">
+    <section className="overflow-hidden rounded-3xl border border-border-subtle bg-bg-card shadow-card">
       <div className="relative h-[220px] w-full overflow-hidden bg-bg-input">
         <Button
           variant="wrapper"

@@ -54,7 +54,7 @@ export function CitiesRow({
               ) : null}
             </p>
             {isDuplicate ? (
-              <p className="mt-0.5 font-mono text-[11px] text-warning-text">
+              <p className="mt-0.5 font-mono text-2xs text-warning-text">
                 {T.duplicateMarker.label}
               </p>
             ) : null}

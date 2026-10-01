@@ -25,7 +25,7 @@ export function MasterColumnHeader({ master }: { master: ScheduleMasterColumn })
       ) : (
         <span
           aria-hidden
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
         >
           {initials(master.name)}
         </span>
@@ -35,7 +35,7 @@ export function MasterColumnHeader({ master }: { master: ScheduleMasterColumn })
           {master.name}
         </p>
         {master.reviewsCount > 0 ? (
-          <p className="mt-0.5 text-[11px] text-text-sec">
+          <p className="mt-0.5 text-2xs text-text-sec">
             {T.ratingTemplate.replace("{value}", master.rating.toFixed(1))}
           </p>
         ) : null}

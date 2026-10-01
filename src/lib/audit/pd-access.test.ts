@@ -153,8 +153,10 @@ describe("инструментирование: где след есть и гд
     expect(read("src/features/admin-cabinet/users/server/users.service.ts")).toContain(
       "recordPdAccess",
     );
-    expect(read("src/lib/master/clients.service.ts")).toContain("recordPdAccess");
-    expect(read("src/lib/studio/clients.service.ts")).toContain("recordPdAccess");
+    // CRM-списки читают страницы «Клиенты» (29.09 доработки · 16 В0); API-списки
+    // без вызывающих удалены в · 31 (решение владельца 31.2).
+    expect(read("src/lib/master/clients-view.service.ts")).toContain("recordPdAccess");
+    expect(read("src/features/studio-cabinet/clients/server/clients-data.service.ts")).toContain("recordPdAccess");
     // Обе billing-выдачи несут displayName+email+phone плательщика — в
     // RKN-FIX-10 остались с пометкой ⚠️, закрыты здесь.
     expect(read("src/features/admin-cabinet/billing/server/payments.service.ts")).toContain(
@@ -174,8 +176,8 @@ describe("инструментирование: где след есть и гд
 
     const sources = [
       "src/features/admin-cabinet/users/server/users.service.ts",
-      "src/lib/master/clients.service.ts",
-      "src/lib/studio/clients.service.ts",
+      "src/lib/master/clients-view.service.ts",
+      "src/features/studio-cabinet/clients/server/clients-data.service.ts",
       "src/features/admin-cabinet/billing/server/payments.service.ts",
       "src/features/admin-cabinet/billing/server/subscriptions.service.ts",
     ].map(read).join("\n");

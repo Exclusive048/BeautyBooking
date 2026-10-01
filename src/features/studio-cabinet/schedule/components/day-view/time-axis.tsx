@@ -17,7 +17,7 @@ export function TimeAxis({ gridWindow }: { gridWindow: GridWindow }) {
       {slots.map((minutes, index) => (
         <div
           key={minutes}
-          className="absolute right-0 -translate-y-1/2 pr-2 font-mono text-[10px] uppercase tracking-wide text-text-sec"
+          className="absolute right-0 -translate-y-1/2 pr-2 font-mono text-3xs uppercase tracking-wide text-text-sec"
           style={{ top: index * SLOT_HEIGHT_PX }}
         >
           {minutes % 60 === 0 ? formatTime(minutes) : ""}

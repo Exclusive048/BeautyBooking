@@ -276,7 +276,7 @@ export function ClientBookingsPage() {
         <div className="space-y-8" data-testid="bookings-list">
           {months.map((month) => (
             <section key={month.key}>
-              <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+              <div className="mb-3 eyebrow">
                 {month.label}
               </div>
               <ul className="space-y-3">
@@ -356,7 +356,7 @@ function KpiCards({
       {/* PWA-FIX-10: плитка «ближайшая запись» остаётся своей — у неё
           бренд-градиент и белый текст, которых у примитива нет, — но её ритм
           выровнен по `<StatTile>`: те же отступы `p-3 sm:p-4`, та же подпись
-          `text-[11px]` вместо mono-uppercase с трекингом (на 375px он был
+          `text-2xs` вместо mono-uppercase с трекингом (на 375px он был
           заметно шире и ломал ряд). */}
       <Card
         className={
@@ -366,7 +366,7 @@ function KpiCards({
         }
       >
         <div
-          className={`text-[11px] leading-tight sm:text-xs ${
+          className={`text-2xs leading-tight sm:text-xs ${
             next ? "text-white/85" : "text-text-sec"
           }`}
         >
@@ -380,7 +380,7 @@ function KpiCards({
           {isLoading ? "—" : next ? formatRelativeDateTime(next.whenIso, next.timeZone) : "—"}
         </div>
         {next ? (
-          <div className="mt-0.5 truncate text-[11px] leading-tight text-white/75">
+          <div className="mt-0.5 truncate text-2xs leading-tight text-white/75">
             {next.providerName}
           </div>
         ) : null}
@@ -606,7 +606,7 @@ function DateBadge({
       }`}
     >
       <span
-        className={`font-mono text-[10px] uppercase tracking-[0.18em] ${
+        className={`eyebrow ${
           highlight ? "text-white/80" : "text-text-sec"
         }`}
       >
@@ -614,7 +614,7 @@ function DateBadge({
       </span>
       <span className="font-display text-2xl leading-none">{day}</span>
       <span
-        className={`font-mono text-[11px] ${
+        className={`font-mono text-2xs ${
           highlight ? "text-white/80" : "text-text-sec"
         }`}
       >

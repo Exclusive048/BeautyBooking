@@ -244,9 +244,9 @@ export function BookingChat({ bookingId, currentRole, onUnreadCountChange }: Pro
                   isMine ? "bg-primary/15 text-text-main" : "bg-bg-card text-text-main"
                 }`}
               >
-                <div className="text-[11px] text-text-sec">{message.senderName}</div>
+                <div className="text-2xs text-text-sec">{message.senderName}</div>
                 <div className="mt-1 whitespace-pre-wrap break-words">{message.body}</div>
-                <div className="mt-1 text-[10px] text-text-sec">
+                <div className="mt-1 text-3xs text-text-sec">
                   {UI_FMT.timeShort(message.createdAt, { timeZone: viewerTimeZone })}
                 </div>
               </div>

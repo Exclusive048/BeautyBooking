@@ -285,7 +285,7 @@ export function BookingCardActionsMenu({
           </MenuItem>
         ) : null}
         {isInitiatorWaitingResponse ? (
-          <p className="border-t border-border-subtle bg-bg-input/30 px-3 py-2 text-[11px] leading-snug text-text-sec">
+          <p className="border-t border-border-subtle bg-bg-input/30 px-3 py-2 text-2xs leading-snug text-text-sec">
             {T.awaitingClientResponse}
           </p>
         ) : null}
@@ -306,7 +306,7 @@ export function BookingCardActionsMenu({
           </MenuItem>
         ) : null}
         {error ? (
-          <p className="border-t border-border-subtle px-3 py-2 text-[11px] text-danger-text">
+          <p className="border-t border-border-subtle px-3 py-2 text-2xs text-danger-text">
             {error}
           </p>
         ) : null}
@@ -345,7 +345,7 @@ export function BookingCardActionsMenu({
       {packageModal}
       {noShow.error ? (
         // Меню к моменту ответа уже закрыто — отказ показывается на карточке.
-        <p role="alert" className="absolute inset-x-1 bottom-1 rounded bg-bg-card/95 px-1.5 py-1 text-[10px] leading-tight text-danger-text">
+        <p role="alert" className="absolute inset-x-1 bottom-1 rounded bg-bg-card/95 px-1.5 py-1 text-3xs leading-tight text-danger-text">
           {noShow.error}
         </p>
       ) : null}

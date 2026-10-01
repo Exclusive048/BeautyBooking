@@ -12,7 +12,6 @@
     "src/lib/bookings/package-booking.ts": 1,
     "src/lib/bookings/package-idempotency.ts": 1,
     "src/lib/catalog/catalog.service.ts": 4,
-    "src/lib/chat/conversation-aggregator.ts": 1,
     "src/lib/client-cabinet/favorites.service.ts": 1,
     "src/lib/deletion/delete-account.ts": 1,
     "src/lib/feed/portfolio.service.ts": 7,

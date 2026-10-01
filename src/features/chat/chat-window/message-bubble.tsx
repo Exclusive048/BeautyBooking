@@ -112,6 +112,13 @@ function AttachmentImage({
   );
 }
 
+// Хвост «пузыря» — три угла 16px и один 4px; одной ступенью шкалы радиусов
+// это не выражается (29.09 доработки · 25, исключение сторожа шкалы).
+// type-ok: составной радиус хвоста своего сообщения (нижний правый угол 4px)
+const BUBBLE_TAIL_MINE = "rounded-[16px_16px_4px_16px]";
+// type-ok: составной радиус хвоста чужого сообщения (нижний левый угол 4px)
+const BUBBLE_TAIL_THEIRS = "rounded-[16px_16px_16px_4px]";
+
 export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
   const hasBody = message.body.trim().length > 0;
   const attachmentUrl = message.attachmentUrl;
@@ -125,10 +132,10 @@ export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
           rel="noopener noreferrer"
           className={cn(
             "block overflow-hidden",
-            hasBody ? "rounded-t-[16px]" : "rounded-[16px]",
-            isMine ? "rounded-bl-[16px]" : "rounded-br-[16px]",
-            isMine && !hasBody ? "rounded-br-[4px]" : "",
-            !isMine && !hasBody ? "rounded-bl-[4px]" : "",
+            hasBody ? "rounded-t-2xl" : "rounded-2xl",
+            isMine ? "rounded-bl-2xl" : "rounded-br-2xl",
+            isMine && !hasBody ? "rounded-br" : "",
+            !isMine && !hasBody ? "rounded-bl" : "",
             "border border-border-subtle bg-bg-input/40",
           )}
         >
@@ -158,11 +165,11 @@ export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
             // keep the speech-bubble tail.
             hasAttachment
               ? isMine
-                ? "rounded-b-[16px] rounded-tl-[16px] rounded-tr-[4px]"
-                : "rounded-b-[16px] rounded-tr-[16px] rounded-tl-[4px]"
+                ? "rounded-b-2xl rounded-tl-2xl rounded-tr"
+                : "rounded-b-2xl rounded-tr-2xl rounded-tl"
               : isMine
-              ? "rounded-[16px_16px_4px_16px]"
-              : "rounded-[16px_16px_16px_4px]",
+              ? BUBBLE_TAIL_MINE
+              : BUBBLE_TAIL_THEIRS,
           )}
         >
           {message.body}

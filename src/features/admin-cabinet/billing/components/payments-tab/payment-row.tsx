@@ -33,7 +33,7 @@ export function PaymentTableRow({ payment, busy, onRefund }: Props) {
   const status = paymentStatusDisplay(payment.status);
   return (
     <tr className="hover:bg-bg-input/40">
-      <td className="px-4 py-3 align-top font-mono text-[11px] text-text-sec">
+      <td className="px-4 py-3 align-top font-mono text-2xs text-text-sec">
         {payment.displayId}
       </td>
       <td className="px-4 py-3 align-top text-xs tabular-nums text-text-sec">

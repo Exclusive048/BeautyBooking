@@ -2,6 +2,8 @@ import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
+import * as UI_TEXT from "@/lib/ui/text";
+import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
 import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
 import { syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
@@ -170,6 +172,16 @@ export async function updateStudioProviderProfile(
   // Conservative on failure: leave cityId/timezone untouched so a working studio
   // is never disrupted by a transient geocoder outage. An explicit selector
   // value (`input.timezone`) always wins over the derived one.
+  // 29.09 доработки · 28: явный пояс — только России или текущий без изменений
+  // (решение 28.3); в интерфейсе студии пояс только для чтения, но API его
+  // принимает.
+  if (input.timezone !== undefined) {
+    const current = await prisma.provider.findUnique({ where: { id: providerId }, select: { timezone: true } });
+    if (!isSelectableTimeZone(input.timezone, current?.timezone)) {
+      throw new AppError(UI_TEXT.cities.timezoneNotAllowed, 422, "TIMEZONE_NOT_ALLOWED");
+    }
+  }
+
   let derivedCityId: string | undefined;
   let derivedTimezone: string | undefined;
   if (typeof input.address === "string" && input.address.trim()) {
@@ -177,6 +189,11 @@ export async function updateStudioProviderProfile(
     if (detection.ok) {
       derivedCityId = detection.cityId;
       derivedTimezone = detection.timezone;
+    } else if (detection.reason === "foreign_country") {
+      // 29.09 доработки · 27: адрес вне России не сохраняется (422) — иначе он
+      // лёг бы рядом со СТАРЫМ городом студии (у прочих отказов город и пояс
+      // намеренно не трогаются), и адрес с городом разъехались бы.
+      throw new AppError(UI_TEXT.cities.addressOutsideRussia, 422, "ADDRESS_OUTSIDE_RUSSIA");
     }
   }
   const resolvedTimezone =

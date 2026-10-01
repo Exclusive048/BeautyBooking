@@ -71,7 +71,7 @@ function ConsentRow({
             cares that the marketing box is visibly not a condition. */}
         <span
           className={cn(
-            "mt-1 block font-mono text-[10px] uppercase tracking-[0.08em]",
+            "mt-1 block eyebrow",
             required ? "text-accent-text/80" : "text-text-sec/60",
           )}
         >
@@ -89,7 +89,7 @@ export function LegalConsentGroup({ value, onChange, className, compact }: Legal
       aria-label={T.groupLabel}
       className={cn(
         "divide-y divide-border-subtle rounded-2xl border border-border-subtle bg-bg-input/70 text-text-sec",
-        compact ? "text-[11px] leading-relaxed" : "text-xs",
+        compact ? "text-2xs leading-relaxed" : "text-xs",
         className,
       )}
     >

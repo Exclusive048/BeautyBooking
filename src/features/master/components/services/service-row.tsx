@@ -13,6 +13,7 @@ import { RowMenu } from "./row-menu";
 import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.row;
 
@@ -48,12 +49,12 @@ export function ServiceRow({ service, categories, onlinePaymentsAvailable }: Pro
         >
           <span className="truncate text-sm text-text-main">{service.name}</span>
           {!service.isEnabled ? (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <Badge size="xs" variant="muted">
               {T.disabledBadge}
-            </span>
+            </Badge>
           ) : null}
         </Button>
-        <span className="shrink-0 font-mono text-[11px] text-text-sec">
+        <span className="shrink-0 font-mono text-2xs text-text-sec">
           {formatDuration(service.durationMin)}
         </span>
         <span className="w-20 shrink-0 text-right font-mono text-sm font-medium text-text-main">

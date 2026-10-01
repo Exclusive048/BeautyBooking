@@ -52,11 +52,14 @@ export type SingleFlightInput<T> = {
   compute: () => Promise<T>;
   lockTtlSeconds?: number;
   waitMs?: number;
+  /** Шаг опроса проигравшим. 25 мс — для дешёвых расчётов; долгому (вызов ИИ) хватит и 250. */
+  pollIntervalMs?: number;
 };
 
 export async function withSingleFlight<T>(input: SingleFlightInput<T>): Promise<T> {
   const lockTtl = input.lockTtlSeconds ?? DEFAULT_LOCK_TTL_SECONDS;
   const waitMs = input.waitMs ?? DEFAULT_WAIT_MS;
+  const pollIntervalMs = input.pollIntervalMs ?? POLL_INTERVAL_MS;
 
   const claim = await cache.claimLock(input.lockKey, "1", lockTtl);
 
@@ -80,9 +83,14 @@ export async function withSingleFlight<T>(input: SingleFlightInput<T>): Promise<
 
   const deadline = Date.now() + waitMs;
   while (Date.now() < deadline) {
-    await sleep(POLL_INTERVAL_MS);
+    await sleep(pollIntervalMs);
     const value = await input.read();
     if (value !== null) return value;
+    // Держатель снял замок, не записав значения (упал или ему нечего писать) —
+    // ждать нечего. Без этого долгое ожидание (сводка отзывов — 35 с) после
+    // отказа победителя превращалось в 35 с тишины у каждого проигравшего.
+    // Обрыв Redis здесь читается как «замка нет» (`get` → null) — то же правило 2.
+    if ((await cache.get<string>(input.lockKey)) === null) return input.compute();
   }
 
   // Правило 1: не дождались — считаем сами, дубль дешевле отказа.

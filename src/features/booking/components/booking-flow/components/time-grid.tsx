@@ -153,7 +153,7 @@ export function TimeGrid({
 
   return (
     <div>
-      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] font-medium uppercase tracking-wider text-text-sec">
+      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-1.5 text-2xs font-medium uppercase tracking-wider text-text-sec">
         <span>{T.timeLabel}</span>
         {zoneLabel ? (
           <span className="font-mono normal-case text-accent-text">{zoneLabel}</span>
@@ -198,7 +198,7 @@ export function TimeGrid({
                 {showHotBadges && slot.isHot ? (
                   <span
                     aria-hidden
-                    className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-hot text-[8px] font-bold text-white"
+                    className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-hot text-3xs font-bold text-white"
                   >
                     ★
                   </span>

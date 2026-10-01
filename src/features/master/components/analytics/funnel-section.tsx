@@ -57,7 +57,7 @@ function FunnelStepRow({ step, maxCount }: { step: FunnelStep; maxCount: number 
           {step.pctFromPrevious !== null ? (
             <span
               className={cn(
-                "font-mono text-[11px]",
+                "font-mono text-2xs",
                 getDropRateColor(step.pctFromPrevious)
               )}
             >
@@ -67,7 +67,7 @@ function FunnelStepRow({ step, maxCount }: { step: FunnelStep; maxCount: number 
         </div>
         <div className="flex shrink-0 items-baseline gap-2">
           <span className="font-display text-base text-text-main">{step.count}</span>
-          <span className="w-10 text-right font-mono text-[11px] text-text-sec">
+          <span className="w-10 text-right font-mono text-2xs text-text-sec">
             {step.pctFromTotal}%
           </span>
         </div>

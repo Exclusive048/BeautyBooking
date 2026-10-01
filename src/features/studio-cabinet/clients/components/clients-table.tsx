@@ -55,7 +55,7 @@ export function ClientsTable({
     <div className="overflow-x-auto rounded-2xl border border-border-subtle bg-bg-card">
       <table className="w-full text-left">
         <thead>
-          <tr className="bg-bg-input/40 text-[10px] font-mono uppercase tracking-[0.12em] text-text-sec">
+          <tr className="bg-bg-input/40 eyebrow">
             <th className="px-3 py-2.5">{T.table.colClient}</th>
             <th className="px-3 py-2.5">{T.table.colPhone}</th>
             <th className="px-3 py-2.5">{T.table.colVisits}</th>

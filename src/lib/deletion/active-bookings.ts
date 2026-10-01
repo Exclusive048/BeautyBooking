@@ -61,3 +61,16 @@ export function countBlockingStudioBookings(
     },
   });
 }
+
+/**
+ * 29.09 доработки · 26 (решение владельца 26.1) — предстоящие записи КЛИЕНТА.
+ * Тот же предикат, что у кабинетов: живой статус и визит ещё не прошёл.
+ * Удаление аккаунта с такой записью останавливается — иначе запись оставалась
+ * подтверждённой, мастер ждал человека, которого нет, а напоминания уходили в
+ * центр уведомлений удалённого профиля.
+ */
+export function countBlockingClientBookings(db: BookingCounter, userId: string, now?: Date): Promise<number> {
+  return db.booking.count({
+    where: { AND: [blockingBookingWhere(now), { clientUserId: userId }] },
+  });
+}

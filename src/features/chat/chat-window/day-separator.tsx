@@ -7,7 +7,7 @@ type Props = {
 
 export function DaySeparator({ dateKey, viewerTimezone }: Props) {
   return (
-    <div className="my-2 flex items-center gap-3 self-stretch text-[11px] text-text-sec">
+    <div className="my-2 flex items-center gap-3 self-stretch text-2xs text-text-sec">
       <span aria-hidden className="h-px flex-1 bg-border-subtle" />
       <span className="font-mono uppercase tracking-wider">
         {formatDaySeparator(dateKey, viewerTimezone)}

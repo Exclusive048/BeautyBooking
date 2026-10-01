@@ -510,7 +510,7 @@ export function BookingFlowStepper({
   }, [state.confirmedBooking, toast]);
 
   return (
-    <div className="overflow-hidden rounded-[20px] border border-border-subtle bg-bg-card">
+    <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
       <AnimatePresence mode="wait" initial={false}>
         <m.div
           key={state.phase}

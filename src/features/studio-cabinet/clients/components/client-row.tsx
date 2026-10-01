@@ -49,7 +49,7 @@ export function ClientTableRow({ row, studioId, scheduleMasters, services, timez
       <td className="px-3 py-3 align-top">
         <div className="text-sm font-semibold tabular-nums text-text-main">{row.visitsCount}</div>
         {row.mastersCount > 0 ? (
-          <div className="text-[11px] text-text-sec">
+          <div className="text-2xs text-text-sec">
             {T.table.mastersCountTemplate.replace("{count}", String(row.mastersCount))}
           </div>
         ) : null}
@@ -59,7 +59,7 @@ export function ClientTableRow({ row, studioId, scheduleMasters, services, timez
           {UI_FMT.priceLabel(row.lifetimeKopeks)}
         </div>
         {row.avgCheckKopeks > 0 ? (
-          <div className="text-[11px] text-text-sec">
+          <div className="text-2xs text-text-sec">
             {T.table.avgCheckTemplate.replace("{amount}", UI_FMT.priceLabel(row.avgCheckKopeks))}
           </div>
         ) : null}
@@ -81,7 +81,7 @@ export function ClientTableRow({ row, studioId, scheduleMasters, services, timez
             ) : (
               <span
                 aria-hidden
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
               >
                 {initialsOf(row.mainMaster.displayName)}
               </span>

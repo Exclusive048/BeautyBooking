@@ -27,7 +27,7 @@ export function AnnouncementCard({ item }: Props) {
         accent,
       )}
     >
-      <p className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-sec">
+      <p className="eyebrow font-medium">
         {item.label}
       </p>
       <p className="mt-1 text-sm font-medium text-text-main">{item.title}</p>
@@ -47,7 +47,7 @@ export function AnnouncementCard({ item }: Props) {
           accent,
         )}
       >
-        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow font-medium">
           {item.label}
         </p>
         <p className="mt-1 text-sm font-medium text-text-main">{item.title}</p>

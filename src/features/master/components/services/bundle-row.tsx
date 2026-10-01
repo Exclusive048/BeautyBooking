@@ -15,6 +15,7 @@ import { RowMenu } from "./row-menu";
 import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
+import { Badge } from "@/components/ui/badge";
 
 const ROW = UI_TEXT.cabinetMaster.servicesPage.row;
 const T = UI_TEXT.cabinetMaster.servicesPage.bundleRow;
@@ -60,12 +61,12 @@ export function BundleRow({ bundle, allServices }: Props) {
             </p>
           </Button>
           {!bundle.isEnabled ? (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <Badge size="xs" variant="muted">
               {ROW.bundleDisabledBadge}
-            </span>
+            </Badge>
           ) : null}
           {bundle.hasDisabledComponent ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-[10px] text-warning-text">
+            <span className="inline-flex items-center gap-1 rounded-full bg-warning-surface px-2 py-0.5 text-3xs text-warning-text">
               <AlertTriangle className="h-3 w-3" aria-hidden />
               <span className="hidden sm:inline">{ROW.bundleWarning}</span>
             </span>
@@ -78,7 +79,7 @@ export function BundleRow({ bundle, allServices }: Props) {
           />
         </div>
 
-        <div className="mt-3 ml-7 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-text-sec">
+        <div className="mt-3 ml-7 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs text-text-sec">
           <span>
             {T.sumLabel}: <span className="text-text-main">{UI_FMT.priceLabelOrDash(bundle.totalPrice)}</span>
           </span>

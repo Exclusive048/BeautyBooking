@@ -26,7 +26,7 @@ export function MasterDetailWeekSchedule({
           <h3 className="font-display text-sm font-semibold text-text-main">
             {T.title}
           </h3>
-          <p className="mt-0.5 text-[11px] text-text-sec">{T.subtitle}</p>
+          <p className="mt-0.5 text-2xs text-text-sec">{T.subtitle}</p>
         </div>
         <Link
           href={`/cabinet/studio/calendar?master=${encodeURIComponent(viewToken)}`}
@@ -55,14 +55,14 @@ export function MasterDetailWeekSchedule({
             >
               <p
                 className={cn(
-                  "font-mono text-[10px] uppercase tracking-wide",
+                  "eyebrow",
                   cell.isToday ? "text-accent-text" : "text-text-sec",
                 )}
               >
                 {cell.dateLabel}
               </p>
               {cell.isDayOff ? (
-                <p className="mt-2 text-[10px] text-text-sec">
+                <p className="mt-2 text-3xs text-text-sec">
                   <abbr title={T.dayOffFull} className="decoration-transparent">{T.dayOff}</abbr>
                 </p>
               ) : (

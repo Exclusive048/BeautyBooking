@@ -156,7 +156,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
         </div>
 
         <div className="space-y-1.5">
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <label className="eyebrow">
             {T.chooseDate}
           </label>
           <Input
@@ -171,7 +171,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
         </div>
 
         <div className="space-y-1.5">
-          <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <label className="eyebrow">
             {T.chooseTime}
           </label>
           {zoneLabel ? (

@@ -216,7 +216,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
               key={opt.value}
               variant="wrapper"
               onClick={() => setType(opt.value)}
-              className={`lux-card rounded-[16px] p-4 text-left transition-all ${
+              className={`lux-card rounded-2xl p-4 text-left transition-all ${
                 type === opt.value
                   ? "bg-bg-card ring-2 ring-primary/50"
                   : "bg-bg-card opacity-70 hover:opacity-100"
@@ -331,7 +331,7 @@ export default function SupportPageClient({ contactOptions }: SupportPageClientP
           <span className="font-normal text-text-sec">{UI_TEXT.pages.support.form.attachmentOptional}</span>
         </label>
         <div
-          className="lux-card cursor-pointer rounded-[16px] border-2 border-dashed border-border-subtle bg-bg-card p-6 text-center transition-colors hover:border-primary/40"
+          className="lux-card cursor-pointer rounded-2xl border-2 border-dashed border-border-subtle bg-bg-card p-6 text-center transition-colors hover:border-primary/40"
           onClick={() => fileRef.current?.click()}
         >
           {fileName ? (

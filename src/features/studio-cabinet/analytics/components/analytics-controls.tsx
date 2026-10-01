@@ -55,7 +55,7 @@ export function AnalyticsControls({ period, view, compare }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <span className="eyebrow">
           {T.periodLabel}
         </span>
         <Tabs

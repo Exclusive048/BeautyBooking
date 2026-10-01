@@ -197,7 +197,7 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
                   >
                     <span>{WEEKDAY_SHORT[weekdayIndex(dateKey)]}</span>
                     <span className="font-medium">{Number(dateKey.slice(8, 10))}</span>
-                    <span className="text-[11px]">{count}</span>
+                    <span className="text-2xs">{count}</span>
                   </div>
                 );
               })}

@@ -25,7 +25,7 @@ export function ProviderResultCard({ item }: Props) {
   const href = providerPublicUrl({ id: item.publicUsername, publicUsername: item.publicUsername }, "search-result-card") ?? "#";
 
   return (
-    <article className="overflow-hidden rounded-[28px] border border-border-subtle/80 bg-bg-card shadow-card">
+    <article className="overflow-hidden rounded-3xl border border-border-subtle/80 bg-bg-card shadow-card">
       <Link href={href} aria-label={item.name} className="group block transition hover:opacity-95">
         <PhotoCarousel photos={item.photos} alt={item.name} className="aspect-[16/10] md:aspect-[4/3]" />
       </Link>

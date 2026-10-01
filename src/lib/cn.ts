@@ -17,7 +17,8 @@ import { extendTailwindMerge } from "tailwind-merge";
  * `shadow-card` читался бы цветом тени, а `bg-brand-gradient` — цветом фона, и
  * `cn("bg-brand-gradient", "bg-bg-card")` молча выбрасывал бы градиент. Новая
  * тень или фон-картинка в `tailwind.config.js` — только вместе с записью здесь
- * (сторож `cn.test.ts` читает конфиг и краснеет на незарегистрированном ключе).
+ * (сторож `cn.test.ts` читает конфиг и краснеет на незарегистрированном ключе);
+ * то же — новый размер шрифта (`fontSize`).
  *
  * ⚠️ `leading-*` ставить ПОСЛЕ размера шрифта: в Tailwind 3 `text-sm` задаёт и
  * высоту строки, и поздний размер выбрасывает ранний `leading-*`.
@@ -31,6 +32,9 @@ const twMerge = extendTailwindMerge({
       ease: [{ ease: ["brand"] }],
       // 29.09 доработки · 21: шкала слоёв (tailwind.config.js → zIndex).
       z: [{ z: ["sticky", "topbar", "float", "nav", "notice", "prompt", "scrim", "modal", "popover", "toast"] }],
+      // 29.09 доработки · 25: мелкие ступени шрифта (tailwind.config.js → fontSize).
+      // Без записи `text-3xs` читался бы цветом текста и выпадал рядом с `text-text-sec`.
+      "font-size": [{ text: ["2xs", "3xs"] }],
     },
   },
 });

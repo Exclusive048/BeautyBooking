@@ -88,7 +88,7 @@ export function SubscriptionsTable({ rows: initialRows, nextCursor }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px]">
             <thead>
-              <tr className="border-b border-border-subtle text-left text-[11px] uppercase tracking-wider text-text-sec">
+              <tr className="border-b border-border-subtle text-left text-2xs uppercase tracking-wider text-text-sec">
                 <th className="px-4 py-3 font-medium">{T.subs.columns.user}</th>
                 <th className="px-4 py-3 font-medium">{T.subs.columns.plan}</th>
                 <th className="px-4 py-3 font-medium">{T.subs.columns.since}</th>

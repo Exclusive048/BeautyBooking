@@ -79,7 +79,7 @@ export function DayView({ weekStartIso, todayIso, days, hourRange, hourPx, colum
             >
               <span
                 className={cn(
-                  "font-mono text-[10px] uppercase tracking-[0.12em]",
+                  "eyebrow",
                   selected ? "text-white/80" : "text-text-sec",
                 )}
               >

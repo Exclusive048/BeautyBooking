@@ -39,13 +39,13 @@ export function TopServicesSection({ services, periodLabel }: Props) {
           return (
             <li key={service.key}>
               <div className="flex items-baseline gap-2">
-                <span className="w-6 shrink-0 font-mono text-[10px] text-text-sec">
+                <span className="w-6 shrink-0 font-mono text-3xs text-text-sec">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="flex-1 truncate text-sm text-text-main">
                   {service.label}
                 </span>
-                <span className="shrink-0 font-mono text-[11px] text-text-sec">
+                <span className="shrink-0 font-mono text-2xs text-text-sec">
                   · {service.bookings}
                 </span>
                 <span className="shrink-0 font-mono text-sm font-medium text-text-main">

@@ -247,7 +247,7 @@ const SlotButton = memo(function SlotButton({
       <span className="inline-flex items-center gap-2">
         {timeText}
         {hotLabel ? (
-          <span className="rounded-full border border-warning-border px-2 py-0.5 text-[10px] font-semibold">
+          <span className="rounded-full border border-warning-border px-2 py-0.5 text-3xs font-semibold">
             {hotLabel}
           </span>
         ) : null}

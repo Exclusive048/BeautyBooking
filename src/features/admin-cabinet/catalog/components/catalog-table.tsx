@@ -138,7 +138,7 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
         <div className="hidden md:block">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border-subtle text-left text-[11px] uppercase tracking-wider text-text-sec">
+              <tr className="border-b border-border-subtle text-left text-2xs uppercase tracking-wider text-text-sec">
                 <th className="px-4 py-3 font-medium">{T.columns.category}</th>
                 <th className="px-4 py-3 font-medium">{T.columns.parent}</th>
                 <th className="px-4 py-3 font-medium">{T.columns.status}</th>

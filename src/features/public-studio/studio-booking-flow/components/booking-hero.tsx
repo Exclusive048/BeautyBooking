@@ -140,7 +140,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-muted">
+          <div className="eyebrow text-text-muted">
             {UI_TEXT.bookingWidget.hero.studioLabel}
             {studio.publicUsername ? ` · @${studio.publicUsername}` : ""}
           </div>
@@ -171,7 +171,7 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
               className="h-10 w-10 text-sm"
             />
             <div className="text-xs leading-tight">
-              <div className="font-mono text-[10px] uppercase tracking-[0.06em] text-text-muted">
+              <div className="eyebrow text-text-muted">
                 {UI_TEXT.bookingWidget.hero.bookingToMaster}
               </div>
               <div className="text-sm font-semibold text-text">{prefilledMaster.name}</div>
@@ -191,12 +191,12 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
                     name={m.name}
                     avatarUrl={m.avatarUrl}
                     sizePx={32}
-                    className="h-8 w-8 border-2 border-bg-card text-[11px]"
+                    className="h-8 w-8 border-2 border-bg-card text-2xs"
                   />
                 </span>
               ))}
               {rest > 0 ? (
-                <span className="-ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-bg-card bg-bg-card text-[11px] font-semibold text-text-muted">
+                <span className="-ml-2 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-bg-card bg-bg-card text-2xs font-semibold text-text-muted">
                   +{rest}
                 </span>
               ) : null}

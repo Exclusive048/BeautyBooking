@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { CityTagBadge } from "@/features/admin-cabinet/cities/components/city-tag-badge";
 import * as UI_TEXT from "@/lib/ui/text";
+import { RF_ADMIN_TIMEZONES, buildTimezoneOptions } from "@/lib/ui/timezone-options";
 import type { AdminCityRow } from "@/features/admin-cabinet/cities/types";
 
 const T = UI_TEXT.adminPanel.cities.detail;
@@ -37,23 +38,6 @@ type Props = {
   }) => Promise<void>;
   onDelete: () => void;
 };
-
-const TIMEZONE_OPTIONS = [
-  "Europe/Moscow",
-  "Europe/Kaliningrad",
-  "Europe/Samara",
-  "Europe/Volgograd",
-  "Asia/Yekaterinburg",
-  "Asia/Omsk",
-  "Asia/Novosibirsk",
-  "Asia/Krasnoyarsk",
-  "Asia/Irkutsk",
-  "Asia/Yakutsk",
-  "Asia/Vladivostok",
-  "Asia/Magadan",
-  "Asia/Kamchatka",
-  "Asia/Almaty",
-];
 
 function toDraft(city: AdminCityRow): CityEditDraft {
   return {
@@ -108,7 +92,7 @@ export function CityEditForm({ city, onClose, onSave, onDelete }: Props) {
       <div className="flex items-center gap-3">
         <CityTagBadge tag={city.tag} />
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+          <p className="eyebrow">
             {T.caption}
           </p>
           <h2 className="truncate font-display text-lg text-text-main">
@@ -155,10 +139,11 @@ export function CityEditForm({ city, onClose, onSave, onDelete }: Props) {
           onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}
         >
           {/* Текущий пояс города показывается, даже если его нет в списке —
-              иначе поле показывало бы другой пункт, а сохранение молча меняло пояс. */}
-          {(TIMEZONE_OPTIONS.includes(draft.timezone) ? TIMEZONE_OPTIONS : [draft.timezone, ...TIMEZONE_OPTIONS]).map((tz) => (
-            <option key={tz} value={tz}>
-              {tz}
+              иначе поле показывало бы другой пункт, а сохранение молча меняло пояс.
+              29.09 доработки · 28: список — все зоны РФ, общий с формой создания. */}
+          {buildTimezoneOptions(draft.timezone, RF_ADMIN_TIMEZONES).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </Select>

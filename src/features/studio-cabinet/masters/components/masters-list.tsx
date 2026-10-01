@@ -25,7 +25,7 @@ export function MastersList({
 }) {
   return (
     <div className="space-y-2">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <p className="eyebrow">
         {T.list.shownTemplate
           .replace("{count}", String(items.length))
           .replace("{total}", String(totalCount))}

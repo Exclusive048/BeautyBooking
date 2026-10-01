@@ -140,7 +140,7 @@ export function MasterSidebar({
           size="sm"
           href="/cabinet/master/dashboard"
         />
-        <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="mt-1.5 eyebrow">
           {T.brand.subtitle}
         </p>
       </div>

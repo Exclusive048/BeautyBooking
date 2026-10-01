@@ -47,6 +47,7 @@ import { runBookingReviewPromptJob } from "@/lib/bookings/review-prompts";
 import { finalizePastBookings } from "@/lib/bookings/finalize-past";
 import { expirePendingBookings } from "@/lib/bookings/expire-pending";
 import { purgeExpiredOtpCodes } from "@/lib/auth/otp-cleanup";
+import { runDeferredAccountDeletionPolicy } from "@/lib/deletion/apply-account-deletion-policy";
 import { runScheduleEndingReminders } from "@/lib/schedule/schedule-ending";
 import {
   indexMediaAsset,
@@ -266,6 +267,20 @@ function startPeriodicJobs() {
   };
   runOtpCleanupSafe();
   setInterval(runOtpCleanupSafe, 24 * 60 * 60 * 1000);
+
+  // 29.09 доработки · 26: отложенные действия политики удаления аккаунта
+  // (`ANONYMIZE_AFTER` / `DELETE_AFTER`) — при старте и раз в сутки. Пока в
+  // политике таких нет, проход ничего не читает.
+  const runDeferredDeletionPolicySafe = () => {
+    void runDeferredAccountDeletionPolicy().catch((error) => {
+      logError("Deferred account deletion policy failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      reportWorkerFailure("deletion.deferredPolicy", error);
+    });
+  };
+  runDeferredDeletionPolicySafe();
+  setInterval(runDeferredDeletionPolicySafe, 24 * 60 * 60 * 1000);
 
   // VISUAL-SEARCH-UNRECOGNIZED-01: фото, которые прежний конвейер пометил
   // нераспознанными (описание обрывалось лимитом токенов), один раз на версию

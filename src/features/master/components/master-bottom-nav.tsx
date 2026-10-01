@@ -29,6 +29,7 @@ import { cn } from "@/lib/cn";
 import { MOTION, SPRING_SHEET } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
+import { CountBadge } from "@/components/ui/count-badge";
 
 const t = UI_TEXT.master.bookingsPage;
 const tNav = UI_TEXT.master.topbar.nav;
@@ -149,7 +150,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
               aria-modal="true"
               aria-labelledby={sheetTitleId}
               tabIndex={-1}
-              className="fixed inset-x-0 bottom-0 z-modal rounded-t-[24px] border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
+              className="fixed inset-x-0 bottom-0 z-modal rounded-t-3xl border-t border-border-subtle bg-bg-card shadow-2xl lg:hidden"
               style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
               <div className="flex justify-center pt-3 pb-1">
@@ -181,15 +182,8 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                       )}
                     >
                       <Icon className="h-5 w-5" aria-hidden />
-                      <span className="text-[11px] font-medium leading-tight">{item.label}</span>
-                      {count > 0 ? (
-                        <span
-                          aria-hidden
-                          className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums text-primary-foreground"
-                        >
-                          {count > 99 ? "99+" : count}
-                        </span>
-                      ) : null}
+                      <span className="text-2xs font-medium leading-tight">{item.label}</span>
+                      <CountBadge count={count} className="absolute right-2 top-2" />
                     </Link>
                   );
                 })}
@@ -199,7 +193,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                   className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
                 >
                   <ExternalLink className="h-5 w-5" aria-hidden />
-                  <span className="text-[11px] font-medium leading-tight">{t.menuMyPage}</span>
+                  <span className="text-2xs font-medium leading-tight">{t.menuMyPage}</span>
                 </Link>
               </div>
             </m.div>

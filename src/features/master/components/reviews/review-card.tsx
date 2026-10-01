@@ -9,6 +9,7 @@ import {
 import { ReviewActionsIsland } from "./review-actions-island";
 import { ReviewExistingReply } from "./review-existing-reply";
 import { StarsDisplay } from "./stars-display";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.cabinetMaster.reviews.card;
 const ANON = UI_TEXT.cabinetMaster.reviews.anon;
@@ -71,9 +72,9 @@ export function ReviewCard({ review, masterName, masterSeed, serviceName, now }:
         </div>
 
         {review.isNew ? (
-          <span className="inline-flex items-center rounded-full bg-danger-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-danger-text">
+          <Badge size="xs" variant="danger">
             {T.newBadge}
-          </span>
+          </Badge>
         ) : null}
       </header>
 

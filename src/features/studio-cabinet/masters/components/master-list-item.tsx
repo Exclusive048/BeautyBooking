@@ -81,7 +81,7 @@ export function MasterListItem({
             {master.displayName}
           </span>
           {master.isCurrentUser ? (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-text">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 font-mono text-3xs uppercase tracking-wide text-accent-text">
               {T.listItem.youChip}
             </span>
           ) : null}
@@ -91,7 +91,7 @@ export function MasterListItem({
             {master.servicesSummary}
           </p>
         ) : null}
-        <div className="mt-1.5 flex items-center gap-2 text-[11px] text-text-sec">
+        <div className="mt-1.5 flex items-center gap-2 text-2xs text-text-sec">
           <span>
             {T.listItem.bookingsTemplate.replace(
               "{count}",
@@ -121,7 +121,7 @@ export function MasterListItem({
         </span>
         <span
           className={cn(
-            "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+            "rounded-full border px-2 py-0.5 text-3xs font-medium",
             STATUS_BADGE_CLASS[tone],
           )}
         >

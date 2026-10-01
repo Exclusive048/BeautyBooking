@@ -86,7 +86,7 @@ export function SegmentedTabs<T extends string>({
             {option.badge !== undefined ? (
               <span
                 className={cn(
-                  "rounded-full px-1.5 py-px font-mono text-[11px] leading-4",
+                  "rounded-full px-1.5 py-px font-mono text-2xs leading-4",
                   active ? "bg-primary/15 text-text-main" : "bg-bg-page text-text-sec",
                 )}
               >

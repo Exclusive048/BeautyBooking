@@ -9,6 +9,7 @@ import { initialsOf } from "../lib/format";
 import type { StudioReviewItem } from "../lib/types";
 import { RatingStars } from "./rating-stars";
 import { ReviewReplyForm } from "./review-reply-form";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.reviewsV2;
 
@@ -46,9 +47,9 @@ export function ReviewCard({ review, onReport }: Props) {
             <RatingStars value={review.rating} size="sm" />
             <span className="text-xs text-text-sec">{review.dateLabel}</span>
             {review.isReported ? (
-              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
+              <Badge size="xs" variant="warning">
                 {T.card.reportedBadge}
-              </span>
+              </Badge>
             ) : null}
           </div>
           {(review.master || review.serviceName) ? (
@@ -94,7 +95,7 @@ export function ReviewCard({ review, onReport }: Props) {
 
       {review.reply ? (
         <div className="mt-3 rounded-xl border-l-2 border-primary/40 bg-bg-input/40 px-3 py-2.5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-accent-text">
+          <p className="eyebrow text-accent-text">
             {T.card.replyCaption}
           </p>
           <p className="mt-1 whitespace-pre-wrap text-sm text-text-main">{review.reply.text}</p>

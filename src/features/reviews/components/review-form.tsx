@@ -191,7 +191,7 @@ export function ReviewForm({ bookingId, onSubmitted, onCancel, submitUrl = "/api
       {privateTags.length > 0 ? (
         <div className="mt-4">
           <div className="text-xs font-medium text-text-main">{t.privateTagsTitle}</div>
-          <div className="mt-0.5 text-[11px] text-text-sec">{t.privateTagsHint}</div>
+          <div className="mt-0.5 text-2xs text-text-sec">{t.privateTagsHint}</div>
           {!tagsLoading ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {privateTags.map((tag) => (

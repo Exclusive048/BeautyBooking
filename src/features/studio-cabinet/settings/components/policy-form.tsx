@@ -264,7 +264,7 @@ function Field({
     <label className="block space-y-1">
       <span className="block text-xs font-medium text-text-label">{label}</span>
       {children}
-      {hint ? <span className="block text-[11px] text-text-sec">{hint}</span> : null}
+      {hint ? <span className="block text-2xs text-text-sec">{hint}</span> : null}
     </label>
   );
 }
@@ -286,7 +286,7 @@ function ToggleRow({
     <div className="flex items-start justify-between gap-4 rounded-xl border border-border-subtle bg-bg-input/30 p-3">
       <div className="min-w-0">
         <p className="text-sm font-medium text-text-main">{label}</p>
-        <p className="mt-0.5 text-[11px] text-text-sec">{hint}</p>
+        <p className="mt-0.5 text-2xs text-text-sec">{hint}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} aria-label={label} />
     </div>

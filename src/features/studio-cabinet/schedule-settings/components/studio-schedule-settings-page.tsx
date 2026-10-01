@@ -35,7 +35,7 @@ export function StudioScheduleSettingsPage({
   return (
     <div className="space-y-5 lg:space-y-6">
       <header className="space-y-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {T.breadcrumb}
         </p>
         <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">

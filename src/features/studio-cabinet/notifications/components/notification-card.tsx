@@ -67,10 +67,10 @@ export function NotificationCard({ item, timeZone }: Props) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+            <span className="eyebrow">
               {config.label}
             </span>
-            <span className="text-[11px] text-text-sec/80">{timeLabel}</span>
+            <span className="text-2xs text-text-sec/80">{timeLabel}</span>
             {!item.isRead ? (
               <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary" aria-label={T.unreadAria} />
             ) : null}
@@ -88,7 +88,7 @@ export function NotificationCard({ item, timeZone }: Props) {
             </p>
           ) : null}
           {relatesParts.length > 0 ? (
-            <p className="mt-1 text-[11px] text-text-sec/80">
+            <p className="mt-1 text-2xs text-text-sec/80">
               <span className="font-mono uppercase tracking-[0.14em]">{T.relatesTo}: </span>
               {relatesParts.join(" · ")}
             </p>

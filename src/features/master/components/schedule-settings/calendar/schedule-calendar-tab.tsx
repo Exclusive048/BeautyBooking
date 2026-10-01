@@ -378,7 +378,7 @@ export function ScheduleCalendarTab({
                 </p>
                 <div className="grid grid-cols-7 gap-1">
                   {WEEKDAY_SHORT.map((label) => (
-                    <span key={label} className="pb-1 text-center text-[11px] font-medium uppercase text-text-sec">
+                    <span key={label} className="pb-1 text-center text-2xs font-medium uppercase text-text-sec">
                       {label}
                     </span>
                   ))}
@@ -410,7 +410,7 @@ export function ScheduleCalendarTab({
             {T.legendPainted}
           </span>
           <span className="flex items-center gap-1.5">
-            <span aria-hidden className="rounded-full bg-bg-input px-1.5 text-[10px] font-medium text-text-main">2</span>
+            <span aria-hidden className="rounded-full bg-bg-input px-1.5 text-3xs font-medium text-text-main">2</span>
             {T.legendBookings}
           </span>
           <span className="flex items-center gap-1.5">
@@ -569,14 +569,14 @@ function DayCell({
           {day.bookings > 0 ? (
             <span
               aria-hidden
-              className="rounded-full bg-bg-card px-1 text-[10px] font-medium leading-4 text-text-main"
+              className="rounded-full bg-bg-card px-1 text-3xs font-medium leading-4 text-text-main"
             >
               {day.bookings}
             </span>
           ) : null}
         </span>
       </span>
-      <span className="hidden w-full truncate text-[10px] leading-tight text-text-main/80 sm:block">{hours}</span>
+      <span className="hidden w-full truncate text-3xs leading-tight text-text-main/80 sm:block">{hours}</span>
     </Button>
   );
 }

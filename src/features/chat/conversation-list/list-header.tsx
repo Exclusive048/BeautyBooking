@@ -30,12 +30,14 @@ export function ListHeader({
         <h2 className="flex items-center gap-2 font-display text-base text-text-main">
           {T.list.heading}
           {totalUnread > 0 ? (
-            <span className="bg-brand-gradient inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 font-mono text-[11px] font-semibold text-white">
+            <span className="bg-brand-gradient inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 font-mono text-2xs font-semibold text-white">
               {totalUnread}
             </span>
           ) : null}
         </h2>
       </div>
+      {/* 29.09 доработки · 31: окно списка (`chat/conversation-window.ts`). */}
+      <p className="-mt-2 text-xs text-text-sec">{T.list.windowNote}</p>
 
       <label className="relative block">
         <Search

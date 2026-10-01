@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -11,10 +12,14 @@ import * as UI_TEXT from "@/lib/ui/text";
 type Props = {
   open: boolean;
   phone: string | null;
-  onConfirm: () => void;
+  onConfirm: (choice: { deleteReviews: boolean }) => void;
   onCancel: () => void;
   loading?: boolean;
   error?: string | null;
+  /** Куда идти, чтобы снять причину отказа (предстоящие записи → «Мои записи»). */
+  errorLink?: { href: string; label: string } | null;
+  /** 29.09 доработки · 26 (Ю26.3-Б): показать галочку «Удалить и мои отзывы». */
+  offerDeleteReviews?: boolean;
 };
 
 export function DeleteAccountModal({
@@ -24,8 +29,11 @@ export function DeleteAccountModal({
   onCancel,
   loading,
   error,
+  errorLink,
+  offerDeleteReviews = false,
 }: Props) {
   const [checked, setChecked] = useState(false);
+  const [deleteReviews, setDeleteReviews] = useState(false);
   const [value, setValue] = useState("");
 
   // DELETION-03: без телефона подтверждаем словом — иначе аккаунты, созданные
@@ -57,6 +65,20 @@ export function DeleteAccountModal({
           {UI_TEXT.deletion.accountConfirmCheckbox}
         </label>
 
+        {offerDeleteReviews ? (
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-text-sec">
+            <Checkbox
+              checked={deleteReviews}
+              onChange={(event) => setDeleteReviews(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              {UI_TEXT.deletion.accountDeleteReviews}
+              <span className="mt-0.5 block text-xs">{UI_TEXT.deletion.accountDeleteReviewsHint}</span>
+            </span>
+          </label>
+        ) : null}
+
         <label className="block text-xs text-text-sec">
           {confirmByPhone ? UI_TEXT.deletion.accountPhonePrompt : UI_TEXT.deletion.accountWordPrompt}
           <Input
@@ -72,6 +94,11 @@ export function DeleteAccountModal({
         {error ? (
           <div role="alert" className="rounded-xl border border-danger-border bg-danger-surface px-3 py-2 text-xs text-danger-text">
             {error}
+            {errorLink ? (
+              <Link href={errorLink.href} className="ml-1 font-medium underline underline-offset-2">
+                {errorLink.label}
+              </Link>
+            ) : null}
           </div>
         ) : null}
 
@@ -85,7 +112,7 @@ export function DeleteAccountModal({
           </Button>
           <Button
             variant="danger"
-            onClick={onConfirm}
+            onClick={() => onConfirm({ deleteReviews: offerDeleteReviews && deleteReviews })}
             disabled={!canConfirm || loading}
           >
             {loading ? UI_TEXT.status.deleting : UI_TEXT.deletion.accountDeleteForever}

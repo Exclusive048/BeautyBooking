@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
 import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.adminPanel.reviews.card;
 
@@ -48,19 +49,19 @@ export function ReviewCard({ review, busy, onApprove, onDelete }: Props) {
               <p className="flex items-center gap-2 text-sm font-medium text-text-main">
                 <span className="truncate">{review.authorDisplay}</span>
                 {review.isReported ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive/[0.12] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-danger-text">
+                  <Badge size="xs" variant="danger" className="gap-1">
                     <Flag className="h-2.5 w-2.5" aria-hidden />
                     {T.reportedBadge}
-                  </span>
+                  </Badge>
                 ) : null}
                 {review.isUrgent ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-white">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-2 py-0.5 font-mono text-3xs font-semibold uppercase tracking-wide text-white">
                     <AlertTriangle className="h-2.5 w-2.5" aria-hidden />
                     {T.urgentBadge}
                   </span>
                 ) : null}
               </p>
-              <p className="mt-0.5 font-mono text-[11px] tabular-nums text-text-sec">
+              <p className="mt-0.5 font-mono text-2xs tabular-nums text-text-sec">
                 {UI_FMT.date(review.createdAt, "dayMonthYearShort", { timeZone: VIEWER_TZ })}
               </p>
             </div>
@@ -85,7 +86,7 @@ export function ReviewCard({ review, busy, onApprove, onDelete }: Props) {
 
           {review.replyText ? (
             <p className="mt-3 rounded-xl bg-bg-input/60 px-3 py-2 text-xs text-text-sec">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em]">
+              <span className="eyebrow">
                 {T.replyBadge}
               </span>
               <span className="ml-2 text-text-main">{review.replyText}</span>

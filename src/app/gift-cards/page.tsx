@@ -20,7 +20,7 @@ export default function GiftCardsPage() {
           <p className="text-text-sec text-lg max-w-[460px] mx-auto leading-relaxed">
             {UI_TEXT.pages.giftCards.heroText}
           </p>
-          <div className="lux-card rounded-[24px] bg-bg-card p-8 space-y-4 text-left max-w-[480px] mx-auto">
+          <div className="lux-card rounded-3xl bg-bg-card p-8 space-y-4 text-left max-w-[480px] mx-auto">
             <p className="font-semibold text-text-main">{UI_TEXT.pages.giftCards.plannedTitle}</p>
             <ul className="space-y-2 text-sm text-text-sec">
               {UI_TEXT.pages.giftCards.plannedItems.map((item) => (

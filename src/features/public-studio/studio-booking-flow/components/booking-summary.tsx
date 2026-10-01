@@ -39,7 +39,7 @@ export function BookingSummary({
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-sm">
       <div
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wider ${
+        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-medium uppercase tracking-wider ${
           ready ? "bg-success/10 text-success-text" : "bg-muted text-text-muted"
         }`}
       >
@@ -106,7 +106,7 @@ export function BookingSummary({
       </Button>
 
       {cancellationDeadlineHours && cancellationDeadlineHours > 0 ? (
-        <p className="mt-3 text-[11px] text-text-muted">
+        <p className="mt-3 text-2xs text-text-muted">
           {UI_TEXT.bookingWidget.summary.freeCancelTemplate.replace("{hours}", String(cancellationDeadlineHours))} ·{" "}
           {UI_TEXT.bookingWidget.summary.freeCancelHint}
         </p>

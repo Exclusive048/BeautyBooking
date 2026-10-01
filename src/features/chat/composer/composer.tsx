@@ -231,7 +231,7 @@ export function Composer({
               className="h-full w-full object-cover"
             />
             {isAttachmentUploading ? (
-              <div className="absolute inset-0 grid place-items-center bg-black/40 text-[10px] font-medium text-white">
+              <div className="absolute inset-0 grid place-items-center bg-black/40 text-3xs font-medium text-white">
                 …
               </div>
             ) : null}
@@ -312,7 +312,7 @@ export function Composer({
         </p>
       ) : null}
 
-      <p className="mt-1.5 font-mono text-[10.5px] tracking-wide text-text-sec">
+      <p className="mt-1.5 font-mono text-2xs tracking-wide text-text-sec">
         {T.composer.footer}
       </p>
     </form>

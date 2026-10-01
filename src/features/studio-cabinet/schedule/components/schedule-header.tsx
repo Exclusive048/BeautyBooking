@@ -145,7 +145,7 @@ export function ScheduleHeader({
       <header className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+            <p className="mb-1 eyebrow">
               {caption}
             </p>
             <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
@@ -158,7 +158,7 @@ export function ScheduleHeader({
                 .replace("{occupancy}", String(kpis.occupancyPercent))}
             </p>
             {zoneLabel ? (
-              <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-input/50 px-2 py-0.5 text-[11px] font-medium text-text-sec">
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-input/50 px-2 py-0.5 text-2xs font-medium text-text-sec">
                 {T.salonTimeNote} {zoneLabel}
               </p>
             ) : null}
@@ -227,7 +227,7 @@ export function ScheduleHeader({
             {T.refresh}
           </Button>
           {refreshedAt ? (
-            <span className="font-mono text-[10px] uppercase tracking-wide text-text-sec">
+            <span className="eyebrow">
               {T.refreshedAtTemplate.replace("{time}", refreshedAt)}
             </span>
           ) : null}

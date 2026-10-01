@@ -88,9 +88,12 @@ export function ChatShell({ perspective }: Props) {
         )}
       />
 
+      {/* 29.09 доработки · 31: `min-h-0` здесь и у окна — без них окно росло по
+          содержимому, лента не прокручивалась сама, а поле ввода длинной
+          переписки уезжало за нижний край карточки (`overflow-hidden`). */}
       <div
         className={cn(
-          "min-w-0 flex-1",
+          "min-h-0 min-w-0 flex-1",
           !activeSlug && totalConversations === 0
             ? "flex items-center justify-center"
             : "flex flex-col",

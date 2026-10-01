@@ -26,7 +26,7 @@ export function UsersRoleTile({ label, count, active, onClick }: Props) {
           : "border-border-subtle hover:border-primary/20 hover:bg-bg-input/40",
       )}
     >
-      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-sec">
+      <span className="eyebrow">
         {label}
       </span>
       <span className="font-display text-xl tabular-nums text-text-main">

@@ -209,16 +209,16 @@ function ActiveFeaturesPanel({
                       <div className="text-xs font-medium text-text-main leading-snug">
                         {item.title}
                         {item.limitValue === null ? (
-                          <span className="ml-1.5 text-[10px] text-success-text font-normal">
+                          <span className="ml-1.5 text-3xs text-success-text font-normal">
                             ({UI_TEXT.billing.currentFeatures.unlimitedValue})
                           </span>
                         ) : item.limitValue !== undefined ? (
-                          <span className="ml-1.5 text-[10px] text-text-sec font-normal">
+                          <span className="ml-1.5 text-3xs text-text-sec font-normal">
                             ({UI_TEXT.billing.currentFeatures.limitValue(item.limitValue)})
                           </span>
                         ) : null}
                       </div>
-                      <div className="text-[11px] text-text-sec leading-snug">{item.description}</div>
+                      <div className="text-2xs text-text-sec leading-snug">{item.description}</div>
                     </div>
                   </li>
                 ))}
@@ -242,7 +242,7 @@ function ActiveFeaturesPanel({
                 </span>
                 <div className="min-w-0">
                   <div className="text-xs font-medium text-text-main leading-snug">{item.title}</div>
-                  <div className="text-[11px] text-text-sec leading-snug">{item.description}</div>
+                  <div className="text-2xs text-text-sec leading-snug">{item.description}</div>
                 </div>
               </div>
             ))}
@@ -386,11 +386,11 @@ export function BillingPage({ scope }: BillingPageProps) {
   }, [scopePlans, status, scope]);
 
   if (loading) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Загружаем…</div>;
+    return <div className="lux-card rounded-3xl p-5 text-sm text-text-sec">Загружаем…</div>;
   }
 
   if (!scopePlans) {
-    return <div className="lux-card rounded-[24px] p-5 text-sm text-text-sec">Тарифы пока не загрузились. Обновите страницу.</div>;
+    return <div className="lux-card rounded-3xl p-5 text-sm text-text-sec">Тарифы пока не загрузились. Обновите страницу.</div>;
   }
 
   const subscription = status?.subscriptions[scope] ?? null;
@@ -486,8 +486,8 @@ export function BillingPage({ scope }: BillingPageProps) {
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-border-subtle bg-bg-input px-3 py-2 text-xs text-text-sec">
             <div>
-              <div className="text-[11px]">{UI_TEXT.billing.autoRenew.label}</div>
-              <div className="text-[11px]">
+              <div className="text-2xs">{UI_TEXT.billing.autoRenew.label}</div>
+              <div className="text-2xs">
                 {isFreePlan
                   ? UI_TEXT.billing.autoRenew.notAvailableForFree
                   : autoRenewEnabled
@@ -523,7 +523,7 @@ export function BillingPage({ scope }: BillingPageProps) {
                   {savings > 0 ? (
                     <span
                       className={cn(
-                        "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
+                        "rounded-full px-1.5 py-0.5 text-3xs font-bold",
                         isSelected ? "bg-white/20 text-white" : "bg-success/15 text-success-text"
                       )}
                     >

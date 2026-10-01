@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { citySlugFromName, normalizeCityName } from "@/lib/cities/normalize";
 import { timezoneForRegions } from "@/lib/cities/region-timezone";
+import { isRussianCountry } from "@/lib/cities/country";
 import { geocodeWithLocality } from "@/lib/cities/yandex-locality";
 
 export type DetectCityResult =
@@ -23,7 +24,12 @@ export type DetectCityResult =
     }
   | {
       ok: false;
-      reason: "no_address" | "geocoder_failed" | "no_locality";
+      /**
+       * `foreign_country` — адрес вне России (29.09 доработки · 27, RF-ONLY):
+       * вызывающий отказывает в сохранении адреса, а не молча выводит из
+       * каталога.
+       */
+      reason: "no_address" | "geocoder_failed" | "no_locality" | "foreign_country";
     };
 
 const DEFAULT_TIMEZONE = "Europe/Moscow";
@@ -33,8 +39,10 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
  * Resolves an address string to a `City` row, creating one on the fly when
  * the locality returned by the geocoder isn't yet in the DB.
  *
- * Auto-grow contract: any locality Yandex recognises is admitted. There is no
- * city whitelist — admins curate after the fact via /admin/cities.
+ * Auto-grow contract: any locality Yandex recognises IN RUSSIA is admitted
+ * (29.09 доработки · 27 — RF-ONLY-SCOPE-01 закрыт и для этого канала; страна —
+ * `country_code` ответа геокодера). There is no city whitelist — admins curate
+ * after the fact via /admin/cities.
  *
  * Race-handling: when two providers in two parallel requests register from a
  * brand-new city, one of them races to `prisma.city.create`. The loser hits a
@@ -52,6 +60,19 @@ export async function detectCityFromAddress(
   const geo = await geocodeWithLocality(address);
   if (!geo) {
     return { ok: false, reason: "geocoder_failed" };
+  }
+
+  // 29.09 доработки · 27: только Россия. Проверка — до поиска города, а не
+  // только до создания: иначе заведённая раньше «Алматы» продолжала бы
+  // принимать адреса. Страны в ответе нет — пропускаем и пишем в лог (решение
+  // владельца 27.2: ложный отказ стоит мастеру регистрации, а лог покажет,
+  // насколько канал не закрыт).
+  const russian = isRussianCountry(geo.country);
+  if (russian === false) {
+    return { ok: false, reason: "foreign_country" };
+  }
+  if (russian === null) {
+    logInfo("city.country_unknown", { locality: geo.locality });
   }
 
   if (!geo.locality) {

@@ -23,8 +23,7 @@ import { studioBookingsWhere } from "@/lib/studio/booking-scope";
  * Strategy:
  *   1. Load every non-cancelled booking for the studio in one query,
  *      with `masterProviderId` selected (so we can compute "main master"
- *      + "visited N masters" per client). Mirrors existing
- *      `getStudioClients` query shape but extends the select.
+ *      + "visited N masters" per client).
  *   2. Group by clientKey (reuse `groupBookings` from `src/lib/crm`).
  *   3. Walk the grouped map a second time to derive per-master booking
  *      counts (N+1-safe because all rows are already in memory).

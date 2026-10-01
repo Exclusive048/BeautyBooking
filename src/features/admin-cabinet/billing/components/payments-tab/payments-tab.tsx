@@ -151,7 +151,7 @@ function PaymentsGroup({
 }) {
   return (
     <section>
-      <h3 className="mb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-text-sec">
+      <h3 className="mb-2 eyebrow text-2xs">
         {title}
       </h3>
       <div
@@ -168,7 +168,7 @@ function PaymentsGroup({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px]">
               <thead>
-                <tr className="border-b border-border-subtle text-left text-[11px] uppercase tracking-wider text-text-sec">
+                <tr className="border-b border-border-subtle text-left text-2xs uppercase tracking-wider text-text-sec">
                   <th className="px-4 py-3 font-medium">
                     {UI_TEXT.adminPanel.billing.payments.columns.id}
                   </th>

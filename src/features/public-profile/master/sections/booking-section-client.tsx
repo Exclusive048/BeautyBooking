@@ -80,7 +80,7 @@ export function BookingSectionClient({ provider, initialSlotStartAt, studioPubli
   return (
     <>
       {/* ── Desktop: inline stepper in right sidebar ── */}
-      <div className="lux-card rounded-[26px] p-5 text-text-main">
+      <div className="lux-card rounded-3xl p-5 text-text-main">
         <div className="mb-4 text-lg font-semibold">{tB.title}</div>
 
         {primaryService ? (

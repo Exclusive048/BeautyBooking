@@ -16,7 +16,7 @@ export function CompletionCard({ percent }: Props) {
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {T.completionLabel}
         </p>
         <p className="font-display text-2xl text-text-main">{safe}%</p>

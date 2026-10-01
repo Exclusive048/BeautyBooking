@@ -59,7 +59,7 @@ export function ReviewReplyForm({ reviewId, onCancel }: Props) {
         maxLength={1000}
         aria-label={T.placeholder}
       />
-      <p className="text-[11px] text-text-sec">{T.hint}</p>
+      <p className="text-2xs text-text-sec">{T.hint}</p>
       {error ? (
         <div
           role="alert"

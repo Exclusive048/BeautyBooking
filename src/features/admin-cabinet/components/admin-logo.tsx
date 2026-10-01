@@ -19,7 +19,7 @@ export function AdminLogo() {
       className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
     >
       <BrandLogo variant="full" size="sm" href={null} />
-      <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <p className="mt-1.5 eyebrow">
         {UI_TEXT.adminPanel.caption}
       </p>
     </Link>

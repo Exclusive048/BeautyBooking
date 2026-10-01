@@ -44,10 +44,10 @@ function CityRow({ value, isEmpty }: { value: string | null; isEmpty: boolean })
     <div className="flex items-start gap-3 py-3">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.cityLabel}
           </p>
-          <span className="font-mono text-[10px] text-text-sec">· {T.cityAutoHint}</span>
+          <span className="font-mono text-3xs text-text-sec">· {T.cityAutoHint}</span>
         </div>
         <p
           className={cn(

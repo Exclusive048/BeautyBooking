@@ -51,7 +51,7 @@ function DayColumn({ day, label }: { day: DayScheduleDto; label: string }) {
       <div className="flex flex-col items-center gap-1.5">
         <span className="text-xs font-medium text-text-sec">{label}</span>
         <div className="h-32 w-full rounded-lg border border-dashed border-border-subtle bg-bg-input" aria-hidden />
-        <abbr title={T.emptyFull} className="text-[10px] uppercase tracking-wide text-text-sec/70 decoration-transparent">
+        <abbr title={T.emptyFull} className="text-3xs uppercase tracking-wide text-text-sec/70 decoration-transparent">
           {T.empty}
         </abbr>
       </div>
@@ -66,13 +66,13 @@ function DayColumn({ day, label }: { day: DayScheduleDto; label: string }) {
           {day.fixedSlotTimes.slice(0, 6).map((time) => (
             <div
               key={time}
-              className="rounded bg-primary/15 py-0.5 text-center text-[10px] text-accent-text"
+              className="rounded bg-primary/15 py-0.5 text-center text-3xs text-accent-text"
             >
               {time}
             </div>
           ))}
         </div>
-        <span className="text-[10px] uppercase tracking-wide text-text-sec/70">
+        <span className="text-3xs uppercase tracking-wide text-text-sec/70">
           {day.fixedSlotTimes.length}
         </span>
       </div>
@@ -109,7 +109,7 @@ function DayColumn({ day, label }: { day: DayScheduleDto; label: string }) {
           );
         })}
       </div>
-      <span className="text-[10px] tabular-nums text-text-sec/80">
+      <span className="text-3xs tabular-nums text-text-sec/80">
         {startLabel}–{endLabel}
       </span>
     </div>

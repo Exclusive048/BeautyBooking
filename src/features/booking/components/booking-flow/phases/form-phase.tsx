@@ -133,7 +133,7 @@ export function FormPhase({
         {T.formBackToSelection}
       </Button>
 
-      <div className="text-[11px] font-medium uppercase tracking-wider text-text-sec">
+      <div className="text-2xs font-medium uppercase tracking-wider text-text-sec">
         {T.formContactsEyebrow}
       </div>
 

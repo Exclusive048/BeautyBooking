@@ -56,7 +56,7 @@ export function PortfolioEmptyState({ categories }: Props) {
 
 function Tip({ icon: Icon, label }: { icon: typeof ImageIcon; label: string }) {
   return (
-    <li className="flex flex-col items-center gap-1 text-[11px]">
+    <li className="flex flex-col items-center gap-1 text-2xs">
       <Icon className="h-4 w-4" aria-hidden />
       <span>{label}</span>
     </li>

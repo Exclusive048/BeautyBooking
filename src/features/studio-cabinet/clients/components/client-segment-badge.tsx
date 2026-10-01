@@ -1,15 +1,15 @@
-import { cn } from "@/lib/cn";
+import { Badge } from "@/components/ui/badge";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioClientPrimarySegment } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.clientsV2.badges;
 
-const STYLES: Record<StudioClientPrimarySegment, string> = {
-  vip: "border-warning-border bg-warning-surface text-warning-text",
-  regular: "border-success-border bg-success-surface text-success-text",
-  new: "border-info-border bg-info-surface text-info-text",
-  sleeping: "border-border-subtle bg-bg-input text-text-sec",
-  other: "border-border-subtle bg-bg-input text-text-sec",
+// 29.09 доработки · 25: цвет плашки — вариант `Badge` (спека 23).
+const VARIANTS: Record<Exclude<StudioClientPrimarySegment, "other">, "warning" | "success" | "info" | "muted"> = {
+  vip: "warning",
+  regular: "success",
+  new: "info",
+  sleeping: "muted",
 };
 
 const LABELS: Record<StudioClientPrimarySegment, string> = {
@@ -23,13 +23,8 @@ const LABELS: Record<StudioClientPrimarySegment, string> = {
 export function ClientSegmentBadge({ segment }: { segment: StudioClientPrimarySegment }) {
   if (segment === "other") return null;
   return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide",
-        STYLES[segment],
-      )}
-    >
+    <Badge size="xs" variant={VARIANTS[segment]} className="shrink-0">
       {LABELS[segment]}
-    </span>
+    </Badge>
   );
 }

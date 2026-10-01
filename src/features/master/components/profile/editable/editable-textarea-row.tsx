@@ -132,7 +132,7 @@ export function EditableTextareaRow({
         <div className="flex items-center gap-2">
           <label
             htmlFor={inputId}
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="eyebrow"
           >
             {label}
           </label>
@@ -153,7 +153,7 @@ export function EditableTextareaRow({
               className="mt-1"
             />
             {counter ? (
-              <p className="mt-1 font-mono text-[10px] text-text-sec">{counter}</p>
+              <p className="mt-1 font-mono text-3xs text-text-sec">{counter}</p>
             ) : null}
           </>
         ) : (

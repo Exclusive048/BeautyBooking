@@ -205,14 +205,14 @@ export function PortfolioCard({
         </Button>
 
         {item.isCatalogCover ? (
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-white shadow-card">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-3xs font-semibold text-white shadow-card">
             <Star className="h-3 w-3 fill-current" aria-hidden />
             {T.coverBadge}
           </span>
         ) : null}
 
         {!item.isPublic ? (
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-bg-card/90 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec shadow-card">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-bg-card/90 px-2 py-0.5 font-mono text-3xs uppercase tracking-[0.18em] text-text-sec shadow-card">
             <EyeOff className="h-3 w-3" aria-hidden />
             {T.hiddenBadge}
           </span>

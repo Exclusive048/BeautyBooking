@@ -122,7 +122,7 @@ export function StudioReviewsSectionClient({
                   {review.publicTags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="rounded-full border border-border-subtle bg-bg-input/80 px-2 py-1 text-[11px] text-text-sec"
+                      className="rounded-full border border-border-subtle bg-bg-input/80 px-2 py-1 text-2xs text-text-sec"
                     >
                       {tag.icon ? `${tag.icon} ` : ""}
                       {tag.label}

@@ -11,6 +11,7 @@ import type {
 import { DeletePackageDialog } from "./delete-package-dialog";
 import { PackageModal } from "./package-modal";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.servicesV2.package;
 
@@ -42,9 +43,9 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
               </span>
               <h3 className="font-display text-base text-text-main">{pkg.name}</h3>
               {!pkg.isEnabled ? (
-                <span className="rounded-full border border-border-subtle bg-bg-card px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec">
+                <Badge size="xs" variant="muted">
                   {T.pausedBadge}
-                </span>
+                </Badge>
               ) : null}
             </div>
             <div className="flex shrink-0 gap-1">
@@ -66,7 +67,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
           </header>
 
           <div>
-            <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+            <p className="mb-1.5 eyebrow">
               {T.componentsLabel.replace("{count}", String(pkg.components.length))}
             </p>
             <ul className="space-y-1">
@@ -81,7 +82,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
                   />
                   <span className="truncate">{component.name}</span>
                   {!component.isEnabled ? (
-                    <span className="text-[10px] text-warning-text">
+                    <span className="text-3xs text-warning-text">
                       ({T.componentDisabled})
                     </span>
                   ) : null}
@@ -91,7 +92,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
           </div>
 
           {pkg.hasDisabledComponent ? (
-            <p className="flex items-start gap-1.5 rounded-lg border border-warning-border bg-warning-surface px-2.5 py-1.5 text-[11px] text-warning-text">
+            <p className="flex items-start gap-1.5 rounded-lg border border-warning-border bg-warning-surface px-2.5 py-1.5 text-2xs text-warning-text">
               <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
               {T.warningDisabledComponents}
             </p>
@@ -99,7 +100,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
 
           <div className="flex items-end justify-between gap-3 border-t border-border-subtle/70 pt-3">
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-text-sec">
+              <p className="text-3xs uppercase tracking-wider text-text-sec">
                 {T.finalPriceLabel}
               </p>
               <p className="font-display text-xl text-text-main">

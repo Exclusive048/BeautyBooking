@@ -4,15 +4,37 @@ import { AppError, toAppError } from "@/lib/api/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { routeRateLimitKey } from "@/lib/rate-limit/keys";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
-import { deleteUserAccount } from "@/lib/deletion/delete-account";
+import { assertAccountDeletable, deleteUserAccount } from "@/lib/deletion/delete-account";
 import { extractClientIp } from "@/lib/http/ip";
 import { clearSessionCookies } from "@/lib/auth/session";
+import { z } from "zod";
+
+// 29.09 доработки · 26: галочка «Удалить и мои отзывы» (действует, только если
+// политика отзывов — USER_CHOICE; иначе сервер её не учитывает).
+const deleteQuerySchema = z.object({ deleteReviews: z.enum(["1"]).optional() });
 
 export const runtime = "nodejs";
+
+function refusal(error: unknown) {
+  const appError = error instanceof AppError ? error : toAppError(error);
+  if (appError.code === "ACTIVE_BOOKINGS") {
+    return fail("Есть активные записи", 409, "ACTIVE_BOOKINGS", appError.details);
+  }
+  return fail(appError.message, appError.status, appError.code, appError.details);
+}
 
 export async function DELETE(req: Request) {
   const auth = await requireAuth();
   if (!auth.ok) return auth.response;
+
+  // 29.09 доработки · 26: отказ из-за живых записей — ДО лимита частоты. Он
+  // ничего не разрушает, а лимит — одна попытка в час: иначе человек, который
+  // отменил записи по подсказке и повторил, получал бы час «Слишком часто».
+  try {
+    await assertAccountDeletable(auth.user.id);
+  } catch (error) {
+    return refusal(error);
+  }
 
   const ip = extractClientIp(req);
   const ipKey = routeRateLimitKey(req, "ip", ip ?? "unknown");
@@ -27,18 +49,19 @@ export async function DELETE(req: Request) {
     return fail("Слишком часто. Попробуйте позже.", 429, "RATE_LIMITED");
   }
 
+  const query = deleteQuerySchema.safeParse(Object.fromEntries(new URL(req.url).searchParams));
+  if (!query.success) {
+    return fail("Некорректный запрос.", 400, "VALIDATION_ERROR");
+  }
+
   try {
-    await deleteUserAccount(auth.user.id);
+    await deleteUserAccount(auth.user.id, { deleteReviews: query.data.deleteReviews === "1" });
 
     const res = ok({ deleted: true });
     // DELETION-03: снимаются ОБЕ куки сессии — раньше `bh_refresh` оставалась.
     clearSessionCookies(res);
     return res;
   } catch (error) {
-    const appError = error instanceof AppError ? error : toAppError(error);
-    if (appError.code === "ACTIVE_BOOKINGS") {
-      return fail("Есть активные записи", 409, "ACTIVE_BOOKINGS", appError.details);
-    }
-    return fail(appError.message, appError.status, appError.code, appError.details);
+    return refusal(error);
   }
 }

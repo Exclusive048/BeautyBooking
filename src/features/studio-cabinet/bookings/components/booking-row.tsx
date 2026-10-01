@@ -20,6 +20,7 @@ import {
 } from "../lib/source-display";
 import type { StudioBookingRow } from "../server/types";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.bookingsV2;
 
@@ -80,7 +81,7 @@ export function BookingRow({
           <div className="font-display text-sm font-semibold tabular-nums text-text-main">
             {formatTime(row.startAtUtc, timezone)}
           </div>
-          <div className="text-[11px] text-text-sec">
+          <div className="text-2xs text-text-sec">
             {formatDateLabel(row.startAtUtc, timezone)}
           </div>
         </td>
@@ -97,7 +98,7 @@ export function BookingRow({
             ) : (
               <span
                 aria-hidden
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-[10px] font-semibold text-text-sec ring-1 ring-border-subtle"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-bg-input text-3xs font-semibold text-text-sec ring-1 ring-border-subtle"
               >
                 {initials(row.master.displayName)}
               </span>
@@ -107,7 +108,7 @@ export function BookingRow({
                 {row.master.displayName}
               </div>
               {row.master.specialization ? (
-                <div className="truncate text-[11px] text-text-sec">
+                <div className="truncate text-2xs text-text-sec">
                   {row.master.specialization}
                 </div>
               ) : null}
@@ -120,18 +121,18 @@ export function BookingRow({
               {row.client.displayName}
             </span>
             {row.client.isNewClient ? (
-              <span className="rounded-full border border-success-border bg-success-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-success-text">
+              <Badge size="xs" variant="success">
                 {T.client.newBadge}
-              </span>
+              </Badge>
             ) : null}
             {row.client.isVip ? (
-              <span className="rounded-full border border-warning-border bg-warning-surface px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-warning-text">
+              <Badge size="xs" variant="warning">
                 {T.client.vipBadge}
-              </span>
+              </Badge>
             ) : null}
           </div>
           {row.client.phone ? (
-            <div className="mt-0.5 text-[11px] text-text-sec">
+            <div className="mt-0.5 text-2xs text-text-sec">
               {row.client.phone}
             </div>
           ) : null}
@@ -139,7 +140,7 @@ export function BookingRow({
         <td className="px-3 py-3 align-top">
           <div className="text-sm text-text-main">{row.service.name}</div>
           {row.service.durationMin > 0 ? (
-            <div className="text-[11px] text-text-sec">
+            <div className="text-2xs text-text-sec">
               {T.table.durationTemplate.replace(
                 "{min}",
                 String(row.service.durationMin),
@@ -153,7 +154,7 @@ export function BookingRow({
         <td className="px-3 py-3 align-top">
           <span
             className={cn(
-              "inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium",
+              "inline-flex rounded-full border px-2 py-0.5 text-3xs font-medium",
               SOURCE_BADGE_CLASS[sourceDisplay.tone],
             )}
           >
@@ -163,7 +164,7 @@ export function BookingRow({
         <td className="px-3 py-3 align-top">
           <span
             className={cn(
-              "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium",
+              "inline-flex rounded-full px-2 py-0.5 text-3xs font-medium",
               BOOKING_CELL_CLASS[tone].split(" ").filter((c) => !c.startsWith("hover:")).join(" "),
             )}
           >

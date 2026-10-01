@@ -1,6 +1,6 @@
 import "server-only";
 
-import { AccountType, ConsentType } from "@prisma/client";
+import { AccountType, ConsentType, type Prisma } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { logError, logInfo } from "@/lib/logging/logger";
 import {
@@ -347,4 +347,23 @@ export async function revokeConsent(input: {
     });
   }
   return result.count;
+}
+
+/**
+ * 29.09 доработки · 26 (Ю26.2) — история согласий УДАЛЁННЫХ аккаунтов после
+ * срока хранения. Здесь, а не в модуле удаления, потому что `UserConsent`
+ * мутирует только этот модуль (инв. #37): строка согласия — доказательство
+ * законности обработки, и её конец жизни должен жить рядом с её началом.
+ * Зовёт отложенный проход политики удаления (`apply-account-deletion-policy.ts`)
+ * — только для людей с `isDeleted`, отобранных по `deletedAt` старше срока.
+ */
+export async function deleteConsentsOfDeletedUsersTx(
+  tx: Pick<Prisma.TransactionClient, "userConsent">,
+  userIds: readonly string[],
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const { count } = await tx.userConsent.deleteMany({
+    where: { userId: { in: [...userIds] }, user: { isDeleted: true } },
+  });
+  return count;
 }

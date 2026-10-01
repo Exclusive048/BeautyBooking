@@ -31,7 +31,7 @@ export function ServiceHeader({
 
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-wider text-text-sec">
+      <div className="text-2xs uppercase tracking-wider text-text-sec">
         {T.headerEyebrow}
       </div>
       {isHot && slot ? (
@@ -42,7 +42,7 @@ export function ServiceHeader({
           <span className="text-sm text-text-sec line-through">
             {UI_FMT.priceLabel(slot.originalPrice ?? servicePrice)}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-md bg-hot/15 px-1.5 py-0.5 text-[11px] font-semibold text-hot-text">
+          <span className="inline-flex items-center gap-1 rounded-md bg-hot/15 px-1.5 py-0.5 text-2xs font-semibold text-hot-text">
             <Flame className="h-3 w-3" aria-hidden strokeWidth={1.8} />
             -{slot.discountPercent ?? slot.discountValue ?? 0}%
           </span>

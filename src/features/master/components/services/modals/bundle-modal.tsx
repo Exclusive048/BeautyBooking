@@ -193,10 +193,10 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
 
         <div>
           <div className="flex items-baseline gap-2">
-            <label className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+            <label className="eyebrow">
               {T.servicesLabel}
             </label>
-            <span className="text-[10px] text-text-sec">· {T.servicesHint}</span>
+            <span className="text-3xs text-text-sec">· {T.servicesHint}</span>
           </div>
           <div className="mt-1.5 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-bg-card">
             {allServices.length === 0 ? (
@@ -218,7 +218,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
                           onChange={() => toggleService(service.id)}
                         />
                         <span className="flex-1 truncate text-text-main">{service.name}</span>
-                        <span className="shrink-0 font-mono text-[11px] text-text-sec">
+                        <span className="shrink-0 font-mono text-2xs text-text-sec">
                           {formatDuration(service.durationMin)}
                         </span>
                         <span className="w-20 shrink-0 text-right font-mono text-sm text-text-main">
@@ -236,7 +236,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         <div>
           <label
             htmlFor={discountValueId}
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="eyebrow"
           >
             {T.discountLabel}
           </label>
@@ -361,7 +361,7 @@ function Field({
     <div>
       <label
         htmlFor={controlId}
-        className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+        className="eyebrow"
       >
         {label}
       </label>
@@ -388,7 +388,7 @@ function PreviewRow({
       <span
         className={cn(
           accent === "emerald" && "text-success-text",
-          muted && "text-[11px] text-text-sec",
+          muted && "text-2xs text-text-sec",
           !accent && !muted && "text-text-sec"
         )}
       >
@@ -397,7 +397,7 @@ function PreviewRow({
       <span
         className={cn(
           accent === "emerald" && "text-success-text",
-          muted && "text-[11px] text-text-sec",
+          muted && "text-2xs text-text-sec",
           bold && "text-base text-text-main",
           !accent && !muted && !bold && "text-text-main"
         )}

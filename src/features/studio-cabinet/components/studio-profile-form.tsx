@@ -182,7 +182,7 @@ export function StudioProfileForm({
   );
 
   return (
-    <section className="lux-card rounded-[24px] p-5 md:p-6">
+    <section className="lux-card rounded-3xl p-5 md:p-6">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="-m-2 space-y-4 rounded-2xl p-2" data-guide="profile">
@@ -289,7 +289,7 @@ export function StudioProfileForm({
             <div className="text-sm text-text-main">
               {zoneLabel ?? studioFormText.timezoneUnknown}
             </div>
-            <p className="text-[11px] text-text-sec">{studioFormText.timezoneHint}</p>
+            <p className="text-2xs text-text-sec">{studioFormText.timezoneHint}</p>
           </div>
         </div>
 

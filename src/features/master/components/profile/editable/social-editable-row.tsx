@@ -120,7 +120,7 @@ export function SocialEditableRow({
         <div className="flex items-center gap-2">
           <label
             htmlFor={inputId}
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+            className="eyebrow"
           >
             {label}
           </label>

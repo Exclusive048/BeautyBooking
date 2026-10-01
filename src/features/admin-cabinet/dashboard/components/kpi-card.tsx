@@ -68,7 +68,7 @@ function DeltaBadge({ kpi }: { kpi: AdminKpi }) {
   if (kpi.deltaText === null || kpi.deltaSign === null) {
     return (
       <span
-        className="font-mono text-[11px] text-text-sec"
+        className="font-mono text-2xs text-text-sec"
         title={T.deltaUnavailable}
       >
         {T.deltaUnavailable}
@@ -80,7 +80,7 @@ function DeltaBadge({ kpi }: { kpi: AdminKpi }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold",
+        "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 font-mono text-2xs font-semibold",
         isZero
           ? "bg-bg-input text-text-sec"
           : isPositive

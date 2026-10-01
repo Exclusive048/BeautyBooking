@@ -97,7 +97,7 @@ export function GuestManagePage({ token, state }: Props) {
   return (
     <div className="space-y-4" data-testid="guest-manage-page">
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+        <p className="eyebrow">
           {view.isPackage ? T.packageLabel : T.pageTitle}
         </p>
         <h1 className="mt-1 font-display text-2xl text-text-main">{view.providerName}</h1>

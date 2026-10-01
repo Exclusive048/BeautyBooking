@@ -95,7 +95,7 @@ function StoryRing({
           {!isViewed ? <span className="sr-only">{T.newWorksSr}</span> : null}
         </div>
 
-        <span className="line-clamp-1 max-w-full text-[11px] font-medium text-text-main sm:text-xs">
+        <span className="line-clamp-1 max-w-full text-2xs font-medium text-text-main sm:text-xs">
           {group.providerName}
         </span>
       </span>

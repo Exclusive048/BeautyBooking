@@ -19,7 +19,7 @@ export function TimeAxis({ hourStart, hourEnd, hourPx }: Props) {
         <div
           key={h}
           style={{ height: hourPx }}
-          className="px-2 pt-1 text-right font-mono text-[10px] tabular-nums text-text-sec"
+          className="px-2 pt-1 text-right font-mono text-3xs tabular-nums text-text-sec"
         >
           {String(h).padStart(2, "0")}:00
         </div>

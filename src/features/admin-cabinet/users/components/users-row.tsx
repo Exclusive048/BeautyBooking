@@ -40,7 +40,7 @@ export function UsersMobileCard({ user, busy, onChangePlan }: Props) {
             <p className="truncate text-xs text-text-main">{user.email}</p>
           ) : null}
           {user.phone ? (
-            <p className="truncate font-mono text-[11px] text-text-sec">
+            <p className="truncate font-mono text-2xs text-text-sec">
               {user.phone}
             </p>
           ) : null}
@@ -49,7 +49,7 @@ export function UsersMobileCard({ user, busy, onChangePlan }: Props) {
       </div>
       <div className="flex items-center justify-between gap-2">
         <UserPlanPill plan={user.plan} onClick={onChangePlan} disabled={busy} />
-        <p className="font-mono text-[11px] tabular-nums text-text-sec">
+        <p className="font-mono text-2xs tabular-nums text-text-sec">
           {user.cityName ?? T.plan.empty}
           <span className="mx-1.5 text-text-sec/40" aria-hidden>
             ·
@@ -78,7 +78,7 @@ export function UsersTableRow({ user, busy, onChangePlan }: Props) {
                 />
               ) : null}
             </p>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-text-sec">
+            <p className="mt-0.5 truncate font-mono text-3xs text-text-sec">
               #{user.id.slice(-8)}
             </p>
           </div>

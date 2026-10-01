@@ -200,7 +200,7 @@ export function CatalogCard({
         />
 
         {item.isHighlighted ? (
-          <span className="absolute left-3 top-3 z-10 inline-flex items-center rounded-full bg-brand-gradient px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white shadow-sm">
+          <span className="absolute left-3 top-3 z-10 inline-flex items-center rounded-full bg-brand-gradient px-2.5 py-0.5 font-mono text-3xs font-semibold uppercase tracking-wider text-white shadow-sm">
             {TC.premiumBadge}
           </span>
         ) : null}
@@ -264,7 +264,7 @@ export function CatalogCard({
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-sm font-semibold text-text-main">{item.title}</p>
               {isNew ? (
-                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-accent-text">
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-medium text-accent-text">
                   {TC.newLabel}
                 </span>
               ) : (

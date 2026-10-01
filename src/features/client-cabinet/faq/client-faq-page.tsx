@@ -53,7 +53,7 @@ export function ClientFaqPage() {
           className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-3xl"
         />
         <div className="relative">
-          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/70">
+          <div className="eyebrow text-white/70">
             {T.heroEyebrow}
           </div>
           <h2 className="mt-1 font-display text-2xl text-white sm:text-3xl">

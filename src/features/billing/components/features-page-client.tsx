@@ -175,7 +175,7 @@ function FeatureRow({
           <p className="text-xs text-text-sec">{item.description}</p>
         </div>
         {item.minTierLabel ? (
-          <span className="shrink-0 text-[11px] text-accent-text underline-offset-2 group-hover:underline">
+          <span className="shrink-0 text-2xs text-accent-text underline-offset-2 group-hover:underline">
             {item.minTierLabel}
           </span>
         ) : null}

@@ -56,7 +56,7 @@ function KpiTile({
         showDelta ? (
           <div
             className={cn(
-              "inline-flex items-center gap-1 text-[11px] font-medium",
+              "inline-flex items-center gap-1 text-2xs font-medium",
               deltaPositive ? "text-success-text" : "text-danger-text",
             )}
           >
@@ -70,7 +70,7 @@ function KpiTile({
             </span>
           </div>
         ) : compare && metric.previous === null ? (
-          <div className="text-[11px] text-text-sec/70">{T.noPrev}</div>
+          <div className="text-2xs text-text-sec/70">{T.noPrev}</div>
         ) : null
       }
     />

@@ -135,7 +135,7 @@ export function HotSlotsPreview() {
             <m.div
               key={item.id}
               variants={itemAnim}
-              className="flex flex-col gap-3 rounded-[20px] border border-border-subtle/60 bg-bg-card/90 p-4"
+              className="flex flex-col gap-3 rounded-2xl border border-border-subtle/60 bg-bg-card/90 p-4"
             >
               {/* Header */}
               <div className="flex items-start justify-between gap-2">

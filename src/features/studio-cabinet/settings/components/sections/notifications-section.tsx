@@ -5,6 +5,7 @@ import { isTelegramEnabled } from "@/lib/env";
 import * as UI_TEXT from "@/lib/ui/text";
 import { SectionCard } from "../section-card";
 import type { StudioNotificationsData } from "../../lib/types";
+import { Badge } from "@/components/ui/badge";
 
 const T = UI_TEXT.studioCabinet.settingsV2.notifications;
 const FG = UI_TEXT.billing.featureGate;
@@ -43,17 +44,11 @@ export function NotificationsSection({ data }: Props) {
             />
             <span className="text-sm font-medium text-text-main">{T.channelPush}</span>
           </div>
-          <span
-            className={
-              data.pushEnabled
-                ? "rounded-full border border-success-border bg-success-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-success-text"
-                : "rounded-full border border-border-subtle bg-bg-input px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-text-sec"
-            }
-          >
+          <Badge size="xs" variant={data.pushEnabled ? "success" : "muted"}>
             {data.pushEnabled ? T.pushEnabled : T.pushDisabled}
-          </span>
+          </Badge>
         </div>
-        <p className="text-[11px] text-text-sec">{T.pushHint}</p>
+        <p className="text-2xs text-text-sec">{T.pushHint}</p>
       </SectionCard>
 
       {/* FIX-TELEGRAM-KILLSWITCH: the entire Telegram card (header + control) is

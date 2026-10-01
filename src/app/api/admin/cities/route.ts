@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { ProviderType } from "@prisma/client";
 import { isValidTimeZone } from "@/lib/schedule/timezone";
+import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
+import * as UI_TEXT from "@/lib/ui/text";
 import { prisma } from "@/lib/prisma";
 import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
@@ -173,6 +175,11 @@ export async function POST(req: Request) {
     const existing = await prisma.city.findUnique({ where: { slug }, select: { id: true } });
     if (existing) {
       return fail("Город с таким слагом уже существует.", 409, "ALREADY_EXISTS");
+    }
+
+    // 29.09 доработки · 28: у нового города пояс — только России (решение 28.3).
+    if (parsed.data.timezone && !isSelectableTimeZone(parsed.data.timezone, null)) {
+      return fail(UI_TEXT.cities.timezoneNotAllowed, 422, "TIMEZONE_NOT_ALLOWED");
     }
 
     const created = await prisma.$transaction(async (tx) => {

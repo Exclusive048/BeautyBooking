@@ -828,7 +828,7 @@ function CompletionGradientCard({
   const done = countedEntries.filter(([, value]) => Boolean(value)).length;
   return (
     <Card className="overflow-hidden border-0 bg-brand-gradient p-5 text-white">
-      <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-white/80">
+      <div className="eyebrow text-white/80">
         {T.completion.rail}
       </div>
       <div className="my-1 font-display text-4xl">{completion.percent}%</div>

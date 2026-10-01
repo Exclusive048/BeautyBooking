@@ -2,6 +2,8 @@ const ERROR_CODES = [
   // FIX-B18: код существовал только литералом в master/profile (и уезжал в поле
   // сообщения). При переводе роута на конверт он стал настоящим ErrorCode.
   "ADDRESS_COORDS_REQUIRED",
+  // 29.09 доработки · 27: адрес вне России (RF-ONLY-SCOPE-01).
+  "ADDRESS_OUTSIDE_RUSSIA",
   "ADDRESS_REQUIRED",
   "AUTH_DATE_EXPIRED",
   "AUTO_CONFIRM_NOT_ALLOWED_FOR_STUDIO",
@@ -17,6 +19,9 @@ const ERROR_CODES = [
   "BOOKING_CONFLICT",
   "BOOKING_NOT_FOUND",
   "BOOKING_TIME_REQUIRED",
+  // 29.09 доработки · 26 (решение 26.1): предстоящие записи клиента
+  // останавливают удаление аккаунта.
+  "CLIENT_ACTIVE_BOOKINGS",
   // LOGIC-02: статус брони изменился между чтением и записью
   "BOOKING_STATUS_CHANGED",
   "PACKAGE_NOT_FOUND",
@@ -179,6 +184,8 @@ const ERROR_CODES = [
   "APP_PUBLIC_URL_MISSING",
   "TIME_RANGE_INVALID",
   "UNAUTHORIZED",
+  // 29.09 доработки · 28: пояс вне России (кроме неизменённого текущего).
+  "TIMEZONE_NOT_ALLOWED",
   "VALIDATION_ERROR",
   // Admin billing features editor (ADMIN-BILLING-FIX-B)
   "PARENT_NOT_FOUND",

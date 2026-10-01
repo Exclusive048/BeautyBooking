@@ -19,7 +19,7 @@ type Variant = "selection" | "form";
 export function Footnote({ variant }: { variant: Variant }) {
   if (variant === "selection") {
     return (
-      <p className="mt-2 text-center text-[11px] leading-relaxed text-text-sec">
+      <p className="mt-2 text-center text-2xs leading-relaxed text-text-sec">
         {T.footnoteSelectionConfirm}
         <br />
         {T.footnoteSelectionPay}
@@ -28,7 +28,7 @@ export function Footnote({ variant }: { variant: Variant }) {
   }
 
   return (
-    <p className="mt-2 text-center text-[11px] leading-relaxed text-text-sec">
+    <p className="mt-2 text-center text-2xs leading-relaxed text-text-sec">
       {T.footnoteFormPay}
     </p>
   );

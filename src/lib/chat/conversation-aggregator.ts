@@ -11,6 +11,8 @@ import {
 } from "@/lib/chat/thread-grouping";
 import type { ConversationParticipant } from "@/lib/chat/conversation-access";
 import { buildChatAttachmentUrl } from "@/lib/media/private-delivery";
+import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
+import { CHAT_THREAD_PAGE_SIZE, chatConversationsWindowStart } from "@/lib/chat/conversation-window";
 
 /**
  * Per-pair conversation aggregator (33a, updated by chat-url-fix).
@@ -69,6 +71,8 @@ export type ConversationDetail = {
   slug: string;
   partner: ConversationPartner;
   thread: ThreadItem[];
+  /** Курсор более ранних сообщений («Показать раньше»); null — загружено всё. */
+  olderCursor: string | null;
   canSend: boolean;
   openBookingId: string | null;
   readonlyOnly: boolean;
@@ -139,6 +143,10 @@ export async function countUnreadChatMessages(input: {
           perspective === "MASTER"
             ? { provider: { ownerUserId: userId, type: ProviderType.MASTER } }
             : { clientUserId: userId, provider: { type: ProviderType.MASTER } },
+        // 29.09 доработки · 31: считаем ровно те чаты, что видны в списке
+        // диалогов (окно активности), — иначе бейдж звал бы к переписке,
+        // которой в списке нет.
+        messages: { some: { createdAt: { gte: chatConversationsWindowStart() } } },
       },
     },
   });
@@ -153,11 +161,14 @@ export async function listConversations(input: {
   // Find every chat the caller participates in (any booking, any
   // status). We pull last message + unread count via subqueries to
   // stay in O(1) round-trip space.
+  // 29.09 доработки · 31 (решение 31.3): только чаты с движением за последний
+  // год — список растёт с каждой записью. Подпись окна — у шапки списка.
+  const windowFilter = { messages: { some: { createdAt: { gte: chatConversationsWindowStart() } } } };
   const chats = await prisma.bookingChat.findMany({
     where:
       perspective === "MASTER"
-        ? { booking: { provider: { ownerUserId: userId } } }
-        : { booking: { clientUserId: userId } },
+        ? { booking: { provider: { ownerUserId: userId } }, ...windowFilter }
+        : { booking: { clientUserId: userId }, ...windowFilter },
     select: {
       id: true,
       createdAt: true,
@@ -361,17 +372,44 @@ function buildPartner(input: {
   };
 }
 
+/** Курсор страницы переписки — время и id самого раннего загруженного сообщения. */
+export function encodeThreadCursor(message: { createdAt: Date; id: string }): string {
+  return encodeCursor(`${message.createdAt.toISOString()}|${message.id}`);
+}
+
+/** Разбор курсора переписки; `null` — токен не разбирается (роут отвечает 400). */
+export function decodeThreadCursor(cursor: string): { createdAt: Date; id: string } | null {
+  const raw = decodeCursor(cursor);
+  if (!raw) return null;
+  const sep = raw.indexOf("|");
+  if (sep <= 0) return null;
+  const createdAt = new Date(raw.slice(0, sep));
+  const id = raw.slice(sep + 1);
+  if (Number.isNaN(createdAt.getTime()) || !id) return null;
+  return { createdAt, id };
+}
+
 /**
- * Load a single conversation thread — all messages across every
- * booking between the (provider, client) pair, flat-ordered, with
- * day separators injected.
+ * Load a single conversation thread — messages across every booking
+ * between the (provider, client) pair, flat-ordered, with day separators
+ * injected.
+ *
+ * 29.09 доработки · 31 (решение 31.4): страница — последние
+ * `CHAT_THREAD_PAGE_SIZE` сообщений до `before` (по умолчанию — самые
+ * свежие); `olderCursor` ведёт к более ранним («Показать раньше»). Раньше
+ * грузилась вся история пары с карточкой записи на каждом сообщении.
+ * Порядок — `(createdAt, id)`: два сообщения с одним временем не теряются и
+ * не дублируются на границе страниц.
  */
 export async function getConversationThread(input: {
   key: ConversationKey;
   perspective: ConversationParticipant;
   viewerTimezone: string;
+  before?: { createdAt: Date; id: string } | null;
+  limit?: number;
 }): Promise<ConversationDetail | null> {
-  const { key, perspective, viewerTimezone } = input;
+  const { key, perspective, viewerTimezone, before } = input;
+  const limit = input.limit ?? CHAT_THREAD_PAGE_SIZE;
 
   const bookings = await prisma.booking.findMany({
     where: {
@@ -385,97 +423,111 @@ export async function getConversationThread(input: {
       startAtUtc: true,
       provider: { select: PARTNER_PROVIDER_SELECT },
       clientUser: { select: PARTNER_USER_SELECT },
-      chat: {
-        select: {
-          id: true,
-          messages: {
-            orderBy: { createdAt: "asc" },
-            select: {
-              id: true,
-              senderType: true,
-              senderName: true,
-              body: true,
-              readAt: true,
-              createdAt: true,
-              // CHAT-FOUNDATION-A-MIGRATION: surface attachment id
-              // for client renderer (image fetched via media path).
-              attachmentMediaAssetId: true,
-              referencedBooking: {
-                select: {
-                  id: true,
-                  status: true,
-                  startAtUtc: true,
-                  endAtUtc: true,
-                  provider: { select: { address: true, timezone: true } },
-                  masterProvider: { select: { address: true, timezone: true } },
-                  serviceItems: {
-                    select: {
-                      titleSnapshot: true,
-                      priceSnapshot: true,
-                      durationSnapshotMin: true,
-                    },
-                    take: 1,
-                  },
-                  service: {
-                    select: { name: true, price: true, durationMin: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      chat: { select: { id: true } },
     },
   });
 
   if (bookings.length === 0) return null;
 
-  // Aggregate all messages across all bookings, attach bookingId,
-  // and sort globally.
-  const flat = bookings.flatMap((booking) => {
-    const chat = booking.chat;
-    if (!chat) return [];
-    return chat.messages.map((message) => {
-      const ref = message.referencedBooking;
-      const refItem = ref?.serviceItems[0];
-      return {
-        id: message.id,
-        senderType: message.senderType,
-        senderName: message.senderName,
-        body: message.body,
-        readAt: message.readAt,
-        createdAt: message.createdAt,
-        bookingId: booking.id,
-        // MASTER-CHAT-ATTACHMENT-FIX-A: emit a signed opaque URL
-        // (15-min token in path) instead of the raw asset cuid. The
-        // client never sees the prisma id and the route at
-        // `/api/chat/attachment/[token]` runs the chat-membership ACL
-        // via `ensureCanReadMedia(CHAT_MESSAGE)`.
-        attachmentUrl: message.attachmentMediaAssetId
-          ? buildChatAttachmentUrl(message.attachmentMediaAssetId)
-          : null,
-        bookingCard: ref
-          ? {
-              id: ref.id,
-              status: ref.status,
-              startAtUtc: ref.startAtUtc?.toISOString() ?? null,
-              endAtUtc: ref.endAtUtc?.toISOString() ?? null,
-              serviceName: refItem?.titleSnapshot ?? ref.service.name,
-              priceSnapshot: refItem?.priceSnapshot ?? ref.service.price,
-              durationMin: refItem?.durationSnapshotMin ?? ref.service.durationMin,
-              address: ref.masterProvider?.address ?? ref.provider.address ?? null,
-              // FIX-TZ-SYSTEM-MESSAGE: salon-tz for the card's appointment
-              // time — mirror the address source (masterProvider is where a
-              // studio booking physically happens; solo master has no
-              // masterProvider so we fall back to the provider). Provider.timezone
-              // is non-nullable (schema default Europe/Moscow).
-              timezone: ref.masterProvider?.timezone ?? ref.provider.timezone,
-            }
-          : null,
-      };
-    });
+  const bookingIdByChat = new Map<string, string>();
+  for (const booking of bookings) {
+    if (booking.chat) bookingIdByChat.set(booking.chat.id, booking.id);
+  }
+
+  const rows =
+    bookingIdByChat.size === 0
+      ? []
+      : await prisma.chatMessage.findMany({
+          where: {
+            chatId: { in: [...bookingIdByChat.keys()] },
+            ...(before
+              ? {
+                  OR: [
+                    { createdAt: { lt: before.createdAt } },
+                    { createdAt: before.createdAt, id: { lt: before.id } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: limit + 1,
+          select: {
+            id: true,
+            chatId: true,
+            senderType: true,
+            senderName: true,
+            body: true,
+            readAt: true,
+            createdAt: true,
+            // CHAT-FOUNDATION-A-MIGRATION: surface attachment id
+            // for client renderer (image fetched via media path).
+            attachmentMediaAssetId: true,
+            referencedBooking: {
+              select: {
+                id: true,
+                status: true,
+                startAtUtc: true,
+                endAtUtc: true,
+                provider: { select: { address: true, timezone: true } },
+                masterProvider: { select: { address: true, timezone: true } },
+                serviceItems: {
+                  select: {
+                    titleSnapshot: true,
+                    priceSnapshot: true,
+                    durationSnapshotMin: true,
+                  },
+                  take: 1,
+                },
+                service: {
+                  select: { name: true, price: true, durationMin: true },
+                },
+              },
+            },
+          },
+        });
+
+  const hasOlder = rows.length > limit;
+  const page = (hasOlder ? rows.slice(0, limit) : rows).reverse();
+
+  const flat = page.map((message) => {
+    const ref = message.referencedBooking;
+    const refItem = ref?.serviceItems[0];
+    return {
+      id: message.id,
+      senderType: message.senderType,
+      senderName: message.senderName,
+      body: message.body,
+      readAt: message.readAt,
+      createdAt: message.createdAt,
+      bookingId: bookingIdByChat.get(message.chatId) ?? "",
+      // MASTER-CHAT-ATTACHMENT-FIX-A: emit a signed opaque URL
+      // (15-min token in path) instead of the raw asset cuid. The
+      // client never sees the prisma id and the route at
+      // `/api/chat/attachment/[token]` runs the chat-membership ACL
+      // via `ensureCanReadMedia(CHAT_MESSAGE)`.
+      attachmentUrl: message.attachmentMediaAssetId
+        ? buildChatAttachmentUrl(message.attachmentMediaAssetId)
+        : null,
+      bookingCard: ref
+        ? {
+            id: ref.id,
+            status: ref.status,
+            startAtUtc: ref.startAtUtc?.toISOString() ?? null,
+            endAtUtc: ref.endAtUtc?.toISOString() ?? null,
+            serviceName: refItem?.titleSnapshot ?? ref.service.name,
+            priceSnapshot: refItem?.priceSnapshot ?? ref.service.price,
+            durationMin: refItem?.durationSnapshotMin ?? ref.service.durationMin,
+            address: ref.masterProvider?.address ?? ref.provider.address ?? null,
+            // FIX-TZ-SYSTEM-MESSAGE: salon-tz for the card's appointment
+            // time — mirror the address source (masterProvider is where a
+            // studio booking physically happens; solo master has no
+            // masterProvider so we fall back to the provider). Provider.timezone
+            // is non-nullable (schema default Europe/Moscow).
+            timezone: ref.masterProvider?.timezone ?? ref.provider.timezone,
+          }
+        : null,
+    };
   });
-  flat.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const openBooking = bookings.find((b) => isBookingChatOpen(b));
   const partner = buildPartner({
@@ -492,6 +544,7 @@ export async function getConversationThread(input: {
     slug,
     partner,
     thread,
+    olderCursor: hasOlder && page[0] ? encodeThreadCursor(page[0]) : null,
     canSend: Boolean(openBooking),
     openBookingId: openBooking?.id ?? null,
     readonlyOnly: false, // refined by route via resolveConversationAccess

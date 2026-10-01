@@ -69,6 +69,13 @@ async function main() {
     const bookings = await prisma.booking.deleteMany({
       where: { providerId: { in: seedProviderIds } },
     });
+    // SCHEDULE-PATTERNS-01: `SchedulePatternDay.templateId` — `onDelete:
+    // Restrict` (прошлые дни не должны стать выходными молча), а удаление
+    // провайдера каскадом сносит и шаблоны, и графики — в порядке, которого
+    // Postgres не обещает. Графики (дни уходят каскадом) — явно и раньше.
+    await prisma.schedulePattern.deleteMany({
+      where: { providerId: { in: seedProviderIds } },
+    });
     const providers = await prisma.provider.deleteMany({
       where: { id: { in: seedProviderIds } },
     });

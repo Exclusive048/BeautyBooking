@@ -130,7 +130,7 @@ export function StatTile({
           title={labelTooltip}
           className={cn(
             "min-w-0 flex-1 truncate text-text-sec sm:text-xs",
-            compact ? "text-[10px]" : "text-[11px]",
+            compact ? "text-3xs" : "text-2xs",
             // `leading-*` — после размера шрифта: `cn` (tailwind-merge) выбрасывает
             // ранний `leading-*`, если позже стоит размер (он задаёт и высоту строки).
             "leading-tight",
@@ -172,7 +172,7 @@ export function StatTile({
       </p>
 
       {sublabel ? (
-        <p className="mt-0.5 truncate text-[11px] leading-tight text-text-sec">{sublabel}</p>
+        <p className="mt-0.5 truncate text-2xs leading-tight text-text-sec">{sublabel}</p>
       ) : null}
 
       {footer ? <div className="mt-1">{footer}</div> : null}

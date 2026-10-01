@@ -29,7 +29,7 @@ export default function BlogPage() {
         </section>
 
         {/* Coming soon banner */}
-        <div className="lux-card rounded-[20px] bg-bg-card border border-border-subtle p-6 flex items-center gap-4">
+        <div className="lux-card rounded-2xl bg-bg-card border border-border-subtle p-6 flex items-center gap-4">
           <PenLine className="h-8 w-8 text-text-sec shrink-0" aria-hidden />
           <div>
             <p className="font-semibold text-text-main">{UI_TEXT.pages.blog.comingSoonTitle}</p>
@@ -44,7 +44,7 @@ export default function BlogPage() {
           {COMING_SOON_POSTS.map((post) => (
             <div
               key={post.title}
-              className="lux-card rounded-[20px] bg-bg-card p-6 flex gap-5 items-start opacity-80"
+              className="lux-card rounded-2xl bg-bg-card p-6 flex gap-5 items-start opacity-80"
             >
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center gap-2">

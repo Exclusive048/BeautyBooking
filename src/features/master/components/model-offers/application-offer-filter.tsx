@@ -22,7 +22,7 @@ export function ApplicationOfferFilter({ options, activeOfferId }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+      <span className="eyebrow">
         {T.filterLabel}
       </span>
       <Chip href="#applications" active={!activeOfferId}>

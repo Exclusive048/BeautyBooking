@@ -79,7 +79,7 @@ export function SectionNav({ bySection }: Props) {
     <nav aria-labelledby={headingId} className="rounded-2xl border border-border-subtle bg-bg-card p-2">
       <p
         id={headingId}
-        className="px-2 pb-2 pt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+        className="px-2 pb-2 pt-1 eyebrow"
       >
         {T.sidebar.sectionsHeading}
       </p>

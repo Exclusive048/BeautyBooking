@@ -150,6 +150,10 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
   },
 
   // ── Phase B: needs a legal decision, NOT an engineering one ───────────────
+  // 29.09 доработки · 26: что делать с каждой связью ниже, решает ОДНА константа
+  // `ACCOUNT_DELETION_POLICY` (`account-deletion-policy.ts`); функции действий
+  // уже написаны. Пока у связи POLICY_PENDING, политика обязана быть KEEP —
+  // сторож `account-deletion-policy.test.ts`.
   bookings: {
     kind: "POLICY_PENDING",
     reason:
@@ -157,14 +161,16 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
       "still findable by phone in booking history. Counsel decides retention vs anonymisation",
   },
   bookingPackages: {
-    kind: "POLICY_PENDING",
-    reason: "RKN-FIX-03-B: groups the bookings above; follows whatever they get",
+    kind: "RETAINED",
+    reason:
+      "29.09 доработки · 26: только id и связи, ПДн нет — пакет держит группировку " +
+      "записей, а ПДн клиента живут в самих записях (`bookings`)",
   },
   notifications: {
-    kind: "POLICY_PENDING",
+    kind: "DELETED",
     reason:
-      "RKN-FIX-03-B: only rows older than 30 days are deleted; fresher ones keep names and " +
-      "appointment times. No background retention job exists (RKN-FIX-04)",
+      "29.09 доработки · 26 (решение владельца 26.2): удаляются все — получателя больше " +
+      "нет, читать их некому. Раньше — только старше 30 дней, свежие жили вечно",
   },
   consents: {
     kind: "POLICY_PENDING",

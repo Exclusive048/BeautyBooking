@@ -82,14 +82,14 @@ export function MasterDetailHeader({
               </h2>
               <span
                 className={cn(
-                  "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  "rounded-full border px-2 py-0.5 text-3xs font-medium",
                   STATUS_BADGE_CLASS[tone],
                 )}
               >
                 {statusLabel(detail.status)}
               </span>
               {detail.isCurrentUser ? (
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-accent-text">
+                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-3xs uppercase tracking-wide text-accent-text">
                   {T.youChip}
                 </span>
               ) : null}

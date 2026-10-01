@@ -77,7 +77,7 @@ export function PortfolioStrip({ items }: Props) {
   }, [selectedId]);
 
   return (
-    <section className="lux-card rounded-[28px] p-5">
+    <section className="lux-card rounded-3xl p-5">
       <h2 className="text-lg font-semibold text-text-main">{UI_TEXT.publicProfile.portfolio.title}</h2>
       {items.length === 0 ? (
         <div className="mt-4 rounded-2xl border border-border-subtle bg-bg-input/70 p-4 text-sm text-text-sec">
@@ -109,7 +109,7 @@ export function PortfolioStrip({ items }: Props) {
               >
                 <div className="relative aspect-square overflow-hidden">
                   {item.visualSearchReady ? (
-                    <div className="absolute left-2 top-2 z-10 rounded-full bg-success/90 px-2 py-1 text-[11px] font-semibold text-white">
+                    <div className="absolute left-2 top-2 z-10 rounded-full bg-success/90 px-2 py-1 text-2xs font-semibold text-white">
                       {UI_TEXT.publicProfile.portfolio.indexedBadge}
                     </div>
                   ) : null}

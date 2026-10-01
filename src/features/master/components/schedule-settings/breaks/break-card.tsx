@@ -32,7 +32,7 @@ export function BreakCard({ group, onDelete }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
       <Minus className="h-4 w-4 shrink-0 text-text-sec" aria-hidden />
-      <span className="inline-flex shrink-0 items-center justify-center rounded-full border border-border-subtle bg-bg-input px-2.5 py-0.5 text-[11px] font-medium text-text-main">
+      <span className="inline-flex shrink-0 items-center justify-center rounded-full border border-border-subtle bg-bg-input px-2.5 py-0.5 text-2xs font-medium text-text-main">
         {formatDaysOfWeek(group.daysOfWeek)}
       </span>
       <p className="min-w-0 flex-1 truncate text-sm font-medium text-text-main">{title}</p>

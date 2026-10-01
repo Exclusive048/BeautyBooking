@@ -5,6 +5,7 @@ import { Children, isValidElement, useCallback, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { CountBadge } from "@/components/ui/count-badge";
 
 /**
  * NAV-ALIGN-01 — единая нижняя панель вкладок для ВСЕХ носителей: общая
@@ -152,14 +153,7 @@ export function BottomTab(props: BottomTabProps) {
     <>
       <span className="relative">
         <Icon className={cn("h-5 w-5 transition-colors", tone)} aria-hidden />
-        {badge > 0 ? (
-          <span
-            aria-hidden
-            className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none tabular-nums text-primary-foreground"
-          >
-            {badge > 99 ? "99+" : badge}
-          </span>
-        ) : null}
+        <CountBadge count={badge} className="absolute -right-2 -top-1.5" />
         {showDot ? (
           <span
             aria-hidden
@@ -167,7 +161,7 @@ export function BottomTab(props: BottomTabProps) {
           />
         ) : null}
       </span>
-      <span className={cn("max-w-full truncate text-[10px] font-medium leading-normal transition-colors", tone)}>
+      <span className={cn("max-w-full truncate text-3xs font-medium leading-normal transition-colors", tone)}>
         {label}
       </span>
       {badge > 0 ? <span className="sr-only">{` (${badge})`}</span> : null}

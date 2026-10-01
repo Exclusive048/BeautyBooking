@@ -20,7 +20,7 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
   // FIX-R2-04-C: group the services menu by attached category (presentational).
   const groups = useMemo(() => groupServicesByCategory(services), [services]);
   return (
-    <section className="lux-card rounded-[28px] p-5">
+    <section className="lux-card rounded-3xl p-5">
       <h2 className="text-lg font-semibold text-text-main">{UI_TEXT.publicProfile.services.title}</h2>
       {groups.length === 0 ? (
         // FIX-D1 (F7): то же оформление, что у «Портфолио» — заголовок без
@@ -36,7 +36,7 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
               <h3 className="font-display text-sm font-semibold text-text-main">
                 {group.categoryName ?? UI_TEXT.publicProfile.services.categoryOther}
               </h3>
-              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-[10px] text-text-sec">
+              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs text-text-sec">
                 {group.services.length}
               </span>
             </div>

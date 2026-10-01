@@ -136,7 +136,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                 <h3 className="font-display text-sm font-semibold text-text">
                   {group.categoryName ?? UI_TEXT.bookingWidget.serviceStep.categoryOther}
                 </h3>
-                <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-text-muted">
+                <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-3xs text-text-muted">
                   {group.services.length}
                 </span>
               </div>
@@ -173,7 +173,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                                 : UI_TEXT.bookingWidget.serviceStep.priceOnRequest}
                             </div>
                           </div>
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-accent-text">
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-medium uppercase tracking-wider text-accent-text">
                             {isSelected ? "✓" : UI_TEXT.bookingWidget.serviceStep.pick}
                           </span>
                         </div>
@@ -188,7 +188,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
       )}
 
       {masters.length > 0 && !prefilledMaster ? (
-        <p className="text-[11px] text-text-muted">
+        <p className="text-2xs text-text-muted">
           {UI_TEXT.bookingWidget.hero.mastersCount.replace("{count}", String(masters.length))}
         </p>
       ) : null}

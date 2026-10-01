@@ -82,6 +82,8 @@ export type ConversationThreadDto = {
   /** Opaque public slug echoed back from the API for symmetry. */
   slug: string;
   thread: ThreadItemDto[];
+  /** Курсор более ранних сообщений («Показать раньше»); null — загружено всё. */
+  olderCursor: string | null;
   partner: ConversationPartnerDto;
   perspective: "MASTER" | "CLIENT";
   canSend: boolean;

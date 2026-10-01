@@ -36,7 +36,7 @@ export function BookingsHeader({
     <>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="mb-1 eyebrow">
             {T.caption.replace("{count}", String(visibleCount))}
           </p>
           <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">

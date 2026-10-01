@@ -54,17 +54,17 @@ export function TimezoneSelector({ current }: { current: string }) {
     <div className="flex items-start gap-3 py-3">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec">
+          <p className="eyebrow">
             {T.timezoneLabel}
           </p>
-          <span className="font-mono text-[10px] text-text-sec">· {T.timezoneAutoHint}</span>
+          <span className="font-mono text-3xs text-text-sec">· {T.timezoneAutoHint}</span>
           {status === "saving" ? (
-            <span className="inline-flex items-center gap-1 text-[10px] text-text-sec">
+            <span className="inline-flex items-center gap-1 text-3xs text-text-sec">
               <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> {T.timezoneSaving}
             </span>
           ) : null}
           {status === "saved" ? (
-            <span className="inline-flex items-center gap-1 text-[10px] text-success-text">
+            <span className="inline-flex items-center gap-1 text-3xs text-success-text">
               <Check className="h-3 w-3" aria-hidden /> {T.timezoneSaved}
             </span>
           ) : null}
@@ -82,7 +82,7 @@ export function TimezoneSelector({ current }: { current: string }) {
             </option>
           ))}
         </Select>
-        <p className={cn("mt-1.5 text-[11px]", status === "error" ? "text-danger-text" : "text-text-sec")}>
+        <p className={cn("mt-1.5 text-2xs", status === "error" ? "text-danger-text" : "text-text-sec")}>
           {status === "error" ? (errorText ?? T.timezoneError) : T.timezoneHint}
         </p>
       </div>

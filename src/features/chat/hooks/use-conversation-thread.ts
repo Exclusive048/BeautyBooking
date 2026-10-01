@@ -1,17 +1,19 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeNotificationEvent } from "@/lib/notifications/client-bus";
 import type { ConversationThreadDto, ChatPerspective } from "@/features/chat/types";
 import * as UI_TEXT from "@/lib/ui/text";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { getViewerTimeZone } from "@/lib/time/use-viewer-timezone";
+import { mergeThreadItems } from "@/features/chat/lib/thread-merge";
 
 type State = {
   detail: ConversationThreadDto | null;
   isLoading: boolean;
   error: string | null;
+  isLoadingOlder: boolean;
 };
 
 /**
@@ -22,6 +24,12 @@ type State = {
  *   - a CHAT_MESSAGE_RECEIVED notification arrives whose payload
  *     references this `conversationSlug` (other-side message) OR an
  *     unknown slug (defensive: refresh anyway)
+ *
+ * 29.09 доработки · 31: сервер отдаёт последние 100 сообщений и курсор более
+ * ранних. Перезапрос свежей страницы не заменяет ленту, а объединяется с уже
+ * загруженным (`mergeThreadItems`), и курсор остаётся у самой ранней
+ * загруженной страницы — иначе новое сообщение сдвигало бы окно «последние
+ * 100» и между страницами появлялась бы дыра.
  */
 export function useConversationThread(input: {
   perspective: ChatPerspective;
@@ -29,6 +37,8 @@ export function useConversationThread(input: {
 }): State & {
   refresh: () => Promise<void>;
   markRead: () => Promise<void>;
+  /** Подгрузить более ранние сообщения; возвращает текст ошибки или null. */
+  loadOlder: () => Promise<string | null>;
 } {
   const { perspective, conversationSlug } = input;
   const router = useRouter();
@@ -36,11 +46,13 @@ export function useConversationThread(input: {
     detail: null,
     isLoading: Boolean(conversationSlug),
     error: null,
+    isLoadingOlder: false,
   });
+  const olderInFlight = useRef(false);
 
   const fetchThread = useCallback(async () => {
     if (!conversationSlug) {
-      setState({ detail: null, isLoading: false, error: null });
+      setState({ detail: null, isLoading: false, error: null, isLoadingOlder: false });
       return;
     }
     // Note: we intentionally do not flip `isLoading: true` here. The
@@ -56,7 +68,17 @@ export function useConversationThread(input: {
           headers: { "x-tz": tz },
         },
       );
-      setState({ detail, isLoading: false, error: null });
+      setState((prev) => {
+        const same = prev.detail?.slug === detail.slug ? prev.detail : null;
+        return {
+          detail: same
+            ? { ...detail, thread: mergeThreadItems(same.thread, detail.thread, tz), olderCursor: same.olderCursor }
+            : detail,
+          isLoading: false,
+          error: null,
+          isLoadingOlder: prev.isLoadingOlder,
+        };
+      });
     } catch (error) {
       setState({
         detail: null,
@@ -65,14 +87,12 @@ export function useConversationThread(input: {
           error instanceof ApiClientError
             ? serverMessageOr(error, UI_TEXT.chat.errors.threadLoadFailed)
             : UI_TEXT.chat.errors.offlineRetry,
+        isLoadingOlder: false,
       });
     }
   }, [conversationSlug, perspective]);
 
   useEffect(() => {
-    // fetchThread setState happens after await — async microtask, not
-    // synchronous-in-effect. Suppressing the conservative lint.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchThread();
   }, [fetchThread]);
 
@@ -105,5 +125,40 @@ export function useConversationThread(input: {
     }
   }, [conversationSlug, perspective, router]);
 
-  return { ...state, refresh: fetchThread, markRead };
+  const cursor = state.detail?.olderCursor ?? null;
+  const loadOlder = useCallback(async (): Promise<string | null> => {
+    if (!conversationSlug || !cursor || olderInFlight.current) return null;
+    olderInFlight.current = true;
+    setState((prev) => ({ ...prev, isLoadingOlder: true }));
+    try {
+      const tz = getViewerTimeZone();
+      const older = await fetchJsonWithAuth<ConversationThreadDto>(
+        `/api/chat/threads/${encodeURIComponent(conversationSlug)}?as=${perspective}&before=${encodeURIComponent(cursor)}`,
+        { cache: "no-store", headers: { "x-tz": tz } },
+      );
+      setState((prev) =>
+        prev.detail && prev.detail.slug === older.slug
+          ? {
+              ...prev,
+              isLoadingOlder: false,
+              detail: {
+                ...prev.detail,
+                thread: mergeThreadItems(prev.detail.thread, older.thread, tz),
+                olderCursor: older.olderCursor,
+              },
+            }
+          : { ...prev, isLoadingOlder: false },
+      );
+      return null;
+    } catch (error) {
+      setState((prev) => ({ ...prev, isLoadingOlder: false }));
+      return error instanceof ApiClientError
+        ? serverMessageOr(error, UI_TEXT.chat.errors.olderLoadFailed)
+        : UI_TEXT.chat.errors.offlineRetry;
+    } finally {
+      olderInFlight.current = false;
+    }
+  }, [conversationSlug, cursor, perspective]);
+
+  return { ...state, refresh: fetchThread, markRead, loadOlder };
 }

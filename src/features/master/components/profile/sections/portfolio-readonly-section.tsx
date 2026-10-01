@@ -73,7 +73,7 @@ export function PortfolioReadonlySection({ data }: Props) {
                 <span
                   className={cn(
                     "absolute right-1 top-1 rounded-full bg-bg-card/90 px-2 py-0.5",
-                    "font-mono text-[10px] uppercase tracking-[0.18em] text-text-sec"
+                    "eyebrow"
                   )}
                 >
                   {T.hiddenBadge}
