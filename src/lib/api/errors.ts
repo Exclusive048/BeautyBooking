@@ -17,6 +17,9 @@ const ERROR_CODES = [
   "BOOKING_CONFLICT",
   "BOOKING_NOT_FOUND",
   "BOOKING_TIME_REQUIRED",
+  // 29.09 доработки · 26 (решение 26.1): предстоящие записи клиента
+  // останавливают удаление аккаунта.
+  "CLIENT_ACTIVE_BOOKINGS",
   // LOGIC-02: статус брони изменился между чтением и записью
   "BOOKING_STATUS_CHANGED",
   "PACKAGE_NOT_FOUND",

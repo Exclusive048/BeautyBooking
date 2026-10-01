@@ -87,6 +87,8 @@ const MASTER_CRM_READERS: Record<string, string> = {
   "src/lib/studio/clients.service.ts": "кабинет студии: база клиентов арендатора",
   "src/lib/deletion/user-data-disposition.ts": "карта диспозиций при удалении аккаунта (инв. #35)",
   "src/lib/deletion/provider-data-disposition.ts": "карта диспозиций при удалении кабинета (инв. #38)",
+  "src/lib/deletion/account-deletion-actions.ts":
+    "удаление аккаунта (29.09 доработки · 26): стирает карточки и заметки мастера о клиенте и фото карточек по политике Ю26.4, наружу ничего не отдаёт",
   "src/lib/billing/feature-catalog.ts": "описание фичи тарифа, не чтение данных",
   "src/lib/billing/plan-catalog.ts": "флаги фич в каталоге тарифов (BILLING-CATALOG-01), не чтение данных",
 };

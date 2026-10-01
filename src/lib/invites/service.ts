@@ -71,6 +71,41 @@ function stagedMasterContactWhere(invite: { phone: string | null; email: string 
   return phone ? { contactPhone: phone } : null;
 }
 
+/**
+ * 29.09 доработки · 26 — неотвеченные приглашения, адресованные ПОДТВЕРЖДЁННЫМ
+ * контактам человека, который удаляет аккаунт, и заготовки мастера под них.
+ * Неподтверждённый номер или адрес мог быть чужим (инв. #41/#46) — по нему
+ * чужие приглашения не ищутся. Удаляет вызывающий: строки приглашений — в своей
+ * транзакции, заготовки — после неё (`discardStagedMaster`, с фото).
+ */
+export async function findPendingInvitesAddressedTo(contact: {
+  phone: string | null;
+  phoneVerified: boolean;
+  email: string | null;
+  emailVerified: boolean;
+}): Promise<{ inviteIds: string[]; stagedMasterIds: string[] }> {
+  const phone = contact.phoneVerified && contact.phone ? (normalizeRussianPhone(contact.phone) ?? contact.phone) : null;
+  const email = contact.emailVerified ? normalizeInviteEmail(contact.email) : null;
+  const addressedTo = [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])];
+  if (addressedTo.length === 0) return { inviteIds: [], stagedMasterIds: [] };
+
+  const invites = await prisma.studioInvite.findMany({
+    where: { status: MembershipStatus.PENDING, OR: addressedTo },
+    select: { id: true, phone: true, email: true, studio: { select: { providerId: true } } },
+  });
+  const stagedMasterIds: string[] = [];
+  for (const invite of invites) {
+    const contactWhere = stagedMasterContactWhere(invite);
+    if (!contactWhere) continue;
+    const staged = await prisma.provider.findMany({
+      where: { type: ProviderType.MASTER, studioId: invite.studio.providerId, ...contactWhere, ownerUserId: null },
+      select: { id: true },
+    });
+    stagedMasterIds.push(...staged.map((row) => row.id));
+  }
+  return { inviteIds: invites.map((invite) => invite.id), stagedMasterIds };
+}
+
 export async function acceptStudioInvite(
   inviteId: string,
   user: InviteActor & { roles: AccountType[] }

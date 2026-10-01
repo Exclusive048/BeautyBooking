@@ -2,6 +2,7 @@ import "server-only";
 
 import { MediaEntityType, MediaKind } from "@prisma/client";
 
+import { policyPendingMediaKinds, policyPurgedMediaKinds } from "@/lib/deletion/account-deletion-policy";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { getStorageProvider } from "@/lib/media/storage";
 import { prisma } from "@/lib/prisma";
@@ -46,22 +47,26 @@ import type { MediaPurgePayload } from "@/lib/queue/types";
  * повторная попытка просто доведёт дело до конца.
  */
 
-/** Виды медиа, которые этот механизм имеет право удалять. */
+/**
+ * Виды медиа, которые этот механизм имеет право удалять: аватар и портфолио
+ * всегда, плюс виды тех связей, по которым политика удаления аккаунта уже
+ * что-то делает (29.09 доработки · 26, `deletion/account-deletion-policy.ts`).
+ * Вид «переезжает» сюда из `POLICY_PENDING_KINDS` правкой политики, а не этого
+ * файла; собирают такие виды не функции ниже, а `collectPolicyMedia` — через
+ * свою связь (фото карточки, референс брони, вложение, фото отклика).
+ */
 export const PURGEABLE_KINDS: ReadonlySet<MediaKind> = new Set([
   MediaKind.AVATAR,
   MediaKind.PORTFOLIO,
+  ...policyPurgedMediaKinds(),
 ]);
 
 /**
- * Виды, намеренно НЕ удаляемые: у каждого есть открытый вопрос к юристу.
- * Экспортируется, чтобы тест мог пиннить именно исключения, а не только правило.
+ * Виды, намеренно НЕ удаляемые: связь, за которой они едут, ждёт ответа юриста
+ * (в политике — `KEEP`). Экспортируется, чтобы тест мог пиннить именно
+ * исключения, а не только правило.
  */
-export const POLICY_PENDING_KINDS: ReadonlySet<MediaKind> = new Set([
-  MediaKind.CLIENT_CARD_PHOTO,
-  MediaKind.MODEL_APPLICATION_PHOTO,
-  MediaKind.BOOKING_REFERENCE,
-  MediaKind.CHAT_ATTACHMENT,
-]);
+export const POLICY_PENDING_KINDS: ReadonlySet<MediaKind> = new Set(policyPendingMediaKinds());
 
 type AssetRef = { id: string; storageKey: string };
 

@@ -8,6 +8,7 @@ import { AppSetupCard } from "@/features/cabinet/components/app-setup-card";
 import { DeleteAccountSection } from "@/features/cabinet/components/delete-account-section";
 import { MarketingConsentSection } from "@/features/cabinet/components/marketing-consent";
 import { getSessionUser } from "@/lib/auth/session";
+import { ACCOUNT_DELETION_POLICY } from "@/lib/deletion/account-deletion-policy";
 import * as UI_TEXT from "@/lib/ui/text";
 import { getVkCommunity } from "@/lib/vk/community";
 
@@ -43,7 +44,10 @@ export default async function SettingsPage() {
         <MarketingConsentSection />
       </div>
 
-      <DeleteAccountSection phone={user.phone ?? null} />
+      <DeleteAccountSection
+        phone={user.phone ?? null}
+        offerDeleteReviews={ACCOUNT_DELETION_POLICY.reviewsAuthored.kind === "USER_CHOICE"}
+      />
     </div>
   );
 }

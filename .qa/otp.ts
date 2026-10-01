@@ -96,7 +96,7 @@ function dbCredentials(): { user: string; db: string } {
   return { user: "master", db: "masterryadom" };
 }
 
-function psql(sql: string): string {
+export function psql(sql: string): string {
   const { user, db } = dbCredentials();
   const stdout = execFileSync(
     "docker",

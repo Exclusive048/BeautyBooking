@@ -32,6 +32,7 @@ const tx = vi.hoisted(() => ({
   mediaAsset: { deleteMany: vi.fn(), updateMany: vi.fn() },
   userConsent: { deleteMany: vi.fn() },
   adminAuditLog: { deleteMany: vi.fn() },
+  studioInvite: { deleteMany: vi.fn(async () => ({ count: 0 })) },
 }));
 
 const prismaMock = vi.hoisted(() => ({
@@ -49,6 +50,12 @@ vi.mock("@/lib/logging/logger", () => ({ logInfo: vi.fn(), logError: vi.fn() }))
 // DELETION-02: постановка задачи на удаление медиа — отдельный модуль, здесь не проверяется.
 vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: vi.fn() }));
 vi.mock("@/lib/monitoring", () => ({ alertWarning: vi.fn() }));
+// 29.09 доработки · 26: приглашения на контакты удаляемого.
+const invites = vi.hoisted(() => ({
+  findPendingInvitesAddressedTo: vi.fn(async () => ({ inviteIds: [] as string[], stagedMasterIds: [] as string[] })),
+  discardStagedMaster: vi.fn(async () => "deleted"),
+}));
+vi.mock("@/lib/invites/service", () => invites);
 const cabinets = vi.hoisted(() => ({ deleteMasterCabinet: vi.fn(), deleteStudioCabinet: vi.fn() }));
 vi.mock("@/lib/deletion/delete-master", () => ({ deleteMasterCabinet: cabinets.deleteMasterCabinet }));
 vi.mock("@/lib/deletion/delete-studio", () => ({
@@ -151,14 +158,11 @@ describe("deleteUserAccount — preserved behaviour", () => {
     expect(tx.mediaAsset.deleteMany).not.toHaveBeenCalled();
   });
 
-  it("keeps notification retention at 30 days (unchanged)", async () => {
+  // 29.09 доработки · 26 (решение владельца 26.2): раньше удалялись только
+  // уведомления старше 30 дней, свежие жили вечно.
+  it("удаляет ВСЕ уведомления удалённого — без границы по дате", async () => {
     await deleteUserAccount(USER_ID);
-
-    const call = firstCallArg<{ where: { userId: string; createdAt: { lt: Date } } }>(
-      tx.notification.deleteMany,
-    );
-    expect(call.where.userId).toBe(USER_ID);
-    expect(call.where.createdAt.lt).toBeInstanceOf(Date);
+    expect(tx.notification.deleteMany).toHaveBeenCalledWith({ where: { userId: { in: [USER_ID] } } });
   });
 
   // 29.09 доработки · 00-6. @probe 2026-09-29 — ветка почты снята из
@@ -192,6 +196,49 @@ describe("deleteUserAccount — preserved behaviour", () => {
   it("404s for a missing user", async () => {
     prismaMock.userProfile.findUnique.mockResolvedValue(null);
     await expect(deleteUserAccount("nope")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("deleteUserAccount — 29.09 доработки · 26", () => {
+  it("предстоящие записи клиента останавливают удаление (решение 26.1)", async () => {
+    // кабинетов нет → единственный подсчёт — записи самого клиента
+    prismaMock.booking.count.mockResolvedValueOnce(2);
+    await expect(deleteUserAccount(USER_ID)).rejects.toMatchObject({
+      code: "CLIENT_ACTIVE_BOOKINGS",
+      status: 409,
+      details: { count: 2 },
+    });
+    const where = (prismaMock.booking.count.mock.calls[0] as unknown as [{ where: { AND: unknown[] } }])[0].where;
+    expect(where.AND).toContainEqual({ clientUserId: USER_ID });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("неотвеченные приглашения на подтверждённые контакты удаляются, заготовки — после коммита", async () => {
+    prismaMock.userProfile.findUnique.mockResolvedValue({
+      id: USER_ID,
+      phone: "+79990001122",
+      phoneVerifiedAt: new Date("2026-09-01T00:00:00Z"),
+      email: "anna@example.ru",
+      emailVerifiedAt: null,
+    });
+    invites.findPendingInvitesAddressedTo.mockResolvedValueOnce({ inviteIds: ["inv-1"], stagedMasterIds: ["staged-1"] });
+    await deleteUserAccount(USER_ID);
+    expect(invites.findPendingInvitesAddressedTo).toHaveBeenCalledWith({
+      phone: "+79990001122",
+      phoneVerified: true,
+      email: "anna@example.ru",
+      emailVerified: false,
+    });
+    expect(tx.studioInvite.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["inv-1"] }, status: "PENDING" } });
+    expect(invites.discardStagedMaster).toHaveBeenCalledWith("staged-1");
+  });
+
+  it("юридические связи по-прежнему не трогаются, пока в политике KEEP", async () => {
+    await deleteUserAccount(USER_ID, { deleteReviews: true });
+    expect(tx.booking.updateMany).not.toHaveBeenCalled();
+    expect(tx.review.deleteMany).not.toHaveBeenCalled();
+    expect(tx.clientCard.deleteMany).not.toHaveBeenCalled();
+    expect(tx.userConsent.deleteMany).not.toHaveBeenCalled();
   });
 });
 
