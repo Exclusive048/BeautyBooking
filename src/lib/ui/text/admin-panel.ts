@@ -469,7 +469,7 @@ export const adminPanel = {
     },
     plans: {
       featuredBadge: "POPULAR",
-      pricePerMonth: "₽ / мес",
+      pricePerMonth: "/ мес",
       priceFree: "Бесплатно",
       activeCountSuffix: "активных",
       editButton: "Редактировать",

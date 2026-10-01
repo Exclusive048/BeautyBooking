@@ -20,7 +20,7 @@ type Props = {
 
 /** Single plan card. PREMIUM tier gets a brand-tinted background +
  * POPULAR ribbon top-right. FREE tier hides the price suffix
- * (no «₽ / мес» when the price is zero). */
+ * (no «/ мес» when the price is zero). */
 export function PlanCardView({ plan, onEdit }: Props) {
   const isFree = plan.primaryPricePerMonthKopeks === 0;
   return (
