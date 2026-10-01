@@ -2,6 +2,7 @@ import { ProviderType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
+import * as UI_TEXT from "@/lib/ui/text";
 import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
 import { syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
@@ -177,6 +178,11 @@ export async function updateStudioProviderProfile(
     if (detection.ok) {
       derivedCityId = detection.cityId;
       derivedTimezone = detection.timezone;
+    } else if (detection.reason === "foreign_country") {
+      // 29.09 доработки · 27: адрес вне России не сохраняется (422) — иначе он
+      // лёг бы рядом со СТАРЫМ городом студии (у прочих отказов город и пояс
+      // намеренно не трогаются), и адрес с городом разъехались бы.
+      throw new AppError(UI_TEXT.cities.addressOutsideRussia, 422, "ADDRESS_OUTSIDE_RUSSIA");
     }
   }
   const resolvedTimezone =

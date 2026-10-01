@@ -2,6 +2,8 @@ const ERROR_CODES = [
   // FIX-B18: код существовал только литералом в master/profile (и уезжал в поле
   // сообщения). При переводе роута на конверт он стал настоящим ErrorCode.
   "ADDRESS_COORDS_REQUIRED",
+  // 29.09 доработки · 27: адрес вне России (RF-ONLY-SCOPE-01).
+  "ADDRESS_OUTSIDE_RUSSIA",
   "ADDRESS_REQUIRED",
   "AUTH_DATE_EXPIRED",
   "AUTO_CONFIRM_NOT_ALLOWED_FOR_STUDIO",

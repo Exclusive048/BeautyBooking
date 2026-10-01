@@ -37,6 +37,8 @@ type YandexGeocodeResponse = {
           metaDataProperty?: {
             GeocoderMetaData?: {
               Address?: {
+                /** ISO 3166-1 alpha-2 («RU»). 29.09 доработки · 27. */
+                country_code?: string;
                 Components?: YandexAddressComponent[];
               };
             };
@@ -57,7 +59,15 @@ export type YandexLocalityResult = {
    * выбирается часовой пояс (`cities/region-timezone.ts`).
    */
   regions: string[];
+  /**
+   * Страна адреса (29.09 доработки · 27, только РФ). `code` — `country_code`
+   * ответа; `name` — компонент `kind: "country"` (запасной путь, если кода
+   * нет). Оба `null` — ответ страну не назвал; что тогда делать, решает
+   * вызывающий (`isRussianCountry`).
+   */
+  country: { code: string | null; name: string | null };
 };
+
 
 function parsePoint(pos: string | undefined): { geoLat: number; geoLng: number } | null {
   if (!pos) return null;
@@ -138,8 +148,10 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
   const point = parsePoint(member.Point?.pos);
   if (!point) return null;
 
-  const components = member.metaDataProperty?.GeocoderMetaData?.Address?.Components;
+  const meta = member.metaDataProperty?.GeocoderMetaData?.Address;
+  const components = meta?.Components;
   const locality = extractLocality(components);
+  const countryComponent = (components ?? []).find((component) => component.kind === "country");
   const regions = (components ?? [])
     .filter((component) => component.kind === "province" && Boolean(component.name))
     .map((component) => component.name as string);
@@ -149,5 +161,9 @@ export async function geocodeWithLocality(address: string): Promise<YandexLocali
     geoLng: point.geoLng,
     locality,
     regions,
+    country: {
+      code: meta?.country_code?.trim() || null,
+      name: countryComponent?.name?.trim() || null,
+    },
   };
 }

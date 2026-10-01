@@ -246,3 +246,114 @@ describe("detectCityFromAddress", () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 29.09 доработки · 27 — только Россия (RF-ONLY-SCOPE-01). Страна — из ответа
+ * геокодера (`country_code`, запасной путь — компонент «страна»).
+ *
+ * @probe 2026-10-01 — проверка страны перенесена ПОСЛЕ поиска города (только
+ * перед созданием): покраснели три — «KZ — отказ, город не ищется», «существующий
+ * город + KZ — тоже отказ» и «кода нет — по названию страны» (заведённый город
+ * возвращался `ok: true`). Возвращено — зелёный.
+ */
+describe("detectCityFromAddress — страна", () => {
+  const almatyRow = { ...moskvaRow, id: "city-almaty", slug: "almaty", name: "Алматы", autoCreated: true };
+
+  beforeEach(() => {
+    findUnique.mockReset();
+    findFirst.mockReset();
+    create.mockReset();
+    geocodeWithLocality.mockReset();
+    vi.mocked(logInfo).mockClear();
+  });
+
+  it("KZ — отказ foreign_country, город не ищется и не создаётся", async () => {
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 43.24,
+      geoLng: 76.95,
+      locality: "Алматы",
+      regions: [],
+      country: { code: "KZ", name: "Казахстан" },
+    });
+    const result = await detectCityFromAddress("Алматы, ул. Достык, 89");
+    expect(result).toEqual({ ok: false, reason: "foreign_country" });
+    expect(findUnique).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("существующий город + KZ — тоже отказ (заведённая раньше «Алматы» адресов не принимает)", async () => {
+    findUnique.mockResolvedValue(almatyRow);
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 43.24,
+      geoLng: 76.95,
+      locality: "Алматы",
+      regions: [],
+      country: { code: "KZ", name: null },
+    });
+    expect(await detectCityFromAddress("Алматы, ул. Достык, 89")).toEqual({ ok: false, reason: "foreign_country" });
+  });
+
+  it("RU — как раньше", async () => {
+    findUnique.mockResolvedValue(moskvaRow);
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 55.75,
+      geoLng: 37.62,
+      locality: "Москва",
+      regions: [],
+      country: { code: "RU", name: "Россия" },
+    });
+    const result = await detectCityFromAddress("Москва, Тверская 1");
+    expect(result).toMatchObject({ ok: true, cityId: "city-moskva" });
+  });
+
+  it("кода нет — по названию страны: «Россия» пускает, другое — отказ", async () => {
+    findUnique.mockResolvedValue(moskvaRow);
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 55.75,
+      geoLng: 37.62,
+      locality: "Москва",
+      regions: [],
+      country: { code: null, name: "Россия" },
+    });
+    expect(await detectCityFromAddress("Москва")).toMatchObject({ ok: true });
+
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 53.9,
+      geoLng: 27.56,
+      locality: "Минск",
+      regions: [],
+      country: { code: null, name: "Беларусь" },
+    });
+    expect(await detectCityFromAddress("Минск")).toEqual({ ok: false, reason: "foreign_country" });
+  });
+
+  it("страны в ответе нет (пустые компоненты) — пускаем и пишем в лог, а не foreign_country (решение 27.2)", async () => {
+    findUnique.mockResolvedValue(moskvaRow);
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 55.75,
+      geoLng: 37.62,
+      locality: "Москва",
+      regions: [],
+      country: { code: null, name: null },
+    });
+    expect(await detectCityFromAddress("Москва")).toMatchObject({ ok: true });
+    expect(logInfo).toHaveBeenCalledWith("city.country_unknown", { locality: "Москва" });
+  });
+
+  it("в лог автосоздания адрес не пишется (ПДн)", async () => {
+    findUnique.mockResolvedValue(null);
+    findFirst.mockResolvedValue(null);
+    create.mockResolvedValue({ ...krasnodarRow, id: "city-samara", slug: "samara", name: "Самара" });
+    geocodeWithLocality.mockResolvedValue({
+      geoLat: 53.2,
+      geoLng: 50.15,
+      locality: "Самара",
+      regions: ["Самарская область"],
+      country: { code: "RU", name: "Россия" },
+    });
+    await detectCityFromAddress("Самара, ул. Ленинградская, 24, кв. 5");
+    const logged = JSON.stringify(vi.mocked(logInfo).mock.calls);
+    expect(logged).toContain("city.auto_created");
+    expect(logged).not.toContain("Ленинградская");
+  });
+});
