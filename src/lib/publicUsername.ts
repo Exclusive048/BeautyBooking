@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { ProviderType } from "@/lib/prisma-enums";
 import { AppError } from "@/lib/api/errors";
+import { hasForbiddenWords } from "@/lib/moderation/forbidden-words";
 
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 32;
@@ -147,7 +148,8 @@ export function validateUsername(username: string): UsernameValidationResult {
     return { ok: false, reason: "Адрес профиля не может быть только из цифр. Добавьте буквы." };
   }
 
-  if (RESERVED_SLUGS.has(username)) {
+  // FORBIDDEN-WORDS-01: тот же отказ, что у зарезервированных адресов.
+  if (RESERVED_SLUGS.has(username) || hasForbiddenWords(username, "name")) {
     return { ok: false, reason: "Этот адрес профиля нельзя использовать. Придумайте другой." };
   }
 

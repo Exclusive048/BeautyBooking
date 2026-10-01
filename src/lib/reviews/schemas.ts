@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 
 // AUDIT (sections 2,3,8):
 // - createReviewSchema now accepts publicTagIds/privateTagIds arrays with max=3 each.
@@ -6,7 +7,7 @@ import { z } from "zod";
 export const createReviewSchema = z.object({
   bookingId: z.string().trim().min(1, "bookingId is required"),
   rating: z.number().int().min(1).max(5),
-  text: z.string().trim().max(1000).optional(),
+  text: z.string().trim().max(1000).superRefine(rejectForbiddenWords("text")).optional(),
   publicTagIds: z.array(z.string().trim().min(1)).max(3).default([]),
   privateTagIds: z.array(z.string().trim().min(1)).max(3).default([]),
 });
@@ -27,7 +28,7 @@ export const reviewIdParamSchema = z.object({
 });
 
 export const reviewReplySchema = z.object({
-  text: z.string().trim().min(1, "text is required").max(1500),
+  text: z.string().trim().min(1, "text is required").max(1500).superRefine(rejectForbiddenWords("text")),
 });
 
 export const reviewReportSchema = z.object({

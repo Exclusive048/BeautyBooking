@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -10,7 +11,7 @@ import { parseBody } from "@/lib/validation";
 
 const updateReviewBodySchema = z.object({
   rating: z.number().int().min(1).max(5),
-  text: z.string().trim().max(1000).optional(),
+  text: z.string().trim().max(1000).superRefine(rejectForbiddenWords("text")).optional(),
 });
 
 type RouteContext = {

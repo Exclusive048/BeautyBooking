@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { timeToMinutes } from "@/lib/schedule/time";
 
 const dateLocalRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -8,7 +9,7 @@ const dateLocalSchema = z.string().trim().regex(dateLocalRegex, "Invalid date fo
 const timeLocalSchema = z.string().trim().regex(timeLocalRegex, "Invalid time format");
 
 const requirementsSchema = z
-  .array(z.string().trim().min(1).max(40))
+  .array(z.string().trim().min(1).max(40).superRefine(rejectForbiddenWords("text")))
   .max(5);
 
 function ensureValidTimeRange(start: string, end: string) {
@@ -65,7 +66,7 @@ export const proposeTimeSchema = z.object({
 
 export const applyModelOfferSchema = z.object({
   consentToShoot: z.literal(true),
-  note: z.string().trim().max(500).optional(),
+  note: z.string().trim().max(500).superRefine(rejectForbiddenWords("text")).optional(),
   mediaIds: z.array(z.string().trim().min(1)).min(1).max(3),
 });
 

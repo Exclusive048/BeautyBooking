@@ -1,5 +1,6 @@
 import { CategoryStatus } from "@prisma/client";
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -16,10 +17,10 @@ const PROPOSAL_RATE_LIMIT = {
 };
 
 const proposeSchema = z.object({
-  title: z.string().trim().min(2).max(60).optional(),
-  name: z.string().trim().min(2).max(60).optional(),
+  title: z.string().trim().min(2).max(60).superRefine(rejectForbiddenWords("name")).optional(),
+  name: z.string().trim().min(2).max(60).superRefine(rejectForbiddenWords("name")).optional(),
   parentId: z.string().trim().min(1).optional(),
-  context: z.string().trim().max(500).optional(),
+  context: z.string().trim().max(500).superRefine(rejectForbiddenWords("text")).optional(),
   isPersonalOnly: z.boolean().optional(),
 });
 

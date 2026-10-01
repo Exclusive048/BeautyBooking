@@ -1,6 +1,7 @@
 import { z, ZodError } from "zod";
 import { AppError } from "@/lib/api/errors";
 import { MAX_JSON_BODY_BYTES, readBodyTextCapped } from "@/lib/http/body-limit";
+import { findForbiddenWordsIssue } from "@/lib/moderation/zod";
 
 type ValidationIssue = {
   path: string;
@@ -49,6 +50,14 @@ export async function parseBody<T>(
 
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
+    // FORBIDDEN-WORDS-01: запрещённые слова — свой код и понятный текст, а не
+    // общее «проверьте поля»: человеку нужно знать, что именно убрать.
+    const forbidden = findForbiddenWordsIssue(parsed.error);
+    if (forbidden) {
+      throw new AppError(forbidden.message, 422, "FORBIDDEN_WORDS", {
+        field: forbidden.path.length > 0 ? forbidden.path.join(".") : "input",
+      });
+    }
     throw validationError("Проверьте правильность заполнения полей.", formatZodIssues(parsed.error));
   }
   return parsed.data;
