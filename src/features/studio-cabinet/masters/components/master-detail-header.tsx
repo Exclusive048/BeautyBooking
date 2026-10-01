@@ -16,7 +16,7 @@ import { EditMasterProfileDialog } from "./edit-master-profile-dialog";
 import { PauseMasterDialog } from "./pause-master-dialog";
 import { RemoveMasterDialog } from "./remove-master-dialog";
 import { RevokeInviteDialog } from "./revoke-invite-dialog";
-import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { ViewerDate } from "@/components/ui/viewer-date";
 
 const T = UI_TEXT.studioCabinet.mastersV2.detail;
 
@@ -31,10 +31,6 @@ function statusLabel(status: StudioMasterDetail["status"]): string {
   if (status === "ACTIVE") return UI_TEXT.studioCabinet.mastersV2.status.active;
   if (status === "INVITED") return UI_TEXT.studioCabinet.mastersV2.status.invited;
   return UI_TEXT.studioCabinet.mastersV2.status.disabled;
-}
-
-function formatJoinedDate(iso: string): string {
-  return UI_FMT.date(iso, "monthYearLong", { timeZone: VIEWER_TZ });
 }
 
 export function MasterDetailHeader({
@@ -96,7 +92,9 @@ export function MasterDetailHeader({
             </div>
             <p className="mt-1 text-sm text-text-sec">
               {detail.servicesSummary ? `${detail.servicesSummary} · ` : ""}
-              {T.joinedTemplate.replace("{date}", formatJoinedDate(detail.joinedAt))}
+              {T.joinedTemplate.split("{date}")[0]}
+              <ViewerDate value={detail.joinedAt} preset="monthYearLong" />
+              {T.joinedTemplate.split("{date}")[1]}
             </p>
             {detail.phone || detail.email ? (
               <p className="mt-2 text-xs text-text-sec">

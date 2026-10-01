@@ -61,6 +61,15 @@ const DATE_PRESETS = {
   dayMonthShortTime: { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
   /** «29.09, 14:30» */
   dayMonthNumericTime: { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
+  /** «29.09.2026, 14:30» — точный момент в таблицах админки. */
+  dateTimeNumeric: {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  },
 } satisfies Record<string, Intl.DateTimeFormatOptions>;
 
 export type DatePreset = keyof typeof DATE_PRESETS;

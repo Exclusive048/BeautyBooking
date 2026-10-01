@@ -7,7 +7,7 @@ import { UserPlanPill } from "@/features/admin-cabinet/users/components/user-pla
 import { UserRoleBadge } from "@/features/admin-cabinet/users/components/user-role-badge";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminUserRow } from "@/features/admin-cabinet/users/types";
-import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
+import { ViewerDate } from "@/components/ui/viewer-date";
 
 const T = UI_TEXT.adminPanel.users;
 
@@ -54,7 +54,7 @@ export function UsersMobileCard({ user, busy, onChangePlan }: Props) {
           <span className="mx-1.5 text-text-sec/40" aria-hidden>
             ·
           </span>
-          {UI_FMT.date(user.createdAt, "monthYearShort", { timeZone: VIEWER_TZ })}
+          <ViewerDate value={user.createdAt} preset="dateTimeNumeric" />
         </p>
       </div>
     </div>
@@ -107,7 +107,7 @@ export function UsersTableRow({ user, busy, onChangePlan }: Props) {
         {user.cityName ?? T.plan.empty}
       </td>
       <td className="px-4 py-3 align-top text-sm tabular-nums text-text-sec">
-        {UI_FMT.date(user.createdAt, "monthYearShort", { timeZone: VIEWER_TZ })}
+        <ViewerDate value={user.createdAt} preset="dateTimeNumeric" />
       </td>
     </tr>
   );

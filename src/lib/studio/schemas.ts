@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
 
@@ -35,12 +36,12 @@ export const studioFinanceSummaryQuerySchema = z.object({
 
 export const createStudioCategorySchema = z.object({
   studioId: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120),
+  title: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")),
 });
 
 export const updateStudioCategorySchema = z.object({
   studioId: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120),
+  title: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")),
 });
 
 export const reorderStudioCategoriesSchema = z.object({
@@ -56,8 +57,8 @@ export const createStudioServiceSchema = z.object({
   // `studio-settings-page.tsx` services tab still supplies categoryId
   // and keeps working.
   categoryId: z.string().trim().min(1).optional(),
-  title: z.string().trim().min(1).max(160),
-  description: z.string().trim().max(1000).optional(),
+  title: z.string().trim().min(1).max(160).superRefine(rejectForbiddenWords("name")),
+  description: z.string().trim().max(1000).superRefine(rejectForbiddenWords("text")).optional(),
   // Required for catalog visibility (approved global OR own-pending).
   // When absent the service stays creatable but invisible to public
   // category filters.
@@ -74,8 +75,8 @@ export const createStudioServiceSchema = z.object({
 export const updateStudioServiceSchema = z.object({
   studioId: z.string().trim().min(1),
   categoryId: z.string().trim().min(1).optional(),
-  title: z.string().trim().min(1).max(160).optional(),
-  description: z.string().trim().max(1000).optional(),
+  title: z.string().trim().min(1).max(160).superRefine(rejectForbiddenWords("name")).optional(),
+  description: z.string().trim().max(1000).superRefine(rejectForbiddenWords("text")).optional(),
   globalCategoryId: z.string().trim().min(1).nullable().optional(),
   onlinePaymentEnabled: z.boolean().optional(),
   basePrice: z
@@ -112,10 +113,10 @@ export const studioMasterQuerySchema = z.object({
 
 export const updateStudioMasterSchema = z.object({
   studioId: z.string().trim().min(1),
-  displayName: z.string().trim().min(1).max(120).optional(),
-  tagline: z.string().trim().min(1).max(240).optional(),
+  displayName: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")).optional(),
+  tagline: z.string().trim().min(1).max(240).superRefine(rejectForbiddenWords("text")).optional(),
   // STUDIO-EDIT-MASTER-PROFILE-01: описание можно и очистить (пустая строка).
-  description: z.string().trim().max(2000).optional(),
+  description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -127,7 +128,7 @@ export const updateStudioMasterSchema = z.object({
 export const createStudioMasterSchema = z
   .object({
     studioId: z.string().trim().min(1),
-    displayName: z.string().trim().min(1).max(120),
+    displayName: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")),
     phone: z
       .string()
       .trim()

@@ -12,6 +12,8 @@ const querySchema = z.object({
   /** Largest `timeMs` seen by the client — server returns only events
    * newer than this. Omit on first load. */
   since: z.coerce.number().int().positive().optional(),
+  /** ADMIN-EVENTS-TABLE: «Показать ещё» — события старше этой отметки. */
+  before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
@@ -30,6 +32,7 @@ export async function GET(req: NextRequest) {
     const data = await getAdminEvents({
       limit: parsed.data.limit,
       sinceMs: parsed.data.since,
+      beforeMs: parsed.data.before,
     });
     return ok(data);
   } catch (error) {

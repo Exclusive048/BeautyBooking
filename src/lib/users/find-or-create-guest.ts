@@ -1,4 +1,4 @@
-import { AccountType, type UserProfile } from "@prisma/client";
+import { AccountType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/api/errors";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
@@ -23,10 +23,25 @@ import { maskPhone } from "@/lib/logging/masking";
  * Returns the profile + a `wasCreated` flag so callers can log/route
  * differently on first-time guests.
  */
+/**
+ * SESSION-SELECT-LOGIN-PATHS (2026-10-01): гостевой чекаут читает только то,
+ * что нужно ему и четырём вызывающим, а не всю строку профиля (адрес, гео,
+ * причины блокировки). Поле вне набора — ошибка `typecheck` у вызывающего.
+ */
+const GUEST_PROFILE_SELECT = {
+  id: true,
+  phone: true,
+  phoneVerifiedAt: true,
+  roles: true,
+  displayName: true,
+} satisfies Prisma.UserProfileSelect;
+
+export type GuestProfile = Prisma.UserProfileGetPayload<{ select: typeof GUEST_PROFILE_SELECT }>;
+
 export async function findOrCreateGuestUserByPhone(input: {
   phone: string;
   displayName?: string | null;
-}): Promise<{ profile: UserProfile; wasCreated: boolean }> {
+}): Promise<{ profile: GuestProfile; wasCreated: boolean }> {
   // LOGIC-30: канонизация — `normalizeRussianPhone`, та же, которой пользуются
   // `linkGuestBookingsToUserByPhone` и `crm/client-key.ts`. Здесь стоял
   // `normalizePhone` (чистит разделители и дописывает «+», формы не проверяет)
@@ -42,7 +57,7 @@ export async function findOrCreateGuestUserByPhone(input: {
     throw new AppError("Проверьте номер телефона.", 400, "VALIDATION_ERROR");
   }
 
-  const existing = await prisma.userProfile.findUnique({ where: { phone } });
+  const existing = await prisma.userProfile.findUnique({ where: { phone }, select: GUEST_PROFILE_SELECT });
   if (existing) {
     // PHONE-CLAIM-01: строка с номером — это либо ДОКАЗАННЫЙ владелец
     // (phoneVerifiedAt; владелец сам бронирует разлогиненным — задуманное
@@ -72,6 +87,7 @@ export async function findOrCreateGuestUserByPhone(input: {
         firstName: orphanDisplayName,
         roles: [AccountType.CLIENT],
       },
+      select: GUEST_PROFILE_SELECT,
     });
     logInfo("guest user created without phone key — number is claimed by an established account", {
       userId: orphan.id,
@@ -88,6 +104,7 @@ export async function findOrCreateGuestUserByPhone(input: {
       firstName: displayName,
       roles: [AccountType.CLIENT],
     },
+    select: GUEST_PROFILE_SELECT,
   });
   // SECURITY-EXPOSURE-AUDIT-01 · Y17: mask the phone in logs (the rest of the
   // codebase does — raw PII in prod logs is a 152-ФЗ concern).

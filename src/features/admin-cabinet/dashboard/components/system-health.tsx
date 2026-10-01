@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SystemHealthRow } from "@/features/admin-cabinet/dashboard/components/system-health-row";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 import type {
   AdminHealth,
+  AdminHealthSection,
 } from "@/features/admin-cabinet/dashboard/types";
+
+const SECTIONS: AdminHealthSection[] = ["platform", "queue", "integrations", "moderation"];
 
 const POLL_MS = 30_000;
 
@@ -20,6 +25,8 @@ const T = UI_TEXT.adminPanel.dashboard.health;
  * session, slow enough not to spam Redis with `LLEN` calls. */
 export function SystemHealth({ initial }: Props) {
   const [health, setHealth] = useState<AdminHealth>(initial);
+  // Время по часам зрителя — только после гидратации (VIEWER-DATE-HYDRATION-MIDNIGHT).
+  const hydrated = useIsHydrated();
   const isVisible = useRef(true);
 
   const refresh = useCallback(async () => {
@@ -53,14 +60,28 @@ export function SystemHealth({ initial }: Props) {
 
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-card">
-      <h3 className="mb-3 font-display text-base font-semibold text-text-main">
-        {T.title}
-      </h3>
-      <ul className="flex flex-col gap-1.5">
-        {health.stats.map((stat) => (
-          <SystemHealthRow key={stat.key} stat={stat} />
-        ))}
-      </ul>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h3 className="font-display text-base font-semibold text-text-main">{T.title}</h3>
+        <span className="text-2xs tabular-nums text-text-sec">
+          {hydrated ? T.checkedAt(UI_FMT.timeShort(new Date(health.checkedAt), { timeZone: VIEWER_TZ })) : null}
+        </span>
+      </div>
+      <div className="flex flex-col gap-4">
+        {SECTIONS.map((section) => {
+          const stats = health.stats.filter((stat) => stat.section === section);
+          if (stats.length === 0) return null;
+          return (
+            <div key={section}>
+              <p className="eyebrow mb-1.5">{T.sections[section]}</p>
+              <ul className="flex flex-col gap-1.5">
+                {stats.map((stat) => (
+                  <SystemHealthRow key={stat.key} stat={stat} />
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

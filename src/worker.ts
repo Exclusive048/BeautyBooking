@@ -749,12 +749,13 @@ async function processPlanEditedNotifyJob(
     return;
   }
 
-  const result = await processPlanEditedMassNotification(job.payload);
+  const result = await processPlanEditedMassNotification(job.payload, { jobId: job.id });
   logInfo("worker.notification.plan-edited.mass.processed", {
     planId: job.payload.planId,
     planCode: job.payload.planCode,
     recipients: result.recipients,
     failures: result.failures,
+    skipped: result.skipped,
   });
 }
 

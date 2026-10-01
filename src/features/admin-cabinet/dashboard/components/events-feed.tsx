@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnimatePresence, m } from "framer-motion";
+import { Download } from "lucide-react";
 import { EventsFeedItem } from "@/features/admin-cabinet/dashboard/components/events-feed-item";
-import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
+import { fetchJson } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminEventItem,
@@ -15,22 +18,30 @@ import type {
 // одной админской ленты не строится (ратифицировано там же). Подпись бейджа
 // берёт интервал ОТСЮДА (POLL_MS/1000) — цифра в UI не может разойтись с кодом.
 const POLL_MS = 30_000;
-const MAX_ITEMS = 30;
+/** ADMIN-EVENTS-TABLE: сколько строк догружает «Показать ещё». */
+const PAGE_SIZE = 30;
+const EXPORT_DAYS = [7, 30, 90] as const;
 
 type Props = {
   initial: AdminEventItem[];
+  initialNextBefore: number | null;
 };
 
 const T = UI_TEXT.adminPanel.dashboard.feed;
 
-/** Event feed. Initial set comes from the server (SSR), then a polling
+/** Event history. Initial set comes from the server (SSR), then a polling
  * loop (POLL_MS) pulls anything newer than the latest `timeMs` we've
- * already shown. New items animate in at the top, the list is capped at
- * `MAX_ITEMS` so the DOM doesn't grow unbounded during a long session.
+ * already shown. ADMIN-EVENTS-TABLE (2026-10-01): компактная таблица вместо
+ * ленты карточек, «Показать ещё» догружает старые события по курсору
+ * `before`, кнопка «Скачать в Excel» выгружает период в .xlsx.
  * Polling pauses when the tab is hidden — there's no point burning
  * rate-limit budget for a tab no admin is looking at. */
-export function EventsFeed({ initial }: Props) {
+export function EventsFeed({ initial, initialNextBefore }: Props) {
+  const toast = useToast();
   const [items, setItems] = useState<AdminEventItem[]>(initial);
+  const [nextBefore, setNextBefore] = useState<number | null>(initialNextBefore);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exportDays, setExportDays] = useState<(typeof EXPORT_DAYS)[number]>(30);
   const seenIds = useRef<Set<string>>(new Set(initial.map((e) => e.id)));
   const isVisible = useRef(true);
   // PERF-27: тик, пришедший поверх незавершённого запроса, ПРОПУСКАЕТСЯ.
@@ -63,16 +74,8 @@ export function EventsFeed({ initial }: Props) {
       if (fresh.length === 0) return;
       for (const it of fresh) seenIds.current.add(it.id);
 
-      setItems((prev) => {
-        const merged = [...fresh, ...prev]
-          .sort((a, b) => b.timeMs - a.timeMs)
-          .slice(0, MAX_ITEMS);
-        // Trim seenIds to match — never let it grow unbounded either.
-        if (seenIds.current.size > MAX_ITEMS * 2) {
-          seenIds.current = new Set(merged.map((e) => e.id));
-        }
-        return merged;
-      });
+      // Список растёт только на то, что админ сам догрузил, плюс новые события.
+      setItems((prev) => [...fresh, ...prev].sort((a, b) => b.timeMs - a.timeMs));
     } catch {
       // Silent — next poll will retry. Avoids surfacing transient
       // network blips as user-visible errors in a live dashboard.
@@ -94,6 +97,36 @@ export function EventsFeed({ initial }: Props) {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
 
+  // ADMIN-EVENTS-EXPORT: отказ выгрузки возвращает на дашборд с ?eventsExport=.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("eventsExport")) return;
+    toast.error(T.exportFailed);
+    params.delete("eventsExport");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, [toast]);
+
+  const loadMore = useCallback(async () => {
+    if (nextBefore === null || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await fetchJson<AdminEventsResponse>(
+        `/api/admin/dashboard/events?before=${nextBefore}&limit=${PAGE_SIZE}`,
+        { cache: "no-store" },
+      );
+      const older = data.items.filter((it) => !seenIds.current.has(it.id));
+      for (const it of older) seenIds.current.add(it.id);
+      setItems((prev) => [...prev, ...older]);
+      setNextBefore(data.nextBefore);
+    } catch {
+      // Листание без действия со стороны админа — своя строка, не серверная.
+      toast.error(T.loadMoreFailed);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, nextBefore, toast]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isVisible.current) return;
@@ -103,33 +136,70 @@ export function EventsFeed({ initial }: Props) {
   }, [latestMs, poll]);
 
   return (
-    <section className="rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-card">
-      <header className="mb-3 flex items-center justify-between">
-        <h3 className="font-display text-base font-semibold text-text-main">
-          {T.title}
-        </h3>
-        <LiveBadge />
+    <section className="min-w-0 rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-card">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h3 className="font-display text-base font-semibold text-text-main">
+            {T.title}
+          </h3>
+          <LiveBadge />
+        </div>
+        <div className="flex items-center gap-2">
+          <Select
+            aria-label={T.exportPeriodLabel}
+            value={exportDays}
+            onChange={(event) => setExportDays(Number(event.target.value) as (typeof EXPORT_DAYS)[number])}
+            className="h-9 w-auto py-0 text-xs"
+          >
+            {EXPORT_DAYS.map((days) => (
+              <option key={days} value={days}>
+                {T.exportPeriod(days)}
+              </option>
+            ))}
+          </Select>
+          <Button asChild variant="secondary" size="sm">
+            {/* Без `download`: файл отдаёт Content-Disposition, а отказ —
+                редирект на дашборд, который иначе скачался бы как HTML. */}
+            <a href={`/api/admin/dashboard/events/export?days=${exportDays}`}>
+              <Download className="h-3.5 w-3.5" aria-hidden />
+              {T.exportCta}
+            </a>
+          </Button>
+        </div>
       </header>
 
       {items.length === 0 ? (
         <p className="py-6 text-center text-sm text-text-sec">{T.empty}</p>
       ) : (
-        <ul className="flex flex-col">
-          <AnimatePresence initial={false}>
-            {items.map((event) => (
-              <m.div
-                key={event.id}
-                initial={{ opacity: 0, y: -DISTANCE.nudge }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={MOTION.base}
-              >
-                <EventsFeedItem event={event} />
-              </m.div>
-            ))}
-          </AnimatePresence>
-        </ul>
+        <div className="-mx-5 overflow-x-auto px-5">
+          {/* Фиксированная раскладка с долями колонок: таблица всегда в ширину
+              карточки, длинное обрезается многоточием (полный текст — в title). */}
+          <table className="w-full min-w-[480px] table-fixed border-collapse text-left">
+            <thead>
+              <tr className="border-b border-border-subtle">
+                <th scope="col" className="eyebrow w-[17%] py-2 pr-3 font-normal">{T.columns.time}</th>
+                <th scope="col" className="eyebrow w-[24%] py-2 pr-3 font-normal">{T.columns.type}</th>
+                <th scope="col" className="eyebrow w-[24%] py-2 pr-3 font-normal">{T.columns.description}</th>
+                <th scope="col" className="eyebrow w-[20%] py-2 pr-3 font-normal">{T.columns.detail}</th>
+                <th scope="col" className="eyebrow w-[15%] py-2 text-right font-normal">{T.columns.amount}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((event) => (
+                <EventsFeedItem key={event.id} event={event} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+
+      {nextBefore !== null ? (
+        <div className="mt-3 flex justify-center">
+          <Button variant="ghost" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
+            {T.loadMore}
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

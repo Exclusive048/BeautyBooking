@@ -1,5 +1,6 @@
 import { BookingStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { AppError } from "@/lib/api/errors";
 import { resolveLinkState } from "@/lib/auth/link-state";
 import { claimPhoneForUser } from "@/lib/auth/phone-claim";
@@ -11,7 +12,7 @@ import { prisma } from "@/lib/prisma";
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const updateProfileSchema = z.object({
-  firstName: z.string().trim().max(100).optional().nullable(),
+  firstName: z.string().trim().max(100).superRefine(rejectForbiddenWords("name")).optional().nullable(),
   // PHONE-CLAIM-01: заявка на номер (см. lib/auth/phone-claim.ts + rule в
   // lib/users/schemas.ts — та же модель у /api/me). Канонизация на границе
   // разбора, форма из bookingCreateSchema — второго подхода не заводим.
@@ -28,7 +29,7 @@ export const updateProfileSchema = z.object({
         }),
     ])
     .optional(),
-  lastName: z.string().trim().max(100).optional().nullable(),
+  lastName: z.string().trim().max(100).superRefine(rejectForbiddenWords("name")).optional().nullable(),
   city: z.string().trim().max(200).optional().nullable(),
   birthDate: z
     .string()

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { isValidTimeZone } from "@/lib/schedule/timezone";
 
@@ -44,12 +45,12 @@ const avatarUrlSchema = z
   });
 
 export const updateMasterProfileSchema = z.object({
-  displayName: z.string().trim().min(1).max(120).optional(),
-  tagline: z.string().trim().max(240).optional(),
+  displayName: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")).optional(),
+  tagline: z.string().trim().max(240).superRefine(rejectForbiddenWords("text")).optional(),
   address: z.string().trim().max(240).optional(),
   geoLat: z.number().finite().nullable().optional(),
   geoLng: z.number().finite().nullable().optional(),
-  bio: z.string().trim().max(4000).nullable().optional(),
+  bio: z.string().trim().max(4000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
   avatarUrl: avatarUrlSchema.nullable().optional(),
   isPublished: z.boolean().optional(),
   // 31a: free-form district label (район/микрорайон) — display-only on
@@ -81,14 +82,14 @@ export const upsertMasterServicesSchema = z.object({
         durationOverrideMin: z.number().int().min(15).max(12 * 60).nullable().optional(),
         priceOverride: z.number().int().min(0).nullable().optional(),
         globalCategoryId: z.string().trim().min(1).nullable().optional(),
-        description: z.string().trim().max(2000).nullable().optional(),
+        description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
       })
     )
     .max(500),
 });
 
 export const createMasterServiceSchema = z.object({
-  title: z.string().trim().min(1).max(240),
+  title: z.string().trim().min(1).max(240).superRefine(rejectForbiddenWords("name")),
   price: z.number().int().min(0),
   durationMin: z.number().int().min(15).max(12 * 60),
   // services-category-creation-restore: accept null in addition to
@@ -97,7 +98,7 @@ export const createMasterServiceSchema = z.object({
   // generic 400 with no fieldErrors. Matches `updateMasterServiceSchema`
   // below (which already does `.nullable().optional()`).
   globalCategoryId: z.string().trim().min(1).nullable().optional(),
-  description: z.string().trim().max(2000).nullable().optional(),
+  description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
   // 31c: optional toggles. Default to current behaviour when absent.
   isEnabled: z.boolean().optional(),
   onlinePaymentEnabled: z.boolean().optional(),
@@ -116,9 +117,9 @@ const SERVICE_FIELD_KEYS = [
 
 export const updateMasterServiceSchema = z
   .object({
-    name: z.string().trim().min(1).max(240).optional(),
-    title: z.string().trim().max(240).nullable().optional(),
-    description: z.string().trim().max(2000).nullable().optional(),
+    name: z.string().trim().min(1).max(240).superRefine(rejectForbiddenWords("name")).optional(),
+    title: z.string().trim().max(240).superRefine(rejectForbiddenWords("name")).nullable().optional(),
+    description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
     durationMin: z.number().int().min(15).max(12 * 60).optional(),
     price: z.number().int().min(0).optional(),
     globalCategoryId: z.string().trim().min(1).nullable().optional(),
@@ -138,7 +139,7 @@ export const reorderMasterServiceSchema = z.object({
 const PACKAGE_DISCOUNT_TYPE = z.enum(["PERCENT", "FIXED"]);
 
 export const createMasterPackageSchema = z.object({
-  name: z.string().trim().min(1).max(120),
+  name: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")),
   serviceIds: z.array(z.string().trim().min(1)).min(2).max(20),
   discountType: PACKAGE_DISCOUNT_TYPE,
   discountValue: z.number().int().min(0).max(1_000_000),
@@ -147,7 +148,7 @@ export const createMasterPackageSchema = z.object({
 
 export const updateMasterPackageSchema = z
   .object({
-    name: z.string().trim().min(1).max(120).optional(),
+    name: z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name")).optional(),
     serviceIds: z.array(z.string().trim().min(1)).min(2).max(20).optional(),
     discountType: PACKAGE_DISCOUNT_TYPE.optional(),
     discountValue: z.number().int().min(0).max(1_000_000).optional(),
@@ -165,7 +166,7 @@ export const updateMasterPackageSchema = z
 
 const bookingQuestionSchema = z.object({
   id: z.string().trim().min(1).optional(),
-  text: z.string().trim().min(10).max(300),
+  text: z.string().trim().min(10).max(300).superRefine(rejectForbiddenWords("text")),
   required: z.boolean(),
   order: z.number().int().min(0).max(1000),
 });
@@ -178,7 +179,7 @@ export const serviceBookingConfigSchema = z.object({
 export const createMasterPortfolioSchema = z.object({
   mediaAssetId: z.string().trim().min(1).optional(),
   mediaUrl: z.string().url().max(2000).optional(),
-  caption: z.string().trim().max(2000).optional(),
+  caption: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).optional(),
   serviceIds: z.array(z.string().trim().min(1)).max(20),
   tagIds: z.array(z.string().trim().min(1)).max(20).optional(),
   globalCategoryId: z.string().trim().min(1).optional(),

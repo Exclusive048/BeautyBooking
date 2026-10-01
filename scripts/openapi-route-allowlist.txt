@@ -47,6 +47,7 @@
 /api/admin/diagnostics/client-ip
 /api/admin/dashboard/charts
 /api/admin/dashboard/events
+/api/admin/dashboard/events/export
 /api/admin/dashboard/health
 /api/admin/dashboard/kpis
 /api/admin/media/broken

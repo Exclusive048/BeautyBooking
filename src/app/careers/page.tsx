@@ -7,6 +7,8 @@ export const metadata: Metadata = {
   title: "Карьера",
   description: "Информация о будущих вакансиях в МастерРядом.",
   alternates: { canonical: "/careers" },
+  // SEO-01: вакансий пока нет — тонкий контент не индексируется.
+  robots: { index: false, follow: true },
 };
 
 const T = UI_TEXT.careers;

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 
 const emptyToNull = (value: unknown) => {
@@ -9,6 +10,10 @@ const emptyToNull = (value: unknown) => {
 
 const optionalText = (max: number) =>
   z.preprocess(emptyToNull, z.string().max(max).nullable().optional());
+
+/** Имя человека — публично (подпись под отзывом), поэтому без запрещённых слов. */
+const optionalName = (max: number) =>
+  z.preprocess(emptyToNull, z.string().max(max).superRefine(rejectForbiddenWords("name")).nullable().optional());
 
 const birthDateSchema = z.preprocess(
   emptyToNull,
@@ -64,9 +69,9 @@ export const profileUpdateSchema = z.object({
   // меняется: обратное было бы новой возможностью продукта, а не фиксом.
   phone: phoneClaimField,
   email: optionalText(120),
-  firstName: optionalText(80),
-  lastName: optionalText(80),
-  middleName: optionalText(80),
+  firstName: optionalName(80),
+  lastName: optionalName(80),
+  middleName: optionalName(80),
   birthDate: birthDateSchema,
   emailNotificationsEnabled: z.boolean().optional(),
   pushNotificationsEnabled: z.boolean().optional(),

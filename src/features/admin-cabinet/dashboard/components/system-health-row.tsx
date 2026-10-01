@@ -5,15 +5,7 @@ import type {
   AdminHealthTone,
 } from "@/features/admin-cabinet/dashboard/types";
 
-const STAT_LABEL: Record<AdminHealthStat["key"], string> = {
-  apiUptime: UI_TEXT.adminPanel.dashboard.health.stats.apiUptime,
-  p95: UI_TEXT.adminPanel.dashboard.health.stats.p95,
-  queuePending: UI_TEXT.adminPanel.dashboard.health.stats.queuePending,
-  queueDead: UI_TEXT.adminPanel.dashboard.health.stats.queueDead,
-  complaintsOpen: UI_TEXT.adminPanel.dashboard.health.stats.complaintsOpen,
-  smsBalance: UI_TEXT.adminPanel.dashboard.health.stats.smsBalance,
-  worker: UI_TEXT.adminPanel.dashboard.health.stats.worker,
-};
+const STAT_LABEL: Record<AdminHealthStat["key"], string> = UI_TEXT.adminPanel.dashboard.health.stats;
 
 const DOT: Record<AdminHealthTone, string> = {
   ok: "bg-success",
@@ -29,17 +21,17 @@ type Props = {
 export function SystemHealthRow({ stat }: Props) {
   return (
     <li
-      className="flex items-center justify-between rounded-xl bg-bg-input/60 px-3 py-2"
+      className="flex items-center justify-between gap-3 rounded-xl bg-bg-input/60 px-3 py-2"
       title={stat.hint}
     >
-      <span className="flex items-center gap-2 text-sm text-text-main">
+      <span className="flex min-w-0 items-center gap-2 text-sm text-text-main">
         <span
           aria-hidden
           className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[stat.tone])}
         />
         {STAT_LABEL[stat.key]}
       </span>
-      <span className="text-sm font-semibold tabular-nums text-text-main">
+      <span className="text-right text-sm font-semibold tabular-nums text-text-main">
         {stat.valueText}
       </span>
     </li>

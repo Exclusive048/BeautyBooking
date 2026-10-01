@@ -223,6 +223,11 @@ const envSchema = z.object({
   //
   // Server + worker DSN. Unset → `Sentry.init` is never called server-side.
   GLITCHTIP_DSN: z.string().optional(),
+  // SEO-01: коды подтверждения прав на сайт — значение `content` мета-тега
+  // из Яндекс Вебмастера и Google Search Console. Пусто — тега нет. Читает
+  // только серверный root layout, поэтому без NEXT_PUBLIC_.
+  YANDEX_SITE_VERIFICATION: z.string().trim().max(200).optional(),
+  GOOGLE_SITE_VERIFICATION: z.string().trim().max(200).optional(),
   // Browser DSN — separate var (and can be a separate GlitchTip project) so
   // frontend noise never buries backend failures, and so enabling backend
   // tracking does not automatically ship a DSN to every visitor.

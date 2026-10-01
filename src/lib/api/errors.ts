@@ -60,6 +60,7 @@ const ERROR_CODES = [
   "FEATURE_GATE",
   "FORBIDDEN",
   "FORBIDDEN_ROLE",
+  "FORBIDDEN_WORDS",
   // GUEST-MANAGE-LINK: ссылка «Управлять записью» подделана/устарела либо запись уже в аккаунте.
   "GUEST_MANAGE_ACCOUNT_REQUIRED",
   "GUEST_MANAGE_LINK_INVALID",

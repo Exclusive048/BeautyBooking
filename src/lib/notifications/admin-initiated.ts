@@ -16,6 +16,7 @@ import {
   createTelegramSendJob,
 } from "@/lib/queue/types";
 import { getTelegramChatIdForUser } from "@/lib/notifications/recipients";
+import { claimNotificationDedup } from "@/lib/notifications/dedup-guard";
 
 export { PUSH_BODY_MAX, PUSH_TITLE_MAX };
 
@@ -105,25 +106,47 @@ export async function dispatchAdminInitiatedNotification(
   }
 }
 
+/** Сколько живёт отметка «этому получателю задача уже отправила» — с запасом
+ * на ретраи очереди (до трёх попыток с задержкой в минуты). */
+const PLAN_EDITED_RECIPIENT_CLAIM_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 /** Fan-out wrapper for plan-edit notifications. Reads active
  * subscribers of the plan in 100-row batches and dispatches an
  * in-app + push + Telegram notification to each. Used by the worker
- * handler — never call directly from a route. */
+ * handler — never call directly from a route.
+ *
+ * QUEUE-MASS-NOTIFY-PER-RECIPIENT-CLAIM (2026-10-01): очередь — at-least-once
+ * (упавший воркер возвращает задачу, до трёх попыток), а прогон заново выбирает
+ * ВСЕХ подписчиков. Без отметки на получателя повтор присылал каждому второе
+ * уведомление. Теперь перед доставкой занимается ключ `(jobId, userId)`:
+ * повтор пропускает уже уведомлённых и досылает остальным. Сторож недоступен —
+ * задача бросает и уходит в ретрай (fail-closed, как у `dedup-guard`): уже
+ * отправленные отмечены, дубля не будет. */
 export async function processPlanEditedMassNotification(payload: {
   planId: string;
   planCode: string;
   summary: string;
-}): Promise<{ recipients: number; failures: number }> {
+}, options: { jobId: string }): Promise<{ recipients: number; failures: number; skipped: number }> {
   const subs = await prisma.userSubscription.findMany({
     where: { planId: payload.planId, status: "ACTIVE" },
     select: { userId: true, scope: true },
   });
 
   let failures = 0;
+  let skipped = 0;
   const BATCH_SIZE = 50;
 
   for (let i = 0; i < subs.length; i += BATCH_SIZE) {
-    const batch = subs.slice(i, i + BATCH_SIZE);
+    const candidates = subs.slice(i, i + BATCH_SIZE);
+    const batch: typeof candidates = [];
+    for (const sub of candidates) {
+      const first = await claimNotificationDedup(
+        `notif:plan-edited:${options.jobId}:${sub.userId}`,
+        PLAN_EDITED_RECIPIENT_CLAIM_TTL_SECONDS,
+      );
+      if (first) batch.push(sub);
+      else skipped += 1;
+    }
     const results = await Promise.allSettled(
       batch.map((sub) =>
         dispatchAdminInitiatedNotification({
@@ -151,7 +174,7 @@ export async function processPlanEditedMassNotification(payload: {
     }
   }
 
-  return { recipients: subs.length, failures };
+  return { recipients: subs.length, failures, skipped };
 }
 
 /** Helper exported so admin routes can enqueue the mass dispatch

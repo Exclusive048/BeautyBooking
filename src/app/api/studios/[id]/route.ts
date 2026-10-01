@@ -9,6 +9,7 @@ import { isValidTimeZone } from "@/lib/schedule/timezone";
 import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { rejectForbiddenWords } from "@/lib/moderation/zod";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -16,11 +17,12 @@ type RouteContext = {
 
 const updateSchema = z
   .object({
-    name: z.string().trim().optional(),
-    tagline: z.string().trim().optional(),
+    // FORBIDDEN-WORDS-01: у названия и подзаголовка не было потолка длины вовсе.
+    name: z.string().trim().max(120).superRefine(rejectForbiddenWords("name")).optional(),
+    tagline: z.string().trim().max(240).superRefine(rejectForbiddenWords("text")).optional(),
     address: z.string().trim().optional(),
     district: z.string().trim().optional(),
-    categories: z.array(z.string().trim().min(1).max(120)).max(20).optional(),
+    categories: z.array(z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name"))).max(20).optional(),
     contactName: z.string().trim().nullable().optional(),
     contactPhone: z.string().trim().nullable().optional(),
     contactEmail: z.string().trim().email().nullable().optional(),
@@ -28,7 +30,7 @@ const updateSchema = z
     // validated server-side in updateStudioProviderProfile (the security boundary).
     socialVk: z.string().trim().max(200).nullable().optional(),
     socialInstagram: z.string().trim().max(200).nullable().optional(),
-    description: z.string().trim().max(2000).nullable().optional(),
+    description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
     geoLat: z.number().nullable().optional(),
     geoLng: z.number().nullable().optional(),
     isPublished: z.boolean().optional(),

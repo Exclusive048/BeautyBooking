@@ -35,7 +35,7 @@ export function StepsBar({ active, done, scenarioB }: Props) {
             role="listitem"
             key={step.id}
             aria-current={isActive ? "step" : undefined}
-            className={`relative flex flex-1 items-center gap-2 px-2 py-1 sm:gap-3 sm:px-3 ${
+            className={`relative flex min-w-0 flex-1 items-center gap-1.5 px-1 py-1 sm:gap-3 sm:px-3 ${
               dimmed ? "opacity-60" : "opacity-100"
             }`}
           >
@@ -52,7 +52,9 @@ export function StepsBar({ active, done, scenarioB }: Props) {
               {isDone ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </span>
             <div className="min-w-0">
-              <div className="eyebrow text-text-muted">
+              {/* MOBILE-OVERFLOW-375: «Шаг 4» рядом с номером повторяет его же —
+                  на телефоне подпись убрана, иначе четвёртый пункт выходил на 14 px. */}
+              <div className="eyebrow hidden text-text-muted sm:block">
                 {UI_TEXT.bookingWidget.steps.stepLabel.replace("{n}", String(i + 1))}
               </div>
               <div className={`truncate text-xs ${isActive || isDone ? "font-semibold text-text" : "text-text"} sm:text-sm`}>

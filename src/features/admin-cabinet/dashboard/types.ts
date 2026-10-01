@@ -86,19 +86,36 @@ export type AdminEventItem = {
 
 export type AdminEventsResponse = {
   items: AdminEventItem[];
+  /** ADMIN-EVENTS-TABLE: `?before=` для следующей страницы; `null` — старше нет. */
+  nextBefore: number | null;
 };
 
 export type AdminHealthTone = "ok" | "warn" | "error" | "neutral";
+
+export type AdminHealthSection = "platform" | "queue" | "integrations" | "moderation";
 
 export type AdminHealthStat = {
   key:
     | "apiUptime"
     | "p95"
+    | "errorRate"
+    | "database"
+    | "redis"
+    | "process"
+    | "worker"
     | "queuePending"
+    | "queueProcessing"
     | "queueDead"
-    | "complaintsOpen"
+    | "realtime"
+    | "email"
+    | "push"
+    | "payments"
     | "smsBalance"
-    | "worker";
+    | "vk"
+    | "aiSpend"
+    | "complaintsOpen";
+  /** ADMIN-HEALTH-02: группа строки на панели. */
+  section: AdminHealthSection;
   valueText: string;
   tone: AdminHealthTone;
   /** Optional hint shown on hover — e.g. why a metric is "—". */
@@ -107,4 +124,6 @@ export type AdminHealthStat = {
 
 export type AdminHealth = {
   stats: AdminHealthStat[];
+  /** Момент сборки снимка (ISO) — подпись «обновлено». */
+  checkedAt: string;
 };

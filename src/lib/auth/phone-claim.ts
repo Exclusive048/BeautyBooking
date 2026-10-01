@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, UserProfile } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { isGuestClassProfile } from "@/lib/legal/consent";
 import { prisma } from "@/lib/prisma";
@@ -132,23 +132,36 @@ export async function claimPhoneForUser(
  * Единственный источник ответа на два вопроса маршрута: «это регистрация?»
  * (гейт согласий ДО сжигания кода) и «в чей профиль выдавать сессию».
  */
+/**
+ * SESSION-SELECT-LOGIN-PATHS (2026-10-01): вход по телефону читает только поля,
+ * нужные триажу и выдаче сессии, а не всю строку профиля.
+ */
+export const PHONE_LOGIN_PROFILE_SELECT = {
+  id: true,
+  phone: true,
+  phoneVerifiedAt: true,
+  roles: true,
+} satisfies Prisma.UserProfileSelect;
+
+export type PhoneLoginProfile = Prisma.UserProfileGetPayload<{ select: typeof PHONE_LOGIN_PROFILE_SELECT }>;
+
 export type PhoneLoginTarget =
   /** Подтверждённый владелец возвращается — обычный вход. */
-  | { kind: "OWNER"; profile: UserProfile }
+  | { kind: "OWNER"; profile: PhoneLoginProfile }
   /** Пассивный гостевой профиль — конверсия гостя в аккаунт, вход + отметка владения. */
-  | { kind: "GUEST_CONVERSION"; profile: UserProfile }
+  | { kind: "GUEST_CONVERSION"; profile: PhoneLoginProfile }
   /**
    * Номер заявлен УСТАНОВИВШИМСЯ аккаунтом без доказательства. Входить в него
    * нельзя — это и был бы перехват (владелец номера получил бы сессию в чужом
    * профиле, зеркало дыры FIX-SEC-EMAIL-IDENTITY-01). Заявка освобождается,
    * доказавший получает СВЕЖИЙ профиль — как в email-модели.
    */
-  | { kind: "FOREIGN_CLAIM"; profile: UserProfile }
+  | { kind: "FOREIGN_CLAIM"; profile: PhoneLoginProfile }
   /** Номер свободен — регистрация. */
   | { kind: "NONE" };
 
 export async function classifyPhoneLoginTarget(
-  existing: UserProfile | null,
+  existing: PhoneLoginProfile | null,
 ): Promise<PhoneLoginTarget> {
   if (!existing) return { kind: "NONE" };
   if (existing.phoneVerifiedAt) return { kind: "OWNER", profile: existing };

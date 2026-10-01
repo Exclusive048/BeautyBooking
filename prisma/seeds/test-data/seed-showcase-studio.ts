@@ -848,7 +848,6 @@ async function ensureBookings(args: {
     await prisma.bookingServiceItem.create({
       data: {
         bookingId: booking.id,
-        studioId: args.studioId,
         serviceId: service.id,
         titleSnapshot: service.name,
         priceSnapshot: service.price,
