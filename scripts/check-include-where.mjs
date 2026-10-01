@@ -248,7 +248,7 @@ function main() {
   if (grew.length === 0 && shrank.length === 0) {
     console.log("");
     console.log(`Дельта против ${BASELINE_PATH}: пусто — новых неограниченных чтений нет. ✅`);
-    console.log("(Зелёный означает «не стало больше», а НЕ «их нет»: 39 находок — открытый backlog.)");
+    console.log(`(Зелёный означает «не стало больше», а НЕ «их нет»: ${total} находок — открытый backlog.)`);
     process.exit(0);
   }
 
