@@ -16,6 +16,10 @@
  *      графиком «с начала времён, продлевается автоматически» (у действующих
  *      мастеров ничего не меняется). Сбой одного профиля деплой НЕ
  *      останавливает — до переноса движок читает его неделю по-старому.
+ *   8. SYSTEM-CATEGORIES-01 — фиксированный набор категорий каталога
+ *      (`lib/catalog/system-categories.ts`): досоздаёт недостающие, существующие
+ *      строки — из набора и ручные — не меняет и не удаляет. Первый слой —
+ *      миграция данных `20261001124736_system_categories`.
  *   7. 29.09 доработки · 08 — сторож данных скоупа студии: `Booking.studioId`
  *      обязан совпадать с поверхностью записи (списки студии читают только
  *      его). Ничего не пишет: при дрейфе — строка ошибки с fingerprint
@@ -34,6 +38,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { ensureBootstrapAdmins } from "../src/lib/auth/bootstrap-admins";
+import { ensureSystemCategories } from "../src/lib/catalog/system-categories";
 import { backfillAvatarCropUrls } from "../src/lib/media/avatar-crop-backfill";
 import { syncAllStudioPortfolioItemsWith } from "../src/lib/studios/portfolio-items-sync";
 import { backfillMissingMasterUsernames } from "../src/lib/publicUsername";
@@ -72,6 +77,12 @@ async function main(): Promise<void> {
 
   const admins = await ensureBootstrapAdmins(prisma);
   console.log(`post-deploy · bootstrap admins: granted ${admins.granted.length}`);
+
+  const systemCategories = await ensureSystemCategories(prisma);
+  console.log(
+    `post-deploy · system categories: created ${systemCategories.created.length}` +
+      (systemCategories.created.length > 0 ? ` (${systemCategories.created.join(", ")})` : ""),
+  );
 
   const studioPortfolio = await syncAllStudioPortfolioItemsWith(prisma);
   console.log(
