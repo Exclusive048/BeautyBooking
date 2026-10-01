@@ -267,15 +267,27 @@ function RoleSwitcherDrawer({
  * are server-only. Defaults to `true` so any caller that forgets it keeps the
  * pre-gate behaviour rather than silently losing the login tab.
  */
-export function BottomNav({ authEnabled = true }: { authEnabled?: boolean }) {
+export function BottomNav({
+  authEnabled = true,
+  sessionHint = false,
+}: {
+  authEnabled?: boolean;
+  /** SESSION-PWA-GUEST-FLASH: у браузера есть кука сессии (с сервера). */
+  sessionHint?: boolean;
+}) {
   const pathname = usePathname();
-  const { user } = useMe();
+  const { user, isLoading, isError } = useMe();
   const { activeRole, availableRoles, hydrated } = useActiveRole();
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const isAdmin = user?.roles?.includes("ADMIN") || user?.roles?.includes("SUPERADMIN");
-  const isGuest = !user;
-  const isLoggedIn = Boolean(user);
+  // SESSION-PWA-GUEST-FLASH: личность ещё не прочитана или чтение упало (сеть
+  // при возврате приложения из фона, автодеплой), а кука сессии есть — это не
+  // гость. Иначе вместо кабинета появлялась вкладка «Войти», и человек
+  // перезаходил при живой сессии.
+  const identityUnknown = !user && sessionHint && (isLoading || isError);
+  const isGuest = !user && !identityUnknown;
+  const isLoggedIn = Boolean(user) || identityUnknown;
 
   const items = useMemo<NavItem[]>(() => {
     if (isAdmin) return NAV_ADMIN;

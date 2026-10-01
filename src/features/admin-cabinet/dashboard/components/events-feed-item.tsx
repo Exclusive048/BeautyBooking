@@ -36,26 +36,26 @@ export function EventsFeedItem({ event }: Props) {
   const columns = adminEventColumns(event);
   return (
     <tr className="border-b border-border-subtle last:border-b-0 hover:bg-bg-input/40">
-      <td className="whitespace-nowrap py-1.5 pr-3 align-top">
+      <td className="truncate py-1.5 pr-3 align-top">
         <time dateTime={event.timeIso} className="font-mono text-2xs tabular-nums text-text-sec">
           {hydrated ? UI_FMT.date(event.timeMs, "dayMonthNumericTime", { timeZone: VIEWER_TZ }) : null}
         </time>
       </td>
-      <td className="whitespace-nowrap py-1.5 pr-3 align-top text-xs text-text-main">
-        <span className="inline-flex items-center gap-1.5">
+      <td className="py-1.5 pr-3 align-top text-xs text-text-main" title={columns.typeLabel}>
+        <span className="flex min-w-0 items-center gap-1.5">
           <span aria-hidden className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT_CLASS[event.dotTone])} />
-          {columns.typeLabel}
+          <span className="truncate">{columns.typeLabel}</span>
         </span>
       </td>
-      <td className="max-w-[16rem] truncate py-1.5 pr-3 align-top text-xs font-medium text-text-main" title={columns.description}>
+      <td className="truncate py-1.5 pr-3 align-top text-xs font-medium text-text-main" title={columns.description}>
         {columns.description}
       </td>
-      <td className="max-w-[12rem] truncate py-1.5 pr-3 align-top text-xs text-text-sec" title={columns.detail}>
+      <td className="truncate py-1.5 pr-3 align-top text-xs text-text-sec" title={columns.detail}>
         {columns.detail}
       </td>
       <td
         className={cn(
-          "whitespace-nowrap py-1.5 text-right align-top text-xs font-semibold tabular-nums",
+          "truncate py-1.5 text-right align-top text-xs font-semibold tabular-nums",
           AMOUNT_CLASS[event.amountTone],
         )}
       >

@@ -172,14 +172,16 @@ export function EventsFeed({ initial, initialNextBefore }: Props) {
         <p className="py-6 text-center text-sm text-text-sec">{T.empty}</p>
       ) : (
         <div className="-mx-5 overflow-x-auto px-5">
-          <table className="w-full min-w-[560px] border-collapse text-left">
+          {/* Фиксированная раскладка с долями колонок: таблица всегда в ширину
+              карточки, длинное обрезается многоточием (полный текст — в title). */}
+          <table className="w-full min-w-[480px] table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-border-subtle">
-                <th scope="col" className="eyebrow py-2 pr-3 font-normal">{T.columns.time}</th>
-                <th scope="col" className="eyebrow py-2 pr-3 font-normal">{T.columns.type}</th>
-                <th scope="col" className="eyebrow py-2 pr-3 font-normal">{T.columns.description}</th>
-                <th scope="col" className="eyebrow py-2 pr-3 font-normal">{T.columns.detail}</th>
-                <th scope="col" className="eyebrow py-2 text-right font-normal">{T.columns.amount}</th>
+                <th scope="col" className="eyebrow w-[17%] py-2 pr-3 font-normal">{T.columns.time}</th>
+                <th scope="col" className="eyebrow w-[24%] py-2 pr-3 font-normal">{T.columns.type}</th>
+                <th scope="col" className="eyebrow w-[24%] py-2 pr-3 font-normal">{T.columns.description}</th>
+                <th scope="col" className="eyebrow w-[20%] py-2 pr-3 font-normal">{T.columns.detail}</th>
+                <th scope="col" className="eyebrow w-[15%] py-2 text-right font-normal">{T.columns.amount}</th>
               </tr>
             </thead>
             <tbody>
