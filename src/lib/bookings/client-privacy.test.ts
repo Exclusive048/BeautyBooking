@@ -83,8 +83,6 @@ const CLIENT_FACING_EXTRA_FILES = [
  */
 const MASTER_CRM_READERS: Record<string, string> = {
   "src/lib/crm/card-service.ts": "владелец CRM-карточки — единственный writer/reader",
-  "src/lib/master/clients.service.ts": "кабинет мастера: его собственная база клиентов",
-  "src/lib/studio/clients.service.ts": "кабинет студии: база клиентов арендатора",
   "src/lib/deletion/user-data-disposition.ts": "карта диспозиций при удалении аккаунта (инв. #35)",
   "src/lib/deletion/provider-data-disposition.ts": "карта диспозиций при удалении кабинета (инв. #38)",
   "src/lib/deletion/account-deletion-actions.ts":

@@ -36,6 +36,8 @@ export function ListHeader({
           ) : null}
         </h2>
       </div>
+      {/* 29.09 доработки · 31: окно списка (`chat/conversation-window.ts`). */}
+      <p className="-mt-2 text-xs text-text-sec">{T.list.windowNote}</p>
 
       <label className="relative block">
         <Search

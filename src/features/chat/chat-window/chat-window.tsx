@@ -31,7 +31,7 @@ export function ChatWindow({
   onMobileBack,
   onMessageSent,
 }: Props) {
-  const { detail, isLoading, error, refresh, markRead } = useConversationThread({
+  const { detail, isLoading, error, refresh, markRead, loadOlder, isLoadingOlder } = useConversationThread({
     perspective,
     conversationSlug,
   });
@@ -59,7 +59,7 @@ export function ChatWindow({
 
   if (isLoading && !detail) {
     return (
-      <section className="flex min-w-0 flex-1 flex-col bg-bg-page">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg-page">
         <div className="h-[68px] shrink-0 animate-pulse border-b border-border-subtle bg-bg-card" />
         <div className="flex-1 animate-pulse p-5" />
         <div className="h-20 shrink-0 animate-pulse border-t border-border-subtle bg-bg-card" />
@@ -82,7 +82,7 @@ export function ChatWindow({
       : T.composer.disabledClient;
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col bg-bg-page">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg-page">
       <WindowHeader
         partner={detail.partner}
         perspective={perspective}
@@ -90,7 +90,14 @@ export function ChatWindow({
         hasOpenBooking={Boolean(detail.openBookingId)}
         onMobileBack={onMobileBack}
       />
-      <Thread items={detail.thread} perspective={perspective} viewerTimezone={viewerTimezone} />
+      <Thread
+        items={detail.thread}
+        perspective={perspective}
+        viewerTimezone={viewerTimezone}
+        hasOlder={Boolean(detail.olderCursor)}
+        isLoadingOlder={isLoadingOlder}
+        onLoadOlder={loadOlder}
+      />
       <Composer
         perspective={perspective}
         conversationSlug={conversationSlug}

@@ -112,6 +112,8 @@
 | `schedule-period-label` | `master/components/schedule/schedule-controls.tsx` | period label between prev/next arrows |
 | `bookings-column-<id>` (+ `data-collapsed`) | `master/components/bookings/kanban-column.tsx` | kanban column; `data-collapsed="true"` when empty (136px on phone) |
 | `footer-cta-metrics` | `layout/footer/FooterCTA.tsx` | live metrics row of the «Для моделей» card (absent when no open offers) |
+| `chat-thread` | `chat/chat-window/thread.tsx` | 29.09 доработки · 31: the message feed of the open conversation (scroller). Scope message-text locators to it — the conversation list repeats the last message as a preview |
+| `chat-thread-show-earlier` | same file | «Показать раньше» — **rendered only while older messages exist** (the server pages the thread by 100) |
 
 > Login still exposes the 6 OTP boxes via `getByLabel("Цифра N из 6")` (unchanged
 > by LOGIN-REDESIGN-01 — the OTP grid moved to the shared `ui/otp-input.tsx`

@@ -149,7 +149,6 @@
 /api/master/advisor/refresh
 /api/master/bookings/seen
 /api/master/bookings/{id}/reschedule-context
-/api/master/clients
 /api/master/clients/{clientKey}/card
 /api/master/clients/{clientKey}/card/photos
 /api/master/clients/{clientKey}/card/photos/{photoId}
