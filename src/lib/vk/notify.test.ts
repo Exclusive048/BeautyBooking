@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { relative } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { listSourceFiles, SRC } from "@/lib/testing/client-graph";
+import { stripComments } from "@/lib/testing/source-scan";
 
 const getVkCommunity = vi.hoisted(() => vi.fn());
 const vkLinkFindUnique = vi.hoisted(() => vi.fn());
@@ -18,7 +22,12 @@ vi.mock("@/lib/logging/logger", () => ({ logInfo, logError }));
 vi.mock("@/lib/app-url", () => ({ resolvePublicAppUrl: () => "https://masterryadom.ru" }));
 
 import { VK_MESSAGE_MAX_LENGTH } from "@/lib/vk/community-api";
-import { buildVkNotificationText, enqueueVkNotification, processVkSendPayload } from "@/lib/vk/notify";
+import {
+  buildVkNotificationText,
+  enqueueVkNotification,
+  processVkSendPayload,
+  toVkSafeLink,
+} from "@/lib/vk/notify";
 
 const COMMUNITY = {
   token: "tok",
@@ -36,16 +45,88 @@ beforeEach(() => {
 });
 
 describe("buildVkNotificationText", () => {
-  it("заголовок, текст и абсолютная ссылка", () => {
-    expect(buildVkNotificationText({ title: "Новая запись", body: "Завтра в 10:00", url: "/cabinet/bookings?focus=1" })).toBe(
-      "Новая запись\n\nЗавтра в 10:00\n\nhttps://masterryadom.ru/cabinet/bookings?focus=1",
-    );
+  it("заголовок, текст и абсолютная ссылка — без id записи", () => {
+    expect(
+      buildVkNotificationText({
+        title: "Новая запись",
+        body: "Завтра в 10:00",
+        url: "/cabinet/bookings?focus=cmg1abcdefghijklmnopqrstu",
+      }),
+    ).toBe("Новая запись\n\nЗавтра в 10:00\n\nhttps://masterryadom.ru/cabinet/bookings");
   });
 
   it("длинный текст режется, а ссылка остаётся целой", () => {
     const text = buildVkNotificationText({ title: "T", body: "я".repeat(VK_MESSAGE_MAX_LENGTH), url: "/x" });
     expect(text.length).toBeLessThanOrEqual(VK_MESSAGE_MAX_LENGTH);
     expect(text.endsWith("https://masterryadom.ru/x")).toBe(true);
+  });
+});
+
+/**
+ * VK-LINK-NO-IDS — в ссылке сообщения ВКонтакте нет внутренних идентификаторов.
+ * Формы ниже — дословно те, что строят отправители уведомлений
+ * (`booking-notifications.ts`, `presentation.ts`, `model-notifications.ts`,
+ * `chat/message-sender.ts`, `api/bookings/[id]/chat/messages`, `hot-slots/*`).
+ *
+ * Полнота: текст сообщения ВКонтакте собирает только `buildVkNotificationText`
+ * (через `enqueueVkNotification`), а отправляет только `processVkSendPayload` —
+ * сторож ниже не даёт завести второго отправителя мимо очистки ссылки.
+ *
+ * @probe 2026-10-02 (выполнена): в `toVkSafeLink` вместо разрешающего списка
+ * оставлен весь query (`parsed.search`) → 11 красных: «заголовок, текст и
+ * абсолютная ссылка», «запись клиента», «отзыв о записи», «запись в кабинете
+ * мастера», «календарь студии», «отклик модели», «оффер мастера», «переписка»,
+ * «чат записи», «свой абсолютный адрес», «запись в тексте сообщения».
+ * @probe 2026-10-02 (выполнена): вызов `createVkSendJob(…)` дописан в
+ * `notifications/delivery.ts` → красный «сообщения ВКонтакте ставит и
+ * отправляет только этот модуль» (два файла вместо одного).
+ */
+describe("toVkSafeLink — без внутренних id", () => {
+  const ID = "cmg1abcdefghijklmnopqrstu";
+  const cases: Array<[string, string, string | null]> = [
+    ["запись клиента", `/cabinet/bookings?focus=${ID}`, "https://masterryadom.ru/cabinet/bookings"],
+    ["отзыв о записи", `/cabinet/bookings?focus=${ID}&review=${ID}`, "https://masterryadom.ru/cabinet/bookings"],
+    ["запись в кабинете мастера", `/cabinet/master/dashboard?focus=${ID}`, "https://masterryadom.ru/cabinet/master/dashboard"],
+    [
+      "календарь студии",
+      `/cabinet/studio/calendar?view=day&date=2026-10-03&focus=${ID}`,
+      "https://masterryadom.ru/cabinet/studio/calendar?view=day&date=2026-10-03",
+    ],
+    ["отклик модели", `/cabinet/model-applications?applicationId=${ID}`, "https://masterryadom.ru/cabinet/model-applications"],
+    ["оффер мастера", `/cabinet/master/model-offers?filterOffer=${ID}`, "https://masterryadom.ru/cabinet/master/model-offers"],
+    ["переписка", "/cabinet/messages?c=k7Hq2xZ", "https://masterryadom.ru/cabinet/messages"],
+    ["чат записи", `/cabinet/master/dashboard?focus=${ID}&chat=open`, "https://masterryadom.ru/cabinet/master/dashboard"],
+    [
+      "горящее окошко — публичный адрес и время остаются",
+      "/u/anna-sokolova/booking?slotStartAt=2026-10-03T07%3A00%3A00.000Z",
+      "https://masterryadom.ru/u/anna-sokolova/booking?slotStartAt=2026-10-03T07%3A00%3A00.000Z",
+    ],
+    ["раздел без параметров", "/cabinet/master/reviews", "https://masterryadom.ru/cabinet/master/reviews"],
+    ["id в пути — без ссылки", `/cabinet/bookings/${ID}`, null],
+    ["публичный id в пути — без ссылки", "/models/e_Y21nMWFiYw", null],
+    ["якорь отбрасывается", `/notifications#${ID}`, "https://masterryadom.ru/notifications"],
+    ["чужой домен — без ссылки", "https://evil.example/cabinet", null],
+    ["свой абсолютный адрес — тоже чистится", `https://masterryadom.ru/cabinet/bookings?focus=${ID}`, "https://masterryadom.ru/cabinet/bookings"],
+    ["пусто", "", null],
+  ];
+
+  for (const [name, input, expected] of cases) {
+    it(name, () => {
+      expect(toVkSafeLink(input)).toBe(expected);
+    });
+  }
+
+  it("сообщения ВКонтакте ставит и отправляет только этот модуль", () => {
+    const producers = listSourceFiles()
+      .filter((file) => !/\.test\.tsx?$/.test(file))
+      .filter((file) => /(?<!function\s+)\b(createVkSendJob|sendCommunityMessage)\(/.test(stripComments(readFileSync(file, "utf8"))))
+      .map((file) => relative(SRC, file).replaceAll("\\", "/"));
+    expect(producers).toEqual(["lib/vk/notify.ts"]);
+  });
+
+  it("запись в тексте сообщения: id не попадает никуда", () => {
+    const text = buildVkNotificationText({ title: "T", body: "B", url: `/cabinet/bookings?focus=${ID}` });
+    expect(text).not.toContain(ID);
   });
 });
 
