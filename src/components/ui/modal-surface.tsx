@@ -62,6 +62,11 @@ type Props = {
    * one). Falls back to the panel container if no focusable found.
    */
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * `id` заголовка, который окно рисует само в `children` (без `title` /
+   * `header`), — чтобы у диалога всё равно было доступное имя.
+   */
+  ariaLabelledBy?: string;
   children: ReactNode;
   className?: string;
 };
@@ -116,6 +121,7 @@ export function ModalSurface({
   fullScreenOnMobile = false,
   size = "lg",
   initialFocusRef,
+  ariaLabelledBy: ownLabelledBy,
   children,
   className,
 }: Props) {
@@ -139,7 +145,7 @@ export function ModalSurface({
   if (!isHydrated) return null;
 
   const headerTitle = header?.title ?? title ?? null;
-  const ariaLabelledBy = headerTitle ? titleId : undefined;
+  const ariaLabelledBy = headerTitle ? titleId : ownLabelledBy;
   const fullScreen = fullScreenOnMobile;
 
   const heading = header ? (

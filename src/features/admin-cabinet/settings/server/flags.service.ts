@@ -4,6 +4,7 @@ import {
   VISUAL_SEARCH_TOGGLE_DEFAULT,
   resolveVisualSearchEnabled,
 } from "@/lib/visual-search/enabled";
+import { WELCOME_DIALOG_DEFAULT } from "@/lib/onboarding/welcome-dialog";
 import type { SystemFlags } from "@/features/admin-cabinet/settings/types";
 
 const FLAG_KEYS: ReadonlyArray<keyof SystemFlags> = [
@@ -11,6 +12,7 @@ const FLAG_KEYS: ReadonlyArray<keyof SystemFlags> = [
   "visualSearchEnabled",
   "legalDraftMode",
   "telegramEnabled",
+  "welcomeDialogEnabled",
 ];
 
 const DEFAULTS: SystemFlags = {
@@ -23,6 +25,7 @@ const DEFAULTS: SystemFlags = {
   // `telegramEnabled` admin toggle defaults to ON, but only *below* the env
   // ceiling — see the env-clamp in `getSystemFlags` below.
   telegramEnabled: true,
+  welcomeDialogEnabled: WELCOME_DIALOG_DEFAULT,
 };
 
 function parseFlag(value: unknown, fallback: boolean): boolean {
@@ -53,5 +56,6 @@ export async function getSystemFlags(): Promise<SystemFlags> {
     visualSearchEnabled: resolveVisualSearchEnabled(byKey.get("visualSearchEnabled")),
     legalDraftMode: parseFlag(byKey.get("legalDraftMode"), DEFAULTS.legalDraftMode),
     telegramEnabled,
+    welcomeDialogEnabled: parseFlag(byKey.get("welcomeDialogEnabled"), DEFAULTS.welcomeDialogEnabled),
   };
 }

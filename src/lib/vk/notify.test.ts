@@ -1,4 +1,8 @@
+import { readFileSync } from "node:fs";
+import { relative } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { listSourceFiles, SRC } from "@/lib/testing/client-graph";
+import { stripComments } from "@/lib/testing/source-scan";
 
 const getVkCommunity = vi.hoisted(() => vi.fn());
 const vkLinkFindUnique = vi.hoisted(() => vi.fn());
@@ -18,7 +22,11 @@ vi.mock("@/lib/logging/logger", () => ({ logInfo, logError }));
 vi.mock("@/lib/app-url", () => ({ resolvePublicAppUrl: () => "https://masterryadom.ru" }));
 
 import { VK_MESSAGE_MAX_LENGTH } from "@/lib/vk/community-api";
-import { buildVkNotificationText, enqueueVkNotification, processVkSendPayload } from "@/lib/vk/notify";
+import {
+  buildVkNotificationText,
+  enqueueVkNotification,
+  processVkSendPayload,
+} from "@/lib/vk/notify";
 
 const COMMUNITY = {
   token: "tok",
@@ -36,16 +44,51 @@ beforeEach(() => {
 });
 
 describe("buildVkNotificationText", () => {
-  it("заголовок, текст и абсолютная ссылка", () => {
-    expect(buildVkNotificationText({ title: "Новая запись", body: "Завтра в 10:00", url: "/cabinet/bookings?focus=1" })).toBe(
-      "Новая запись\n\nЗавтра в 10:00\n\nhttps://masterryadom.ru/cabinet/bookings?focus=1",
-    );
+  it("заголовок, текст и абсолютная ссылка — без id записи", () => {
+    expect(
+      buildVkNotificationText({
+        title: "Новая запись",
+        body: "Завтра в 10:00",
+        url: "/cabinet/bookings?focus=cmg1abcdefghijklmnopqrstu",
+      }),
+    ).toBe("Новая запись\n\nЗавтра в 10:00\n\nhttps://masterryadom.ru/cabinet/bookings");
   });
 
   it("длинный текст режется, а ссылка остаётся целой", () => {
     const text = buildVkNotificationText({ title: "T", body: "я".repeat(VK_MESSAGE_MAX_LENGTH), url: "/x" });
     expect(text.length).toBeLessThanOrEqual(VK_MESSAGE_MAX_LENGTH);
     expect(text.endsWith("https://masterryadom.ru/x")).toBe(true);
+  });
+});
+
+/**
+ * VK-LINK-NO-IDS — в ссылке сообщения ВКонтакте нет внутренних идентификаторов.
+ * Правило очистки — общее с письмами (`notifications/external-link.ts`, там же
+ * таблица форм адресов); здесь — что сообщение ВК собирается через него и что
+ * второго отправителя мимо очистки нет.
+ *
+ * @probe 2026-10-02 (выполнена): вызов `createVkSendJob(…)` дописан в
+ * `notifications/delivery.ts` → красный «сообщения ВКонтакте ставит и
+ * отправляет только этот модуль» (два файла вместо одного).
+ * @probe 2026-10-02 (выполнена): в `buildVkNotificationText` ссылка взята
+ * сырой (`input.url`) вместо `toExternalSafeLink` → 3 красных: «заголовок, текст
+ * и абсолютная ссылка», «длинный текст режется, а ссылка остаётся целой»,
+ * «запись в тексте сообщения».
+ */
+describe("сообщение ВКонтакте — без внутренних id", () => {
+  const ID = "cmg1abcdefghijklmnopqrstu";
+
+  it("сообщения ВКонтакте ставит и отправляет только этот модуль", () => {
+    const producers = listSourceFiles()
+      .filter((file) => !/\.test\.tsx?$/.test(file))
+      .filter((file) => /(?<!function\s+)\b(createVkSendJob|sendCommunityMessage)\(/.test(stripComments(readFileSync(file, "utf8"))))
+      .map((file) => relative(SRC, file).replaceAll("\\", "/"));
+    expect(producers).toEqual(["lib/vk/notify.ts"]);
+  });
+
+  it("запись в тексте сообщения: id не попадает никуда", () => {
+    const text = buildVkNotificationText({ title: "T", body: "B", url: `/cabinet/bookings?focus=${ID}` });
+    expect(text).not.toContain(ID);
   });
 });
 

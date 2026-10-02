@@ -7,6 +7,8 @@ export type SystemFlags = {
   // ENV-SPLIT-01; the old NEXT_PUBLIC_TELEGRAM_ENABLED is gone) — when the env is
   // off this displays as false (locked) regardless of the stored value.
   telegramEnabled: boolean;
+  /** WELCOME-DIALOG-01: приветствие этапа тестирования после регистрации. */
+  welcomeDialogEnabled: boolean;
 };
 
 export type SeoValues = {

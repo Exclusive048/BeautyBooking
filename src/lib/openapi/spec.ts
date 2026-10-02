@@ -2987,6 +2987,16 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/me/welcome": {
+      post: {
+        summary: "Mark the testing-stage welcome dialog as seen (idempotent); `/api/me` then returns welcomePending=false",
+        tags: ["me"],
+        responses: {
+          "200": okResponse({ type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] }),
+          "401": errorResponse("Unauthorized"),
+        },
+      },
+    },
     "/api/me/setup-guide": {
       get: {
         summary: "«Первые шаги» of the signed-in user's own master/studio cabinet: steps, which are done, what is next",

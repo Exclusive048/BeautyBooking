@@ -1,9 +1,9 @@
 import "server-only";
 
 import { randomInt } from "crypto";
-import { resolvePublicAppUrl } from "@/lib/app-url";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { prisma } from "@/lib/prisma";
+import { toExternalSafeLink } from "@/lib/notifications/external-link";
 import { enqueue } from "@/lib/queue/queue";
 import { createVkSendJob, type VkSendPayload } from "@/lib/queue/types";
 import { getVkCommunity } from "@/lib/vk/community";
@@ -23,16 +23,12 @@ import { sendCommunityMessage, VK_MESSAGE_MAX_LENGTH } from "@/lib/vk/community-
  * отправке и обрабатывается как «этому получателю писать нельзя».
  */
 
-function absoluteUrl(url: string | undefined): string | null {
-  if (!url) return null;
-  if (/^https?:\/\//i.test(url)) return url;
-  const base = resolvePublicAppUrl();
-  if (!base) return null;
-  return `${base}${url.startsWith("/") ? url : `/${url}`}`;
-}
-
+/**
+ * VK-LINK-NO-IDS (2026-10-02) — ссылка в сообщении без внутренних id: текст
+ * хранит ВКонтакте. Правило общее с письмами — `toExternalSafeLink`.
+ */
 export function buildVkNotificationText(input: { title: string; body: string; url?: string }): string {
-  const link = absoluteUrl(input.url);
+  const link = toExternalSafeLink(input.url);
   const parts = [input.title.trim(), input.body.trim(), link ?? ""].filter((part) => part.length > 0);
   const text = parts.join("\n\n");
   if (text.length <= VK_MESSAGE_MAX_LENGTH) return text;

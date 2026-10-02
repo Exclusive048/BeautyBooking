@@ -31,6 +31,7 @@ export { meta } from "./text/meta";
 export { actions } from "./text/actions";
 export { status } from "./text/status";
 export { moderation } from "./text/moderation";
+export { welcome } from "./text/welcome";
 export { auth } from "./text/auth";
 export { nav } from "./text/nav";
 export { social } from "./text/social";

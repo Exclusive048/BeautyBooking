@@ -17,6 +17,7 @@ import {
   buildNotificationEmailText,
 } from "@/lib/email/templates/notification";
 import { resolvePublicAppUrl } from "@/lib/app-url";
+import { toExternalSafeLink } from "@/lib/notifications/external-link";
 import { enqueueVkNotification } from "@/lib/vk/notify";
 
 type DeliveryInput = {
@@ -117,7 +118,8 @@ async function deliverEmailNotification(
 
   const baseUrl = resolvePublicAppUrl() ?? "";
   const unsubscribeUrl = `${baseUrl}/cabinet/settings`;
-  const resolvedCtaUrl = ctaUrl ? (ctaUrl.startsWith("http") ? ctaUrl : `${baseUrl}${ctaUrl}`) : undefined;
+  // EXTERNAL-LINK-NO-IDS: письмо хранят почтовые сервисы — в ссылке только раздел.
+  const resolvedCtaUrl = toExternalSafeLink(ctaUrl) ?? undefined;
 
   await sendEmail({
     to: user.email,
