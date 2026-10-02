@@ -26,7 +26,6 @@ import {
   buildVkNotificationText,
   enqueueVkNotification,
   processVkSendPayload,
-  toVkSafeLink,
 } from "@/lib/vk/notify";
 
 const COMMUNITY = {
@@ -64,57 +63,20 @@ describe("buildVkNotificationText", () => {
 
 /**
  * VK-LINK-NO-IDS — в ссылке сообщения ВКонтакте нет внутренних идентификаторов.
- * Формы ниже — дословно те, что строят отправители уведомлений
- * (`booking-notifications.ts`, `presentation.ts`, `model-notifications.ts`,
- * `chat/message-sender.ts`, `api/bookings/[id]/chat/messages`, `hot-slots/*`).
+ * Правило очистки — общее с письмами (`notifications/external-link.ts`, там же
+ * таблица форм адресов); здесь — что сообщение ВК собирается через него и что
+ * второго отправителя мимо очистки нет.
  *
- * Полнота: текст сообщения ВКонтакте собирает только `buildVkNotificationText`
- * (через `enqueueVkNotification`), а отправляет только `processVkSendPayload` —
- * сторож ниже не даёт завести второго отправителя мимо очистки ссылки.
- *
- * @probe 2026-10-02 (выполнена): в `toVkSafeLink` вместо разрешающего списка
- * оставлен весь query (`parsed.search`) → 11 красных: «заголовок, текст и
- * абсолютная ссылка», «запись клиента», «отзыв о записи», «запись в кабинете
- * мастера», «календарь студии», «отклик модели», «оффер мастера», «переписка»,
- * «чат записи», «свой абсолютный адрес», «запись в тексте сообщения».
  * @probe 2026-10-02 (выполнена): вызов `createVkSendJob(…)` дописан в
  * `notifications/delivery.ts` → красный «сообщения ВКонтакте ставит и
  * отправляет только этот модуль» (два файла вместо одного).
+ * @probe 2026-10-02 (выполнена): в `buildVkNotificationText` ссылка взята
+ * сырой (`input.url`) вместо `toExternalSafeLink` → 3 красных: «заголовок, текст
+ * и абсолютная ссылка», «длинный текст режется, а ссылка остаётся целой»,
+ * «запись в тексте сообщения».
  */
-describe("toVkSafeLink — без внутренних id", () => {
+describe("сообщение ВКонтакте — без внутренних id", () => {
   const ID = "cmg1abcdefghijklmnopqrstu";
-  const cases: Array<[string, string, string | null]> = [
-    ["запись клиента", `/cabinet/bookings?focus=${ID}`, "https://masterryadom.ru/cabinet/bookings"],
-    ["отзыв о записи", `/cabinet/bookings?focus=${ID}&review=${ID}`, "https://masterryadom.ru/cabinet/bookings"],
-    ["запись в кабинете мастера", `/cabinet/master/dashboard?focus=${ID}`, "https://masterryadom.ru/cabinet/master/dashboard"],
-    [
-      "календарь студии",
-      `/cabinet/studio/calendar?view=day&date=2026-10-03&focus=${ID}`,
-      "https://masterryadom.ru/cabinet/studio/calendar?view=day&date=2026-10-03",
-    ],
-    ["отклик модели", `/cabinet/model-applications?applicationId=${ID}`, "https://masterryadom.ru/cabinet/model-applications"],
-    ["оффер мастера", `/cabinet/master/model-offers?filterOffer=${ID}`, "https://masterryadom.ru/cabinet/master/model-offers"],
-    ["переписка", "/cabinet/messages?c=k7Hq2xZ", "https://masterryadom.ru/cabinet/messages"],
-    ["чат записи", `/cabinet/master/dashboard?focus=${ID}&chat=open`, "https://masterryadom.ru/cabinet/master/dashboard"],
-    [
-      "горящее окошко — публичный адрес и время остаются",
-      "/u/anna-sokolova/booking?slotStartAt=2026-10-03T07%3A00%3A00.000Z",
-      "https://masterryadom.ru/u/anna-sokolova/booking?slotStartAt=2026-10-03T07%3A00%3A00.000Z",
-    ],
-    ["раздел без параметров", "/cabinet/master/reviews", "https://masterryadom.ru/cabinet/master/reviews"],
-    ["id в пути — без ссылки", `/cabinet/bookings/${ID}`, null],
-    ["публичный id в пути — без ссылки", "/models/e_Y21nMWFiYw", null],
-    ["якорь отбрасывается", `/notifications#${ID}`, "https://masterryadom.ru/notifications"],
-    ["чужой домен — без ссылки", "https://evil.example/cabinet", null],
-    ["свой абсолютный адрес — тоже чистится", `https://masterryadom.ru/cabinet/bookings?focus=${ID}`, "https://masterryadom.ru/cabinet/bookings"],
-    ["пусто", "", null],
-  ];
-
-  for (const [name, input, expected] of cases) {
-    it(name, () => {
-      expect(toVkSafeLink(input)).toBe(expected);
-    });
-  }
 
   it("сообщения ВКонтакте ставит и отправляет только этот модуль", () => {
     const producers = listSourceFiles()
