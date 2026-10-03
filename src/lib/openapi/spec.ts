@@ -1859,11 +1859,33 @@ export const openApiSpec = {
           serviceIds: { type: "array", items: { type: "string" } },
         },
       },
+      MasterPortfolioListItem: {
+        type: "object",
+        required: ["id", "mediaUrl", "caption", "serviceIds", "isPublic", "inSearch", "createdAt", "sortOrder"],
+        properties: {
+          id: { type: "string" },
+          mediaUrl: { type: "string" },
+          caption: { type: "string", nullable: true },
+          serviceIds: { type: "array", items: { type: "string" } },
+          globalCategoryId: { type: "string", nullable: true },
+          categorySource: { type: "string", nullable: true },
+          inSearch: { type: "boolean" },
+          isPublic: { type: "boolean" },
+          createdAt: { type: "string", format: "date-time" },
+          sortOrder: { type: "integer", description: "Позиция ручного порядка (меньше — выше)." },
+        },
+      },
       MasterPortfolioListData: {
         type: "object",
-        required: ["items"],
+        required: ["items", "total"],
         properties: {
-          items: { type: "array", items: { $ref: "#/components/schemas/MasterPortfolioItem" } },
+          items: {
+            type: "array",
+            description:
+              "В порядке показа (sortOrder asc, createdAt desc) — как каталог и публичная страница; до 500 работ.",
+            items: { $ref: "#/components/schemas/MasterPortfolioListItem" },
+          },
+          total: { type: "integer", description: "Всего работ мастера (счётчик лимита тарифа)." },
         },
       },
       MeUser: {
@@ -6861,7 +6883,7 @@ export const openApiSpec = {
     "/api/master/portfolio": {
       get: {
         summary: "List master portfolio items",
-        tags: ["master", "portfolio"],
+        tags: ["master", "portfolio", "mobile"],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/MasterPortfolioListData" }),
           "401": errorResponse("Unauthorized"),
