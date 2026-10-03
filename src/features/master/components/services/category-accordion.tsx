@@ -23,6 +23,11 @@ export function CategoryAccordion({ category, categories, onlinePaymentsAvailabl
           className="h-4 w-4 text-text-sec transition-transform group-open:rotate-90"
           aria-hidden
         />
+        {category.icon ? (
+          <span aria-hidden className="text-base leading-none">
+            {category.icon}
+          </span>
+        ) : null}
         <span className="flex-1 font-display text-base text-text-main">
           {category.name || T.uncategorisedName}
         </span>

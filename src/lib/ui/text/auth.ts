@@ -3,20 +3,21 @@ export const auth = {
   loginPage: {
     heroTitle: "Запишитесь к мастеру без звонков",
     heroSubtitle: "Выбирайте по фото и отзывам, а время выбирайте онлайн",
-    title: "Вход по номеру телефона",
-    subtitle: "Введите номер — пришлём код. Без пароля.",
-    // AUTH-GATE-01: the heading used to say «Вход по номеру телефона» even
-    // when the email tab was selected. With phone auth gated off the form can
-    // open directly on email, so the email-mode heading is now required — and
-    // it fixes that pre-existing mismatch for the both-enabled case too.
-    titleEmail: "Вход по email",
-    subtitleEmail: "Введите адрес — пришлём код. Без пароля.",
-    // AUTH-GATE-01: heading for a config where BOTH OTP channels are off but
-    // an OAuth provider is on (e.g. VK-only). The code form is hidden and the
-    // social buttons carry the whole page, so the heading must not promise a
-    // code that nothing will send.
-    titleSocial: "Вход в аккаунт",
-    subtitleSocial: "Выберите сервис, через который хотите войти.",
+    // LOGIN-TILES-01 (2026-10-03, макет владельца): один заголовок на все
+    // способы входа — способ выбирают плитки ниже, а не заголовок. Прежние
+    // «Вход по номеру телефона» / «Вход по email» / «Вход в аккаунт» и их
+    // подзаголовки сняты вместе с вкладками.
+    titleLogin: "Вход в МастерРядом",
+    codeStepTitle: "Введите код",
+    methodsLabel: "Способ входа",
+    tileVk: "VK ID",
+    tileYandex: "Яндекс ID",
+    tileEmail: "Почта",
+    tilePhone: "Телефон",
+    // Озвучивается, пока браузер уходит на страницу VK ID / Яндекс ID.
+    oauthRedirecting: "Открываем страницу входа…",
+    getCode: "Получить код",
+    consentHint: "Отметьте обязательные согласия, чтобы продолжить",
     phoneLabel: "Телефон",
     phonePlaceholder: "+79001234567",
     phonePlaceholderMask: "+7 (___) ___-__-__",
@@ -26,7 +27,6 @@ export const auth = {
     sendCodeFailed: "Не удалось отправить код. Попробуйте ещё раз.",
     enterCode: "Введите код",
     invalidCode: "Неверный код",
-    sendCode: "Отправить код",
     sending: "Отправляем…",
     codeSentTo: "Код отправлен на",
     verifying: "Проверяем…",
@@ -38,7 +38,7 @@ export const auth = {
     returnAfterLogin: "После входа вы вернётесь на:",
     or: "ИЛИ",
     socialLoginLabel: "Войти с помощью",
-    noAccountHint: "Аккаунт создадим автоматически при первом входе",
+    noAccountHint: "Без пароля — аккаунт создадим при первом входе",
     telegramSectionTitle: "Войти через Telegram",
     vkSectionTitle: "Войти через VK",
     // RKN-FIX-01: two separate required consents now — the wording no longer
@@ -81,8 +81,6 @@ export const auth = {
     resendCodeTimer: "Повторить через",
     resendCodeSeconds: "сек",
     changePhoneNumber: "Изменить номер",
-    tabPhone: "Телефон",
-    tabEmail: "Email",
     emailLabel: "Email",
     emailPlaceholder: "example@mail.ru",
     invalidEmail: "Введите корректный email",
@@ -104,8 +102,6 @@ export const auth = {
     brandHeadlineWith: "с",
     brandHeadlineAccent: "тебя",
     brandTagline: "Запись к мастеру за 30 секунд — без звонков и переписок. Выбирайте по работам, платите после процедуры.",
-    // Divider above the social-login buttons.
-    socialDividerLabel: "или войти через",
     // Vertical marquee of benefit cards on the brand stage. These are product
     // benefits (no invented person, no invented quote, no fabricated rating) —
     // real trust framing, kept as a purely visual device.

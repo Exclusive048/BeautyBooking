@@ -130,6 +130,11 @@ export function CatalogQuickFilters({
               active={active}
               onClick={() => onChange({ globalCategoryId: active ? null : category.id })}
             >
+              {category.icon ? (
+                <span aria-hidden className="-ml-0.5 mr-1.5 text-sm leading-none">
+                  {category.icon}
+                </span>
+              ) : null}
               {category.title}
             </ChipButton>
           );

@@ -49,10 +49,15 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
   const [editing, setEditing] = useState<AdminCategoryRow | null>(null);
   const [rejectTarget, setRejectTarget] = useState<AdminCategoryRow | null>(null);
 
-  // Re-sync local state if the server-rendered list changes
-  // (e.g. URL filter changed and the page re-rendered).
-  if (rows !== initialRows && rows.length === 0) {
-    // initial mount: keep server rows
+  // CATEGORY-ICONS-01: сервер прислал новый список (`router.refresh()` после
+  // правки, смена фильтра в адресе) — он и становится строками таблицы.
+  // Прежде `useState(initialRows)` держал строки первой загрузки навсегда:
+  // сохранённая правка, новая категория и фильтры не появлялись до
+  // перезагрузки страницы, и редактирование выглядело неработающим.
+  const [syncedRows, setSyncedRows] = useState(initialRows);
+  if (syncedRows !== initialRows) {
+    setSyncedRows(initialRows);
+    setRows(initialRows);
   }
 
   const patchRow = (id: string, patch: Partial<AdminCategoryRow>) => {
@@ -100,33 +105,34 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
     }
   };
 
+  // Ошибку запроса показывает само окно (бросаем дальше) — там заперт фокус.
   const handleSubmitDialog = async (value: CreateDialogValue) => {
-    const isEdit = !!editing;
-    try {
-      await fetchJsonWithAuth<unknown>(
-        isEdit
-          ? `/api/admin/catalog/categories/${editing!.id}`
-          : "/api/admin/catalog/categories",
-        {
-          method: isEdit ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: value.name,
-            parentId: value.parentId,
-          }),
-        },
-      );
-      setCreateOpen(false);
-      setEditing(null);
-      toast.success(isEdit ? T.toasts.updated : T.toasts.created);
-      // Reload server rows — count + new row will appear via refresh.
-      router.refresh();
-    } catch (error) {
-      // «Категория не может быть вложена сама в себя.», «Родительская категория
-      // не найдена.» — отказы сервера дословно. Прежде клиент искал в тексте
-      // ответа слово «Circular», которого сервер не присылал никогда.
-      toast.error(serverMessageOr(error, T.toasts.errorGeneric));
+    const target = editing;
+    await fetchJsonWithAuth<unknown>(
+      target ? `/api/admin/catalog/categories/${target.id}` : "/api/admin/catalog/categories",
+      {
+        method: target ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: value.name,
+          icon: value.icon,
+          parentId: value.parentId,
+        }),
+      },
+    );
+    if (target) {
+      const parent = value.parentId ? parentOptions.find((p) => p.id === value.parentId) : null;
+      patchRow(target.id, {
+        name: value.name,
+        icon: value.icon,
+        parent: parent ? { id: parent.id, name: parent.name } : null,
+      });
     }
+    setCreateOpen(false);
+    setEditing(null);
+    toast.success(target ? T.toasts.updated : T.toasts.created);
+    // Reload server rows — count + new row will appear via refresh.
+    router.refresh();
   };
 
   return (
@@ -164,9 +170,7 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
                 rows.map((row) => (
                   <tr key={row.id} className="hover:bg-bg-input/40">
                     <td className="px-4 py-3 align-top">
-                      <p className="text-sm font-medium text-text-main">
-                        {row.name}
-                      </p>
+                      <CategoryName row={row} />
                       {row.proposer ? (
                         <p className="mt-0.5 text-xs text-text-sec">
                           {T.proposedBy}: {row.proposer.displayName ?? "—"}
@@ -212,9 +216,7 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
               <li key={row.id} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-text-main">
-                      {row.name}
-                    </p>
+                    <CategoryName row={row} />
                     <p className="mt-0.5 text-xs text-text-sec">
                       {row.parent ? row.parent.name : T.rootParent}
                     </p>
@@ -247,16 +249,18 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
         </ul>
       </div>
 
-      <CreateCategoryDialog
-        open={createOpen || editing !== null}
-        editing={editing}
-        parentOptions={parentOptions}
-        onClose={() => {
-          setCreateOpen(false);
-          setEditing(null);
-        }}
-        onSubmit={handleSubmitDialog}
-      />
+      {createOpen || editing !== null ? (
+        <CreateCategoryDialog
+          key={editing?.id ?? "new"}
+          editing={editing}
+          parentOptions={parentOptions}
+          onClose={() => {
+            setCreateOpen(false);
+            setEditing(null);
+          }}
+          onSubmit={handleSubmitDialog}
+        />
+      ) : null}
 
       <RejectConfirmDialog
         open={rejectTarget !== null}
@@ -267,6 +271,19 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
         }
       />
     </div>
+  );
+}
+
+function CategoryName({ row }: { row: AdminCategoryRow }) {
+  return (
+    <p className="flex items-center gap-2 text-sm font-medium text-text-main">
+      {row.icon ? (
+        <span aria-hidden className="text-base leading-none">
+          {row.icon}
+        </span>
+      ) : null}
+      <span className="min-w-0">{row.name}</span>
+    </p>
   );
 }
 

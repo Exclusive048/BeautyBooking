@@ -941,6 +941,54 @@ html[data-guide-hint] .guide-space {
 /* — Marquee — */
 .login-mq-col { display: flex; flex-direction: column; gap: 0.875rem; }
 
+/* — LOGIN-TILES-01: способы входа плитками (макет владельца 2026-10-03) — */
+
+/* Раскрытие по высоте: строка сетки 0fr → 1fr. Закрытое содержимое скрыто
+   `visibility` — оно уходит из порядка табуляции и из дерева доступности, а
+   задержка перехода видимости держит его видимым, пока панель сворачивается.
+   Отступ сверху — у содержимого, а не у обёртки: паддинг обёртки не
+   схлопнулся бы в 0fr. */
+.login-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+.login-reveal > * {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+.login-reveal[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.login-reveal[data-open="true"] > * {
+  visibility: visible;
+}
+
+/* Выбранная плитка указывает на панель под собой: выемка «^» в верхней рамке
+   панели. Квадрат повёрнут на 45° и обрезан по диагонали до верхнего
+   треугольника — рамка только у двух его верхних граней, заливка совпадает с
+   панелью (`bg-bg-card`). Основание треугольника — по нижнему краю верхней
+   рамки панели (рамка на 10px ниже плитки — `mt-2.5` формы, толщина 1px, +
+   полпикселя запаса): заливка закрашивает рамку под остриём и не заходит
+   внутрь панели, где кольцо фокуса поля. Панель позиционирована
+   (`relative`) и потому лежит поверх тени выбранной плитки; стрелка —
+   поверх панели (`z-index: 1`). */
+.login-tile-pointer::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  bottom: -17.5px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  background: rgb(var(--bg-card));
+  border-left: 1px solid rgb(var(--primary-magenta));
+  border-top: 1px solid rgb(var(--primary-magenta));
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+}
+
 /* — OTP micro-feedback (static classes; animated only under no-preference) — */
 
 @media (prefers-reduced-motion: no-preference) {
@@ -962,6 +1010,11 @@ html[data-guide-hint] .guide-space {
   .login-mq-zone:hover .login-mq-col { animation-play-state: paused; }
   .login-otp-pop { animation: login-digit-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
   .login-otp-shake { animation: login-otp-shake 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+  /* LOGIN-TILES-01: блок согласий вздрагивает, когда способ входа нажали без них. */
+  .login-shake { animation: login-otp-shake 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .login-reveal { transition: grid-template-rows 380ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .login-reveal > * { transition: visibility 0s linear 380ms; }
+  .login-reveal[data-open="true"] > * { transition-delay: 0s; }
 }
 
 @keyframes login-float-a { from { transform: translate(0, 0) scale(1); }   to { transform: translate(9%, 13%) scale(1.18); } }

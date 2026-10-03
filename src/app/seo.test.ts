@@ -14,7 +14,7 @@ const findMany = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({ prisma: { provider: { findMany } } }));
 
 import robots from "@/app/robots";
-import sitemap from "@/app/sitemap";
+import sitemap, { dynamic as sitemapDynamic } from "@/app/sitemap";
 
 beforeEach(() => findMany.mockReset());
 
@@ -30,6 +30,14 @@ describe("robots", () => {
 });
 
 describe("sitemap", () => {
+  // SEO-SITEMAP-01: на сборке база — заглушка, и закэшированный на `next build`
+  // sitemap держал только статические страницы до следующего деплоя.
+  // @probe 2026-10-03 — снять `export const dynamic` → красный здесь, а
+  //        `next build` снова печатает `○ /sitemap.xml` (статический).
+  it("считается на каждый запрос, а не на сборке", () => {
+    expect(sitemapDynamic).toBe("force-dynamic");
+  });
+
   it("статические страницы и опубликованные профили", async () => {
     findMany.mockResolvedValueOnce([{ id: "p1", publicUsername: "anna-sokolova", updatedAt: new Date("2026-09-30T00:00:00Z") }]);
     const urls = (await sitemap()).map((entry) => entry.url);

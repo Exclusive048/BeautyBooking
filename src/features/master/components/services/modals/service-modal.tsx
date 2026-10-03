@@ -15,6 +15,7 @@ import type {
   ServiceItemView,
 } from "@/lib/master/services-view.service";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatDuration } from "../lib/format";
 import { Select } from "@/components/ui/select";
@@ -183,6 +184,7 @@ export function ServiceModal({
       const newCategory: ServiceCategoryOption = {
         id: created.id,
         name: created.title,
+        icon: null,
         status: created.status,
       };
       setCategoryList((prev) =>
@@ -257,8 +259,8 @@ export function ServiceModal({
             {categoryList.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.status === "PENDING"
-                  ? `${category.name} ${T.categoryPendingSuffix}`
-                  : category.name}
+                  ? `${categoryLabel(category)} ${T.categoryPendingSuffix}`
+                  : categoryLabel(category)}
               </option>
             ))}
           </Select>

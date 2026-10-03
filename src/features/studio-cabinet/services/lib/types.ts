@@ -13,6 +13,8 @@ export type StudioServiceCategoryRow = {
   /** GlobalCategory id or the `UNCATEGORIZED_KEY` token. */
   id: string;
   title: string;
+  /** Смайлик категории; у «Без категории» — `null`. */
+  icon: string | null;
   servicesCount: number;
   /** "uncategorized" for the synthetic bucket. */
   status: CategoryDisplayStatus | "uncategorized";
@@ -40,6 +42,8 @@ export type StudioServiceListItem = {
 export type StudioCategoryPickerOption = {
   id: string;
   name: string;
+  /** Смайлик категории — пункт выбора подписывается «💅 Маникюр». */
+  icon: string | null;
   status: CategoryDisplayStatus;
 };
 

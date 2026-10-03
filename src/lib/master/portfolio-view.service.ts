@@ -68,6 +68,8 @@ export type PortfolioKpi = {
 export type PortfolioCategoryOption = {
   id: string;
   name: string;
+  /** Смайлик категории — подпись «💅 Маникюр» в выборе и фильтре. */
+  icon: string | null;
 };
 
 export type PortfolioServiceOption = {
@@ -137,7 +139,7 @@ export async function getMasterPortfolioView(input: {
       include: {
         services: { select: { serviceId: true } },
         tags: { select: { tagId: true, tag: { select: { name: true } } } },
-        globalCategory: { select: { id: true, name: true } },
+        globalCategory: { select: { id: true, name: true, icon: true } },
       },
     }),
     prisma.portfolioItemTag.findMany({
@@ -170,6 +172,7 @@ export async function getMasterPortfolioView(input: {
       categoriesUsedMap.set(item.globalCategory.id, {
         id: item.globalCategory.id,
         name: item.globalCategory.name,
+        icon: item.globalCategory.icon,
       });
     }
   }
@@ -245,10 +248,10 @@ async function listAvailableGlobalCategories(
           : []),
       ],
     },
-    select: { id: true, name: true, visualSearchSlug: true },
+    select: { id: true, name: true, icon: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
   return rows
     .filter((row) => row.visualSearchSlug !== "hot")
-    .map((row) => ({ id: row.id, name: row.name }));
+    .map((row) => ({ id: row.id, name: row.name, icon: row.icon }));
 }

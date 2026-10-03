@@ -111,7 +111,7 @@ export async function listAvailableCategoriesForStudio(
         { proposedBy: currentUserId },
       ],
     },
-    select: { id: true, name: true, status: true, visualSearchSlug: true },
+    select: { id: true, name: true, icon: true, status: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
   return rows
@@ -123,6 +123,7 @@ export async function listAvailableCategoriesForStudio(
     .map((row) => ({
       id: row.id,
       name: row.name,
+      icon: row.icon,
       status: row.status === CategoryStatus.APPROVED ? "APPROVED" : "PENDING",
     }));
 }
@@ -159,7 +160,7 @@ async function buildCategoriesSidebar(
         { proposedBy: currentUserId },
       ],
     },
-    select: { id: true, name: true, status: true, visualSearchSlug: true },
+    select: { id: true, name: true, icon: true, status: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
   const globals = globalsRaw.filter((g) => g.visualSearchSlug !== "hot");
@@ -178,6 +179,7 @@ async function buildCategoriesSidebar(
     .map<StudioServiceCategoryRow>((g) => ({
       id: g.id,
       title: g.name,
+      icon: g.icon,
       servicesCount: countByCategory.get(g.id) ?? 0,
       status: g.status === CategoryStatus.APPROVED ? "APPROVED" : "PENDING",
     }))
@@ -198,6 +200,7 @@ async function buildCategoriesSidebar(
     rows.push({
       id: UNCATEGORIZED_KEY,
       title: "Без категории",
+      icon: null,
       servicesCount: uncategorizedCount,
       status: "uncategorized",
     });

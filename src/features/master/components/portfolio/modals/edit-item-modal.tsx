@@ -14,6 +14,7 @@ import type {
   PortfolioServiceOption,
   PortfolioTagOption,
 } from "@/lib/master/portfolio-view.service";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import { CropModal } from "./crop-modal";
 import { TagInput } from "./tag-input";
@@ -263,7 +264,7 @@ export function EditItemModal({
                 <option value="">{T.categoryNone}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.name}
+                    {categoryLabel(category)}
                   </option>
                 ))}
               </Select>

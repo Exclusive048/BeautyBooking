@@ -7,6 +7,7 @@ import { getAdminAuditContext } from "@/lib/audit/admin-audit-context";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
+import { CATEGORY_ICON_MAX_LENGTH, isCategoryIcon } from "@/lib/catalog/category-icon";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -16,7 +17,13 @@ const MAX_CATEGORY_DEPTH = 3;
 
 const patchSchema = z.object({
   title: z.string().trim().min(2).max(60).optional(),
-  icon: z.string().trim().max(10).nullable().optional(),
+  icon: z
+    .string()
+    .trim()
+    .max(CATEGORY_ICON_MAX_LENGTH)
+    .refine((value) => value === "" || isCategoryIcon(value), "Смайлик категории — ровно один смайлик.")
+    .nullable()
+    .optional(),
   parentId: z.string().trim().min(1).nullable().optional(),
   status: z.nativeEnum(CategoryStatus).optional(),
   isSystem: z.boolean().optional(),

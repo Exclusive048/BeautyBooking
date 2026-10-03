@@ -75,6 +75,7 @@ export async function listAdminCategories(
     select: {
       id: true,
       name: true,
+      icon: true,
       slug: true,
       status: true,
       isSystem: true,
@@ -138,6 +139,7 @@ export async function listAdminCategories(
   const mapped: AdminCategoryRow[] = rows.map((r) => ({
     id: r.id,
     name: r.name,
+    icon: r.icon,
     slug: r.slug,
     status: r.status as AdminCategoryStatus,
     parent: r.parent ? { id: r.parent.id, name: r.parent.name } : null,
@@ -192,7 +194,7 @@ export async function listParentOptions(): Promise<AdminCategoryParentOption[]> 
   const rows = await prisma.globalCategory.findMany({
     where: { status: CategoryStatus.APPROVED },
     orderBy: [{ name: "asc" }],
-    select: { id: true, name: true },
+    select: { id: true, name: true, icon: true },
   });
-  return rows.map((r) => ({ id: r.id, name: r.name }));
+  return rows.map((r) => ({ id: r.id, name: r.name, icon: r.icon }));
 }

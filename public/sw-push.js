@@ -1,11 +1,14 @@
-﻿self.addEventListener("push", (event) => {
+self.addEventListener("push", (event) => {
   const data = event.data?.json() ?? {};
   event.waitUntil(
     self.registration.showNotification(data.title ?? "МастерРядом", {
       body: data.body,
-      icon: "/icons/icon-192.png",
+      icon: "/brand/icon-192.png",
       // PUSH-COVERAGE-01: прежний `/icons/badge-72.png` в public/ не существовал.
-      badge: "/icons/icon-72.png",
+      // BRAND-ICONS-02: значок в строке состояния Android — силуэт: система
+      // берёт только альфа-канал и красит его сама, поэтому цветная плитка
+      // превращалась бы в белый квадрат.
+      badge: "/brand/icon-512-monochrome.png",
       // Сообщения одной переписки схлопываются в одну плашку (tag), но каждое
       // новое всё равно звенит (renotify). Без тега — как раньше, стопкой.
       ...(data.tag ? { tag: data.tag, renotify: true } : {}),

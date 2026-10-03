@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCategoryCounts,
@@ -111,7 +112,7 @@ export function CatalogFilters({
         <option value="root">{T.parentRoot}</option>
         {parentOptions.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.name}
+            {categoryLabel(p)}
           </option>
         ))}
       </Select>

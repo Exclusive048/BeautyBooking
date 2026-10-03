@@ -10,6 +10,7 @@ import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { cn } from "@/lib/cn";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import type { PortfolioCategoryOption } from "@/lib/master/portfolio-view.service";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Select } from "@/components/ui/select";
 import { FileInput } from "@/components/ui/file-input";
@@ -308,7 +309,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
             <option value="">{T.defaultCategoryNone}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {categoryLabel(category)}
               </option>
             ))}
           </Select>
