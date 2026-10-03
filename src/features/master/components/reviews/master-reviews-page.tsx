@@ -4,6 +4,7 @@ import { FocusHighlighter } from "@/components/cabinet/focus-highlighter";
 import { getSessionUser } from "@/lib/auth/session";
 import {
   getMasterReviewsView,
+  loadReviewServiceTitles,
   parseFilter,
 } from "@/lib/master/reviews-view.service";
 import { prisma } from "@/lib/prisma";
@@ -84,23 +85,7 @@ export async function MasterReviewsPage({ searchParams }: Props) {
     filter,
   });
 
-  const bookingIds = Array.from(
-    new Set(data.reviews.map((review) => review.bookingId).filter((id): id is string => Boolean(id)))
-  );
-  const serviceByBookingId = new Map<string, string>();
-  if (bookingIds.length > 0) {
-    const bookings = await prisma.booking.findMany({
-      where: { id: { in: bookingIds } },
-      select: {
-        id: true,
-        service: { select: { name: true, title: true } },
-      },
-    });
-    for (const row of bookings) {
-      const title = row.service.title?.trim() || row.service.name;
-      if (title) serviceByBookingId.set(row.id, title);
-    }
-  }
+  const serviceByBookingId = await loadReviewServiceTitles(data.reviews.map((review) => review.bookingId));
 
   const masterName =
     user.displayName?.trim() ||

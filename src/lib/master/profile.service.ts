@@ -49,6 +49,9 @@ export type MasterContext = {
   ratingCount: number;
   autoPublishStoriesEnabled: boolean;
   cityId: string | null;
+  timezone: string;
+  publicUsername: string | null;
+  district: string;
 };
 
 export async function getMasterContext(masterId: string): Promise<MasterContext> {
@@ -73,6 +76,9 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       ratingCount: true,
       autoPublishStoriesEnabled: true,
       cityId: true,
+      timezone: true,
+      publicUsername: true,
+      district: true,
     },
   });
   if (!master || master.type !== "MASTER") {
@@ -100,6 +106,9 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       ratingCount: master.ratingCount,
       autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
       cityId: master.cityId,
+      timezone: master.timezone,
+      publicUsername: master.publicUsername,
+      district: master.district,
     };
   }
 
@@ -131,6 +140,9 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     ratingCount: master.ratingCount,
     autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
     cityId: master.cityId,
+    timezone: master.timezone,
+    publicUsername: master.publicUsername,
+    district: master.district,
   };
 }
 
@@ -184,6 +196,12 @@ export type MasterProfileData = {
     ratingCount: number;
     autoPublishStoriesEnabled: boolean;
     cityId: string | null;
+    /** MOBILE-MASTER-C: пояс салона (IANA) — в нём показывать время записей. */
+    timezone: string;
+    /** MOBILE-MASTER-C: адрес публичной страницы `/u/{publicUsername}`; здесь не генерируется (`null` — ещё не выдан). */
+    publicUsername: string | null;
+    /** MOBILE-MASTER-C: район (свободная строка профиля, может быть пустой). */
+    district: string;
   };
   services: MasterProfileServiceItem[];
   portfolio: MasterPortfolioItem[];
@@ -236,6 +254,9 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         ratingCount: context.ratingCount,
         autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
         cityId: context.cityId,
+        timezone: context.timezone,
+        publicUsername: context.publicUsername,
+        district: context.district,
       },
       services: services.map((service) => ({
         serviceId: service.id,
@@ -317,6 +338,9 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       ratingCount: context.ratingCount,
       autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
       cityId: context.cityId,
+      timezone: context.timezone,
+      publicUsername: context.publicUsername,
+      district: context.district,
     },
     services: services.map((service) => {
       const override = overrideByService.get(service.id);

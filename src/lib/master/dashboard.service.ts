@@ -6,7 +6,7 @@ import { getPendingBookingsForMaster, type PendingBookingRow } from "@/lib/booki
 import { getOrCreateConversationSlug } from "@/lib/chat/conversation-slug";
 import { getUnansweredReviewsForMaster, type UnansweredReviewRow } from "@/lib/reviews/unanswered-list";
 import { toLocalDateKey, toUtcFromLocalDateTime } from "@/lib/schedule/timezone";
-import { addDaysToDateKey, dateFromLocalDateKey } from "@/lib/schedule/dateKey";
+import { addDaysToDateKey, dateFromLocalDateKey, localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { dayPlanHours, loadDayPlans } from "@/lib/schedule/day-plans";
 import { timeToMinutes } from "@/lib/schedule/time";
 import {
@@ -107,18 +107,6 @@ const REVENUE_STATUSES: BookingStatus[] = [
   BookingStatus.STARTED,
   BookingStatus.FINISHED,
 ];
-
-function startOfTodayUtc(now: Date): Date {
-  const d = new Date(now);
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfTodayUtc(now: Date): Date {
-  const d = startOfTodayUtc(now);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d;
-}
 
 function bookingPriceFromItems(item: {
   serviceItems: Array<{ priceSnapshot: number }>;
@@ -230,10 +218,6 @@ export const getMasterDashboardData = cache(
     now?: Date;
   }): Promise<DashboardData> => {
     const now = input.now ?? new Date();
-    const todayStart = startOfTodayUtc(now);
-    const todayEnd = endOfTodayUtc(now);
-    const weekStart = new Date(todayStart);
-    weekStart.setUTCDate(weekStart.getUTCDate() - 6);
 
     const master = await prisma.provider.findUnique({
       where: { id: input.masterId },
@@ -251,6 +235,13 @@ export const getMasterDashboardData = cache(
     if (!master) {
       throw new Error(`Master not found: ${input.masterId}`);
     }
+    // MOBILE-MASTER-C (rule 17, salon-tz): «сегодня» и «7 дней» — сутки САЛОНА.
+    // Раньше окно было UTC-сутками (`setUTCHours(0)`): у московского мастера
+    // записи 00:00–03:00 выпадали из «Сегодня», а у мастера на UTC+10 утро до
+    // 10:00 показывалось вчерашним днём.
+    const todayKey = toLocalDateKey(now, master.timezone);
+    const { startUtc: todayStart, endExclusiveUtc: todayEnd } = localDayRangeUtc(todayKey, master.timezone);
+    const weekStart = localDayRangeUtc(addDaysToDateKey(todayKey, -6), master.timezone).startUtc;
     const isSolo = master.studioId === null;
     const workProfileIds = input.workProfiles?.allIds ?? [input.masterId];
     const worksInStudio = input.workProfiles?.worksInStudio ?? !isSolo;

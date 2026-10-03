@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/prisma";
 import { listReviews } from "@/lib/reviews/service";
 import type { ReviewDto } from "@/lib/reviews/types";
 import {
@@ -145,4 +146,29 @@ export async function getMasterReviewsView(input: {
     activeFilter: input.filter,
     reviews: decorate(filtered, now),
   };
+}
+
+/**
+ * Название услуги визита для карточки отзыва («Маникюр + гель-лак»): одним
+ * запросом по `bookingId` отзывов, без расширения `ReviewDto`. Общий для
+ * страницы кабинета и `GET /api/cabinet/master/reviews` (MOBILE-MASTER-C).
+ */
+export async function loadReviewServiceTitles(
+  bookingIds: ReadonlyArray<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const ids = Array.from(new Set(bookingIds.filter((id): id is string => Boolean(id))));
+  const titles = new Map<string, string>();
+  if (ids.length === 0) return titles;
+  const bookings = await prisma.booking.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      service: { select: { name: true, title: true } },
+    },
+  });
+  for (const row of bookings) {
+    const title = row.service.title?.trim() || row.service.name;
+    if (title) titles.set(row.id, title);
+  }
+  return titles;
 }

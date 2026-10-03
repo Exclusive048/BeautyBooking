@@ -14,6 +14,9 @@ type SchemaObject = {
   description?: string;
   /** GATES-FIX-01: валидный OpenAPI-ключ, понадобился для GuestConsentInput.marketing. */
   default?: string | number | boolean;
+  /** MOBILE-MASTER-C: размер массива (`serviceIds` пакета — 2…20). */
+  minItems?: number;
+  maxItems?: number;
   nullable?: boolean;
   oneOf?: SchemaObject[];
   allOf?: SchemaObject[];
@@ -1734,6 +1737,13 @@ export const openApiSpec = {
           "isSolo",
           "ratingAvg",
           "ratingCount",
+          "socialVk",
+          "socialInstagram",
+          "autoPublishStoriesEnabled",
+          "cityId",
+          "timezone",
+          "publicUsername",
+          "district",
         ],
         properties: {
           id: { type: "string" },
@@ -1748,6 +1758,17 @@ export const openApiSpec = {
           isSolo: { type: "boolean" },
           ratingAvg: { type: "number" },
           ratingCount: { type: "integer" },
+          socialVk: { type: "string", nullable: true },
+          socialInstagram: { type: "string", nullable: true },
+          autoPublishStoriesEnabled: { type: "boolean" },
+          cityId: { type: "string", nullable: true },
+          timezone: { type: "string", description: "MOBILE-MASTER-C: IANA-пояс салона." },
+          publicUsername: {
+            type: "string",
+            nullable: true,
+            description: "MOBILE-MASTER-C: адрес `/u/{publicUsername}`; `null` — ещё не выдан (здесь не генерируется).",
+          },
+          district: { type: "string", description: "MOBILE-MASTER-C: район, может быть пустой строкой." },
         },
       },
       MasterProfileService: {
@@ -3089,6 +3110,758 @@ export const openApiSpec = {
         type: "object",
         required: ["booking"],
         properties: { booking: { $ref: "#/components/schemas/ClientBooking" } },
+      },
+      RevenueSplit: {
+        type: "object",
+        description: "Выручка по контекстам, копейки: личные записи мастера и записи в студии.",
+        required: ["personal", "studio"],
+        properties: {
+          personal: { type: "integer" },
+          studio: { type: "integer" },
+        },
+      },
+      BookingWorkContext: {
+        type: "object",
+        description: "Где выполняется запись: личный профиль мастера или студия (`studioName` только у STUDIO).",
+        required: ["kind"],
+        properties: {
+          kind: { type: "string", enum: ["PERSONAL", "STUDIO"] },
+          studioName: { type: "string" },
+        },
+      },
+      MasterBookingActions: {
+        type: "object",
+        description:
+          "MOBILE-MASTER-C: что мастер может сделать с записью прямо сейчас (`bookings/master-actions.ts`, " +
+          "те же проверки, что у сервера).",
+        required: [
+          "confirm",
+          "decline",
+          "declineReschedule",
+          "cancel",
+          "reschedule",
+          "noShow",
+          "awaitingClient",
+          "modifyWindowClosed",
+          "wholePackageOnly",
+          "rescheduleLimitReached",
+        ],
+        properties: {
+          confirm: {
+            type: "boolean",
+            description: "`PATCH /api/master/bookings/{id}/status {status:CONFIRMED}`: подтвердить запись или принять перенос от клиента.",
+          },
+          decline: {
+            type: "boolean",
+            description: "`…/status {status:REJECTED, comment}`: отклонить неподтверждённую запись, причина обязательна.",
+          },
+          declineReschedule: {
+            type: "boolean",
+            description: "`…/status {status:REJECTED}` без причины: отказать в переносе, запись остаётся на прежнем времени.",
+          },
+          cancel: {
+            type: "boolean",
+            description: "`…/status {status:CANCELLED, comment}`: отменить подтверждённую запись, причина обязательна.",
+          },
+          reschedule: { type: "boolean", description: "`POST /api/bookings/{id}/reschedule`: предложить другое время." },
+          noShow: { type: "boolean", description: "`…/status {status:NO_SHOW}`: приём идёт или закончился меньше часа назад." },
+          awaitingClient: { type: "boolean", description: "Мастер предложил перенос и ждёт ответа клиента." },
+          modifyWindowClosed: {
+            type: "boolean",
+            description: "До начала меньше 60 минут (или время не задано): отказ, отмена и перенос закрыты.",
+          },
+          wholePackageOnly: {
+            type: "boolean",
+            description: "Запись из пакета: отказ и отмена только пакетом, `POST /api/bookings/package/{bookingPackageId}/cancel`.",
+          },
+          rescheduleLimitReached: { type: "boolean", description: "Мастер уже переносил запись 3 раза." },
+        },
+      },
+      MasterBookingItem: {
+        type: "object",
+        description:
+          "MOBILE-MASTER-C: запись в списках кабинета мастера (главная, канбан, неделя). Телефона клиента нет: " +
+          "он только в карточке `GET /api/cabinet/master/bookings/{id}`.",
+        required: [
+          "id",
+          "status",
+          "runtimeStatus",
+          "source",
+          "startAtUtc",
+          "endAtUtc",
+          "durationMin",
+          "timezone",
+          "proposedStartAtUtc",
+          "proposedEndAtUtc",
+          "requestedBy",
+          "actionRequiredBy",
+          "changeComment",
+          "needsAnswer",
+          "clientName",
+          "clientUserId",
+          "clientAvatarUrl",
+          "finishedVisitsCount",
+          "isNewClient",
+          "serviceTitle",
+          "services",
+          "price",
+          "bookingPackageId",
+          "workContext",
+          "chatSlug",
+          "actions",
+        ],
+        properties: {
+          id: { type: "string" },
+          status: {
+            type: "string",
+            description: "Статус в БД.",
+            enum: [
+              "NEW",
+              "PENDING",
+              "CONFIRMED",
+              "CHANGE_REQUESTED",
+              "REJECTED",
+              "IN_PROGRESS",
+              "PREPAID",
+              "STARTED",
+              "FINISHED",
+              "CANCELLED",
+              "NO_SHOW",
+            ],
+          },
+          runtimeStatus: {
+            type: "string",
+            description: "Вычисляемый статус: начавшаяся — IN_PROGRESS, через 60 минут после конца — FINISHED.",
+            enum: ["PENDING", "CONFIRMED", "CHANGE_REQUESTED", "REJECTED", "IN_PROGRESS", "FINISHED"],
+          },
+          source: { type: "string", enum: ["MANUAL", "WEB", "APP"] },
+          startAtUtc: { type: "string", format: "date-time", nullable: true },
+          endAtUtc: { type: "string", format: "date-time", nullable: true },
+          durationMin: { type: "integer" },
+          timezone: { type: "string", description: "IANA-пояс салона записи: в нём показывать её время." },
+          proposedStartAtUtc: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Предложенное время переноса, только при CHANGE_REQUESTED.",
+          },
+          proposedEndAtUtc: { type: "string", format: "date-time", nullable: true },
+          requestedBy: { type: "string", enum: ["CLIENT", "MASTER"], nullable: true },
+          actionRequiredBy: { type: "string", enum: ["CLIENT", "MASTER"], nullable: true },
+          changeComment: { type: "string", nullable: true, description: "Комментарий к переносу или причина отмены." },
+          needsAnswer: { type: "boolean", description: "Ждёт ответа мастера: новая запись или перенос от клиента." },
+          clientName: { type: "string" },
+          clientUserId: { type: "string", nullable: true },
+          clientAvatarUrl: { type: "string", nullable: true },
+          finishedVisitsCount: {
+            type: "integer",
+            nullable: true,
+            description: "Завершённых визитов клиента к мастеру по всем его профилям; `null` у гостя.",
+          },
+          isNewClient: { type: "boolean", description: "Зарегистрированный клиент без завершённых визитов." },
+          serviceTitle: { type: "string" },
+          services: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["title", "price", "durationMin"],
+              properties: {
+                title: { type: "string" },
+                price: { type: "integer", description: "Копейки." },
+                durationMin: { type: "integer" },
+              },
+            },
+          },
+          price: { type: "integer", description: "Копейки: сумма услуг записи." },
+          bookingPackageId: { type: "string", nullable: true },
+          workContext: { $ref: "#/components/schemas/BookingWorkContext" },
+          chatSlug: {
+            type: "string",
+            nullable: true,
+            description: "Переписка с клиентом; только у записи к личному профилю мастера с аккаунтом клиента.",
+          },
+          actions: { $ref: "#/components/schemas/MasterBookingActions" },
+        },
+      },
+      MasterBookingDetail: {
+        description: "MOBILE-MASTER-C: карточка записи для мастера, элемент списка плюс подробности.",
+        allOf: [
+          { $ref: "#/components/schemas/MasterBookingItem" },
+          {
+            type: "object",
+            required: [
+              "createdAt",
+              "client",
+              "comment",
+              "silentMode",
+              "answers",
+              "clientChangeRequestsCount",
+              "masterChangeRequestsCount",
+              "changeRequestLimit",
+              "cancelledBy",
+              "cancelReason",
+              "cancelledAtUtc",
+              "review",
+            ],
+            properties: {
+              createdAt: { type: "string", format: "date-time" },
+              client: {
+                type: "object",
+                required: ["name", "phone", "userId", "key", "historyToken"],
+                properties: {
+                  name: { type: "string" },
+                  phone: { type: "string", nullable: true, description: "Телефон из записи, нормализованный, если разбирается." },
+                  userId: { type: "string", nullable: true },
+                  key: {
+                    type: "string",
+                    nullable: true,
+                    description: "Ключ CRM-карточки (`/api/master/clients/{key}/detail|card`, в `encodeURIComponent`).",
+                  },
+                  historyToken: {
+                    type: "string",
+                    nullable: true,
+                    description: "Для `GET /api/cabinet/master/bookings?client=`.",
+                  },
+                },
+              },
+              comment: { type: "string", nullable: true },
+              silentMode: { type: "boolean" },
+              answers: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["question", "answer"],
+                  properties: { question: { type: "string" }, answer: { type: "string" } },
+                },
+              },
+              clientChangeRequestsCount: { type: "integer" },
+              masterChangeRequestsCount: { type: "integer" },
+              changeRequestLimit: { type: "integer" },
+              cancelledBy: { type: "string", enum: ["CLIENT", "PROVIDER", "SYSTEM"], nullable: true },
+              cancelReason: { type: "string", nullable: true },
+              cancelledAtUtc: { type: "string", format: "date-time", nullable: true },
+              review: {
+                type: "object",
+                nullable: true,
+                required: ["id", "rating", "text", "replyText", "repliedAt", "createdAt", "canReply"],
+                properties: {
+                  id: { type: "string", description: "Публичный токен отзыва для `/api/reviews/{id}/…`." },
+                  rating: { type: "integer", minimum: 1, maximum: 5 },
+                  text: { type: "string", nullable: true },
+                  replyText: { type: "string", nullable: true },
+                  repliedAt: { type: "string", format: "date-time", nullable: true },
+                  createdAt: { type: "string", format: "date-time" },
+                  canReply: { type: "boolean", description: "`false`: отзыв о визите в студию, отвечает студия." },
+                },
+              },
+            },
+          },
+        ],
+      },
+      MasterBookingDetailData: {
+        type: "object",
+        required: ["booking"],
+        properties: { booking: { $ref: "#/components/schemas/MasterBookingDetail" } },
+      },
+      MasterCabinetDashboardData: {
+        type: "object",
+        required: [
+          "timezone",
+          "todayKey",
+          "master",
+          "isSolo",
+          "showWorkContext",
+          "scheduleEndsOn",
+          "kpis",
+          "freeSlot",
+          "attention",
+          "today",
+        ],
+        properties: {
+          timezone: { type: "string", description: "IANA-пояс салона." },
+          todayKey: { type: "string", format: "date", description: "Сегодня по часам салона." },
+          master: {
+            type: "object",
+            required: ["id", "name", "avatarUrl", "publicUsername", "studio"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              avatarUrl: { type: "string", nullable: true },
+              publicUsername: { type: "string", nullable: true },
+              studio: {
+                type: "object",
+                nullable: true,
+                required: ["name"],
+                properties: { name: { type: "string" } },
+              },
+            },
+          },
+          isSolo: { type: "boolean" },
+          showWorkContext: { type: "boolean", description: "Показывать пометку «Личная / Студия»." },
+          scheduleEndsOn: {
+            type: "string",
+            format: "date",
+            nullable: true,
+            description: "Последний день настроенного графика, если он кончается в ближайшие 7 дней.",
+          },
+          kpis: {
+            type: "object",
+            required: [
+              "todayRevenue",
+              "todayRevenueSplit",
+              "todayBookingsCount",
+              "todayCapacityHours",
+              "weekRevenue",
+              "weekRevenueSplit",
+              "newClientsCount",
+              "returningClientsCount",
+            ],
+            properties: {
+              todayRevenue: { type: "integer", description: "Копейки." },
+              todayRevenueSplit: { $ref: "#/components/schemas/RevenueSplit" },
+              todayBookingsCount: { type: "integer" },
+              todayCapacityHours: { type: "integer" },
+              weekRevenue: { type: "integer", description: "Копейки, последние 7 дней салона." },
+              weekRevenueSplit: { $ref: "#/components/schemas/RevenueSplit" },
+              newClientsCount: { type: "integer" },
+              returningClientsCount: { type: "integer" },
+            },
+          },
+          freeSlot: {
+            type: "object",
+            nullable: true,
+            description: "Первое свободное окно от 60 минут сегодня.",
+            required: ["startAtUtc", "endAtUtc", "durationMin"],
+            properties: {
+              startAtUtc: { type: "string", format: "date-time" },
+              endAtUtc: { type: "string", format: "date-time" },
+              durationMin: { type: "integer" },
+            },
+          },
+          attention: {
+            type: "object",
+            required: [
+              "bookingsCount",
+              "pendingConfirmationCount",
+              "rescheduleRequestsCount",
+              "unansweredReviewsCount",
+              "bookings",
+              "reviews",
+            ],
+            properties: {
+              bookingsCount: { type: "integer", description: "Ждут ответа мастера, как бейдж «Записи»." },
+              pendingConfirmationCount: { type: "integer" },
+              rescheduleRequestsCount: { type: "integer" },
+              unansweredReviewsCount: { type: "integer" },
+              bookings: {
+                type: "array",
+                description: "До 3 ближайших записей, ждущих ответа.",
+                items: { $ref: "#/components/schemas/MasterBookingItem" },
+              },
+              reviews: {
+                type: "array",
+                description: "До 2 последних отзывов без ответа.",
+                items: {
+                  type: "object",
+                  required: ["id", "authorName", "rating", "text", "createdAt"],
+                  properties: {
+                    id: { type: "string", description: "Публичный токен отзыва." },
+                    authorName: { type: "string" },
+                    rating: { type: "integer", minimum: 1, maximum: 5 },
+                    text: { type: "string", nullable: true },
+                    createdAt: { type: "string", format: "date-time" },
+                  },
+                },
+              },
+            },
+          },
+          today: {
+            type: "array",
+            description: "Записи сегодняшних суток салона, по времени.",
+            items: {
+              allOf: [
+                { $ref: "#/components/schemas/MasterBookingItem" },
+                {
+                  type: "object",
+                  required: ["isCurrent", "isNext"],
+                  properties: { isCurrent: { type: "boolean" }, isNext: { type: "boolean" } },
+                },
+              ],
+            },
+          },
+        },
+      },
+      MasterKanbanPageData: {
+        type: "object",
+        required: ["column", "timezone", "showWorkContext", "counts", "stats", "items", "nextCursor", "total"],
+        properties: {
+          column: { type: "string", enum: ["pending", "confirmed", "today", "done", "cancelled"] },
+          timezone: { type: "string" },
+          showWorkContext: { type: "boolean" },
+          counts: {
+            type: "object",
+            description: "Размер каждой колонки после фильтров.",
+            required: ["pending", "confirmed", "today", "done", "cancelled"],
+            properties: {
+              pending: { type: "integer" },
+              confirmed: { type: "integer" },
+              today: { type: "integer" },
+              done: { type: "integer" },
+              cancelled: { type: "integer" },
+            },
+          },
+          stats: {
+            type: "object",
+            required: ["total", "pendingSum", "confirmedSum"],
+            properties: {
+              total: { type: "integer" },
+              pendingSum: { type: "integer", description: "Копейки." },
+              confirmedSum: { type: "integer", description: "Копейки: подтверждённые и идущие." },
+            },
+          },
+          items: {
+            type: "array",
+            items: {
+              allOf: [
+                { $ref: "#/components/schemas/MasterBookingItem" },
+                {
+                  type: "object",
+                  required: ["reviewRating"],
+                  properties: { reviewRating: { type: "integer", nullable: true } },
+                },
+              ],
+            },
+          },
+          nextCursor: { type: "string", nullable: true },
+          total: { type: "integer", description: "Размер колонки." },
+        },
+      },
+      MasterScheduleWeekJsonData: {
+        type: "object",
+        required: ["timezone", "from", "to", "todayKey", "showWorkContext", "hourRange", "kpi", "days"],
+        properties: {
+          timezone: { type: "string" },
+          from: { type: "string", format: "date" },
+          to: { type: "string", format: "date", description: "Последний день недели, включительно." },
+          todayKey: { type: "string", format: "date" },
+          showWorkContext: { type: "boolean" },
+          hourRange: {
+            type: "object",
+            description: "Часы сетки (0–24) по рабочим часам, записям и блокам недели.",
+            required: ["start", "end"],
+            properties: { start: { type: "integer" }, end: { type: "integer" } },
+          },
+          kpi: {
+            type: "object",
+            required: [
+              "weekBookingsCount",
+              "weekRevenue",
+              "weekRevenueSplit",
+              "loadPct",
+              "totalWorkingHours",
+              "freeSlotsToday",
+              "firstFreeAfter",
+            ],
+            properties: {
+              weekBookingsCount: { type: "integer" },
+              weekRevenue: { type: "integer", description: "Копейки." },
+              weekRevenueSplit: { $ref: "#/components/schemas/RevenueSplit" },
+              loadPct: { type: "integer" },
+              totalWorkingHours: { type: "integer" },
+              freeSlotsToday: { type: "integer" },
+              firstFreeAfter: { type: "string", nullable: true, description: "`HH:MM` по часам салона." },
+            },
+          },
+          days: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "date",
+                "weekday",
+                "isToday",
+                "isOff",
+                "workingIntervals",
+                "breaks",
+                "fixedStarts",
+                "timeBlocks",
+                "bookings",
+              ],
+              properties: {
+                date: { type: "string", format: "date" },
+                weekday: { type: "integer", minimum: 0, maximum: 6, description: "0 = воскресенье." },
+                isToday: { type: "boolean" },
+                isOff: { type: "boolean" },
+                workingIntervals: { type: "array", items: { $ref: "#/components/schemas/HmInterval" } },
+                breaks: { type: "array", items: { $ref: "#/components/schemas/HmInterval" } },
+                fixedStarts: {
+                  type: "array",
+                  nullable: true,
+                  items: { type: "string" },
+                  description: "«Фиксированное время»: разрешённые начала `HH:MM`; `null` — сетка слотов.",
+                },
+                timeBlocks: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "type", "note", "startAtUtc", "endAtUtc"],
+                    properties: {
+                      id: { type: "string" },
+                      type: { type: "string", enum: ["BREAK", "BLOCK"] },
+                      note: { type: "string", nullable: true },
+                      startAtUtc: { type: "string", format: "date-time" },
+                      endAtUtc: { type: "string", format: "date-time" },
+                    },
+                  },
+                },
+                bookings: {
+                  type: "array",
+                  description: "Без отменённых, отклонённых и неявок.",
+                  items: { $ref: "#/components/schemas/MasterBookingItem" },
+                },
+              },
+            },
+          },
+        },
+      },
+      HmInterval: {
+        type: "object",
+        description: "Интервал `HH:MM`–`HH:MM` по часам салона.",
+        required: ["start", "end"],
+        properties: { start: { type: "string" }, end: { type: "string" } },
+      },
+      MasterClientsPageData: {
+        type: "object",
+        required: ["windowMonths", "tab", "sort", "q", "kpi", "tabCounts", "items", "nextCursor", "total"],
+        properties: {
+          windowMonths: { type: "integer", description: "Окно CRM в месяцах." },
+          tab: { type: "string", enum: ["all", "new", "regular", "vip", "sleeping"] },
+          sort: { type: "string", enum: ["recent", "alphabetical", "ltv_desc"] },
+          q: { type: "string" },
+          kpi: {
+            type: "object",
+            description: "По всему окну, без фильтров.",
+            required: ["totalCount", "newThisMonthCount", "totalLtv", "avgLtv", "avgFrequency", "retentionPct"],
+            properties: {
+              totalCount: { type: "integer" },
+              newThisMonthCount: { type: "integer" },
+              totalLtv: { type: "integer", description: "Копейки." },
+              avgLtv: { type: "integer", description: "Копейки." },
+              avgFrequency: { type: "number", description: "Визитов на клиента." },
+              retentionPct: { type: "integer" },
+            },
+          },
+          tabCounts: {
+            type: "object",
+            required: ["all", "new", "regular", "vip", "sleeping"],
+            properties: {
+              all: { type: "integer" },
+              new: { type: "integer" },
+              regular: { type: "integer" },
+              vip: { type: "integer" },
+              sleeping: { type: "integer" },
+            },
+          },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "key",
+                "clientUserId",
+                "displayName",
+                "contact",
+                "visitsCount",
+                "totalAmount",
+                "lastVisitAt",
+                "daysSinceLastVisit",
+                "statuses",
+                "workContexts",
+              ],
+              properties: {
+                key: { type: "string", description: "`user:<id>` или `phone:<номер>`; в URL — `encodeURIComponent`." },
+                clientUserId: { type: "string", nullable: true },
+                displayName: { type: "string" },
+                contact: { type: "string", nullable: true, description: "Телефон, иначе email, иначе Telegram." },
+                visitsCount: { type: "integer" },
+                totalAmount: { type: "integer", description: "Копейки." },
+                lastVisitAt: { type: "string", format: "date-time", nullable: true },
+                daysSinceLastVisit: { type: "integer", nullable: true },
+                statuses: { type: "array", items: { type: "string", enum: ["new", "regular", "vip", "sleeping"] } },
+                workContexts: { type: "array", items: { $ref: "#/components/schemas/BookingWorkContext" } },
+              },
+            },
+          },
+          nextCursor: { type: "string", nullable: true },
+          total: { type: "integer", description: "После `tab` и `q`." },
+        },
+      },
+      MasterReviewTag: {
+        type: "object",
+        required: ["id", "code", "label", "icon", "type"],
+        properties: {
+          id: { type: "string" },
+          code: { type: "string" },
+          label: { type: "string" },
+          icon: { type: "string", nullable: true },
+          type: { type: "string", enum: ["PUBLIC", "PRIVATE"] },
+        },
+      },
+      MasterReviewsPageData: {
+        type: "object",
+        required: ["filter", "stats", "filterCounts", "items", "nextCursor", "total"],
+        properties: {
+          filter: { type: "string", enum: ["all", "unanswered", "good", "bad"] },
+          stats: {
+            type: "object",
+            description: "По последним 100 отзывам, без фильтра.",
+            required: [
+              "totalCount",
+              "avgRating",
+              "distribution",
+              "responseRate",
+              "unansweredCount",
+              "avgResponseMs",
+              "withPhotosCount",
+              "trendValue",
+            ],
+            properties: {
+              totalCount: { type: "integer" },
+              avgRating: { type: "number" },
+              distribution: {
+                type: "object",
+                required: ["1", "2", "3", "4", "5"],
+                properties: {
+                  "1": { type: "integer" },
+                  "2": { type: "integer" },
+                  "3": { type: "integer" },
+                  "4": { type: "integer" },
+                  "5": { type: "integer" },
+                },
+              },
+              responseRate: { type: "integer", description: "Процент отзывов с ответом мастера." },
+              unansweredCount: { type: "integer" },
+              avgResponseMs: { type: "number", nullable: true },
+              withPhotosCount: { type: "integer" },
+              trendValue: { type: "number", nullable: true },
+            },
+          },
+          filterCounts: {
+            type: "object",
+            required: ["all", "unanswered", "good", "bad"],
+            properties: {
+              all: { type: "integer" },
+              unanswered: { type: "integer" },
+              good: { type: "integer" },
+              bad: { type: "integer" },
+            },
+          },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "id",
+                "bookingId",
+                "rating",
+                "text",
+                "authorName",
+                "createdAt",
+                "serviceTitle",
+                "replyText",
+                "repliedAt",
+                "reportedAt",
+                "isNew",
+                "isStudioVisit",
+                "canReply",
+                "publicTags",
+                "privateTags",
+              ],
+              properties: {
+                id: { type: "string", description: "Публичный токен для `/api/reviews/{id}/reply|suggest-reply|report`." },
+                bookingId: { type: "string", nullable: true },
+                rating: { type: "integer", minimum: 1, maximum: 5 },
+                text: { type: "string", nullable: true },
+                authorName: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+                serviceTitle: { type: "string", nullable: true },
+                replyText: { type: "string", nullable: true },
+                repliedAt: { type: "string", format: "date-time", nullable: true },
+                reportedAt: { type: "string", format: "date-time", nullable: true },
+                isNew: { type: "boolean", description: "Последние 7 дней и без ответа." },
+                isStudioVisit: { type: "boolean" },
+                canReply: { type: "boolean", description: "`false`: отзыв о визите в студию, отвечает студия." },
+                publicTags: { type: "array", items: { $ref: "#/components/schemas/MasterReviewTag" } },
+                privateTags: { type: "array", items: { $ref: "#/components/schemas/MasterReviewTag" } },
+              },
+            },
+          },
+          nextCursor: { type: "string", nullable: true },
+          total: { type: "integer", description: "После фильтра." },
+        },
+      },
+      MasterServicePackage: {
+        type: "object",
+        required: [
+          "id",
+          "name",
+          "isEnabled",
+          "discountType",
+          "discountValue",
+          "sortOrder",
+          "services",
+          "totalPrice",
+          "discountAmount",
+          "finalPrice",
+          "totalDurationMin",
+          "hasDisabledComponent",
+        ],
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          isEnabled: { type: "boolean" },
+          discountType: { type: "string", enum: ["PERCENT", "FIXED"] },
+          discountValue: { type: "integer", description: "PERCENT — проценты; FIXED — копейки." },
+          sortOrder: { type: "integer" },
+          services: {
+            type: "array",
+            description: "Услуги пакета в порядке каталога мастера.",
+            items: {
+              type: "object",
+              required: ["id", "title", "price", "durationMin", "isEnabled"],
+              properties: {
+                id: { type: "string" },
+                title: { type: "string" },
+                price: { type: "integer", description: "Копейки." },
+                durationMin: { type: "integer" },
+                isEnabled: { type: "boolean" },
+              },
+            },
+          },
+          totalPrice: { type: "integer", description: "Копейки: сумма услуг." },
+          discountAmount: { type: "integer", description: "Копейки: PERCENT — округлённый процент, FIXED — не больше суммы." },
+          finalPrice: { type: "integer", description: "Копейки, не меньше 0." },
+          totalDurationMin: { type: "integer" },
+          hasDisabledComponent: { type: "boolean", description: "Хотя бы одна услуга пакета выключена." },
+        },
+      },
+      MasterServicePackagesData: {
+        type: "object",
+        required: ["packages"],
+        properties: {
+          packages: { type: "array", items: { $ref: "#/components/schemas/MasterServicePackage" } },
+        },
+      },
+      CreateMasterServicePackageInput: {
+        type: "object",
+        required: ["name", "serviceIds", "discountType", "discountValue"],
+        properties: {
+          name: { type: "string", minLength: 1, maxLength: 120 },
+          serviceIds: { type: "array", minItems: 2, maxItems: 20, items: { type: "string" } },
+          discountType: { type: "string", enum: ["PERCENT", "FIXED"] },
+          discountValue: { type: "integer", minimum: 0, maximum: 1000000 },
+          isEnabled: { type: "boolean" },
+        },
       },
       ClientReviewTarget: {
         type: "object",
@@ -4724,6 +5497,221 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/cabinet/master/dashboard": {
+      get: {
+        operationId: "masterCabinetDashboard",
+        summary: "Master cabinet «Сегодня» (dashboard)",
+        description:
+          "MOBILE-MASTER-C: главная кабинета мастера в JSON. Записи дня — сутки салона (`timezone`), с пометками " +
+          "`isCurrent` / `isNext`; «Требуют внимания» — счётчики (как бейджи кабинета) и до 3 записей / 2 отзывов. " +
+          "Свободные окошки по категориям — `GET /api/cabinet/master/dashboard/free-slots`, «Первые шаги» — " +
+          "`GET /api/me/setup-guide?scope=master`. Ответ `private, no-store`.",
+        tags: ["mobile", "master", "dashboard"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterCabinetDashboardData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/master/bookings": {
+      get: {
+        operationId: "masterCabinetBookingsColumn",
+        summary: "Master cabinet bookings kanban, one column page",
+        description:
+          "MOBILE-MASTER-C: канбан записей мастера по колонке, постранично. `pending` — ждут подтверждения или ответа " +
+          "на перенос; `confirmed` — подтверждены (60 дней вперёд); `today` — приём уже идёт; `done` — завершены за " +
+          "60 дней, новые сверху; `cancelled` — отменены, отклонены и неявки за 30 дней. Фильтры `q` / `tab` / `client` " +
+          "применяются до разбиения: `counts` и `stats` — по отфильтрованному набору. Курсор непрозрачный; " +
+          "испорченный — 400 «Список обновился. Загрузите его заново.».",
+        tags: ["mobile", "master", "bookings"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "column",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["pending", "confirmed", "today", "done", "cancelled"], default: "pending" },
+          },
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            description: "Подстрока имени клиента или услуги.",
+            schema: { type: "string", maxLength: 80 },
+          },
+          {
+            name: "tab",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["all", "new", "regular"], default: "all" },
+          },
+          {
+            name: "client",
+            in: "query",
+            required: false,
+            description: "`historyToken` из карточки записи или клиента: только записи этого клиента.",
+            schema: { type: "string", minLength: 1, maxLength: 512 },
+          },
+          { name: "cursor", in: "query", required: false, schema: { type: "string", maxLength: 64 } },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterKanbanPageData" }),
+          "400": errorResponse("VALIDATION_ERROR — параметры, курсор или устаревший токен клиента"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/master/bookings/{id}": {
+      get: {
+        operationId: "masterCabinetBookingGet",
+        summary: "Master cabinet booking card",
+        description:
+          "MOBILE-MASTER-C: карточка записи, которую мастер выполняет (любой его рабочий профиль): клиент с телефоном " +
+          "и ключом CRM-карточки, комментарий, ответы, переносы, отмена, отзыв и `actions`. Чужая, несуществующая и " +
+          "невозможная по форме — один 404 `BOOKING_NOT_FOUND` «Запись не найдена.».",
+        tags: ["mobile", "master", "bookings"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, description: "CUID записи.", schema: { type: "string", maxLength: 64 } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterBookingDetailData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "404": errorResponse("BOOKING_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule/week": {
+      get: {
+        operationId: "masterCabinetScheduleWeek",
+        summary: "Master cabinet schedule, 7 days",
+        description:
+          "MOBILE-MASTER-C: семь дней расписания с `from`: рабочие часы, перерывы, «Фиксированное время», выходной, " +
+          "блокировки и записи (без отменённых, отклонённых и неявок). Даты и `HH:MM` — по часам салона, записи и " +
+          "блоки выбираются по суткам салона.",
+        tags: ["mobile", "master", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "from",
+            in: "query",
+            required: false,
+            description: "Первый день, `YYYY-MM-DD` (настоящая дата). Без него — понедельник текущей недели салона.",
+            schema: { type: "string", format: "date" },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterScheduleWeekJsonData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "404": errorResponse("MASTER_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/master/clients": {
+      get: {
+        operationId: "masterCabinetClients",
+        summary: "Master cabinet clients (CRM), page",
+        description:
+          "MOBILE-MASTER-C: клиенты из записей всех рабочих профилей за окно CRM (`windowMonths`), постранично. " +
+          "`kpi` и `tabCounts` — по всему окну; `total` — после `tab` и `q`. Каждый запрос пишет след массового " +
+          "чтения ПДн (RKN-FIX-10). Карточка — `GET /api/master/clients/{key}/detail` и `…/card`.",
+        tags: ["mobile", "master", "clients"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            description: "Имя или контакт.",
+            schema: { type: "string", maxLength: 80 },
+          },
+          {
+            name: "tab",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["all", "new", "regular", "vip", "sleeping"], default: "all" },
+          },
+          {
+            name: "sort",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["recent", "alphabetical", "ltv_desc"], default: "recent" },
+          },
+          { name: "cursor", in: "query", required: false, schema: { type: "string", maxLength: 64 } },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 50, default: 30 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterClientsPageData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "404": errorResponse("MASTER_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/master/reviews": {
+      get: {
+        operationId: "masterCabinetReviews",
+        summary: "Master cabinet reviews, page",
+        description:
+          "MOBILE-MASTER-C: последние 100 отзывов всех рабочих профилей мастера, постранично; `stats` и " +
+          "`filterCounts` — по всем ста, `total` — после фильтра. Ответ, правка ответа, подсказка и жалоба — " +
+          "`POST|PATCH /api/reviews/{id}/reply`, `POST /api/reviews/{id}/suggest-reply`, `POST /api/reviews/{id}/report`.",
+        tags: ["mobile", "master", "reviews"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "filter",
+            in: "query",
+            required: false,
+            description: "`good` — 4–5 звёзд, `bad` — 1–3.",
+            schema: { type: "string", enum: ["all", "unanswered", "good", "bad"], default: "all" },
+          },
+          { name: "cursor", in: "query", required: false, schema: { type: "string", maxLength: 64 } },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterReviewsPageData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
     "/api/cabinet/master/schedule/pattern": {
       put: {
         summary:
@@ -5775,10 +6763,56 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/master/service-packages": {
+      get: {
+        operationId: "masterServicePackagesList",
+        summary: "Master service packages (all, including disabled)",
+        description:
+          "MOBILE-MASTER-C: все пакеты личного профиля мастера, включая выключенные, по `sortOrder`, затем по дате " +
+          "создания. Цена — то же правило, что у страницы «Услуги». Ответ `private, no-store`.",
+        tags: ["mobile", "master", "services"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MasterServicePackagesData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — не мастер"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+      post: {
+        operationId: "masterServicePackageCreate",
+        summary: "Create master service package",
+        tags: ["mobile", "master", "services"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/CreateMasterServicePackageInput" } },
+          },
+        },
+        responses: {
+          "201": okResponse(
+            { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+            "Created",
+          ),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("SERVICE_NOT_FOUND — услуга не из каталога мастера"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
     "/api/master/profile": {
       get: {
+        operationId: "masterProfileGet",
         summary: "Get master profile aggregate for cabinet",
-        tags: ["master", "profile"],
+        description:
+          "MOBILE-MASTER-C: в `data.master` добавлены `timezone`, `publicUsername` (здесь не генерируется, " +
+          "`null` — адрес ещё не выдан) и `district`; прежние поля не менялись.",
+        tags: ["mobile", "master", "profile"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/MasterProfileData" }),
           "401": errorResponse("Unauthorized"),

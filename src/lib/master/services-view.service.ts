@@ -99,6 +99,112 @@ export type ServicePackageView = {
   globalCount: number;
 };
 
+export type PackagePricing = {
+  /** Sum of component prices (kopeks). */
+  totalPrice: number;
+  /** PERCENT — от `totalPrice` с округлением; FIXED — копейки, не больше `totalPrice`. */
+  discountAmount: number;
+  /** totalPrice - discountAmount, never negative. */
+  finalPrice: number;
+  /** Sum of component durations (minutes). */
+  totalDurationMin: number;
+};
+
+/**
+ * Цена и длительность пакета из его услуг — одно правило для страницы «Услуги»
+ * и `GET /api/master/service-packages` (MOBILE-MASTER-C).
+ */
+export function computePackagePricing(input: {
+  components: ReadonlyArray<{ price: number; durationMin: number }>;
+  discountType: DiscountType;
+  discountValue: number;
+}): PackagePricing {
+  const totalPrice = input.components.reduce((sum, item) => sum + item.price, 0);
+  const totalDurationMin = input.components.reduce((sum, item) => sum + item.durationMin, 0);
+  const discountAmount =
+    input.discountType === DiscountType.PERCENT
+      ? Math.round((totalPrice * input.discountValue) / 100)
+      : Math.min(totalPrice, input.discountValue);
+  return {
+    totalPrice,
+    discountAmount,
+    finalPrice: Math.max(0, totalPrice - discountAmount),
+    totalDurationMin,
+  };
+}
+
+export type MasterServicePackageItem = PackagePricing & {
+  id: string;
+  name: string;
+  isEnabled: boolean;
+  discountType: DiscountType;
+  /** PERCENT — проценты; FIXED — копейки. */
+  discountValue: number;
+  sortOrder: number;
+  /** Услуги пакета в порядке каталога мастера (`Service.sortOrder`). */
+  services: Array<{ id: string; title: string; price: number; durationMin: number; isEnabled: boolean }>;
+  /** Хотя бы одна услуга пакета выключена. */
+  hasDisabledComponent: boolean;
+};
+
+/**
+ * MOBILE-MASTER-C — все пакеты ЛИЧНОГО профиля мастера, включая выключенные
+ * (`sortOrder` ↑, затем `createdAt` ↑), с ценой по {@link computePackagePricing}.
+ */
+export async function listMasterServicePackages(masterId: string): Promise<MasterServicePackageItem[]> {
+  const packages = await prisma.servicePackage.findMany({
+    where: { masterId },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      isEnabled: true,
+      discountType: true,
+      discountValue: true,
+      sortOrder: true,
+      items: {
+        select: {
+          service: {
+            select: {
+              id: true,
+              name: true,
+              title: true,
+              durationMin: true,
+              price: true,
+              isEnabled: true,
+              sortOrder: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  return packages.map((pkg) => {
+    const components = pkg.items.map((item) => item.service).sort((a, b) => a.sortOrder - b.sortOrder);
+    return {
+      id: pkg.id,
+      name: pkg.name,
+      isEnabled: pkg.isEnabled,
+      discountType: pkg.discountType,
+      discountValue: pkg.discountValue,
+      sortOrder: pkg.sortOrder,
+      services: components.map((service) => ({
+        id: service.id,
+        title: service.title?.trim() || service.name,
+        price: service.price,
+        durationMin: service.durationMin,
+        isEnabled: service.isEnabled,
+      })),
+      ...computePackagePricing({
+        components,
+        discountType: pkg.discountType,
+        discountValue: pkg.discountValue,
+      }),
+      hasDisabledComponent: components.some((service) => !service.isEnabled),
+    };
+  });
+}
+
 export type ServicesKpi = {
   servicesCount: number;
   bundlesCount: number;
@@ -193,16 +299,11 @@ export async function getMasterServicesView(input: {
     const sortedItems = [...pkg.items].sort(
       (a, b) => a.service.sortOrder - b.service.sortOrder
     );
-    const totalPrice = sortedItems.reduce((sum, item) => sum + item.service.price, 0);
-    const totalDurationMin = sortedItems.reduce(
-      (sum, item) => sum + item.service.durationMin,
-      0
-    );
-    const discountAmount =
-      pkg.discountType === DiscountType.PERCENT
-        ? Math.round((totalPrice * pkg.discountValue) / 100)
-        : Math.min(totalPrice, pkg.discountValue);
-    const finalPrice = Math.max(0, totalPrice - discountAmount);
+    const { totalPrice, discountAmount, finalPrice, totalDurationMin } = computePackagePricing({
+      components: sortedItems.map((item) => item.service),
+      discountType: pkg.discountType,
+      discountValue: pkg.discountValue,
+    });
     return {
       id: pkg.id,
       name: pkg.name,

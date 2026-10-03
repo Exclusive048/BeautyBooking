@@ -157,7 +157,6 @@
 /api/master/portfolio/media/{assetId}/classification
 /api/master/portfolio/reorder
 /api/master/portfolio/{id}/category
-/api/master/service-packages
 /api/master/service-packages/reorder
 /api/master/service-packages/{id}
 /api/master/services/reorder
