@@ -35,6 +35,8 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
 import { env } from "@/lib/env";
 import { safeJsonLd } from "@/lib/seo/schema";
+import { SITE_ICONS } from "@/lib/seo/site-icons";
+import { APPLE_STARTUP_IMAGES } from "@/lib/pwa/apple-splash";
 
 ensureVisualSearchStartupConfig();
 
@@ -122,46 +124,15 @@ export const metadata: Metadata = {
   // brand-kit: PWA manifest + icons served from `/brand/`. The orphan
   // off-brand `public/manifest.json` (theme_color #c6a97e) was deleted in
   // FIX-EXP-A11Y-PWA (EXP-032) — only this `/brand/manifest.webmanifest` is
-  // linked. (Legacy `/icons/*` orphans remain — separate cleanup.)
+  // linked. Legacy `/icons/*` were removed with the BRAND-ICONS-02 icon set.
   manifest: "/brand/manifest.webmanifest",
-  icons: {
-    icon: [
-      { url: "/brand/favicon.png", sizes: "32x32", type: "image/png" },
-      { url: "/brand/icon-16.png", sizes: "16x16", type: "image/png" },
-      { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/brand/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/brand/icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: [
-      { url: "/brand/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
-  },
+  icons: SITE_ICONS,
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: UI_TEXT.brand.name,
-    startupImage: [
-      {
-        url: "/splash/apple-splash-1290-2796.png",
-        media:
-          "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)",
-      },
-      {
-        url: "/splash/apple-splash-1179-2556.png",
-        media:
-          "(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)",
-      },
-      {
-        url: "/splash/apple-splash-1170-2532.png",
-        media:
-          "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)",
-      },
-      {
-        url: "/splash/apple-splash-750-1334.png",
-        media:
-          "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)",
-      },
-    ],
+    // PWA-SPLASH-01: список и файлы — `lib/pwa/apple-splash.ts` + `public/splash/`.
+    startupImage: [...APPLE_STARTUP_IMAGES],
   },
   other: {
     "apple-mobile-web-app-capable": "yes",

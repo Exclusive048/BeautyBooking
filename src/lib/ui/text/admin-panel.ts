@@ -260,6 +260,13 @@ export const adminPanel = {
       saveCreate: "Создать",
       saveEdit: "Сохранить",
       errorNameRequired: "Введите название категории.",
+      iconLabel: "Смайлик",
+      iconCustomLabel: "Или свой",
+      iconPlaceholder: "🙂",
+      iconClear: "Без смайлика",
+      iconHint: "Показывается рядом с названием в каталоге, поиске и кабинетах.",
+      iconInvalid: "Вставьте один смайлик — например, 💅.",
+      errorGeneric: "Не удалось сохранить категорию. Попробуйте ещё раз.",
     },
     rootParent: "—",
     empty: {

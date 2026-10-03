@@ -111,6 +111,11 @@ export function CategoriesSidebar({
                   aria-pressed={active}
                 >
                   <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    {category.icon ? (
+                      <span aria-hidden className="shrink-0 text-sm leading-none">
+                        {category.icon}
+                      </span>
+                    ) : null}
                     <span className="truncate text-sm font-medium">
                       {category.title}
                     </span>

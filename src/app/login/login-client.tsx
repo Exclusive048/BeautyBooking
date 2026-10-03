@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
+import { withConsentQuery } from "@/components/auth/social-consent";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
-import VkLoginButton from "@/components/auth/vk-login-button";
-import YandexLoginButton from "@/components/auth/yandex-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OtpInput, type OtpState } from "@/components/ui/otp-input";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { parseInternalPath } from "@/lib/http/safe-redirect";
@@ -25,6 +23,13 @@ import type { PublicStats } from "@/lib/stats/public-stats";
 import { DISTANCE, MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 import { LoginShowcase } from "./login-showcase";
+import {
+  ChannelTile,
+  OAuthTile,
+  tileGridColumns,
+  type OAuthProvider,
+  type OtpChannel,
+} from "./login-method-tiles";
 import { UI_FMT } from "@/lib/ui/fmt";
 
 const RESEND_TIMEOUT = 60;
@@ -39,7 +44,17 @@ const OTP_LENGTH = 6;
  */
 const SUCCESS_HOLD_MS = 380;
 
-type LoginMode = "phone" | "email";
+/**
+ * LOGIN-TILES-01 — как долго плитка VK ID / Яндекс ID крутит спиннер, если
+ * браузер так и не ушёл к провайдеру (нет сети, переход отменён). Возврат
+ * кнопкой «Назад» снимает спиннер раньше — через `pageshow`.
+ */
+const OAUTH_PENDING_RESET_MS = 15_000;
+
+/** Фокус в поле после раскрытия панели — когда раскрытие (380 мс) почти закончилось. */
+const PANEL_FOCUS_DELAY_MS = 250;
+
+type LoginMode = OtpChannel;
 
 type LoginClientProps = {
   heroImageUrl: string | null;
@@ -141,13 +156,19 @@ export default function LoginClient({
     if (code === "start_failed") return UI_TEXT.auth.loginPage.oauthStartFailed;
     return null;
   }, [searchParams]);
+  // Вернулись с OAuth без согласий — блок согласий сразу в состоянии «отметьте».
+  const initialConsentWarn = useMemo(() => {
+    const code = searchParams.get("error");
+    return code === "consent" || code === "consent_required";
+  }, [searchParams]);
   const reduce = useReducedMotion();
   const stepAnim = stepVariants;
 
-  // AUTH-GATE-01: open on whichever OTP channel is actually available. The
-  // page only renders this component when at least one method is on, so with
-  // phone gated off the form starts (and stays) on email.
-  const [mode, setMode] = useState<LoginMode>(phoneEnabled ? "phone" : "email");
+  // AUTH-GATE-01: the panel opens on whichever OTP channel is actually
+  // available. LOGIN-TILES-01: email first — it is the channel that works in
+  // production without an SMS gateway; `mode` only matters once a tile opened
+  // the panel.
+  const [mode, setMode] = useState<LoginMode>(emailEnabled ? "email" : "phone");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -164,6 +185,15 @@ export default function LoginClient({
     () => ({ granted: requiredConsentsGiven, query: consentFlagsToQuery(consent) }),
     [consent, requiredConsentsGiven],
   );
+  // LOGIN-TILES-01: способ входа нажат без обязательных согласий — блок
+  // согласий подсвечен и вздрагивает, под ним подсказка. Снимается, как только
+  // обе обязательные галочки стоят.
+  const [consentWarn, setConsentWarn] = useState(initialConsentWarn);
+  const [consentShake, setConsentShake] = useState(0);
+  const consentWarnVisible = consentWarn && !requiredConsentsGiven;
+  const consentHintId = useId();
+  const panelId = useId();
+  const [pendingProvider, setPendingProvider] = useState<OAuthProvider | null>(null);
   const [resendTimer, setResendTimer] = useState(0);
   const [shakeKey, setShakeKey] = useState(0);
   // LOGIN-WOW-01: the OTP grid's own lifecycle. Purely presentational — the
@@ -171,6 +201,8 @@ export default function LoginClient({
   const [otpState, setOtpState] = useState<OtpState>("idle");
 
   const resendIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const focusOnOpenRef = useRef(false);
   const phoneValid = isPhoneValid(phone);
   const emailValid = isEmailValid(email);
   const inputValid = mode === "phone" ? phoneValid : emailValid;
@@ -216,13 +248,86 @@ export default function LoginClient({
     setShakeKey((k) => k + 1);
   }
 
-  // AUTH-GATE-01: at least one OTP channel must be live for the code form to
-  // make sense. With neither (VK/Yandex-only config) the form, the tabs and the
-  // "или войти через" divider are all dropped and the social grid stands alone.
+  // AUTH-GATE-01: at least one OTP channel must be live for the code panel to
+  // make sense. With neither (VK/Yandex-only config) only the provider tiles
+  // are rendered.
   const otpEnabled = phoneEnabled || emailEnabled;
-  // Each social button self-gates, so this mirrors what the grid below will
-  // actually render.
   const hasSocialProviders = Boolean(telegramEnabled || vkEnabled || yandexEnabled);
+  // LOGIN-TILES-01: order matters — the OTP tiles come last, so with four
+  // tiles in two rows the open panel sits right under the selected one.
+  const methods: Array<OAuthProvider | OtpChannel> = [
+    ...(vkEnabled ? (["vk"] as const) : []),
+    ...(yandexEnabled ? (["yandex"] as const) : []),
+    ...(emailEnabled ? (["email"] as const) : []),
+    ...(phoneEnabled ? (["phone"] as const) : []),
+  ];
+  // A single OTP channel and nothing else to choose: no reason to make the
+  // visitor open the only door — the panel starts open.
+  const [panelOpen, setPanelOpen] = useState(
+    otpEnabled && !hasSocialProviders && !(phoneEnabled && emailEnabled),
+  );
+
+  useEffect(() => {
+    if (!panelOpen || !focusOnOpenRef.current) return;
+    focusOnOpenRef.current = false;
+    const timer = window.setTimeout(
+      () => inputRef.current?.focus({ preventScroll: true }),
+      reduce ? 0 : PANEL_FOCUS_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [panelOpen, mode, reduce]);
+
+  // Back/forward cache returns the page exactly as it was left — with the
+  // spinner still spinning on the provider tile.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setPendingProvider(null);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingProvider) return;
+    const timer = window.setTimeout(() => setPendingProvider(null), OAUTH_PENDING_RESET_MS);
+    return () => window.clearTimeout(timer);
+  }, [pendingProvider]);
+
+  function warnConsents() {
+    setConsentWarn(true);
+    setConsentShake((k) => k + 1);
+  }
+
+  function handleConsentChange(next: ConsentFlags) {
+    setConsent(next);
+    if (hasRequiredConsents(next)) setConsentWarn(false);
+  }
+
+  function toggleChannel(channel: OtpChannel) {
+    if (panelOpen && mode === channel) {
+      setPanelOpen(false);
+      return;
+    }
+    switchMode(channel);
+    focusOnOpenRef.current = true;
+    setPanelOpen(true);
+  }
+
+  function startOAuth(provider: OAuthProvider, event: MouseEvent<HTMLAnchorElement>) {
+    if (pendingProvider) {
+      event.preventDefault();
+      return;
+    }
+    if (!requiredConsentsGiven) {
+      event.preventDefault();
+      warnConsents();
+      return;
+    }
+    // Ctrl/Cmd/Shift-click opens a new tab — this page stays where it is.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    setErrorText(null);
+    setPendingProvider(provider);
+  }
 
   function switchMode(newMode: LoginMode) {
     if (newMode === mode) return;
@@ -263,8 +368,7 @@ export default function LoginClient({
         return;
       }
       if (!requiredConsentsGiven) {
-        setErrorText(UI_TEXT.auth.loginPage.consentRequired);
-        triggerShake();
+        warnConsents();
         return;
       }
       setLoading(true);
@@ -291,8 +395,7 @@ export default function LoginClient({
         return;
       }
       if (!requiredConsentsGiven) {
-        setErrorText(UI_TEXT.auth.loginPage.consentRequired);
-        triggerShake();
+        warnConsents();
         return;
       }
       setLoading(true);
@@ -420,15 +523,20 @@ export default function LoginClient({
     />
   );
 
+  // LOGIN-TILES-01: на телефоне страница — обычная прокрутка (шапка, форма,
+  // футер сайта), а колонка формы занимает первый экран целиком, чтобы строка
+  // «Без пароля…» стояла внизу экрана, как в макете. Отступ 3rem/5rem — это
+  // `py-6` / `md:py-10` обёртки `AppShellContent`. На ПК — прежняя
+  // фиксированная сцена во всю высоту под шапкой.
   return (
-    <div className="min-h-[100dvh] overflow-y-auto bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-sticky lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
+    <div className="bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-sticky lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
       {/* LOGIN-WOW-01 — `lg:items-center`, not `items-stretch`: the brand pane
           is capped at `max-h-[760px]`, and a stretch item that cannot stretch
           falls back to START alignment. On any viewport taller than the cap
           that parked the pane at the top of the row with dead space beneath it,
           while the form column centred itself — which is exactly the
           off-centre reading. Centring the row aligns both columns on one axis. */}
-      <div className="mx-auto grid h-full min-h-[100dvh] w-full max-w-6xl gap-8 px-4 py-6 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-10 lg:py-8">
+      <div className="mx-auto grid min-h-[calc(100dvh-var(--topbar-h)-3rem)] w-full max-w-6xl gap-8 px-1 md:min-h-[calc(100dvh-var(--topbar-h)-5rem)] lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-10 lg:px-4 lg:py-8">
 
         {/* ── LEFT PANEL — brand stage (desktop only) ── */}
         <LoginShowcase heroImageUrl={heroImageUrl} stats={stats} />
@@ -436,35 +544,31 @@ export default function LoginClient({
         {/* ── RIGHT PANEL — form ── */}
         {/* `lg:overflow-hidden` clips the decorative halo to this pane on desktop
             (where the layout is fixed-height); on mobile there is no clip and no
-            halo, so a tall form step can never be cut off — the outer container
-            scrolls instead. */}
-        <main className="relative flex h-full min-h-0 items-center justify-center lg:overflow-hidden">
+            halo, so a tall form step can never be cut off. */}
+        <main className="relative flex min-h-0 flex-col lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
           <div className="login-halo hidden lg:block" aria-hidden />
           {/* Deliberately NOT wrapped in an entrance animation. A framer
               `initial` is serialised into the SSR HTML as `opacity:0`, so an
               entrance here would leave the login form invisible until
               hydration finishes — on the product's front door that trades a
               first impression for a blank screen. The form's motion language
-              is interaction-driven instead: step transitions, the tab thumb,
-              the CTA shine, the field focus-lift and the OTP choreography. */}
-          <div className="relative z-1 w-full max-w-[400px]">
+              is interaction-driven instead: step transitions, the panel
+              reveal, the CTA shine and the OTP choreography. */}
+          <div className="relative z-1 mx-auto flex w-full max-w-[400px] flex-1 flex-col lg:flex-none">
 
-            {/* Mobile brand hint — compact full BrandLogo + tagline. The brand
-                stage itself stays desktop-only (it is decorative and would push
-                the form below the fold), so the live-stat pill is the one piece
-                of it that also earns its place on a phone. */}
-            <div className="mb-6 lg:hidden">
+            {/* Mobile brand row — logo + live-stat chip. The brand stage itself
+                stays desktop-only (it is decorative and would push the form
+                below the fold). LOGIN-TILES-01: the tagline under the logo is
+                gone — the owner's layout keeps only the logo and the chip. */}
+            <div className="mb-5 flex flex-col items-start gap-4 lg:hidden">
               {/* `bg-wordmark`: the wordmark's default brand-gradient text-clip
                   is burgundy in BOTH themes, so on the dark page (#1F1417) its
                   tail («…дом») sank into the background. The token keeps the
                   gradient in light and fills a legible cream in dark
                   (`--wordmark-fill`, 29.09 доработки · 23). */}
               <BrandLogo variant="full" size="sm" href={null} textClassName="bg-wordmark" />
-              <p className="mt-1 font-mono text-3xs tracking-[0.08em] text-text-sec">
-                {UI_TEXT.brand.tagline}
-              </p>
               {stats ? (
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1 text-[12px] text-text-sec">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-bg-card px-3 py-1.5 text-xs text-text-sec">
                   <span className="login-dot h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
                   <span className="tabular-nums">
                     {UI_FMT.countShort(stats.masters)} {T.socialProofMastersLabel}
@@ -474,32 +578,18 @@ export default function LoginClient({
             </div>
 
             {/* Header */}
-            <div className="mb-6">
-              <h1 className="font-display text-[1.75rem] font-medium tracking-tight text-text-main">
-                {step === "input"
-                  ? !otpEnabled
-                    ? T.titleSocial
-                    : mode === "email"
-                      ? T.titleEmail
-                      : T.title
-                  : T.codeSentTo}
+            <div className="mb-5">
+              <h1 className="font-display text-[2rem] font-medium leading-[1.1] tracking-tight text-text-main">
+                {step === "input" ? T.titleLogin : T.codeStepTitle}
               </h1>
-              <p className="mt-1.5 text-sm text-text-sec">
-                {step === "input"
-                  ? !otpEnabled
-                    ? T.subtitleSocial
-                    : mode === "email"
-                      ? T.subtitleEmail
-                      : T.subtitle
-                  : (
-                    <span>
-                      {mode === "email" ? T.codeSentToEmail : T.codeSentTo}{" "}
-                      <span className="font-medium text-text-main">
-                        {mode === "phone" ? normalizePhone(phone) : email.trim().toLowerCase()}
-                      </span>
-                    </span>
-                  )}
-              </p>
+              {step === "code" ? (
+                <p className="mt-2 text-sm text-text-sec">
+                  {mode === "email" ? T.codeSentToEmail : T.codeSentTo}{" "}
+                  <span className="font-medium text-text-main">
+                    {mode === "phone" ? normalizePhone(phone) : email.trim().toLowerCase()}
+                  </span>
+                </p>
+              ) : null}
             </div>
 
             {/* Error block */}
@@ -520,122 +610,179 @@ export default function LoginClient({
               ) : null}
             </AnimatePresence>
 
-            {/* Mode tabs — only when there is a real choice to make (both OTP
-                channels live) and we're on the input step. AUTH-GATE-01: a
-                single-channel config renders no tabs at all. */}
-            {phoneEnabled && emailEnabled && step === "input" ? (
-              <SegmentedTabs<LoginMode>
-                value={mode}
-                onChange={switchMode}
-                className="mb-5"
-                options={[
-                  {
-                    value: "phone",
-                    label: T.tabPhone,
-                    icon: <Phone className="h-3.5 w-3.5" aria-hidden />,
-                    testId: "login-tab-phone",
-                  },
-                  {
-                    value: "email",
-                    label: T.tabEmail,
-                    icon: <Mail className="h-3.5 w-3.5" aria-hidden />,
-                    testId: "login-tab-email",
-                  },
-                ]}
-              />
-            ) : null}
-
-            {/* Form steps — dropped entirely when no OTP channel is live.
-                `initial={false}`: the step variants' `enter` state (opacity 0)
-                was being serialised into the SSR HTML, so the very first paint
-                of the form was invisible until hydration. Suppressing only the
-                MOUNT animation keeps every real step transition
-                (phone↔email, input↔code) animating exactly as before. */}
-            {otpEnabled ? (
+            {/* Steps. `initial={false}`: the step variants' `enter` state
+                (opacity 0) was being serialised into the SSR HTML, so the very
+                first paint of the form was invisible until hydration.
+                Suppressing only the MOUNT animation keeps every real step
+                transition (input↔code) animating exactly as before. */}
             <AnimatePresence mode="wait" initial={false}>
               {step === "input" ? (
                 <m.div
-                  key={`input-step-${mode}`}
+                  key="input-step"
                   variants={stepAnim}
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  className="space-y-4"
                 >
-                  {mode === "phone" ? (
-                    <div className="space-y-1.5">
-                      <label htmlFor="phone-input" className="block text-sm font-medium text-text-label">
-                        {T.phoneLabel}
-                      </label>
-                      <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
-                        <Phone
-                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-accent-text"
-                          aria-hidden
-                        />
-                        <Input
-                          id="phone-input"
-                          className="h-[52px] rounded-2xl pl-10 pr-4 text-base"
-                          placeholder={T.phonePlaceholderMask}
-                          value={phone}
-                          onChange={(ev) => setPhone(ev.target.value)}
-                          inputMode="tel"
-                          autoComplete="tel"
-                          aria-label={T.phoneLabel}
-                        />
-                      </div>
+                  {/* RKN-FIX-01: one consent block for every method — each of
+                      them can create an account. LOGIN-TILES-01: a method
+                      pressed without the required boxes lights the block up,
+                      shakes it and shows the hint under it. */}
+                  <LegalConsentGroup
+                    value={consent}
+                    onChange={handleConsentChange}
+                    invalid={consentWarnVisible}
+                    describedBy={consentWarnVisible ? consentHintId : undefined}
+                    shakeSignal={consentShake}
+                  />
+                  <div className="login-reveal" data-open={consentWarnVisible}>
+                    <div>
+                      {/* Visual copy; the announcement comes from the live
+                          region below, so this one stays out of the tree. */}
+                      <p id={consentHintId} aria-hidden className="mt-2 px-1 text-xs text-danger-text">
+                        {T.consentHint}
+                      </p>
                     </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <label htmlFor="email-input" className="block text-sm font-medium text-text-label">
-                        {T.emailLabel}
-                      </label>
-                      <div className="group/field relative transition-transform duration-200 focus-within:-translate-y-0.5">
-                        <Mail
-                          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-[color,transform] duration-200 group-focus-within/field:scale-110 group-focus-within/field:text-accent-text"
-                          aria-hidden
-                        />
-                        <Input
-                          id="email-input"
-                          className="h-[52px] rounded-2xl pl-10 pr-4 text-base"
-                          placeholder={T.emailPlaceholder}
-                          value={email}
-                          onChange={(ev) => setEmail(ev.target.value)}
-                          type="email"
-                          inputMode="email"
-                          autoComplete="email"
-                          aria-label={T.emailLabel}
-                        />
-                      </div>
-                    </div>
-                  )}
+                  </div>
+                  <span className="sr-only" role="alert">
+                    {consentWarnVisible ? T.consentHint : ""}
+                  </span>
 
-                  {/* Consent appears once the identifier is valid — the same
-                      progressive-disclosure beat the single checkbox had, so
-                      the form still opens as one field + one CTA. With social
-                      providers on screen it shows immediately instead: those
-                      buttons are gated by the same boxes and must not sit next
-                      to an invisible gate. */}
-                  {inputValid || hasSocialProviders ? (
-                    <LegalConsentGroup value={consent} onChange={setConsent} />
+                  {methods.length > 0 ? (
+                    <div
+                      role="group"
+                      aria-label={T.methodsLabel}
+                      className={`mt-3 grid gap-2.5 ${tileGridColumns(methods.length)}`}
+                    >
+                      {methods.map((method) => {
+                        if (method === "vk" || method === "yandex") {
+                          return (
+                            <OAuthTile
+                              key={method}
+                              provider={method}
+                              // RKN-FIX-01: the ticked purposes ride to `/start`,
+                              // which re-validates them server-side.
+                              href={withConsentQuery(
+                                method === "vk" ? "/api/auth/vk/start" : "/api/auth/yandex/start",
+                                socialConsent,
+                              )}
+                              label={method === "vk" ? T.tileVk : T.tileYandex}
+                              pending={pendingProvider === method}
+                              onClick={(event) => startOAuth(method, event)}
+                              testId={`login-oauth-${method}`}
+                            />
+                          );
+                        }
+                        return (
+                          <ChannelTile
+                            key={method}
+                            channel={method}
+                            label={method === "email" ? T.tileEmail : T.tilePhone}
+                            selected={panelOpen && mode === method}
+                            panelId={panelId}
+                            onClick={() => toggleChannel(method)}
+                            testId={`login-tab-${method}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {pendingProvider ? T.oauthRedirecting : ""}
+                  </span>
+
+                  {/* The code request panel — opened by the Почта / Телефон
+                      tile. Closed, its content is `visibility: hidden`
+                      (`.login-reveal`), i.e. out of the tab order. */}
+                  {otpEnabled ? (
+                    <div id={panelId} className="login-reveal" data-open={panelOpen}>
+                      <div>
+                        <form
+                          noValidate
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void sendCode();
+                          }}
+                          className="relative mt-2.5 space-y-2.5 rounded-2xl border border-primary-magenta bg-bg-card p-3"
+                        >
+                          <div className="group/field relative">
+                            {mode === "phone" ? (
+                              <Phone
+                                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-colors duration-200 group-focus-within/field:text-accent-text"
+                                aria-hidden
+                              />
+                            ) : (
+                              <Mail
+                                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec transition-colors duration-200 group-focus-within/field:text-accent-text"
+                                aria-hidden
+                              />
+                            )}
+                            {mode === "phone" ? (
+                              <Input
+                                ref={inputRef}
+                                id="phone-input"
+                                className="h-[50px] rounded-xl pl-10 pr-4 text-base"
+                                placeholder={T.phonePlaceholderMask}
+                                value={phone}
+                                onChange={(ev) => setPhone(ev.target.value)}
+                                inputMode="tel"
+                                autoComplete="tel"
+                                aria-label={T.phoneLabel}
+                              />
+                            ) : (
+                              <Input
+                                ref={inputRef}
+                                id="email-input"
+                                className="h-[50px] rounded-xl pl-10 pr-4 text-base"
+                                placeholder={T.emailPlaceholder}
+                                value={email}
+                                onChange={(ev) => setEmail(ev.target.value)}
+                                type="email"
+                                inputMode="email"
+                                autoComplete="email"
+                                aria-label={T.emailLabel}
+                              />
+                            )}
+                          </div>
+
+                          {/* Disabled only for an incomplete address/number.
+                              Missing consents are not a disabled state: the
+                              press is what shows WHAT is missing (the consent
+                              block lights up), a greyed button explains nothing. */}
+                          <Button
+                            type="submit"
+                            disabled={loading || !inputValid}
+                            size="lg"
+                            data-testid="login-send-code"
+                            className="group relative w-full overflow-hidden rounded-xl"
+                          >
+                            {loading ? (
+                              T.sending
+                            ) : (
+                              <>
+                                {ctaShine}
+                                {T.getCode}
+                                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden />
+                              </>
+                            )}
+                          </Button>
+                        </form>
+                      </div>
+                    </div>
                   ) : null}
 
-                  <Button
-                    onClick={sendCode}
-                    disabled={loading || !inputValid || (inputValid && !requiredConsentsGiven)}
-                    size="lg"
-                    data-testid="login-send-code"
-                    className="group relative w-full overflow-hidden rounded-full"
-                  >
-                    {loading ? (
-                      T.sending
-                    ) : (
-                      <>
-                        {ctaShine}
-                        {T.sendCode}
-                        <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden />
-                      </>
-                    )}
-                  </Button>
+                  {/* Telegram stays a full-width button: its login is a widget
+                      callback, not a redirect a tile could start
+                      (FIX-TELEGRAM-KILLSWITCH keeps it off in production). */}
+                  {telegramEnabled ? (
+                    <div className="mt-2.5">
+                      <TelegramLoginButton
+                        showConfigError={false}
+                        botUsername={telegramBotUsername}
+                        consent={socialConsent}
+                      />
+                    </div>
+                  ) : null}
                 </m.div>
               ) : (
                 <m.div
@@ -679,7 +826,7 @@ export default function LoginClient({
                     disabled={loading || code.length < OTP_LENGTH}
                     size="lg"
                     data-testid="login-verify"
-                    className="group relative w-full overflow-hidden rounded-full"
+                    className="group relative w-full overflow-hidden rounded-xl"
                   >
                     {otpState === "success" ? (
                       <m.span
@@ -733,61 +880,11 @@ export default function LoginClient({
                 </m.div>
               )}
             </AnimatePresence>
-            ) : null}
 
-            {/* Divider — "или войти через" only reads correctly when there IS a
-                form above it AND at least one provider below it. Without a form
-                (social-only) it was already dropped; LOGIN-WOW-01 adds the
-                mirror case, because a config with OTP but no OAuth provider
-                (today's dev/launch config, where VK resolves to disabled) was
-                painting the divider over an empty grid. Both branches keep the
-                vertical rhythm with a plain spacer. */}
-            {otpEnabled && hasSocialProviders ? (
-              <div className="my-6 flex items-center gap-3">
-                <div className="h-px flex-1 bg-border-subtle" />
-                <span className="eyebrow">
-                  {T.socialDividerLabel}
-                </span>
-                <div className="h-px flex-1 bg-border-subtle" />
-              </div>
-            ) : (
-              <div className="mb-6" />
-            )}
-
-            {/* Social-only config: no form to hang the consent group under, so
-                it stands on its own above the provider grid. */}
-            {!otpEnabled && hasSocialProviders ? (
-              <LegalConsentGroup value={consent} onChange={setConsent} className="mb-4" />
-            ) : null}
-
-            {/* Social login — grid columns adapt to the number of enabled
-                providers (Telegram gated by FIX-TELEGRAM-KILLSWITCH; VK + Yandex
-                self-gate). Launch config = VK + Yandex → 2 columns.
-                RKN-FIX-01: every provider is a registration path, so each button
-                is inert until the required boxes are ticked and carries the
-                ticked purposes into `/start`. */}
-            <div
-              className={`grid gap-2.5${
-                [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length >= 3
-                  ? " sm:grid-cols-3"
-                  : [telegramEnabled, vkEnabled, yandexEnabled].filter(Boolean).length === 2
-                    ? " sm:grid-cols-2"
-                    : ""
-              }`}
-            >
-              {telegramEnabled && (
-                <TelegramLoginButton
-                  showConfigError={false}
-                  botUsername={telegramBotUsername}
-                  consent={socialConsent}
-                />
-              )}
-              <VkLoginButton enabled={vkEnabled} consent={socialConsent} />
-              <YandexLoginButton enabled={yandexEnabled} consent={socialConsent} />
-            </div>
-
-            {/* Bottom hint */}
-            <p className="mt-5 text-center text-xs leading-relaxed text-text-sec">
+            {/* Bottom hint — pinned to the bottom of the first screen on a
+                phone (`mt-auto` in the full-height column), right under the
+                form on desktop. */}
+            <p className="mt-auto pt-8 text-center text-xs leading-relaxed text-text-sec lg:mt-0 lg:pt-6">
               {T.noAccountHint}
             </p>
           </div>

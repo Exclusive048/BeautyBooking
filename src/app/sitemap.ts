@@ -6,6 +6,12 @@ import { logError } from "@/lib/logging/logger";
 const FALLBACK_BASE_URL = "https://masterryadom.ru";
 const PAGE_SIZE = 1000;
 
+// SEO-SITEMAP-01: без этого Next кэширует sitemap на `next build`, где база —
+// заглушка Dockerfile (`127.0.0.1:5432/build`): запрос падает, `catch` отдаёт
+// только статические страницы, и такой файл раздаётся до следующего деплоя —
+// на проде в sitemap не было ни одной страницы мастера или студии.
+export const dynamic = "force-dynamic";
+
 function buildStaticRoutes(baseUrl: string): MetadataRoute.Sitemap {
   return [
     { url: `${baseUrl}/`, changeFrequency: "daily", priority: 1.0 },

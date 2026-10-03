@@ -32,12 +32,14 @@ const FIXTURE_CATEGORIES: ReadonlyArray<FixtureCategory> = [
   { slug: "massage", name: "Массаж и СПА", icon: "💆", parentSlug: null, orderIndex: 5 },
   { slug: "makeup", name: "Макияж", icon: "💄", parentSlug: null, orderIndex: 6 },
 
-  { slug: "manicure", name: "Маникюр", icon: null, parentSlug: "nails", orderIndex: 1 },
-  { slug: "pedicure", name: "Педикюр", icon: null, parentSlug: "nails", orderIndex: 2 },
-  { slug: "haircut", name: "Стрижка", icon: null, parentSlug: "hair", orderIndex: 1 },
-  { slug: "coloring", name: "Окрашивание", icon: null, parentSlug: "hair", orderIndex: 2 },
-  { slug: "lashes", name: "Наращивание ресниц", icon: null, parentSlug: "brows", orderIndex: 1 },
-  { slug: "browarchitect", name: "Оформление бровей", icon: null, parentSlug: "brows", orderIndex: 2 },
+  // Смайлики и у подкатегорий (CATEGORY-ICONS-01): `upsert` пишет поле целиком,
+  // и `null` здесь стирал смайлик общей с набором строки (`manicure`, `pedicure`).
+  { slug: "manicure", name: "Маникюр", icon: "💅", parentSlug: "nails", orderIndex: 1 },
+  { slug: "pedicure", name: "Педикюр", icon: "🦶", parentSlug: "nails", orderIndex: 2 },
+  { slug: "haircut", name: "Стрижка", icon: "✂️", parentSlug: "hair", orderIndex: 1 },
+  { slug: "coloring", name: "Окрашивание", icon: "🎨", parentSlug: "hair", orderIndex: 2 },
+  { slug: "lashes", name: "Наращивание ресниц", icon: "👁️", parentSlug: "brows", orderIndex: 1 },
+  { slug: "browarchitect", name: "Оформление бровей", icon: "🖌️", parentSlug: "brows", orderIndex: 2 },
 ];
 
 /**

@@ -57,47 +57,53 @@ function attachObservers(page: Page, consoleErrors: ConsoleError[], failedReques
 /**
  * Resolve which channel to drive, on the page as it actually rendered.
  *
- * The tabs only exist when BOTH channels are live (`login-client.tsx`:
- * `phoneEnabled && emailEnabled && step === "input"`), so their absence is not
- * an error — it means the config is single-channel and the visible input tells
- * us which one. Switching tabs clears the identifier field (`switchMode`
- * resets phone/email/code), so this must run BEFORE anything is typed.
+ * LOGIN-TILES-01: the code field lives in a panel that the «Почта» / «Телефон»
+ * tile opens (`login-client.tsx`). The panel starts open only when a single
+ * OTP channel is the whole choice, so a visible input means "that is the
+ * channel"; otherwise the tile for the wanted channel is pressed. Switching
+ * channels clears the identifier field (`switchMode` resets phone/email/code),
+ * so this must run BEFORE anything is typed.
  */
 async function resolveChannel(page: Page, want: LoginChannel): Promise<"phone" | "email"> {
-  const emailTab = page.getByTestId("login-tab-email");
-  const phoneTab = page.getByTestId("login-tab-phone");
+  const emailTile = page.getByTestId("login-tab-email");
+  const phoneTile = page.getByTestId("login-tab-phone");
   const emailInput = page.locator("#email-input");
   const phoneInput = page.locator("#phone-input");
 
   // Wait for the form to exist at all before deciding anything.
-  await expect(emailInput.or(phoneInput).first()).toBeVisible({ timeout: 30_000 });
+  await expect(
+    emailInput.or(phoneInput).or(emailTile).or(phoneTile).first(),
+  ).toBeVisible({ timeout: 30_000 });
 
   if (want === "auto") {
-    return (await emailInput.isVisible().catch(() => false)) ? "email" : "phone";
+    if (await emailInput.isVisible().catch(() => false)) return "email";
+    if (await phoneInput.isVisible().catch(() => false)) return "phone";
+    // Email first, as on the page itself: it works in prod without SMS creds.
+    want = (await emailTile.isVisible().catch(() => false)) ? "email" : "phone";
   }
 
   const target = want === "email" ? emailInput : phoneInput;
   if (await target.isVisible().catch(() => false)) return want;
 
-  const tab = want === "email" ? emailTab : phoneTab;
-  if (!(await tab.isVisible().catch(() => false))) {
-    // No tab and no input for the requested channel ⇒ it is gated off server-side.
+  const tile = want === "email" ? emailTile : phoneTile;
+  if (!(await tile.isVisible().catch(() => false))) {
+    // No tile and no input for the requested channel ⇒ it is gated off server-side.
     // Fail with the reason rather than quietly logging in through the other one.
     throw new Error(
-      `loginAs: channel "${want}" is not available on /login (no tab, no input) — ` +
-        `it is gated off in this environment (see resolveAuthMethods / PHONE_AUTH_ENABLED).`,
+      `loginAs: channel "${want}" is not available on /login (no tile, no input) — ` +
+        `it is gated off in this environment (see resolveAuthMethods / isPhoneAuthEnabled).`,
     );
   }
 
-  // The tab is a plain `<button role="tab" onClick>` (SegmentedTabs), so a click
-  // that lands BEFORE hydration is a silent no-op — the button is in the SSR
-  // HTML, `onChange` is not wired yet. That reproduced immediately on the first
-  // acceptance run: click succeeded, `#email-input` never appeared. Same class
-  // as the QA-003 race, same remedy as GATES-FIX-01 — click and confirm inside
-  // ONE retry unit, so a no-op click just costs another iteration.
+  // The tile is a plain `<button onClick>`, so a click that lands BEFORE
+  // hydration is a silent no-op — the button is in the SSR HTML, `onClick` is
+  // not wired yet. Same class as the QA-003 race, same remedy as GATES-FIX-01 —
+  // click and confirm inside ONE retry unit, so a no-op click just costs
+  // another iteration. The visibility check comes first on every iteration:
+  // a second press on the selected tile would close the panel again.
   await expect(async () => {
     if (await target.isVisible().catch(() => false)) return;
-    await tab.click();
+    await tile.click();
     await expect(target).toBeVisible({ timeout: 2000 });
   }).toPass({ timeout: 60_000 });
   return want;
@@ -148,12 +154,12 @@ export async function loginAs(
   //   (b) /login has a dev-mode hydration mismatch (server HTML != client,
   //       see QA-003) that regenerates the tree shortly after load and can
   //       wipe input typed too early.
-  // Retrying the type until the consent checkbox (which only renders for a
-  // valid identifier) becomes visible is deterministic against the hydration race.
+  // Retrying the whole unit (type → consents → enabled CTA) is deterministic
+  // against the hydration race.
   //
   // Both channels use `#id` here rather than the accessible name: the email
-  // field's aria-label is the bare word "Email", which also matches the social
-  // buttons' text on the same screen.
+  // field's aria-label is the bare word "Email", and «Телефон» is also the
+  // phone tile's label on the same screen.
   const identityInput = page.locator(channel === "email" ? "#email-input" : "#phone-input");
   // RKN-FIX-01: consent is no longer ONE checkbox. The form now carries three
   // independent purposes — offer, PD processing (both required) and marketing
@@ -168,7 +174,8 @@ export async function loginAs(
   // (40 s for cold compiles). The QA-003 hydration race can wipe the tree
   // between "consent visible" and a separate `.check()`, which failed ~20% of
   // logins in the PASS-02 stability run; retrying the whole unit absorbs it.
-  const sendCodeButton = page.getByRole("button", { name: /Отправить код/ });
+  // LOGIN-TILES-01: «Получить код» (the old «Отправить код» kept for older builds).
+  const sendCodeButton = page.getByRole("button", { name: /Получить код|Отправить код/ });
   const otpFirstBox = page.getByLabel("Цифра 1 из 6");
 
   // GATES-FIX-01 — ОДНА retry-единица на «ввести телефон → отметить согласия →

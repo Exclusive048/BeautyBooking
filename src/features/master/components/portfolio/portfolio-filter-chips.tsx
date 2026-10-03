@@ -4,6 +4,7 @@ import type {
   PortfolioCategoryOption,
   PortfolioFilterId,
 } from "@/lib/master/portfolio-view.service";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.filters;
@@ -91,7 +92,7 @@ export function PortfolioFilterChips({
               key={category.id}
               href={buildHref({ cat: category.id })}
               active={activeCategoryId === category.id}
-              label={category.name}
+              label={categoryLabel(category)}
             />
           ))}
         </div>

@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import {
   SERVICE_DURATION_STEP_MIN,
@@ -202,7 +203,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
               <option value="">{T.categoryNone}</option>
               {pickerOptions.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.name}
+                  {categoryLabel(option)}
                   {option.status === "PENDING" ? ` · ${T.pendingSuffix}` : ""}
                 </option>
               ))}

@@ -393,6 +393,7 @@ export async function getPublicModelOffer(code: string): Promise<PublicModelOffe
 export type PublicModelOfferFilterCategory = {
   id: string;
   name: string;
+  icon: string | null;
 };
 
 /**
@@ -430,7 +431,7 @@ async function listModelOfferCategoriesWithOffers(todayStr: string): Promise<Pub
         },
       },
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, icon: true },
     orderBy: { name: "asc" },
   });
 }
@@ -446,7 +447,7 @@ export async function listModelOfferFilterCategories(): Promise<PublicModelOffer
       visibleToAll: true,
       ...NOT_HOT_CATEGORY_WHERE,
     },
-    select: { id: true, name: true },
+    select: { id: true, name: true, icon: true },
     orderBy: { name: "asc" },
   });
 }

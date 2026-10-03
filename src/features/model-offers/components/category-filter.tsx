@@ -45,6 +45,11 @@ export function CategoryFilter({ categories, activeCategoryId }: Props) {
             }
             aria-current={isActive ? "page" : undefined}
           >
+            {cat.icon ? (
+              <span aria-hidden className="mr-1.5">
+                {cat.icon}
+              </span>
+            ) : null}
             {cat.name}
           </Link>
         );

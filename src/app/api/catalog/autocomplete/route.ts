@@ -38,6 +38,7 @@ export async function GET(req: Request) {
         select: {
           id: true,
           name: true,
+          icon: true,
           slug: true,
           parentId: true,
         },
@@ -72,6 +73,7 @@ export async function GET(req: Request) {
       categories: categories.map((c) => ({
         id: encodePublicId(c.id),
         name: c.name,
+        icon: c.icon,
         slug: c.slug,
         parentId: c.parentId ? encodePublicId(c.parentId) : c.parentId,
       })),

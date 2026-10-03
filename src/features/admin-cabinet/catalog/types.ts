@@ -25,6 +25,8 @@ export type AdminCategoryProposer = {
 export type AdminCategoryRow = {
   id: string;
   name: string;
+  /** Смайлик категории (`GlobalCategory.icon`), `null` — без него. */
+  icon: string | null;
   slug: string;
   status: AdminCategoryStatus;
   parent: AdminCategoryParent | null;
@@ -53,4 +55,5 @@ export type AdminCategoryCounts = {
 export type AdminCategoryParentOption = {
   id: string;
   name: string;
+  icon: string | null;
 };

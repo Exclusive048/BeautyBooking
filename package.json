@@ -41,7 +41,7 @@
     "deploy:post": "npx tsx scripts/post-deploy.ts",
     "seed:review-tags": "npx tsx scripts/seed-review-tags.ts",
     "migrate:billing": "npx tsx scripts/migrate-billing-plans.ts",
-    "generate:icons": "node scripts/generate-icons.mjs",
+    "generate:icons": "npx tsx scripts/generate-icons.ts",
     "lighthouse": "npx tsx scripts/lighthouse-audit.ts",
     "analyze": "cross-env ANALYZE=true npm run build",
     "media:audit": "npx tsx scripts/audit-media-assets.ts",

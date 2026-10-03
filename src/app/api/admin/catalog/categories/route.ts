@@ -5,6 +5,7 @@ import { ok, fail } from "@/lib/api/response";
 import { requireAdminAuth } from "@/lib/auth/admin";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
+import { CATEGORY_ICON_MAX_LENGTH, isCategoryIcon } from "@/lib/catalog/category-icon";
 import { slugifyCategory } from "@/lib/slug";
 import { sortCategoriesHierarchically } from "@/lib/catalog/category-sort";
 
@@ -20,7 +21,13 @@ const createSchema = z.object({
     .max(60)
     .regex(/^[a-z0-9-]+$/)
     .optional(),
-  icon: z.string().trim().max(10).optional().nullable(),
+  icon: z
+    .string()
+    .trim()
+    .max(CATEGORY_ICON_MAX_LENGTH)
+    .refine((value) => value === "" || isCategoryIcon(value), "Смайлик категории — ровно один смайлик.")
+    .optional()
+    .nullable(),
   parentId: z.string().trim().min(1).optional().nullable(),
 });
 

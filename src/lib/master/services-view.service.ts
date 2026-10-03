@@ -33,6 +33,8 @@ export function parseServicesFilter(value: string | null | undefined): ServicesF
 export type ServiceCategoryOption = {
   id: string;
   name: string;
+  /** Смайлик категории — пункт выбора подписывается «💅 Маникюр». */
+  icon: string | null;
   /** Approval state — passed to the UI so the master's own pending
    * proposals can carry a «(на одобрении)» suffix instead of looking
    * indistinguishable from approved ones. APPROVED categories load
@@ -51,6 +53,7 @@ export type ServiceItemView = {
   onlinePaymentEnabled: boolean;
   globalCategoryId: string | null;
   globalCategoryName: string | null;
+  globalCategoryIcon: string | null;
   sortOrder: number;
   /** Position in the master's full service list. UI uses for reorder
    * boundary detection (same pattern as 31b portfolio). */
@@ -62,6 +65,8 @@ export type ServicesByCategory = {
   /** GlobalCategory.id when known, null for the uncategorised bucket. */
   id: string | null;
   name: string;
+  /** Смайлик категории — у заголовка группы. */
+  icon: string | null;
   services: ServiceItemView[];
 };
 
@@ -138,7 +143,7 @@ export async function getMasterServicesView(input: {
     prisma.service.findMany({
       where: { providerId: provider.id },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-      include: { globalCategory: { select: { id: true, name: true } } },
+      include: { globalCategory: { select: { id: true, name: true, icon: true } } },
     }),
     prisma.servicePackage.findMany({
       where: { masterId: provider.id },
@@ -176,6 +181,7 @@ export async function getMasterServicesView(input: {
     onlinePaymentEnabled: service.onlinePaymentEnabled,
     globalCategoryId: service.globalCategoryId,
     globalCategoryName: service.globalCategory?.name ?? null,
+    globalCategoryIcon: service.globalCategory?.icon ?? null,
     sortOrder: service.sortOrder,
     globalIndex: index,
     globalCount: services.length,
@@ -287,6 +293,7 @@ function groupByCategory(services: ServiceItemView[]): ServicesByCategory[] {
       bucket = {
         id: key,
         name: service.globalCategoryName ?? "Без категории",
+        icon: service.globalCategoryIcon,
         services: [],
       };
       buckets.set(key, bucket);
@@ -317,10 +324,10 @@ async function listAvailableGlobalCategories(
           : []),
       ],
     },
-    select: { id: true, name: true, status: true, visualSearchSlug: true },
+    select: { id: true, name: true, icon: true, status: true, visualSearchSlug: true },
     orderBy: { name: "asc" },
   });
   return rows
     .filter((row) => row.visualSearchSlug !== "hot")
-    .map((row) => ({ id: row.id, name: row.name, status: row.status }));
+    .map((row) => ({ id: row.id, name: row.name, icon: row.icon, status: row.status }));
 }

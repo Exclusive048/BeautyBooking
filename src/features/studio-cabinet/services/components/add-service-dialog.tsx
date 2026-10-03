@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import {
   SERVICE_DURATION_STEP_MIN,
@@ -95,6 +96,7 @@ export function AddServiceDialog({
       const newOption: StudioCategoryPickerOption = {
         id: created.id,
         name: created.title,
+        icon: null,
         status: created.status === "APPROVED" ? "APPROVED" : "PENDING",
       };
       setOptions((prev) => [...prev, newOption]);
@@ -274,7 +276,7 @@ export function AddServiceDialog({
               ) : null}
               {sortedOptions.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.name}
+                  {categoryLabel(option)}
                   {option.status === "PENDING" ? ` · ${T.pendingSuffix}` : ""}
                 </option>
               ))}
