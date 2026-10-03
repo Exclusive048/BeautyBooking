@@ -31,7 +31,7 @@ const spies = vi.hoisted(() => ({
   getSessionUser: vi.fn(async () => null as unknown),
   setSessionCookies: vi.fn(),
   requireAuth: vi.fn(async () => ({ ok: true, user: { id: "u1", roles: ["CLIENT"], phone: null } })),
-  vkLinkUpdateMany: vi.fn(async () => ({ count: 1 })),
+  unlinkOAuthIdentity: vi.fn(async () => ({ unlinked: true })),
   generateTelegramLinkToken: vi.fn(async () => ({ token: "tok", expiresAt: "2026-01-01T00:00:00.000Z" })),
 }));
 
@@ -65,7 +65,7 @@ vi.mock("next/headers", () => ({ cookies: vi.fn(async () => cookieStore) }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    vkLink: { findUnique: vi.fn(), upsert: vi.fn(), updateMany: spies.vkLinkUpdateMany },
+    vkLink: { findUnique: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() },
     yandexLink: { findUnique: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() },
     userProfile: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
     telegramLink: { upsert: vi.fn() },
@@ -78,6 +78,9 @@ vi.mock("@/lib/auth/session", () => ({
   setSessionCookies: spies.setSessionCookies,
 }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: spies.requireAuth }));
+// VK-YANDEX-UNLINK-01: отвязка — общий сервис; здесь важно только, что роут
+// до него доходит при выключенном провайдере.
+vi.mock("@/lib/auth/oauth-unlink", () => ({ unlinkOAuthIdentity: spies.unlinkOAuthIdentity }));
 vi.mock("@/lib/auth/cabinet-redirect", () => ({
   resolveCabinetRedirect: vi.fn(async () => ({ target: "/cabinet" })),
 }));
@@ -156,7 +159,7 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
     spies.verifyTelegramLogin.mockReturnValue(true);
     spies.buildVkAuthorizeUrl.mockReturnValue("https://vk.com/authorize?x=1");
     spies.buildYandexAuthorizeUrl.mockReturnValue("https://oauth.yandex.ru/authorize?x=1");
-    spies.vkLinkUpdateMany.mockResolvedValue({ count: 1 });
+    spies.unlinkOAuthIdentity.mockResolvedValue({ unlinked: true });
   });
 
   describe("VK (isVkAuthEnabled)", () => {
@@ -211,7 +214,7 @@ describe("AUTH-KILLSWITCH-ENFORCE-01 — route-level enabled-flag gating", () =>
       spies.getSessionUser.mockResolvedValue({ id: "u1", roles: ["CLIENT"], phone: null });
       const res = await vkUnlink(req());
       expect(res.status).toBe(200);
-      expect(spies.vkLinkUpdateMany).toHaveBeenCalledOnce();
+      expect(spies.unlinkOAuthIdentity).toHaveBeenCalledWith("u1", "vk");
     });
   });
 

@@ -67,6 +67,8 @@ describe("provider links — source level", () => {
     // в общий сервис — правило едет вместе с ней.
     "src/lib/auth/oauth-login.ts",
     "src/lib/auth/oauth-mobile-callback.ts",
+    // VK-YANDEX-UNLINK-01: отвязка (удаление связки) — общий сервис.
+    "src/lib/auth/oauth-unlink.ts",
   ];
 
   it.each(ROUTES)("%s never writes or selects a provider token", (relativePath) => {

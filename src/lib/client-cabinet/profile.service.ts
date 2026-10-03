@@ -87,8 +87,8 @@ export type ProfileDTO = {
     };
     // MOBILE-AUTH-A2: Яндекс ID — способ входа, канала уведомлений у него нет.
     // `linked` — та же identity-семантика (строка связки с id провайдера);
-    // `enabled` — флаг `isEnabled`, который снимает `/api/auth/yandex/unlink`
-    // (связка не удаляется) и возвращает следующий вход через Яндекс.
+    // `enabled` — флаг `isEnabled` (его снимала прежняя мягкая отвязка). С
+    // VK-YANDEX-UNLINK-01 `/api/auth/yandex/unlink` удаляет связку целиком.
     yandex: {
       linked: boolean;
       enabled: boolean;

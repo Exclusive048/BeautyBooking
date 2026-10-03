@@ -186,6 +186,8 @@ const ERROR_CODES = [
   // список сессий («завершить сеанс» чужой/несуществующей семьи).
   "OAUTH_CODE_INVALID",
   "SESSION_NOT_FOUND",
+  // VK-YANDEX-UNLINK-01 — отвязка оставила бы аккаунт без единого способа входа.
+  "LAST_LOGIN_METHOD",
   // MOBILE-B1 — `?city=<slug>` назвал неизвестный или погашенный город.
   "CITY_NOT_FOUND",
   "APP_PUBLIC_URL_MISSING",

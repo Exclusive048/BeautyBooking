@@ -1,27 +1,25 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
+import { unlinkOAuthIdentity } from "@/lib/auth/oauth-unlink";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 /**
- * Disconnect VK. We disable rather than delete so we can audit
- * subsequent re-connects.
+ * Отвязать VK ID от профиля: вход через VK и уведомления ВКонтакте.
  *
- * RKN-FIX-12: the token-zeroing that used to accompany this is gone — there
- * are no token columns left to zero. Nothing else about the flow changed.
+ * VK-YANDEX-UNLINK-01: связка удаляется целиком (раньше снимался только
+ * `isEnabled`, и вход через VK продолжал вести в этот аккаунт). Последний
+ * способ входа отвязать нельзя — `409 LAST_LOGIN_METHOD`; правила —
+ * `src/lib/auth/oauth-unlink.ts`.
  */
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
-    await prisma.vkLink.updateMany({
-      where: { userId: user.id },
-      data: { isEnabled: false },
-    });
+    await unlinkOAuthIdentity(user.id, "vk");
 
     return jsonOk({ unlinked: true });
   } catch (error) {

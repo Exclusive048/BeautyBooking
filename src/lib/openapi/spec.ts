@@ -2787,7 +2787,9 @@ export const openApiSpec = {
           linked: { type: "boolean", description: "Аккаунт VK привязан (identity)." },
           deliveryEnabled: {
             type: "boolean",
-            description: "Уведомления через VK включены. `POST /api/auth/vk/unlink` снимает именно этот флаг.",
+            description:
+              "Уведомления через VK включены. Выключает `POST /api/integrations/vk/disable`; " +
+              "`POST /api/auth/vk/unlink` удаляет связку целиком (`linked = false`).",
           },
           connectedAt: { type: "string", format: "date-time", nullable: true },
         },
@@ -2800,8 +2802,8 @@ export const openApiSpec = {
           enabled: {
             type: "boolean",
             description:
-              "Связка включена. `POST /api/auth/yandex/unlink` снимает флаг (связка не удаляется), " +
-              "следующий вход через Яндекс возвращает его.",
+              "Связка включена (флаг из прежней мягкой отвязки). `POST /api/auth/yandex/unlink` теперь " +
+              "удаляет связку целиком (`linked = false`).",
           },
           connectedAt: { type: "string", format: "date-time", nullable: true },
         },
@@ -4171,15 +4173,17 @@ export const openApiSpec = {
     "/api/auth/vk/unlink": {
       post: {
         operationId: "authVkUnlink",
-        summary: "Disable the VK link of the current user",
+        summary: "Unlink VK ID from the current user",
         description:
-          "Снимает `isEnabled` связки (уведомления через VK); сама связка остаётся — `linked` в профиле " +
-          "не меняется, вход через VK работает. Bearer или кука.",
+          "Удаляет связку VK: вход через этот VK больше не ведёт в аккаунт, уведомления ВКонтакте " +
+          "выключаются вместе с ней. Нет связки — тот же ответ. Последний работающий способ входа " +
+          "отвязать нельзя — `409 LAST_LOGIN_METHOD`. Bearer или кука.",
         tags: ["mobile", "auth", "vk"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/ProviderUnlinkData" }),
           "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("LAST_LOGIN_METHOD"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -4187,15 +4191,17 @@ export const openApiSpec = {
     "/api/auth/yandex/unlink": {
       post: {
         operationId: "authYandexUnlink",
-        summary: "Disable the Yandex ID link of the current user",
+        summary: "Unlink Yandex ID from the current user",
         description:
-          "Снимает `isEnabled` связки (в профиле `linked.yandex.enabled = false`); строка связки " +
-          "остаётся, следующий вход через Яндекс включает её снова. Bearer или кука.",
+          "Удаляет связку Яндекс ID: вход через этот аккаунт Яндекса больше не ведёт в профиль. " +
+          "Нет связки — тот же ответ. Последний работающий способ входа отвязать нельзя — " +
+          "`409 LAST_LOGIN_METHOD`. Bearer или кука.",
         tags: ["mobile", "auth", "yandex"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/ProviderUnlinkData" }),
           "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("LAST_LOGIN_METHOD"),
           "500": errorResponse("Internal error"),
         },
       },
