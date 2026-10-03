@@ -32,7 +32,9 @@ type Row = {
   rotatedToSessionId: string | null;
 };
 
-const db = vi.hoisted(() => ({ rows: new Map<string, Row>() }));
+type Device = { id: string; userId: string; sessionFamilyId: string };
+
+const db = vi.hoisted(() => ({ rows: new Map<string, Row>(), devices: [] as Device[] }));
 
 function matches(row: Row, where: Record<string, unknown>): boolean {
   for (const [key, cond] of Object.entries(where)) {
@@ -81,8 +83,19 @@ vi.mock("@/lib/prisma", () => {
       return {};
     },
   };
+  // MOBILE-B2: push-токены установки — `unlinkPushDevicesOfFamilies`.
+  const mobilePushDevice = {
+    deleteMany: async ({ where }: { where: { userId: string; sessionFamilyId: { in: string[] } } }) => {
+      const before = db.devices.length;
+      db.devices = db.devices.filter(
+        (device) => !(device.userId === where.userId && where.sessionFamilyId.in.includes(device.sessionFamilyId)),
+      );
+      return { count: before - db.devices.length };
+    },
+  };
   const tx = {
     refreshSession,
+    mobilePushDevice,
     userProfile: { findFirst: async () => ({ id: "u1", phone: null, roles: ["CLIENT"] }) },
   };
   return { prisma: { $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx), refreshSession } };
@@ -124,6 +137,7 @@ function refreshSidIn(response: NextResponse): string | null {
 
 beforeEach(() => {
   db.rows.clear();
+  db.devices = [];
 });
 
 describe("SESSION-LOSS-01 · потерянный ответ ротации", () => {
@@ -217,6 +231,23 @@ describe("выход из аккаунта — отзыв семьи", () => {
 
     for (const id of ["a1", "a2", "a3"]) expect(db.rows.get(id)!.revokedAt).not.toBeNull();
     expect(db.rows.get("b1")!.revokedAt).toBeNull();
+  });
+
+  it("MOBILE-B2: выход удаляет push-токены установки этой семьи, другие устройства — нет", async () => {
+    db.rows.set("a1", row("a1"));
+    db.rows.set("b1", row("b1", { familyId: "other-device" }));
+    db.devices = [
+      { id: "d-a", userId: "u1", sessionFamilyId: "fam" },
+      { id: "d-b", userId: "u1", sessionFamilyId: "other-device" },
+      { id: "d-x", userId: "u2", sessionFamilyId: "fam" },
+    ];
+
+    await revokeRefreshSessionByToken(tokenFor("a1"));
+    expect(db.devices.map((device) => device.id)).toEqual(["d-b", "d-x"]);
+
+    // Повторный выход идемпотентен.
+    await expect(revokeRefreshSessionByToken(tokenFor("a1"))).resolves.toBe("ALREADY_INACTIVE");
+    expect(db.devices.map((device) => device.id)).toEqual(["d-b", "d-x"]);
   });
 
   it("после выхода отставший токен сессию не восстанавливает", async () => {

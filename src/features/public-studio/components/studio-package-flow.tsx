@@ -19,7 +19,7 @@ import {
   type SlotItem,
   type StudioMaster,
 } from "@/features/booking/lib/studio-booking";
-import type { StudioBundleView } from "@/features/public-studio/server/studio-packages.service";
+import type { StudioBundleView } from "@/lib/providers/public-packages";
 import {
   studioNextComponentEarliestStart,
   type StudioPlacedComponent,

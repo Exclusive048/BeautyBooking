@@ -182,6 +182,12 @@ const ERROR_CODES = [
   "YANDEX_OAUTH_FAILED",
   "YANDEX_PROFILE_FAILED",
   "YANDEX_ALREADY_LINKED",
+  // MOBILE-AUTH-A2/A3 — обмен одноразового кода OAuth-входа приложения и
+  // список сессий («завершить сеанс» чужой/несуществующей семьи).
+  "OAUTH_CODE_INVALID",
+  "SESSION_NOT_FOUND",
+  // MOBILE-B1 — `?city=<slug>` назвал неизвестный или погашенный город.
+  "CITY_NOT_FOUND",
   "APP_PUBLIC_URL_MISSING",
   "TIME_RANGE_INVALID",
   "UNAUTHORIZED",

@@ -49,3 +49,47 @@ model PushSubscription {
 
   @@index([userId])
 }
+
+/// MOBILE-B2 — push-токен нативного приложения (FCM / APNs / RuStore).
+///
+/// Одна строка на УСТАНОВКУ (`X-Installation-Id`): повторная регистрация на
+/// том же телефоне — upsert, вход другого человека на нём же переносит строку
+/// на него. Один и тот же токен не живёт на двух установках: регистрация
+/// забирает его у прежней (`@@unique([provider, token])`).
+///
+/// `sessionFamilyId` — семья сессий (SEC-13), под которой токен
+/// зарегистрирован. Не внешний ключ (`RefreshSession.familyId` не уникален),
+/// а связь по значению: отзыв семьи (выход, «завершить сеанс», удаление
+/// аккаунта) удаляет строку, а отправка дополнительно пропускает и удаляет
+/// строки, чья семья уже не жива (`notifications/native-push/devices.ts`).
+///
+/// ПДн здесь нет: токен — адрес доставки, выданный сервисом, а не человеком.
+model MobilePushDevice {
+  id String @id @default(cuid())
+
+  installationId String @unique @db.VarChar(64)
+
+  userId String
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionFamilyId String @db.VarChar(64)
+
+  provider MobilePushProvider
+
+  token String @db.VarChar(1024)
+
+  /// Только у APNS; у остальных `null`.
+  apnsEnvironment MobilePushApnsEnvironment?
+
+  platform String? @db.VarChar(16)
+
+  appVersion String? @db.VarChar(32)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, token])
+  @@index([userId, sessionFamilyId])
+}

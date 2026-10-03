@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { generateIcs } from "@/lib/bookings/ics-export";
+import { resolveVisitAddress } from "@/lib/bookings/visit-address";
 import {
   ICS_FAILURE_PARAM,
   icsFailureReturnPath,
@@ -83,7 +84,10 @@ export async function GET(
     const display = booking.masterProvider ?? booking.provider;
     const serviceTitle =
       booking.serviceItems[0]?.titleSnapshot ?? booking.service.name;
-    const address = display.address ?? booking.provider.address ?? null;
+    // MOBILE-CLIENT-01 (B2): `Provider.address` NOT NULL — `??` не срабатывал,
+    // и у студийной записи (профиль мастера в студии с `address: ""`) в файле
+    // не было ни LOCATION, ни адреса. Правило — то же, что у «Моих записей».
+    const address = resolveVisitAddress(display.address, booking.provider.address);
 
     const ics = generateIcs({
       uid: `booking-${booking.id}@masterryadom.ru`,

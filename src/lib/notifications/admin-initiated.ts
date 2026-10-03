@@ -72,11 +72,16 @@ export async function dispatchAdminInitiatedNotification(
   // as `createBillingNotification` for regular subscription events.
   // Failures log inside the helper; we never want a missing push to
   // surface as a 5xx for the admin action.
-  void sendPushToUser(input.targetUserId, {
-    title: truncatePushTitle(input.title),
-    body: truncatePushBody(input.body),
-    url: input.url ?? "/cabinet/notifications",
-  }).catch((error) => {
+  void sendPushToUser(
+    input.targetUserId,
+    {
+      title: truncatePushTitle(input.title),
+      body: truncatePushBody(input.body),
+      url: input.url ?? "/cabinet/notifications",
+    },
+    // MOBILE-B2: в приложение — по таблице `native-push/payload.ts`.
+    { native: { type: record.type, notificationId: record.id, payloadJson: record.payloadJson } },
+  ).catch((error) => {
     logError("admin-initiated.push.failed", {
       type: input.type,
       userId: input.targetUserId,

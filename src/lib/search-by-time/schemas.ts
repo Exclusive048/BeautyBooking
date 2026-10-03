@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { catalogEntityTypeSchema, catalogSmartTagPresetSchema } from "@/lib/catalog/schemas";
+import { cityQueryParamSchema } from "@/lib/cities/city-param";
 
 export const availabilitySearchQuerySchema = z.object({
   date: z.string().trim().optional(),
@@ -15,6 +16,8 @@ export const availabilitySearchQuerySchema = z.object({
   smartTag: catalogSmartTagPresetSchema.optional(),
   entityType: catalogEntityTypeSchema.optional(),
   limit: z.coerce.number().int().min(1).max(60).default(30),
+  // MOBILE-B1: slug города (`GET /api/cities`). Резолвит роут; сервис получает `cityId`.
+  city: cityQueryParamSchema,
 });
 
 export type AvailabilitySearchQuery = z.infer<typeof availabilitySearchQuerySchema>;

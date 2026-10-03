@@ -70,6 +70,10 @@ const MEMORY_FALLBACK_MAX_BUCKETS = 20_000;
  */
 const SENSITIVE_ROUTE_PREFIXES = [
   "/api/auth",
+  // MOBILE-AUTH-A: входы приложения — тот же класс, что `/api/auth` (выдача и
+  // ротация сессий). Конфиг `/api/mobile/v1/config` сюда НЕ входит: это
+  // справочник, обрыв Redis не должен гасить запуск приложения.
+  "/api/mobile/v1/auth",
   "/api/billing",
   "/api/bookings",
   "/api/payments",
@@ -382,4 +386,36 @@ export async function checkRateLimit(
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
   return checkRateLimitConfig(key, config);
+}
+
+/**
+ * MOBILE-CLIENT-01 (B7) — вернуть ОДНУ попытку, израсходованную
+ * `checkRateLimit` по этому ключу, когда операция за ней не состоялась по вине
+ * сервера (5xx). Нужен там, где бюджет — единицы в час: упавшее удаление
+ * аккаунта (`destructiveDelete`, 1/ч) иначе запирало повтор на час.
+ *
+ * Best-effort и никогда не бросает: не удалось вернуть — попытка просто
+ * остаётся израсходованной (как было до функции). Счётчик не уходит ниже нуля:
+ * ключ, истёкший между проверкой и возвратом, DECR воскресил бы без срока со
+ * значением −1 — такой ключ удаляется. Зовётся только после пройденной
+ * `checkRateLimit` того же ключа и только один раз на неё.
+ */
+export async function refundRateLimit(key: RateLimitKey): Promise<void> {
+  try {
+    const client = await getRedisConnection();
+    if (!client) {
+      const bucket = memoryBuckets.get(key);
+      if (bucket && bucket.count > 0) bucket.count -= 1;
+      return;
+    }
+    const remaining = await withRedisCommandTimeout("rate-limit:refund:decr", client.decr(key));
+    if (remaining <= 0) {
+      await withRedisCommandTimeout("rate-limit:refund:del", client.del(key));
+    }
+  } catch (error) {
+    logError("Rate limit refund failed", {
+      key,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

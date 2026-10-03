@@ -41,6 +41,7 @@ export { network } from "./text/network";
 export { ai } from "./text/ai";
 export { deletion } from "./text/deletion";
 export { notifications } from "./text/notifications";
+export { nativePush } from "./text/native-push";
 export { billing } from "./text/billing";
 export { schedule } from "./text/schedule";
 export { cabinet } from "./text/cabinet";

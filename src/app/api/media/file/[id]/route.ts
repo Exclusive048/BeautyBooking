@@ -4,7 +4,7 @@ import { sharedCacheControlFor } from "@/lib/api/cache-headers";
 import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { Readable } from "stream";
 import { getSessionUser } from "@/lib/auth/session";
-import { toAppError } from "@/lib/api/errors";
+import { AppError, toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import {
   PRIVATE_MEDIA_TOKEN_QUERY_PARAM,
@@ -12,6 +12,13 @@ import {
 } from "@/lib/media/private-delivery";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import { ensureCanReadMedia } from "@/lib/media/access";
+import {
+  MEDIA_PREVIEW_QUERY_PARAM,
+  isPreviewableMimeType,
+  parseMediaPreviewWidth,
+  readMediaPreview,
+  type MediaBody,
+} from "@/lib/media/preview-variants";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { getMediaFile, isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
@@ -32,6 +39,22 @@ const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
   MediaEntityType.STUDIO,
   MediaEntityType.SITE,
 ]);
+
+/**
+ * MOBILE-B1 — ответ с превью `?w=` (`lib/media/preview-variants.ts`). Тот же
+ * `Cache-Control`, что у оригинала в этой же ветке доступа: публичное остаётся
+ * публичным, приватное — `private, no-store`.
+ */
+function previewResponse(file: MediaBody, cacheControl: string): NextResponse {
+  return new NextResponse(file.body, {
+    status: 200,
+    headers: {
+      "Content-Type": file.contentType,
+      "Content-Length": String(file.sizeBytes),
+      "Cache-Control": cacheControl,
+    },
+  });
+}
 
 function isStorageMissingErrorDetails(details: unknown): boolean {
   if (!details || typeof details !== "object") return false;
@@ -65,6 +88,12 @@ export async function GET(req: Request, ctx: RouteContext) {
       return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
     }
 
+    // MOBILE-B1: `?w=` — превью для списков приложения. Мусорный `w` и
+    // не-картинка дают `null`, то есть ровно прежний ответ с оригиналом.
+    const searchParams = new URL(req.url).searchParams;
+    const requestedWidth = parseMediaPreviewWidth(searchParams.get(MEDIA_PREVIEW_QUERY_PARAM));
+    const previewWidth = requestedWidth && isPreviewableMimeType(asset.mimeType) ? requestedWidth : null;
+
     // SECURITY-EXPOSURE-AUDIT-01 #3: serve publicly ONLY when the asset is
     // actually public. A hidden (`isPublic:false`), unpublished-provider, or
     // delete-orphaned portfolio asset fails this and falls through to the
@@ -75,7 +104,9 @@ export async function GET(req: Request, ctx: RouteContext) {
       PUBLIC_MEDIA_KINDS.has(asset.kind) && PUBLIC_MEDIA_ENTITY_TYPES.has(asset.entityType);
     if (isPublicKind && (await isProviderMediaPubliclyVisible(asset))) {
       const storage = getStorageProvider();
-      const publicFile = await storage.getObject(asset.storageKey, asset.mimeType);
+      const publicFile = previewWidth
+        ? await readMediaPreview(asset, previewWidth)
+        : await storage.getObject(asset.storageKey, asset.mimeType);
       if (!publicFile) {
         // Asset record exists in DB but bytes are missing in storage —
         // mark the row as BROKEN so the audit script can clean it up later.
@@ -105,6 +136,12 @@ export async function GET(req: Request, ctx: RouteContext) {
         outcome: "success",
         operation: "public-stream",
       });
+      if ("body" in publicFile) {
+        return previewResponse(
+          publicFile,
+          sharedCacheControlFor(req, "public, max-age=31536000, immutable"),
+        );
+      }
       return new NextResponse(Readable.toWeb(publicFile.stream) as ReadableStream, {
         status: 200,
         headers: {
@@ -118,7 +155,7 @@ export async function GET(req: Request, ctx: RouteContext) {
       });
     }
 
-    const mediaToken = new URL(req.url).searchParams.get(PRIVATE_MEDIA_TOKEN_QUERY_PARAM);
+    const mediaToken = searchParams.get(PRIVATE_MEDIA_TOKEN_QUERY_PARAM);
     if (mediaToken) {
       const isValidToken = verifyPrivateMediaDeliveryToken(mediaToken, asset.id);
       if (!isValidToken) {
@@ -144,7 +181,9 @@ export async function GET(req: Request, ctx: RouteContext) {
       await ensureCanReadMedia(tokenUser, asset.entityType, asset.entityId, asset.kind);
 
       const storage = getStorageProvider();
-      const tokenFile = await storage.getObject(asset.storageKey, asset.mimeType);
+      const tokenFile = previewWidth
+        ? await readMediaPreview(asset, previewWidth)
+        : await storage.getObject(asset.storageKey, asset.mimeType);
       if (!tokenFile) {
         await prisma.mediaAsset
           .updateMany({
@@ -161,6 +200,9 @@ export async function GET(req: Request, ctx: RouteContext) {
         outcome: "success",
         operation: "private-token",
       });
+      if ("body" in tokenFile) {
+        return previewResponse(tokenFile, "private, no-store");
+      }
       return new NextResponse(Readable.toWeb(tokenFile.stream) as ReadableStream, {
         status: 200,
         headers: {
@@ -172,6 +214,24 @@ export async function GET(req: Request, ctx: RouteContext) {
     }
 
     const user = await getSessionUser();
+    if (previewWidth) {
+      // Та же проверка, что внутри `getMediaFile`; строка актива уже прочитана
+      // выше с теми же условиями (не удалён, READY).
+      await ensureCanReadMedia(user, asset.entityType, asset.entityId, asset.kind);
+      const preview = await readMediaPreview(asset, previewWidth);
+      if (!preview) {
+        throw new AppError("Файл не найден.", 404, "MEDIA_ASSET_NOT_FOUND", {
+          reason: "STORAGE_MISSING",
+          assetId: asset.id,
+        });
+      }
+      void recordSurfaceEvent({
+        surface: "media",
+        outcome: "success",
+        operation: "private-session",
+      });
+      return previewResponse(preview, "private, no-store");
+    }
     const file = await getMediaFile(user, assetId);
     void recordSurfaceEvent({
       surface: "media",

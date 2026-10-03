@@ -54,6 +54,7 @@ const PUBLIC_REFERENCE_ROUTES = [
   "src/app/api/reviews/tags/route.ts",
   "src/app/api/billing/plans/route.ts",
   "src/app/api/cities/route.ts",
+  "src/app/api/mobile/v1/config/route.ts",
 ];
 
 describe("PERF-13 · публичные справочники несут Cache-Control", () => {

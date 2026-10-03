@@ -38,6 +38,28 @@ const CANONICAL_PUBLIC_HOSTS = new Set([
   "www.masterryadom.ru",
 ]);
 
+/** MOBILE-AUTH-A — версия приложения `MAJOR.MINOR.PATCH` (без `+build`). */
+const MOBILE_VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
+
+function mobileVersionSchema(fallback: string) {
+  return z
+    .string()
+    .trim()
+    .regex(MOBILE_VERSION_PATTERN, "must be MAJOR.MINOR.PATCH, e.g. 1.2.0")
+    .default(fallback);
+}
+
+/** Сравнение `MAJOR.MINOR.PATCH`: отрицательное — `a` раньше `b`, 0 — равны, положительное — `a` новее. */
+export function compareMobileVersions(a: string, b: string): number {
+  const left = a.split(".").map(Number);
+  const right = b.split(".").map(Number);
+  for (let i = 0; i < 3; i += 1) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 const envSchema = z.object({
   // ── Runtime ──────────────────────────────────────────────────────────────
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -149,6 +171,37 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_EMAIL: z.string().optional(),
 
+  // ── Native push в приложение (MOBILE-B2) ─────────────────────────────────
+  // 🔴 Выключатель ОТПРАВКИ, а не конфигурации. Исключение из принципа
+  // ENV-SPLIT-01 («включено = сконфигурировано») сделано осознанно и по
+  // решению владельца: FCM и APNs — серверы Google и Apple за пределами РФ,
+  // и до вердикта юриста по RKN-AUDIT-01 (152-ФЗ ст. 12) отправка выключена,
+  // даже когда креды заведены (их заводят заранее — для стенда и проверки).
+  // Регистрация устройств (`/api/mobile/v1/devices`) от него не зависит:
+  // токены копятся, чтобы включение не ждало переустановки приложения.
+  // Только `"true"` включает; пусто / `"false"` — выключено. Иное значение
+  // («yes», «1», опечатка) отвергается на старте, а не трактуется молча.
+  MOBILE_PUSH_SENDING_ENABLED: z.enum(["", "true", "false"]).optional(),
+  // FCM HTTP v1 (Android с Google-сервисами): сервисный аккаунт Firebase —
+  // `project_id`, `client_email`, `private_key` из JSON-ключа (Firebase
+  // Console → Project settings → Service accounts → Generate new private key).
+  // Ключ — PEM; переводы строк можно записать как `\n` в одну строку.
+  FCM_PROJECT_ID: z.string().optional(),
+  FCM_CLIENT_EMAIL: z.string().optional(),
+  FCM_PRIVATE_KEY: z.string().optional(),
+  // APNs (iOS), токенная авторизация: ключ .p8 (Apple Developer → Keys →
+  // «Apple Push Notifications service»), его Key ID, Team ID аккаунта и bundle
+  // id приложения (= `apns-topic`). Окружение (sandbox / production) — у
+  // каждого устройства своё, из регистрации.
+  APNS_TEAM_ID: z.string().optional(),
+  APNS_KEY_ID: z.string().optional(),
+  APNS_PRIVATE_KEY: z.string().optional(),
+  APNS_BUNDLE_ID: z.string().optional(),
+  // RuStore Push (Android без Google-сервисов): консоль RuStore → приложение →
+  // Push-уведомления → проекты: ID проекта и сервисный токен.
+  RUSTORE_PUSH_PROJECT_ID: z.string().optional(),
+  RUSTORE_PUSH_SERVICE_TOKEN: z.string().optional(),
+
   // ── Yandex ────────────────────────────────────────────────────────────────
   YANDEX_GEOCODER_API_KEY: z.string().optional(),
   YANDEX_SUGGEST_API_KEY: z.string().optional(),
@@ -244,6 +297,18 @@ const envSchema = z.object({
 
   // ── Timezone ─────────────────────────────────────────────────────────────
   DEFAULT_TIMEZONE: z.string().min(1).default("Europe/Moscow"),
+
+  // ── Mobile app (MOBILE-AUTH-A) ─────────────────────────────────────────────
+  // Отдаются приложению в `GET /api/mobile/v1/config`. Ниже `MIN` — экран
+  // «Обновите приложение» (жёсткий барьер), ниже `LATEST` — мягкое
+  // предложение обновиться. Формат — `MAJOR.MINOR.PATCH` без build-суффикса
+  // (`+12` в `X-App-Version` клиент сравнивает сам). Дефолты безопасны:
+  // `0.0.0` не блокирует ни одну сборку. Рефайн ниже не даёт выставить
+  // минимум выше последней версии — иначе обновиться было бы не на что.
+  MOBILE_MIN_VERSION_IOS: mobileVersionSchema("0.0.0"),
+  MOBILE_MIN_VERSION_ANDROID: mobileVersionSchema("0.0.0"),
+  MOBILE_LATEST_VERSION_IOS: mobileVersionSchema("1.0.0"),
+  MOBILE_LATEST_VERSION_ANDROID: mobileVersionSchema("1.0.0"),
 });
 
 const has = (value: string | undefined): boolean => Boolean(value?.trim());
@@ -352,6 +417,37 @@ const refinedSchema = envSchema
       "YANDEX_OAUTH_REDIRECT_URI are missing. Set them or remove the client id " +
       "(removing it is how Yandex login is switched off since ENV-SPLIT-01)."
   )
+  // MOBILE-B2: native push — тот же принцип «якорь задан → набор полон».
+  // Неполный набор не падал бы, а тихо выключал провайдера (`config.ts`
+  // считает его ненастроенным), то есть «включили FCM» на деле означало бы
+  // «Android без пушей» без единой ошибки. Только в production.
+  .refine(
+    (e) => {
+      if (e.NODE_ENV !== "production") return true;
+      if (!has(e.FCM_PROJECT_ID)) return true;
+      return has(e.FCM_CLIENT_EMAIL) && has(e.FCM_PRIVATE_KEY);
+    },
+    "FCM_PROJECT_ID is set but FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY are missing — FCM push cannot " +
+      "authenticate. Set all three (service-account JSON key) or remove FCM_PROJECT_ID."
+  )
+  .refine(
+    (e) => {
+      if (e.NODE_ENV !== "production") return true;
+      if (!has(e.APNS_KEY_ID)) return true;
+      return has(e.APNS_TEAM_ID) && has(e.APNS_PRIVATE_KEY) && has(e.APNS_BUNDLE_ID);
+    },
+    "APNS_KEY_ID is set but APNS_TEAM_ID / APNS_PRIVATE_KEY / APNS_BUNDLE_ID are missing — APNs push " +
+      "cannot authenticate. Set all four (.p8 token auth) or remove APNS_KEY_ID."
+  )
+  .refine(
+    (e) => {
+      if (e.NODE_ENV !== "production") return true;
+      if (!has(e.RUSTORE_PUSH_PROJECT_ID)) return true;
+      return has(e.RUSTORE_PUSH_SERVICE_TOKEN);
+    },
+    "RUSTORE_PUSH_PROJECT_ID is set but RUSTORE_PUSH_SERVICE_TOKEN is missing. Set the service token " +
+      "or remove the project id."
+  )
   // HARDENING-MISC-01 (из PAY-SEC-01) — раньше незаданный вебхук-токен просто
   // отключал URL-проверку с однократным warn'ом в проде: тихая деградация
   // конфига, которую никто не замечал. Теперь это отказ на старте.
@@ -385,6 +481,16 @@ const refinedSchema = envSchema
   // видит. Приватность вложения чата или фото клиентской карточки держалась бы
   // на непредсказуемости имени файла. `STORAGE_PROVIDER` по умолчанию `"local"`,
   // то есть забытая переменная в проде давала бы ровно этот режим молча.
+  // MOBILE-AUTH-A: минимум выше последней версии = экран «Обновите
+  // приложение», с которого обновиться не на что. Во всех окружениях: значения
+  // не зависят от инфраструктуры, ошибка одинаково вредна везде.
+  .refine(
+    (e) =>
+      compareMobileVersions(e.MOBILE_MIN_VERSION_IOS, e.MOBILE_LATEST_VERSION_IOS) <= 0 &&
+      compareMobileVersions(e.MOBILE_MIN_VERSION_ANDROID, e.MOBILE_LATEST_VERSION_ANDROID) <= 0,
+    "MOBILE_MIN_VERSION_{IOS,ANDROID} must not exceed MOBILE_LATEST_VERSION_{IOS,ANDROID} — " +
+      "the app would demand an update to a version that does not exist."
+  )
   .refine(
     (e) => e.NODE_ENV !== "production" || e.STORAGE_PROVIDER !== "local",
     "STORAGE_PROVIDER=local is not allowed in production — set STORAGE_PROVIDER=s3. " +
@@ -467,6 +573,22 @@ export const env: AppEnv = _parsed.success ? _parsed.data : withSchemaDefaults(p
 export const isPushEnabled = Boolean(
   env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_EMAIL
 );
+/**
+ * MOBILE-B2 — native push в приложение. Провайдер «настроен», когда задан
+ * ПОЛНЫЙ набор его кредов (неполный в проде отвергает рефайн выше, в dev
+ * провайдер просто пропускается). Отправка — только при включённом
+ * `MOBILE_PUSH_SENDING_ENABLED` (юридический выключатель, см. схему) И хотя бы
+ * одном настроенном провайдере: ровно это отдаёт приложению
+ * `GET /api/mobile/v1/config` → `features.push`. `isPushEnabled` выше — веб
+ * (VAPID) и к приложению отношения не имеет.
+ */
+export const isFcmConfigured = has(env.FCM_PROJECT_ID) && has(env.FCM_CLIENT_EMAIL) && has(env.FCM_PRIVATE_KEY);
+export const isApnsConfigured =
+  has(env.APNS_TEAM_ID) && has(env.APNS_KEY_ID) && has(env.APNS_PRIVATE_KEY) && has(env.APNS_BUNDLE_ID);
+export const isRustorePushConfigured = has(env.RUSTORE_PUSH_PROJECT_ID) && has(env.RUSTORE_PUSH_SERVICE_TOKEN);
+export const isMobilePushSwitchOn = env.MOBILE_PUSH_SENDING_ENABLED?.trim() === "true";
+export const isMobilePushEnabled =
+  isMobilePushSwitchOn && (isFcmConfigured || isApnsConfigured || isRustorePushConfigured);
 export const isPaymentsEnabled = Boolean(env.YOOKASSA_SHOP_ID && env.YOOKASSA_SECRET_KEY);
 export const isTelegramAuthEnabled = Boolean(env.TELEGRAM_BOT_TOKEN);
 /**

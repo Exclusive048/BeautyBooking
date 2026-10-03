@@ -16,6 +16,9 @@ const subsDeleteMany = vi.hoisted(() => vi.fn());
 const sendNotification = vi.hoisted(() => vi.fn());
 const logInfo = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
+// MOBILE-B2: push в нативное приложение ставится в очередь из той же точки.
+const enqueueNativePush = vi.hoisted(() => vi.fn(async () => undefined));
+const flags = vi.hoisted(() => ({ web: true, mobile: false }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -25,9 +28,17 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/lib/notifications/push/vapid", () => ({
-  isPushEnabled: true,
+  get isPushEnabled() {
+    return flags.web;
+  },
   webpush: { sendNotification },
 }));
+vi.mock("@/lib/env", () => ({
+  get isMobilePushEnabled() {
+    return flags.mobile;
+  },
+}));
+vi.mock("@/lib/notifications/native-push/enqueue", () => ({ enqueueNativePush }));
 
 vi.mock("@/lib/logging/logger", () => ({ logInfo, logError }));
 
@@ -44,6 +55,8 @@ const PAYLOAD = { title: "T", body: "B", url: "/x" } as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  flags.web = true;
+  flags.mobile = false;
   subsFindMany.mockResolvedValue([SUBSCRIPTION]);
   sendNotification.mockResolvedValue(undefined);
 });
@@ -147,5 +160,75 @@ describe("sendPushToUser — граница запроса (RES-22)", () => {
     await expect(sendPushToUser("u-1", PAYLOAD)).resolves.toBeUndefined();
     expect(subsDeleteMany).not.toHaveBeenCalled();
     expect(logError).toHaveBeenCalled();
+  });
+});
+
+/**
+ * MOBILE-B2 — нативное приложение из той же точки: тот же тумблер
+ * `pushNotificationsEnabled`, свой выключатель (`isMobilePushEnabled`), веб-push
+ * при этом ведёт себя как раньше.
+ */
+describe("sendPushToUser — native push (MOBILE-B2)", () => {
+  const NATIVE = { native: { type: "BOOKING_CREATED" as const, notificationId: "n1", payloadJson: { bookingId: "b1" } } };
+  const WEB_PAYLOAD = { title: "T", body: "B", url: "/cabinet/master/dashboard?focus=b1", tag: "t1" };
+
+  it("выключатель выключен — в очередь ничего, веб-push как прежде", async () => {
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    await sendPushToUser("user-1", WEB_PAYLOAD, NATIVE);
+    expect(enqueueNativePush).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it("включён — в очередь уходит тип, id, payload и веб-ссылка (ради стороны получателя)", async () => {
+    flags.mobile = true;
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    await sendPushToUser("user-1", WEB_PAYLOAD, NATIVE);
+    expect(enqueueNativePush).toHaveBeenCalledWith("user-1", {
+      type: "BOOKING_CREATED",
+      notificationId: "n1",
+      payloadJson: { bookingId: "b1" },
+      webUrl: "/cabinet/master/dashboard?focus=b1",
+      tag: "t1",
+    });
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it("тумблер пользователя выключен — ни приложения, ни веба", async () => {
+    flags.mobile = true;
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: false });
+    await sendPushToUser("user-1", WEB_PAYLOAD, NATIVE);
+    expect(enqueueNativePush).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("веб-push без VAPID, приложение включено — только очередь, подписки не читаются", async () => {
+    flags.web = false;
+    flags.mobile = true;
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    await sendPushToUser("user-1", WEB_PAYLOAD, NATIVE);
+    expect(enqueueNativePush).toHaveBeenCalledTimes(1);
+    expect(subsFindMany).not.toHaveBeenCalled();
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("всё выключено — даже профиль не читается (прежнее поведение)", async () => {
+    flags.web = false;
+    await sendPushToUser("user-1", WEB_PAYLOAD, NATIVE);
+    expect(userFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("без `native` — только веб, как у прежних вызовов", async () => {
+    flags.mobile = true;
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    await sendPushToUser("user-1", WEB_PAYLOAD);
+    expect(enqueueNativePush).not.toHaveBeenCalled();
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it("веб-payload не меняется: в браузер не уходит ничего от приложения", async () => {
+    flags.mobile = true;
+    userFindUnique.mockResolvedValue({ pushNotificationsEnabled: true });
+    await sendPushToUser("user-1", WEB_PAYLOAD, NATIVE);
+    expect(JSON.parse(sendNotification.mock.calls[0]?.[1] as string)).toEqual(WEB_PAYLOAD);
   });
 });

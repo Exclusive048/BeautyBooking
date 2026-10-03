@@ -19,8 +19,10 @@
  *    money helper re-brands **once at its return** (`toKopeks(sum)`), not on
  *    every sub-expression.
  *
- * NOT branded: `discountValue` (dual-unit — a percentage for PERCENT, kopeks
- * for FIXED), durations, counts, percentages, ratings.
+ * NOT branded: `discountValue` (dual-unit — a percentage for PERCENT; for FIXED
+ * kopeks on `ServicePackage`, but RUBLES on the hot-slot `DiscountRule` /
+ * `HotSlot`, converted once in `hot-slots/pricing.ts` — HOT-SLOT-FIXED-UNIT),
+ * durations, counts, percentages, ratings.
  *
  * Client-safe (no server-only imports) — used by both server math paths and
  * client-facing money helpers (rule 13).

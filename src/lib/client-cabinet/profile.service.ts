@@ -1,13 +1,13 @@
-import { BookingStatus, MediaEntityType, MediaKind } from "@prisma/client";
+import { BookingStatus } from "@prisma/client";
 import { z } from "zod";
 import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { AppError } from "@/lib/api/errors";
 import { resolveLinkState } from "@/lib/auth/link-state";
 import { claimPhoneForUser } from "@/lib/auth/phone-claim";
 import { isTelegramEnabled } from "@/lib/env";
-import { buildMediaFileUrl } from "@/lib/media/types";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
+import { resolveClientAvatarUrl } from "@/lib/users/client-avatar";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -85,6 +85,15 @@ export type ProfileDTO = {
       deliveryEnabled: boolean;
       connectedAt: string | null;
     };
+    // MOBILE-AUTH-A2: Яндекс ID — способ входа, канала уведомлений у него нет.
+    // `linked` — та же identity-семантика (строка связки с id провайдера);
+    // `enabled` — флаг `isEnabled`, который снимает `/api/auth/yandex/unlink`
+    // (связка не удаляется) и возвращает следующий вход через Яндекс.
+    yandex: {
+      linked: boolean;
+      enabled: boolean;
+      connectedAt: string | null;
+    };
   };
   stats: {
     visitsCount: number;
@@ -109,36 +118,6 @@ function utcDateToIsoDateKey(date: Date): string {
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-/**
- * Resolve the avatar URL by checking the AVATAR media asset (preferred) and
- * falling back to the legacy `externalPhotoUrl` (Telegram-imported pic). The
- * MediaAsset lookup is a single indexed query; we do it inline rather than
- * carving out a separate avatar service to keep `getClientProfile` one DB
- * round-trip plus a constant number of joins.
- */
-async function resolveAvatarUrl(
-  userId: string,
-  externalPhotoUrl: string | null,
-): Promise<string | null> {
-  const avatarAsset = await prisma.mediaAsset.findFirst({
-    where: {
-      entityType: MediaEntityType.USER,
-      entityId: userId,
-      kind: MediaKind.AVATAR,
-      status: "READY",
-    },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
-  if (avatarAsset) {
-    // PWA-FIX-01: путь именно `/api/media/file/<id>`. Форма `/api/media/<id>/file`
-    // была единственной в дереве и роута такого нет (`src/app/api/media/file/[id]`),
-    // то есть аватар клиента отдавал 404 — «загрузили фото, а оно не показывается».
-    return buildMediaFileUrl(avatarAsset.id);
-  }
-  return externalPhotoUrl;
 }
 
 function computeCompletion(input: {
@@ -175,7 +154,7 @@ function computeCompletion(input: {
 }
 
 export async function getClientProfile(userId: string): Promise<ProfileDTO> {
-  const [user, tgLink, vkLink, visitsCount, favoritesCount] = await Promise.all([
+  const [user, tgLink, vkLink, yandexLink, visitsCount, favoritesCount] = await Promise.all([
     prisma.userProfile.findUnique({
       where: { id: userId },
       select: {
@@ -201,6 +180,10 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
       where: { userId },
       select: { vkUserId: true, linkedAt: true, isEnabled: true },
     }),
+    prisma.yandexLink.findUnique({
+      where: { userId },
+      select: { yandexUserId: true, linkedAt: true, isEnabled: true },
+    }),
     prisma.booking.count({
       where: { clientUserId: userId, status: BookingStatus.FINISHED },
     }),
@@ -218,7 +201,7 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
     select: { telegramUsername: true },
   });
 
-  const avatarUrl = await resolveAvatarUrl(userId, user.externalPhotoUrl);
+  const avatarUrl = await resolveClientAvatarUrl(userId, user.externalPhotoUrl);
 
   // Email verification status: backed by UserProfile.emailVerifiedAt. The
   // verify endpoint sets the timestamp; the request-verify endpoint clears
@@ -230,6 +213,7 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
   // isDeliveryEnabled (delivery preference). Never merged into one boolean.
   const telegramState = resolveLinkState({ linkId: tgLink?.chatId, isEnabled: tgLink?.isEnabled });
   const vkState = resolveLinkState({ linkId: vkLink?.vkUserId, isEnabled: vkLink?.isEnabled });
+  const yandexState = resolveLinkState({ linkId: yandexLink?.yandexUserId, isEnabled: yandexLink?.isEnabled });
 
   const completion = computeCompletion({
     firstName: user.firstName,
@@ -274,6 +258,12 @@ export async function getClientProfile(userId: string): Promise<ProfileDTO> {
         linked: vkState.isLinked,
         deliveryEnabled: vkState.isDeliveryEnabled,
         connectedAt: vkLink?.linkedAt?.toISOString() ?? null,
+      },
+      yandex: {
+        linked: yandexState.isLinked,
+        // Тот же предикат: «включено» не бывает без связки.
+        enabled: yandexState.isDeliveryEnabled,
+        connectedAt: yandexLink?.linkedAt?.toISOString() ?? null,
       },
     },
     stats: {

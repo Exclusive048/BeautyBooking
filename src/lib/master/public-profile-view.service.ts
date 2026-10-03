@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { DiscountType, SubscriptionScope } from "@prisma/client";
+import { SubscriptionScope } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { buildOccupancyBookingWhere, resolveOccupancyProviderIds } from "@/lib/schedule/occupancy";
 import { getProviderProfile } from "@/lib/providers/usecases";
@@ -18,6 +18,7 @@ import { earliestBookableUtc } from "@/lib/bookings/policy-enforcement";
 import { normalizeBufferMinutes } from "@/lib/bookings/booking-core";
 import { logError } from "@/lib/logging/logger";
 import { ACTIVE_STUDIO_PROFILE_SELECT, pickActiveStudioProfile } from "@/lib/providers/studio-profile";
+import { listSoloMasterBundles, type PublicBundleView } from "@/lib/providers/public-packages";
 
 /**
  * Aggregator for `/u/[username]` master public profile (32a).
@@ -29,24 +30,14 @@ import { ACTIVE_STUDIO_PROFILE_SELECT, pickActiveStudioProfile } from "@/lib/pro
  * `provider.createdAt`, and an availability hint — the earliest free
  * slot today (or next working day). Wrapped in React `cache()` so
  * sections can call it freely; one Prisma roundtrip per request.
+ *
+ * MOBILE-B3: the hero extras (`getMasterHeroExtras`) and the bundle catalog
+ * (`listSoloMasterBundles`, `providers/public-packages.ts`) are separate
+ * functions now, so the JSON routes for the native app reuse exactly the same
+ * logic (`GET /api/public/providers/{key}/{overview,packages}`).
  */
 
-export type PublicBundleView = {
-  // PACKAGE-BOOKING-MVP-1: the bundle is now bookable, so the package `id` +
-  // component `serviceId`s are exposed (booking-flow carve-out to Rule 12,
-  // same as providerId/serviceId in the single-booking widget).
-  id: string;
-  name: string;
-  serviceNames: string[];
-  /** Components in package `sortOrder` — the sequence the booking places them in. */
-  components: Array<{ serviceId: string; name: string; price: number; durationMin: number }>;
-  totalDurationMin: number;
-  totalPrice: number;
-  finalPrice: number;
-  discountAmount: number;
-  discountType: DiscountType;
-  discountValue: number;
-};
+export type { PublicBundleView };
 
 export type AvailabilityHint =
   | { kind: "today"; time: string }
@@ -78,6 +69,22 @@ export type MasterPublicProfileView = {
   studio: { name: string; publicUsername: string | null } | null;
 };
 
+/**
+ * Hero data of a master page that `ProviderProfileDto` doesn't carry.
+ *
+ * `studio.id` is the studio's `Provider.id` — the same value as
+ * `ProviderProfileDto.studioId` (booking-flow carve-out to Rule 12: the studio
+ * booking needs it). The web view strips it (QA-115: the RSC payload carries
+ * only the public link); the JSON overview route keeps it.
+ */
+export type MasterHeroExtras = {
+  planTier: PlanTier | null;
+  experienceMonths: number | null;
+  availability: AvailabilityHint;
+  providerBufferMin: number;
+  studio: { id: string; name: string; publicUsername: string | null } | null;
+};
+
 const AVAILABILITY_PROBE_DURATION_MIN = 30;
 const AVAILABILITY_PROBE_DAYS = 8;
 
@@ -93,179 +100,119 @@ export const getMasterPublicProfileView = cache(
     }
     if (provider.type !== "MASTER") return null;
 
-    // Rule 12 (RULE-12-OWNERUSERID-RSC, FIX-17): the serialized row must carry
-    // NO internal user CUID. `ownerUserId` is needed only as a server-side arg
-    // for `getCurrentPlan`, so it's fetched separately into a local primitive
-    // below — never kept on a row that crosses into the RSC flight payload.
-    const [ownerMeta, packages] = await Promise.all([
-      prisma.provider.findUnique({
-        where: { id: provider.id },
-        select: {
-          createdAt: true,
-          slotStepMin: true,
-          // EXP-023: the availability chip must respect the same booking-window
-          // cutoff + buffer the booking widget applies, so it shows the FIRST
-          // actually-bookable slot (not the next raw schedule step after now).
-          minBookingHoursAhead: true,
-          bufferBetweenBookingsMin: true,
-          // QA-115: studio affiliation (studioId references the studio's provider row).
-          studio: { select: { name: true, publicUsername: true, isPublished: true } },
-          // STUDIO-MASTER-PROFILES (этап 4): после разделения студия — у профиля
-          // мастера в студии; тем же запросом.
-          ...ACTIVE_STUDIO_PROFILE_SELECT,
-        },
-      }),
-      prisma.servicePackage.findMany({
-        where: { masterId: provider.id, isEnabled: true },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-        // Rule 12: explicit select. PACKAGE-BOOKING-MVP-1 — the package `id`
-        // and component `serviceId`s are now exposed because the bundle is
-        // bookable; this is the accepted booking-flow carve-out (same as
-        // providerId/serviceId already used by /api/public/bookings —
-        // RULE-12-BOOKING-CONTRACT-OPTIONAL). Still never expose masterId /
-        // timestamps.
-        select: {
-          id: true,
-          name: true,
-          discountType: true,
-          discountValue: true,
-          items: {
-            select: {
-              serviceId: true,
-              sortOrder: true,
-              service: {
-                select: {
-                  id: true,
-                  name: true,
-                  title: true,
-                  durationMin: true,
-                  price: true,
-                  isEnabled: true,
-                  sortOrder: true,
-                },
-              },
-            },
-          },
-        },
-      }),
+    const [extras, bundles] = await Promise.all([
+      getMasterHeroExtras(provider.id, provider.timezone),
+      listSoloMasterBundles(provider.id),
     ]);
-
-    // Transient primitive — the intermediate row is discarded immediately, so
-    // the owner UserProfile CUID never persists on an object that reaches flight.
-    const ownerUserId =
-      (
-        await prisma.provider.findUnique({
-          where: { id: provider.id },
-          select: { ownerUserId: true },
-        })
-      )?.ownerUserId ?? null;
-    const createdAt = ownerMeta?.createdAt ?? null;
-
-    // RULE-12-SCHEDULE (FIX-19): `getCurrentPlan` returns a rich `CurrentPlanInfo`
-    // (with the BillingPlan `planId` CUID) but only `.tier` is needed here. The old
-    // `Promise.all([planInfo, availability])` tuple flight-serialized the whole
-    // `planInfo` (leaking `planId`) — same RSC mechanism as `ownerUserId`/schedule.
-    // Extract the `tier` primitive immediately; never keep the rich object in a
-    // flight-reachable structure. Sequential awaits (read-only) keep behaviour identical.
-    const planInfoRaw = ownerUserId
-      ? await getCurrentPlan(ownerUserId, SubscriptionScope.MASTER).catch(() => null)
-      : null;
-    const planTier: PlanTier | null = planInfoRaw?.tier ?? null;
-    const availability = await computeAvailabilityHint(
-      provider.id,
-      provider.timezone,
-      normalizeSlotStepMin(ownerMeta?.slotStepMin),
-      Math.max(0, ownerMeta?.minBookingHoursAhead ?? 0),
-      normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
-    );
-
-    const bundles = packages
-      .map((pkg) => {
-        // PACKAGE-BOOKING-MVP-1: order by the package's own item.sortOrder so
-        // the displayed sequence == the booked sequential placement order.
-        const items = [...pkg.items].sort(
-          (a, b) => a.sortOrder - b.sortOrder || a.service.sortOrder - b.service.sortOrder,
-        );
-        const totalPrice = items.reduce((sum, item) => sum + item.service.price, 0);
-        const totalDurationMin = items.reduce(
-          (sum, item) => sum + item.service.durationMin,
-          0,
-        );
-        const discountAmount =
-          pkg.discountType === DiscountType.PERCENT
-            ? Math.round((totalPrice * pkg.discountValue) / 100)
-            : Math.min(totalPrice, pkg.discountValue);
-        const finalPrice = Math.max(0, totalPrice - discountAmount);
-        const serviceNames = items.map(
-          (item) => item.service.title?.trim() || item.service.name,
-        );
-        const components = items.map((item) => ({
-          serviceId: item.serviceId,
-          name: item.service.title?.trim() || item.service.name,
-          price: item.service.price,
-          durationMin: item.service.durationMin,
-        }));
-        const hasDisabledComponent = items.some((item) => !item.service.isEnabled);
-        return {
-          id: pkg.id,
-          name: pkg.name,
-          serviceNames,
-          components,
-          totalDurationMin,
-          totalPrice,
-          finalPrice,
-          discountAmount,
-          discountType: pkg.discountType,
-          discountValue: pkg.discountValue,
-          hasDisabledComponent,
-        };
-      })
-      .filter((bundle) => !bundle.hasDisabledComponent)
-      .map((bundle): PublicBundleView => ({
-        id: bundle.id,
-        name: bundle.name,
-        serviceNames: bundle.serviceNames,
-        components: bundle.components,
-        totalDurationMin: bundle.totalDurationMin,
-        totalPrice: bundle.totalPrice,
-        finalPrice: bundle.finalPrice,
-        discountAmount: bundle.discountAmount,
-        discountType: bundle.discountType,
-        discountValue: bundle.discountValue,
-      }));
-
-    const experienceMonths = createdAt
-      ? computeMonthsBetween(createdAt, new Date())
-      : null;
-
-    // QA-115: only expose a public link when the studio is published + has a
-    // public username; otherwise show the name without a link (no CUID leak).
-    const studioRow = ownerMeta?.studio ?? null;
-    // STUDIO-MASTER-PROFILES (этап 4): после разделения студия — у профиля
-    // мастера в студии, а не у личного.
-    const studioProfile = studioRow ? null : pickActiveStudioProfile(ownerMeta);
-    const studio = studioRow
-      ? {
-          name: studioRow.name,
-          publicUsername: studioRow.isPublished ? studioRow.publicUsername : null,
-        }
-      : studioProfile
-        ? { name: studioProfile.studioName, publicUsername: studioProfile.studioPublicUsername }
-        : null;
 
     return {
       provider,
       bundles,
-      planTier,
-      experienceMonths,
-      availability,
-      // PACKAGE-SOLO-WIZARD-01 — same normalization the booking core applies,
-      // so the wizard's cursor matches the create's `intraPackageOverlap` gap.
-      providerBufferMin: normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
-      studio,
+      planTier: extras.planTier,
+      experienceMonths: extras.experienceMonths,
+      availability: extras.availability,
+      providerBufferMin: extras.providerBufferMin,
+      // QA-115: the web view never carries the studio's internal id.
+      studio: extras.studio
+        ? { name: extras.studio.name, publicUsername: extras.studio.publicUsername }
+        : null,
     };
   },
 );
+
+/**
+ * Plan tier of the provider's owner (`FREE` / `PRO` / `PREMIUM`), `null` when
+ * the provider has no owner or the plan lookup failed.
+ *
+ * Rule 12 (RULE-12-OWNERUSERID-RSC, FIX-17): `ownerUserId` is needed only as a
+ * server-side arg for `getCurrentPlan`, so it's fetched into a transient local
+ * primitive — never kept on a row that crosses into the RSC flight payload.
+ * RULE-12-SCHEDULE (FIX-19): `getCurrentPlan` returns a rich `CurrentPlanInfo`
+ * (with the BillingPlan `planId` CUID); only the `tier` primitive leaves here.
+ */
+export async function resolveProviderPlanTier(
+  providerId: string,
+  scope: SubscriptionScope,
+): Promise<PlanTier | null> {
+  const ownerUserId =
+    (
+      await prisma.provider.findUnique({
+        where: { id: providerId },
+        select: { ownerUserId: true },
+      })
+    )?.ownerUserId ?? null;
+  const planInfoRaw = ownerUserId ? await getCurrentPlan(ownerUserId, scope).catch(() => null) : null;
+  return planInfoRaw?.tier ?? null;
+}
+
+/**
+ * Hero extras of a MASTER page: plan tier, months on the platform, the
+ * nearest-window hint, the normalized buffer and the studio affiliation.
+ * Body of the former `getMasterPublicProfileView` minus the profile and the
+ * bundles — same queries, same order.
+ */
+export async function getMasterHeroExtras(providerId: string, timezone: string): Promise<MasterHeroExtras> {
+  const ownerMeta = await prisma.provider.findUnique({
+    where: { id: providerId },
+    select: {
+      createdAt: true,
+      slotStepMin: true,
+      // EXP-023: the availability chip must respect the same booking-window
+      // cutoff + buffer the booking widget applies, so it shows the FIRST
+      // actually-bookable slot (not the next raw schedule step after now).
+      minBookingHoursAhead: true,
+      bufferBetweenBookingsMin: true,
+      // QA-115: studio affiliation (studioId references the studio's provider row).
+      studio: { select: { id: true, name: true, publicUsername: true, isPublished: true } },
+      // STUDIO-MASTER-PROFILES (этап 4): после разделения студия — у профиля
+      // мастера в студии; тем же запросом.
+      ...ACTIVE_STUDIO_PROFILE_SELECT,
+    },
+  });
+  const createdAt = ownerMeta?.createdAt ?? null;
+
+  // Sequential awaits (read-only) — the same order the aggregator always had.
+  const planTier = await resolveProviderPlanTier(providerId, SubscriptionScope.MASTER);
+  const availability = await computeAvailabilityHint(
+    providerId,
+    timezone,
+    normalizeSlotStepMin(ownerMeta?.slotStepMin),
+    Math.max(0, ownerMeta?.minBookingHoursAhead ?? 0),
+    normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
+  );
+
+  const experienceMonths = createdAt ? computeMonthsBetween(createdAt, new Date()) : null;
+
+  // QA-115: only expose a public link when the studio is published + has a
+  // public username; otherwise show the name without a link (no CUID leak).
+  const studioRow = ownerMeta?.studio ?? null;
+  // STUDIO-MASTER-PROFILES (этап 4): после разделения студия — у профиля
+  // мастера в студии, а не у личного.
+  const studioProfile = studioRow ? null : pickActiveStudioProfile(ownerMeta);
+  const studio = studioRow
+    ? {
+        id: studioRow.id,
+        name: studioRow.name,
+        publicUsername: studioRow.isPublished ? studioRow.publicUsername : null,
+      }
+    : studioProfile
+      ? {
+          id: studioProfile.studioProviderId,
+          name: studioProfile.studioName,
+          publicUsername: studioProfile.studioPublicUsername,
+        }
+      : null;
+
+  return {
+    planTier,
+    experienceMonths,
+    availability,
+    // PACKAGE-SOLO-WIZARD-01 — same normalization the booking core applies,
+    // so the wizard's cursor matches the create's `intraPackageOverlap` gap.
+    providerBufferMin: normalizeBufferMinutes(ownerMeta?.bufferBetweenBookingsMin),
+    studio,
+  };
+}
 
 function computeMonthsBetween(from: Date, to: Date): number {
   const years = to.getUTCFullYear() - from.getUTCFullYear();

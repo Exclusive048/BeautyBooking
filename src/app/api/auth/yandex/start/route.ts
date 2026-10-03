@@ -1,5 +1,3 @@
-import crypto from "crypto";
-import { cookies } from "next/headers";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import {
   cabinetRefererPath,
@@ -10,24 +8,12 @@ import {
 } from "@/lib/auth/oauth-start-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { PHONE_VERIFY_START_PARAM, rememberPhoneVerifyReturn } from "@/lib/auth/phone-verify-return";
-import { buildYandexAuthorizeUrl, requireYandexRedirectUri } from "@/lib/yandex/oauth";
-import { generateCodeChallenge, generateCodeVerifier } from "@/lib/yandex/pkce";
-import {
-  signYandexCookieValue,
-  YANDEX_STATE_COOKIE,
-  YANDEX_STATE_TTL_SECONDS,
-  YANDEX_VERIFIER_COOKIE,
-} from "@/lib/yandex/cookies";
+import { beginOAuthAuthorization, OAUTH_NOT_CONFIGURED_CODES } from "@/lib/auth/oauth-providers";
 import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
-import { signConsentCookieValue, YANDEX_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
-import { isProduction, isYandexAuthEnabled } from "@/lib/env";
+import { isYandexAuthEnabled } from "@/lib/env";
 
 // FIX-YANDEX-OAUTH — start route, bespoke-parallel to api/auth/vk/start.
-const YANDEX_NOT_CONFIGURED_CODES = new Set([
-  "YANDEX_CLIENT_ID_MISSING",
-  "YANDEX_CLIENT_SECRET_MISSING",
-  "YANDEX_REDIRECT_URI_MISSING",
-]);
+const YANDEX_NOT_CONFIGURED_CODES = OAUTH_NOT_CONFIGURED_CODES.yandex;
 
 export async function GET(req: Request): Promise<OAuthStartNavigation> {
   return withRequestContext(req, async () => {
@@ -47,34 +33,9 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
     }
 
     try {
-      const state = crypto.randomBytes(32).toString("hex");
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = generateCodeChallenge(codeVerifier);
-      const redirectUri = requireYandexRedirectUri();
-      const authUrl = buildYandexAuthorizeUrl({ state, codeChallenge, redirectUri });
-
-      const cookieStore = await cookies();
-      cookieStore.set(YANDEX_CONSENT_COOKIE, signConsentCookieValue(state, consentFlags), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: isProduction,
-        path: "/",
-        maxAge: YANDEX_STATE_TTL_SECONDS,
-      });
-      cookieStore.set(YANDEX_STATE_COOKIE, signYandexCookieValue(state), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: isProduction,
-        path: "/",
-        maxAge: YANDEX_STATE_TTL_SECONDS,
-      });
-      cookieStore.set(YANDEX_VERIFIER_COOKIE, signYandexCookieValue(codeVerifier), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: isProduction,
-        path: "/",
-        maxAge: YANDEX_STATE_TTL_SECONDS,
-      });
+      // state + PKCE + три подписанные куки (согласия, state, verifier) — общий
+      // с мобильным стартом `beginOAuthAuthorization` (MOBILE-AUTH-A2).
+      const { authorizeUrl: authUrl } = await beginOAuthAuthorization("yandex", consentFlags);
 
       // PHONE-OAUTH-PROOF-01: вход из кнопки «Подтвердить номер» в кабинете —
       // колбэк вернёт на ту же страницу с итогом (`phone-verify-return.ts`).

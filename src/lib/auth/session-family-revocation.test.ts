@@ -77,6 +77,8 @@ vi.mock("@/lib/prisma", () => {
 vi.mock("@/lib/monitoring/status", () => ({ recordSurfaceEvent: vi.fn() }));
 const cookieJar = vi.hoisted(() => new Map<string, string>());
 vi.mock("next/headers", () => ({
+  // MOBILE-AUTH-A: путь без Request сначала смотрит `Authorization: Bearer`.
+  headers: () => Promise.resolve(new Headers()),
   cookies: () =>
     Promise.resolve({
       get: (name: string) => {

@@ -7,8 +7,9 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { exceedsDeclaredBodyLimit } from "@/lib/http/body-limit";
 import { getClientIp } from "@/lib/http/ip";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
-import { proxyRateLimitKey } from "@/lib/rate-limit/keys";
-import { verifyToken } from "@/lib/auth/jwt";
+import { proxyRateLimitKey, proxyUserRateLimitKey } from "@/lib/rate-limit/keys";
+import { accessTokenSubject, readCookie } from "@/lib/rate-limit/subject";
+import { isBearerAuthorization, parseBearerToken } from "@/lib/auth/bearer";
 import { startApiMetricsFlusher } from "@/lib/monitoring/api-metrics";
 import { installHttpApiMetricsHook } from "@/lib/monitoring/http-metrics-hook";
 
@@ -147,10 +148,18 @@ type RateLimitTier =
   | "modelApplication"
   | "cabinetMutation"
   | "webhookIngress"
+  | "mobileAuth"
+  | "mobileAuthRefresh"
+  | "mediaRead"
   | "publicApi";
 
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const REFRESH_ENDPOINT_PATH = "/api/auth/refresh";
+/** MOBILE-AUTH-A — входы нативного приложения (токены в теле, без кук). */
+const MOBILE_AUTH_PATH_PREFIX = "/api/mobile/v1/auth";
+const MOBILE_REFRESH_ENDPOINT_PATH = `${MOBILE_AUTH_PATH_PREFIX}/refresh`;
+/** MOBILE-B1 — байты медиа (оригинал, `?w=`-превью, вырез `crop/{v}`). */
+const MEDIA_FILE_PATH_PREFIX = "/api/media/file/";
 /** FIX-C2 — две неаутентифицированные health-пробы (см. `resolveRateLimitTier`). */
 const HEALTH_LIVENESS_PATH = "/api/health";
 const HEALTH_READINESS_PATH = "/api/health/ready";
@@ -169,8 +178,12 @@ const HEALTH_READINESS_PATH = "/api/health/ready";
  * вошедшего в кабинет, но без обновления сессии она его не узнавала. Теперь
  * сессия обновляется и там, и страница уводит по `next`. Отсутствующий
  * `/register` убран вместе с ним.
+ *
+ * MOBILE-AUTH-A: `/api/mobile/v1/auth/*` — тот же класс, что `/api/auth/otp`:
+ * сессию эти роуты выдают/ротируют/гасят сами по телу запроса, кука-хоп
+ * прокси им не нужен (и приклеил бы `Set-Cookie` к ответу с токенами).
  */
-const PUBLIC_PATHS = ["/api/auth/otp", REFRESH_ENDPOINT_PATH, "/_next", "/favicon"];
+const PUBLIC_PATHS = ["/api/auth/otp", REFRESH_ENDPOINT_PATH, MOBILE_AUTH_PATH_PREFIX, "/_next", "/favicon"];
 
 function resolveRequestId(request: NextRequest): string {
   const header = request.headers.get("x-request-id");
@@ -216,6 +229,11 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
     // retries never trip a shared public-API limit. Still sensitive/fail-closed
     // via the /api/payments prefix in rate-limit/index.ts.
     if (pathname === "/api/payments/yookassa/webhook") return "webhookIngress";
+    // MOBILE-AUTH-A: веб-refresh из лимита изъят (строка выше — его зовёт сам
+    // прокси), мобильный — нет: это публичная транзакция в БД на любой
+    // присланный токен. Оба тира fail-closed через префикс в rate-limit/index.ts.
+    if (pathname === MOBILE_REFRESH_ENDPOINT_PATH) return "mobileAuthRefresh";
+    if (pathname.startsWith(`${MOBILE_AUTH_PATH_PREFIX}/`)) return "mobileAuth";
   }
 
   if (
@@ -227,7 +245,51 @@ function resolveRateLimitTier(method: string, pathname: string): RateLimitTier |
     return "cabinetMutation";
   }
 
+  // MOBILE-B1: картинки — своё ведро, а не общий `publicApi`. Экран ленты
+  // приложения — это десятки плиток (`?w=`-превью), и 120/мин на ленту из
+  // одних картинок тесно уже одному человеку, а за CGNAT — тем более. Дёшево по
+  // построению: байты неизменны (`immutable`, клиент не перезапрашивает), а
+  // генерация превью ограничена набором ширин — не больше шести на актив.
+  if (method === "GET" && pathname.startsWith(MEDIA_FILE_PATH_PREFIX)) return "mediaRead";
+
   return "publicApi";
+}
+
+/**
+ * MOBILE-B1 — ось ключа тира: вошедший пользователь — по `userId`, аноним —
+ * по IP (`lib/rate-limit/subject.ts`, там же — почему: CGNAT мобильных
+ * операторов).
+ *
+ * По аккаунту меряются ПОЛЬЗОВАТЕЛЬСКИЕ тиры: действия продукта, где единица
+ * злоупотребления — аккаунт, а аккаунт дорог (вход по OTP). По IP — всегда:
+ *  · `webhookIngress` — сервер ЮKassa, сессии у него нет;
+ *  · `mobileAuth` / `mobileAuthRefresh` и ЛЮБОЙ путь под `/api/auth` или
+ *    `/api/mobile/v1/auth` (на этих путях тир чаще всего `publicApi`): вход,
+ *    запрос и проверка OTP, refresh. Здесь вызывающий доказывает личность, а
+ *    не пользуется ею: ключ по аккаунту позволил бы перебирать код из-под N
+ *    своих сессий с N вёдрами. Собственные лимитеры OTP (телефон/почта + IP)
+ *    не меняются.
+ * Лимитеры уровня роута свою ось выбирают сами (`routeRateLimitKey`), этот
+ * список их не касается.
+ */
+const USER_KEYED_TIERS: ReadonlySet<RateLimitTier> = new Set<RateLimitTier>([
+  "bookingCreate",
+  "reviewCreate",
+  "mediaUpload",
+  "modelOffer",
+  "modelApplication",
+  "cabinetMutation",
+  "mediaRead",
+  "publicApi",
+]);
+const AUTH_SURFACE_PREFIXES = ["/api/auth", MOBILE_AUTH_PATH_PREFIX];
+
+export function rateLimitAxisFor(tier: RateLimitTier, pathname: string): "user" | "ip" {
+  if (!USER_KEYED_TIERS.has(tier)) return "ip";
+  const isAuthSurface = AUTH_SURFACE_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  return isAuthSurface ? "ip" : "user";
 }
 
 /**
@@ -267,15 +329,6 @@ export function shouldRejectCrossSiteMutation(input: {
   if (input.fetchSite) return !CSRF_TRUSTED_FETCH_SITES.has(input.fetchSite);
   if (!input.origin) return false;
   return !input.originAllowed;
-}
-
-function isAccessTokenValid(token: string | undefined): boolean {
-  if (!token) return false;
-  try {
-    return Boolean(verifyToken(token, "access"));
-  } catch {
-    return false;
-  }
 }
 
 function splitCombinedSetCookieHeader(headerValue: string): string[] {
@@ -436,13 +489,33 @@ export async function proxy(request: NextRequest) {
   // обработчика выигрывает у заголовка middleware (проверено рантаймом), поэтому
   // множества разводятся здесь. Ни один из этих роутов сессию не читает, а
   // обновление произойдёт на следующем же запросе к любому другому пути.
-  const skipSessionRefresh = isPublicPath || isPublicReferenceApiPath(pathname);
+  // MOBILE-AUTH-A: запрос с `Authorization: Bearer` решается заголовком
+  // (`selectAccessToken` в `auth/bearer.ts` — заголовок главнее куки), поэтому
+  // кука-хоп ему бесполезен: ротировать куки, которые обработчик не прочтёт,
+  // значит тратить одноразовый refresh-токен впустую. Нативное приложение кук
+  // и не шлёт — проверка страхует смешанный случай.
+  const authorization = request.headers.get("authorization");
+  const bearerDeclared = isBearerAuthorization(authorization);
+  const skipSessionRefresh =
+    isPublicPath ||
+    isPublicReferenceApiPath(pathname) ||
+    bearerDeclared;
   let refreshedSetCookies: string[] = [];
 
+  // MOBILE-B1: владелец access-куки нужен дважды — решить, обновлять ли сессию,
+  // и выбрать ось лимита. Подпись проверяется один раз и запоминается
+  // (`undefined` — ещё не проверяли).
+  const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
+  let cookieSubject: string | null | undefined;
+  const readCookieSubject = (): string | null => {
+    if (cookieSubject === undefined) {
+      cookieSubject = accessTokenSubject(request.cookies.get(accessCookieName)?.value);
+    }
+    return cookieSubject;
+  };
+
   if (!skipSessionRefresh) {
-    const accessCookieName = process.env.AUTH_COOKIE_NAME ?? "bh_session";
-    const accessToken = request.cookies.get(accessCookieName)?.value;
-    const accessValid = isAccessTokenValid(accessToken);
+    const accessValid = readCookieSubject() !== null;
 
     if (!accessValid) {
       const refreshToken = request.cookies.get("bh_refresh")?.value;
@@ -481,10 +554,10 @@ export async function proxy(request: NextRequest) {
             // LOGIC-22: свежая кука уезжает и ВНУТРЬ — иначе обработчик этого же
             // запроса продолжит читать протухшую и примет вызывающего за гостя.
             if (refreshedSetCookies.length > 0) {
-              requestHeaders.set(
-                "cookie",
-                mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies),
-              );
+              const mergedCookies = mergeRefreshedCookies(request.headers.get("cookie"), refreshedSetCookies);
+              requestHeaders.set("cookie", mergedCookies);
+              // MOBILE-B1: лимит этого запроса — уже по владельцу свежей сессии.
+              cookieSubject = accessTokenSubject(readCookie(mergedCookies, accessCookieName));
               // PUBLIC-CACHE-SET-COOKIE: обработчик `public`-ответа обязан
               // знать, что к его ответу приложится сессия (`sharedCacheControlFor`).
               requestHeaders.set(SESSION_REFRESHED_REQUEST_HEADER, "1");
@@ -503,10 +576,20 @@ export async function proxy(request: NextRequest) {
   const tier = resolveRateLimitTier(method, pathname);
 
   if (tier) {
-    const ip = getClientIp(request);
+    // MOBILE-B1: вошедший — ведро аккаунта, аноним и auth-поверхность — ведро
+    // IP (`rateLimitAxisFor`). Заявлен Bearer — решает заголовок, кука не
+    // читается (то же правило, что у сессии, `auth/bearer.ts`).
+    const userId =
+      rateLimitAxisFor(tier, pathname) === "user"
+        ? bearerDeclared
+          ? accessTokenSubject(parseBearerToken(authorization))
+          : readCookieSubject()
+        : null;
     // SEC-03: ключ строится по ШАБЛОНУ роута, а не по конкретному URL. Иначе
     // каждый id — своё ведро, и перечисление по id не throttled вообще.
-    const key = proxyRateLimitKey(tier, ip, method, pathname);
+    const key = userId
+      ? proxyUserRateLimitKey(tier, userId, method, pathname)
+      : proxyRateLimitKey(tier, getClientIp(request), method, pathname);
     const result = await checkRateLimit(key, RATE_LIMITS[tier]);
 
     if (result.limited) {

@@ -37,6 +37,17 @@ export function proxyRateLimitKey(tier: string, ip: string, method: string, path
 }
 
 /**
+ * MOBILE-B1 — ключ тира прокси для вошедшего пользователя:
+ * `rl:<tier>:user:<hmac(userId)>:<method>:<шаблон>`. Сегмент `user` не может
+ * совпасть с IP, поэтому вёдра двух осей не пересекаются; шаблон — по-прежнему
+ * последним (чувствительность, `isSensitiveRouteKey`). Какие тиры так ключуются
+ * — решает прокси (`resolveRateLimitSubject`).
+ */
+export function proxyUserRateLimitKey(tier: string, userId: string, method: string, pathname: string): RateLimitKey {
+  return `rl:${tier}:user:${hashIdentity(userId)}:${method}:${toApiRouteTemplate(pathname)}` as RateLimitKey;
+}
+
+/**
  * Ключ лимитера роута: `rl:route:<ось>:<hmac(личность)>:<шаблон>`. Ось — чем
  * меряется бюджет (`ip`, `user`, `phone`, `token`); шаблон — из `req.url`.
  */

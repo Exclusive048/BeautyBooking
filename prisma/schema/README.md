@@ -14,7 +14,7 @@
 | `booking.prisma` | Бронирование | `Booking`, `BookingServiceItem`, `BookingChat`, `ChatMessage` |
 | `schedule.prisma` | Расписание | `WeeklyScheduleConfig`, `WeeklyScheduleDay`, `ScheduleTemplate`, `ScheduleTemplateBreak`, `ScheduleOverride`, `ScheduleBreak`, `ScheduleChangeRequest`, `TimeBlock` |
 | `billing.prisma` | Биллинг | `BillingPlan`, `BillingPlanPrice`, `UserSubscription`, `BillingPayment`, `BillingAuditLog` |
-| `notification.prisma` | Уведомления | `Notification`, `PushSubscription` |
+| `notification.prisma` | Уведомления | `Notification`, `PushSubscription`, `MobilePushDevice` |
 | `media.prisma` | Медиа / Портфолио | `MediaAsset`, `MediaAssetEmbedding`, `ClientCardPhoto`, `PortfolioItem`, `PortfolioItemService`, `PortfolioItemTag`, `Favorite` |
 | `review.prisma` | Отзывы | `Review`, `ReviewTag`, `ReviewTagOnReview` |
 | `hot-slot.prisma` | Горячие слоты | `HotSlot`, `HotSlotSubscription`, `DiscountRule` |

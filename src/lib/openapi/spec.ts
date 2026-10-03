@@ -8,6 +8,9 @@ type SchemaObject = {
   minimum?: number;
   maximum?: number;
   maxLength?: number;
+  /** MOBILE-AUTH-A2: форма PKCE-челленджа и verifier (`codeChallenge`, `codeVerifier`). */
+  minLength?: number;
+  pattern?: string;
   description?: string;
   /** GATES-FIX-01: валидный OpenAPI-ключ, понадобился для GuestConsentInput.marketing. */
   default?: string | number | boolean;
@@ -20,11 +23,24 @@ type SchemaObject = {
 
 type ParameterObject = {
   name: string;
-  in: "path" | "query";
+  /** MOBILE-AUTH-A: `header` — заголовки метаданных клиента (`X-App-Version` и пр.). */
+  in: "path" | "query" | "header";
   required?: boolean;
   schema: SchemaObject;
   description?: string;
 };
+
+/** MOBILE-AUTH-A: схемы аутентификации (`components.securitySchemes`). */
+type SecuritySchemeObject = {
+  type: "http" | "apiKey";
+  scheme?: string;
+  bearerFormat?: string;
+  in?: "cookie" | "header" | "query";
+  name?: string;
+  description?: string;
+};
+
+type SecurityRequirementObject = Record<string, string[]>;
 
 type RequestBodyObject = {
   required?: boolean;
@@ -41,6 +57,8 @@ type ResponseObject = {
 };
 
 type OperationObject = {
+  /** MOBILE-AUTH-A: стабильное имя операции для генераторов клиентов (Flutter). */
+  operationId?: string;
   summary?: string;
   /**
    * GATES-FIX-01: длинное пояснение к эндпоинту. `summary` — одна строка для
@@ -52,6 +70,8 @@ type OperationObject = {
   parameters?: ParameterObject[];
   requestBody?: RequestBodyObject;
   responses: Record<string, ResponseObject>;
+  /** Пустой объект в списке = «можно и без аутентификации». */
+  security?: SecurityRequirementObject[];
 };
 
 type PathItemObject = {
@@ -70,9 +90,11 @@ type OpenApiSpec = {
     description?: string;
   };
   servers?: { url: string; description?: string }[];
+  tags?: { name: string; description?: string }[];
   paths: Record<string, PathItemObject>;
   components?: {
     schemas?: Record<string, SchemaObject>;
+    securitySchemes?: Record<string, SecuritySchemeObject>;
   };
 };
 
@@ -105,6 +127,17 @@ const providerIdParam: ParameterObject = {
   required: true,
   schema: { type: "string" },
   description: "Provider or master id",
+};
+
+/** MOBILE-B3: ключ `/api/public/providers/{providerId}/…` — адрес профиля или CUID. */
+const publicProviderKeyParam: ParameterObject = {
+  name: "providerId",
+  in: "path",
+  required: true,
+  schema: { type: "string", maxLength: 64 },
+  description:
+    "Адрес профиля (`publicUsername`; регистр не важен, старый адрес ведёт на текущий — как `/u/{username}`) " +
+    "или CUID провайдера. Только опубликованные, иначе 404 `PROVIDER_NOT_FOUND`.",
 };
 
 const masterIdParam: ParameterObject = {
@@ -335,6 +368,68 @@ const manualWindowQuery: ParameterObject = {
     "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden. Honoured only for the provider's own side; ignored otherwise.",
 };
 
+/**
+ * MOBILE-AUTH-A — заголовки метаданных нативного клиента. Необязательны:
+ * невалидное или отсутствующее значение просто не попадает в сессию.
+ */
+/**
+ * MOBILE-B1 — город выдачи (`?city=<slug>`), общий для каталога и лент.
+ * Разница «кука / явный параметр / CITY_NOT_FOUND» — в `lib/cities/server-city.ts`.
+ */
+const cityQuery: ParameterObject = {
+  name: "city",
+  in: "query",
+  required: false,
+  schema: { type: "string", maxLength: 64 },
+  description:
+    "MOBILE-B1: slug города из `GET /api/cities` (тот же, что кука `mr-city-slug` веба). Без параметра — " +
+    "все города. Неизвестный или погашенный slug → 400 `CITY_NOT_FOUND` (выберите город заново). " +
+    "Пустое значение — как отсутствующее.",
+};
+
+const catalogCityQuery: ParameterObject = {
+  ...cityQuery,
+  description:
+    "MOBILE-B1: slug города из `GET /api/cities`; ГЛАВНЕЕ куки `mr-city-slug`. Без параметра — город из " +
+    "куки (веб), без куки — все города. Неизвестный или погашенный slug → 400 `CITY_NOT_FOUND`.",
+};
+
+/** MOBILE-B1: публичные чтения — сессия необязательна (вошедшему — свой бюджет лимитов). */
+const optionalAuth: SecurityRequirementObject[] = [{ bearerAuth: [] }, { cookieAuth: [] }, {}];
+
+const mobileClientHeaders: ParameterObject[] = [
+  {
+    name: "X-Client-Platform",
+    in: "header",
+    required: false,
+    schema: { type: "string", enum: ["ios", "android"] },
+    description: "Платформа клиента. Иные значения игнорируются.",
+  },
+  {
+    name: "X-App-Version",
+    in: "header",
+    required: false,
+    schema: { type: "string", maxLength: 32 },
+    description: "Версия приложения, напр. `1.0.0+12` (алфавит `[0-9A-Za-z.+-]`).",
+  },
+  {
+    name: "X-Device-Name",
+    in: "header",
+    required: false,
+    schema: { type: "string", maxLength: 100 },
+    description:
+      "Имя устройства для списка сессий; обрезается до 100 символов. Значение заголовка — Latin-1, " +
+      "поэтому не-ASCII имя слать percent-encoded UTF-8 (`Uri.encodeComponent`).",
+  },
+  {
+    name: "X-Installation-Id",
+    in: "header",
+    required: false,
+    schema: { type: "string", maxLength: 64 },
+    description: "Идентификатор установки (UUID v4), 8–64 символа `[A-Za-z0-9._-]`.",
+  },
+];
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
@@ -343,7 +438,32 @@ export const openApiSpec = {
     description: "Minimal OpenAPI contract for МастерРядом public API.",
   },
   servers: [{ url: "/" }],
+  tags: [
+    {
+      name: "mobile",
+      description:
+        "MOBILE-AUTH-A: эндпоинты нативного приложения. Сессия — токены в теле ответа, дальше " +
+        "`Authorization: Bearer <accessToken>` на любых роутах (наравне с cookie `bh_session`).",
+    },
+  ],
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description:
+          "MOBILE-AUTH-A: access-токен (HS256, ~2 ч) из /api/mobile/v1/auth/*. Принимается всеми " +
+          "роутами наравне с cookie `bh_session`; заявлена схема Bearer — решает заголовок, кука " +
+          "не читается. Протухший/отозванный токен → 401; клиент один раз делает refresh и повторяет.",
+      },
+      cookieAuth: {
+        type: "apiKey",
+        in: "cookie",
+        name: "bh_session",
+        description: "Веб-сессия (httpOnly). Обновляется прокси по cookie `bh_refresh`.",
+      },
+    },
     schemas: {
       ApiSuccess: {
         type: "object",
@@ -919,7 +1039,7 @@ export const openApiSpec = {
             isEnabled: { type: "boolean" },
             triggerHours: { type: "integer" },
             discountType: { $ref: "#/components/schemas/DiscountType" },
-            discountValue: { type: "integer" },
+            discountValue: { type: "integer", description: "PERCENT — проценты; FIXED — рубли (не копейки), HOT-SLOT-FIXED-UNIT" },
             applyMode: { $ref: "#/components/schemas/DiscountApplyMode" },
             minPriceFrom: { type: "integer", nullable: true },
             serviceIds: { type: "array", items: { type: "string" } },
@@ -946,7 +1066,7 @@ export const openApiSpec = {
             isEnabled: { type: "boolean" },
             triggerHours: { type: "integer" },
             discountType: { $ref: "#/components/schemas/DiscountType" },
-            discountValue: { type: "integer" },
+            discountValue: { type: "integer", description: "PERCENT — проценты; FIXED — рубли (не копейки), HOT-SLOT-FIXED-UNIT" },
             applyMode: { $ref: "#/components/schemas/DiscountApplyMode" },
             minPriceFrom: { type: "integer", nullable: true },
             serviceIds: { type: "array", items: { type: "string" } },
@@ -984,7 +1104,7 @@ export const openApiSpec = {
             startAtUtc: { type: "string", format: "date-time" },
             endAtUtc: { type: "string", format: "date-time" },
             discountType: { $ref: "#/components/schemas/DiscountType" },
-            discountValue: { type: "integer" },
+            discountValue: { type: "integer", description: "PERCENT — проценты; FIXED — рубли (не копейки), HOT-SLOT-FIXED-UNIT" },
             isActive: { type: "boolean" },
           },
         },
@@ -2157,14 +2277,1010 @@ export const openApiSpec = {
           hasPhone: { type: "boolean" },
         },
       },
+      // ── MOBILE-AUTH-A ────────────────────────────────────────────────────
+      MobileSessionTokens: {
+        type: "object",
+        required: ["accessToken", "accessTokenExpiresAt", "refreshToken", "refreshTokenExpiresAt"],
+        properties: {
+          accessToken: { type: "string", description: "HS256 JWT, ~2 ч. Шлётся как `Authorization: Bearer`." },
+          accessTokenExpiresAt: { type: "string", format: "date-time" },
+          refreshToken: {
+            type: "string",
+            description: "Одноразовый, ротируемый, ~30 дн. Хранить в защищённом хранилище устройства.",
+          },
+          refreshTokenExpiresAt: { type: "string", format: "date-time" },
+        },
+      },
+      MeIdentity: {
+        type: "object",
+        description: "Форма `data.user` в `GET /api/me`.",
+        required: [
+          "id",
+          "roles",
+          "displayName",
+          "phone",
+          "email",
+          "externalPhotoUrl",
+          "avatarUrl",
+          "phoneVerified",
+          "emailNotificationsEnabled",
+          "pushNotificationsEnabled",
+        ],
+        properties: {
+          id: { type: "string" },
+          roles: {
+            type: "array",
+            items: { type: "string", enum: ["CLIENT", "MASTER", "STUDIO", "STUDIO_ADMIN", "ADMIN", "SUPERADMIN"] },
+          },
+          displayName: { type: "string", nullable: true },
+          phone: { type: "string", nullable: true },
+          email: { type: "string", nullable: true },
+          externalPhotoUrl: { type: "string", nullable: true },
+          avatarUrl: {
+            type: "string",
+            nullable: true,
+            description:
+              "MOBILE-CLIENT-01: аватар клиента — то же правило, что `avatar.url` кабинетного профиля: " +
+              "загруженный (`/api/media/file/{id}`, относительный, приватный — грузить с `Authorization`, " +
+              "без кропа), иначе `externalPhotoUrl` (абсолютный), иначе null.",
+          },
+          phoneVerified: {
+            type: "boolean",
+            description: "MOBILE-CLIENT-01: владение номером доказано (phone-OTP, VK / Яндекс). `phone` без него — заявка.",
+          },
+          emailNotificationsEnabled: { type: "boolean" },
+          emailVerified: {
+            type: "boolean",
+            description: "Может отсутствовать (старый кадр кэша) — трактовать как «неизвестно».",
+          },
+          pushNotificationsEnabled: { type: "boolean" },
+          welcomePending: { type: "boolean", description: "Может отсутствовать — трактовать как false." },
+        },
+      },
+      MeIdentityData: {
+        type: "object",
+        required: ["user"],
+        properties: {
+          user: { allOf: [{ $ref: "#/components/schemas/MeIdentity" }], nullable: true },
+        },
+      },
+      MobileAuthData: {
+        type: "object",
+        required: ["tokens", "user"],
+        properties: {
+          tokens: { $ref: "#/components/schemas/MobileSessionTokens" },
+          user: { $ref: "#/components/schemas/MeIdentity" },
+        },
+      },
+      MobileTokensData: {
+        type: "object",
+        required: ["tokens"],
+        properties: {
+          tokens: { $ref: "#/components/schemas/MobileSessionTokens" },
+        },
+      },
+      MobileOtpVerifyInput: {
+        type: "object",
+        required: ["phone", "code"],
+        properties: {
+          phone: { type: "string", description: "+7XXXXXXXXXX (нормализуется сервером)" },
+          code: { type: "string" },
+          consent: {
+            $ref: "#/components/schemas/GuestConsentInput",
+            description: "Обязателен, когда вход создаёт аккаунт (иначе 400 CONSENT_REQUIRED).",
+          },
+        },
+      },
+      MobileOtpEmailVerifyInput: {
+        type: "object",
+        required: ["email", "code"],
+        properties: {
+          email: { type: "string", format: "email" },
+          code: { type: "string" },
+          consent: {
+            $ref: "#/components/schemas/GuestConsentInput",
+            description: "Обязателен, когда вход создаёт аккаунт (иначе 400 CONSENT_REQUIRED).",
+          },
+        },
+      },
+      MobileRefreshTokenInput: {
+        type: "object",
+        required: ["refreshToken"],
+        properties: {
+          refreshToken: { type: "string", maxLength: 4096 },
+        },
+      },
+      MobileEmptyData: {
+        type: "object",
+        additionalProperties: false,
+      },
+      // ── MOBILE-B2: native push ────────────────────────────────────────────
+      MobilePushDeviceInput: {
+        type: "object",
+        required: ["provider", "token"],
+        properties: {
+          provider: {
+            type: "string",
+            enum: ["fcm", "apns", "rustore"],
+            description: "`apns` — только iOS, `rustore` — только Android, `fcm` — обе платформы.",
+          },
+          token: {
+            type: "string",
+            maxLength: 1024,
+            description: "Push-токен устройства (видимые ASCII; у APNs — hex 32–200 символов).",
+          },
+          apnsEnvironment: {
+            type: "string",
+            enum: ["sandbox", "production"],
+            description: "Только для `apns`: сборка из Xcode/TestFlight — `sandbox`, App Store — `production` (по умолчанию).",
+          },
+        },
+      },
+      MobilePushDeviceRegisteredData: {
+        type: "object",
+        required: ["registered"],
+        properties: { registered: { type: "boolean", enum: [true] } },
+      },
+      MobilePushData: {
+        type: "object",
+        description:
+          "MOBILE-B2: `data` push-уведомления (FCM/RuStore — `message.data`, APNs — ключи рядом с `aps`). " +
+          "Все значения — строки. Без ПДн: заголовок и текст общие по типу события, только id сущностей. " +
+          "`actions = BOOKING_DECISION` — новая запись ждёт решения мастера: iOS — `aps.category`, " +
+          "Android — сообщение без блока notification, уведомление с кнопками строит приложение.",
+        required: ["v", "type", "link", "title", "body", "channelId"],
+        properties: {
+          v: { type: "string", enum: ["1"], description: "Версия формы `data`." },
+          type: { type: "string", description: "`NotificationType` (как в `GET /api/notifications`)." },
+          link: { type: "string", description: "Путь экрана приложения, напр. `/master/bookings/{bookingId}`." },
+          title: { type: "string" },
+          body: { type: "string" },
+          channelId: { type: "string", enum: ["bookings", "messages", "general", "promo"], description: "Канал Android." },
+          notificationId: { type: "string", description: "Id уведомления — отметить прочитанным." },
+          actions: { type: "string", enum: ["BOOKING_DECISION"] },
+          badge: { type: "string", description: "Число непрочитанных (строкой)." },
+          bookingId: { type: "string" },
+          chatId: { type: "string" },
+          conversationSlug: { type: "string" },
+          reviewId: { type: "string" },
+          offerId: { type: "string" },
+          applicationId: { type: "string" },
+          hotSlotId: { type: "string" },
+        },
+      },
+      // ── MOBILE-B1: платформа (город, истории, онбординг) ─────────────────
+      CityItem: {
+        type: "object",
+        required: ["id", "slug", "name", "nameGenitive", "latitude", "longitude"],
+        properties: {
+          id: { type: "string" },
+          slug: { type: "string", description: "Идентификатор для `?city=` и куки `mr-city-slug`" },
+          name: { type: "string" },
+          nameGenitive: { type: "string", nullable: true, description: "«Казани» — для заголовков «в …»" },
+          latitude: { type: "number" },
+          longitude: { type: "number" },
+        },
+      },
+      CityListData: {
+        type: "object",
+        required: ["items"],
+        properties: { items: { type: "array", items: { $ref: "#/components/schemas/CityItem" } } },
+      },
+      PublicPackageComponent: {
+        type: "object",
+        required: ["serviceId", "name", "price", "durationMin"],
+        properties: {
+          serviceId: {
+            type: "string",
+            description:
+              "CUID услуги (booking-flow исключение правила 12): `serviceId` для `/slots` (соло) или " +
+              "`/api/masters/{id}/availability` (студия) и для тела propose/book.",
+          },
+          name: { type: "string", description: "`title`, иначе `name` услуги" },
+          price: {
+            type: "integer",
+            description: "Копейки. Студия — базовая цена каталога: у мастера может быть своя, точную даёт `studio/propose`.",
+          },
+          durationMin: { type: "integer", description: "Минуты. Студия — базовая длительность (у мастера может быть своя)." },
+        },
+      },
+      PublicPackage: {
+        type: "object",
+        required: [
+          "id",
+          "name",
+          "serviceNames",
+          "components",
+          "totalDurationMin",
+          "totalPrice",
+          "finalPrice",
+          "discountAmount",
+        ],
+        properties: {
+          id: {
+            type: "string",
+            description: "CUID пакета для `/api/public/packages/{id}/…` (booking-flow исключение правила 12).",
+          },
+          name: { type: "string" },
+          serviceNames: { type: "array", items: { type: "string" } },
+          components: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PublicPackageComponent" },
+            description: "В порядке пакета — в этом порядке веб и предлагает выбирать время.",
+          },
+          totalDurationMin: { type: "integer" },
+          totalPrice: { type: "integer", description: "Копейки: сумма услуг" },
+          finalPrice: { type: "integer", description: "Копейки: цена пакета со скидкой" },
+          discountAmount: { type: "integer", description: "Копейки" },
+        },
+      },
+      PublicProviderPackagesData: {
+        type: "object",
+        required: ["kind", "bufferMin", "packages"],
+        properties: {
+          kind: {
+            type: "string",
+            enum: ["solo", "studio", "none"],
+            description:
+              "`solo` — запись через `/api/public/packages/{id}/{propose,book}`; `studio` — через " +
+              "`…/studio/{propose,book}` (мастер на каждую услугу); `none` — пакеты на этой странице не продаются " +
+              "(мастер студии), `packages` пуст.",
+          },
+          bufferMin: {
+            type: "integer",
+            minimum: 0,
+            description:
+              "`solo`: перерыв мастера между записями (нормализован как в ядре записи) — следующая услуга пакета " +
+              "не раньше `конец предыдущей + bufferMin`. `studio`/`none`: 0 (буфер мастера студии — в " +
+              "`GET /api/providers/{id}/masters`).",
+          },
+          packages: { type: "array", items: { $ref: "#/components/schemas/PublicPackage" } },
+        },
+      },
+      ProviderAvailabilityHint: {
+        type: "object",
+        required: ["kind"],
+        properties: {
+          kind: { type: "string", enum: ["today", "later", "none"] },
+          time: { type: "string", description: "`kind=today`: `HH:MM` в поясе салона (`provider.timezone`)" },
+          dateKey: { type: "string", format: "date", description: "`kind=later`: `YYYY-MM-DD` в поясе салона" },
+        },
+      },
+      PublicProviderOverviewData: {
+        type: "object",
+        required: ["planTier", "experienceMonths", "availability", "studio", "viewer"],
+        properties: {
+          planTier: {
+            type: "string",
+            enum: ["FREE", "PRO", "PREMIUM"],
+            nullable: true,
+            description: "Тариф владельца (кольцо и бейдж — у `PREMIUM`); `null` — неизвестен.",
+          },
+          experienceMonths: {
+            type: "integer",
+            nullable: true,
+            description: "Мастер: месяцев на платформе. Студия: `null`.",
+          },
+          availability: {
+            allOf: [{ $ref: "#/components/schemas/ProviderAvailabilityHint" }],
+            nullable: true,
+            description:
+              "Мастер: ближайшее окошко (зонд на 8 дней, услуга 30 мин; подсказка, кэш 60 с). Студия: `null`.",
+          },
+          studio: {
+            type: "object",
+            nullable: true,
+            required: ["id", "name", "publicUsername"],
+            description: "Мастер в студии; иначе `null`.",
+            properties: {
+              id: { type: "string", description: "`Provider.id` студии — то же, что `provider.studioId` профиля" },
+              name: { type: "string" },
+              publicUsername: { type: "string", nullable: true, description: "`null` — страница студии не публична" },
+            },
+          },
+          viewer: {
+            type: "object",
+            required: ["isFavorited", "isOwner", "reviewableBookingId"],
+            description: "Флаги зрителя; гостю — `false`/`null`. Не кэшируются.",
+            properties: {
+              isFavorited: { type: "boolean" },
+              isOwner: { type: "boolean", description: "Своя страница — запись не предлагать (сервер её отклонит)" },
+              reviewableBookingId: {
+                type: "string",
+                nullable: true,
+                description: "Своя запись зрителя, на которую можно оставить отзыв (`POST /api/reviews`)",
+              },
+            },
+          },
+        },
+      },
+      FeedStoriesItem: {
+        type: "object",
+        required: ["id", "mediaUrl", "createdAt", "performerName", "serviceTitle"],
+        properties: {
+          id: { type: "string", description: "Непрозрачный токен (не id работы)" },
+          mediaUrl: { type: "string", description: "Относительная ссылка `/api/media/file/{id}` — понимает `?w=`" },
+          createdAt: { type: "string", format: "date-time" },
+          performerName: { type: "string", nullable: true },
+          serviceTitle: { type: "string", nullable: true },
+        },
+      },
+      FeedStoriesGroup: {
+        type: "object",
+        required: ["masterId", "providerName", "providerType", "username", "avatarUrl", "items"],
+        properties: {
+          masterId: { type: "string", description: "Непрозрачный токен группы (не id провайдера)" },
+          providerName: { type: "string" },
+          providerType: { type: "string", enum: ["MASTER", "STUDIO"] },
+          username: { type: "string", nullable: true, description: "publicUsername — профиль `/u/{username}`" },
+          avatarUrl: { type: "string", nullable: true },
+          items: { type: "array", items: { $ref: "#/components/schemas/FeedStoriesItem" } },
+        },
+      },
+      FeedStoriesData: {
+        type: "object",
+        required: ["groups", "cachedAt"],
+        properties: {
+          groups: { type: "array", items: { $ref: "#/components/schemas/FeedStoriesGroup" } },
+          cachedAt: { type: "string", format: "date-time" },
+        },
+      },
+      CatalogAutocompleteData: {
+        type: "object",
+        required: ["categories", "providers"],
+        properties: {
+          categories: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Публичный токен — фильтр `globalCategoryId` каталога" },
+                name: { type: "string" },
+                icon: { type: "string", nullable: true },
+                slug: { type: "string", nullable: true },
+                parentId: { type: "string", nullable: true },
+              },
+            },
+          },
+          providers: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                publicUsername: { type: "string", nullable: true },
+                type: { type: "string", enum: ["master", "studio"] },
+                ratingAvg: { type: "number" },
+                ratingCount: { type: "integer" },
+                avatarUrl: { type: "string", nullable: true },
+              },
+            },
+          },
+        },
+      },
+      AvailabilitySearchData: {
+        type: "object",
+        required: ["items"],
+        properties: {
+          items: {
+            type: "array",
+            items: { type: "object", description: "Провайдер с ближайшими окнами (`AvailabilityProviderItem`)" },
+          },
+        },
+      },
+      PublicModelOffersData: {
+        type: "object",
+        required: ["items", "nextPage"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/PublicModelOfferItem" } },
+          nextPage: { type: "integer", nullable: true },
+        },
+      },
+      ProfessionalOnboardingData: {
+        type: "object",
+        required: ["role", "status", "providerId", "next"],
+        properties: {
+          role: { type: "string", enum: ["MASTER", "STUDIO"] },
+          status: {
+            type: "string",
+            enum: ["created", "already-exists"],
+            description: "`already-exists` — кабинет уже был; повтор безопасен (идемпотентно)",
+          },
+          providerId: { type: "string", description: "Внутренний id провайдера кабинета (для кабинетных API)" },
+          masterProfileId: { type: "string", description: "Только для MASTER" },
+          studioId: { type: "string", description: "Только для STUDIO" },
+          next: {
+            type: "string",
+            enum: ["/cabinet/master", "/cabinet/studio"],
+            description: "Куда ведёт веб; подсказка, у приложения своя навигация",
+          },
+        },
+      },
+      // ── MOBILE-AUTH-A2: вход через VK ID / Яндекс ID ─────────────────────
+      MobileOAuthExchangeInput: {
+        type: "object",
+        required: ["code", "codeVerifier"],
+        properties: {
+          code: {
+            type: "string",
+            maxLength: 256,
+            description: "Одноразовый код из `masterryadom://auth/callback?code=…` (живёт 60 с).",
+          },
+          codeVerifier: {
+            type: "string",
+            minLength: 43,
+            maxLength: 128,
+            pattern: "^[A-Za-z0-9._~-]{43,128}$",
+            description: "PKCE verifier приложения (RFC 7636), чей S256-челлендж ушёл на старт.",
+          },
+        },
+      },
+      MobileOAuthLinkIntentData: {
+        type: "object",
+        required: ["intent"],
+        properties: {
+          intent: {
+            type: "string",
+            description:
+              "Одноразовый токен привязки (5 мин): передать в `…/oauth/{provider}/start?intent=…`. " +
+              "Привязан к пользователю и провайдеру.",
+          },
+        },
+      },
+      // ── MOBILE-AUTH-A3: список сессий ───────────────────────────────────
+      SessionFamily: {
+        type: "object",
+        required: [
+          "id",
+          "clientType",
+          "platform",
+          "deviceName",
+          "appVersion",
+          "browser",
+          "createdAt",
+          "lastUsedAt",
+          "current",
+        ],
+        properties: {
+          id: { type: "string", description: "Id семьи сессий — его принимает `DELETE /api/me/sessions/{id}`." },
+          clientType: { type: "string", enum: ["WEB", "MOBILE"] },
+          platform: { type: "string", nullable: true, description: "`ios` / `android` у приложения; у веба null." },
+          deviceName: { type: "string", nullable: true },
+          appVersion: { type: "string", nullable: true },
+          browser: {
+            type: "string",
+            nullable: true,
+            description: "Сводка User-Agent веб-сессии («Chrome, Windows»); у приложения и старых веб-сессий null.",
+          },
+          createdAt: { type: "string", format: "date-time" },
+          lastUsedAt: { type: "string", format: "date-time", nullable: true },
+          current: { type: "boolean", description: "Сессия, которой сделан этот запрос." },
+        },
+      },
+      SessionFamilyListData: {
+        type: "object",
+        required: ["sessions"],
+        properties: {
+          sessions: { type: "array", items: { $ref: "#/components/schemas/SessionFamily" } },
+        },
+      },
+      SessionRevokeOthersData: {
+        type: "object",
+        required: ["revoked"],
+        properties: {
+          revoked: { type: "integer", minimum: 0, description: "Сколько активных сессий завершено." },
+        },
+      },
+      ProviderUnlinkData: {
+        type: "object",
+        required: ["unlinked"],
+        properties: {
+          unlinked: { type: "boolean", enum: [true] },
+        },
+      },
+      // Клиентский профиль (`/api/cabinet/user/profile`) — источник флагов
+      // «VK/Яндекс привязан» для приложения.
+      ClientProfileLinkedVk: {
+        type: "object",
+        required: ["linked", "deliveryEnabled", "connectedAt"],
+        properties: {
+          linked: { type: "boolean", description: "Аккаунт VK привязан (identity)." },
+          deliveryEnabled: {
+            type: "boolean",
+            description: "Уведомления через VK включены. `POST /api/auth/vk/unlink` снимает именно этот флаг.",
+          },
+          connectedAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+      ClientProfileLinkedYandex: {
+        type: "object",
+        required: ["linked", "enabled", "connectedAt"],
+        properties: {
+          linked: { type: "boolean", description: "Аккаунт Яндекс ID привязан (identity)." },
+          enabled: {
+            type: "boolean",
+            description:
+              "Связка включена. `POST /api/auth/yandex/unlink` снимает флаг (связка не удаляется), " +
+              "следующий вход через Яндекс возвращает его.",
+          },
+          connectedAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+      ClientProfileData: {
+        type: "object",
+        required: ["personal", "contacts", "avatar", "linked", "stats", "completion"],
+        properties: {
+          personal: {
+            type: "object",
+            required: ["firstName", "lastName", "city", "birthDate", "hideAgeYear"],
+            properties: {
+              firstName: { type: "string", nullable: true },
+              lastName: { type: "string", nullable: true },
+              city: { type: "string", nullable: true },
+              birthDate: { type: "string", format: "date", nullable: true },
+              hideAgeYear: { type: "boolean" },
+            },
+          },
+          contacts: {
+            type: "object",
+            required: ["phone", "phoneVerified", "email", "emailVerified"],
+            properties: {
+              phone: { type: "string", nullable: true },
+              phoneVerified: { type: "boolean" },
+              email: { type: "string", nullable: true },
+              emailVerified: { type: "boolean" },
+            },
+          },
+          avatar: {
+            type: "object",
+            required: ["url"],
+            properties: { url: { type: "string", nullable: true } },
+          },
+          linked: {
+            type: "object",
+            required: ["telegram", "vk", "yandex"],
+            properties: {
+              telegram: {
+                type: "object",
+                required: ["linked", "deliveryEnabled", "username", "connectedAt"],
+                properties: {
+                  linked: { type: "boolean" },
+                  deliveryEnabled: { type: "boolean" },
+                  username: { type: "string", nullable: true },
+                  connectedAt: { type: "string", format: "date-time", nullable: true },
+                },
+              },
+              vk: { $ref: "#/components/schemas/ClientProfileLinkedVk" },
+              yandex: { $ref: "#/components/schemas/ClientProfileLinkedYandex" },
+            },
+          },
+          stats: {
+            type: "object",
+            required: ["visitsCount", "favoritesCount", "memberSince"],
+            properties: {
+              visitsCount: { type: "integer" },
+              favoritesCount: { type: "integer" },
+              memberSince: { type: "string", format: "date-time" },
+            },
+          },
+          completion: {
+            type: "object",
+            required: ["percent", "items"],
+            properties: {
+              percent: { type: "integer", minimum: 0, maximum: 100 },
+              items: {
+                type: "object",
+                required: ["nameLastname", "phoneVerified", "emailVerified", "birthday", "tgLinked", "vkLinked"],
+                properties: {
+                  nameLastname: { type: "boolean" },
+                  phoneVerified: { type: "boolean", description: "Исторический ключ: номер указан (не владение)." },
+                  emailVerified: { type: "boolean" },
+                  birthday: { type: "boolean" },
+                  tgLinked: { type: "boolean" },
+                  vkLinked: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+      },
+      ClientProfileUpdateInput: {
+        type: "object",
+        description: "Частичное обновление: отсутствующее поле не меняется, `null` — очищает.",
+        properties: {
+          firstName: { type: "string", maxLength: 100, nullable: true },
+          lastName: { type: "string", maxLength: 100, nullable: true },
+          phone: {
+            type: "string",
+            maxLength: 40,
+            nullable: true,
+            description: "Российский номер, нормализуется в +7XXXXXXXXXX.",
+          },
+          city: { type: "string", maxLength: 200, nullable: true },
+          birthDate: { type: "string", format: "date", nullable: true },
+          hideAgeYear: { type: "boolean" },
+          email: { type: "string", format: "email", maxLength: 255, nullable: true },
+        },
+      },
+      // ── MOBILE-CLIENT-01: «Мои записи», «Мои отзывы», предложение для моделей ──
+      ClientBooking: {
+        type: "object",
+        description:
+          "Элемент «Моих записей» (`ClientBookingDTO`) — одна форма у списка и у карточки записи. " +
+          "Мгновения — UTC ISO, показывать в `provider.timezone` (часовой пояс салона); деньги — копейки; " +
+          "id — внутренние CUID (кабинет, правило 12 не действует).",
+        required: [
+          "id", "status", "createdAt", "startAtUtc", "endAtUtc", "durationMin", "slotLabel",
+          "isUpcoming", "isFinished", "isCancelled", "isToday", "canReview", "hasReview",
+          "reviewDeadlineUtc", "chatSlug", "proposedStartAt", "proposedEndAt", "actionRequiredBy",
+          "changeComment", "clientChangeRequestsCount", "changeRequestLimit", "bookingPackageId",
+          "cancelledBy", "cancelReason", "cancellationDeadlineHours", "comment", "silentMode",
+          "isOnSite", "address", "provider", "studio", "service",
+        ],
+        properties: {
+          id: { type: "string" },
+          status: {
+            type: "string",
+            enum: [
+              "NEW", "PENDING", "CONFIRMED", "CHANGE_REQUESTED", "REJECTED", "IN_PROGRESS",
+              "PREPAID", "STARTED", "FINISHED", "CANCELLED", "NO_SHOW",
+            ],
+            description: "ХРАНИМЫЙ статус (не runtime): группу брать из `isUpcoming`/`isFinished`/`isCancelled`.",
+          },
+          createdAt: {
+            type: "string",
+            format: "date-time",
+            description: "Создание записи; неподтверждённая отменяется через 24 ч от него (или в момент начала).",
+          },
+          startAtUtc: { type: "string", format: "date-time", nullable: true },
+          endAtUtc: { type: "string", format: "date-time", nullable: true },
+          durationMin: { type: "integer" },
+          slotLabel: { type: "string", description: "Служебная подпись — не показывать." },
+          isUpcoming: { type: "boolean" },
+          isFinished: { type: "boolean" },
+          isCancelled: { type: "boolean" },
+          isToday: { type: "boolean", description: "Начало — сегодня по часам салона." },
+          canReview: { type: "boolean", description: "Тот же предикат, что у `POST /api/reviews`." },
+          hasReview: { type: "boolean", description: "Отзыв есть (в том числе удалённый)." },
+          reviewDeadlineUtc: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description:
+              "Конец окна отзыва (начало + длительность + 60 мин + 3 дня). null — отзыва по записи уже не будет: " +
+              "отзыв есть, запись отменена или окно прошло. У будущей записи — конец её будущего окна.",
+          },
+          chatSlug: {
+            type: "string",
+            nullable: true,
+            description:
+              "Переписка (`/api/chat/threads/{slug}`). Только у записи к мастеру; у студийной записи всегда null " +
+              "(мессенджер студийные записи не показывает).",
+          },
+          proposedStartAt: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Только при CHANGE_REQUESTED.",
+          },
+          proposedEndAt: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Только при CHANGE_REQUESTED.",
+          },
+          actionRequiredBy: {
+            type: "string",
+            enum: ["CLIENT", "MASTER"],
+            nullable: true,
+            description: "Только при CHANGE_REQUESTED: CLIENT — мастер предложил время и ждёт вас, MASTER — ждёте мастера.",
+          },
+          changeComment: {
+            type: "string",
+            nullable: true,
+            description: "Комментарий мастера к предложенному переносу; только при CHANGE_REQUESTED.",
+          },
+          clientChangeRequestsCount: { type: "integer", description: "Сколько раз вы уже просили перенос." },
+          changeRequestLimit: {
+            type: "integer",
+            description: "Предел запросов переноса (сейчас 3): при `clientChangeRequestsCount >= changeRequestLimit` перенос — 409.",
+          },
+          bookingPackageId: {
+            type: "string",
+            nullable: true,
+            description: "Часть пакета: отменяется только целиком (`/api/bookings/package/{id}/cancel`).",
+          },
+          cancelledBy: {
+            type: "string",
+            enum: ["CLIENT", "PROVIDER", "SYSTEM"],
+            nullable: true,
+            description: "Кто отменил; только у отменённой записи (`isCancelled`).",
+          },
+          cancelReason: { type: "string", nullable: true, description: "Причина отмены мастером/студией (только PROVIDER)." },
+          cancellationDeadlineHours: {
+            type: "integer",
+            minimum: 1,
+            nullable: true,
+            description:
+              "Срок бесплатной отмены записанного провайдера (у студийной записи — студии), часов до начала; " +
+              "null — срока нет. Позже — отмена 423 CANCELLATION_DEADLINE_PASSED.",
+          },
+          comment: { type: "string", nullable: true, description: "Ваш комментарий к записи." },
+          silentMode: { type: "boolean", description: "«Хочу помолчать»." },
+          isOnSite: { type: "boolean", description: "Есть адрес — можно строить маршрут." },
+          address: {
+            type: "string",
+            nullable: true,
+            description: "Первый непустой из адреса мастера и адреса записанного провайдера (у студийной — студии).",
+          },
+          provider: {
+            type: "object",
+            description:
+              "Кто оказывает услугу: мастер (у студийной записи — профиль мастера в студии), без мастера — сама студия.",
+            required: ["id", "name", "publicUsername", "type", "avatarUrl", "timezone"],
+            properties: {
+              id: { type: "string", description: "Provider CUID (слоты переноса)." },
+              name: { type: "string" },
+              publicUsername: { type: "string", nullable: true },
+              type: { type: "string", enum: ["MASTER", "STUDIO"] },
+              avatarUrl: { type: "string", nullable: true },
+              timezone: { type: "string", description: "IANA-пояс салона — в нём показывать все времена записи." },
+            },
+          },
+          studio: {
+            type: "object",
+            nullable: true,
+            description: "Студия, через которую записались, когда `provider` — мастер в ней; иначе null.",
+            required: ["id", "name", "publicUsername", "address"],
+            properties: {
+              id: { type: "string", description: "Provider CUID студии." },
+              name: { type: "string" },
+              publicUsername: { type: "string", nullable: true },
+              address: { type: "string", nullable: true },
+            },
+          },
+          service: {
+            type: "object",
+            required: ["id", "name", "priceSnapshot", "durationSnapshotMin"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              priceSnapshot: { type: "integer", description: "Копейки, цена на момент записи (со скидками)." },
+              durationSnapshotMin: { type: "integer" },
+            },
+          },
+        },
+      },
+      ClientBookingsData: {
+        type: "object",
+        required: ["bookings", "kpi"],
+        properties: {
+          bookings: {
+            type: "array",
+            description: "До 300 последних записей: предстоящие по возрастанию, затем завершённые и отменённые по убыванию.",
+            items: { $ref: "#/components/schemas/ClientBooking" },
+          },
+          kpi: {
+            type: "object",
+            description: "Считается по всем загруженным записям, без фильтров.",
+            required: ["totalCount", "upcomingNext", "finishedCount", "spentLast90dKopeks"],
+            properties: {
+              totalCount: { type: "integer" },
+              upcomingNext: {
+                type: "object",
+                nullable: true,
+                required: ["whenIso", "providerName", "serviceName", "timeZone"],
+                properties: {
+                  whenIso: { type: "string", format: "date-time" },
+                  providerName: { type: "string" },
+                  serviceName: { type: "string" },
+                  timeZone: { type: "string" },
+                },
+              },
+              finishedCount: { type: "integer" },
+              spentLast90dKopeks: { type: "integer" },
+            },
+          },
+        },
+      },
+      ClientBookingData: {
+        type: "object",
+        required: ["booking"],
+        properties: { booking: { $ref: "#/components/schemas/ClientBooking" } },
+      },
+      ClientReviewTarget: {
+        type: "object",
+        required: ["type", "id", "name", "avatarUrl", "publicUsername"],
+        properties: {
+          type: { type: "string", enum: ["MASTER", "STUDIO"] },
+          id: { type: "string", description: "Provider CUID." },
+          name: { type: "string", description: "«—», если провайдера больше нет." },
+          avatarUrl: { type: "string", nullable: true },
+          publicUsername: { type: "string", nullable: true },
+        },
+      },
+      ClientReviewsData: {
+        type: "object",
+        required: ["reviews", "kpi", "pending"],
+        properties: {
+          reviews: {
+            type: "array",
+            items: {
+              type: "object",
+              required: [
+                "id", "rating", "text", "createdAt", "updatedAt", "canEdit", "hasReply", "replyText",
+                "repliedAt", "target", "bookingId", "serviceName",
+              ],
+              properties: {
+                id: { type: "string", description: "CUID отзыва (PATCH/DELETE `/api/reviews/{id}` его принимают)." },
+                rating: { type: "integer", minimum: 1, maximum: 5 },
+                text: { type: "string", nullable: true },
+                createdAt: { type: "string", format: "date-time" },
+                updatedAt: { type: "string", format: "date-time" },
+                canEdit: { type: "boolean", description: "48 ч от публикации." },
+                hasReply: { type: "boolean" },
+                replyText: { type: "string", nullable: true },
+                repliedAt: { type: "string", format: "date-time", nullable: true },
+                target: { $ref: "#/components/schemas/ClientReviewTarget" },
+                bookingId: { type: "string", nullable: true },
+                serviceName: { type: "string", nullable: true },
+              },
+            },
+          },
+          kpi: {
+            type: "object",
+            required: ["total", "averageRating", "respondedCount", "pendingCount"],
+            properties: {
+              total: { type: "integer" },
+              averageRating: { type: "number", nullable: true },
+              respondedCount: { type: "integer" },
+              pendingCount: { type: "integer" },
+            },
+          },
+          pending: {
+            type: "array",
+            description: "До 10 визитов, ждущих отзыва; цель — записанный провайдер (у студийной записи — студия).",
+            items: {
+              type: "object",
+              required: ["bookingId", "serviceName", "endAtUtc", "daysLeft", "target"],
+              properties: {
+                bookingId: { type: "string" },
+                serviceName: { type: "string", nullable: true },
+                endAtUtc: { type: "string", format: "date-time" },
+                daysLeft: { type: "integer", minimum: 0 },
+                target: { $ref: "#/components/schemas/ClientReviewTarget" },
+              },
+            },
+          },
+        },
+      },
+      PublicModelOfferItem: {
+        type: "object",
+        description:
+          "Предложение для моделей. Без внутренних id (правило 12): адрес — `publicCode`, мастер — `publicUsername`. " +
+          "Дата и время — настенные часы мастера (не конвертировать). Цены — копейки.",
+        required: [
+          "publicCode", "dateLocal", "timeRangeStartLocal", "timeRangeEndLocal", "price", "extraBusyMin",
+          "requirements", "service", "master",
+        ],
+        properties: {
+          publicCode: { type: "string" },
+          dateLocal: { type: "string", format: "date" },
+          timeRangeStartLocal: { type: "string", description: "HH:mm" },
+          timeRangeEndLocal: { type: "string", description: "HH:mm" },
+          price: { type: "number", nullable: true, description: "Копейки; null или 0 — бесплатно для модели." },
+          extraBusyMin: { type: "integer", description: "Доп. время мастера на съёмку после услуги, мин." },
+          requirements: { type: "array", items: { type: "string" } },
+          service: {
+            type: "object",
+            required: ["title", "description", "durationMin", "originalPrice", "category"],
+            properties: {
+              title: { type: "string" },
+              description: { type: "string", nullable: true },
+              durationMin: { type: "integer" },
+              originalPrice: { type: "number", nullable: true, description: "Копейки, цена мастера без скидки." },
+              category: {
+                type: "object",
+                nullable: true,
+                required: ["title", "slug"],
+                properties: { title: { type: "string" }, slug: { type: "string", nullable: true } },
+              },
+            },
+          },
+          master: {
+            type: "object",
+            required: ["name", "publicUsername", "avatarUrl", "ratingAvg", "ratingCount", "city"],
+            properties: {
+              name: { type: "string" },
+              publicUsername: { type: "string", nullable: true },
+              avatarUrl: { type: "string", nullable: true },
+              ratingAvg: { type: "number" },
+              ratingCount: { type: "integer" },
+              city: { type: "string", nullable: true },
+            },
+          },
+        },
+      },
+      PublicModelOfferData: {
+        type: "object",
+        required: ["offer"],
+        properties: { offer: { $ref: "#/components/schemas/PublicModelOfferItem" } },
+      },
+      MobilePlatformVersions: {
+        type: "object",
+        required: ["ios", "android"],
+        properties: {
+          ios: { type: "string", description: "MAJOR.MINOR.PATCH" },
+          android: { type: "string", description: "MAJOR.MINOR.PATCH" },
+        },
+      },
+      MobileAppConfig: {
+        type: "object",
+        required: ["minVersion", "latestVersion", "authMethods", "features", "pushProviders", "legal"],
+        properties: {
+          minVersion: {
+            $ref: "#/components/schemas/MobilePlatformVersions",
+            description: "Ниже — экран «Обновите приложение».",
+          },
+          latestVersion: { $ref: "#/components/schemas/MobilePlatformVersions" },
+          authMethods: {
+            type: "object",
+            required: ["phone", "email", "vk", "yandex", "telegram"],
+            properties: {
+              phone: { type: "boolean" },
+              email: { type: "boolean" },
+              vk: { type: "boolean" },
+              yandex: { type: "boolean" },
+              telegram: { type: "boolean" },
+            },
+          },
+          features: {
+            type: "object",
+            required: ["visualSearch", "onlinePayments", "push"],
+            properties: {
+              visualSearch: { type: "boolean" },
+              onlinePayments: { type: "boolean" },
+              push: {
+                type: "boolean",
+                description:
+                  "MOBILE-B2: push в приложение реально уходит — включена отправка " +
+                  "(`MOBILE_PUSH_SENDING_ENABLED`) и настроен хотя бы один провайдер. Пока false — не " +
+                  "просить разрешение на уведомления.",
+              },
+            },
+          },
+          pushProviders: {
+            type: "object",
+            description: "MOBILE-B2: через какие сервисы push сейчас уходит (все false, пока `features.push` false).",
+            required: ["fcm", "apns", "rustore"],
+            properties: {
+              fcm: { type: "boolean" },
+              apns: { type: "boolean" },
+              rustore: { type: "boolean" },
+            },
+          },
+          legal: {
+            type: "object",
+            required: ["termsUrl", "privacyUrl", "consentUrl"],
+            properties: {
+              termsUrl: { type: "string" },
+              privacyUrl: { type: "string" },
+              consentUrl: { type: "string" },
+            },
+          },
+        },
+      },
     },
   },
   paths: {
     "/api/catalog/search": {
       get: {
+        operationId: "catalogSearch",
         summary: "Search catalog for masters/studios",
-        tags: ["catalog"],
+        tags: ["mobile", "catalog"],
+        security: optionalAuth,
         parameters: [
+          catalogCityQuery,
           { name: "serviceQuery", in: "query", required: false, schema: { type: "string" } },
           { name: "district", in: "query", required: false, schema: { type: "string" } },
           { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
@@ -2187,8 +3303,176 @@ export const openApiSpec = {
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/CatalogSearchData" }),
-          "400": errorResponse("Validation error"),
+          "400": errorResponse("VALIDATION_ERROR | CITY_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/catalog/autocomplete": {
+      get: {
+        operationId: "catalogAutocomplete",
+        summary: "Catalog search-bar suggestions: categories + providers by name",
+        description:
+          "Без лимита роута (клиент дебаунсит). MOBILE-B1: `city` — синоним `citySlug` (сужает только " +
+          "подсказки мастеров; неизвестный slug — просто пустой список мастеров, без 400).",
+        tags: ["mobile", "catalog"],
+        parameters: [
+          { name: "q", in: "query", required: true, schema: { type: "string", minLength: 2, maxLength: 50 } },
+          {
+            name: "city",
+            in: "query",
+            required: false,
+            schema: { type: "string", maxLength: 64 },
+            description: "MOBILE-B1: slug города (`GET /api/cities`); при обоих главнее `citySlug`.",
+          },
+          { name: "citySlug", in: "query", required: false, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/CatalogAutocompleteData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/cities": {
+      get: {
+        operationId: "citiesList",
+        summary: "Cities to choose from (slug is the `city` parameter of catalog and feeds)",
+        description:
+          "MOBILE-B1: активные города в порядке выбора. `slug` — значение `?city=` у каталога и лент. " +
+          "Публичный справочник с кэшем CDN (`Cache-Control: public, …`).",
+        tags: ["mobile", "cities"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/CityListData" }),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/search/availability": {
+      get: {
+        operationId: "searchAvailability",
+        summary: "Catalog search by time: providers with free windows for a service on a date",
+        tags: ["mobile", "catalog"],
+        parameters: [
+          cityQuery,
+          { name: "serviceId", in: "query", required: false, schema: { type: "string" } },
+          { name: "date", in: "query", required: false, schema: { type: "string", format: "date" } },
+          { name: "timeFrom", in: "query", required: false, schema: { type: "string", description: "HH:MM, часы салона" } },
+          { name: "timeTo", in: "query", required: false, schema: { type: "string", description: "HH:MM, часы салона" } },
+          { name: "district", in: "query", required: false, schema: { type: "string" } },
+          { name: "priceMin", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+          { name: "priceMax", in: "query", required: false, schema: { type: "integer", minimum: 0 } },
+          { name: "availableToday", in: "query", required: false, schema: { type: "boolean" } },
+          { name: "hot", in: "query", required: false, schema: { type: "boolean" } },
+          { name: "ratingMin", in: "query", required: false, schema: { type: "number", minimum: 0, maximum: 5 } },
+          { name: "entityType", in: "query", required: false, schema: { type: "string", enum: ["all", "master", "studio"] } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 60 } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AvailabilitySearchData" }),
+          "400": errorResponse("VALIDATION_ERROR | CITY_NOT_FOUND"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/model-offers": {
+      get: {
+        operationId: "publicModelOffers",
+        summary: "Public model offers list",
+        description:
+          "`city` здесь исторически — подстрока адреса (названия из фильтров). MOBILE-B1: если значение — " +
+          "slug активного города (`GET /api/cities`), фильтр идёт по городу провайдера; иначе — прежний поиск " +
+          "по адресу. Поэтому неизвестный `city` здесь НЕ 400.",
+        tags: ["mobile", "model-offers"],
+        parameters: [
+          { name: "city", in: "query", required: false, schema: { type: "string" } },
+          {
+            name: "categoryId",
+            in: "query",
+            required: false,
+            description:
+              "MOBILE-CLIENT-01 (B8): id категории — `e_…` из публичного справочника категорий (декодируется) " +
+              "или сырой CUID (веб).",
+            schema: { type: "string" },
+          },
+          { name: "page", in: "query", required: false, schema: { type: "integer", minimum: 1 } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 40 } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/PublicModelOffersData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/model-offers/{code}": {
+      get: {
+        operationId: "publicModelOffer",
+        summary: "Public model offer by code",
+        description:
+          "MOBILE-CLIENT-01: одно предложение для моделей — то, что рендерит страница `/models/{code}` " +
+          "(активно, дата не прошла, мастер виден). `data.offer` — форма элемента списка " +
+          "`GET /api/public/model-offers`, без внутренних id. Не найдено, закрыто, прошло или код невозможной " +
+          "формы — один 404 `NOT_FOUND` «Предложение не найдено.». Сессия не нужна; лимит — тир прокси " +
+          "`publicApi` (120 в минуту), как у списка.",
+        tags: ["mobile", "model-offers"],
+        parameters: [
+          {
+            name: "code",
+            in: "path",
+            required: true,
+            description: "`publicCode` из списка (до 64 символов `[A-Za-z0-9_-]`).",
+            schema: { type: "string", maxLength: 64 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/PublicModelOfferData" }),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/onboarding/professional/master": {
+      post: {
+        operationId: "onboardingBecomeMaster",
+        summary: "Become a master: create the personal master cabinet (idempotent)",
+        description:
+          "Тела нет (веб шлёт пустую HTML-форму; тело игнорируется). MOBILE-B1: с `Authorization: Bearer` " +
+          "или `Accept: application/json` — конверт `ok()`; иначе (веб-форма) — 303 на `/cabinet/master`, " +
+          "без сессии — 303 на `/login`. Роль MASTER пишется в БД; токены перевыпускать не нужно — роли " +
+          "из access-токена ни одна проверка не читает, кабинетные API пускают сразу. Актуальные роли — " +
+          "`GET /api/me`. Пробный тариф создаётся фоном (ответ его не ждёт).",
+        tags: ["mobile", "onboarding"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ProfessionalOnboardingData" }),
+          "303": { description: "Веб-форма: редирект в кабинет (или на /login без сессии)" },
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/onboarding/professional/studio": {
+      post: {
+        operationId: "onboardingOpenStudio",
+        summary: "Open a studio: create the studio cabinet with the caller as OWNER (idempotent)",
+        description:
+          "Тела нет. MOBILE-B1: Bearer / `Accept: application/json` — конверт `ok()`; веб-форма — 303 на " +
+          "`/cabinet/studio` (без сессии — на `/login`). Роль STUDIO пишется в БД, токены не перевыпускаются " +
+          "(см. onboardingBecomeMaster).",
+        tags: ["mobile", "onboarding"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ProfessionalOnboardingData" }),
+          "303": { description: "Веб-форма: редирект в кабинет (или на /login без сессии)" },
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
         },
       },
     },
@@ -2208,14 +3492,60 @@ export const openApiSpec = {
     },
     "/api/providers/{id}": {
       get: {
+        operationId: "providerProfile",
         summary: "Get provider profile",
-        tags: ["providers"],
+        description:
+          "Публичный профиль мастера или студии. `id` — CUID провайдера или адрес профиля: MOBILE-B3 — адрес " +
+          "ищется как на странице `/u/{username}` (регистр не важен, старый адрес из `PublicUsernameAlias` ведёт " +
+          "на текущий профиль); в ответе `publicUsername` — текущий адрес. Не найден или не опубликован — 404.",
+        tags: ["mobile", "providers"],
         parameters: [providerIdParam],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/ProviderProfileData" }),
           "400": errorResponse("Validation error"),
           "404": errorResponse("Provider not found"),
           "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/public/providers/{providerId}/packages": {
+      get: {
+        operationId: "publicProviderPackages",
+        summary: "Service packages a provider page sells (solo master or studio)",
+        description:
+          "MOBILE-B3: на вебе каталог пакетов есть только в SSR страницы. Соло-мастер — тот же каталог, что у " +
+          "`/u/{username}`; студия — пакеты студии (цены/длительности базовые); мастер студии — `kind: none`. " +
+          "Скрыты пакеты с выключенной услугой (студия: и с неактивной, и меньше двух услуг). Ответ одинаков для " +
+          "всех зрителей.",
+        tags: ["mobile", "providers"],
+        parameters: [publicProviderKeyParam],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/PublicProviderPackagesData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "404": errorResponse("PROVIDER_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/public/providers/{providerId}/overview": {
+      get: {
+        operationId: "publicProviderOverview",
+        summary: "Provider page hero extras + viewer flags",
+        description:
+          "MOBILE-B3: то, что веб показывает в шапке сверх `GET /api/providers/{id}` (тариф, стаж, ближайшее " +
+          "окошко, студия мастера), и флаги зрителя (избранное, владелец, запись для отзыва). Сессия " +
+          "необязательна: битый/протухший Bearer — гость (не 401), флаги `false`/`null`. Общая часть кэшируется " +
+          "на сервере 60 с на провайдера, `viewer` — никогда.",
+        tags: ["mobile", "providers"],
+        security: optionalAuth,
+        parameters: [publicProviderKeyParam],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/PublicProviderOverviewData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "404": errorResponse("PROVIDER_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
@@ -2743,8 +4073,13 @@ export const openApiSpec = {
     "/api/auth/vk/callback": {
       get: {
         summary: "VK ID authorization callback",
+        description:
+          "MOBILE-AUTH-A2: флоу, начатый приложением (`/api/mobile/v1/auth/oauth/vk/start`), кончается " +
+          "302 на `masterryadom://auth/callback` с `code` (вход), `linked=vk` (привязка) или `error`; " +
+          "куки сессии такой флоу не ставит.",
         tags: ["auth", "vk"],
         responses: {
+          "302": { description: "Mobile flow: redirect to masterryadom://auth/callback?code|linked|error" },
           "307": { description: "Redirect to cabinet" },
           "400": errorResponse("Validation error"),
           "409": errorResponse("Conflict"),
@@ -2768,9 +4103,13 @@ export const openApiSpec = {
     "/api/auth/yandex/callback": {
       get: {
         summary: "Yandex ID authorization callback",
-        description: "Гейтится тем же флагом, что и start (session-issuing leg). Новый аккаунт без обязательных согласий не создаётся — редирект на /login?error=consent.",
+        description:
+          "Гейтится тем же флагом, что и start (session-issuing leg). Новый аккаунт без обязательных " +
+          "согласий не создаётся — редирект на /login?error=consent. MOBILE-AUTH-A2: флоу приложения " +
+          "кончается 302 на `masterryadom://auth/callback` с `code` / `linked=yandex` / `error`.",
         tags: ["auth", "yandex"],
         responses: {
+          "302": { description: "Mobile flow: redirect to masterryadom://auth/callback?code|linked|error" },
           "307": { description: "Redirect to cabinet" },
           "400": errorResponse("Validation error"),
           "409": errorResponse("Conflict"),
@@ -2829,12 +4168,234 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/auth/vk/unlink": {
+      post: {
+        operationId: "authVkUnlink",
+        summary: "Disable the VK link of the current user",
+        description:
+          "Снимает `isEnabled` связки (уведомления через VK); сама связка остаётся — `linked` в профиле " +
+          "не меняется, вход через VK работает. Bearer или кука.",
+        tags: ["mobile", "auth", "vk"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ProviderUnlinkData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/auth/yandex/unlink": {
+      post: {
+        operationId: "authYandexUnlink",
+        summary: "Disable the Yandex ID link of the current user",
+        description:
+          "Снимает `isEnabled` связки (в профиле `linked.yandex.enabled = false`); строка связки " +
+          "остаётся, следующий вход через Яндекс включает её снова. Bearer или кука.",
+        tags: ["mobile", "auth", "yandex"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ProviderUnlinkData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/cabinet/user/bookings": {
+      get: {
+        operationId: "clientBookingsList",
+        summary: "Client cabinet bookings («Мои записи»)",
+        description:
+          "До 300 последних записей клиента и KPI. Фильтры применяются к загруженному набору, KPI — без них. " +
+          "MOBILE-CLIENT-01: элементы дополнены полями (`createdAt`, `cancelledBy`, `changeComment`, " +
+          "`clientChangeRequestsCount`, `changeRequestLimit`, `cancellationDeadlineHours`, `comment`, " +
+          "`silentMode`, `studio`, `reviewDeadlineUtc`), прежние поля не менялись.",
+        tags: ["mobile", "client", "bookings"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            description: "Группа; неизвестное значение — `all`.",
+            schema: { type: "string", enum: ["all", "upcoming", "finished", "cancelled"] },
+          },
+          {
+            name: "search",
+            in: "query",
+            required: false,
+            description: "Подстрока имени провайдера или услуги, без учёта регистра.",
+            schema: { type: "string" },
+          },
+          {
+            name: "dateFrom",
+            in: "query",
+            required: false,
+            description: "Начало записи не раньше (ISO date-time).",
+            schema: { type: "string", format: "date-time" },
+          },
+          {
+            name: "dateTo",
+            in: "query",
+            required: false,
+            description: "Начало записи не позже (ISO date-time).",
+            schema: { type: "string", format: "date-time" },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ClientBookingsData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/cabinet/user/bookings/{id}": {
+      get: {
+        operationId: "clientBookingGet",
+        summary: "Client cabinet booking by id",
+        description:
+          "MOBILE-CLIENT-01: одна запись клиента (цель push и ссылок `/bookings/{id}`); `data.booking` — ровно " +
+          "элемент списка `GET /api/cabinet/user/bookings`. Чужая, несуществующая и невозможная по форме — " +
+          "один 404 `BOOKING_NOT_FOUND` «Запись не найдена.» (существование чужой записи не раскрывается).",
+        tags: ["mobile", "client", "bookings"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            description: "CUID записи.",
+            schema: { type: "string", maxLength: 64 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ClientBookingData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("BOOKING_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/cabinet/user/reviews": {
+      get: {
+        operationId: "clientReviewsList",
+        summary: "Client cabinet reviews («Мои отзывы»)",
+        description:
+          "Отзывы клиента (без удалённых), KPI и до 10 визитов, ждущих отзыва. MOBILE-CLIENT-01 (B1): " +
+          "цель отзыва на мастера читается из `Provider` по `targetId` — имя, аватар и `publicUsername` " +
+          "у соло-мастера больше не пустые.",
+        tags: ["mobile", "client", "reviews"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ClientReviewsData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/cabinet/user/profile": {
+      get: {
+        operationId: "clientProfileGet",
+        summary: "Client cabinet profile (incl. linked VK / Yandex / Telegram)",
+        description:
+          "Источник флагов привязки для приложения: `data.linked.vk.linked`, " +
+          "`data.linked.yandex.linked` / `enabled`.",
+        tags: ["mobile", "client"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ClientProfileData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+      patch: {
+        operationId: "clientProfileUpdate",
+        summary: "Update client cabinet profile",
+        tags: ["mobile", "client"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ClientProfileUpdateInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ClientProfileData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("ALREADY_EXISTS — номер или email заняты другим аккаунтом"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/me/sessions": {
+      get: {
+        operationId: "meSessionsList",
+        summary: "Active sessions of the current user (one per sign-in)",
+        description:
+          "MOBILE-AUTH-A3: семьи сессий, самые свежие по активности — первыми. `current` — сессия " +
+          "этого запроса. `no-store`.",
+        tags: ["mobile", "me"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/SessionFamilyListData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/me/sessions/{id}": {
+      delete: {
+        operationId: "meSessionRevoke",
+        summary: "Sign out one session",
+        description:
+          "Завершает семью сессий: refresh больше не обновится, access-токены перестают проходить " +
+          "сразу. Можно завершить и текущую. Идемпотентно (`200 {}`); чужая или несуществующая — " +
+          "404 SESSION_NOT_FOUND.",
+        tags: ["mobile", "me"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 }, description: "`SessionFamily.id`" },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileEmptyData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("SESSION_NOT_FOUND"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/me/sessions/revoke-others": {
+      post: {
+        operationId: "meSessionsRevokeOthers",
+        summary: "Sign out all other sessions",
+        description:
+          "Завершает все семьи, кроме текущей; текущая не трогается (токены не перевыдаются). " +
+          "`revoked` — число завершённых активных сессий.",
+        tags: ["mobile", "me"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/SessionRevokeOthersData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
     "/api/me": {
       get: {
+        operationId: "meGet",
         summary: "Get current user profile",
-        tags: ["me", "client"],
+        description:
+          "`data.user` — форма `MeIdentity` (её же отдают мобильные входы `/api/mobile/v1/auth/*`); аноним " +
+          "получает `user: null`. MOBILE-CLIENT-01: добавлены `avatarUrl` и `phoneVerified`. Ответ кэшируется " +
+          "на сервере до 30 с; загрузка и удаление аватара кэш сбрасывают.",
+        tags: ["mobile", "me", "client"],
+        // MOBILE-AUTH-A: пример для всех сессионных роутов — Bearer наравне с кукой.
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }, {}],
         responses: {
-          "200": okResponse({ $ref: "#/components/schemas/MeData" }),
+          "200": okResponse({ $ref: "#/components/schemas/MeIdentityData" }),
           "500": errorResponse("Internal error"),
         },
       },
@@ -2853,6 +4414,42 @@ export const openApiSpec = {
           "401": errorResponse("Unauthorized"),
           "409": errorResponse("Conflict"),
           "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/me/delete": {
+      delete: {
+        operationId: "meDeleteAccount",
+        summary: "Delete own account",
+        description:
+          "Необратимо. Порядок: сессия → разбор запроса (400) → живые записи (409, попытку не тратит) → " +
+          "лимит одна попытка в час на адрес и на аккаунт (429) → удаление. MOBILE-CLIENT-01 (B7): ошибка " +
+          "запроса не тратит попытку; удаление, упавшее по вине сервера (5xx), возвращает попытку в оба ведра; " +
+          "отказ по лимиту аккаунта не тратит попытку адреса. При недоступности счётчика — отказ (fail-closed, " +
+          "503 от прокси). Успех снимает куки сессии; мобильный клиент сам удаляет свои токены.",
+        tags: ["mobile", "me", "client"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "deleteReviews",
+            in: "query",
+            required: false,
+            description: "`1` — удалить и мои отзывы (учитывается, только если политика отзывов USER_CHOICE).",
+            schema: { type: "string", enum: ["1"] },
+          },
+        ],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["deleted"],
+            properties: { deleted: { type: "boolean", enum: [true] } },
+          }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "409": errorResponse("ACTIVE_BOOKINGS | CLIENT_ACTIVE_BOOKINGS"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("Internal error"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
         },
       },
     },
@@ -2952,8 +4549,18 @@ export const openApiSpec = {
     },
     "/api/media/file/{id}": {
       get: {
-        summary: "Serve media file",
-        tags: ["media"],
+        operationId: "mediaFile",
+        summary: "Serve media file (original, or a width-bounded webp preview with `?w=`)",
+        description:
+          "MOBILE-B1: `?w=<int>` — превью для списков: ширина округляется ВВЕРХ до 160 / 320 / 480 / 640 / " +
+          "960 / 1280 (больше 1280 — 1280), пропорции сохраняются, без увеличения, формат `image/webp`. " +
+          "Каждый вариант считается один раз и хранится рядом с оригиналом. Мусорный `w` (не целое, ≤0) и " +
+          "не-картинки — оригинал как есть (не 400). Доступ и `Cache-Control` — как у оригинала: публичное " +
+          "(аватар/портфолио опубликованного кабинета) — `public, max-age=31536000, immutable`; остальное — " +
+          "по сессии (Bearer/кука) или `?mt=`-токену, `private, no-store`. Оригинал — без `w`. Свой тир " +
+          "лимита `mediaRead` (300/мин; вошедшему — по аккаунту).",
+        tags: ["mobile", "media"],
+        security: optionalAuth,
         parameters: [
           {
             name: "id",
@@ -2961,9 +4568,25 @@ export const openApiSpec = {
             required: true,
             schema: { type: "string" },
           },
+          {
+            name: "w",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1 },
+            description: "Желаемая ширина превью в px; округляется вверх до набора 160…1280.",
+          },
+          {
+            name: "mt",
+            in: "query",
+            required: false,
+            schema: { type: "string" },
+            description: "Короткоживущий токен приватной доставки (сервер кладёт его в ссылку); сочетается с `w`.",
+          },
         ],
         responses: {
-          "200": { description: "Binary image stream" },
+          "200": { description: "Binary image (original type, or image/webp with `w`)" },
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
           "500": errorResponse("Internal error"),
@@ -3344,8 +4967,11 @@ export const openApiSpec = {
     },
     "/api/media/file/{id}/crop/{v}": {
       get: {
+        operationId: "mediaFileCrop",
         summary: "Serve media file cut to its saved crop area (avatar display)",
-        tags: ["media"],
+        description: "Ссылку собирает сервер (`avatarUrl`); `?w=` здесь не действует. Тир лимита `mediaRead`.",
+        tags: ["mobile", "media"],
+        security: optionalAuth,
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string" } },
           {
@@ -4280,9 +5906,12 @@ export const openApiSpec = {
     },
     "/api/feed/portfolio": {
       get: {
+        operationId: "feedPortfolio",
         summary: "Inspiration portfolio feed",
-        tags: ["portfolio", "feed"],
+        tags: ["mobile", "portfolio", "feed"],
+        security: optionalAuth,
         parameters: [
+          cityQuery,
           { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50 } },
           { name: "cursor", in: "query", required: false, schema: { type: "string" } },
           { name: "q", in: "query", required: false, schema: { type: "string" } },
@@ -4294,23 +5923,43 @@ export const openApiSpec = {
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/PortfolioFeedData" }),
-          "400": errorResponse("Validation error"),
+          "400": errorResponse("VALIDATION_ERROR | CITY_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("Internal error"),
         },
       },
     },
     "/api/feed/home": {
       get: {
+        operationId: "feedHome",
         summary: "Home collage feed: one tile per author upload group (48h window)",
-        tags: ["portfolio", "feed"],
+        tags: ["mobile", "portfolio", "feed"],
+        security: optionalAuth,
         parameters: [
+          cityQuery,
           { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 30 } },
           { name: "cursor", in: "query", required: false, schema: { type: "string" } },
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/HomeFeedData" }),
-          "400": errorResponse("Validation error"),
+          "400": errorResponse("VALIDATION_ERROR | CITY_NOT_FOUND"),
           "429": errorResponse("Rate limited"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/feed/stories": {
+      get: {
+        operationId: "feedStories",
+        summary: "Stories: recent works of masters with auto-published stories, grouped by master",
+        description:
+          "Кэш 5 мин (общий и по городу; новая работа гасит оба). MOBILE-B1: `city` — истории мастеров города.",
+        tags: ["mobile", "feed"],
+        parameters: [cityQuery],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/FeedStoriesData" }),
+          "400": errorResponse("VALIDATION_ERROR | CITY_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -4455,18 +6104,23 @@ export const openApiSpec = {
     },
     "/api/hot-slots": {
       get: {
+        operationId: "hotSlotsFeed",
         summary: "List active hot slots",
-        tags: ["hot-slots"],
+        tags: ["mobile", "hot-slots"],
         parameters: [
+          cityQuery,
           { name: "from", in: "query", required: false, schema: { type: "string", format: "date-time" } },
           { name: "to", in: "query", required: false, schema: { type: "string", format: "date-time" } },
           { name: "category", in: "query", required: false, schema: { type: "string" } },
           { name: "tag", in: "query", required: false, schema: { type: "string" } },
           { name: "geo", in: "query", required: false, schema: { type: "string" } },
+          { name: "cursor", in: "query", required: false, schema: { type: "string" } },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 100 } },
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/HotSlotsData" }),
-          "400": errorResponse("Validation error"),
+          "400": errorResponse("VALIDATION_ERROR | CITY_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -4551,6 +6205,257 @@ export const openApiSpec = {
           "200": okResponse({ $ref: "#/components/schemas/HotSlotsRunData" }),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    // ── MOBILE-AUTH-A: нативное приложение ─────────────────────────────────
+    "/api/mobile/v1/auth/otp/verify": {
+      post: {
+        operationId: "mobileAuthOtpVerify",
+        summary: "Mobile: sign in with SMS code",
+        description:
+          "Код запрашивается обычным `POST /api/auth/otp/request {phone}`. Логика и отказы — как у " +
+          "веб-`/api/auth/otp/verify`: 503 SYSTEM_FEATURE_DISABLED (вход по телефону выключен), " +
+          "400 VALIDATION_ERROR / CONSENT_REQUIRED (`consent` обязателен, когда вход создаёт аккаунт), " +
+          "401 CODE_NOT_FOUND, 429 OTP_LOCKED / 503 RATE_LIMIT_UNAVAILABLE (блокировка перебора). " +
+          "Сессия — в теле (`tokens`), кук нет. Лимит прокси: 30/мин на IP (тир mobileAuth).",
+        tags: ["mobile", "auth"],
+        parameters: mobileClientHeaders,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobileOtpVerifyInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileAuthData" }),
+          "400": errorResponse("VALIDATION_ERROR | CONSENT_REQUIRED"),
+          "401": errorResponse("CODE_NOT_FOUND"),
+          "429": errorResponse("OTP_LOCKED | RATE_LIMITED"),
+          "503": errorResponse("SYSTEM_FEATURE_DISABLED | RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/mobile/v1/auth/otp/email/verify": {
+      post: {
+        operationId: "mobileAuthOtpEmailVerify",
+        summary: "Mobile: sign in with email code",
+        description:
+          "Код запрашивается обычным `POST /api/auth/otp/email/request {email}`. Логика и отказы — как " +
+          "у веб-`/api/auth/otp/email/verify`: 400 VALIDATION_ERROR / CONSENT_REQUIRED, 401 " +
+          "CODE_NOT_FOUND, EMAIL_NOT_VERIFIED (адрес занят неподтверждённой строкой), 429 OTP_LOCKED. " +
+          "Сессия — в теле (`tokens`), кук нет. Лимит прокси: 30/мин на IP (тир mobileAuth).",
+        tags: ["mobile", "auth"],
+        parameters: mobileClientHeaders,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobileOtpEmailVerifyInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileAuthData" }),
+          "400": errorResponse("VALIDATION_ERROR | CONSENT_REQUIRED"),
+          "401": errorResponse("CODE_NOT_FOUND"),
+          "409": errorResponse("EMAIL_NOT_VERIFIED"),
+          "429": errorResponse("OTP_LOCKED | RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/mobile/v1/auth/refresh": {
+      post: {
+        operationId: "mobileAuthRefresh",
+        summary: "Mobile: rotate session tokens",
+        description:
+          "Одноразовая ротация внутри семьи сессии. Повтор с токеном «на шаг позади» (ответ ротации " +
+          "потерялся) отдаёт того же преемника (SESSION-LOSS-01). Любой отказ ротации — 401 " +
+          "UNAUTHORIZED: клиент разлогинивается. Лимит прокси: 60/мин на IP (тир mobileAuthRefresh), " +
+          "fail-closed — при недоступном лимитере 503 RATE_LIMIT_UNAVAILABLE (повторить позже, не выходить).",
+        tags: ["mobile", "auth"],
+        parameters: mobileClientHeaders,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobileRefreshTokenInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileTokensData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED — refresh-токен недействителен, протух или отозван"),
+          "429": errorResponse("RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/mobile/v1/auth/logout": {
+      post: {
+        operationId: "mobileAuthLogout",
+        summary: "Mobile: sign out (revoke session family)",
+        description:
+          "Отзывает всю семью сессии: access-токены этой семьи перестают работать сразу. " +
+          "Идемпотентен — повтор и недействительный токен тоже `200 {}`.",
+        tags: ["mobile", "auth"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobileRefreshTokenInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileEmptyData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "429": errorResponse("RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    // ── MOBILE-AUTH-A2: VK ID / Яндекс ID ─────────────────────────────────
+    "/api/mobile/v1/auth/oauth/{provider}/start": {
+      get: {
+        operationId: "mobileAuthOAuthStart",
+        summary: "Mobile: start VK ID / Yandex ID sign-in (open in the system browser)",
+        description:
+          "Открывать в системном браузере (ASWebAuthenticationSession / Custom Tabs), не в WebView. " +
+          "Успех — редирект к провайдеру, дальше общий колбэк `/api/auth/{provider}/callback`, который " +
+          "кончается 302 на `masterryadom://auth/callback?code=…` (вход; код — в " +
+          "`POST /api/mobile/v1/auth/oauth/exchange`) либо `?linked=<provider>` (привязка по `intent`). " +
+          "Любой отказ — 302 на `masterryadom://auth/callback?error=<код>`: invalid_request · " +
+          "provider_unavailable · consent_required · intent_invalid · start_failed (старт); " +
+          "state_invalid · access_denied · provider_timeout · vk_already_linked · yandex_already_linked · " +
+          "email_taken · callback_failed (колбэк). Сессию браузера не читает. Согласия обязательны, " +
+          "если нет `intent` (вход может создать аккаунт).",
+        tags: ["mobile", "auth"],
+        parameters: [
+          { name: "provider", in: "path", required: true, schema: { type: "string", enum: ["vk", "yandex"] } },
+          {
+            name: "codeChallenge",
+            in: "query",
+            required: true,
+            schema: { type: "string", minLength: 43, maxLength: 43, pattern: "^[A-Za-z0-9_-]{43}$" },
+            description: "PKCE S256 приложения: base64url(sha256(codeVerifier)) без паддинга.",
+          },
+          { name: "terms", in: "query", required: false, schema: { type: "string", enum: ["1"] }, description: "Согласие с офертой." },
+          { name: "pd", in: "query", required: false, schema: { type: "string", enum: ["1"] }, description: "Согласие на обработку ПДн." },
+          { name: "marketing", in: "query", required: false, schema: { type: "string", enum: ["1"] }, description: "Маркетинг (необязательно)." },
+          {
+            name: "intent",
+            in: "query",
+            required: false,
+            schema: { type: "string", maxLength: 256 },
+            description: "Токен из `…/link-intent`: привязать аккаунт провайдера к вошедшему пользователю.",
+          },
+        ],
+        responses: {
+          "302": {
+            description: "Redirect to the provider, or to masterryadom://auth/callback?error=<код>",
+          },
+        },
+      },
+    },
+    "/api/mobile/v1/auth/oauth/{provider}/link-intent": {
+      post: {
+        operationId: "mobileAuthOAuthLinkIntent",
+        summary: "Mobile: one-time intent to link VK ID / Yandex ID to the signed-in account",
+        description:
+          "Одноразовый, 5 минут, привязан к пользователю и провайдеру. `no-store`. Лимит прокси: 30/мин " +
+          "на IP (тир mobileAuth).",
+        tags: ["mobile", "auth"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "provider", in: "path", required: true, schema: { type: "string", enum: ["vk", "yandex"] } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileOAuthLinkIntentData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("NOT_FOUND — неизвестный провайдер"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("SERVICE_UNAVAILABLE (провайдер выключен, Redis) | RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/mobile/v1/auth/oauth/exchange": {
+      post: {
+        operationId: "mobileAuthOAuthExchange",
+        summary: "Mobile: exchange the one-time OAuth code for session tokens",
+        description:
+          "Код одноразовый (60 с) и сгорает при любом исходе; verifier сверяется с челленджем старта " +
+          "(S256). Любая проблема с кодом — один ответ 400 OAUTH_CODE_INVALID: начать вход заново. " +
+          "Ответ как у OTP-входа: `{ tokens, user }`, `no-store`, без кук. Лимит прокси: 30/мин на IP " +
+          "(тир mobileAuth).",
+        tags: ["mobile", "auth"],
+        parameters: mobileClientHeaders,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobileOAuthExchangeInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileAuthData" }),
+          "400": errorResponse("VALIDATION_ERROR | OAUTH_CODE_INVALID"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("SERVICE_UNAVAILABLE | RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    // ── MOBILE-B2: native push ────────────────────────────────────────────
+    "/api/mobile/v1/devices": {
+      post: {
+        operationId: "mobileDeviceRegister",
+        summary: "Mobile: register this installation's push token",
+        description:
+          "Upsert по `X-Installation-Id` (обязателен, как и `X-Client-Platform`): вход другим аккаунтом " +
+          "переносит строку, тот же токен у другой установки удаляется там. Токен привязан к текущей " +
+          "семье сессии — выход и завершение сессии его удаляют. Работает и при `features.push = false`. " +
+          "Формат `data` push — схема `MobilePushData`. `no-store`.",
+        tags: ["mobile", "notifications"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: mobileClientHeaders,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/MobilePushDeviceInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobilePushDeviceRegisteredData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+      delete: {
+        operationId: "mobileDeviceUnregister",
+        summary: "Mobile: unlink this installation's push token",
+        description: "Удаляет токен установки `X-Installation-Id` текущего пользователя. Идемпотентно (`200 {}`).",
+        tags: ["mobile", "notifications"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: mobileClientHeaders,
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileEmptyData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/mobile/v1/config": {
+      get: {
+        operationId: "mobileConfig",
+        summary: "Mobile: app config (versions, auth methods, features, legal links)",
+        description:
+          "Публичный, одинаковый для всех; `Cache-Control: public, max-age=60, s-maxage=300, " +
+          "stale-while-revalidate=600`.",
+        tags: ["mobile"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileAppConfig" }),
           "500": errorResponse("Internal error"),
         },
       },

@@ -38,11 +38,17 @@ export async function createBillingNotification(input: BillingNotificationInput)
   // inside the worker (yookassa webhook job), where a rejected detached
   // promise triggers unhandledRejection → process.exit(1) and halts ALL
   // background jobs. Mirrors the existing pattern in `admin-initiated.ts`.
-  void sendPushToUser(input.userId, {
-    title: record.title,
-    body: record.body,
-    url: input.scope ? billingUpgradeHref(input.scope) : "/cabinet/billing",
-  }).catch((error) => {
+  void sendPushToUser(
+    input.userId,
+    {
+      title: record.title,
+      body: record.body,
+      url: input.scope ? billingUpgradeHref(input.scope) : "/cabinet/billing",
+    },
+    // MOBILE-B2: решение «пушить ли в приложение» — в таблице
+    // `native-push/payload.ts` (биллинг туда не уходит), а не здесь.
+    { native: { type: record.type, notificationId: record.id, payloadJson: record.payloadJson } },
+  ).catch((error) => {
     logError("Billing push notification delivery failed", {
       userId: input.userId,
       type: input.type,

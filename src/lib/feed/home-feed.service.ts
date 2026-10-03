@@ -2,10 +2,10 @@ import { prisma } from "@/lib/prisma";
 import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
 import { encodePublicId } from "@/lib/public-id";
 import {
-  PUBLISHED_MASTER_WHERE,
   buildPortfolioSnapshot,
   collectMasterServicePairs,
   loadMasterServiceOverridesMap,
+  publishedMasterWhere,
 } from "@/lib/feed/portfolio.service";
 import {
   decodeFeedPosition,
@@ -52,7 +52,10 @@ export type HomeFeedPage = {
   nextCursor: string | null;
 };
 
-const VISIBLE_WORK_WHERE = { isPublic: true, ...PUBLISHED_MASTER_WHERE };
+/** MOBILE-B1: с городом (`?city=`) — только мастера города; без него — как было. */
+function visibleWorkWhere(cityId?: string) {
+  return { isPublic: true, ...publishedMasterWhere(cityId) };
+}
 
 /** Работ за один проход сканирования на одну запрошенную группу. */
 const SCAN_ITEMS_PER_GROUP = 4;
@@ -73,6 +76,8 @@ export async function listHomeFeedGroups(input: {
   limit: number;
   cursor?: string;
   currentUserId?: string;
+  /** MOBILE-B1: только работы мастеров этого города (`City.id`). */
+  cityId?: string;
 }): Promise<HomeFeedPage> {
   const limit = Math.max(1, Math.min(30, input.limit));
   const decoded = input.cursor ? decodeCursor(input.cursor) : null;
@@ -87,7 +92,7 @@ export async function listHomeFeedGroups(input: {
 
   for (let round = 0; round < MAX_SCAN_ROUNDS; round += 1) {
     const rows = await prisma.portfolioItem.findMany({
-      where: { ...VISIBLE_WORK_WHERE, ...afterPositionWhere(position) },
+      where: { ...visibleWorkWhere(input.cityId), ...afterPositionWhere(position) },
       select: { id: true, masterId: true, createdAt: true },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       take: batch + 1,
@@ -110,7 +115,7 @@ export async function listHomeFeedGroups(input: {
     );
     if (newAuthors.length > 0) {
       const history = await prisma.portfolioItem.findMany({
-        where: { ...VISIBLE_WORK_WHERE, masterId: { in: newAuthors } },
+        where: { ...visibleWorkWhere(input.cityId), masterId: { in: newAuthors } },
         select: { id: true, masterId: true, createdAt: true },
       });
       for (const row of history) {

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { CITY_COOKIE_NAME } from "@/lib/cities/client-city";
 
@@ -27,7 +28,11 @@ export async function getServerCity(): Promise<ServerCity | null> {
   const cookieStore = await cookies();
   const slug = cookieStore.get(CITY_COOKIE_NAME)?.value;
   if (!slug) return null;
+  return findActiveCityBySlug(slug);
+}
 
+/** Активный город по slug (`City.slug`, его же хранит кука `mr-city-slug`); иначе `null`. */
+export async function findActiveCityBySlug(slug: string): Promise<ServerCity | null> {
   const city = await prisma.city.findUnique({
     where: { slug },
     select: {
@@ -53,4 +58,33 @@ export async function getServerCity(): Promise<ServerCity | null> {
     longitude: city.longitude,
     timezone: city.timezone,
   };
+}
+
+/**
+ * MOBILE-B1 — явный город в запросе: `?city=<slug>`.
+ *
+ * Веб выбирает город кукой `mr-city-slug` (slug, ставит клиент —
+ * `client-city.ts`), а у нативного приложения кук нет. Поэтому публичные
+ * JSON-эндпоинты, зависящие от города, принимают тот же slug параметром, и он
+ * ГЛАВНЕЕ куки. Список городов и их slug — `GET /api/cities`.
+ *
+ * Разница с кукой — в отказе. Кука — фоновое состояние браузера: битая или
+ * погашенная админом ведёт к «все города» молча (так было и остаётся).
+ * Параметр — явная просьба клиента, и молча подменить «Казань» на «все
+ * города» значило бы показать чужую выдачу под заголовком выбранного города;
+ * поэтому неизвестный/неактивный slug — 400 `CITY_NOT_FOUND`, и приложение
+ * предлагает выбрать город заново. Схема параметра — `city-param.ts`.
+ */
+export async function resolveCityParam(slug: string | undefined): Promise<ServerCity | null> {
+  if (!slug) return null;
+  const city = await findActiveCityBySlug(slug);
+  if (!city) {
+    throw new AppError("Город не найден. Выберите город из списка.", 400, "CITY_NOT_FOUND", { city: slug });
+  }
+  return city;
+}
+
+/** Явный `?city=` главнее куки; без параметра — кука, как на вебе. */
+export async function resolveRequestCity(slug: string | undefined): Promise<ServerCity | null> {
+  return slug ? resolveCityParam(slug) : getServerCity();
 }

@@ -135,6 +135,8 @@ export async function deleteUserAccount(userId: string, options: AccountDeletion
     // stale silently when new relations were added.
     await Promise.all([
       tx.pushSubscription.deleteMany({ where: { userId } }),
+      // MOBILE-B2: push-токены приложения — удалённому аккаунту push не уходит.
+      tx.mobilePushDevice.deleteMany({ where: { userId } }),
       tx.telegramLinkToken.deleteMany({ where: { userId } }),
       tx.telegramLink.deleteMany({ where: { userId } }),
       tx.vkLink.deleteMany({ where: { userId } }),

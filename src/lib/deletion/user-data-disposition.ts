@@ -75,6 +75,7 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
 
   // ── User-owned preferences: no reason to outlive the account ──────────────
   pushSubscriptions: { kind: "DELETED", reason: "delete-account: device push endpoints" },
+  mobilePushDevices: { kind: "DELETED", reason: "delete-account: native app push tokens (MOBILE-B2)" },
   favorites: { kind: "DELETED", reason: "delete-account: portfolio bookmarks" },
   providerFavorites: {
     kind: "DELETED",

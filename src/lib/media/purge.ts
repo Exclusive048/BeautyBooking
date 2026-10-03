@@ -4,6 +4,7 @@ import { MediaEntityType, MediaKind } from "@prisma/client";
 
 import { policyPendingMediaKinds, policyPurgedMediaKinds } from "@/lib/deletion/account-deletion-policy";
 import { logError, logInfo } from "@/lib/logging/logger";
+import { deleteMediaPreviews } from "@/lib/media/preview-variants";
 import { getStorageProvider } from "@/lib/media/storage";
 import { prisma } from "@/lib/prisma";
 import type { MediaPurgePayload } from "@/lib/queue/types";
@@ -129,6 +130,10 @@ export async function runMediaPurge(payload: MediaPurgePayload): Promise<{
     try {
       // 1. Объект. Идемпотентно: удаление отсутствующего ключа — не ошибка.
       await storage.deleteObject(asset.storageKey);
+      // MOBILE-B1: и его превью `?w=` — производная той же ПДн. Ключи выводятся
+      // из `storageKey` снимка, поэтому повтор джобы удалит их и без строки.
+      // Провал любого — провал актива: строка остаётся, очередь повторит.
+      await deleteMediaPreviews(storage, asset.storageKey);
       objectsDeleted += 1;
     } catch (error) {
       failedKeys.push(asset.storageKey);

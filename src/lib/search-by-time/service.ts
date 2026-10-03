@@ -78,8 +78,11 @@ function resolveProviderTimezone(timezone: string | null | undefined): string {
   return isValidTimeZone(selected) ? selected : DEFAULT_SEARCH_TIMEZONE;
 }
 
+/** MOBILE-B1: `cityId` — город из `?city=<slug>` (резолвит роут). */
+type AvailabilitySearchInput = AvailabilitySearchQuery & { cityId?: string };
+
 function buildWhere(
-  input: AvailabilitySearchQuery,
+  input: AvailabilitySearchInput,
   serviceId: string,
   hotProviderIds?: string[]
 ): Prisma.ProviderWhereInput {
@@ -100,6 +103,10 @@ function buildWhere(
       },
     },
   ];
+
+  if (input.cityId) {
+    and.push({ cityId: input.cityId });
+  }
 
   if (input.entityType === "master") {
     and.push({ type: ProviderType.MASTER });
@@ -188,7 +195,7 @@ async function loadSmartTagCounts(
   return counts;
 }
 
-export async function searchAvailabilityByTime(input: AvailabilitySearchQuery): Promise<AvailabilitySearchResponse> {
+export async function searchAvailabilityByTime(input: AvailabilitySearchInput): Promise<AvailabilitySearchResponse> {
   const serviceId = input.serviceId?.trim() ?? "";
   if (!serviceId) {
     throw new AppError("Сначала выберите услугу", 400, "SERVICE_REQUIRED");

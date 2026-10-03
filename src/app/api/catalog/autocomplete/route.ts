@@ -6,12 +6,17 @@ import { parseQuery } from "@/lib/validation";
 import { prisma } from "@/lib/prisma";
 import { encodePublicId } from "@/lib/public-id";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
+import { cityQueryParamSchema } from "@/lib/cities/city-param";
 
 export const runtime = "nodejs";
 
 const querySchema = z.object({
   q: z.string().trim().min(2).max(50),
   citySlug: z.string().trim().min(1).max(40).optional(),
+  // MOBILE-B1: единое имя параметра города для приложения — тот же slug, что
+  // `citySlug`, и те же правила (фильтр подсказок мастеров; неизвестный slug —
+  // просто без мастеров, как у `citySlug`). При обоих главнее `city`.
+  city: cityQueryParamSchema,
 });
 
 const CATEGORY_LIMIT = 5;
@@ -26,7 +31,9 @@ const PROVIDER_LIMIT = 6;
  */
 export async function GET(req: Request) {
   try {
-    const { q, citySlug } = parseQuery(new URL(req.url), querySchema);
+    const query = parseQuery(new URL(req.url), querySchema);
+    const q = query.q;
+    const citySlug = query.city ?? query.citySlug;
 
     const [categories, providers] = await Promise.all([
       prisma.globalCategory.findMany({

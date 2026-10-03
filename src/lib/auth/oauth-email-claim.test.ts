@@ -105,5 +105,12 @@ describe("3 · вариант B зафиксирован: OAuth-адрес не 
           `он требует решения владельца и обработки коллизии (инв. #41)`,
       ).not.toMatch(/emailVerifiedAt/);
     }
+    // MOBILE-AUTH-A2: создание/обновление пользователя по профилю провайдера
+    // живёт в общем сервисе (веб и приложение) — пин распространяется на него.
+    const service = readFileSync(path.resolve(__dirname, "oauth-login.ts"), "utf8");
+    expect(
+      service,
+      "сервис OAuth-входа проставляет emailVerifiedAt — это вариант A (инв. #41)",
+    ).not.toMatch(/emailVerifiedAt/);
   });
 });

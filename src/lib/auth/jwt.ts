@@ -40,12 +40,20 @@ export const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 type AccessTokenPayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti" | "sid">;
 type RefreshTokenPayload = Pick<SessionPayload, "sub" | "sid" | "jti">;
 
-function createToken(
+/**
+ * MOBILE-AUTH-A — подписанный токен вместе с его `exp`. Мобильный клиент
+ * получает срок явно (`accessTokenExpiresAt` / `refreshTokenExpiresAt`), и
+ * срок обязан быть РОВНО тем, что лежит в токене: пересчёт «now + TTL»
+ * снаружи расходился бы с `exp` на секунду на границе секунды.
+ */
+export type SignedToken = { token: string; expiresAt: Date };
+
+function createSignedToken(
   payload: Record<string, unknown>,
   ttlSeconds: number,
   tokenType: "access" | "refresh",
   input?: { jti?: string }
-) {
+): SignedToken {
   const secret = env.AUTH_JWT_SECRET;
   if (!secret) throw new Error("AUTH_JWT_SECRET is not set");
 
@@ -66,7 +74,16 @@ function createToken(
   const data = `${encHeader}.${encPayload}`;
   const sig = sign(data, secret);
 
-  return `${data}.${sig}`;
+  return { token: `${data}.${sig}`, expiresAt: new Date(exp * 1000) };
+}
+
+function createToken(
+  payload: Record<string, unknown>,
+  ttlSeconds: number,
+  tokenType: "access" | "refresh",
+  input?: { jti?: string }
+) {
+  return createSignedToken(payload, ttlSeconds, tokenType, input).token;
 }
 
 export function createSessionToken(
@@ -81,7 +98,15 @@ export function signAccessToken(payload: AccessTokenPayload): string {
 }
 
 export function signRefreshToken(payload: RefreshTokenPayload): string {
-  return createToken(payload, REFRESH_TOKEN_TTL_SECONDS, "refresh", {
+  return signRefreshTokenWithExpiry(payload).token;
+}
+
+export function signAccessTokenWithExpiry(payload: AccessTokenPayload): SignedToken {
+  return createSignedToken(payload, ACCESS_TOKEN_TTL_SECONDS, "access");
+}
+
+export function signRefreshTokenWithExpiry(payload: RefreshTokenPayload): SignedToken {
+  return createSignedToken(payload, REFRESH_TOKEN_TTL_SECONDS, "refresh", {
     jti: payload.jti,
   });
 }

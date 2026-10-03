@@ -52,6 +52,7 @@
   "/api/media",
   "/api/media/[id]",
   "/api/media/[id]/crop",
+  "/api/mobile/v1/devices",
   "/api/model-offers/[code]/apply",
   "/api/notifications/[id]",
   "/api/notifications/[id]/read",
