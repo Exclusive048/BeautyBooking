@@ -105,10 +105,6 @@
 /api/cabinet/master/delete
 /api/cabinet/master/leave-studio
 /api/cabinet/master/public-username
-/api/cabinet/master/schedule
-/api/cabinet/studio/delete
-/api/cabinet/studio/members/{memberId}/remove
-/api/cabinet/studio/public-username
 /api/cabinet/user/favorites
 /api/cabinet/user/profile/email/request-verify
 /api/cabinet/user/profile/email/verify
@@ -199,14 +195,9 @@
 /api/studio/clients/{clientKey}/card/photos
 /api/studio/clients/{clientKey}/card/photos/{photoId}
 /api/studio/dashboard/revenue
-/api/studio/schedule/requests
-/api/studio/schedule/requests/{id}
-/api/studio/schedule/requests/{id}/approve
-/api/studio/schedule/requests/{id}/reject
 /api/studio/service-packages
 /api/studio/service-packages/{id}
 /api/studio/services/{id}/booking-config
-/api/studio/services/{id}/unassign-master
 /api/studios/{id}/masters
 /api/studios/{id}/masters/{masterId}/schedule/buffer
 /api/studios/{id}/masters/{masterId}/schedule/overrides

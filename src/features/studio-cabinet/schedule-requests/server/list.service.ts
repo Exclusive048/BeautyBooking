@@ -13,6 +13,8 @@ export type ScheduleRequestListItem = {
   provider: {
     id: string;
     name: string;
+    /** MOBILE-STUDIO-C (team): аватар профиля мастера в студии для карточки в приложении. */
+    avatarUrl: string | null;
   };
   /** Raw payload — passed to client preview helper. */
   payload: unknown;
@@ -42,7 +44,7 @@ export async function listScheduleRequestsForStudio(studioId: string): Promise<S
         createdAt: true,
         updatedAt: true,
         payloadJson: true,
-        provider: { select: { id: true, name: true } },
+        provider: { select: { id: true, name: true, avatarUrl: true } },
       },
     }),
     prisma.scheduleChangeRequest.findMany({
@@ -59,7 +61,7 @@ export async function listScheduleRequestsForStudio(studioId: string): Promise<S
         createdAt: true,
         updatedAt: true,
         payloadJson: true,
-        provider: { select: { id: true, name: true } },
+        provider: { select: { id: true, name: true, avatarUrl: true } },
       },
     }),
   ]);
@@ -70,7 +72,7 @@ export async function listScheduleRequestsForStudio(studioId: string): Promise<S
     comment: row.comment,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    provider: { id: row.provider.id, name: row.provider.name },
+    provider: { id: row.provider.id, name: row.provider.name, avatarUrl: row.provider.avatarUrl ?? null },
     payload: row.payloadJson,
     review,
   });

@@ -124,6 +124,10 @@ export const updateStudioMasterSchema = z.object({
  * STUDIO-INVITE-EMAIL-01 — мастера приглашают по телефону ИЛИ по почте, ровно
  * одним контактом. Почта приводится к нижнему регистру: так она хранится в
  * `StudioInvite.email` и так сравнивается с адресом аккаунта.
+ *
+ * MOBILE-STUDIO-C (team): тексты полей (`details.issues[].message`) — русские,
+ * как у формы приглашения; раньше здесь были английские «Phone is required» и
+ * «Title is required».
  */
 export const createStudioMasterSchema = z
   .object({
@@ -132,14 +136,14 @@ export const createStudioMasterSchema = z
     phone: z
       .string()
       .trim()
-      .min(1, "Phone is required")
+      .min(1, "Укажите телефон или почту мастера.")
       .transform((value) => normalizeRussianPhone(value))
       .refine((value): value is string => value !== null, {
-        message: "Phone must match +7XXXXXXXXXX or 8XXXXXXXXXX",
+        message: "Проверьте номер телефона: нужен формат +7 900 000-00-00.",
       })
       .optional(),
     email: z.string().trim().toLowerCase().email("Проверьте адрес почты.").max(254).optional(),
-    title: z.string().trim().min(1, "Title is required").max(240),
+    title: z.string().trim().min(1, "Укажите специализацию мастера.").max(240),
   })
   .refine((value) => Boolean(value.phone) !== Boolean(value.email), {
     message: "Укажите телефон или почту мастера.",
