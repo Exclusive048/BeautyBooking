@@ -187,6 +187,9 @@ const SENSITIVE_ROUTE_TEMPLATES = [
   "/api/public/packages/:id/book",
   "/api/public/packages/:id/studio/book",
   "/api/telegram/webhook",
+  // MOBILE-STUDIO-C (team): повтор приглашения шлёт SMS/письмо на контакт мастера —
+  // при обрыве Redis лимит не деградирует до памяти, роут отвечает 503.
+  "/api/cabinet/studio/masters/:id/invite/resend",
 ] as const;
 
 const RATE_LIMIT_UNAVAILABLE_RETRY_SECONDS = 60;

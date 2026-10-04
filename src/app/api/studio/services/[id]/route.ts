@@ -11,9 +11,7 @@ import {
   updateStudioService,
 } from "@/lib/studio/services.service";
 import { parseBody, parseQuery } from "@/lib/validation";
-import { SubscriptionScope } from "@prisma/client";
-import { getCurrentPlan } from "@/lib/billing/get-current-plan";
-import { createFeatureGateError, createSystemDisabledError } from "@/lib/billing/guards";
+import { ensureStudioOnlinePaymentsAllowed } from "@/lib/studio/online-payments-gate";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -36,13 +34,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     });
 
     if (body.onlinePaymentEnabled === true) {
-      const plan = await getCurrentPlan(user.id, SubscriptionScope.STUDIO);
-      if (!plan.features.onlinePayments) {
-        throw createFeatureGateError("onlinePayments", "PRO");
-      }
-      if (!plan.system.onlinePaymentsEnabled) {
-        throw createSystemDisabledError("onlinePayments");
-      }
+      await ensureStudioOnlinePaymentsAllowed(user.id);
     }
 
     const data = await updateStudioService({

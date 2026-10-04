@@ -214,6 +214,13 @@ export async function loadStudioServicesListData(input: {
   currentUserId: string;
   categoryId?: string | null;
   search?: string;
+  /**
+   * MOBILE-STUDIO-C: что делать без категории (или с неизвестной). Веб
+   * (`"first"`, по умолчанию) открывает первую категорию сайдбара; приложение
+   * (`"all"`) получает весь прайс, а неизвестную категорию — как есть
+   * (пустой список).
+   */
+  categoryFallback?: "first" | "all";
 }): Promise<{
   categories: StudioServiceCategoryRow[];
   items: StudioServiceListItem[];
@@ -239,9 +246,11 @@ export async function loadStudioServicesListData(input: {
   ]);
 
   const selectedCategoryId =
-    input.categoryId && categories.some((c) => c.id === input.categoryId)
-      ? input.categoryId
-      : categories[0]?.id ?? null;
+    input.categoryFallback === "all"
+      ? input.categoryId || null
+      : input.categoryId && categories.some((c) => c.id === input.categoryId)
+        ? input.categoryId
+        : categories[0]?.id ?? null;
 
   const searchTrimmed = input.search?.trim() ?? "";
 
@@ -276,6 +285,9 @@ export async function loadStudioServicesListData(input: {
         baseDurationMin: true,
         globalCategoryId: true,
         isActive: true,
+        onlinePaymentEnabled: true,
+        sortOrder: true,
+        _count: { select: { masterServices: { where: { isEnabled: true } } } },
         masterServices: {
           where: { isEnabled: true },
           take: 4,
@@ -298,7 +310,10 @@ export async function loadStudioServicesListData(input: {
     priceKopeks: service.basePrice ?? service.price,
     categoryId: service.globalCategoryId ?? null,
     isActive: service.isActive,
+    onlinePaymentEnabled: service.onlinePaymentEnabled,
+    sortOrder: service.sortOrder,
     bookings30d: bookingsByService.get(service.id)?.count ?? 0,
+    mastersCount: service._count.masterServices,
     masters: service.masterServices.map((ms) => ({
       id: ms.masterProvider.id,
       displayName: ms.masterProvider.name,
@@ -418,8 +433,11 @@ export async function loadStudioServiceDetail(input: {
       baseDurationMin: true,
       globalCategoryId: true,
       isActive: true,
+      onlinePaymentEnabled: true,
+      sortOrder: true,
       masterServices: {
         where: { isEnabled: true },
+        orderBy: { createdAt: "asc" },
         select: {
           masterProvider: { select: { id: true, name: true, avatarUrl: true } },
         },
@@ -484,7 +502,10 @@ export async function loadStudioServiceDetail(input: {
     priceKopeks: service.basePrice ?? service.price,
     categoryId: service.globalCategoryId ?? null,
     isActive: service.isActive,
+    onlinePaymentEnabled: service.onlinePaymentEnabled,
+    sortOrder: service.sortOrder,
     bookings30d: periodBookings.length,
+    mastersCount: assignedMasters.length,
     masters: assignedMasters,
     description: service.description ?? null,
     assignedMasters,

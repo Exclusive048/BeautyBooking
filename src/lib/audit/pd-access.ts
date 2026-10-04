@@ -55,7 +55,13 @@ export type PdAccessSurface =
   /** Мастер листает свою клиентскую базу (имена + телефоны). */
   | "master.clients.list"
   /** Студия листает свою клиентскую базу. */
-  | "studio.clients.list";
+  | "studio.clients.list"
+  /**
+   * Студия открывает карточку клиента в приложении (MOBILE-STUDIO-C). Чтение
+   * одного клиента, но ключ телефонного клиента — `phone:<номер>`, его можно
+   * подбирать: перебор карточек — то же перечисление базы, поэтому след пишется.
+   */
+  | "studio.clients.detail";
 
 type RecordPdAccessInput = {
   surface: PdAccessSurface;

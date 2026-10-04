@@ -555,6 +555,1244 @@ const mobileClientHeaders: ParameterObject[] = [
   },
 ];
 
+// ─── MOBILE-STUDIO-C (каталог): услуги, пакеты, клиенты, отзывы, аналитика, портфолио, тариф ───
+// Схемы и пути одним блоком (вливаются в `components.schemas` и `paths` ниже), чтобы
+// параллельные срезы кабинета студии не правили одни и те же строки.
+const STUDIO_CABINET_AUTH: SecurityRequirementObject[] = [{ bearerAuth: [] }, { cookieAuth: [] }];
+const STUDIO_ID_QUERY: ParameterObject = {
+  name: "studioId",
+  in: "query",
+  required: true,
+  schema: { type: "string" },
+  description: "Studio.id (`studio.id` из `GET /api/cabinet/studio/context`).",
+};
+const CLIENT_KEY_PATH: ParameterObject = {
+  name: "clientKey",
+  in: "path",
+  required: true,
+  schema: { type: "string" },
+  description: "`user:<id>` или `phone:+7…` в `encodeURIComponent`.",
+};
+const PAGE_CURSOR_QUERY: ParameterObject = {
+  name: "cursor",
+  in: "query",
+  required: false,
+  schema: { type: "string", maxLength: 64 },
+  description: "Непрозрачный `nextCursor` прошлой страницы; испорченный — 400 «Список обновился. Загрузите его заново.».",
+};
+const NULLABLE_STRING: SchemaObject = { type: "string", nullable: true };
+const KPI_METRIC: SchemaObject = {
+  type: "object",
+  required: ["value", "previous", "deltaPct"],
+  properties: {
+    value: { type: "number" },
+    previous: { type: "number", nullable: true },
+    deltaPct: { type: "number", nullable: true, description: "Доля: 0.26 = +26%." },
+  },
+};
+const FEATURE_GATE_LOCK: SchemaObject = {
+  type: "object",
+  nullable: true,
+  description: "`null` — раздел открыт; иначе — замок в форме ошибки 403 `FEATURE_GATE`.",
+  required: ["code", "message", "details"],
+  properties: {
+    code: { type: "string", enum: ["FEATURE_GATE"] },
+    message: { type: "string" },
+    details: {
+      type: "object",
+      required: ["feature", "requiredPlan"],
+      properties: { feature: { type: "string" }, requiredPlan: { type: "string", enum: ["FREE", "PRO", "PREMIUM"] } },
+    },
+  },
+};
+const STUDIO_CABINET_READ_ERRORS: Record<string, ResponseObject> = {
+  "401": errorResponse("UNAUTHORIZED"),
+  "403": errorResponse("FORBIDDEN — мастер студии или нет студии"),
+  "429": errorResponse("RATE_LIMITED"),
+  "500": errorResponse("INTERNAL_ERROR"),
+};
+
+const STUDIO_CATALOG_SCHEMAS: Record<string, SchemaObject> = {
+  StudioCabinetMasterChip: {
+    type: "object",
+    required: ["id", "displayName", "avatarUrl"],
+    properties: {
+      id: { type: "string", description: "Provider.id мастера." },
+      displayName: { type: "string" },
+      avatarUrl: NULLABLE_STRING,
+    },
+  },
+  StudioCabinetServiceItem: {
+    type: "object",
+    required: [
+      "id", "name", "durationMin", "priceKopeks", "globalCategoryId", "isActive", "onlinePaymentEnabled",
+      "sortOrder", "bookings30d", "mastersCount", "masters",
+    ],
+    properties: {
+      id: { type: "string" },
+      name: { type: "string" },
+      durationMin: { type: "integer" },
+      priceKopeks: { type: "integer" },
+      globalCategoryId: { type: "string", nullable: true, description: "`null` — «Без категории»." },
+      isActive: { type: "boolean", description: "`false` — на паузе (не видна в каталоге)." },
+      onlinePaymentEnabled: { type: "boolean" },
+      sortOrder: { type: "integer" },
+      bookings30d: { type: "integer", description: "Записи за 30 дней (UTC-сутки), без отмен." },
+      mastersCount: { type: "integer" },
+      masters: {
+        type: "array",
+        description: "В списке — первые 4 назначенных, в карточке — все.",
+        items: { $ref: "#/components/schemas/StudioCabinetMasterChip" },
+      },
+    },
+  },
+  StudioCabinetServicesData: {
+    type: "object",
+    required: ["kpis", "categories", "pickerCategories", "categoryId", "q", "items"],
+    properties: {
+      kpis: {
+        type: "object",
+        required: [
+          "totalServices", "totalCategories", "popularServiceName", "popularBookings30d", "averageCheckKopeks",
+          "servicesWithoutMaster",
+        ],
+        properties: {
+          totalServices: { type: "integer" },
+          totalCategories: { type: "integer" },
+          popularServiceName: NULLABLE_STRING,
+          popularBookings30d: { type: "integer" },
+          averageCheckKopeks: { type: "integer" },
+          servicesWithoutMaster: { type: "integer" },
+        },
+      },
+      categories: {
+        type: "array",
+        description: "Сайдбар: категории со счётчиками (больше услуг — выше) и «Без категории» (`__uncategorized__`).",
+        items: {
+          type: "object",
+          required: ["id", "name", "icon", "status", "servicesCount"],
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            icon: NULLABLE_STRING,
+            status: { type: "string", enum: ["APPROVED", "PENDING", "uncategorized"] },
+            servicesCount: { type: "integer" },
+          },
+        },
+      },
+      pickerCategories: {
+        type: "array",
+        description: "Варианты категории для создания/правки услуги.",
+        items: {
+          type: "object",
+          required: ["id", "name", "icon", "status"],
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            icon: NULLABLE_STRING,
+            status: { type: "string", enum: ["APPROVED", "PENDING"] },
+          },
+        },
+      },
+      categoryId: { type: "string", nullable: true, description: "Эхо фильтра; `null` — весь прайс." },
+      q: { type: "string" },
+      items: { type: "array", items: { $ref: "#/components/schemas/StudioCabinetServiceItem" } },
+    },
+  },
+  StudioCabinetServiceDetailData: {
+    type: "object",
+    required: ["service"],
+    properties: {
+      service: {
+        allOf: [
+          { $ref: "#/components/schemas/StudioCabinetServiceItem" },
+          {
+            type: "object",
+            required: ["description", "assignedMasters", "availableMasters", "stats30d"],
+            properties: {
+              description: NULLABLE_STRING,
+              assignedMasters: { type: "array", items: { $ref: "#/components/schemas/StudioCabinetMasterChip" } },
+              availableMasters: {
+                type: "array",
+                description: "Активные мастера студии, которых можно назначить.",
+                items: { $ref: "#/components/schemas/StudioCabinetMasterChip" },
+              },
+              stats30d: {
+                type: "object",
+                required: ["bookingsCount", "revenueKopeks"],
+                properties: { bookingsCount: { type: "integer" }, revenueKopeks: { type: "integer" } },
+              },
+            },
+          },
+        ],
+      },
+    },
+  },
+  ReorderStudioServicesInput: {
+    type: "object",
+    required: ["studioId", "orderedIds"],
+    properties: {
+      studioId: { type: "string" },
+      orderedIds: { type: "array", minItems: 1, maxItems: 1000, items: { type: "string" }, description: "Без повторов." },
+      globalCategoryId: {
+        type: "string",
+        nullable: true,
+        description: "Скоуп — категория каталога; `null` / `__uncategorized__` — «Без категории»; без поля — весь прайс.",
+      },
+      categoryId: { type: "string", description: "Устаревшая ServiceCategory (важнее `globalCategoryId`)." },
+    },
+  },
+  StudioServiceBookingConfig: {
+    type: "object",
+    required: ["requiresReferencePhoto", "questions"],
+    properties: {
+      requiresReferencePhoto: { type: "boolean" },
+      questions: {
+        type: "array",
+        maxItems: 5,
+        items: {
+          type: "object",
+          required: ["text", "required", "order"],
+          properties: {
+            id: { type: "string" },
+            text: { type: "string", minLength: 10, maxLength: 300 },
+            required: { type: "boolean" },
+            order: { type: "integer", minimum: 0, maximum: 1000 },
+          },
+        },
+      },
+    },
+  },
+  StudioServicePackageInput: {
+    type: "object",
+    required: ["studioId", "name", "serviceIds", "discountType", "discountValue"],
+    properties: {
+      studioId: { type: "string" },
+      name: { type: "string", minLength: 1, maxLength: 120 },
+      serviceIds: { type: "array", minItems: 2, maxItems: 20, items: { type: "string" } },
+      discountType: { type: "string", enum: ["PERCENT", "FIXED"] },
+      discountValue: { type: "integer", minimum: 0, maximum: 1000000, description: "PERCENT — проценты; FIXED — копейки." },
+      isEnabled: { type: "boolean" },
+    },
+  },
+  StudioServicePackageUpdateInput: {
+    type: "object",
+    required: ["studioId"],
+    description: "Хотя бы одно поле кроме `studioId`.",
+    properties: {
+      studioId: { type: "string" },
+      name: { type: "string", minLength: 1, maxLength: 120 },
+      serviceIds: { type: "array", minItems: 2, maxItems: 20, items: { type: "string" } },
+      discountType: { type: "string", enum: ["PERCENT", "FIXED"] },
+      discountValue: { type: "integer", minimum: 0, maximum: 1000000 },
+      isEnabled: { type: "boolean" },
+    },
+  },
+  StudioCabinetClientRow: {
+    type: "object",
+    required: [
+      "key", "clientUserId", "displayName", "phone", "visitsCount", "mastersCount", "lifetimeKopeks",
+      "avgCheckKopeks", "lastVisitAt", "lastVisitDaysAgo", "mainMaster", "segments", "primarySegment",
+    ],
+    properties: {
+      key: { type: "string", description: "`user:<id>` / `phone:+7…` — ключ карточки (в пути — encodeURIComponent)." },
+      clientUserId: NULLABLE_STRING,
+      displayName: { type: "string" },
+      phone: NULLABLE_STRING,
+      visitsCount: { type: "integer", description: "Завершённые визиты в окне." },
+      mastersCount: { type: "integer" },
+      lifetimeKopeks: { type: "integer" },
+      avgCheckKopeks: { type: "integer" },
+      lastVisitAt: { type: "string", format: "date-time", nullable: true },
+      lastVisitDaysAgo: { type: "integer", nullable: true, description: "Дни по поясу салона." },
+      mainMaster: { allOf: [{ $ref: "#/components/schemas/StudioCabinetMasterChip" }], nullable: true },
+      segments: { type: "array", items: { type: "string", enum: ["vip", "regular", "new", "sleeping", "other"] } },
+      primarySegment: { type: "string", enum: ["vip", "regular", "new", "sleeping", "other"] },
+    },
+  },
+  StudioCabinetClientsData: {
+    type: "object",
+    required: [
+      "windowMonths", "timezone", "segment", "q", "master", "kpi", "segmentCounts", "masterOptions", "items",
+      "nextCursor", "total", "totalCount",
+    ],
+    properties: {
+      windowMonths: { type: "integer", description: "Окно CRM: брони за последние N месяцев." },
+      timezone: { type: "string" },
+      segment: { type: "string", enum: ["all", "vip", "regular", "new", "sleeping"] },
+      q: { type: "string" },
+      master: NULLABLE_STRING,
+      kpi: {
+        type: "object",
+        required: ["total", "active30d", "avgLifetime", "vip", "sleeping"],
+        properties: {
+          total: { type: "object", properties: { count: { type: "integer" }, addedThisMonth: { type: "integer" } } },
+          active30d: { type: "object", properties: { count: { type: "integer" }, percentOfBase: { type: "integer" } } },
+          avgLifetime: { type: "object", properties: { kopeks: { type: "integer" } } },
+          vip: { type: "object", properties: { count: { type: "integer" }, revenuePercent: { type: "integer" } } },
+          sleeping: { type: "object", properties: { count: { type: "integer" } } },
+        },
+      },
+      segmentCounts: {
+        type: "object",
+        required: ["all", "vip", "regular", "new", "sleeping"],
+        properties: {
+          all: { type: "integer" },
+          vip: { type: "integer" },
+          regular: { type: "integer" },
+          new: { type: "integer" },
+          sleeping: { type: "integer" },
+        },
+      },
+      masterOptions: { type: "array", items: { $ref: "#/components/schemas/StudioCabinetMasterChip" } },
+      items: { type: "array", items: { $ref: "#/components/schemas/StudioCabinetClientRow" } },
+      nextCursor: NULLABLE_STRING,
+      total: { type: "integer", description: "После `segment` / `master` / `q`." },
+      totalCount: { type: "integer", description: "Вся база в окне." },
+    },
+  },
+  StudioCabinetClientDetailData: {
+    type: "object",
+    required: ["windowMonths", "timezone", "client", "nextBooking", "recentVisits"],
+    properties: {
+      windowMonths: { type: "integer" },
+      timezone: { type: "string" },
+      client: {
+        type: "object",
+        required: [
+          "key", "clientUserId", "displayName", "phone", "segments", "primarySegment", "visitsCount",
+          "lifetimeKopeks", "avgCheckKopeks", "firstVisitAt", "lastVisitAt", "lastVisitDaysAgo", "mastersCount",
+          "mainMaster",
+        ],
+        properties: {
+          key: { type: "string" },
+          clientUserId: NULLABLE_STRING,
+          displayName: { type: "string" },
+          phone: NULLABLE_STRING,
+          segments: { type: "array", items: { type: "string", enum: ["vip", "regular", "new", "sleeping", "other"] } },
+          primarySegment: { type: "string", enum: ["vip", "regular", "new", "sleeping", "other"] },
+          visitsCount: { type: "integer" },
+          lifetimeKopeks: { type: "integer" },
+          avgCheckKopeks: { type: "integer" },
+          firstVisitAt: { type: "string", format: "date-time", nullable: true },
+          lastVisitAt: { type: "string", format: "date-time", nullable: true },
+          lastVisitDaysAgo: { type: "integer", nullable: true },
+          mastersCount: { type: "integer" },
+          mainMaster: { allOf: [{ $ref: "#/components/schemas/StudioCabinetMasterChip" }], nullable: true },
+        },
+      },
+      nextBooking: {
+        type: "object",
+        nullable: true,
+        required: ["id", "startAtUtc", "status", "serviceName", "master", "href"],
+        properties: {
+          id: { type: "string" },
+          startAtUtc: { type: "string", format: "date-time" },
+          status: { type: "string" },
+          serviceName: { type: "string" },
+          master: {
+            type: "object",
+            nullable: true,
+            properties: { id: { type: "string" }, displayName: { type: "string" } },
+          },
+          href: { type: "string", description: "`/studio/bookings/{id}`" },
+        },
+      },
+      recentVisits: {
+        type: "array",
+        maxItems: 3,
+        items: {
+          type: "object",
+          required: ["bookingId", "startAtUtc", "serviceName", "amountKopeks", "master", "href"],
+          properties: {
+            bookingId: { type: "string" },
+            startAtUtc: { type: "string", format: "date-time" },
+            serviceName: { type: "string" },
+            amountKopeks: { type: "integer" },
+            master: {
+              type: "object",
+              nullable: true,
+              properties: { id: { type: "string" }, displayName: { type: "string" } },
+            },
+            href: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  StudioClientCardData: {
+    type: "object",
+    required: ["card", "history", "visitsCount", "daysSinceLastVisit", "timeZone"],
+    properties: {
+      card: {
+        type: "object",
+        properties: {
+          id: NULLABLE_STRING,
+          notes: NULLABLE_STRING,
+          tags: { type: "array", items: { type: "string" } },
+          photos: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                url: { type: "string" },
+                caption: NULLABLE_STRING,
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+        },
+      },
+      history: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            bookingId: { type: "string" },
+            date: { type: "string", format: "date-time" },
+            serviceName: { type: "string" },
+            amount: { type: "integer", description: "Копейки." },
+            status: { type: "string" },
+          },
+        },
+      },
+      visitsCount: { type: "integer" },
+      daysSinceLastVisit: { type: "integer", nullable: true },
+      timeZone: { type: "string" },
+    },
+  },
+  StudioCabinetReviewsData: {
+    type: "object",
+    required: [
+      "filter", "master", "stats", "filterCounts", "unansweredCount", "totalReviewsCount", "masterOptions", "items",
+      "nextCursor", "total",
+    ],
+    properties: {
+      filter: { type: "string", enum: ["all", "no_reply", "low_rating", "five_star"] },
+      master: NULLABLE_STRING,
+      stats: {
+        type: "object",
+        required: ["averageRating", "totalReviews", "positivePercent", "distribution", "topServicesByReviews"],
+        properties: {
+          averageRating: { type: "number" },
+          totalReviews: { type: "integer" },
+          positivePercent: { type: "integer" },
+          distribution: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { stars: { type: "integer" }, count: { type: "integer" }, percent: { type: "integer" } },
+            },
+          },
+          topServicesByReviews: {
+            type: "array",
+            maxItems: 5,
+            items: {
+              type: "object",
+              properties: { serviceName: { type: "string" }, reviewCount: { type: "integer" } },
+            },
+          },
+        },
+      },
+      filterCounts: {
+        type: "object",
+        required: ["all", "no_reply", "low_rating", "five_star"],
+        properties: {
+          all: { type: "integer" },
+          no_reply: { type: "integer" },
+          low_rating: { type: "integer" },
+          five_star: { type: "integer" },
+        },
+      },
+      unansweredCount: { type: "integer" },
+      totalReviewsCount: { type: "integer" },
+      masterOptions: {
+        type: "array",
+        items: { type: "object", properties: { id: { type: "string" }, displayName: { type: "string" } } },
+      },
+      items: {
+        type: "array",
+        items: {
+          type: "object",
+          required: [
+            "id", "clientName", "rating", "createdAt", "master", "serviceName", "text", "reply", "canReply", "isReported",
+          ],
+          properties: {
+            id: { type: "string" },
+            clientName: { type: "string" },
+            rating: { type: "integer", minimum: 1, maximum: 5 },
+            createdAt: { type: "string", format: "date-time" },
+            master: {
+              type: "object",
+              nullable: true,
+              properties: { id: { type: "string" }, displayName: { type: "string" } },
+            },
+            serviceName: NULLABLE_STRING,
+            text: { type: "string" },
+            reply: {
+              type: "object",
+              nullable: true,
+              properties: { text: { type: "string" }, repliedAt: { type: "string", format: "date-time" } },
+            },
+            canReply: { type: "boolean", description: "Ответ/правка пройдут проверку сервера." },
+            isReported: { type: "boolean" },
+          },
+        },
+      },
+      nextCursor: NULLABLE_STRING,
+      total: { type: "integer" },
+    },
+  },
+  StudioCabinetAnalyticsData: {
+    type: "object",
+    required: [
+      "period", "view", "compare", "periodLabel", "timezone", "features", "locks", "kpi", "overview", "masters",
+      "services", "clients",
+    ],
+    properties: {
+      period: { type: "string", enum: ["7d", "30d", "90d", "365d"] },
+      view: { type: "string", enum: ["overview", "masters", "services", "clients"] },
+      compare: { type: "boolean" },
+      periodLabel: { type: "string" },
+      timezone: { type: "string" },
+      features: {
+        type: "object",
+        properties: {
+          dashboard: { type: "boolean" },
+          revenue: { type: "boolean" },
+          clients: { type: "boolean" },
+          bookingInsights: { type: "boolean" },
+          cohorts: { type: "boolean" },
+        },
+      },
+      locks: {
+        type: "object",
+        required: ["revenue", "clients", "bookingInsights"],
+        properties: { revenue: FEATURE_GATE_LOCK, clients: FEATURE_GATE_LOCK, bookingInsights: FEATURE_GATE_LOCK },
+      },
+      kpi: {
+        type: "object",
+        description: "Деньги — копейки; occupancy и returnRate — доли 0..1.",
+        properties: {
+          revenue: KPI_METRIC,
+          bookings: KPI_METRIC,
+          avgCheck: KPI_METRIC,
+          occupancy: KPI_METRIC,
+          returnRate: KPI_METRIC,
+        },
+      },
+      overview: {
+        type: "object",
+        nullable: true,
+        properties: {
+          revenue: {
+            type: "object",
+            nullable: true,
+            properties: {
+              totalCurrent: { type: "integer" },
+              totalPrevious: { type: "integer", nullable: true },
+              deltaPct: { type: "number", nullable: true },
+              granularity: { type: "string", enum: ["day", "week", "month"] },
+              points: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string", description: "YYYY-MM-DD (салон)." },
+                    current: { type: "integer" },
+                    previous: { type: "integer", nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          sources: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                source: { type: "string", enum: ["WEB", "MANUAL", "APP"] },
+                label: { type: "string" },
+                count: { type: "integer" },
+                percent: { type: "integer" },
+              },
+            },
+          },
+          heatmap: {
+            type: "object",
+            nullable: true,
+            properties: {
+              cells: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    weekday: { type: "integer", description: "0 = вс … 6 = сб." },
+                    hour: { type: "integer" },
+                    count: { type: "integer" },
+                  },
+                },
+              },
+              maxCount: { type: "integer" },
+            },
+          },
+        },
+      },
+      masters: {
+        type: "array",
+        nullable: true,
+        items: {
+          type: "object",
+          properties: {
+            masterId: { type: "string" },
+            masterName: { type: "string" },
+            bookings: { type: "integer" },
+            revenueKopeks: { type: "integer" },
+            avgCheckKopeks: { type: "integer" },
+            occupancyRate: { type: "number" },
+            rating: { type: "number" },
+            reviewsCount: { type: "integer" },
+          },
+        },
+      },
+      services: {
+        type: "array",
+        nullable: true,
+        items: {
+          type: "object",
+          properties: {
+            serviceKey: { type: "string" },
+            serviceName: { type: "string" },
+            bookings: { type: "integer" },
+            revenueKopeks: { type: "integer" },
+            share: { type: "number" },
+            mastersCount: { type: "integer" },
+          },
+        },
+      },
+      clients: {
+        type: "object",
+        nullable: true,
+        properties: {
+          segments: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                key: { type: "string", enum: ["new", "returning", "loyal", "sleeping", "lost"] },
+                label: { type: "string" },
+                count: { type: "integer" },
+                percent: { type: "integer" },
+              },
+            },
+          },
+          topClients: {
+            type: "array",
+            maxItems: 10,
+            items: {
+              type: "object",
+              properties: {
+                clientKey: { type: "string", description: "`user:<id>` — ключ карточки клиента." },
+                displayName: { type: "string" },
+                visitsCount: { type: "integer" },
+                lifetimeKopeks: { type: "integer" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  StudioCabinetPortfolioData: {
+    type: "object",
+    required: ["providerId", "timezone", "photos", "masters", "services", "limit"],
+    properties: {
+      providerId: { type: "string", description: "Provider студии — `entityId` загрузки и путь подписи." },
+      timezone: { type: "string" },
+      photos: {
+        type: "array",
+        description: "Новые сверху.",
+        items: {
+          type: "object",
+          required: ["assetId", "url", "createdAt", "isBanner", "isCatalogCover", "performerId", "serviceId"],
+          properties: {
+            assetId: { type: "string" },
+            url: { type: "string", description: "`/api/media/file/{id}`; превью — `?w=`." },
+            createdAt: { type: "string", format: "date-time" },
+            isBanner: { type: "boolean", description: "Баннер страницы — не работа, в лимит не идёт." },
+            isCatalogCover: { type: "boolean", description: "Выбрано главным фото каталога." },
+            performerId: NULLABLE_STRING,
+            serviceId: NULLABLE_STRING,
+          },
+        },
+      },
+      masters: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            serviceIds: { type: "array", items: { type: "string" } },
+          },
+        },
+      },
+      services: {
+        type: "array",
+        items: { type: "object", properties: { id: { type: "string" }, title: { type: "string" } } },
+      },
+      limit: {
+        type: "object",
+        required: ["max", "used"],
+        properties: {
+          max: { type: "integer", nullable: true, description: "`null` — без лимита." },
+          used: { type: "integer", description: "Без баннера." },
+        },
+      },
+    },
+  },
+  CurrentPlanData: {
+    type: "object",
+    required: ["planId", "planCode", "tier", "scope", "features", "system"],
+    properties: {
+      planId: NULLABLE_STRING,
+      planCode: NULLABLE_STRING,
+      tier: { type: "string", nullable: true, enum: ["FREE", "PRO", "PREMIUM"] },
+      scope: { type: "string", enum: ["MASTER", "STUDIO"] },
+      features: {
+        type: "object",
+        description: "Флаги (boolean) и лимиты (integer | null — без лимита).",
+        additionalProperties: true,
+      },
+      system: {
+        type: "object",
+        properties: { onlinePaymentsEnabled: { type: "boolean" }, visualSearchEnabled: { type: "boolean" } },
+      },
+    },
+  },
+};
+
+const STUDIO_CATALOG_PATHS: Record<string, PathItemObject> = {
+  "/api/cabinet/studio/services": {
+    get: {
+      operationId: "studioCabinetServices",
+      summary: "Studio price list for the app (KPI, categories, services)",
+      description:
+        "MOBILE-STUDIO-C: прайс студии одним ответом, без пагинации. Без `categoryId` — весь прайс, " +
+        "`__uncategorized__` — «Без категории», неизвестная категория — пустой список. Порядок — `sortOrder`.",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [
+        { name: "categoryId", in: "query", required: false, schema: { type: "string", maxLength: 64 } },
+        { name: "q", in: "query", required: false, schema: { type: "string", maxLength: 80 } },
+      ],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetServicesData" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/services/{id}": {
+    get: {
+      operationId: "studioCabinetService",
+      summary: "Studio service card (description, masters, 30-day stats)",
+      description: "MOBILE-STUDIO-C: чужая или несуществующая услуга — 404 `SERVICE_NOT_FOUND` «Услуга не найдена.».",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetServiceDetailData" }),
+        "404": errorResponse("SERVICE_NOT_FOUND"),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/service-packages": {
+    get: {
+      operationId: "studioCabinetServicePackages",
+      summary: "Studio service packages (same shape as the master's)",
+      description:
+        "MOBILE-STUDIO-C (G5): все пакеты студии, включая выключенные; услуга «на паузе» (`isActive: false`) — " +
+        "выключенная (`hasDisabledComponent`). Цена — прайс студии (`basePrice ?? price`).",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/MasterServicePackagesData" }),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/clients": {
+    get: {
+      operationId: "studioCabinetClients",
+      summary: "Studio client base for the app (paged)",
+      description:
+        "MOBILE-STUDIO-C (G6): клиенты из записей студии за окно CRM; KPI и `segmentCounts` — по всей базе, " +
+        "`total` — после фильтров. Порядок: VIP, затем последний визит. Каждый ответ — след `studio.clients.list`.",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [
+        {
+          name: "segment",
+          in: "query",
+          required: false,
+          schema: { type: "string", enum: ["all", "vip", "regular", "new", "sleeping"], default: "all" },
+        },
+        { name: "q", in: "query", required: false, schema: { type: "string", maxLength: 80 } },
+        {
+          name: "master",
+          in: "query",
+          required: false,
+          schema: { type: "string", maxLength: 64 },
+          description: "Provider мастера (основной мастер клиента); `all` — без фильтра.",
+        },
+        PAGE_CURSOR_QUERY,
+        { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 30 } },
+      ],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetClientsData" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/clients/{clientKey}": {
+    get: {
+      operationId: "studioCabinetClient",
+      summary: "Studio client summary (no plan gate)",
+      description:
+        "MOBILE-STUDIO-C (G6): сводка клиента (те же окно и цифры, что у строки списка), ближайшая запись и до " +
+        "трёх последних визитов. След `studio.clients.detail`. Заметки, теги, фото — PRO-карточка " +
+        "`/api/studio/clients/{clientKey}/card`.",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [CLIENT_KEY_PATH],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetClientDetailData" }),
+        "400": errorResponse("CLIENT_KEY_INVALID"),
+        "404": errorResponse("NOT_FOUND — у студии нет такого клиента в окне"),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/reviews": {
+    get: {
+      operationId: "studioCabinetReviews",
+      summary: "Studio reviews for the app (stats, filters, paged items)",
+      description:
+        "MOBILE-STUDIO-C (G7): статистика и счётчики — по всем отзывам студии, `total` — после фильтров. " +
+        "`canReply` — по правилу ответа на отзыв (`/api/reviews/{id}/reply`).",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [
+        {
+          name: "filter",
+          in: "query",
+          required: false,
+          schema: { type: "string", enum: ["all", "no_reply", "low_rating", "five_star"], default: "all" },
+        },
+        { name: "master", in: "query", required: false, schema: { type: "string", maxLength: 64 } },
+        PAGE_CURSOR_QUERY,
+        { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+      ],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetReviewsData" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/analytics": {
+    get: {
+      operationId: "studioCabinetAnalytics",
+      summary: "Studio analytics for the app (KPI + one view, plan locks)",
+      description:
+        "MOBILE-STUDIO-C (G8): сервис веб-страницы аналитики. Раздел, закрытый тарифом, — `null`, причина — " +
+        "`locks.*` (форма ошибки `FEATURE_GATE`). Кроме мастера студии — 403 `FORBIDDEN_ROLE`, если нет прав на " +
+        "аналитику студии.",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [
+        {
+          name: "period",
+          in: "query",
+          required: false,
+          schema: { type: "string", enum: ["7d", "30d", "90d", "365d"], default: "30d" },
+        },
+        {
+          name: "view",
+          in: "query",
+          required: false,
+          schema: { type: "string", enum: ["overview", "masters", "services", "clients"], default: "overview" },
+        },
+        { name: "compare", in: "query", required: false, schema: { type: "string", enum: ["on", "off"], default: "on" } },
+      ],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetAnalyticsData" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/cabinet/studio/portfolio": {
+    get: {
+      operationId: "studioCabinetPortfolio",
+      summary: "Studio portfolio for the app (photos, captions, banner, cover, plan limit)",
+      description:
+        "MOBILE-STUDIO-C: загрузка — `POST /api/media` (`entityType=STUDIO`, `entityId=providerId`, " +
+        "`kind=PORTFOLIO`), подпись — `PATCH /api/studios/{providerId}/portfolio/{assetId}`.",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioCabinetPortfolioData" }),
+        ...STUDIO_CABINET_READ_ERRORS,
+      },
+    },
+  },
+  "/api/studio/services/{id}/unassign-master": {
+    post: {
+      operationId: "studioServiceUnassignMaster",
+      summary: "Unassign a master from a studio service",
+      tags: ["mobile", "studio", "services"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/AssignMasterInput" } } },
+      },
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/AssignMasterData" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("SERVICE_NOT_FOUND / MASTER_NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/studio/services/{id}/booking-config": {
+    get: {
+      operationId: "studioServiceBookingConfig",
+      summary: "Studio service booking config (reference photo, questions)",
+      tags: ["mobile", "studio", "services"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, STUDIO_ID_QUERY],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioServiceBookingConfig" }),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("SERVICE_NOT_FOUND / STUDIO_NOT_FOUND"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+    put: {
+      operationId: "studioServiceBookingConfigUpdate",
+      summary: "Replace studio service booking config",
+      tags: ["mobile", "studio", "services"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, STUDIO_ID_QUERY],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/StudioServiceBookingConfig" } } },
+      },
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioServiceBookingConfig" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("SERVICE_NOT_FOUND / STUDIO_NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/studio/service-packages": {
+    post: {
+      operationId: "studioServicePackageCreate",
+      summary: "Create a studio service package",
+      tags: ["mobile", "studio", "services"],
+      security: STUDIO_CABINET_AUTH,
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/StudioServicePackageInput" } } },
+      },
+      responses: {
+        "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
+        "400": errorResponse("VALIDATION_ERROR"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("SERVICE_NOT_FOUND / STUDIO_NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/studio/service-packages/{id}": {
+    patch: {
+      operationId: "studioServicePackageUpdate",
+      summary: "Edit or toggle a studio service package",
+      tags: ["mobile", "studio", "services"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/StudioServicePackageUpdateInput" } } },
+      },
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+        "400": errorResponse("VALIDATION_ERROR"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("NOT_FOUND / SERVICE_NOT_FOUND / STUDIO_NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+    delete: {
+      operationId: "studioServicePackageDelete",
+      summary: "Delete a studio service package",
+      tags: ["mobile", "studio", "services"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, STUDIO_ID_QUERY],
+      responses: {
+        "200": okResponse({
+          type: "object",
+          required: ["id", "deleted"],
+          properties: { id: { type: "string" }, deleted: { type: "boolean" } },
+        }),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("NOT_FOUND / STUDIO_NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/studio/clients/{clientKey}/card": {
+    get: {
+      operationId: "studioClientCard",
+      summary: "Studio client card: notes, tags, photos, full history (PRO)",
+      description: "Гейт: 403 `FEATURE_GATE` «Заметки, теги и история доступны с тарифа PRO.».",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [CLIENT_KEY_PATH, STUDIO_ID_QUERY],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/StudioClientCardData" }),
+        "400": errorResponse("CLIENT_KEY_INVALID"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
+        "404": errorResponse("STUDIO_NOT_FOUND"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+    patch: {
+      operationId: "studioClientCardUpdate",
+      summary: "Update studio client card notes and tags (PRO)",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [CLIENT_KEY_PATH, STUDIO_ID_QUERY],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                notes: { type: "string", nullable: true, maxLength: 2000 },
+                tags: {
+                  type: "array",
+                  maxItems: 9,
+                  items: {
+                    type: "string",
+                    enum: ["vip", "regular", "new", "allergy", "late", "no_show", "discount", "prepay", "favorite"],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      responses: {
+        "200": okResponse({
+          type: "object",
+          required: ["card"],
+          properties: {
+            card: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                notes: NULLABLE_STRING,
+                tags: { type: "array", items: { type: "string" } },
+              },
+            },
+          },
+        }),
+        "400": errorResponse("VALIDATION_ERROR / CLIENT_KEY_INVALID"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
+        "404": errorResponse("STUDIO_NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/studio/clients/{clientKey}/card/photos": {
+    post: {
+      operationId: "studioClientCardPhotoUpload",
+      summary: "Add a photo to the studio client card (PRO, max 3)",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [CLIENT_KEY_PATH, STUDIO_ID_QUERY],
+      requestBody: {
+        required: true,
+        content: {
+          "multipart/form-data": {
+            schema: { type: "object", required: ["file"], properties: { file: { type: "string", format: "binary" } } },
+          },
+        },
+      },
+      responses: {
+        "201": okResponse(
+          {
+            type: "object",
+            required: ["photo"],
+            properties: {
+              photo: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  caption: NULLABLE_STRING,
+                  url: { type: "string" },
+                  createdAt: { type: "string", format: "date-time" },
+                },
+              },
+            },
+          },
+          "Created",
+        ),
+        "400": errorResponse("MEDIA_FILE_REQUIRED / CLIENT_KEY_INVALID"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
+        "409": errorResponse("PHOTO_LIMIT_REACHED"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/studio/clients/{clientKey}/card/photos/{photoId}": {
+    delete: {
+      operationId: "studioClientCardPhotoDelete",
+      summary: "Delete a photo from the studio client card (PRO)",
+      tags: ["mobile", "studio"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [
+        CLIENT_KEY_PATH,
+        { name: "photoId", in: "path", required: true, schema: { type: "string" } },
+        STUDIO_ID_QUERY,
+      ],
+      responses: {
+        "200": okResponse({ type: "object", required: ["deleted"], properties: { deleted: { type: "boolean" } } }),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN / FEATURE_GATE"),
+        "404": errorResponse("NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/reviews/{id}/suggest-reply": {
+    post: {
+      operationId: "reviewSuggestReply",
+      summary: "AI draft of a reply to a review",
+      description:
+        "Доступ — как у ответа на отзыв (мастер; владелец/администратор студии — для отзывов на студию и её " +
+        "мастеров). Свой лимит `aiSuggestReply` (20/час на аккаунт); AI выключен — 503 `SYSTEM_FEATURE_DISABLED`.",
+      tags: ["mobile", "reviews"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: {
+        "200": okResponse({ type: "object", required: ["suggestion"], properties: { suggestion: { type: "string" } } }),
+        "400": errorResponse("ALREADY_EXISTS / VALIDATION_ERROR"),
+        "401": errorResponse("UNAUTHORIZED"),
+        "403": errorResponse("FORBIDDEN"),
+        "404": errorResponse("NOT_FOUND"),
+        "429": errorResponse("RATE_LIMITED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+        "503": errorResponse("SYSTEM_FEATURE_DISABLED"),
+      },
+    },
+  },
+  "/api/me/plan": {
+    get: {
+      operationId: "mePlan",
+      summary: "Caller's current plan, features and limits",
+      description: "`Cache-Control: private, max-age=60`. Тариф — СОБСТВЕННЫЙ у вызывающего в выбранном `scope`.",
+      tags: ["mobile", "billing"],
+      security: STUDIO_CABINET_AUTH,
+      parameters: [
+        { name: "scope", in: "query", required: false, schema: { type: "string", enum: ["MASTER", "STUDIO"] } },
+      ],
+      responses: {
+        "200": okResponse({ $ref: "#/components/schemas/CurrentPlanData" }),
+        "401": errorResponse("UNAUTHORIZED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/billing/status": {
+    get: {
+      operationId: "billingStatus",
+      summary: "Caller's subscriptions by scope",
+      tags: ["mobile", "billing"],
+      security: STUDIO_CABINET_AUTH,
+      responses: {
+        "200": okResponse({
+          type: "object",
+          required: ["subscriptions", "availableScopes"],
+          properties: {
+            subscriptions: {
+              type: "object",
+              properties: {
+                MASTER: { type: "object", nullable: true, additionalProperties: true },
+                STUDIO: { type: "object", nullable: true, additionalProperties: true },
+              },
+            },
+            availableScopes: { type: "array", items: { type: "string", enum: ["MASTER", "STUDIO"] } },
+          },
+        }),
+        "401": errorResponse("UNAUTHORIZED"),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+  "/api/billing/plans": {
+    get: {
+      operationId: "billingPlans",
+      summary: "Public plan catalog with prices and features",
+      tags: ["mobile", "billing"],
+      responses: {
+        "200": okResponse({
+          type: "object",
+          required: ["plans"],
+          properties: {
+            plans: {
+              type: "object",
+              properties: {
+                MASTER: { type: "array", items: { type: "object", additionalProperties: true } },
+                STUDIO: { type: "array", items: { type: "object", additionalProperties: true } },
+              },
+            },
+          },
+        }),
+        "500": errorResponse("INTERNAL_ERROR"),
+      },
+    },
+  },
+};
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
@@ -590,6 +1828,7 @@ export const openApiSpec = {
       },
     },
     schemas: {
+      ...STUDIO_CATALOG_SCHEMAS,
       ApiSuccess: {
         type: "object",
         required: ["ok", "data"],
@@ -1508,9 +2747,10 @@ export const openApiSpec = {
       },
       ReviewReportInput: {
         type: "object",
-        required: ["comment"],
+        required: ["reason"],
         properties: {
-          comment: { type: "string", maxLength: 1500 },
+          reason: { type: "string", enum: ["SPAM", "FAKE", "OFFENSIVE", "INAPPROPRIATE", "OTHER"] },
+          comment: { type: "string", maxLength: 500 },
         },
       },
       ReviewData: {
@@ -1633,14 +2873,19 @@ export const openApiSpec = {
       },
       CreateStudioServiceInput: {
         type: "object",
-        required: ["studioId", "categoryId", "title", "basePrice", "baseDurationMin"],
+        required: ["studioId", "title", "basePrice", "baseDurationMin"],
         properties: {
           studioId: { type: "string" },
-          categoryId: { type: "string" },
-          title: { type: "string" },
-          description: { type: "string" },
-          basePrice: { type: "integer" },
-          baseDurationMin: { type: "integer" },
+          categoryId: { type: "string", description: "Устаревшая ServiceCategory — не отправлять." },
+          globalCategoryId: { type: "string", description: "Категория каталога (`pickerCategories[].id`)." },
+          title: { type: "string", maxLength: 160 },
+          description: { type: "string", maxLength: 1000 },
+          basePrice: { type: "integer", description: "Копейки; сервер округляет до целых рублей." },
+          baseDurationMin: { type: "integer", minimum: 1, maximum: 1440, description: "Сервер округляет до 5 минут." },
+          onlinePaymentEnabled: {
+            type: "boolean",
+            description: "MOBILE-STUDIO-C: `true` — гейт тарифа (`FEATURE_GATE` / `SYSTEM_FEATURE_DISABLED`), как у PATCH.",
+          },
         },
       },
       UpdateStudioServiceInput: {
@@ -1653,7 +2898,9 @@ export const openApiSpec = {
           description: { type: "string" },
           basePrice: { type: "integer" },
           baseDurationMin: { type: "integer" },
-          isActive: { type: "boolean" },
+          isActive: { type: "boolean", description: "`false` — пауза: не видна в каталоге, записаться нельзя." },
+          globalCategoryId: { type: "string", nullable: true },
+          onlinePaymentEnabled: { type: "boolean", description: "`true` — гейт тарифа." },
         },
       },
       AssignMasterInput: {
@@ -4605,6 +5852,7 @@ export const openApiSpec = {
     },
   },
   paths: {
+    ...STUDIO_CATALOG_PATHS,
     "/api/catalog/search": {
       get: {
         operationId: "catalogSearch",
@@ -4940,7 +6188,7 @@ export const openApiSpec = {
     "/api/studios/{id}/portfolio/{assetId}": {
       patch: {
         summary: "Set performer and service caption of a studio portfolio photo",
-        tags: ["studio"],
+        tags: ["mobile", "studio"],
         parameters: [
           providerIdParam,
           { name: "assetId", in: "path", required: true, schema: { type: "string" } },
@@ -5839,7 +7087,10 @@ export const openApiSpec = {
       },
       post: {
         summary: "Upload media asset",
-        tags: ["media"],
+        description:
+          "`kind=PORTFOLIO` → 201 `{ asset, assetId, url, aiClassificationPending }`; сверх лимита тарифа — 409 " +
+          "`LIMIT_REACHED`. `replaceAssetId` — замена с переносом подписи. Тир прокси `mediaUpload`.",
+        tags: ["mobile", "media"],
         requestBody: {
           required: true,
           content: {
@@ -5871,7 +7122,7 @@ export const openApiSpec = {
     "/api/media/{id}": {
       delete: {
         summary: "Delete media asset",
-        tags: ["media"],
+        tags: ["mobile", "media"],
         parameters: [
           {
             name: "id",
@@ -5881,7 +7132,11 @@ export const openApiSpec = {
           },
         ],
         responses: {
-          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "200": okResponse({
+            type: "object",
+            required: ["result"],
+            properties: { result: { $ref: "#/components/schemas/DeleteResult" } },
+          }),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
@@ -6677,7 +7932,7 @@ export const openApiSpec = {
     "/api/reviews/{id}/reply": {
       post: {
         summary: "Reply to review (master once)",
-        tags: ["reviews"],
+        tags: ["mobile", "reviews"],
         parameters: [
           {
             name: "id",
@@ -6702,11 +7957,31 @@ export const openApiSpec = {
           "500": errorResponse("Internal error"),
         },
       },
+      patch: {
+        operationId: "reviewReplyEdit",
+        summary: "Edit the reply to a review",
+        tags: ["mobile", "reviews"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": { schema: { $ref: "#/components/schemas/ReviewReplyInput" } },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ReviewData" }),
+          "400": errorResponse("Validation error"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("NOT_FOUND — отзыва или ответа нет"),
+          "500": errorResponse("Internal error"),
+        },
+      },
     },
     "/api/reviews/{id}/report": {
       post: {
         summary: "Report review (master within 3 days)",
-        tags: ["reviews"],
+        tags: ["mobile", "reviews"],
         parameters: [
           {
             name: "id",
@@ -6722,7 +7997,7 @@ export const openApiSpec = {
           },
         },
         responses: {
-          "200": okResponse({ $ref: "#/components/schemas/ReviewData" }),
+          "200": okResponse({ type: "object", required: ["reported"], properties: { reported: { type: "boolean" } } }),
           "400": errorResponse("Validation error"),
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
@@ -6863,7 +8138,7 @@ export const openApiSpec = {
       },
       post: {
         summary: "Create studio service",
-        tags: ["studio", "services"],
+        tags: ["mobile", "studio", "services"],
         requestBody: {
           required: true,
           content: {
@@ -6883,7 +8158,7 @@ export const openApiSpec = {
     "/api/studio/services/{id}": {
       patch: {
         summary: "Update studio service",
-        tags: ["studio", "services"],
+        tags: ["mobile", "studio", "services"],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         requestBody: {
           required: true,
@@ -6900,15 +8175,35 @@ export const openApiSpec = {
           "500": errorResponse("Internal error"),
         },
       },
+      delete: {
+        operationId: "studioServiceDelete",
+        summary: "Delete studio service",
+        description:
+          "MOBILE-STUDIO-C (G4): у услуги есть записи — 409 `SERVICE_HAS_BOOKINGS` «У услуги есть записи. " +
+          "Выключите её вместо удаления.» (раньше 500).",
+        tags: ["mobile", "studio", "services"],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("SERVICE_NOT_FOUND / STUDIO_NOT_FOUND"),
+          "409": errorResponse("SERVICE_HAS_BOOKINGS"),
+          "500": errorResponse("Internal error"),
+        },
+      },
     },
     "/api/studio/services/reorder": {
       patch: {
-        summary: "Reorder studio services inside category",
-        tags: ["studio", "services"],
+        summary: "Reorder studio services (inside a catalog category, «Без категории» or the whole list)",
+        tags: ["mobile", "studio", "services"],
         requestBody: {
           required: true,
           content: {
-            "application/json": { schema: { $ref: "#/components/schemas/ReorderIdsInput" } },
+            "application/json": { schema: { $ref: "#/components/schemas/ReorderStudioServicesInput" } },
           },
         },
         responses: {

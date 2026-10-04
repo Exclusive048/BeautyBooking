@@ -71,6 +71,7 @@ describe("listMasterServicePackages", () => {
               durationMin: 90,
               price: 200_000,
               isEnabled: false,
+              isActive: true,
               sortOrder: 2,
             },
           },
@@ -82,6 +83,7 @@ describe("listMasterServicePackages", () => {
               durationMin: 60,
               price: 150_000,
               isEnabled: true,
+              isActive: true,
               sortOrder: 1,
             },
           },
@@ -107,5 +109,72 @@ describe("listMasterServicePackages", () => {
         hasDisabledComponent: true,
       },
     ]);
+  });
+
+  it("услуга «на паузе» (isActive = false) — выключенная: на пакет по ней не записаться (MOBILE-STUDIO-C, G5)", async () => {
+    servicePackageFindMany.mockResolvedValue([
+      {
+        id: "pkg-2",
+        name: "Пакет студии",
+        isEnabled: true,
+        discountType: "FIXED",
+        discountValue: 0,
+        sortOrder: 0,
+        items: [
+          {
+            service: {
+              id: "svc-3",
+              name: "Стрижка",
+              title: null,
+              durationMin: 60,
+              price: 100_000,
+              baseDurationMin: null,
+              basePrice: null,
+              isEnabled: true,
+              isActive: false,
+              sortOrder: 0,
+            },
+          },
+        ],
+      },
+    ]);
+    const [pkg] = await listMasterServicePackages("studio-provider-1");
+    expect(pkg!.services[0]!.isEnabled).toBe(false);
+    expect(pkg!.hasDisabledComponent).toBe(true);
+  });
+
+  it("useBasePrice — цена и длительность прайса студии (basePrice ?? price)", async () => {
+    servicePackageFindMany.mockResolvedValue([
+      {
+        id: "pkg-3",
+        name: "Пакет студии",
+        isEnabled: true,
+        discountType: "PERCENT",
+        discountValue: 0,
+        sortOrder: 0,
+        items: [
+          {
+            service: {
+              id: "svc-4",
+              name: "Окрашивание",
+              title: null,
+              durationMin: 60,
+              price: 100_000,
+              baseDurationMin: 120,
+              basePrice: 300_000,
+              isEnabled: true,
+              isActive: true,
+              sortOrder: 0,
+            },
+          },
+        ],
+      },
+    ]);
+    const [base] = await listMasterServicePackages("studio-provider-1", { useBasePrice: true });
+    expect(base!.services[0]).toMatchObject({ price: 300_000, durationMin: 120, isEnabled: true });
+    expect(base).toMatchObject({ totalPrice: 300_000, totalDurationMin: 120, hasDisabledComponent: false });
+
+    const [plain] = await listMasterServicePackages("master-1");
+    expect(plain!.services[0]).toMatchObject({ price: 100_000, durationMin: 60 });
   });
 });

@@ -70,6 +70,9 @@ export const createStudioServiceSchema = z.object({
     .min(1)
     .max(24 * 60)
     .transform((value) => normalizeStudioServiceDurationMin(value)),
+  // MOBILE-STUDIO-C: онлайн-оплата сразу при создании (раньше — только
+  // отдельным PATCH). `true` проходит те же проверки тарифа, что и PATCH.
+  onlinePaymentEnabled: z.boolean().optional(),
 });
 
 export const updateStudioServiceSchema = z.object({
@@ -95,10 +98,21 @@ export const updateStudioServiceSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/**
+ * MOBILE-STUDIO-C (G3): порядок — внутри устаревшей `categoryId`, категории
+ * каталога `globalCategoryId` (`null` / `"__uncategorized__"` — «Без
+ * категории») или всего прайса, если не прислано ни то, ни другое
+ * (`studioServicesReorderScope`). Повтор id — 400, а не тихая перезапись.
+ */
 export const reorderStudioServicesSchema = z.object({
   studioId: z.string().trim().min(1),
-  categoryId: z.string().trim().min(1),
-  orderedIds: z.array(z.string().trim().min(1)).min(1).max(1000),
+  categoryId: z.string().trim().min(1).optional(),
+  globalCategoryId: z.string().trim().min(1).max(64).nullable().optional(),
+  orderedIds: z
+    .array(z.string().trim().min(1))
+    .min(1)
+    .max(1000)
+    .refine((ids) => new Set(ids).size === ids.length, { message: "Услуги в списке не должны повторяться." }),
 });
 
 export const assignMasterToServiceSchema = z.object({
