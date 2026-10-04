@@ -1859,6 +1859,38 @@ export const openApiSpec = {
           serviceIds: { type: "array", items: { type: "string" } },
         },
       },
+      StudioCabinetContextData: {
+        type: "object",
+        required: ["studio", "roles", "isOwner", "canAdminister", "todayKey", "counts"],
+        properties: {
+          studio: {
+            type: "object",
+            required: ["id", "providerId", "name", "timezone", "mastersCount", "isPublished"],
+            properties: {
+              id: { type: "string", description: "Studio.id — studioId всех `/api/studio/*`." },
+              providerId: { type: "string", description: "Provider студии — для `/api/studios/{id}/**`." },
+              name: { type: "string" },
+              avatarUrl: { type: "string", nullable: true },
+              publicUsername: { type: "string", nullable: true },
+              isPublished: { type: "boolean" },
+              timezone: { type: "string", description: "IANA-пояс салона." },
+              mastersCount: { type: "integer" },
+            },
+          },
+          roles: { type: "array", items: { type: "string", enum: ["OWNER", "ADMIN", "MASTER"] } },
+          isOwner: { type: "boolean" },
+          canAdminister: { type: "boolean", description: "Владелец или администратор." },
+          todayKey: { type: "string", description: "YYYY-MM-DD по поясу салона." },
+          counts: {
+            type: "object",
+            nullable: true,
+            properties: {
+              scheduleRequestsPending: { type: "integer" },
+              reviewsUnanswered: { type: "integer" },
+            },
+          },
+        },
+      },
       MasterPortfolioListItem: {
         type: "object",
         required: ["id", "mediaUrl", "caption", "serviceIds", "isPublic", "inSearch", "createdAt", "sortOrder"],
@@ -5729,6 +5761,26 @@ export const openApiSpec = {
           "400": errorResponse("VALIDATION_ERROR"),
           "401": errorResponse("UNAUTHORIZED"),
           "403": errorResponse("FORBIDDEN — не мастер"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/context": {
+      get: {
+        operationId: "studioCabinetContext",
+        summary: "Studio cabinet context for the app",
+        description:
+          "MOBILE-STUDIO-C: студия текущего пользователя (как веб-кабинет: OWNER > ADMIN > MASTER) — оба id " +
+          "(`studio.id` = Studio.id для `/api/studio/*`, `studio.providerId` для `/api/studios/{id}/**`), роли, " +
+          "пояс салона, «сегодня» по салону и бейджи разделов. Мастер студии — 200 с `canAdminister: false` и " +
+          "`counts: null`; без членства в студии — 403.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioCabinetContextData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — нет студии"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR"),
         },
