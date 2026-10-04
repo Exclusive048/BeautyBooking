@@ -8,8 +8,8 @@ import { getStudioProviderById, updateStudioProviderProfile } from "@/lib/studio
 import { isValidTimeZone } from "@/lib/schedule/timezone";
 import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { rejectForbiddenWords } from "@/lib/moderation/zod";
+import { z, type ZodError } from "zod";
+import { findForbiddenWordsIssue, rejectForbiddenWords } from "@/lib/moderation/zod";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -25,7 +25,7 @@ const updateSchema = z
     categories: z.array(z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name"))).max(20).optional(),
     contactName: z.string().trim().nullable().optional(),
     contactPhone: z.string().trim().nullable().optional(),
-    contactEmail: z.string().trim().email().nullable().optional(),
+    contactEmail: z.string().trim().email("Проверьте адрес почты.").nullable().optional(),
     // FEAT-PROVIDER-SOCIALS: raw input (URL or handle); normalized + host/scheme
     // validated server-side in updateStudioProviderProfile (the security boundary).
     socialVk: z.string().trim().max(200).nullable().optional(),
@@ -42,7 +42,7 @@ const updateSchema = z
       .trim()
       .min(3)
       .max(64)
-      .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
+      .refine(isValidTimeZone, { message: "Проверьте часовой пояс." })
       .optional(),
     bannerAssetId: z.string().trim().nullable().optional(),
     // CATALOG-MAIN-PHOTO: главное фото карточки каталога — из портфолио студии.
@@ -91,6 +91,31 @@ const updateSchema = z
     { message: "Заполните хотя бы одно поле." }
   );
 
+/**
+ * MOBILE-STUDIO-C (team) — отказ валидации тела человеческим текстом, а не
+ * машинным «поле: сообщение; …» (`formatZodError`), которое форма показывала
+ * как есть: запрещённые слова — их текст, пустой патч — «Заполните хотя бы
+ * одно поле.», остальное — общий текст и `details.issues` для подсветки полей.
+ * Статус и код прежние (400 `VALIDATION_ERROR`).
+ */
+function bodyValidationFailure(error: ZodError) {
+  const forbidden = findForbiddenWordsIssue(error);
+  if (forbidden) return fail(forbidden.message, 400, "VALIDATION_ERROR");
+  const issues = error.issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join(".") : "input",
+    message: issue.message,
+    code: issue.code,
+  }));
+  // Единственная проверка уровня всего тела — «хотя бы одно поле».
+  const emptyPatch = error.issues.find((issue) => issue.code === "custom" && issue.path.length === 0);
+  return fail(
+    emptyPatch?.message ?? "Проверьте правильность заполнения полей.",
+    400,
+    "VALIDATION_ERROR",
+    { issues },
+  );
+}
+
 function coordsRequired() {
   // FIX-B14: прежняя форма клала МАШИННЫЙ КОД в поле `error`, где UI ждёт
   // объект `{ message, code }` — то есть сообщения не было вовсе, а гейт
@@ -135,7 +160,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   const body = await req.json().catch(() => null);
   const parsedBody = updateSchema.safeParse(body);
   if (!parsedBody.success) {
-    return fail(formatZodError(parsedBody.error), 400, "VALIDATION_ERROR");
+    return bodyValidationFailure(parsedBody.error);
   }
   const payload = parsedBody.data;
   const addressProvided = payload.address !== undefined;

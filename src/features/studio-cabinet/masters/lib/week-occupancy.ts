@@ -17,6 +17,8 @@ const DAILY_CAPACITY = 5;
 const WEEKDAY_LABELS = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"] as const;
 
 export type WeekScheduleCell = {
+  /** MOBILE-STUDIO-C (team): дата салона `YYYY-MM-DD` — приложению не разбирать подпись. */
+  date: string;
   /** 1=Mon ... 7=Sun (matches WeeklyScheduleDay.weekday convention). */
   weekday: number;
   /** Two-letter label + day-of-month, e.g. «ПН 4». */
@@ -120,6 +122,7 @@ export async function getMasterWeekOccupancy(input: {
     const booked = bookingsByLocalDay.get(cellKey) ?? 0;
     const dayOfMonth = Number(cellKey.split("-")[2]);
     return {
+      date: cellKey,
       weekday,
       dateLabel: `${WEEKDAY_LABELS[dayIndex]} ${dayOfMonth}`,
       booked,

@@ -21,6 +21,7 @@
   "/api/billing/renew/run",
   "/api/cabinet/master/leave-studio",
   "/api/cabinet/master/public-username",
+  "/api/cabinet/studio/masters/[id]/invite/resend",
   "/api/cabinet/studio/members/[memberId]/remove",
   "/api/cabinet/studio/public-username",
   "/api/catalog/available-today/run",

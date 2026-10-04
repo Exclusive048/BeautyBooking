@@ -646,6 +646,15 @@ export const openApiSpec = {
           "bufferBetweenBookingsMin",
           "bannerAssetId",
           "bannerUrl",
+          "socialVk",
+          "socialInstagram",
+          "catalogCoverAssetId",
+          "minBookingHoursAhead",
+          "maxBookingDaysAhead",
+          "cancellationDeadlineHours",
+          "lateCancelAction",
+          "acceptNewClients",
+          "remindersEnabled",
         ],
         properties: {
           id: { type: "string" },
@@ -666,6 +675,15 @@ export const openApiSpec = {
           bufferBetweenBookingsMin: { type: "integer" },
           bannerAssetId: { type: "string", nullable: true },
           bannerUrl: { type: "string", nullable: true },
+          socialVk: { type: "string", nullable: true },
+          socialInstagram: { type: "string", nullable: true },
+          catalogCoverAssetId: { type: "string", nullable: true },
+          minBookingHoursAhead: { type: "integer" },
+          maxBookingDaysAhead: { type: "integer" },
+          cancellationDeadlineHours: { type: "integer", nullable: true },
+          lateCancelAction: { type: "string", enum: ["none", "reminder", "fine"] },
+          acceptNewClients: { type: "boolean" },
+          remindersEnabled: { type: "boolean" },
         },
       },
       StudioPortfolioAttributionItem: {
@@ -731,6 +749,7 @@ export const openApiSpec = {
           isPublished: { type: "boolean" },
           timezone: { type: "string" },
           bannerAssetId: { type: "string", nullable: true },
+          catalogCoverAssetId: { type: "string", nullable: true, maxLength: 64 },
           socialVk: { type: "string", nullable: true },
           socialInstagram: { type: "string", nullable: true },
           minBookingHoursAhead: { type: "integer" },
@@ -1519,8 +1538,9 @@ export const openApiSpec = {
         type: "object",
         required: ["studioId", "masterId"],
         properties: {
-          studioId: { type: "string" },
-          masterId: { type: "string" },
+          studioId: { type: "string", description: "Studio.id" },
+          masterId: { type: "string", description: "Provider.id профиля мастера в студии" },
+          isEnabled: { type: "boolean", default: true },
         },
       },
       AssignMasterData: {
@@ -1593,22 +1613,25 @@ export const openApiSpec = {
       },
       CreateStudioMasterInput: {
         type: "object",
-        required: ["studioId", "displayName", "phone", "title"],
+        description: "Ровно один контакт: `phone` или `email` (иначе 400 «Укажите телефон или почту мастера.»).",
+        required: ["studioId", "displayName", "title"],
         properties: {
-          studioId: { type: "string" },
-          displayName: { type: "string" },
-          phone: { type: "string" },
-          title: { type: "string" },
+          studioId: { type: "string", description: "Studio.id" },
+          displayName: { type: "string", maxLength: 120 },
+          phone: { type: "string", description: "Нормализуется в +7XXXXXXXXXX." },
+          email: { type: "string", maxLength: 254, description: "Приводится к нижнему регистру." },
+          title: { type: "string", maxLength: 240, description: "Специализация мастера." },
         },
       },
       UpdateStudioMasterInput: {
         type: "object",
         required: ["studioId"],
         properties: {
-          studioId: { type: "string" },
-          displayName: { type: "string" },
-          tagline: { type: "string" },
-          isActive: { type: "boolean" },
+          studioId: { type: "string", description: "Studio.id" },
+          displayName: { type: "string", maxLength: 120, description: "Публичное имя профиля мастера в студии." },
+          tagline: { type: "string", maxLength: 240 },
+          description: { type: "string", maxLength: 2000, description: "Пустая строка очищает." },
+          isActive: { type: "boolean", description: "false — пауза в студии, true — вернуть к работе (проверка лимита команды)." },
         },
       },
       BulkMasterServicesInput: {
@@ -4099,6 +4122,360 @@ export const openApiSpec = {
           },
         },
       },
+      // MOBILE-STUDIO-C (team) — команда, заявки на расписание, настройки студии.
+      StudioCabinetMasterMetrics: {
+        type: "object",
+        required: ["revenue30dKopeks", "bookings30d", "occupancy30dPercent", "rating", "reviewsCount"],
+        properties: {
+          revenue30dKopeks: { type: "integer" },
+          bookings30d: { type: "integer" },
+          occupancy30dPercent: { type: "integer", description: "0..100, оценка bookings30d / (30 × 5)." },
+          rating: { type: "number" },
+          reviewsCount: { type: "integer" },
+        },
+      },
+      StudioCabinetMasterListItem: {
+        type: "object",
+        required: ["id", "userId", "displayName", "avatarUrl", "servicesSummary", "status", "isCurrentUser", "metrics"],
+        properties: {
+          id: { type: "string", description: "Provider.id профиля мастера в студии — id всех роутов команды." },
+          userId: { type: "string", nullable: true, description: "null — приглашение не принято." },
+          displayName: { type: "string" },
+          avatarUrl: { type: "string", nullable: true },
+          servicesSummary: { type: "string" },
+          status: { type: "string", enum: ["ACTIVE", "INVITED", "DISABLED"], description: "DISABLED — пауза в студии." },
+          isCurrentUser: { type: "boolean" },
+          metrics: { $ref: "#/components/schemas/StudioCabinetMasterMetrics" },
+        },
+      },
+      StudioCabinetMastersData: {
+        type: "object",
+        required: ["filter", "q", "items", "counts", "teamLimit"],
+        properties: {
+          filter: { type: "string", enum: ["all", "active", "invited", "disabled"] },
+          q: { type: "string" },
+          items: { type: "array", items: { $ref: "#/components/schemas/StudioCabinetMasterListItem" } },
+          counts: {
+            type: "object",
+            required: ["total", "active", "invited", "disabled"],
+            properties: {
+              total: { type: "integer" },
+              active: { type: "integer" },
+              invited: { type: "integer" },
+              disabled: { type: "integer" },
+            },
+          },
+          teamLimit: {
+            type: "object",
+            required: ["max", "activeCount", "canInvite"],
+            properties: {
+              max: { type: "integer", nullable: true, description: "Потолок тарифа владельца; null — без ограничения." },
+              activeCount: { type: "integer", description: "Занятые места: приглашение принято и не на паузе." },
+              canInvite: { type: "boolean" },
+            },
+          },
+        },
+      },
+      StudioCabinetMasterServiceRow: {
+        type: "object",
+        required: [
+          "serviceId",
+          "title",
+          "isActive",
+          "basePriceKopeks",
+          "baseDurationMin",
+          "isEnabled",
+          "priceOverrideKopeks",
+          "durationOverrideMin",
+          "commissionPct",
+          "effectivePriceKopeks",
+          "effectiveDurationMin",
+        ],
+        properties: {
+          serviceId: { type: "string" },
+          title: { type: "string" },
+          isActive: { type: "boolean", description: "Услуга студии включена." },
+          basePriceKopeks: { type: "integer" },
+          baseDurationMin: { type: "integer" },
+          isEnabled: { type: "boolean", description: "Мастер выполняет услугу." },
+          priceOverrideKopeks: { type: "integer", nullable: true },
+          durationOverrideMin: { type: "integer", nullable: true },
+          commissionPct: { type: "number", nullable: true },
+          effectivePriceKopeks: { type: "integer" },
+          effectiveDurationMin: { type: "integer" },
+        },
+      },
+      StudioCabinetMasterDetailData: {
+        type: "object",
+        required: ["timezone", "studio", "master", "services"],
+        properties: {
+          timezone: { type: "string" },
+          studio: {
+            type: "object",
+            required: ["id", "providerId"],
+            properties: {
+              id: { type: "string", description: "Studio.id — `studioId` пишущих роутов." },
+              providerId: { type: "string" },
+            },
+          },
+          master: {
+            allOf: [
+              { $ref: "#/components/schemas/StudioCabinetMasterListItem" },
+              {
+                type: "object",
+                required: [
+                  "phone",
+                  "email",
+                  "joinedAt",
+                  "clientsCount",
+                  "averageCheckKopeks",
+                  "weekSchedule",
+                  "profile",
+                  "blockingStudioBookings",
+                  "actions",
+                ],
+                properties: {
+                  phone: { type: "string", nullable: true },
+                  email: { type: "string", nullable: true },
+                  joinedAt: { type: "string", format: "date-time" },
+                  clientsCount: { type: "integer" },
+                  averageCheckKopeks: { type: "integer" },
+                  weekSchedule: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["date", "weekday", "dateLabel", "booked", "total", "isDayOff", "isToday"],
+                      properties: {
+                        date: { type: "string", format: "date" },
+                        weekday: { type: "integer", minimum: 1, maximum: 7 },
+                        dateLabel: { type: "string" },
+                        booked: { type: "integer" },
+                        total: { type: "integer" },
+                        isDayOff: { type: "boolean" },
+                        isToday: { type: "boolean" },
+                      },
+                    },
+                  },
+                  profile: {
+                    type: "object",
+                    required: ["name", "tagline", "description"],
+                    properties: {
+                      name: { type: "string" },
+                      tagline: { type: "string" },
+                      description: { type: "string" },
+                    },
+                  },
+                  blockingStudioBookings: { type: "integer" },
+                  actions: {
+                    type: "object",
+                    required: ["pause", "activate", "remove", "revokeInvite", "resendInvite", "editSchedule"],
+                    properties: {
+                      pause: { type: "boolean" },
+                      activate: { type: "boolean" },
+                      remove: { type: "boolean" },
+                      revokeInvite: { type: "boolean" },
+                      resendInvite: { type: "boolean" },
+                      editSchedule: { type: "boolean" },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+          services: { type: "array", items: { $ref: "#/components/schemas/StudioCabinetMasterServiceRow" } },
+        },
+      },
+      StudioMasterInviteResendData: {
+        type: "object",
+        required: ["inviteId", "channel"],
+        properties: {
+          inviteId: { type: "string" },
+          channel: { type: "string", enum: ["PHONE", "EMAIL"] },
+        },
+      },
+      StudioSchedulePayloadPreview: {
+        type: "object",
+        required: ["format"],
+        description:
+          "По `format`: CHANGES_V1 {pattern|null, week|null, dayCount}; PATTERN_V1 {summary, period, days[]}; " +
+          "EDITOR_V1 {week[], exceptions[]}; LEGACY / UNKNOWN {summary}. pattern = {summary, period, days[]}; " +
+          "week[] = {weekdayLabel, isWorkday, mode, summary, breaks[]}; exceptions[] = {date, isWorkday, mode, summary, note}.",
+        properties: {
+          format: { type: "string", enum: ["CHANGES_V1", "PATTERN_V1", "EDITOR_V1", "LEGACY", "UNKNOWN"] },
+          summary: { type: "string" },
+          period: { type: "string" },
+          days: { type: "array", items: { type: "string" } },
+          dayCount: { type: "integer" },
+          pattern: {
+            type: "object",
+            nullable: true,
+            properties: {
+              summary: { type: "string" },
+              period: { type: "string" },
+              days: { type: "array", items: { type: "string" } },
+            },
+          },
+          week: { type: "array", nullable: true, items: { type: "object" } },
+          exceptions: { type: "array", items: { type: "object" } },
+        },
+      },
+      StudioScheduleRequestItem: {
+        type: "object",
+        required: [
+          "id",
+          "status",
+          "comment",
+          "createdAt",
+          "updatedAt",
+          "provider",
+          "canApprove",
+          "canReject",
+          "preview",
+          "reviewPreview",
+        ],
+        properties: {
+          id: { type: "string" },
+          status: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] },
+          comment: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          provider: {
+            type: "object",
+            required: ["id", "name", "avatarUrl"],
+            properties: {
+              id: { type: "string", description: "Master id (studio profile)." },
+              name: { type: "string" },
+              avatarUrl: { type: "string", nullable: true },
+            },
+          },
+          canApprove: { type: "boolean" },
+          canReject: { type: "boolean" },
+          preview: { $ref: "#/components/schemas/StudioSchedulePayloadPreview" },
+          reviewPreview: {
+            type: "object",
+            nullable: true,
+            required: ["current", "days"],
+            properties: {
+              current: { type: "string", nullable: true },
+              days: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["date", "dateLabel", "before", "after"],
+                  properties: {
+                    date: { type: "string", format: "date" },
+                    dateLabel: { type: "string" },
+                    before: { type: "string" },
+                    after: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      StudioCabinetScheduleRequestsData: {
+        type: "object",
+        required: ["timezone", "pending", "resolved"],
+        properties: {
+          timezone: { type: "string" },
+          pending: { type: "array", items: { $ref: "#/components/schemas/StudioScheduleRequestItem" } },
+          resolved: {
+            type: "array",
+            description: "Последние 20 решённых.",
+            items: { $ref: "#/components/schemas/StudioScheduleRequestItem" },
+          },
+        },
+      },
+      StudioTeamMember: {
+        type: "object",
+        required: ["userId", "displayName", "email", "phone", "roles", "isCurrentUser"],
+        properties: {
+          userId: { type: "string" },
+          displayName: { type: "string" },
+          email: { type: "string", nullable: true },
+          phone: { type: "string", nullable: true },
+          roles: { type: "array", items: { type: "string", enum: ["OWNER", "ADMIN", "MASTER"] } },
+          isCurrentUser: { type: "boolean" },
+        },
+      },
+      StudioCabinetSettingsData: {
+        type: "object",
+        required: ["timezone", "scope", "studio", "team"],
+        properties: {
+          timezone: { type: "string" },
+          scope: {
+            type: "object",
+            required: ["isOwner", "isAdmin", "roles", "canDanger", "canEditPublicUsername"],
+            properties: {
+              isOwner: { type: "boolean" },
+              isAdmin: { type: "boolean" },
+              roles: { type: "array", items: { type: "string", enum: ["OWNER", "ADMIN", "MASTER"] } },
+              canDanger: { type: "boolean", description: "Только владелец: удалить студию." },
+              canEditPublicUsername: { type: "boolean" },
+            },
+          },
+          studio: {
+            type: "object",
+            required: ["id", "providerId", "publicUsername", "cityName", "mapUrl", "profile"],
+            properties: {
+              id: { type: "string", description: "Studio.id" },
+              providerId: { type: "string", description: "Путь PATCH /api/studios/{id}." },
+              publicUsername: { type: "string", nullable: true },
+              cityName: { type: "string", nullable: true },
+              mapUrl: { type: "string", nullable: true },
+              profile: { $ref: "#/components/schemas/StudioPrivateProfile" },
+            },
+          },
+          team: {
+            type: "object",
+            description: "Только чтение: назначать администраторов и передавать студию пока нельзя.",
+            required: ["owner", "admins"],
+            properties: {
+              owner: { allOf: [{ $ref: "#/components/schemas/StudioTeamMember" }], nullable: true },
+              admins: { type: "array", items: { $ref: "#/components/schemas/StudioTeamMember" } },
+            },
+          },
+        },
+      },
+      StudioMemberRemoveInput: {
+        type: "object",
+        required: ["studioId"],
+        properties: {
+          studioId: { type: "string", description: "Studio.id" },
+          transferServices: {
+            type: "boolean",
+            default: true,
+            description: "Перенести услуги студии, которые мастер оказывал, в его личный прайс.",
+          },
+        },
+      },
+      StudioMemberRemoveData: {
+        type: "object",
+        required: ["masterId", "transferredServices", "revokedInvites", "alreadyLeft"],
+        properties: {
+          masterId: { type: "string" },
+          transferredServices: { type: "integer" },
+          revokedInvites: { type: "integer" },
+          alreadyLeft: { type: "boolean" },
+        },
+      },
+      StudioScheduleRequestDecisionData: {
+        type: "object",
+        required: ["id", "status"],
+        properties: {
+          id: { type: "string" },
+          status: { type: "string", enum: ["APPROVED", "REJECTED"] },
+        },
+      },
+      StudioPublicUsernameData: {
+        type: "object",
+        required: ["username", "url"],
+        properties: {
+          username: { type: "string" },
+          url: { type: "string", description: "Полная публичная ссылка `…/u/{username}`." },
+        },
+      },
     },
   },
   paths: {
@@ -4381,7 +4758,8 @@ export const openApiSpec = {
     "/api/studios/{id}": {
       get: {
         summary: "Get studio private profile",
-        tags: ["studio"],
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [providerIdParam],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioPrivateProfileData" }),
@@ -4394,7 +4772,12 @@ export const openApiSpec = {
       },
       patch: {
         summary: "Update studio private profile",
-        tags: ["studio"],
+        description:
+          "Путь — Provider.id студии (`context.studio.providerId`). Ответ — та же форма, что у GET. Ошибка схемы — " +
+          "400 `VALIDATION_ERROR`: запрещённые слова — их текст, пустое тело — «Заполните хотя бы одно поле.», " +
+          "остальное — «Проверьте правильность заполнения полей.» и `details.issues`.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [providerIdParam],
         requestBody: {
           required: true,
@@ -5790,7 +6173,7 @@ export const openApiSpec = {
       put: {
         summary:
           "Apply a dated work schedule (week, alternating weeks or N-on/M-off cycle) from the setup wizard; bookings left on new days off are listed, not changed",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
         requestBody: { required: true, content: { "application/json": { schema: SCHEDULE_PATTERN_REQUEST_SCHEMA } } },
         responses: {
@@ -5810,7 +6193,7 @@ export const openApiSpec = {
       },
       patch: {
         summary: "Set the last day of the configured schedule, or null to extend it automatically",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
         requestBody: {
           required: true,
@@ -5835,7 +6218,7 @@ export const openApiSpec = {
     "/api/cabinet/master/schedule/pattern/preview": {
       post: {
         summary: "Dry run of the setup wizard: bookings the new schedule would leave on days off or outside working hours",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
         requestBody: { required: true, content: { "application/json": { schema: SCHEDULE_PATTERN_REQUEST_SCHEMA } } },
         responses: {
@@ -5853,7 +6236,7 @@ export const openApiSpec = {
     "/api/cabinet/master/schedule/calendar": {
       get: {
         summary: "Schedule calendar for the current month through the 3-month horizon, as the slot engine sees it",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
         responses: {
           "200": okResponse({
@@ -5869,7 +6252,7 @@ export const openApiSpec = {
         summary:
           "Paint calendar days: a palette working day, a day off, own hours, or back to the schedule; bookings are kept. " +
           "For a studio profile the days are added to the open studio request instead (withdraw removes a day from it)",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
         requestBody: {
           required: true,
@@ -5920,7 +6303,13 @@ export const openApiSpec = {
       get: {
         summary:
           "Studio team board: active masters × 14 days (salon dates) as the slot engine sees them, with each master's schedule plan and palette; read-only",
-        tags: ["schedule"],
+        operationId: "studioTeamScheduleBoard",
+        description:
+          "Студия — из сессии (как `GET /api/cabinet/studio/context`), без `studioId`. Строки — только активные " +
+          "мастера. День правится `PUT /api/cabinet/master/schedule/calendar?studioId&masterId`, график — " +
+          "`PUT …/schedule/pattern?studioId&masterId` (`masters[].id` = `masterId`).",
+        tags: ["mobile", "studio", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [
           {
             name: "from",
@@ -5971,7 +6360,7 @@ export const openApiSpec = {
     "/api/cabinet/master/schedule/palette": {
       post: {
         summary: "Create a named palette working day (hours, breaks, booking mode, muted colour)",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: SCHEDULE_ACTOR_PARAMETERS,
         requestBody: { required: true, content: { "application/json": { schema: SCHEDULE_PALETTE_DAY_SCHEMA } } },
         responses: {
@@ -5990,7 +6379,7 @@ export const openApiSpec = {
     "/api/cabinet/master/schedule/palette/{templateId}": {
       patch: {
         summary: "Rename or recolour a palette working day (hours never change: other hours are a new day)",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: [
           { name: "templateId", in: "path", required: true, schema: { type: "string" } },
           ...SCHEDULE_ACTOR_PARAMETERS,
@@ -6019,7 +6408,7 @@ export const openApiSpec = {
       },
       delete: {
         summary: "Delete a palette working day that no schedule, week or future calendar day uses",
-        tags: ["schedule"],
+        tags: ["mobile", "schedule"],
         parameters: [
           { name: "templateId", in: "path", required: true, schema: { type: "string" } },
           ...SCHEDULE_ACTOR_PARAMETERS,
@@ -6408,7 +6797,7 @@ export const openApiSpec = {
     },
     "/api/studio/masters": {
       get: {
-        summary: "List studio masters",
+        summary: "List studio masters (legacy; reports paused masters as ACTIVE — the app uses GET /api/cabinet/studio/masters)",
         tags: ["studio", "masters"],
         parameters: [{ name: "studioId", in: "query", required: true, schema: { type: "string" } }],
         responses: {
@@ -6420,8 +6809,15 @@ export const openApiSpec = {
         },
       },
       post: {
-        summary: "Create local studio master",
-        tags: ["studio", "masters"],
+        operationId: "studioMasterInvite",
+        summary: "Invite a master: stub master (status INVITED) + pending invite",
+        description:
+          "Ровно один контакт — `phone` или `email`. Уведомление (и письмо — для почты) уходит только для НОВОГО " +
+          "приглашения; повторная отправка — `POST /api/cabinet/studio/masters/{id}/invite/resend`. Полная команда → " +
+          "409 `LIMIT_REACHED` (`details: { limitKey: \"maxTeamMasters\", max, current }`), хотя ожидающие " +
+          "приглашения места не занимают; контакт уже принятого мастера → 409 `ALREADY_EXISTS`.",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         requestBody: {
           required: true,
           content: {
@@ -6429,19 +6825,26 @@ export const openApiSpec = {
           },
         },
         responses: {
-          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "500": errorResponse("Internal error"),
+          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created — `id` of the new master"),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("STUDIO_NOT_FOUND"),
+          "409": errorResponse("LIMIT_REACHED | ALREADY_EXISTS"),
+          "422": errorResponse("FORBIDDEN_WORDS"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
     "/api/studio/services/{id}/assign-master": {
       post: {
-        summary: "Assign master to service",
-        tags: ["studio", "services"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        operationId: "studioServiceAssignMaster",
+        summary: "Assign an ACTIVE master to a studio service (keeps the master's overrides)",
+        description: "Мастер не принял приглашение или на паузе → 409 `MASTER_NOT_ACTIVE`.",
+        tags: ["mobile", "studio", "services"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, description: "Service id", schema: { type: "string" } }],
         requestBody: {
           required: true,
           content: {
@@ -6450,35 +6853,47 @@ export const openApiSpec = {
         },
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/AssignMasterData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Service not found"),
-          "500": errorResponse("Internal error"),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("SERVICE_NOT_FOUND | MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "409": errorResponse("MASTER_NOT_ACTIVE"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
     "/api/studio/masters/{id}": {
       get: {
-        summary: "Studio master card details",
-        tags: ["studio", "masters"],
+        operationId: "studioMasterLegacyCard",
+        summary: "Studio master card (legacy: only the master's existing MasterService rows)",
+        description: "Приложение берёт карточку из `GET /api/cabinet/studio/masters/{id}` (матрица всех услуг студии).",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "id", in: "path", required: true, description: "Master id (studio profile)", schema: { type: "string" } },
           { name: "studioId", in: "query", required: true, schema: { type: "string" } },
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioMasterData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
       patch: {
-        summary: "Update studio master profile",
-        tags: ["studio", "masters"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        operationId: "studioMasterUpdate",
+        summary: "Edit the master's studio profile, pause or return to work",
+        description:
+          "Правит профиль мастера В СТУДИИ (имя, специализация, описание), не его личную страницу. " +
+          "`isActive: false` — пауза, `true` — вернуть к работе: для принявшего приглашение мастера на паузе " +
+          "проверяется лимит команды (409 `LIMIT_REACHED`). Пустой патч — 200 без изменений.",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, description: "Master id (studio profile)", schema: { type: "string" } }],
         requestBody: {
           required: true,
           content: {
@@ -6487,19 +6902,53 @@ export const openApiSpec = {
         },
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "409": errorResponse("LIMIT_REACHED"),
+          "422": errorResponse("FORBIDDEN_WORDS"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+      delete: {
+        operationId: "studioMasterRevokeInvite",
+        summary: "Revoke a pending invite: the invite is closed and the stub master is deleted",
+        description: "Только заготовка без аккаунта; иначе 409 `MASTER_NOT_INVITED` «У мастера нет активного приглашения.».",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, description: "Master id (studio profile)", schema: { type: "string" } },
+          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["inviteId"],
+            properties: { inviteId: { type: "string", nullable: true } },
+          }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "409": errorResponse("MASTER_NOT_INVITED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
     "/api/studio/masters/{id}/services": {
       put: {
-        summary: "Bulk update master services",
-        tags: ["studio", "masters", "services"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        operationId: "studioMasterServicesBulk",
+        summary: "Set the master's studio services: enabled, own price/duration, commission",
+        description:
+          "Каждый элемент — upsert строки мастера. В отправленном элементе НЕ переданные `priceOverride` / " +
+          "`durationOverrideMin` сбрасываются в null (передавайте текущие), не переданный `commissionPct` не " +
+          "меняется. Неотправленные услуги не трогаются. Подходит любой мастер студии (и на паузе, и приглашённый).",
+        tags: ["mobile", "studio", "masters", "services"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, description: "Master id (studio profile)", schema: { type: "string" } }],
         requestBody: {
           required: true,
           content: {
@@ -6508,109 +6957,12 @@ export const openApiSpec = {
         },
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/masters/{id}/schedule": {
-      get: {
-        summary: "Get master schedule for studio drawer",
-        tags: ["studio", "masters", "schedule"],
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
-        ],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/StudioMasterScheduleData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/masters/{id}/schedule/templates": {
-      post: {
-        summary: "Create master shift template",
-        tags: ["studio", "masters", "schedule"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": { schema: { $ref: "#/components/schemas/CreateWorkTemplateInput" } },
-          },
-        },
-        responses: {
-          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/masters/{id}/schedule/day-rules": {
-      put: {
-        summary: "Bulk upsert day rules",
-        tags: ["studio", "masters", "schedule"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": { schema: { $ref: "#/components/schemas/UpsertDayRulesInput" } },
-          },
-        },
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/BulkUpdatedData" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/masters/{id}/schedule/exceptions": {
-      post: {
-        summary: "Create master schedule exception",
-        tags: ["studio", "masters", "schedule"],
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": { schema: { $ref: "#/components/schemas/CreateWorkExceptionInput" } },
-          },
-        },
-        responses: {
-          "201": okResponse({ $ref: "#/components/schemas/DeleteResult" }, "Created"),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
-        },
-      },
-    },
-    "/api/studio/masters/{id}/schedule/exceptions/{exceptionId}": {
-      delete: {
-        summary: "Delete master schedule exception",
-        tags: ["studio", "masters", "schedule"],
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-          { name: "exceptionId", in: "path", required: true, schema: { type: "string" } },
-          { name: "studioId", in: "query", required: true, schema: { type: "string" } },
-        ],
-        responses: {
-          "200": okResponse({ $ref: "#/components/schemas/DeleteResult" }),
-          "400": errorResponse("Validation error"),
-          "401": errorResponse("Unauthorized"),
-          "403": errorResponse("Forbidden"),
-          "404": errorResponse("Not found"),
-          "500": errorResponse("Internal error"),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("MASTER_NOT_FOUND | SERVICE_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
@@ -7571,6 +7923,400 @@ export const openApiSpec = {
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/MobileAppConfig" }),
           "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    // MOBILE-STUDIO-C (team) — команда, заявки на расписание, настройки студии.
+    "/api/cabinet/studio/masters": {
+      get: {
+        operationId: "studioCabinetMasters",
+        summary: "Studio team: masters with 30-day metrics, tab counts and the plan cap",
+        description:
+          "Студия — из сессии. `loadStudioMastersList` (веб «Мастера студии»): метрики за 30 дней, статус " +
+          "(`DISABLED` — пауза), `counts` по всей команде; `teamLimit` — потолок тарифа владельца и занятые места " +
+          "(то же правило, что у проверки приглашения). Телефонов и почт в списке нет.",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "filter",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["all", "active", "invited", "disabled"], default: "all" },
+          },
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            description: "Имя или услуги/специализация.",
+            schema: { type: "string", maxLength: 80 },
+          },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioCabinetMastersData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — мастер студии или нет студии"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/masters/{id}": {
+      get: {
+        operationId: "studioCabinetMaster",
+        summary: "Studio master card: contacts, KPIs, week, profile, allowed actions and the services matrix",
+        description:
+          "`loadStudioMasterDetail` + матрица «каждая услуга студии × строка мастера» (`getStudioMasterServicesMatrix`) " +
+          "с базовой ценой и длительностью — правится `PUT /api/studio/masters/{id}/services`. `id` мастера — для " +
+          "всех роутов команды; `studio.id` — их `studioId`.",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, description: "Master id (studio profile)", schema: { type: "string", maxLength: 64 } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioCabinetMasterDetailData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — мастер студии или нет студии"),
+          "404": errorResponse("MASTER_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/masters/{id}/invite/resend": {
+      post: {
+        operationId: "studioCabinetMasterInviteResend",
+        summary: "Send a pending master invite again",
+        description:
+          "То же уведомление, что при приглашении (и письмо — для приглашения по почте). Лимит — 3 в час на " +
+          "мастера; отказы 404/409 попытку не тратят. 409 `MASTER_NOT_INVITED` — приглашение принято, отозвано " +
+          "или его нет.",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, description: "Master id (studio profile)", schema: { type: "string", maxLength: 64 } },
+        ],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioMasterInviteResendData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — мастер студии или нет студии"),
+          "404": errorResponse("MASTER_NOT_FOUND"),
+          "409": errorResponse("MASTER_NOT_INVITED"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/cabinet/studio/schedule-requests": {
+      get: {
+        operationId: "studioCabinetScheduleRequests",
+        summary: "Masters' schedule change requests: all pending and the last 20 decided, with ready Russian previews",
+        description:
+          "`listScheduleRequestsForStudio`; `preview` / `reviewPreview` — веб-форматтеры `buildSchedulePayloadPreview` / " +
+          "`buildReviewPreview`. Решение — `POST /api/studio/schedule/requests/{id}/approve|reject`.",
+        tags: ["mobile", "studio", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioCabinetScheduleRequestsData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — мастер студии или нет студии"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/settings": {
+      get: {
+        operationId: "studioCabinetSettings",
+        summary: "Studio settings snapshot: rights, owner and admins, city and map link, public username, profile form",
+        description:
+          "`loadStudioSettingsData` + `getStudioProviderById`. `studio.profile` — ровно `data.studio` из " +
+          "`GET|PATCH /api/studios/{providerId}`. Владелец и администраторы — только чтение. Адрес профиля этот " +
+          "запрос не создаёт.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioCabinetSettingsData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — мастер студии или нет студии"),
+          "404": errorResponse("STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/members/{memberId}/remove": {
+      post: {
+        operationId: "studioMemberRemove",
+        summary: "Remove a master from the studio",
+        description:
+          "`memberId` — id мастера (профиль в студии). Будущие живые записи студии мешают: 409 " +
+          "`MASTER_HAS_STUDIO_BOOKINGS` (`details.count`). Уже ушедший мастер — 200 с `alreadyLeft: true`.",
+        tags: ["mobile", "studio", "masters"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "memberId", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/StudioMemberRemoveInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioMemberRemoveData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND | STUDIO_NOT_FOUND"),
+          "409": errorResponse("MASTER_HAS_STUDIO_BOOKINGS | CONFLICT"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/studio/schedule/requests": {
+      get: {
+        operationId: "studioScheduleRequests",
+        summary: "Schedule change requests of the current studio (no paging, no payload)",
+        description: "Студия — из сессии. Приложение берёт `GET /api/cabinet/studio/schedule-requests`.",
+        tags: ["mobile", "studio", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["pending", "approved", "rejected", "all"] },
+          },
+        ],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["requests"],
+            properties: {
+              requests: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "status", "createdAt", "provider"],
+                  properties: {
+                    id: { type: "string" },
+                    status: { type: "string", enum: ["PENDING", "APPROVED", "REJECTED"] },
+                    createdAt: { type: "string", format: "date-time" },
+                    provider: {
+                      type: "object",
+                      required: ["id", "name"],
+                      properties: { id: { type: "string" }, name: { type: "string" } },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/studio/schedule/requests/{id}": {
+      get: {
+        operationId: "studioScheduleRequest",
+        summary: "One schedule change request with the raw payload, the master's settings snapshot and before/after days",
+        tags: ["mobile", "studio", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["request", "current"],
+            properties: { request: { type: "object" }, current: { type: "object" } },
+          }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/studio/schedule/requests/{id}/approve": {
+      post: {
+        operationId: "studioScheduleRequestApprove",
+        summary: "Approve a pending schedule change request: applied at once, the master is notified",
+        tags: ["mobile", "studio", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioScheduleRequestDecisionData" }),
+          "400": errorResponse("VALIDATION_ERROR — «Запрос уже обработан.» | SCHEDULE_PATTERN_INVALID"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "422": errorResponse("INVALID_REQUEST_PAYLOAD"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/studio/schedule/requests/{id}/reject": {
+      post: {
+        operationId: "studioScheduleRequestReject",
+        summary: "Reject a pending schedule change request with a comment (the master is notified)",
+        tags: ["mobile", "studio", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["comment"],
+                properties: { comment: { type: "string", description: "Обязателен после trim." } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioScheduleRequestDecisionData" }),
+          "400": errorResponse("VALIDATION_ERROR — «Комментарий обязателен.» | «Запрос уже обработан.»"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/studio/services/{id}/unassign-master": {
+      post: {
+        operationId: "studioServiceUnassignMaster",
+        summary: "Stop a master performing a studio service (keeps the row and overrides)",
+        tags: ["mobile", "studio", "services"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, description: "Service id", schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["studioId", "masterId"],
+                properties: { studioId: { type: "string" }, masterId: { type: "string" } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AssignMasterData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("SERVICE_NOT_FOUND | MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/public-username": {
+      get: {
+        operationId: "studioPublicUsername",
+        summary: "Studio public profile address and link (owner only; creates one on first call)",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPublicUsernameData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("PROVIDER_NOT_FOUND — нет студии во владении (в т.ч. администратор)"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR | APP_PUBLIC_URL_MISSING"),
+        },
+      },
+      post: {
+        operationId: "studioPublicUsernameSet",
+        summary: "Change the studio public profile address (owner only; the old one keeps redirecting)",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { type: "object", required: ["username"], properties: { username: { type: "string" } } },
+            },
+          },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/StudioPublicUsernameData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("PROVIDER_NOT_FOUND"),
+          "409": errorResponse("CONFLICT — адрес занят"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/studio/delete": {
+      delete: {
+        operationId: "studioCabinetDelete",
+        summary: "Delete the studio permanently (owner only)",
+        description:
+          "Сначала проверка живых записей студии (409 `ACTIVE_BOOKINGS`, `details.count`, попытку не тратит), " +
+          "затем лимит 1 в час на IP и на аккаунт (429), затем удаление.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ type: "object", required: ["deleted"], properties: { deleted: { type: "boolean" } } }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("NOT_FOUND — не владелец"),
+          "409": errorResponse("ACTIVE_BOOKINGS"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+    },
+    "/api/cabinet/master/schedule": {
+      get: {
+        operationId: "scheduleEditorSnapshot",
+        summary: "Schedule settings snapshot (palette, plan, booking rules, visibility, buffer, slot step) and approval mode",
+        description:
+          "Без параметров — своё расписание мастера; `?profile=` — профиль мастера в студии (правки — заявкой); " +
+          "`?studioId&masterId` — владелец/администратор студии правит расписание мастера студии, сразу " +
+          "(`approval.mode = STUDIO_ADMIN`).",
+        tags: ["mobile", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        responses: {
+          "200": okResponse({ type: "object", description: "ScheduleEditorSnapshot + `approval`" }),
+          "400": errorResponse("VALIDATION_ERROR — только один из studioId / masterId"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
+        },
+      },
+      patch: {
+        operationId: "scheduleEditorUpdate",
+        summary: "Update booking rules, visibility, slot step, buffer, hot slots (and legacy week / exceptions)",
+        description:
+          "Тело не через Zod: значения нормализуются и молча ограничиваются. У администратора студии " +
+          "`visibility.isPublished` не применяется; `hotSlots` — по тарифу вызывающего (403 `FEATURE_GATE`).",
+        tags: ["mobile", "schedule"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: SCHEDULE_ACTOR_PARAMETERS,
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object" } } } },
+        responses: {
+          "200": okResponse({ type: "object", description: "ScheduleEditorSnapshot + `approval` (`lastAction`)" }),
+          "400": errorResponse("INVALID_BODY | VALIDATION_ERROR | DAY_INVALID | TIME_RANGE_INVALID | BREAK_OVERLAP"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN | FEATURE_GATE"),
+          "404": errorResponse("MASTER_NOT_FOUND | STUDIO_NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },

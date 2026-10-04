@@ -46,6 +46,50 @@ export function isStudioTeamAtCap(activeCount: number, cap: number | null): bool
  * @throws 404 STUDIO_NOT_FOUND · 409 LIMIT_REACHED
  */
 export async function ensureStudioTeamLimit(studioId: string): Promise<void> {
+  const { providerId, cap } = await resolveStudioTeamCapForStudio(studioId);
+  if (cap === null) return; // unlimited
+
+  const activeCount = await countActiveStudioMasters(providerId);
+  if (isStudioTeamAtCap(activeCount, cap)) {
+    throw createLimitReachedError("maxTeamMasters", cap, activeCount);
+  }
+}
+
+/** MOBILE-STUDIO-C (team) — потолок команды и занятые места, без отказа. */
+export type StudioTeamCapacity = {
+  /** `null` — без ограничения. */
+  max: number | null;
+  /** Мастера, занимающие место: приглашение принято и не на паузе. */
+  activeCount: number;
+};
+
+/**
+ * MOBILE-STUDIO-C (team) — то же правило, что у {@link ensureStudioTeamLimit}
+ * (тариф ВЛАДЕЛЬЦА студии, считаются только ACTIVE), но без отказа: список
+ * команды в приложении показывает «лимит» до того, как пользователь откроет
+ * приглашение.
+ *
+ * @param studioId `Studio.id`
+ * @throws 404 STUDIO_NOT_FOUND
+ */
+export async function getStudioTeamCapacity(studioId: string): Promise<StudioTeamCapacity> {
+  const { providerId, cap } = await resolveStudioTeamCapForStudio(studioId);
+  return { max: cap, activeCount: await countActiveStudioMasters(providerId) };
+}
+
+function countActiveStudioMasters(studioProviderId: string): Promise<number> {
+  return prisma.provider.count({
+    where: {
+      type: "MASTER",
+      studioId: studioProviderId,
+      ...STUDIO_ACTIVE_MASTER_WHERE,
+    },
+  });
+}
+
+async function resolveStudioTeamCapForStudio(
+  studioId: string,
+): Promise<{ providerId: string; cap: number | null }> {
   const studio = await prisma.studio.findUnique({
     where: { id: studioId },
     select: {
@@ -60,29 +104,12 @@ export async function ensureStudioTeamLimit(studioId: string): Promise<void> {
   }
 
   const ownerUserId = studio.ownerUserId ?? studio.provider.ownerUserId;
-
-  let cap: number | null;
-  if (ownerUserId) {
-    const plan = await getCurrentPlan(ownerUserId, SubscriptionScope.STUDIO);
-    cap = resolveStudioTeamCap(plan.features);
-  } else {
+  if (!ownerUserId) {
     // Orphaned studio (no resolvable owner — should not happen post-onboarding).
     // Enforce the most restrictive FREE cap defensively rather than allowing
     // unlimited masters.
-    cap = STUDIO_TEAM_CAP_BY_TIER.FREE;
+    return { providerId: studio.providerId, cap: STUDIO_TEAM_CAP_BY_TIER.FREE };
   }
-
-  if (cap === null) return; // unlimited
-
-  const activeCount = await prisma.provider.count({
-    where: {
-      type: "MASTER",
-      studioId: studio.providerId,
-      ...STUDIO_ACTIVE_MASTER_WHERE,
-    },
-  });
-
-  if (isStudioTeamAtCap(activeCount, cap)) {
-    throw createLimitReachedError("maxTeamMasters", cap, activeCount);
-  }
+  const plan = await getCurrentPlan(ownerUserId, SubscriptionScope.STUDIO);
+  return { providerId: studio.providerId, cap: resolveStudioTeamCap(plan.features) };
 }
