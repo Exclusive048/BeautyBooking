@@ -33,7 +33,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     if (body.onlinePaymentEnabled === true) {
       const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
       if (!plan.features.onlinePayments) {
-        throw createFeatureGateError("onlinePayments", "PRO");
+        throw createFeatureGateError("onlinePayments", SubscriptionScope.MASTER);
       }
       if (!plan.system.onlinePaymentsEnabled) {
         throw createSystemDisabledError("onlinePayments");

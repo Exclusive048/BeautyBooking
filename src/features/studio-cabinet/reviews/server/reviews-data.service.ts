@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { isStudioSurfaceBooking } from "@/lib/studio/booking-scope";
 import { canReplyToStudioReview } from "../lib/can-reply";
 import { formatReviewDateLabel } from "../lib/format";
 import type {
@@ -147,6 +148,7 @@ export async function loadStudioReviewsSet(input: Omit<LoadStudioReviewsInput, "
       master: { select: { id: true, name: true } },
       booking: {
         select: {
+          studioId: true,
           service: { select: { name: true, title: true } },
         },
       },
@@ -224,6 +226,9 @@ export async function loadStudioReviewsSet(input: Omit<LoadStudioReviewsInput, "
         ? { id: r.master.id, displayName: r.master.name }
         : null,
       serviceName,
+      // MOBILE-POLISH: ссылка на запись — только на запись этой студии
+      // (личная запись мастера в кабинете студии не открывается — 404).
+      bookingId: r.bookingId && r.booking && isStudioSurfaceBooking(r.booking, studio.id) ? r.bookingId : null,
       text: r.text ?? "",
       reply:
         r.replyText && r.repliedAt

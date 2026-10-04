@@ -102,7 +102,7 @@ export async function PUT(req: Request) {
     if (wantsOnlinePayments) {
       const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
       if (!plan.features.onlinePayments) {
-        throw createFeatureGateError("onlinePayments", "PRO");
+        throw createFeatureGateError("onlinePayments", SubscriptionScope.MASTER);
       }
       if (!plan.system.onlinePaymentsEnabled) {
         throw createSystemDisabledError("onlinePayments");
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
     if (body.onlinePaymentEnabled === true) {
       const plan = await getCurrentPlan(user.id, SubscriptionScope.MASTER);
       if (!plan.features.onlinePayments) {
-        throw createFeatureGateError("onlinePayments", "PRO");
+        throw createFeatureGateError("onlinePayments", SubscriptionScope.MASTER);
       }
       if (!plan.system.onlinePaymentsEnabled) {
         throw createSystemDisabledError("onlinePayments");

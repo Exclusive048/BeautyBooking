@@ -10,6 +10,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { ProviderType, SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
+import { cheapestPlanTierWithFeature } from "@/lib/billing/required-plan";
 
 const createSchema = z.object({
   name: z.string().trim().min(1),
@@ -108,7 +109,7 @@ export async function PUT(
     if (!plan.features.onlinePayments) {
       return fail("Функция недоступна на текущем тарифе.", 403, "FEATURE_GATE", {
         feature: "onlinePayments",
-        requiredPlan: "PRO",
+        requiredPlan: cheapestPlanTierWithFeature("onlinePayments", SubscriptionScope.MASTER),
       });
     }
     if (!plan.system.onlinePaymentsEnabled) {

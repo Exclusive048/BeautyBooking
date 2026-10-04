@@ -27,6 +27,10 @@ const querySchema = z.object({
  * отзыв (отзыв на студию или на мастера этой студии), `isReported` — жалоба
  * уже отправлена. Ответ, правка ответа, подсказка и жалоба —
  * `/api/reviews/{id}/reply|suggest-reply|report`.
+ *
+ * MOBILE-POLISH: `bookingId` — запись этой студии, по которой оставлен отзыв
+ * (`null` — без записи или запись не студии); карточка —
+ * `GET /api/cabinet/studio/bookings/{id}`.
  */
 export async function GET(req: Request) {
   try {
@@ -66,6 +70,7 @@ export async function GET(req: Request) {
           createdAt: item.createdAt,
           master: item.master,
           serviceName: item.serviceName,
+          bookingId: item.bookingId,
           text: item.text,
           reply: item.reply,
           canReply: item.canReply,

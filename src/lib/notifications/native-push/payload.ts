@@ -52,6 +52,7 @@ type NativePushSpec = {
 
 const T = UI_TEXT.nativePush;
 const NOTIFICATIONS_LINK = "/notifications";
+const STUDIO_TEAM_LINK = "/studio/team";
 
 const booking = (title: string, body: string = T.details, extra: Partial<NativePushSpec> = {}): NativePushSpec => ({
   title,
@@ -124,16 +125,19 @@ export const NATIVE_PUSH_SPECS = {
   REVIEW_REPLIED: booking(T.review.replied, T.review.repliedBody, { channel: "general" }),
   REVIEW_DELETED_BY_ADMIN: general(T.review.deleted),
 
+  // MOBILE-POLISH: события, которые получает студия (владелец), ведут на её
+  // экраны — команда и заявки на смену графика. Мастеру (приглашение, решение
+  // по заявке с комментарием, исключение) — центр уведомлений, как раньше.
   STUDIO_INVITE_RECEIVED: general(T.studio.inviteReceived),
-  STUDIO_INVITE_ACCEPTED: general(T.studio.inviteAccepted),
-  STUDIO_INVITE_REJECTED: general(T.studio.inviteRejected),
-  STUDIO_MEMBER_LEFT: general(T.studio.memberLeft),
+  STUDIO_INVITE_ACCEPTED: general(T.studio.inviteAccepted, STUDIO_TEAM_LINK),
+  STUDIO_INVITE_REJECTED: general(T.studio.inviteRejected, STUDIO_TEAM_LINK),
+  STUDIO_MEMBER_LEFT: general(T.studio.memberLeft, STUDIO_TEAM_LINK),
   STUDIO_MEMBER_REMOVED: general(T.studio.memberRemoved),
-  STUDIO_SCHEDULE_REQUEST: general(T.studio.scheduleRequest),
+  STUDIO_SCHEDULE_REQUEST: general(T.studio.scheduleRequest, "/studio/schedule-requests"),
   STUDIO_SCHEDULE_APPROVED: general(T.studio.scheduleApproved),
   STUDIO_SCHEDULE_REJECTED: general(T.studio.scheduleRejected),
   STUDIO_DISBANDED: general(T.studio.disbanded),
-  STUDIO_SCHEDULE_ENDING: general(T.studio.scheduleEnding, "/studio/team", T.studio.scheduleEndingBody),
+  STUDIO_SCHEDULE_ENDING: general(T.studio.scheduleEnding, STUDIO_TEAM_LINK, T.studio.scheduleEndingBody),
   SCHEDULE_ENDING: general(T.schedule.ending, "/master/calendar", T.schedule.endingBody),
   MASTER_CABINET_DELETED: null,
 
@@ -272,9 +276,13 @@ function bookingLink(
   }
 }
 
+/**
+ * MOBILE-POLISH: у студии в приложении (и в вебе) нет чатов — студийный
+ * получатель уходит в центр уведомлений, а не на несуществующий `/studio/chats`.
+ */
 function chatLink(audience: Audience | null, slug: string | null): string {
-  const prefix = audience === "master" ? "/master/chats" : audience === "studio" ? "/studio/chats" : "/chats";
-  if (audience === null) return NOTIFICATIONS_LINK;
+  if (audience === null || audience === "studio") return NOTIFICATIONS_LINK;
+  const prefix = audience === "master" ? "/master/chats" : "/chats";
   return slug ? `${prefix}/${enc(slug)}` : prefix;
 }
 

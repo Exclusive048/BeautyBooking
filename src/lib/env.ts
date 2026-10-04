@@ -49,6 +49,28 @@ function mobileVersionSchema(fallback: string) {
     .default(fallback);
 }
 
+/**
+ * MOBILE-POLISH — значения для файлов App Links / Universal Links
+ * (`lib/mobile/app-links.ts`). Формат проверяется на старте; сам модуль ссылок
+ * ещё раз отбрасывает непохожее (в dev/тестах env отдаётся без парса).
+ */
+export const ANDROID_PACKAGE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
+export const ANDROID_CERT_FINGERPRINT_PATTERN = /^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$/;
+export const IOS_APP_ID_PATTERN = /^[A-Z0-9]{10}\.[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
+
+/** Список из env через запятую: без пробелов по краям, без пустых и повторов. */
+export function splitEnvList(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0),
+    ),
+  );
+}
+
 /** Сравнение `MAJOR.MINOR.PATCH`: отрицательное — `a` раньше `b`, 0 — равны, положительное — `a` новее. */
 export function compareMobileVersions(a: string, b: string): number {
   const left = a.split(".").map(Number);
@@ -309,6 +331,40 @@ const envSchema = z.object({
   MOBILE_MIN_VERSION_ANDROID: mobileVersionSchema("0.0.0"),
   MOBILE_LATEST_VERSION_IOS: mobileVersionSchema("1.0.0"),
   MOBILE_LATEST_VERSION_ANDROID: mobileVersionSchema("1.0.0"),
+
+  // ── App Links / Universal Links (MOBILE-POLISH) ───────────────────────────
+  // Файлы `/.well-known/assetlinks.json` (Android) и
+  // `/.well-known/apple-app-site-association` (iOS): по ним система открывает
+  // ссылки `https://<домен>/u/*` и `/models/*` сразу в приложении. Списки —
+  // через запятую. Нет отпечатков — Android-файл отвечает 404, нет App ID —
+  // iOS-файл отвечает 404 (ссылки открываются в браузере, как раньше).
+  // Пакет Android; пусто — `ru.masterryadom`.
+  MOBILE_ANDROID_PACKAGE: z
+    .string()
+    .optional()
+    .refine(
+      (value) => !value?.trim() || ANDROID_PACKAGE_PATTERN.test(value.trim()),
+      "must be an Android application id, e.g. ru.masterryadom",
+    ),
+  // SHA-256 отпечатки сертификатов подписи (Play Console → Целостность
+  // приложения → сертификат ключа подписи; плюс ключ загрузки / отладки, если
+  // нужен), формат `AA:BB:…` (32 байта), регистр не важен.
+  MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS: z
+    .string()
+    .optional()
+    .refine(
+      (value) => splitEnvList(value).every((item) => ANDROID_CERT_FINGERPRINT_PATTERN.test(item)),
+      "must be comma-separated SHA-256 fingerprints, e.g. AA:BB:…:FF (32 bytes)",
+    ),
+  // App ID приложения iOS: `<TEAMID>.<bundle id>`, например
+  // `ABCDE12345.ru.masterryadom` (Team ID — Apple Developer → Membership).
+  MOBILE_IOS_APP_IDS: z
+    .string()
+    .optional()
+    .refine(
+      (value) => splitEnvList(value).every((item) => IOS_APP_ID_PATTERN.test(item)),
+      "must be comma-separated TEAMID.bundle.id values, e.g. ABCDE12345.ru.masterryadom",
+    ),
 });
 
 const has = (value: string | undefined): boolean => Boolean(value?.trim());

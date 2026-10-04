@@ -1,10 +1,16 @@
+import type { SubscriptionScope } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
-import type { PlanTier } from "@/lib/billing/features";
+import { cheapestPlanTierWithFeature } from "@/lib/billing/required-plan";
 
-export function createFeatureGateError(feature: string, requiredPlan?: PlanTier): AppError {
+/**
+ * Отказ «нет в тарифе». `details.requiredPlan` — самый дешёвый тариф каталога
+ * с этой фичей для кабинета `scope` (MOBILE-POLISH, `required-plan.ts`), а не
+ * константа вызывающего: подсказка не может разойтись с каталогом.
+ */
+export function createFeatureGateError(feature: string, scope?: SubscriptionScope): AppError {
   return new AppError("Это доступно на тарифах выше. Откройте раздел «Подписка», чтобы перейти.", 403, "FEATURE_GATE", {
     feature,
-    requiredPlan,
+    requiredPlan: cheapestPlanTierWithFeature(feature, scope),
   });
 }
 

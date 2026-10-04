@@ -32,6 +32,7 @@ import type {
   StudioScheduleData,
 } from "./types";
 import { isStudioSurfaceBooking, studioBookingsWhere } from "@/lib/studio/booking-scope";
+import { loadStudioWeekCells } from "./calendar-week.service";
 
 /**
  * Studio admin booking operations (create/move/cancel) are DIRECT —
@@ -428,11 +429,8 @@ async function buildWeekData(
 ): Promise<ScheduleWeekData> {
   // Неделя — календарная арифметика над ключами дат, границы — в поясе салона.
   const weekStartKey = toDateKey(startOfUtcWeekMonday(parseDateKey(dateKey)));
-  const weekStart = salonDayBounds(weekStartKey, timeZone).start;
-  const weekEnd = salonDayBounds(addDaysToDateKey(weekStartKey, 6), timeZone).end;
 
-  const [masters, bookings] = await Promise.all([
-    prisma.provider.findMany({
+  const masters = await prisma.provider.findMany({
       where: { type: ProviderType.MASTER, studioId: providerId },
       select: {
         id: true,
@@ -448,20 +446,19 @@ async function buildWeekData(
         },
       },
       orderBy: { name: "asc" },
-    }),
-    prisma.booking.findMany({
-      where: {
-        ...studioBookingsWhere(studioId),
-        startAtUtc: { gte: weekStart, lt: weekEnd },
-        status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
-      },
-      select: {
-        masterProviderId: true,
-        providerId: true,
-        startAtUtc: true,
-      },
-    }),
-  ]);
+  });
+
+  // MOBILE-POLISH: ячейки — по НАСТОЯЩЕМУ графику мастера, тем же расчётом,
+  // что неделя приложения (`GET /api/cabinet/studio/calendar/week`): ёмкость —
+  // рабочие минуты без перерывов (или фиксированные начала), выходной — по
+  // графику. Раньше — «5 записей = 100%» и выходной только у неактивного.
+  const cellsByMaster = await loadStudioWeekCells({
+    studioId,
+    timezone: timeZone,
+    from: weekStartKey,
+    masters: masters.map((master) => ({ id: master.id, active: isStudioMasterActive(master) })),
+    now: new Date(),
+  });
 
   const days: ScheduleWeekDay[] = Array.from({ length: 7 }, (_, index) => {
     const key = addDaysToDateKey(weekStartKey, index);
@@ -472,26 +469,13 @@ async function buildWeekData(
       isToday: key === studioTodayKey,
     };
   });
-  const weekDayKeys = new Set(days.map((day) => day.dateKey));
-
-  const countsByMasterAndDay = new Map<string, Map<string, number>>();
-  for (const booking of bookings) {
-    if (!booking.startAtUtc) continue;
-    // День записи — по салону (rule 17), а не смещение в UTC-сутках.
-    const dayKey = toLocalDateKey(booking.startAtUtc, timeZone);
-    if (!weekDayKeys.has(dayKey)) continue;
-    const masterId = booking.masterProviderId ?? booking.providerId;
-    const byDay = countsByMasterAndDay.get(masterId) ?? new Map<string, number>();
-    byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + 1);
-    countsByMasterAndDay.set(masterId, byDay);
-  }
 
   // STUDIO-BUGS-FIX-A bug #5: INVITED masters get zero capacity + isDayOff
   // across the whole week. They surface in the grid so admin sees they
   // exist, but with no schedulable hours.
   const rows: ScheduleWeekRow[] = masters.map((master) => {
     const active = isStudioMasterActive(master);
-    const byDay = countsByMasterAndDay.get(master.id) ?? new Map();
+    const cells = cellsByMaster.get(master.id) ?? [];
     return {
       master: {
         id: master.id,
@@ -502,19 +486,15 @@ async function buildWeekData(
         isAvailable: active,
         serviceIds: master.masterServices.map((row) => row.serviceId),
       },
-      cells: days.map((day) => {
-        const booked = byDay.get(day.dateKey) ?? 0;
-        const capacity = active ? DAILY_CAPACITY : 0;
-        const percent =
-          capacity > 0 ? Math.min(Math.round((booked / capacity) * 100), 100) : 0;
-        return {
-          dateKey: day.dateKey,
-          booked,
-          capacity,
-          percent,
-          isDayOff: !active,
-        };
-      }),
+      cells: cells.map((cell) => ({
+        dateKey: cell.date,
+        booked: cell.booked,
+        bookedMinutes: cell.bookedMinutes,
+        capacityMinutes: cell.capacityMinutes,
+        fixedSlots: cell.fixedSlots,
+        percent: cell.percent,
+        isDayOff: cell.isDayOff,
+      })),
     };
   });
 
