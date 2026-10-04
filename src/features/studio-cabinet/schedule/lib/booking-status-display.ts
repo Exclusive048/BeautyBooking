@@ -1,3 +1,4 @@
+import type { BookingRuntimeStatus } from "@/lib/bookings/flow";
 import { BookingStatus } from "@/lib/prisma-enums";
 
 export type BookingStatusTone = "confirmed" | "pending" | "new" | "done" | "muted";
@@ -25,6 +26,31 @@ export function bookingToneFromStatus(status: BookingStatus): BookingStatusTone 
     case BookingStatus.NO_SHOW:
     case BookingStatus.NEW:
       return "muted";
+    default:
+      return "muted";
+  }
+}
+
+/**
+ * MOBILE-STUDIO-C (ops) — тот же цветовой разряд, но по ВЫЧИСЛЯЕМОМУ статусу
+ * (`resolveBookingRuntimeStatus`): у приложения нет своей копии правил времени.
+ * NEW (= PENDING) — «ждёт», начавшаяся — «подтверждена», прошедшая +60 мин —
+ * «завершена». Первый визит клиента подсвечивает подтверждённую запись, как в вебе.
+ */
+export function bookingToneFromRuntimeStatus(
+  runtime: BookingRuntimeStatus,
+  isNewClient: boolean,
+): BookingStatusTone {
+  switch (runtime) {
+    case "PENDING":
+    case "CHANGE_REQUESTED":
+      return "pending";
+    case "CONFIRMED":
+    case "IN_PROGRESS":
+      return isNewClient ? "new" : "confirmed";
+    case "FINISHED":
+      return "done";
+    case "REJECTED":
     default:
       return "muted";
   }

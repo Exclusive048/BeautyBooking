@@ -89,6 +89,8 @@ const MASTER_CRM_READERS: Record<string, string> = {
     "удаление аккаунта (29.09 доработки · 26): стирает карточки и заметки мастера о клиенте и фото карточек по политике Ю26.4, наружу ничего не отдаёт",
   "src/lib/billing/feature-catalog.ts": "описание фичи тарифа, не чтение данных",
   "src/lib/billing/plan-catalog.ts": "флаги фич в каталоге тарифов (BILLING-CATALOG-01), не чтение данных",
+  "src/features/studio-cabinet/bookings/server/booking-detail.service.ts":
+    "карточка записи студии для приложения (MOBILE-STUDIO-C): `Booking.notes` студийной записи пишет только администратор студии при ручной записи — ему же и показывается, клиенту не уходит",
 };
 
 /**

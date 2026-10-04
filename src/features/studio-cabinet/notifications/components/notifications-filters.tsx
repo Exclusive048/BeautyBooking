@@ -60,9 +60,10 @@ export function NotificationsFilters({ activeChip, sort, counts }: Props) {
     if (busy) return;
     setBusy(true);
     try {
-      // Reuse existing bulk endpoint — `context=all` covers every channel
-      // the studio admin sees (STUDIO + any spillover like SYSTEM).
-      await fetchJsonWithAuth<unknown>("/api/notifications/read-all?context=all", { method: "POST" });
+      // MOBILE-STUDIO-C (ops): только канал студии — эта страница его и
+      // показывает. Прежний `/api/notifications/read-all?context=all` гасил
+      // заодно личные уведомления и уведомления мастера, которых здесь не видно.
+      await fetchJsonWithAuth<unknown>("/api/cabinet/studio/notifications/read-all", { method: "POST" });
       startTransition(() => router.refresh());
     } catch (error) {
       // 29.09 · 11: раньше отказ не проверялся вовсе — тихий отказ.

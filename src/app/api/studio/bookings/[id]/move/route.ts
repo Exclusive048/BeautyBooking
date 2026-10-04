@@ -43,7 +43,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     // STUDIO-MOVE-NOTIFY-01: после коммита; сбой рассылки перенос не откатывает.
     try {
       const fullBooking = await loadBookingWithRelations(result.id);
-      if (fullBooking) await notifyStudioBookingMoved(fullBooking, result);
+      if (fullBooking) await notifyStudioBookingMoved(fullBooking, result, { actorUserId: user.id });
     } catch (error) {
       logError("PATCH /api/studio/bookings/[id]/move notification failed", {
         requestId: getRequestId(req),

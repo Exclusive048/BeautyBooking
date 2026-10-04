@@ -40,7 +40,9 @@ export function StudioRevenueChart({
     startTransition(() => {
       // Чтение графика: отказ — своя строка поверхности (действия, кроме
       // повтора, нет).
-      void fetchJsonWithAuth<StudioRevenueChartData>(`/api/studio/dashboard/revenue?period=${next}`)
+      void fetchJsonWithAuth<StudioRevenueChartData & { period: StudioDashboardPeriodId }>(
+        `/api/studio/dashboard/revenue?period=${next}`,
+      )
         .then((data) => {
           setData(data);
         })

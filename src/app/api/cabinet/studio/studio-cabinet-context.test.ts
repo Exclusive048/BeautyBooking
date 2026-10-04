@@ -14,12 +14,14 @@ const resolveCurrentStudioAccess = vi.hoisted(() => vi.fn());
 const providerFindUnique = vi.hoisted(() => vi.fn());
 const getStudioShellInfo = vi.hoisted(() => vi.fn());
 const getStudioSidebarCounts = vi.hoisted(() => vi.fn());
+const getStudioNotificationCounts = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth/session", () => ({ getSessionUser }));
 vi.mock("@/lib/studio/current", () => ({ resolveCurrentStudioAccess }));
 vi.mock("@/lib/prisma", () => ({ prisma: { provider: { findUnique: providerFindUnique } } }));
 vi.mock("@/features/studio-cabinet/server/studio-info.service", () => ({ getStudioShellInfo }));
 vi.mock("@/features/studio-cabinet/server/sidebar-counts.service", () => ({ getStudioSidebarCounts }));
+vi.mock("@/lib/notifications/studio-feed", () => ({ getStudioNotificationCounts }));
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn(), logInfo: vi.fn(), getRequestId: () => "req" }));
 vi.mock("@/lib/monitoring/api-alerts", () => ({ track5xxError: vi.fn() }));
 vi.mock("@/lib/observability/report", () => ({ reportMessage: vi.fn() }));
@@ -57,6 +59,7 @@ beforeEach(() => {
     reviewsUnanswered: 3,
     notificationsUnread: 9,
   });
+  getStudioNotificationCounts.mockResolvedValue({ unreadCount: 4, needsDecisionCount: 1 });
 });
 
 describe("GET /api/cabinet/studio/context", () => {
@@ -80,8 +83,10 @@ describe("GET /api/cabinet/studio/context", () => {
       roles: ["OWNER"],
       isOwner: true,
       canAdminister: true,
-      counts: { scheduleRequestsPending: 2, reviewsUnanswered: 3 },
+      // MOBILE-STUDIO-C (ops): уведомления — канал студии, а не личные (9 из сайдбара веба).
+      counts: { scheduleRequestsPending: 2, reviewsUnanswered: 3, notificationsUnread: 4 },
     });
+    expect(getStudioNotificationCounts).toHaveBeenCalledWith("user-1");
     expect(body.data?.todayKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(getStudioSidebarCounts).toHaveBeenCalledWith({
       studioId: "studio-1",
@@ -101,6 +106,7 @@ describe("GET /api/cabinet/studio/context", () => {
 
     expect(body.data).toMatchObject({ isOwner: false, canAdminister: false, counts: null });
     expect(getStudioSidebarCounts).not.toHaveBeenCalled();
+    expect(getStudioNotificationCounts).not.toHaveBeenCalled();
   });
 
   it("answers 401 without a session", async () => {
