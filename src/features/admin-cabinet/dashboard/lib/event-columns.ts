@@ -18,6 +18,8 @@ export function adminEventTypeLabel(type: AdminEventItem["type"]): string {
       return T.eventTypes.subscription;
     case "complaint":
       return T.eventTypes.complaint;
+    case "content_report":
+      return T.eventTypes.contentReport;
   }
 }
 

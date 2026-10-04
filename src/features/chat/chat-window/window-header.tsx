@@ -1,9 +1,13 @@
 "use client";
 
-import { Calendar, Phone } from "lucide-react";
+import { useState } from "react";
+import { Ban, Calendar, LockOpen, Phone } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { useToast } from "@/components/ui/toast";
+import { useConfirm } from "@/hooks/use-confirm";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { ChatPerspective, ConversationPartnerDto } from "@/features/chat/types";
 
@@ -14,6 +18,11 @@ type Props = {
   perspective: ChatPerspective;
   canSend: boolean;
   hasOpenBooking: boolean;
+  /** MOBILE-POLISH (App Store 1.2): блокировка собеседника. */
+  conversationSlug: string;
+  blockedByMe: boolean;
+  blockedByOther: boolean;
+  onBlockChanged: () => void;
   onMobileBack?: () => void;
 };
 
@@ -26,12 +35,55 @@ export function WindowHeader({
   perspective,
   canSend,
   hasOpenBooking,
+  conversationSlug,
+  blockedByMe,
+  blockedByOther,
+  onBlockChanged,
   onMobileBack,
 }: Props) {
-  const statusLabel = hasOpenBooking ? T.header.statusOpen : T.header.statusClosed;
-  const statusClass = hasOpenBooking
-    ? "text-success-text"
-    : "text-text-sec";
+  const toast = useToast();
+  const { confirm, modal: confirmModal } = useConfirm();
+  const [blockBusy, setBlockBusy] = useState(false);
+  const blocked = blockedByMe || blockedByOther;
+
+  const statusLabel = blockedByMe
+    ? T.header.statusBlockedByMe
+    : blockedByOther
+      ? T.header.statusBlockedByOther
+      : hasOpenBooking
+        ? T.header.statusOpen
+        : T.header.statusClosed;
+  const statusClass = blocked
+    ? "text-danger-text"
+    : hasOpenBooking
+      ? "text-success-text"
+      : "text-text-sec";
+
+  // Снять блок может только тот, кто его поставил: у заблокированного
+  // кнопка «Заблокировать» (ответный блок), а не «Разблокировать».
+  const toggleBlock = async () => {
+    const unblock = blockedByMe;
+    const ok = await confirm({
+      title: unblock ? T.block.unblockConfirmTitle : T.block.confirmTitle,
+      message: unblock ? T.block.unblockConfirmBody : T.block.confirmBody,
+      confirmLabel: unblock ? T.block.unblock : T.block.block,
+      variant: unblock ? "default" : "danger",
+    });
+    if (!ok) return;
+    setBlockBusy(true);
+    try {
+      await fetchJsonWithAuth<unknown>(
+        `/api/chat/threads/${encodeURIComponent(conversationSlug)}/block`,
+        { method: unblock ? "DELETE" : "POST" },
+      );
+      toast.success(unblock ? T.block.unblockedToast : T.block.blockedToast);
+      onBlockChanged();
+    } catch (error) {
+      toast.error(serverMessageOr(error, unblock ? T.block.unblockFailed : T.block.blockFailed));
+    } finally {
+      setBlockBusy(false);
+    }
+  };
 
   return (
     <header className="flex h-[68px] shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-bg-card px-4 md:px-5">
@@ -74,7 +126,7 @@ export function WindowHeader({
           <p className="mt-px truncate text-xs">
             <span className={statusClass}>{statusLabel}</span>
             <span className="text-text-sec"> · {partner.roleSummary}</span>
-            {!canSend ? (
+            {!canSend && !blocked ? (
               <span className="ml-1 text-text-sec/80">
                 · {perspective === "master" ? T.header.composeHintMaster : T.header.composeHintClient}
               </span>
@@ -108,7 +160,23 @@ export function WindowHeader({
             </a>
           </Button>
         ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => void toggleBlock()}
+          disabled={blockBusy}
+          aria-label={blockedByMe ? T.block.unblockAria : T.block.blockAria}
+        >
+          {blockedByMe ? (
+            <LockOpen className="h-4 w-4" aria-hidden strokeWidth={1.6} />
+          ) : (
+            <Ban className="h-4 w-4" aria-hidden strokeWidth={1.6} />
+          )}
+          <span className="hidden sm:inline">{blockedByMe ? T.block.unblock : T.block.block}</span>
+        </Button>
       </div>
+      {confirmModal}
     </header>
   );
 }

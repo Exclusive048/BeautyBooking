@@ -1,5 +1,6 @@
 import "server-only"; // ENV-SPLIT-01: серверная половина env — в клиентском бандле ей делать нечего
 import { z } from "zod";
+import { APP_REVIEW_LOGIN_CODE_PATTERN, isLoginEmail } from "@/lib/auth/app-review-login-format";
 
 /**
  * ENV-SPLIT-01 — БЭК-половина env. Полная Zod-схема + fail-fast на старте.
@@ -365,6 +366,24 @@ const envSchema = z.object({
       (value) => splitEnvList(value).every((item) => IOS_APP_ID_PATTERN.test(item)),
       "must be comma-separated TEAMID.bundle.id values, e.g. ABCDE12345.ru.masterryadom",
     ),
+
+  // ── App Review login (MOBILE-POLISH) ──────────────────────────────────────
+  // Вход для проверяющего App Store / Google Play без доступа к почте: для
+  // ЭТОГО адреса запрос кода письмо не отправляет, а вход принимает
+  // постоянный код ниже. Включено, только когда заданы ОБА значения и оба
+  // верны; по умолчанию выключено (значений по умолчанию нет и не будет).
+  // Лимиты и блокировка неверных попыток действуют как для всех.
+  APP_REVIEW_LOGIN_EMAIL: z
+    .string()
+    .optional()
+    .refine((value) => !value?.trim() || isLoginEmail(value.trim()), "must be an email address"),
+  APP_REVIEW_LOGIN_CODE: z
+    .string()
+    .optional()
+    .refine(
+      (value) => !value?.trim() || APP_REVIEW_LOGIN_CODE_PATTERN.test(value.trim()),
+      "must be exactly 6 digits",
+    ),
 });
 
 const has = (value: string | undefined): boolean => Boolean(value?.trim());
@@ -546,6 +565,12 @@ const refinedSchema = envSchema
       compareMobileVersions(e.MOBILE_MIN_VERSION_ANDROID, e.MOBILE_LATEST_VERSION_ANDROID) <= 0,
     "MOBILE_MIN_VERSION_{IOS,ANDROID} must not exceed MOBILE_LATEST_VERSION_{IOS,ANDROID} — " +
       "the app would demand an update to a version that does not exist."
+  )
+  // MOBILE-POLISH: вход для App Review — оба значения или ни одного. Одно без
+  // другого — почти наверняка опечатка в деплое, а вход молча не включился бы.
+  .refine(
+    (e) => has(e.APP_REVIEW_LOGIN_EMAIL) === has(e.APP_REVIEW_LOGIN_CODE),
+    "APP_REVIEW_LOGIN_EMAIL and APP_REVIEW_LOGIN_CODE must be set together (or both left empty)"
   )
   .refine(
     (e) => e.NODE_ENV !== "production" || e.STORAGE_PROVIDER !== "local",

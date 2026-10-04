@@ -12,6 +12,7 @@ const tx = vi.hoisted(() => ({
   otpCode: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   pushSubscription: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   mobilePushDevice: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+  chatBlock: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   notification: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   telegramLinkToken: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   telegramLink: { deleteMany: vi.fn(async () => ({ count: 0 })) },
@@ -119,6 +120,13 @@ describe("deleteUserAccount — auth artefacts", () => {
     await deleteUserAccount(USER_ID);
     expect(tx.mobilePushDevice.deleteMany).toHaveBeenCalledWith({ where: { userId: USER_ID } });
     expect(tx.pushSubscription.deleteMany).toHaveBeenCalledWith({ where: { userId: USER_ID } });
+  });
+
+  it("deletes chat blocks in both directions (MOBILE-POLISH)", async () => {
+    await deleteUserAccount(USER_ID);
+    expect(tx.chatBlock.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ blockerUserId: USER_ID }, { blockedUserId: USER_ID }] },
+    });
   });
 });
 

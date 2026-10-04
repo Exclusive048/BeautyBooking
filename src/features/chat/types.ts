@@ -26,6 +26,10 @@ export type ConversationListItemDto = {
   unreadCount: number;
   hasOpenBooking: boolean;
   latestActivityAt: string;
+  /** MOBILE-POLISH: я заблокировал собеседника. */
+  blockedByMe: boolean;
+  /** MOBILE-POLISH: собеседник заблокировал меня. */
+  blockedByOther: boolean;
 };
 
 /** Booking snapshot pinned by a SYSTEM message. */
@@ -90,4 +94,10 @@ export type ConversationThreadDto = {
   openBookingId: string | null;
   readonlyOnly: boolean;
   timezone: string;
+  /** MOBILE-POLISH: я заблокировал собеседника (переписка закрыта, `canSend: false`). */
+  blockedByMe: boolean;
+  /** MOBILE-POLISH: собеседник заблокировал меня. */
+  blockedByOther: boolean;
+  /** Готовый текст для поля ввода при блоке; `null` — блока нет. */
+  blockedReason: string | null;
 };

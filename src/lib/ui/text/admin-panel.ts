@@ -9,6 +9,7 @@ export const adminPanel = {
     users: "Пользователи",
     billing: "Финансы и тарифы",
     reviews: "Отзывы",
+    reports: "Жалобы",
     settings: "Настройки системы",
   },
   breadcrumb: {
@@ -38,6 +39,10 @@ export const adminPanel = {
     reviews: {
       title: "Отзывы",
       sublabel: "модерация и жалобы",
+    },
+    reports: {
+      title: "Жалобы",
+      sublabel: "жалобы пользователей на контент",
     },
     settings: {
       title: "Настройки системы",
@@ -93,10 +98,12 @@ export const adminPanel = {
         registrationClient: "Регистрация · клиент",
         subscription: "Подписка",
         complaint: "Жалоба на отзыв",
+        contentReport: "Жалоба на контент",
       },
       perMonthSuffix: "/мес",
       cancelPrefix: "−",
       complaintOpenLabel: "Открыто",
+      complaintClosedLabel: "Разобрано",
       columns: {
         time: "Время",
         type: "Тип",
@@ -773,6 +780,108 @@ export const adminPanel = {
       approved: "Отзыв одобрен",
       deleted: "Отзыв удалён",
       errorGeneric: "Не удалось выполнить действие. Попробуйте ещё раз.",
+    },
+  },
+  // MOBILE-POLISH (App Store 1.2): очередь жалоб пользователей на контент.
+  reports: {
+    header: {
+      caption: "Модерация контента",
+      pendingSuffix: "ждут ответа",
+      overdueSuffix: "дольше 24 часов",
+      slaHint:
+        "На жалобу нужно ответить в течение 24 часов: принять меры или отклонить. Сам контент удаляют в его разделе — ссылки есть в карточке.",
+    },
+    reviewsNotice: (count: number) =>
+      `Жалобы мастеров на отзывы о себе разбираются в «Отзывах» — сейчас там ${count}.`,
+    reviewsNoticeLink: "Открыть «Отзывы»",
+    tabs: {
+      new: "Новые",
+      resolved: "Приняты меры",
+      dismissed: "Отклонённые",
+      all: "Все",
+    },
+    filters: {
+      tabsAria: "Какие жалобы показать",
+      typeLabel: "Тип контента",
+      typeAll: "Любой контент",
+    },
+    targetTypes: {
+      PROVIDER: "Страница",
+      REVIEW: "Отзыв",
+      PORTFOLIO_ITEM: "Работа",
+      CHAT: "Переписка",
+      MODEL_OFFER: "Предложение для моделей",
+    },
+    reasons: {
+      SPAM: "Спам",
+      OFFENSIVE: "Оскорбления",
+      FRAUD: "Мошенничество",
+      INAPPROPRIATE_CONTENT: "Недопустимый контент",
+      OTHER: "Другое",
+    },
+    statuses: {
+      NEW: "Новая",
+      RESOLVED: "Приняты меры",
+      DISMISSED: "Отклонена",
+    },
+    target: {
+      unknown: "—",
+      review: (rating: number, aboutName: string | null) =>
+        aboutName ? `Отзыв ★${rating} о «${aboutName}»` : `Отзыв ★${rating}`,
+      portfolio: (masterName: string) => `Работа · ${masterName}`,
+      modelOffer: (masterName: string, dateLocal: string) =>
+        `Предложение для моделей · ${masterName} · ${dateLocal}`,
+      chat: (masterName: string, clientName: string) => `${masterName} ↔ ${clientName}`,
+      chatWhole: "Жалоба на переписку целиком, без конкретного сообщения.",
+    },
+    card: {
+      reporterLabel: "Пожаловался",
+      reasonLabel: "Причина",
+      commentLabel: "Комментарий",
+      offenderLabel: "Автор контента",
+      overdueBadge: "Больше 24 ч",
+      missingTarget: "Контент уже удалён или скрыт",
+      openPublic: "Открыть на сайте",
+      openReview: "Открыть в «Отзывах»",
+      openOffender: "Открыть в «Пользователях»",
+      resolutionLabel: "Решение",
+      resolutionBy: (name: string) => `Решил: ${name}`,
+      photoAlt: "Фото работы, на которую пожаловались",
+    },
+    actions: {
+      resolve: "Принять меры",
+      dismiss: "Отклонить",
+    },
+    resolveDialog: {
+      title: "Принять меры",
+      body: "Опишите, что сделано: например, отзыв удалён, автор заблокирован или предупреждён. Пометка останется в журнале действий.",
+      noteLabel: "Что сделано",
+      notePlaceholder: "Например: отзыв удалён, автор предупреждён",
+      noteRequired: "Опишите, какие меры приняты.",
+      cancel: "Отмена",
+      confirm: "Принять меры",
+    },
+    dismissDialog: {
+      title: "Отклонить жалобу",
+      body: "Нарушения нет — жалоба закроется без действий. Автор жалобы сможет пожаловаться снова.",
+      noteLabel: "Комментарий (необязательно)",
+      notePlaceholder: "Например: нарушения правил не найдено",
+      cancel: "Отмена",
+      confirm: "Отклонить",
+    },
+    empty: {
+      newTitle: "Новых жалоб нет",
+      newHint: "Все жалобы разобраны.",
+      otherTitle: "Здесь пока пусто",
+      otherHint: "Жалобы появятся, когда пользователи их отправят.",
+    },
+    pagination: {
+      loadMore: "Загрузить ещё",
+    },
+    toasts: {
+      resolved: "Жалоба закрыта: меры приняты",
+      dismissed: "Жалоба отклонена",
+      errorGeneric: "Не удалось сохранить решение. Попробуйте ещё раз.",
     },
   },
   settings: {

@@ -514,6 +514,11 @@ enum AdminAuditAction {
   SETTINGS_FLAG_TOGGLED
 
   SETTINGS_APP_SETTING_UPDATED
+
+  // Жалобы на контент (MOBILE-POLISH, App Store 1.2)
+  CONTENT_REPORT_RESOLVED
+
+  CONTENT_REPORT_DISMISSED
 }
 
 /// RKN-FIX-10 — кто выполнил массовое чтение ПДн. Не роль пользователя, а
@@ -524,4 +529,31 @@ enum PdAccessActorType {
   MASTER
   STUDIO
   SYSTEM
+}
+
+/// MOBILE-POLISH (App Store 1.2) — на что пожаловался пользователь.
+/// PROVIDER — страница мастера или студии, CHAT — переписка (и, по желанию,
+/// одно сообщение в ней), MODEL_OFFER — предложение для моделей.
+enum ContentReportTargetType {
+  PROVIDER
+  REVIEW
+  PORTFOLIO_ITEM
+  CHAT
+  MODEL_OFFER
+}
+
+/// MOBILE-POLISH — причина жалобы. Для OTHER комментарий обязателен.
+enum ContentReportReason {
+  SPAM
+  OFFENSIVE
+  FRAUD
+  INAPPROPRIATE_CONTENT
+  OTHER
+}
+
+/// MOBILE-POLISH — состояние жалобы в очереди администратора.
+enum ContentReportStatus {
+  NEW
+  RESOLVED
+  DISMISSED
 }

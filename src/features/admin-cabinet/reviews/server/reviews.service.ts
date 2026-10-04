@@ -36,6 +36,8 @@ function buildWhere(opts: ListOpts): Prisma.ReviewWhereInput {
   if (q) {
     conds.push({
       OR: [
+        // MOBILE-POLISH: точный id — ссылка «Открыть в «Отзывах»» из «Жалоб».
+        { id: q },
         { text: { contains: q, mode: "insensitive" } },
         { reportComment: { contains: q, mode: "insensitive" } },
         {

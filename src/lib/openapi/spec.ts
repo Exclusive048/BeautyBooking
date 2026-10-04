@@ -4290,6 +4290,118 @@ export const openApiSpec = {
           revoked: { type: "integer", minimum: 0, description: "Сколько активных сессий завершено." },
         },
       },
+      // ── MOBILE-POLISH (App Store 1.2): жалобы и блокировка ──────────────
+      ContentReportInput: {
+        type: "object",
+        required: ["targetType", "targetId", "reason"],
+        properties: {
+          targetType: {
+            type: "string",
+            enum: ["PROVIDER", "REVIEW", "PORTFOLIO_ITEM", "CHAT", "MODEL_OFFER"],
+          },
+          targetId: {
+            type: "string",
+            maxLength: 200,
+            description:
+              "Публичный идентификатор цели: PROVIDER — `publicUsername` (или старый адрес / id), " +
+              "REVIEW — `id` отзыва из публичного списка (`e_…`), PORTFOLIO_ITEM — `id` работы (`e_…`), " +
+              "CHAT — slug переписки, MODEL_OFFER — `publicCode`.",
+          },
+          messageId: {
+            type: "string",
+            maxLength: 200,
+            description: "Только для CHAT: `id` сообщения из `thread` (необязательно).",
+          },
+          reason: { type: "string", enum: ["SPAM", "OFFENSIVE", "FRAUD", "INAPPROPRIATE_CONTENT", "OTHER"] },
+          comment: { type: "string", maxLength: 1000, description: "Для OTHER обязателен." },
+        },
+      },
+      ContentReportCreatedData: {
+        type: "object",
+        required: ["id", "alreadyReported"],
+        properties: {
+          id: { type: "string", description: "Id жалобы." },
+          alreadyReported: {
+            type: "boolean",
+            description: "true — открытая жалоба этого пользователя на эту цель уже есть (ответ 200, без дубля).",
+          },
+        },
+      },
+      ChatBlockStateData: {
+        type: "object",
+        required: ["blockedByMe", "blockedByOther", "blockedReason"],
+        properties: {
+          blockedByMe: { type: "boolean", description: "Вы заблокировали собеседника." },
+          blockedByOther: { type: "boolean", description: "Собеседник заблокировал вас." },
+          blockedReason: {
+            type: "string",
+            nullable: true,
+            description: "Текст для поля ввода при блоке («Собеседник ограничил переписку с вами.»); null — блока нет.",
+          },
+        },
+      },
+      ChatBlockItem: {
+        type: "object",
+        required: ["id", "createdAt", "name", "avatarUrl"],
+        properties: {
+          id: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          name: { type: "string", description: "Имя клиента или название кабинета мастера." },
+          avatarUrl: { type: "string", nullable: true },
+        },
+      },
+      ChatBlockListData: {
+        type: "object",
+        required: ["items"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/ChatBlockItem" } },
+        },
+      },
+      AdminContentReportListData: {
+        type: "object",
+        required: ["items", "nextCursor", "counts"],
+        properties: {
+          items: {
+            type: "array",
+            items: { type: "object", additionalProperties: true },
+            description: "Карточки очереди (`AdminReportRow`, `features/admin-cabinet/reports/types.ts`).",
+          },
+          nextCursor: { type: "string", nullable: true },
+          counts: {
+            type: "object",
+            required: ["new", "resolved", "dismissed", "all", "overdue", "reportedReviews"],
+            properties: {
+              new: { type: "integer" },
+              resolved: { type: "integer" },
+              dismissed: { type: "integer" },
+              all: { type: "integer" },
+              overdue: { type: "integer", description: "NEW старше 24 часов." },
+              reportedReviews: { type: "integer", description: "Открытые жалобы мастеров на отзывы (в «Отзывах»)." },
+            },
+          },
+        },
+      },
+      AdminContentReportDecisionInput: {
+        type: "object",
+        properties: {
+          note: { type: "string", maxLength: 1000, description: "resolve — обязательна (что сделано), dismiss — нет." },
+        },
+      },
+      AdminContentReportDecisionData: {
+        type: "object",
+        required: ["report"],
+        properties: {
+          report: {
+            type: "object",
+            required: ["id", "status", "resolvedAt"],
+            properties: {
+              id: { type: "string" },
+              status: { type: "string", enum: ["RESOLVED", "DISMISSED"] },
+              resolvedAt: { type: "string", format: "date-time" },
+            },
+          },
+        },
+      },
       ProviderUnlinkData: {
         type: "object",
         required: ["unlinked"],
@@ -7007,6 +7119,83 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/me/blocks": {
+      get: {
+        operationId: "meChatBlocksList",
+        summary: "People you blocked in chats",
+        description:
+          "MOBILE-POLISH (App Store 1.2): «Заблокированные», свежие первыми. Только имя и фото (у мастера — " +
+          "его кабинет), без телефона и внутренних id. `no-store`.",
+        tags: ["mobile", "me", "chat"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ChatBlockListData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/me/blocks/{id}": {
+      delete: {
+        operationId: "meChatBlockRemove",
+        summary: "Unblock from the blocked list",
+        description:
+          "Снимает свой блок (`id` из `GET /api/me/blocks`). Чужой или несуществующий — 404 NOT_FOUND. " +
+          "Лимит: 30/час на пользователя; путь чувствительный (обрыв Redis — 503).",
+        tags: ["mobile", "me", "chat"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/MobileEmptyData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
+    "/api/chat/threads/{slug}/block": {
+      post: {
+        operationId: "chatThreadBlock",
+        summary: "Block the other participant of a chat",
+        description:
+          "MOBILE-POLISH (App Store 1.2): блок на уровне людей (клиент ↔ владелец кабинета мастера). " +
+          "Пока он есть, переписка закрыта в обе стороны во всех их переписках: отправка — 403 CHAT_BLOCKED " +
+          "(«Собеседник ограничил переписку с вами.» / «Вы заблокировали собеседника…»), `GET " +
+          "/api/chat/threads/{slug}` отдаёт `canSend: false`, `blockedByMe`, `blockedByOther`, `blockedReason`, " +
+          "список переписок — `blockedByMe` / `blockedByOther`. Записи блок не трогает. Идемпотентно. " +
+          "Только участник: нет переписки — 404, не участник — 403. Лимит: 30/час на пользователя.",
+        tags: ["mobile", "chat"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ChatBlockStateData" }),
+          "400": errorResponse("VALIDATION_ERROR — переписка с самим собой"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+      delete: {
+        operationId: "chatThreadUnblock",
+        summary: "Remove your block of the other participant",
+        description:
+          "Снимает только СВОЙ блок; блок собеседника остаётся (тогда `blockedByOther: true`). Идемпотентно.",
+        tags: ["mobile", "chat"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "slug", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ChatBlockStateData" }),
+          "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN"),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+        },
+      },
+    },
     "/api/me/sessions/revoke-others": {
       post: {
         operationId: "meSessionsRevokeOthers",
@@ -8059,6 +8248,36 @@ export const openApiSpec = {
           "404": errorResponse("Not found"),
           "409": errorResponse("Conflict"),
           "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/reports": {
+      post: {
+        operationId: "contentReportCreate",
+        summary: "Report user content",
+        description:
+          "MOBILE-POLISH (App Store 1.2): жалоба вошедшего пользователя на страницу мастера/студии, отзыв, " +
+          "работу, переписку (или сообщение в ней), предложение для моделей. 201 — новая жалоба; 200 " +
+          "`alreadyReported: true` — открытая жалоба на эту цель уже есть. 404 NOT_FOUND — цели нет или она " +
+          "не видна (переписка — только участнику). 400 REPORT_OWN_CONTENT — свой контент. 400 " +
+          "VALIDATION_ERROR — текстом первого поля и `fieldErrors`. Лимит: 20/час на пользователя; путь " +
+          "чувствительный (обрыв Redis — 503). Жалобы мастера на отзыв о себе — по-прежнему " +
+          "`POST /api/reviews/{id}/report`.",
+        tags: ["mobile", "reports"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ContentReportInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/ContentReportCreatedData" }, "Already reported"),
+          "201": okResponse({ $ref: "#/components/schemas/ContentReportCreatedData" }, "Created"),
+          "400": errorResponse("VALIDATION_ERROR / REPORT_OWN_CONTENT"),
+          "401": errorResponse("UNAUTHORIZED"),
+          "404": errorResponse("NOT_FOUND"),
+          "429": errorResponse("RATE_LIMITED"),
+          "503": errorResponse("RATE_LIMIT_UNAVAILABLE"),
+          "500": errorResponse("INTERNAL_ERROR"),
         },
       },
     },
@@ -9702,6 +9921,69 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/admin/reports": {
+      get: {
+        summary: "Content reports queue (admin)",
+        description:
+          "MOBILE-POLISH (App Store 1.2): `?status=new|resolved|dismissed|all` (по умолчанию new — от старых " +
+          "к свежим, срок ответа 24 часа), `?type=PROVIDER|REVIEW|PORTFOLIO_ITEM|CHAT|MODEL_OFFER`, `?cursor`, " +
+          "`?limit` (до 100). Страница `/admin/reports` рендерит то же на сервере.",
+        tags: ["admin", "reports"],
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminContentReportListData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/admin/reports/{id}/resolve": {
+      post: {
+        summary: "Resolve a content report («Принять меры»)",
+        description:
+          "Пометка обязательна (что сделано). Только из NEW; разобранная — 409 CONFLICT. Журнал действий: " +
+          "CONTENT_REPORT_RESOLVED.",
+        tags: ["admin", "reports"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminContentReportDecisionInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminContentReportDecisionData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse("CONFLICT"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
+    "/api/admin/reports/{id}/dismiss": {
+      post: {
+        summary: "Dismiss a content report («Отклонить»)",
+        description:
+          "Пометка по желанию, тело можно не передавать. Только из NEW; разобранная — 409 CONFLICT. Журнал " +
+          "действий: CONTENT_REPORT_DISMISSED.",
+        tags: ["admin", "reports"],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        requestBody: {
+          required: false,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminContentReportDecisionInput" } } },
+        },
+        responses: {
+          "200": okResponse({ $ref: "#/components/schemas/AdminContentReportDecisionData" }),
+          "400": errorResponse("VALIDATION_ERROR"),
+          "401": errorResponse("Unauthorized"),
+          "403": errorResponse("Forbidden"),
+          "404": errorResponse("NOT_FOUND"),
+          "409": errorResponse("CONFLICT"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     "/api/admin/hot-slots/run": {
       post: {
         summary: "Run hot slots job",
@@ -9747,7 +10029,10 @@ export const openApiSpec = {
         operationId: "mobileAuthOtpEmailVerify",
         summary: "Mobile: sign in with email code",
         description:
-          "Код запрашивается обычным `POST /api/auth/otp/email/request {email}`. Логика и отказы — как " +
+          "Код запрашивается обычным `POST /api/auth/otp/email/request {email}`. MOBILE-POLISH: для адреса " +
+          "`APP_REVIEW_LOGIN_EMAIL` (вход для App Review, включён только при заданных `APP_REVIEW_LOGIN_EMAIL` " +
+          "и `APP_REVIEW_LOGIN_CODE`) письмо не отправляется, а вход принимает постоянный код из env; лимиты и " +
+          "блокировка — как у всех. Логика и отказы — как " +
           "у веб-`/api/auth/otp/email/verify`: 400 VALIDATION_ERROR / CONSENT_REQUIRED, 401 " +
           "CODE_NOT_FOUND, EMAIL_NOT_VERIFIED (адрес занят неподтверждённой строкой), 429 OTP_LOCKED. " +
           "Сессия — в теле (`tokens`), кук нет. Лимит прокси: 30/мин на IP (тир mobileAuth).",

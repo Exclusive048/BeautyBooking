@@ -13,6 +13,7 @@ import {
   markAttachmentUsed,
   validateChatAttachmentAsset,
 } from "@/lib/chat/attachment";
+import { assertChatNotBlocked } from "@/lib/chat/blocks";
 
 const MAX_BODY_LENGTH = 1000;
 
@@ -137,6 +138,10 @@ export async function sendConversationMessage(
 
   const recipientUserId =
     senderType === ChatSenderType.MASTER ? booking.clientUserId : booking.provider.ownerUserId;
+
+  // MOBILE-POLISH (App Store 1.2): блок в любую сторону закрывает отправку —
+  // 403 CHAT_BLOCKED до записи сообщения и уведомления.
+  await assertChatNotBlocked(input.userId, recipientUserId);
 
   // Sender name uses the same logic as the existing per-booking route
   // — snapshotted into ChatMessage.senderName.

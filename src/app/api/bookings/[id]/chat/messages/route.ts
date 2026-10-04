@@ -5,6 +5,7 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/access";
 import { resolveChatAccess } from "@/lib/chat/access";
+import { assertChatNotBlocked } from "@/lib/chat/blocks";
 import {
   markAttachmentUsed,
   validateChatAttachmentAsset,
@@ -69,6 +70,15 @@ export async function POST(req: NextRequest, ctx: { params: RouteParams }) {
     }
 
     const body = await parseBody(req, bodySchema);
+
+    // MOBILE-POLISH (App Store 1.2): блок между участниками закрывает и этот,
+    // старый путь отправки — тот же 403 CHAT_BLOCKED, что у переписки по slug.
+    await assertChatNotBlocked(
+      user.userId,
+      access.senderType === "CLIENT"
+        ? access.booking.masterProvider?.ownerUserId ?? null
+        : access.booking.clientUserId,
+    );
 
     const chat = await prisma.bookingChat.upsert({
       where: { bookingId },

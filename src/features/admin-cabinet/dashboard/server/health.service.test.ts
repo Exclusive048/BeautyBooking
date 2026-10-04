@@ -18,6 +18,7 @@ vi.mock("@/lib/queue/queue", () => ({ getQueueStats: () => queueStats() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     review: { count: () => reviewCount() },
+    contentReport: { count: async () => 0 },
     aiSpendCounter: { findMany: async () => [{ meter: "review-reply", count: 450 }] },
   },
 }));

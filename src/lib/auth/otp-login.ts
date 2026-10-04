@@ -4,6 +4,11 @@ import { OtpChannel } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { fail } from "@/lib/api/response";
 import { formatZodError } from "@/lib/api/validation";
+import {
+  isAppReviewLoginEmail,
+  logAppReviewLogin,
+  matchesAppReviewLoginCode,
+} from "@/lib/auth/app-review-login";
 import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import { findVerifiedEmailProfile, resolveEmailLoginProfile } from "@/lib/auth/email-login-profile";
@@ -230,20 +235,29 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
   }
 
   const now = new Date();
-  const codeHash = hashOtpCode(normalizedEmail, code);
 
-  const otp = await prisma.otpCode.findFirst({
-    where: {
-      email: normalizedEmail,
-      channel: OtpChannel.EMAIL,
-      codeHash,
-      usedAt: null,
-      expiresAt: { gt: now },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  // MOBILE-POLISH: вход для App Review — для адреса `APP_REVIEW_LOGIN_EMAIL`
+  // подходит только постоянный код из env (сравнение за постоянное время),
+  // кодов в базе у этого адреса нет (запрос их не создаёт). Блокировка выше и
+  // счётчик неверных попыток ниже — те же, что у всех.
+  const appReview = isAppReviewLoginEmail(normalizedEmail);
+  const appReviewCodeOk = appReview && matchesAppReviewLoginCode(normalizedEmail, code);
+  if (appReview) logAppReviewLogin("verify", appReviewCodeOk ? "accepted" : "rejected");
 
-  if (!otp) {
+  const otp = appReview
+    ? null
+    : await prisma.otpCode.findFirst({
+        where: {
+          email: normalizedEmail,
+          channel: OtpChannel.EMAIL,
+          codeHash: hashOtpCode(normalizedEmail, code),
+          usedAt: null,
+          expiresAt: { gt: now },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+  if (!otp && !appReviewCodeOk) {
     const failResult = await registerOtpEmailVerifyFailure(normalizedEmail, clientIp);
     if (!failResult.ok) {
       void recordSurfaceEvent({ surface: "auth", outcome: "failure", operation: "otp-email-verify", code: failResult.error ?? "OTP_VERIFY_LOCKED" });
@@ -277,7 +291,7 @@ export async function verifyEmailOtpLogin(req: Request, options: OtpLoginOptions
 
   await Promise.all([
     clearOtpEmailVerifyFailures(normalizedEmail, clientIp),
-    prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }),
+    otp ? prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: now } }) : Promise.resolve(),
   ]);
 
   // OTP-EMAIL-LOGIN-RACE: create-or-recover is delegated so a P2002 from two

@@ -137,6 +137,9 @@ export async function deleteUserAccount(userId: string, options: AccountDeletion
       tx.pushSubscription.deleteMany({ where: { userId } }),
       // MOBILE-B2: push-токены приложения — удалённому аккаунту push не уходит.
       tx.mobilePushDevice.deleteMany({ where: { userId } }),
+      // MOBILE-POLISH: блокировки в переписке — в обе стороны. Это настройка
+      // между двумя людьми из одних id; без аккаунта ей нечего охранять.
+      tx.chatBlock.deleteMany({ where: { OR: [{ blockerUserId: userId }, { blockedUserId: userId }] } }),
       tx.telegramLinkToken.deleteMany({ where: { userId } }),
       tx.telegramLink.deleteMany({ where: { userId } }),
       tx.vkLink.deleteMany({ where: { userId } }),
