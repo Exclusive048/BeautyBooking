@@ -371,6 +371,128 @@ const manualWindowQuery: ParameterObject = {
     "Operator window for manual booking (master / studio admin): minBookingHoursAhead is not applied, only past slots are hidden. Honoured only for the provider's own side; ignored otherwise.",
 };
 
+// MOBILE-STUDIO-C (ops) — общие схемы чтений кабинета студии для приложения
+// (`/api/cabinet/studio/{dashboard,calendar,bookings,booking-options,notifications}`).
+const STUDIO_OPS_TIME = (description?: string): SchemaObject => ({ type: "string", format: "date-time", description });
+const STUDIO_OPS_TIME_NULLABLE: SchemaObject = { type: "string", format: "date-time", nullable: true };
+const STUDIO_OPS_RUNTIME_STATUS: SchemaObject = {
+  type: "string",
+  enum: ["PENDING", "CONFIRMED", "CHANGE_REQUESTED", "REJECTED", "IN_PROGRESS", "FINISHED"],
+  description: "Вычисляемый статус (`resolveBookingRuntimeStatus`): NEW→PENDING, начавшаяся — IN_PROGRESS, конец + 60 мин — FINISHED.",
+};
+const STUDIO_OPS_BOOKING_STATUS: SchemaObject = {
+  type: "string",
+  enum: ["NEW", "PENDING", "CONFIRMED", "CHANGE_REQUESTED", "REJECTED", "IN_PROGRESS", "PREPAID", "STARTED", "FINISHED", "CANCELLED", "NO_SHOW"],
+};
+const STUDIO_OPS_SIDE: SchemaObject = { type: "string", enum: ["CLIENT", "MASTER"], nullable: true };
+const STUDIO_OPS_ACTIONS: SchemaObject = {
+  type: "object",
+  description:
+    "Что владелец / администратор студии может сделать с записью сейчас (`lib/bookings/studio-actions.ts`): " +
+    "confirm и acceptReschedule — POST /api/bookings/{id}/confirm; declineReschedule — POST /api/bookings/{id}/decline-reschedule; " +
+    "move — PATCH /api/studio/bookings/{id}/move; cancel — POST /api/bookings/{id}/cancel, а при wholePackageOnly — " +
+    "POST /api/bookings/package/{bookingPackageId}/cancel с обязательной причиной.",
+  required: ["confirm", "acceptReschedule", "declineReschedule", "awaitingClient", "move", "cancel", "wholePackageOnly"],
+  properties: {
+    confirm: { type: "boolean" },
+    acceptReschedule: { type: "boolean" },
+    declineReschedule: { type: "boolean" },
+    awaitingClient: { type: "boolean", description: "Клиенту предложено новое время — ждём его ответа." },
+    move: { type: "boolean" },
+    cancel: { type: "boolean" },
+    wholePackageOnly: { type: "boolean" },
+  },
+};
+const STUDIO_OPS_MASTER_REF: SchemaObject = {
+  type: "object",
+  required: ["id", "name", "avatarUrl", "specialization"],
+  properties: {
+    id: { type: "string", description: "Provider.id профиля мастера в студии." },
+    name: { type: "string" },
+    avatarUrl: { type: "string", nullable: true },
+    specialization: { type: "string", nullable: true },
+  },
+};
+const STUDIO_OPS_BOOKING_FIELDS: Record<string, SchemaObject> = {
+  id: { type: "string" },
+  startAtUtc: STUDIO_OPS_TIME(),
+  endAtUtc: STUDIO_OPS_TIME(),
+  durationMin: { type: "integer" },
+  status: STUDIO_OPS_BOOKING_STATUS,
+  runtimeStatus: STUDIO_OPS_RUNTIME_STATUS,
+  source: { type: "string", enum: ["MANUAL", "WEB", "APP"] },
+  master: STUDIO_OPS_MASTER_REF,
+  serviceId: { type: "string" },
+  serviceTitle: { type: "string" },
+  priceKopeks: { type: "integer" },
+  proposedStartAtUtc: STUDIO_OPS_TIME_NULLABLE,
+  proposedEndAtUtc: STUDIO_OPS_TIME_NULLABLE,
+  actionRequiredBy: STUDIO_OPS_SIDE,
+  bookingPackageId: { type: "string", nullable: true },
+  needsAnswer: { type: "boolean", description: "confirm || acceptReschedule || declineReschedule." },
+  actions: STUDIO_OPS_ACTIONS,
+};
+const STUDIO_OPS_BOOKING_ITEM: SchemaObject = {
+  type: "object",
+  description: "Запись студии в списке — без телефона клиента (он только в карточке записи).",
+  required: [...Object.keys(STUDIO_OPS_BOOKING_FIELDS), "client"],
+  properties: {
+    ...STUDIO_OPS_BOOKING_FIELDS,
+    client: {
+      type: "object",
+      required: ["name", "isNewClient", "isVip"],
+      properties: { name: { type: "string" }, isNewClient: { type: "boolean" }, isVip: { type: "boolean" } },
+    },
+  },
+};
+const STUDIO_OPS_KPI_TILE: SchemaObject = {
+  type: "object",
+  required: ["current", "previous", "delta", "tone"],
+  properties: {
+    current: { type: "number" },
+    previous: { type: "number" },
+    delta: { type: "number", nullable: true, description: "Проценты, п.п. (загрузка) или доля балла (рейтинг); null — сравнивать не с чем." },
+    tone: { type: "string", enum: ["positive", "negative", "neutral"] },
+  },
+};
+const STUDIO_OPS_HM_RANGE: SchemaObject = {
+  type: "object",
+  required: ["start", "end"],
+  properties: { start: { type: "string", description: "HH:mm салона" }, end: { type: "string", description: "HH:mm салона" } },
+};
+const STUDIO_OPS_CHIP: SchemaObject = {
+  type: "string",
+  enum: ["all", "unread", "bookings", "cancellations", "reschedules", "reviews", "messages", "team", "finance", "system"],
+};
+const STUDIO_OPS_DATE_QUERY: ParameterObject = {
+  name: "date",
+  in: "query",
+  required: false,
+  schema: { type: "string", format: "date" },
+  description: "Дата салона YYYY-MM-DD (настоящая); без неё — сегодня по салону.",
+};
+const STUDIO_OPS_CURSOR_QUERY: ParameterObject = {
+  name: "cursor",
+  in: "query",
+  required: false,
+  schema: { type: "string", maxLength: 64 },
+  description: "Непрозрачный `nextCursor` предыдущей страницы; чужой — 400 «Список обновился. Загрузите его заново.».",
+};
+const STUDIO_OPS_LIMIT_QUERY: ParameterObject = {
+  name: "limit",
+  in: "query",
+  required: false,
+  schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+};
+const studioOpsResponses = (data: SchemaObject, extra: Record<string, ResponseObject> = {}): Record<string, ResponseObject> => ({
+  "200": okResponse(data),
+  "401": errorResponse("UNAUTHORIZED"),
+  "403": errorResponse("FORBIDDEN — нет студии или мастер студии («Этот раздел доступен владельцу студии.»)"),
+  ...extra,
+  "429": errorResponse("RATE_LIMITED"),
+  "500": errorResponse("INTERNAL_ERROR"),
+});
+
 /**
  * MOBILE-AUTH-A — заголовки метаданных нативного клиента. Необязательны:
  * невалидное или отсутствующее значение просто не попадает в сессию.
@@ -1910,6 +2032,10 @@ export const openApiSpec = {
             properties: {
               scheduleRequestsPending: { type: "integer" },
               reviewsUnanswered: { type: "integer" },
+              notificationsUnread: {
+                type: "integer",
+                description: "MOBILE-STUDIO-C (ops): уведомления канала студии + ожидающие заявки на график.",
+              },
             },
           },
         },
@@ -5190,7 +5316,7 @@ export const openApiSpec = {
     "/api/masters/{id}/availability": {
       get: {
         summary: "List available slots for master",
-        tags: ["schedule", "masters"],
+        tags: ["schedule", "masters", "mobile"],
         parameters: [
           masterIdParam,
           serviceIdQuery,
@@ -6609,7 +6735,7 @@ export const openApiSpec = {
     "/api/studio/blocks": {
       post: {
         summary: "Create studio time block",
-        tags: ["studio", "calendar"],
+        tags: ["studio", "calendar", "mobile"],
         requestBody: {
           required: true,
           content: {
@@ -6628,7 +6754,7 @@ export const openApiSpec = {
     "/api/studio/blocks/{id}": {
       patch: {
         summary: "Update studio time block",
-        tags: ["studio", "calendar"],
+        tags: ["studio", "calendar", "mobile"],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         requestBody: {
           required: true,
@@ -6647,7 +6773,7 @@ export const openApiSpec = {
       },
       delete: {
         summary: "Delete studio time block",
-        tags: ["studio", "calendar"],
+        tags: ["studio", "calendar", "mobile"],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string" } },
           { name: "studioId", in: "query", required: true, schema: { type: "string" } },
@@ -7331,7 +7457,7 @@ export const openApiSpec = {
     "/api/studio/bookings/{id}/move": {
       patch: {
         summary: "Move booking between masters/time slots",
-        tags: ["studio", "bookings"],
+        tags: ["studio", "bookings", "mobile"],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         requestBody: {
           required: true,
@@ -7345,6 +7471,8 @@ export const openApiSpec = {
           "401": errorResponse("Unauthorized"),
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Booking not found"),
+          "409": errorResponse("CONFLICT / SLOT_CONFLICT / TIME_BLOCKED / MASTER_NOT_ACTIVE"),
+          "422": errorResponse("OUTSIDE_WORK_HOURS / MASTER_SERVICE_MISMATCH"),
           "500": errorResponse("Internal error"),
         },
       },
@@ -7352,7 +7480,7 @@ export const openApiSpec = {
     "/api/studio/bookings": {
       post: {
         summary: "Create booking from studio calendar",
-        tags: ["studio", "bookings"],
+        tags: ["studio", "bookings", "mobile"],
         requestBody: {
           required: true,
           content: {
@@ -7366,8 +7494,521 @@ export const openApiSpec = {
           "403": errorResponse("Forbidden"),
           "404": errorResponse("Not found"),
           "409": errorResponse("Conflict"),
+          "422": errorResponse("OUTSIDE_WORK_HOURS"),
           "500": errorResponse("Internal error"),
         },
+      },
+    },
+    // MOBILE-STUDIO-C (ops) — главная, календарь, журнал, карточка записи,
+    // выбор мастера и услуги, уведомления кабинета студии в приложении.
+    "/api/studio/dashboard/revenue": {
+      get: {
+        operationId: "studioDashboardRevenue",
+        summary: "Studio revenue by master for a period",
+        description:
+          "Выручка студии по мастерам за последние N дней салона (подтверждённые и завершённые записи). " +
+          "Неизвестный `period` — 30d. Плоская форма `{ totalKopeks, points, period }`.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "period", in: "query", required: false, schema: { type: "string", enum: ["7d", "30d", "90d", "365d"], default: "30d" } },
+        ],
+        responses: studioOpsResponses({
+          type: "object",
+          required: ["totalKopeks", "points", "period"],
+          properties: {
+            totalKopeks: { type: "integer" },
+            period: { type: "string", enum: ["7d", "30d", "90d", "365d"] },
+            points: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["masterId", "masterName", "revenueKopeks", "bookingsCount"],
+                properties: {
+                  masterId: { type: "string" },
+                  masterName: { type: "string" },
+                  revenueKopeks: { type: "integer" },
+                  bookingsCount: { type: "integer" },
+                },
+              },
+            },
+          },
+        }),
+      },
+    },
+    "/api/cabinet/studio/dashboard": {
+      get: {
+        operationId: "studioCabinetDashboard",
+        summary: "Studio home: today, KPIs, attention, awaiting bookings",
+        description:
+          "Данные веб-дашборда (`loadStudioDashboardData`) числами и без href веба, плюс до 20 ближайших записей, " +
+          "ждущих ответа (PENDING / CHANGE_REQUESTED, начало впереди), с действиями. Только владелец / администратор.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: studioOpsResponses({
+          type: "object",
+          required: ["studioId", "timezone", "todayKey", "today", "kpis", "topMasters", "attention", "topOccupancyToday", "popularServices", "revenueChart"],
+          properties: {
+            studioId: { type: "string" },
+            timezone: { type: "string" },
+            todayKey: { type: "string", format: "date" },
+            today: {
+              type: "object",
+              properties: {
+                bookingsCount: { type: "integer" },
+                mastersOnShift: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, avatarUrl: { type: "string", nullable: true } } } },
+                totalMasters: { type: "integer" },
+                averageLoadPercent: { type: "integer" },
+              },
+            },
+            kpis: {
+              type: "object",
+              properties: {
+                periodDays: { type: "integer" },
+                revenueKopeks: STUDIO_OPS_KPI_TILE,
+                bookingsCount: STUDIO_OPS_KPI_TILE,
+                occupancyPercent: STUDIO_OPS_KPI_TILE,
+                averageRating: STUDIO_OPS_KPI_TILE,
+                averageCheckKopeks: { type: "integer" },
+                ratingCount: { type: "integer" },
+                mastersOnShiftCount: { type: "integer" },
+                totalMastersCount: { type: "integer" },
+              },
+            },
+            topMasters: { type: "array", items: { type: "object" } },
+            attention: {
+              type: "object",
+              required: ["items", "urgentCount", "bookings", "bookingsTotal"],
+              properties: {
+                items: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["id", "count", "urgent"],
+                    properties: {
+                      id: { type: "string", enum: ["pending-master-approvals", "bookings-awaiting", "reviews-unanswered", "schedule-requests"] },
+                      count: { type: "integer" },
+                      urgent: { type: "boolean" },
+                    },
+                  },
+                },
+                urgentCount: { type: "integer" },
+                bookings: { type: "array", items: STUDIO_OPS_BOOKING_ITEM },
+                bookingsTotal: { type: "integer" },
+              },
+            },
+            topOccupancyToday: { type: "array", items: { type: "object" } },
+            popularServices: { type: "array", items: { type: "object" } },
+            revenueChart: { type: "object", properties: { period: { type: "string" }, totalKopeks: { type: "integer" }, points: { type: "array", items: { type: "object" } } } },
+          },
+        }),
+      },
+    },
+    "/api/cabinet/studio/calendar/day": {
+      get: {
+        operationId: "studioCabinetCalendarDay",
+        summary: "Studio calendar day: masters' hours, bookings, personal busy time, blocks",
+        description:
+          "Сборка дня веба (`buildDayData` + `computeKpis`) и план дня каждого активного мастера из движка расписания. " +
+          "Записи студии — с действиями и без телефона; личные записи мастеров — только занятостью; блокировки — для " +
+          "правки через `/api/studio/blocks`. День «Фиксированное время»: `fixedStarts`, отрезки — сутки движка.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [STUDIO_OPS_DATE_QUERY],
+        responses: studioOpsResponses(
+          {
+            type: "object",
+            required: ["studioId", "timezone", "date", "todayKey", "dayStartUtc", "gridWindow", "masters", "bookings", "personalBusy", "blocks", "kpis"],
+            properties: {
+              studioId: { type: "string", description: "Studio.id — для `/api/studio/bookings` и `/api/studio/blocks`." },
+              timezone: { type: "string" },
+              date: { type: "string", format: "date" },
+              todayKey: { type: "string", format: "date" },
+              dayStartUtc: STUDIO_OPS_TIME("Полночь салона"),
+              gridWindow: { type: "object", properties: { startHour: { type: "integer" }, endHour: { type: "integer" } } },
+              masters: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    avatarUrl: { type: "string", nullable: true },
+                    rating: { type: "number" },
+                    reviewsCount: { type: "integer" },
+                    isAvailable: { type: "boolean" },
+                    serviceIds: { type: "array", items: { type: "string" } },
+                    hours: {
+                      type: "object",
+                      required: ["isWorking", "intervals", "breaks", "fixedStarts"],
+                      properties: {
+                        isWorking: { type: "boolean" },
+                        intervals: { type: "array", items: STUDIO_OPS_HM_RANGE },
+                        breaks: { type: "array", items: STUDIO_OPS_HM_RANGE },
+                        fixedStarts: { type: "array", items: { type: "string" }, nullable: true },
+                      },
+                    },
+                  },
+                },
+              },
+              bookings: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    ...STUDIO_OPS_BOOKING_FIELDS,
+                    masterId: { type: "string" },
+                    tone: { type: "string", enum: ["confirmed", "pending", "new", "done", "muted"] },
+                    clientName: { type: "string" },
+                    isNewClient: { type: "boolean" },
+                  },
+                },
+              },
+              personalBusy: {
+                type: "array",
+                items: { type: "object", properties: { id: { type: "string" }, masterId: { type: "string" }, startAtUtc: STUDIO_OPS_TIME(), endAtUtc: STUDIO_OPS_TIME() } },
+              },
+              blocks: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    masterId: { type: "string" },
+                    startAtUtc: STUDIO_OPS_TIME(),
+                    endAtUtc: STUDIO_OPS_TIME(),
+                    type: { type: "string", enum: ["BREAK", "BLOCK"] },
+                    note: { type: "string", nullable: true },
+                  },
+                },
+              },
+              kpis: {
+                type: "object",
+                properties: {
+                  bookingsCount: { type: "integer" },
+                  bookingsConfirmedCount: { type: "integer" },
+                  revenueKopeks: { type: "integer" },
+                  occupancyPercent: { type: "integer" },
+                  mastersOnShift: { type: "integer" },
+                  freeWindowsCount: { type: "integer" },
+                },
+              },
+            },
+          },
+          { "400": errorResponse("VALIDATION_ERROR — дата") },
+        ),
+      },
+    },
+    "/api/cabinet/studio/calendar/week": {
+      get: {
+        operationId: "studioCabinetCalendarWeek",
+        summary: "Studio calendar week: load per master and day from real schedules",
+        description:
+          "Понедельник–воскресенье недели `date`. Выходной и ёмкость — из плана дня движка (`loadDayPlans`), а не «5 записей = 100%» " +
+          "веб-недели; день «Фиксированное время» — доля занятых начал. Только записи студии.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [STUDIO_OPS_DATE_QUERY],
+        responses: studioOpsResponses(
+          {
+            type: "object",
+            required: ["studioId", "timezone", "todayKey", "from", "to", "days", "masters"],
+            properties: {
+              studioId: { type: "string" },
+              timezone: { type: "string" },
+              todayKey: { type: "string", format: "date" },
+              from: { type: "string", format: "date" },
+              to: { type: "string", format: "date" },
+              days: {
+                type: "array",
+                items: { type: "object", properties: { date: { type: "string", format: "date" }, weekday: { type: "integer" }, isToday: { type: "boolean" } } },
+              },
+              masters: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    avatarUrl: { type: "string", nullable: true },
+                    isAvailable: { type: "boolean" },
+                    days: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          date: { type: "string", format: "date" },
+                          isDayOff: { type: "boolean" },
+                          booked: { type: "integer" },
+                          bookedMinutes: { type: "integer" },
+                          capacityMinutes: { type: "integer", nullable: true },
+                          fixedSlots: { type: "integer", nullable: true },
+                          percent: { type: "integer" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          { "400": errorResponse("VALIDATION_ERROR — дата") },
+        ),
+      },
+    },
+    "/api/cabinet/studio/bookings": {
+      get: {
+        operationId: "studioCabinetBookings",
+        summary: "Studio booking journal page",
+        description:
+          "Журнал веба (`listStudioBookings`, `loadStudioBookingsKpis`, `loadStudioMasterOptions`) постранично. " +
+          "status: awaiting = NEW/PENDING/CHANGE_REQUESTED, confirmed = CONFIRMED/PREPAID/STARTED/IN_PROGRESS, " +
+          "finished = FINISHED, cancelled = REJECTED/CANCELLED, no_show = NO_SHOW. Без телефонов в элементах.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "range", in: "query", required: false, schema: { type: "string", enum: ["today", "tomorrow", "week", "all"], default: "today" } },
+          { name: "status", in: "query", required: false, schema: { type: "string", enum: ["all", "awaiting", "confirmed", "finished", "cancelled", "no_show"], default: "all" } },
+          { name: "master", in: "query", required: false, schema: { type: "string", maxLength: 64 }, description: "Provider.id мастера или all." },
+          { name: "q", in: "query", required: false, schema: { type: "string", maxLength: 80 }, description: "Имя клиента, цифры телефона, услуга." },
+          STUDIO_OPS_CURSOR_QUERY,
+          STUDIO_OPS_LIMIT_QUERY,
+        ],
+        responses: studioOpsResponses(
+          {
+            type: "object",
+            required: ["studioId", "timezone", "range", "status", "rangeCounts", "kpis", "masters", "items", "nextCursor"],
+            properties: {
+              studioId: { type: "string" },
+              timezone: { type: "string" },
+              range: { type: "string" },
+              status: { type: "string" },
+              rangeCounts: {
+                type: "object",
+                properties: { today: { type: "integer" }, tomorrow: { type: "integer" }, week: { type: "integer" }, all: { type: "integer" } },
+              },
+              kpis: {
+                type: "object",
+                properties: {
+                  todayCount: { type: "integer" },
+                  todayCompleted: { type: "integer" },
+                  todayUpcoming: { type: "integer" },
+                  needsActionCount: { type: "integer" },
+                  confirmedNext7Days: { type: "integer" },
+                  revenueTodayKopeks: { type: "integer" },
+                  revenueDeltaPercent: { type: "integer", nullable: true },
+                  noShowLast7Days: { type: "integer" },
+                },
+              },
+              masters: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" } } } },
+              items: { type: "array", items: STUDIO_OPS_BOOKING_ITEM },
+              nextCursor: { type: "string", nullable: true },
+            },
+          },
+          { "400": errorResponse("VALIDATION_ERROR — фильтры или курсор") },
+        ),
+      },
+    },
+    "/api/cabinet/studio/bookings/{id}": {
+      get: {
+        operationId: "studioCabinetBookingDetail",
+        summary: "Studio booking detail (push target /studio/bookings/{id})",
+        description:
+          "Элемент журнала плюс телефон и ключ CRM клиента, визиты в студию, комментарий, заметка студии, ответы, " +
+          "переносы и отмена, отзыв. Личная запись мастера, чужая, несуществующая и битый id — один 404 BOOKING_NOT_FOUND.",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", maxLength: 64 } }],
+        responses: studioOpsResponses(
+          {
+            type: "object",
+            required: ["studioId", "timezone", "booking"],
+            properties: {
+              studioId: { type: "string" },
+              timezone: { type: "string" },
+              booking: {
+                type: "object",
+                properties: {
+                  ...STUDIO_OPS_BOOKING_FIELDS,
+                  createdAt: STUDIO_OPS_TIME(),
+                  requestedBy: STUDIO_OPS_SIDE,
+                  changeComment: { type: "string", nullable: true },
+                  client: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      phone: { type: "string", nullable: true },
+                      userId: { type: "string", nullable: true },
+                      key: { type: "string", nullable: true, description: "Ключ CRM студии: /api/studio/clients/{key}/card" },
+                      avatarUrl: { type: "string", nullable: true },
+                      isNewClient: { type: "boolean" },
+                      isVip: { type: "boolean" },
+                      pastVisitsCount: { type: "integer" },
+                    },
+                  },
+                  services: {
+                    type: "array",
+                    items: { type: "object", properties: { title: { type: "string" }, price: { type: "integer" }, durationMin: { type: "integer" } } },
+                  },
+                  comment: { type: "string", nullable: true },
+                  notes: { type: "string", nullable: true },
+                  silentMode: { type: "boolean" },
+                  answers: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } } } },
+                  clientChangeRequestsCount: { type: "integer" },
+                  masterChangeRequestsCount: { type: "integer" },
+                  changeRequestLimit: { type: "integer" },
+                  cancelledBy: { type: "string", enum: ["CLIENT", "PROVIDER", "SYSTEM"], nullable: true },
+                  cancelReason: { type: "string", nullable: true },
+                  cancelledAtUtc: STUDIO_OPS_TIME_NULLABLE,
+                  review: {
+                    type: "object",
+                    nullable: true,
+                    properties: {
+                      id: { type: "string", description: "Публичный токен — /api/reviews/{id}/reply" },
+                      rating: { type: "integer" },
+                      text: { type: "string", nullable: true },
+                      replyText: { type: "string", nullable: true },
+                      repliedAt: STUDIO_OPS_TIME_NULLABLE,
+                      createdAt: STUDIO_OPS_TIME(),
+                      canReply: { type: "boolean" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          { "404": errorResponse("BOOKING_NOT_FOUND") },
+        ),
+      },
+    },
+    "/api/cabinet/studio/booking-options": {
+      get: {
+        operationId: "studioCabinetBookingOptions",
+        summary: "Bookable masters and services for create / move",
+        description:
+          "Загрузчик веб-диалога «Новая запись» (`loadStudioCabinetShellExtras`): активные мастера и включённые активные услуги, " +
+          "с длительностью и ценой у каждого мастера (то, что запишет `createStudioBooking`).",
+        tags: ["mobile", "studio"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: studioOpsResponses({
+          type: "object",
+          required: ["studioId", "timezone", "masters", "services"],
+          properties: {
+            studioId: { type: "string" },
+            timezone: { type: "string" },
+            masters: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  avatarUrl: { type: "string", nullable: true },
+                  serviceIds: { type: "array", items: { type: "string" } },
+                },
+              },
+            },
+            services: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  durationMin: { type: "integer" },
+                  priceKopeks: { type: "integer" },
+                  masterIds: { type: "array", items: { type: "string" } },
+                  masters: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: { masterId: { type: "string" }, durationMin: { type: "integer" }, priceKopeks: { type: "integer" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      },
+    },
+    "/api/cabinet/studio/notifications": {
+      get: {
+        operationId: "studioCabinetNotifications",
+        summary: "Studio notifications feed (studio channel + pending schedule requests)",
+        description:
+          "Канал STUDIO центра уведомлений условием в базе (`studioChannelNotificationWhere`) и ожидающие заявки на смену " +
+          "графика первыми; вкладки веба; `link` — путь экрана приложения или null.",
+        tags: ["mobile", "studio", "notifications"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        parameters: [
+          { name: "chip", in: "query", required: false, schema: { ...STUDIO_OPS_CHIP, default: "all" } },
+          STUDIO_OPS_CURSOR_QUERY,
+          STUDIO_OPS_LIMIT_QUERY,
+        ],
+        responses: studioOpsResponses(
+          {
+            type: "object",
+            required: ["timezone", "chip", "unreadCount", "needsDecisionCount", "chipCounts", "items", "nextCursor"],
+            properties: {
+              timezone: { type: "string" },
+              chip: STUDIO_OPS_CHIP,
+              unreadCount: { type: "integer" },
+              needsDecisionCount: { type: "integer" },
+              chipCounts: { type: "object", additionalProperties: { type: "integer" } },
+              items: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "type", "chip", "title", "body", "isRead", "readAt", "createdAt", "bookingId", "needsDecision", "link", "payload"],
+                  properties: {
+                    id: { type: "string", description: "Notification.id или schedule-request:<id>" },
+                    type: { type: "string" },
+                    chip: STUDIO_OPS_CHIP,
+                    title: { type: "string" },
+                    body: { type: "string" },
+                    isRead: { type: "boolean" },
+                    readAt: STUDIO_OPS_TIME_NULLABLE,
+                    createdAt: STUDIO_OPS_TIME(),
+                    bookingId: { type: "string", nullable: true },
+                    needsDecision: { type: "boolean" },
+                    link: { type: "string", nullable: true },
+                    payload: { type: "object", nullable: true },
+                  },
+                },
+              },
+              nextCursor: { type: "string", nullable: true },
+            },
+          },
+          { "400": errorResponse("VALIDATION_ERROR — вкладка или курсор") },
+        ),
+      },
+    },
+    "/api/cabinet/studio/notifications/unread-count": {
+      get: {
+        operationId: "studioCabinetNotificationsUnreadCount",
+        summary: "Studio notifications badge",
+        tags: ["mobile", "studio", "notifications"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: studioOpsResponses({
+          type: "object",
+          required: ["unreadCount", "needsDecisionCount"],
+          properties: { unreadCount: { type: "integer" }, needsDecisionCount: { type: "integer" } },
+        }),
+      },
+    },
+    "/api/cabinet/studio/notifications/read-all": {
+      post: {
+        operationId: "studioCabinetNotificationsReadAll",
+        summary: "Mark all studio-channel notifications read",
+        description: "Личные уведомления и уведомления мастера не трогаются; заявки на смену графика остаются. Лимит — cabinetMutation.",
+        tags: ["mobile", "studio", "notifications"],
+        security: [{ bearerAuth: [] }, { cookieAuth: [] }],
+        responses: studioOpsResponses({
+          type: "object",
+          required: ["updated", "unreadCount", "needsDecisionCount"],
+          properties: { updated: { type: "integer" }, unreadCount: { type: "integer" }, needsDecisionCount: { type: "integer" } },
+        }),
       },
     },
     "/api/feed/portfolio": {

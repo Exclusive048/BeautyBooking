@@ -84,7 +84,7 @@ function parseJsonPayload(payloadJson: unknown): unknown {
  * Сохранённый `startAtUtc` не трогается — по расхождению с ним страница и
  * понимает, что время сменилось.
  */
-function mergeBookingPayload(
+export function mergeBookingPayload(
   payloadJson: unknown,
   booking:
     | {
@@ -216,21 +216,121 @@ async function listVisiblePendingInvites(userId: string) {
   });
 }
 
-export async function getNotificationCenterData(input: {
-  userId: string;
-  phone: string | null;
-}): Promise<NotificationCenterData> {
-  const [studioMemberships, ownedStudios, invites, notifications, unreadCount] = await Promise.all([
+/**
+ * Студии пользователя для канала STUDIO центра уведомлений:
+ *  - `studioIds` — студии с АКТИВНЫМ членством (любая роль): запись такой
+ *    студии классифицируется как STUDIO (`classifyNotificationChannel`);
+ *  - `adminStudioIds` — где он OWNER/ADMIN или владелец: их заявки на смену
+ *    графика приходят псевдо-уведомлениями.
+ * MOBILE-STUDIO-C (ops): вынесено из `getNotificationCenterData`, чтобы лента
+ * студии в приложении (`lib/notifications/studio-feed.ts`) считала то же множество.
+ */
+export async function loadNotificationStudioAudience(
+  userId: string,
+): Promise<{ studioIds: Set<string>; adminStudioIds: Set<string> }> {
+  const [studioMemberships, ownedStudios] = await Promise.all([
     prisma.studioMembership.findMany({
-      where: { userId: input.userId, status: MembershipStatus.ACTIVE },
+      where: { userId, status: MembershipStatus.ACTIVE },
       select: { studioId: true, roles: true },
     }),
     prisma.studio.findMany({
       where: {
-        OR: [{ ownerUserId: input.userId }, { provider: { ownerUserId: input.userId } }],
+        OR: [{ ownerUserId: userId }, { provider: { ownerUserId: userId } }],
       },
       select: { id: true },
     }),
+  ]);
+  const studioIds = new Set(studioMemberships.map((item) => item.studioId));
+  const adminStudioIds = new Set(
+    studioMemberships
+      .filter((item) => item.roles.some((role) => role === StudioRole.OWNER || role === StudioRole.ADMIN))
+      .map((item) => item.studioId)
+  );
+  ownedStudios.forEach((studio) => adminStudioIds.add(studio.id));
+  return { studioIds, adminStudioIds };
+}
+
+/** Сколько ожидающих заявок на смену графика центр показывает псевдо-уведомлениями. */
+export const SCHEDULE_REQUEST_ITEMS_LIMIT = 50;
+
+/**
+ * Ожидающие решения заявки мастеров на смену графика — псевдо-уведомления
+ * канала STUDIO (id `schedule-request:<id>`, всегда непрочитанные; уходят из
+ * списка, когда заявку решили). Не больше `SCHEDULE_REQUEST_ITEMS_LIMIT`, новые сверху.
+ */
+export async function loadPendingScheduleRequestItems(
+  adminStudioIds: Iterable<string>,
+): Promise<NotificationCenterNotificationItem[]> {
+  const studioIdList = Array.from(adminStudioIds);
+  const pendingScheduleRequests =
+    studioIdList.length === 0
+      ? []
+      : await prisma.scheduleChangeRequest.findMany({
+          where: {
+            studioId: { in: studioIdList },
+            status: "PENDING",
+          },
+          select: {
+            id: true,
+            studioId: true,
+            providerId: true,
+            status: true,
+            payloadJson: true,
+            createdAt: true,
+            studio: {
+              select: {
+                provider: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: SCHEDULE_REQUEST_ITEMS_LIMIT,
+        });
+
+  const masterIds = Array.from(new Set(pendingScheduleRequests.map((item) => item.providerId)));
+  const masters =
+    masterIds.length === 0
+      ? []
+      : await prisma.provider.findMany({
+          where: { id: { in: masterIds } },
+          select: { id: true, name: true },
+        });
+  const masterNameById = new Map(
+    masters.map((master) => [master.id, master.name || "Мастер"])
+  );
+
+  return pendingScheduleRequests.map((item) => {
+    const masterName = masterNameById.get(item.providerId) ?? "Мастер";
+    const details = describeScheduleRequest(item.payloadJson);
+    return {
+      id: `schedule-request:${item.id}`,
+      title: "Мастер просит изменить график",
+      // 29.09 · 01-а: название в «ёлочках», без слова «студия» — иначе
+      // «студия Студия Ольги».
+      body: [masterName, details, item.studio?.provider.name ? `«${item.studio.provider.name}»` : null]
+        .filter(Boolean)
+        .join(" · "),
+      type: "SCHEDULE_REQUEST",
+      channel: "STUDIO",
+      isRead: false,
+      readAt: null,
+      createdAt: item.createdAt.toISOString(),
+      payloadJson: null,
+      // R2-06-D: schedule-change requests live on the dedicated
+      // /schedule-requests page (with inline Approve/Reject), not /team.
+      openHref: "/cabinet/studio/schedule-requests",
+    };
+  });
+}
+
+export async function getNotificationCenterData(input: {
+  userId: string;
+  phone: string | null;
+}): Promise<NotificationCenterData> {
+  const [audience, invites, notifications, unreadCount] = await Promise.all([
+    loadNotificationStudioAudience(input.userId),
     listVisiblePendingInvites(input.userId),
     prisma.notification.findMany({
       where: { userId: input.userId, deletedAt: null },
@@ -275,76 +375,8 @@ export async function getNotificationCenterData(input: {
     }),
   ]);
 
-  const studioIds = new Set(studioMemberships.map((item) => item.studioId));
-  const adminStudioIds = new Set(
-    studioMemberships
-      .filter((item) => item.roles.some((role) => role === StudioRole.OWNER || role === StudioRole.ADMIN))
-      .map((item) => item.studioId)
-  );
-  ownedStudios.forEach((studio) => adminStudioIds.add(studio.id));
-
-  const pendingScheduleRequests =
-    adminStudioIds.size === 0
-      ? []
-      : await prisma.scheduleChangeRequest.findMany({
-          where: {
-            studioId: { in: Array.from(adminStudioIds) },
-            status: "PENDING",
-          },
-          select: {
-            id: true,
-            studioId: true,
-            providerId: true,
-            status: true,
-            payloadJson: true,
-            createdAt: true,
-            studio: {
-              select: {
-                provider: {
-                  select: { name: true },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 50,
-        });
-
-  const masterIds = Array.from(new Set(pendingScheduleRequests.map((item) => item.providerId)));
-  const masters =
-    masterIds.length === 0
-      ? []
-      : await prisma.provider.findMany({
-          where: { id: { in: masterIds } },
-          select: { id: true, name: true },
-        });
-  const masterNameById = new Map(
-    masters.map((master) => [master.id, master.name || "Мастер"])
-  );
-
-  const scheduleRequestNotifications: NotificationCenterNotificationItem[] =
-    pendingScheduleRequests.map((item) => {
-      const masterName = masterNameById.get(item.providerId) ?? "Мастер";
-      const details = describeScheduleRequest(item.payloadJson);
-      return {
-        id: `schedule-request:${item.id}`,
-        title: "Мастер просит изменить график",
-        // 29.09 · 01-а: название в «ёлочках», без слова «студия» — иначе
-        // «студия Студия Ольги».
-        body: [masterName, details, item.studio?.provider.name ? `«${item.studio.provider.name}»` : null]
-          .filter(Boolean)
-          .join(" · "),
-        type: "SCHEDULE_REQUEST",
-        channel: "STUDIO",
-        isRead: false,
-        readAt: null,
-        createdAt: item.createdAt.toISOString(),
-        payloadJson: null,
-        // R2-06-D: schedule-change requests live on the dedicated
-        // /schedule-requests page (with inline Approve/Reject), not /team.
-        openHref: "/cabinet/studio/schedule-requests",
-      };
-    });
+  const { studioIds, adminStudioIds } = audience;
+  const scheduleRequestNotifications = await loadPendingScheduleRequestItems(adminStudioIds);
 
   const timelineNotifications: NotificationCenterNotificationItem[] = [
     ...notifications.map((item) => {

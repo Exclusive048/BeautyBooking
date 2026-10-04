@@ -40,6 +40,8 @@ export type StudioBookingRow = {
   proposedStartAtUtc: string | null;
   proposedEndAtUtc: string | null;
   actionRequiredBy: "CLIENT" | "MASTER" | null;
+  /** MOBILE-STUDIO-C (ops): пакет записи — отмена только пакетом целиком. */
+  bookingPackageId: string | null;
 };
 
 export type StudioBookingsRangeCounts = {

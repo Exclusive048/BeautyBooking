@@ -31,9 +31,12 @@ const PAGE_SIZE = 50;
 
 export type StudioBookingsFilters = {
   range: BookingsTimeRange;
-  status?: BookingStatus | "all";
+  /** Один статус (веб) или группа статусов (MOBILE-STUDIO-C: «ждут ответа», «отменены»…). */
+  status?: BookingStatus | BookingStatus[] | "all";
   masterId?: string | "all";
   search?: string;
+  /** MOBILE-STUDIO-C (ops): только записи, начинающиеся строго позже этого момента. */
+  startsAfter?: Date;
 };
 
 function resolveBookingPriceKopeks(input: {
@@ -98,6 +101,14 @@ export async function listStudioBookings(input: {
   studioId: string;
   filters: StudioBookingsFilters;
   cursor?: string | null;
+  /**
+   * MOBILE-STUDIO-C (ops): постраничность смещением (`offset-cursor`) вместо
+   * курсора по id. Тогда `nextCursor` — лишь признак «есть ещё» (id последней
+   * строки страницы), следующее смещение считает вызывающий.
+   */
+  page?: { offset: number; limit: number };
+  /** `false` — не считать счётчики диапазонов (в ответе нули). По умолчанию считаются. */
+  withRangeCounts?: boolean;
 }): Promise<StudioBookingsListData> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
@@ -124,10 +135,14 @@ export async function listStudioBookings(input: {
   const whereRange: Prisma.BookingWhereInput = bounds.from
     ? { startAtUtc: { gte: bounds.from, lt: bounds.toExclusive ?? undefined } }
     : {};
-  const whereStatus: Prisma.BookingWhereInput =
-    filters.status && filters.status !== "all"
+  const whereStatus: Prisma.BookingWhereInput = Array.isArray(filters.status)
+    ? { status: { in: filters.status } }
+    : filters.status && filters.status !== "all"
       ? { status: filters.status }
       : {};
+  const whereStartsAfter: Prisma.BookingWhereInput = filters.startsAfter
+    ? { startAtUtc: { gt: filters.startsAfter } }
+    : {};
   const whereMaster: Prisma.BookingWhereInput =
     filters.masterId && filters.masterId !== "all"
       ? { masterProviderId: filters.masterId }
@@ -140,9 +155,14 @@ export async function listStudioBookings(input: {
       whereRange,
       whereStatus,
       whereMaster,
+      whereStartsAfter,
       ...(whereSearch ? [whereSearch] : []),
     ],
   };
+  const pageSize = input.page?.limit ?? PAGE_SIZE;
+  const withRangeCounts = input.withRangeCounts ?? true;
+  const countIf = (where: Prisma.BookingWhereInput) =>
+    withRangeCounts ? prisma.booking.count({ where }) : Promise.resolve(0);
 
   // Range chip counts — parallel, ignore status/master/search so the
   // chips show "in this range total". This matches catalog convention
@@ -155,9 +175,15 @@ export async function listStudioBookings(input: {
     await Promise.all([
       prisma.booking.findMany({
         where,
-        orderBy: { startAtUtc: "asc" },
-        take: PAGE_SIZE + 1,
-        ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+        // Вторичный ключ — устойчивый порядок записей с одинаковым началом
+        // (смещение не должно дублировать и терять строки между страницами).
+        orderBy: input.page ? [{ startAtUtc: "asc" }, { id: "asc" }] : { startAtUtc: "asc" },
+        take: pageSize + 1,
+        ...(input.page
+          ? { skip: input.page.offset }
+          : input.cursor
+            ? { cursor: { id: input.cursor }, skip: 1 }
+            : {}),
         select: {
           id: true,
           startAtUtc: true,
@@ -179,50 +205,45 @@ export async function listStudioBookings(input: {
           proposedStartAt: true,
           proposedEndAt: true,
           actionRequiredBy: true,
+          bookingPackageId: true,
           service: {
             select: { name: true, title: true, price: true, durationMin: true },
           },
           serviceItems: { select: { priceSnapshot: true } },
         },
       }),
-      prisma.booking.count({
-        where: {
-          AND: [
-            baseScope,
-            { startAtUtc: { gte: todayBounds.from!, lt: todayBounds.toExclusive! } },
-          ],
-        },
+      countIf({
+        AND: [
+          baseScope,
+          { startAtUtc: { gte: todayBounds.from!, lt: todayBounds.toExclusive! } },
+        ],
       }),
-      prisma.booking.count({
-        where: {
-          AND: [
-            baseScope,
-            {
-              startAtUtc: {
-                gte: tomorrowBounds.from!,
-                lt: tomorrowBounds.toExclusive!,
-              },
+      countIf({
+        AND: [
+          baseScope,
+          {
+            startAtUtc: {
+              gte: tomorrowBounds.from!,
+              lt: tomorrowBounds.toExclusive!,
             },
-          ],
-        },
+          },
+        ],
       }),
-      prisma.booking.count({
-        where: {
-          AND: [
-            baseScope,
-            { startAtUtc: { gte: weekBounds.from!, lt: weekBounds.toExclusive! } },
-          ],
-        },
+      countIf({
+        AND: [
+          baseScope,
+          { startAtUtc: { gte: weekBounds.from!, lt: weekBounds.toExclusive! } },
+        ],
       }),
-      prisma.booking.count({ where: { AND: [baseScope] } }),
+      countIf({ AND: [baseScope] }),
     ]);
 
   // Pagination cursor
   let nextCursor: string | null = null;
   let pageRows = bookings;
-  if (bookings.length > PAGE_SIZE) {
-    nextCursor = bookings[PAGE_SIZE - 1]!.id;
-    pageRows = bookings.slice(0, PAGE_SIZE);
+  if (bookings.length > pageSize) {
+    nextCursor = bookings[pageSize - 1]!.id;
+    pageRows = bookings.slice(0, pageSize);
   }
 
   // Resolve master records once
@@ -339,6 +360,7 @@ export async function listStudioBookings(input: {
       source: row.source as BookingSource,
       status: row.status,
       ...mapProposedReschedule(row),
+      bookingPackageId: row.bookingPackageId ?? null,
     };
   });
 

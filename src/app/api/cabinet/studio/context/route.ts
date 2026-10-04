@@ -1,6 +1,7 @@
 import { fail, ok } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
 import { CABINET_NO_STORE_INIT, cabinetReadFailure } from "@/lib/master/cabinet-json";
+import { getStudioNotificationCounts } from "@/lib/notifications/studio-feed";
 import { prisma } from "@/lib/prisma";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveStudioCabinetAccess } from "@/lib/studio/cabinet-access";
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
     if (!user) return fail("Требуется вход в аккаунт.", 401, "UNAUTHORIZED");
 
     const access = await resolveStudioCabinetAccess(user.id);
-    const [shell, provider, counts] = await Promise.all([
+    const [shell, provider, counts, notifications] = await Promise.all([
       getStudioShellInfo(access.studioId),
       prisma.provider.findUnique({
         where: { id: access.providerId },
@@ -34,6 +35,9 @@ export async function GET(req: Request) {
       access.canAdminister
         ? getStudioSidebarCounts({ studioId: access.studioId, userId: user.id, phone: user.phone ?? null })
         : null,
+      // MOBILE-STUDIO-C (ops): бейдж уведомлений — канал студии (как лента
+      // `GET /api/cabinet/studio/notifications`), а не личные уведомления.
+      access.canAdminister ? getStudioNotificationCounts(user.id) : null,
     ]);
 
     return ok(
@@ -56,6 +60,7 @@ export async function GET(req: Request) {
           ? {
               scheduleRequestsPending: counts.scheduleRequestsPending,
               reviewsUnanswered: counts.reviewsUnanswered,
+              notificationsUnread: notifications?.unreadCount ?? 0,
             }
           : null,
       },

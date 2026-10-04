@@ -43,6 +43,12 @@ export type ScheduleBookingCell = {
   proposedEndAtUtc: string | null;
   actionRequiredBy: "CLIENT" | "MASTER" | null;
   /**
+   * MOBILE-STUDIO-C (ops): пакет, в который входит запись. Отмена такой
+   * записи — только пакетом (`cancelBooking` → `PACKAGE_CANCEL_WHOLE`).
+   * У личной записи мастера — `null`.
+   */
+  bookingPackageId: string | null;
+  /**
    * STUDIO-MASTER-OWN-BOOKINGS-01 — запись с личной страницы мастера студии
    * (`Booking.studioId = null`). Календарь показывает её, чтобы админ видел
    * занятость мастера (LOGIC-01), но студия ею не управляет (`auth/ownership.ts`

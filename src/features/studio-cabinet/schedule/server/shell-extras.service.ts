@@ -25,9 +25,15 @@ import type { ScheduleMasterColumn } from "./types";
 export type StudioCabinetServiceOption = {
   id: string;
   name: string;
+  /** Базовые длительность и цена услуги (`baseDurationMin ?? durationMin`, `basePrice ?? price`). */
   durationMin: number;
   priceKopeks: number;
   masterIds: string[];
+  /**
+   * MOBILE-STUDIO-C (ops): что запишет `createStudioBooking` у каждого мастера —
+   * его длительность и цена (`durationOverrideMin` / `priceOverride`), иначе базовые.
+   */
+  masterOffers: Array<{ masterId: string; durationMin: number; priceKopeks: number }>;
 };
 
 export type StudioCabinetShellExtras = {
@@ -59,13 +65,17 @@ export async function loadStudioCabinetShellExtras(
       orderBy: { name: "asc" },
     }),
     prisma.service.findMany({
-      where: { studioId, isEnabled: true },
+      // MOBILE-STUDIO-C (ops): архивная услуга (`isActive: false`) не
+      // записывается (`createStudioBooking` → «Услуга не найдена.»).
+      where: { studioId, isEnabled: true, isActive: true },
       select: {
         id: true,
         name: true,
         title: true,
         durationMin: true,
         price: true,
+        baseDurationMin: true,
+        basePrice: true,
       },
       orderBy: { name: "asc" },
     }),
@@ -74,9 +84,15 @@ export async function loadStudioCabinetShellExtras(
         isEnabled: true,
         masterProvider: { type: ProviderType.MASTER, studioId: studio.providerId },
       },
-      select: { masterProviderId: true, serviceId: true },
+      select: { masterProviderId: true, serviceId: true, priceOverride: true, durationOverrideMin: true },
     }),
   ]);
+  const linksByService = new Map<string, typeof masterServices>();
+  for (const link of masterServices) {
+    const links = linksByService.get(link.serviceId) ?? [];
+    links.push(link);
+    linksByService.set(link.serviceId, links);
+  }
 
   const mastersByService = new Map<string, string[]>();
   // STUDIO-RESCHEDULE-VALIDATION-A: invert the same join so each
@@ -103,12 +119,21 @@ export async function loadStudioCabinetShellExtras(
       isAvailable: isStudioMasterActive(m),
       serviceIds: servicesByMaster.get(m.id) ?? [],
     })),
-    services: services.map((s) => ({
-      id: s.id,
-      name: s.title?.trim() || s.name,
-      durationMin: s.durationMin,
-      priceKopeks: s.price,
-      masterIds: mastersByService.get(s.id) ?? [],
-    })),
+    services: services.map((s) => {
+      const durationMin = s.baseDurationMin ?? s.durationMin;
+      const priceKopeks = s.basePrice ?? s.price;
+      return {
+        id: s.id,
+        name: s.title?.trim() || s.name,
+        durationMin,
+        priceKopeks,
+        masterIds: mastersByService.get(s.id) ?? [],
+        masterOffers: (linksByService.get(s.id) ?? []).map((link) => ({
+          masterId: link.masterProviderId,
+          durationMin: link.durationOverrideMin ?? durationMin,
+          priceKopeks: link.priceOverride ?? priceKopeks,
+        })),
+      };
+    }),
   };
 }

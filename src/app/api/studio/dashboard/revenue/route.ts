@@ -33,7 +33,11 @@ export async function GET(req: Request) {
       : "30d";
 
     const data = await buildRevenueChart(access.studioId, period);
-    return jsonOk({ data, period });
+    // MOBILE-STUDIO-C (ops): плоская форма `{ totalKopeks, points, period }`.
+    // Было `{ data, period }` — после конверта `data.data`, и веб-график
+    // (`fetchJsonWithAuth<StudioRevenueChartData>`) при смене периода получал
+    // объект без `points`.
+    return jsonOk({ ...data, period });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

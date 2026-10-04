@@ -36,6 +36,7 @@ function makeRow(overrides: Partial<StudioBookingRow> = {}): StudioBookingRow {
     proposedStartAtUtc: null,
     proposedEndAtUtc: null,
     actionRequiredBy: null,
+    bookingPackageId: null,
     ...overrides,
   };
 }
