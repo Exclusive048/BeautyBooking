@@ -5,6 +5,7 @@ import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { SCHEDULE_REQUEST_REJECT_COMMENT_MAX } from "../lib/reject-comment";
 
 type Props = {
   open: boolean;
@@ -84,7 +85,7 @@ export function RejectDialog({ open, onClose, requestId, providerName, onResolve
           onChange={(e) => setComment(e.target.value)}
           placeholder={T.commentPlaceholder}
           disabled={submitting}
-          maxLength={500}
+          maxLength={SCHEDULE_REQUEST_REJECT_COMMENT_MAX}
         />
       </label>
     </FormDialog>

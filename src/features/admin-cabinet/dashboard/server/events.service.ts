@@ -3,6 +3,7 @@ import "server-only";
 import {
   AccountType,
   BookingStatus,
+  ContentReportStatus,
   SubscriptionStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -58,7 +59,7 @@ export async function getAdminEvents(
       ? { ...(sinceDate ? { gt: sinceDate } : {}), ...(beforeDate ? { lt: beforeDate } : {}) }
       : undefined;
 
-  const [bookings, cancellations, newUsers, subscriptions, complaints] =
+  const [bookings, cancellations, newUsers, subscriptions, complaints, contentReports] =
     await Promise.all([
       // New bookings (excludes cancellations — they get their own bucket).
       prisma.booking.findMany({
@@ -152,6 +153,14 @@ export async function getAdminEvents(
         orderBy: { reportedAt: "desc" },
         take: MAX_PER_SOURCE,
         select: { id: true, reportedAt: true },
+      }),
+      // MOBILE-POLISH (App Store 1.2): жалобы пользователей на контент — по
+      // моменту подачи; открыта ли ещё, видно по метке справа.
+      prisma.contentReport.findMany({
+        where: { createdAt: timeWhere },
+        orderBy: { createdAt: "desc" },
+        take: MAX_PER_SOURCE,
+        select: { id: true, createdAt: true, targetType: true, status: true },
       }),
     ]);
 
@@ -253,6 +262,21 @@ export async function getAdminEvents(
       amountText: T.complaintOpenLabel,
       amountTone: "negative",
       dotTone: "alert",
+    });
+  }
+
+  for (const r of contentReports) {
+    const open = r.status === ContentReportStatus.NEW;
+    merged.push({
+      id: `content_report:${r.id}`,
+      type: "content_report",
+      timeIso: r.createdAt.toISOString(),
+      timeMs: r.createdAt.getTime(),
+      primary: T.eventTypes.contentReport,
+      secondary: UI_TEXT.adminPanel.reports.targetTypes[r.targetType],
+      amountText: open ? T.complaintOpenLabel : T.complaintClosedLabel,
+      amountTone: open ? "negative" : "neutral",
+      dotTone: open ? "alert" : "ok",
     });
   }
 

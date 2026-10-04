@@ -51,6 +51,8 @@ function buildRoleWhere(group: AdminUserRoleGroup): Prisma.UserProfileWhereInput
 function buildSearchWhere(needle: string): Prisma.UserProfileWhereInput {
   return {
     OR: [
+      // MOBILE-POLISH: точный id — ссылка «Автор контента» из «Жалоб».
+      { id: needle },
       { displayName: { contains: needle, mode: "insensitive" } },
       { phone: { contains: needle } },
       { email: { contains: needle, mode: "insensitive" } },

@@ -173,3 +173,17 @@ describe("мобильные тиры лимитера", () => {
     expect(isSensitiveRouteKey("rl:publicApi:1.2.3.4:GET:/api/mobile/v1/config")).toBe(false);
   });
 });
+
+describe("файлы App Links / Universal Links (MOBILE-POLISH)", () => {
+  it.each(["/.well-known/assetlinks.json", "/.well-known/apple-app-site-association"])(
+    "%s — проходит без кука-хопа, лимита и редиректа",
+    async (path) => {
+      redis.available = false;
+      const result = await callProxy("GET", path, { cookie: STALE_COOKIES });
+      expect(result.status).toBe(200);
+      expect(result.passedThrough).toBe(true);
+      expect(rotateSessionWithTelemetry).not.toHaveBeenCalled();
+      expect(redis.counters.size).toBe(0);
+    },
+  );
+});

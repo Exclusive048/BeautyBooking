@@ -97,6 +97,26 @@ describe("loadStudioReviewsSet — canReply по правилу сервера",
   });
 });
 
+describe("loadStudioReviewsSet — bookingId (MOBILE-POLISH)", () => {
+  it("id записи — только у записи этой студии", async () => {
+    reviewFindMany.mockResolvedValue([
+      review("r-own", { bookingId: "b-own", booking: { studioId: "studio-1", service: { name: "Маникюр", title: null } } }),
+      review("r-personal", { bookingId: "b-personal", booking: { studioId: null, service: null } }),
+      review("r-other", { bookingId: "b-other", booking: { studioId: "studio-2", service: null } }),
+      review("r-none", { bookingId: null, booking: null }),
+    ]);
+    const set = await loadStudioReviewsSet({ studioId: "studio-1", currentUserId: "owner-1", filter: "all" });
+    expect(Object.fromEntries(set.items.map((item) => [item.id, item.bookingId]))).toEqual({
+      "r-own": "b-own",
+      "r-personal": null,
+      "r-other": null,
+      "r-none": null,
+    });
+    const select = reviewFindMany.mock.calls[0]?.[0]?.select;
+    expect(select.booking.select.studioId).toBe(true);
+  });
+});
+
 describe("loadStudioReviewsList — веб без изменений", () => {
   it("страница режется курсором-id после общего набора", async () => {
     const list = await loadStudioReviewsList({

@@ -7,7 +7,7 @@ const REQUIRED = {
   analytics_dashboard: "FREE",
   analytics_revenue: "PRO",
   analytics_clients: "PRO",
-  analytics_booking_insights: "PREMIUM",
+  analytics_booking_insights: "PRO",
   analytics_cohorts: "PREMIUM",
   analytics_forecast: "PREMIUM",
 } as const;
@@ -26,7 +26,7 @@ describe("buildStudioAnalyticsLocks", () => {
     expect(buildStudioAnalyticsLocks(flags(), REQUIRED)).toEqual({ revenue: null, clients: null, bookingInsights: null });
   });
 
-  it("FREE — замки выручки и клиентов (PRO) и тепловой карты (PREMIUM)", () => {
+  it("FREE — замки выручки, клиентов и тепловой карты (все PRO по каталогу)", () => {
     const locks = buildStudioAnalyticsLocks(flags({ revenue: false, clients: false, bookingInsights: false }), REQUIRED);
     expect(locks.revenue).toEqual({
       code: "FEATURE_GATE",
@@ -34,7 +34,7 @@ describe("buildStudioAnalyticsLocks", () => {
       details: { feature: "analytics_revenue", requiredPlan: "PRO" },
     });
     expect(locks.clients?.details).toEqual({ feature: "analytics_clients", requiredPlan: "PRO" });
-    expect(locks.bookingInsights?.details).toEqual({ feature: "analytics_booking_insights", requiredPlan: "PREMIUM" });
+    expect(locks.bookingInsights?.details).toEqual({ feature: "analytics_booking_insights", requiredPlan: "PRO" });
   });
 
   it("текст — как у `ensureFeatureAccess`", () => {

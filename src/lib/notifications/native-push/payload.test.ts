@@ -242,6 +242,45 @@ describe("сторона получателя и путь экрана", () => {
     expect(client!.collapseKey).toBe("chat:c1");
   });
 
+  it("чат студии — центр уведомлений (чатов у студии нет)", () => {
+    const studio = buildNativePushMessage({
+      type: "CHAT_MESSAGE_RECEIVED",
+      payloadJson: { chatId: "c1", conversationSlug: "Ab3dE5gH7j" },
+      webUrl: "/cabinet/studio/calendar",
+    });
+    expect(studio!.data.link).toBe("/notifications");
+  });
+
+  it.each([
+    ["STUDIO_SCHEDULE_REQUEST", "/studio/schedule-requests"],
+    ["STUDIO_INVITE_ACCEPTED", "/studio/team"],
+    ["STUDIO_INVITE_REJECTED", "/studio/team"],
+    ["STUDIO_MEMBER_LEFT", "/studio/team"],
+    ["STUDIO_SCHEDULE_ENDING", "/studio/team"],
+    ["STUDIO_INVITE_RECEIVED", "/notifications"],
+    ["STUDIO_MEMBER_REMOVED", "/notifications"],
+    ["STUDIO_SCHEDULE_APPROVED", "/notifications"],
+    ["STUDIO_SCHEDULE_REJECTED", "/notifications"],
+    ["STUDIO_DISBANDED", "/notifications"],
+  ] as const)("студия: %s → %s", (type, link) => {
+    const message = buildNativePushMessage({
+      type,
+      payloadJson: { requestId: "r1", studioId: "s1", comment: "Нужны вечерние окна." },
+      webUrl: "/notifications",
+    });
+    expect(message!.data.link).toBe(link);
+    expect(JSON.stringify(message)).not.toContain("вечерние");
+  });
+
+  it("ни один push не ведёт на /studio/chats", () => {
+    for (const type of ALL_TYPES) {
+      for (const webUrl of [undefined, "/cabinet/studio", "/cabinet/master", "/cabinet/bookings"]) {
+        const message = buildNativePushMessage({ type, payloadJson: { conversationSlug: "Ab3dE5gH7j" }, webUrl });
+        if (message) expect(message.data.link, `${type} ${webUrl}`).not.toMatch(/^\/studio\/chats/);
+      }
+    }
+  });
+
   it("модели: мастеру — предложение, клиенту — заявка", () => {
     const ids = { offerId: "o1", applicationId: "a1" };
     expect(

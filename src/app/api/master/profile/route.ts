@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { getCurrentMasterProviderId } from "@/lib/master/access";
 import { getMasterProfileData, updateMasterProfile } from "@/lib/master/profile.service";
+import { loadMasterStudioMembership } from "@/lib/master/studio-membership";
 import { updateMasterProfileSchema } from "@/lib/master/schemas";
 import { parseBody } from "@/lib/validation";
 import { NextResponse } from "next/server";
@@ -39,13 +40,22 @@ function jsonProfileFail(status: number, message: string, code: ErrorCode) {
   return response;
 }
 
+/**
+ * MOBILE-POLISH: `studioMembership` — работа мастера в студии (`null` — не в
+ * студии). `master.isSolo` описывает ЛИЧНЫЙ профиль и после разделения
+ * профилей всегда `true` — плашку «Вы работаете в составе студии» строят по
+ * `studioMembership`; выход — `POST /api/cabinet/master/leave-studio`.
+ */
 export async function GET(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
     const masterId = await getCurrentMasterProviderId(user.id);
-    const data = await getMasterProfileData(masterId);
-    return jsonOk(data);
+    const [data, studioMembership] = await Promise.all([
+      getMasterProfileData(masterId),
+      loadMasterStudioMembership(user.id),
+    ]);
+    return jsonOk({ ...data, studioMembership });
   } catch (error) {
     const appError = toAppError(error);
     if (appError.status >= 500) {

@@ -96,10 +96,20 @@ export type ScheduleWeekDay = {
 
 export type ScheduleWeekRow = {
   master: ScheduleMasterColumn;
+  /**
+   * MOBILE-POLISH: загрузка по НАСТОЯЩЕМУ графику мастера (`loadStudioWeekCells`,
+   * как у приложения), а не «5 записей = 100%». Выходной — мастер недоступен
+   * или день нерабочий по графику.
+   */
   cells: Array<{
     dateKey: string;
     booked: number;
-    capacity: number;
+    /** Минуты записей дня. */
+    bookedMinutes: number;
+    /** Рабочие минуты без перерывов; `null` — день «Фиксированное время»; `0` — выходной. */
+    capacityMinutes: number | null;
+    /** Число фиксированных начал (день «Фиксированное время»), иначе `null`. */
+    fixedSlots: number | null;
     percent: number;
     isDayOff: boolean;
   }>;

@@ -287,6 +287,35 @@ model ChatMessage {
   @@index([attachmentMediaAssetId])
 }
 
+// MOBILE-POLISH (App Store 1.2): блокировка в переписке — на уровне
+// ЛЮДЕЙ, а не одной пары. Участники переписки — клиент и владелец кабинета
+// мастера (`Provider.ownerUserId`); блок между ними закрывает отправку во
+// ВСЕХ их переписках в обе стороны (переписка закрыта, пока блок не снят тем,
+// кто его поставил). Записи и бронирование блок не трогает.
+// `providerId` / `clientUserId` — переписка, из которой поставили блок (для
+// подписи в списке «Заблокированные»), без FK: блок переживает удаление
+// кабинета.
+model ChatBlock {
+  id String @id @default(cuid())
+
+  blockerUserId String
+
+  blocker UserProfile @relation("ChatBlockBlocker", fields: [blockerUserId], references: [id], onDelete: Cascade)
+
+  blockedUserId String
+
+  blocked UserProfile @relation("ChatBlockBlocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  providerId String
+
+  clientUserId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockedUserId])
+}
+
 // chat-url-fix: opaque public identifier for (provider, client) chat
 // pair. Replaces the prior `providerId:clientUserId` key that leaked
 // internal CUIDs into URLs and notification payloads. Slug is

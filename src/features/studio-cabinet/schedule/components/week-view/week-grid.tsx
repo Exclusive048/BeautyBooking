@@ -2,9 +2,30 @@ import Link from "next/link";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
-import type { ScheduleWeekData } from "../../server/types";
+import type { ScheduleWeekData, ScheduleWeekRow } from "../../server/types";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.weekView;
+
+type WeekCell = ScheduleWeekRow["cells"][number];
+
+function durationLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return T.durationMinutes.replace("{m}", String(m));
+  if (m === 0) return T.durationHours.replace("{h}", String(h));
+  return T.durationHoursMinutes.replace("{h}", String(h)).replace("{m}", String(m));
+}
+
+/** MOBILE-POLISH: подсказка ячейки — записи и занятое время из рабочего по графику. */
+function occupancyTitle(cell: WeekCell): string {
+  if (cell.fixedSlots !== null) {
+    return T.occupancyTitleSlots.replace("{booked}", String(cell.booked)).replace("{slots}", String(cell.fixedSlots));
+  }
+  return T.occupancyTitleMinutes
+    .replace("{booked}", String(cell.booked))
+    .replace("{bookedTime}", durationLabel(cell.bookedMinutes))
+    .replace("{capacityTime}", durationLabel(cell.capacityMinutes ?? 0));
+}
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -79,12 +100,11 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                       <Link
                         href={`?view=day&date=${cell.dateKey}`}
                         scroll={false}
+                        title={occupancyTitle(cell)}
                         className="block rounded-lg px-2 py-1.5 transition-colors hover:bg-primary/5"
                       >
                         <p className="font-mono text-xs font-semibold tabular-nums text-text-main">
-                          {T.occupancyTemplate
-                            .replace("{booked}", String(cell.booked))
-                            .replace("{total}", String(cell.capacity))}
+                          {T.occupancyPercent.replace("{percent}", String(cell.percent))}
                         </p>
                         <div className="mt-1 h-1 overflow-hidden rounded-full bg-bg-input">
                           <div

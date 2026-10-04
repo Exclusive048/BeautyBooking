@@ -141,6 +141,16 @@ const FROZEN_BYPASS_INVENTORY: Record<string, { count: number; reason: string }>
       "значит «без превью», а заглушка с 200 закэшировалась бы на сутки и пережила бы " +
       "публикацию профиля. Скрытому профилю страница ссылку на эту картинку не даёт.",
   },
+
+  "src/lib/mobile/app-links.ts": {
+    count: 1,
+    reason:
+      "РАТИФИЦИРОВАНО (MOBILE-POLISH): `/.well-known/assetlinks.json` и " +
+      "`/.well-known/apple-app-site-association` читают верификаторы Android и iOS, а не " +
+      "человек. Не настроено — 404 БЕЗ тела (`new NextResponse(null)`), как у отсутствующего " +
+      "статического файла: текста в ответе нет, переводить нечего, а JSON-конверт ошибки " +
+      "в файле, который ОС разбирает как документ ассоциации, был бы чужеродным.",
+  },
 };
 
 const IGNORED_DIRS = new Set(["node_modules"]);

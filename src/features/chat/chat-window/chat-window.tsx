@@ -75,11 +75,17 @@ export function ChatWindow({
     );
   }
 
-  const disabledHint = detail.readonlyOnly
-    ? T.composer.disabledReadonly
-    : perspective === "master"
-      ? T.composer.disabledMaster
-      : T.composer.disabledClient;
+  // MOBILE-POLISH: блок важнее причины «нет записи» — снять его может только
+  // тот, кто поставил, и подсказка говорит, кто именно.
+  const disabledHint = detail.blockedByOther
+    ? T.composer.disabledBlockedByOther
+    : detail.blockedByMe
+      ? T.composer.disabledBlockedByMe
+      : detail.readonlyOnly
+        ? T.composer.disabledReadonly
+        : perspective === "master"
+          ? T.composer.disabledMaster
+          : T.composer.disabledClient;
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg-page">
@@ -88,6 +94,13 @@ export function ChatWindow({
         perspective={perspective}
         canSend={detail.canSend}
         hasOpenBooking={Boolean(detail.openBookingId)}
+        conversationSlug={conversationSlug}
+        blockedByMe={detail.blockedByMe}
+        blockedByOther={detail.blockedByOther}
+        onBlockChanged={() => {
+          void refresh();
+          onMessageSent?.();
+        }}
         onMobileBack={onMobileBack}
       />
       <Thread

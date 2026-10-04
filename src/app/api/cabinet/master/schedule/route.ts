@@ -236,6 +236,21 @@ async function loadStudioMasterStatus(providerId: string): Promise<{
   };
 }
 
+/**
+ * MOBILE-POLISH: администратор студии в редакторе мастера (`STUDIO_ADMIN`)
+ * видит открытую заявку мастера — только для показа («Мастер ждёт решения по
+ * заявке»): решение — `POST /api/studio/schedule/requests/{id}/approve|reject`.
+ * Отклонённые заявки здесь не показываем — это решение самой студии.
+ */
+async function loadOpenRequestId(providerId: string): Promise<string | null> {
+  const pending = await prisma.scheduleChangeRequest.findFirst({
+    where: { providerId, status: "PENDING" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  return pending?.id ?? null;
+}
+
 async function buildResponse(input: {
   providerId: string;
   mode: ActorMode;
@@ -255,6 +270,9 @@ async function buildResponse(input: {
     approval.requestStatus = status.requestStatus;
     approval.pendingRequestId = status.pendingRequestId;
     approval.rejectedComment = status.rejectedComment;
+  } else if (input.mode === "STUDIO_ADMIN") {
+    approval.pendingRequestId = await loadOpenRequestId(input.providerId);
+    approval.requestStatus = approval.pendingRequestId ? "PENDING" : null;
   }
 
   return {
@@ -347,7 +365,7 @@ export async function PATCH(req: Request) {
         actor.mode === "STUDIO_ADMIN" ? SubscriptionScope.STUDIO : SubscriptionScope.MASTER;
       const plan = await getCurrentPlan(user.id, scope);
       if (!plan.features.hotSlots) {
-        throw createFeatureGateError("hotSlots", "PRO");
+        throw createFeatureGateError("hotSlots", scope);
       }
     }
 

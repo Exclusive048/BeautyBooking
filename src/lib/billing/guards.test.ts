@@ -8,21 +8,27 @@ import {
 
 describe("billing/guards — createFeatureGateError", () => {
   it("returns AppError with 403 + FEATURE_GATE code", () => {
-    const err = createFeatureGateError("hotSlots", "PRO");
+    const err = createFeatureGateError("hotSlots", "MASTER");
     expect(err).toBeInstanceOf(AppError);
     expect(err.status).toBe(403);
     expect(err.code).toBe("FEATURE_GATE");
   });
 
-  it("attaches feature key + requiredPlan in details", () => {
-    const err = createFeatureGateError("analytics_revenue", "PREMIUM");
-    expect(err.details).toMatchObject({ feature: "analytics_revenue", requiredPlan: "PREMIUM" });
+  it("attaches feature key + requiredPlan from the plan catalog (MOBILE-POLISH)", () => {
+    expect(createFeatureGateError("analytics_booking_insights", "MASTER").details).toMatchObject({
+      feature: "analytics_booking_insights",
+      requiredPlan: "PRO",
+    });
+    expect(createFeatureGateError("analytics_forecast", "STUDIO").details).toMatchObject({
+      feature: "analytics_forecast",
+      requiredPlan: "PREMIUM",
+    });
   });
 
-  it("works without requiredPlan", () => {
-    const err = createFeatureGateError("hotSlots");
+  it("no catalog plan grants the feature for the scope — no requiredPlan", () => {
+    const err = createFeatureGateError("hotSlots", "STUDIO");
     expect(err).toBeInstanceOf(AppError);
-    expect(err.details).toMatchObject({ feature: "hotSlots" });
+    expect(err.details).toEqual({ feature: "hotSlots", requiredPlan: undefined });
   });
 });
 

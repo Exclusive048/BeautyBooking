@@ -162,6 +162,18 @@ model UserProfile {
   /// optional `Review.deletedBy` relation added in the same commit.
   reviewsDeleted Review[] @relation("ReviewDeletedBy")
 
+  /// MOBILE-POLISH: жалобы на контент, которые отправил этот пользователь.
+  contentReports ContentReport[] @relation("ContentReportReporter")
+
+  /// MOBILE-POLISH: жалобы, решённые этим пользователем как администратором.
+  contentReportsResolved ContentReport[] @relation("ContentReportResolvedBy")
+
+  /// MOBILE-POLISH: кого этот пользователь заблокировал в переписке.
+  chatBlocksMade ChatBlock[] @relation("ChatBlockBlocker")
+
+  /// MOBILE-POLISH: кто заблокировал этого пользователя в переписке.
+  chatBlocksReceived ChatBlock[] @relation("ChatBlockBlocked")
+
   @@index([blockedAt])
 }
 

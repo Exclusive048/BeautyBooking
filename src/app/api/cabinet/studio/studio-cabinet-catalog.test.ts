@@ -54,7 +54,7 @@ vi.mock("@/features/analytics/domain/guards", () => ({
     analytics_dashboard: "FREE",
     analytics_revenue: "PRO",
     analytics_clients: "PRO",
-    analytics_booking_insights: "PREMIUM",
+    analytics_booking_insights: "PRO",
     analytics_cohorts: "PREMIUM",
     analytics_forecast: "PREMIUM",
   },
@@ -127,6 +127,7 @@ const REVIEW_ITEM = (id: string) => ({
   dateLabel: "вчера",
   master: { id: "prov-m1", displayName: "Анна" },
   serviceName: "Маникюр",
+  bookingId: `b-${id}`,
   text: "Спасибо!",
   reply: null,
   canReply: true,
@@ -516,7 +517,7 @@ describe("GET /api/cabinet/studio/reviews", () => {
     const items = body.data?.items as Array<Record<string, unknown>>;
     expect(items.map((i) => i.id)).toEqual(["r-1", "r-2"]);
     expect(items[0]).not.toHaveProperty("dateLabel");
-    expect(items[0]).toMatchObject({ canReply: true, isReported: false, reply: null });
+    expect(items[0]).toMatchObject({ canReply: true, isReported: false, reply: null, bookingId: "b-r-1" });
     expect(typeof body.data?.nextCursor).toBe("string");
 
     const next = await read(
@@ -550,7 +551,7 @@ describe("GET /api/cabinet/studio/analytics", () => {
         bookingInsights: {
           code: "FEATURE_GATE",
           message: "Этот отчёт недоступен на вашем тарифе.",
-          details: { feature: "analytics_booking_insights", requiredPlan: "PREMIUM" },
+          details: { feature: "analytics_booking_insights", requiredPlan: "PRO" },
         },
       },
     });

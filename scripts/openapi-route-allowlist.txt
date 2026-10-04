@@ -101,7 +101,6 @@
 /api/bookings/{id}/ics
 /api/cabinet/master/dashboard/free-slots
 /api/cabinet/master/delete
-/api/cabinet/master/leave-studio
 /api/cabinet/master/public-username
 /api/cabinet/user/favorites
 /api/cabinet/user/profile/email/request-verify

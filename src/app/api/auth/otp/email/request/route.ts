@@ -15,6 +15,7 @@ import { maskEmail } from "@/lib/logging/masking";
 import { isProduction } from "@/lib/env";
 import { extractClientIp } from "@/lib/http/ip";
 import { observeAuthClientIp } from "@/lib/http/proxy-trust";
+import { isAppReviewLoginEmail, logAppReviewLogin } from "@/lib/auth/app-review-login";
 
 export async function POST(req: Request) {
   return withRequestContext(req, async () => {
@@ -39,6 +40,15 @@ export async function POST(req: Request) {
     const rateLimit = await checkOtpEmailRequestRateLimit({ email: normalizedEmail, ip: extractClientIp(req) });
     if (!rateLimit.ok) {
       return otpRateLimitFail(rateLimit);
+    }
+
+    // MOBILE-POLISH: адрес для App Review (`APP_REVIEW_LOGIN_EMAIL`) — письмо
+    // не отправляется и код не создаётся: вход примет постоянный код из env.
+    // Ответ тот же, что всем, — снаружи режим не отличить. Лимит выше уже
+    // посчитан, как для любого адреса.
+    if (isAppReviewLoginEmail(normalizedEmail)) {
+      logAppReviewLogin("request", "accepted");
+      return ok({});
     }
 
     const code = generateOtpCode();

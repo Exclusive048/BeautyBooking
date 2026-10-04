@@ -14,7 +14,7 @@ import { createFeatureGateError, createSystemDisabledError } from "@/lib/billing
 export async function ensureStudioOnlinePaymentsAllowed(userId: string): Promise<void> {
   const plan = await getCurrentPlan(userId, SubscriptionScope.STUDIO);
   if (!plan.features.onlinePayments) {
-    throw createFeatureGateError("onlinePayments", "PRO");
+    throw createFeatureGateError("onlinePayments", SubscriptionScope.STUDIO);
   }
   if (!plan.system.onlinePaymentsEnabled) {
     throw createSystemDisabledError("onlinePayments");

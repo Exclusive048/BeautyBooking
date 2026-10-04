@@ -7,6 +7,7 @@ import {
   parseDateKeyParts,
 } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { AppError } from "@/lib/api/errors";
 
 export type AnalyticsPeriod = "today" | "week" | "month" | "quarter" | "custom";
 
@@ -68,12 +69,21 @@ function resolvePresetRange(period: AnalyticsPeriod, timeZone: string): { fromKe
   return { fromKey: todayKey, toKey: todayKey };
 }
 
+/**
+ * MOBILE-POLISH: неверный период — ошибка ВВОДА (400 `VALIDATION_ERROR`), а не
+ * сбой сервера. Раньше здесь бросался голый `Error`, и `toAppError` превращал
+ * «начало позже конца» в 500 на всех `/api/analytics/*` (приложение проверяло
+ * период само, чтобы не показывать «сервер упал»).
+ */
+export const ANALYTICS_RANGE_ORDER_MESSAGE = "Начало периода не может быть позже конца. Выберите другие даты.";
+export const ANALYTICS_RANGE_DATES_MESSAGE = "Укажите начало и конец периода.";
+
 function buildRange(fromKey: string, toKey: string, timeZone: string): AnalyticsRange {
   if (!isDateKey(fromKey) || !isDateKey(toKey)) {
-    throw new Error(`Invalid date keys: ${fromKey} - ${toKey}`);
+    throw new AppError(ANALYTICS_RANGE_DATES_MESSAGE, 400, "VALIDATION_ERROR");
   }
   if (compareDateKeys(fromKey, toKey) > 0) {
-    throw new Error(`Invalid date range: ${fromKey} - ${toKey}`);
+    throw new AppError(ANALYTICS_RANGE_ORDER_MESSAGE, 400, "VALIDATION_ERROR");
   }
 
   const toKeyExclusive = addDaysToDateKey(toKey, 1);
@@ -108,7 +118,7 @@ export function resolveRangeWithCompare(input: {
 
   if (period === "custom") {
     if (!base.fromKey || !base.toKey) {
-      throw new Error("Custom range requires from and to");
+      throw new AppError(ANALYTICS_RANGE_DATES_MESSAGE, 400, "VALIDATION_ERROR");
     }
   }
 

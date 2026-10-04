@@ -182,8 +182,19 @@ const HEALTH_READINESS_PATH = "/api/health/ready";
  * MOBILE-AUTH-A: `/api/mobile/v1/auth/*` — тот же класс, что `/api/auth/otp`:
  * сессию эти роуты выдают/ротируют/гасят сами по телу запроса, кука-хоп
  * прокси им не нужен (и приклеил бы `Set-Cookie` к ответу с токенами).
+ *
+ * MOBILE-POLISH: `/.well-known` — файлы App Links / Universal Links
+ * (`lib/mobile/app-links.ts`). Ответ публичный и кэшируется на час: кука-хоп
+ * приклеил бы к нему чужую сессию. Лимита и CSRF у пути и так нет (не `/api`).
  */
-const PUBLIC_PATHS = ["/api/auth/otp", REFRESH_ENDPOINT_PATH, MOBILE_AUTH_PATH_PREFIX, "/_next", "/favicon"];
+const PUBLIC_PATHS = [
+  "/api/auth/otp",
+  REFRESH_ENDPOINT_PATH,
+  MOBILE_AUTH_PATH_PREFIX,
+  "/_next",
+  "/favicon",
+  "/.well-known",
+];
 
 function resolveRequestId(request: NextRequest): string {
   const header = request.headers.get("x-request-id");

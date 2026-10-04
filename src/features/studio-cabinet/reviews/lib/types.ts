@@ -30,6 +30,12 @@ export type StudioReviewItem = {
   dateLabel: string;
   master: StudioReviewMasterChip | null;
   serviceName: string | null;
+  /**
+   * MOBILE-POLISH: запись, по которой оставлен отзыв, — только если это запись
+   * этой студии (`Booking.studioId`), иначе `null`. Внутренний id кабинета:
+   * карточка — `GET /api/cabinet/studio/bookings/{id}`.
+   */
+  bookingId: string | null;
   text: string;
   reply: {
     text: string;
