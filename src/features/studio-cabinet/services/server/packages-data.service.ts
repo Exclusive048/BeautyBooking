@@ -23,6 +23,11 @@ export type StudioPackageServiceComponent = {
   name: string;
   priceKopeks: number;
   durationMin: number;
+  /**
+   * Услуга доступна для записи: `isEnabled && isActive`. Студия выключает
+   * услугу через `isActive` («на паузе»), и запись на пакет такую услугу
+   * отвергает (`package-booking.ts`) — MOBILE-STUDIO-C, G5.
+   */
   isEnabled: boolean;
 };
 
@@ -96,6 +101,7 @@ export async function loadStudioPackages(
               durationMin: true,
               baseDurationMin: true,
               isEnabled: true,
+              isActive: true,
               sortOrder: true,
             },
           },
@@ -114,7 +120,7 @@ export async function loadStudioPackages(
         name: item.service.title?.trim() || item.service.name,
         priceKopeks: item.service.basePrice ?? item.service.price,
         durationMin: item.service.baseDurationMin ?? item.service.durationMin,
-        isEnabled: item.service.isEnabled,
+        isEnabled: item.service.isEnabled && item.service.isActive,
       }),
     );
     const pricing = computePricing({
@@ -154,6 +160,7 @@ export async function loadStudioPackagePickerServices(
       durationMin: true,
       baseDurationMin: true,
       isEnabled: true,
+      isActive: true,
     },
   });
   return services.map((s) => ({
@@ -161,6 +168,6 @@ export async function loadStudioPackagePickerServices(
     name: s.title?.trim() || s.name,
     priceKopeks: s.basePrice ?? s.price,
     durationMin: s.baseDurationMin ?? s.durationMin,
-    isEnabled: s.isEnabled,
+    isEnabled: s.isEnabled && s.isActive,
   }));
 }

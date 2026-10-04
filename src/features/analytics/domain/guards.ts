@@ -41,7 +41,8 @@ export type AnalyticsFeatureKey =
   | "analytics_cohorts"
   | "analytics_forecast";
 
-const FEATURE_REQUIRED_PLAN: Record<AnalyticsFeatureKey, PlanTier> = {
+/** Минимальный тариф отчёта; MOBILE-STUDIO-C — и для замков разделов в `GET /api/cabinet/studio/analytics`. */
+export const FEATURE_REQUIRED_PLAN: Record<AnalyticsFeatureKey, PlanTier> = {
   analytics_dashboard: "FREE",
   analytics_revenue: "PRO",
   analytics_clients: "PRO",

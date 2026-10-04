@@ -1,4 +1,5 @@
-import { CategoryStatus } from "@prisma/client";
+import { CategoryStatus, type Prisma } from "@prisma/client";
+import { UNCATEGORIZED_KEY } from "@/features/studio-cabinet/services/lib/types";
 import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { requireActiveStudioMaster } from "@/lib/studio/master-eligibility";
@@ -212,6 +213,8 @@ export async function createStudioService(input: {
   proposerUserId?: string;
   basePrice: number;
   baseDurationMin: number;
+  /** MOBILE-STUDIO-C: сразу с онлайн-оплатой (тариф проверяет маршрут). */
+  onlinePaymentEnabled?: boolean;
 }): Promise<{ id: string }> {
   const studio = await getStudioContext(input.studioId);
   const normalizedPrice = normalizeStudioServicePrice(input.basePrice);
@@ -281,7 +284,7 @@ export async function createStudioService(input: {
         sortOrder: (last?.sortOrder ?? -1) + 1,
         isActive: true,
         isEnabled: true,
-        onlinePaymentEnabled: false,
+        onlinePaymentEnabled: input.onlinePaymentEnabled ?? false,
       },
       select: { id: true },
     });
@@ -414,15 +417,38 @@ export async function updateStudioService(input: {
   return { id: input.serviceId };
 }
 
+/**
+ * Скоуп списка, внутри которого меняется порядок (MOBILE-STUDIO-C, G3).
+ *  - `categoryId` — устаревшая `ServiceCategory` (прежний контракт);
+ *  - `globalCategoryId` — категория каталога: так прайс группируют веб и
+ *    приложение, а новые услуги создаются без устаревшей категории, и раньше
+ *    их порядок поменять было нельзя вовсе. `null` или `"__uncategorized__"`
+ *    (ключ корзины «Без категории» кабинета) — услуги без категории;
+ *  - ни того, ни другого — весь прайс студии.
+ */
+export function studioServicesReorderScope(input: {
+  categoryId?: string;
+  globalCategoryId?: string | null;
+}): Prisma.ServiceWhereInput {
+  if (input.categoryId) return { categoryId: input.categoryId };
+  if (input.globalCategoryId === undefined) return {};
+  const isUncategorized =
+    input.globalCategoryId === null || input.globalCategoryId === UNCATEGORIZED_KEY;
+  return { globalCategoryId: isUncategorized ? null : input.globalCategoryId };
+}
+
 export async function reorderStudioServices(input: {
   studioId: string;
-  categoryId: string;
+  categoryId?: string;
+  globalCategoryId?: string | null;
   orderedIds: string[];
 }): Promise<{ updated: number }> {
+  // Каждая услуга списка обязана быть этой студии и этого скоупа — иначе 404,
+  // и порядок не трогаем вовсе (в том числе чужих строк).
   const services = await prisma.service.findMany({
     where: {
       studioId: input.studioId,
-      categoryId: input.categoryId,
+      ...studioServicesReorderScope(input),
       id: { in: input.orderedIds },
     },
     select: { id: true },
@@ -516,14 +542,37 @@ export async function unassignMasterFromService(input: {
  * delete is acceptable for catalogue items (no business retention need
  * — analytics use `BookingServiceItem.priceSnapshot` snapshots, which
  * survive service deletion).
+ *
+ * MOBILE-STUDIO-C (G4): `Booking.serviceId` — `onDelete: Restrict`, поэтому
+ * услуга с записями не удаляется, и раньше это был 500 (P2003 до
+ * `toAppError` не узнаётся). Теперь — 409 `SERVICE_HAS_BOOKINGS` с подсказкой
+ * выключить услугу, как у мастера (`deleteMasterService`): записи считаются
+ * заранее, а запись, созданная между подсчётом и удалением, ловится по P2003.
+ * Счётчик использования категории уменьшается, как при смене категории.
  */
+export const SERVICE_HAS_BOOKINGS_MESSAGE = "У услуги есть записи. Выключите её вместо удаления.";
+
+function serviceHasBookingsError(): AppError {
+  return new AppError(SERVICE_HAS_BOOKINGS_MESSAGE, 409, "SERVICE_HAS_BOOKINGS");
+}
+
+/** P2003 — нарушение внешнего ключа; структурно, без value-импорта Prisma (как P2002 в `toAppError`). */
+function isForeignKeyViolation(error: unknown): boolean {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2003";
+}
+
 export async function deleteStudioService(input: {
   studioId: string;
   serviceId: string;
 }): Promise<{ id: string }> {
   const service = await prisma.service.findUnique({
     where: { id: input.serviceId },
-    select: { id: true, studioId: true },
+    select: {
+      id: true,
+      studioId: true,
+      globalCategoryId: true,
+      _count: { select: { bookings: true } },
+    },
   });
   if (!service) {
     throw new AppError("Услуга не найдена.", 404, "SERVICE_NOT_FOUND");
@@ -531,7 +580,23 @@ export async function deleteStudioService(input: {
   if (service.studioId !== input.studioId) {
     throw new AppError("Недостаточно прав для этого действия.", 403, "FORBIDDEN");
   }
-  await prisma.service.delete({ where: { id: service.id } });
+  if (service._count.bookings > 0) {
+    throw serviceHasBookingsError();
+  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.service.delete({ where: { id: service.id } });
+      if (service.globalCategoryId) {
+        await tx.globalCategory.updateMany({
+          where: { id: service.globalCategoryId, usageCount: { gt: 0 } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+    });
+  } catch (error) {
+    if (isForeignKeyViolation(error)) throw serviceHasBookingsError();
+    throw error;
+  }
   return { id: service.id };
 }
 

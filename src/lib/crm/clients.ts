@@ -42,10 +42,25 @@ export type ClientAggregate = {
 
 const COMPLETED_STATUSES: BookingStatus[] = ["FINISHED"];
 
-function resolveBookingPhone(booking: BookingClientRow): string | null {
+function resolveBookingPhone(booking: Pick<BookingClientRow, "clientPhone" | "clientPhoneSnapshot">): string | null {
   const source = booking.clientPhoneSnapshot?.trim() || booking.clientPhone?.trim() || "";
   if (!source) return null;
   return normalizeRussianPhone(source);
+}
+
+/**
+ * Ключ клиента одной брони — тот же, что ставит {@link groupBookings}:
+ * `user:<id>`, иначе `phone:<нормализованный>` (снимок телефона важнее
+ * текущего), иначе `null` (бронь без контактов в базу не попадает).
+ * MOBILE-STUDIO-C: нужен, чтобы сопоставлять брони с клиентом списка (мастера
+ * клиента в студии, его карточка) без расхождения в нормализации телефона.
+ */
+export function resolveBookingClientKey(
+  booking: Pick<BookingClientRow, "clientUserId" | "clientPhone" | "clientPhoneSnapshot">,
+): string | null {
+  if (booking.clientUserId) return `user:${booking.clientUserId}`;
+  const phone = resolveBookingPhone(booking);
+  return phone ? `phone:${phone}` : null;
 }
 
 function resolveBookingName(booking: BookingClientRow): string {

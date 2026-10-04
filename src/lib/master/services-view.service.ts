@@ -150,8 +150,17 @@ export type MasterServicePackageItem = PackagePricing & {
 /**
  * MOBILE-MASTER-C — все пакеты ЛИЧНОГО профиля мастера, включая выключенные
  * (`sortOrder` ↑, затем `createdAt` ↑), с ценой по {@link computePackagePricing}.
+ *
+ * MOBILE-STUDIO-C (G5): услуга пакета считается выключенной и при
+ * `isActive = false` («на паузе» — так её выключает студия), как в записи на
+ * пакет (`package-booking.ts` требует `isEnabled && isActive`). Пакеты студии
+ * (`masterId` = Provider студии) идут через эту же функцию с
+ * `useBasePrice: true`: прайс студии — `basePrice ?? price`, как у веба.
  */
-export async function listMasterServicePackages(masterId: string): Promise<MasterServicePackageItem[]> {
+export async function listMasterServicePackages(
+  masterId: string,
+  options: { useBasePrice?: boolean } = {},
+): Promise<MasterServicePackageItem[]> {
   const packages = await prisma.servicePackage.findMany({
     where: { masterId },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -171,7 +180,10 @@ export async function listMasterServicePackages(masterId: string): Promise<Maste
               title: true,
               durationMin: true,
               price: true,
+              baseDurationMin: true,
+              basePrice: true,
               isEnabled: true,
+              isActive: true,
               sortOrder: true,
             },
           },
@@ -180,7 +192,19 @@ export async function listMasterServicePackages(masterId: string): Promise<Maste
     },
   });
   return packages.map((pkg) => {
-    const components = pkg.items.map((item) => item.service).sort((a, b) => a.sortOrder - b.sortOrder);
+    const components = pkg.items
+      .map(({ service }) => ({
+        id: service.id,
+        name: service.name,
+        title: service.title,
+        sortOrder: service.sortOrder,
+        price: options.useBasePrice ? (service.basePrice ?? service.price) : service.price,
+        durationMin: options.useBasePrice
+          ? (service.baseDurationMin ?? service.durationMin)
+          : service.durationMin,
+        isEnabled: service.isEnabled && service.isActive,
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
     return {
       id: pkg.id,
       name: pkg.name,
