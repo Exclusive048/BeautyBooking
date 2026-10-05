@@ -571,6 +571,7 @@ export async function deleteStudioService(input: {
       id: true,
       studioId: true,
       globalCategoryId: true,
+      // include-ok: счётчик, а не выборка строк.
       _count: { select: { bookings: true } },
     },
   });
