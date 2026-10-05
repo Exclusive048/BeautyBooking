@@ -6,9 +6,8 @@ import { parseQuery } from "@/lib/validation";
 import { searchCatalog } from "@/lib/catalog/catalog.service";
 import { catalogSearchQuerySchema } from "@/lib/catalog/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { routeRateLimitKey } from "@/lib/rate-limit/keys";
-import { getClientIp } from "@/lib/http/ip";
-import { getServerCity } from "@/lib/cities/server-city";
+import { viewerRateLimitKey } from "@/lib/rate-limit/subject";
+import { resolveRequestCity } from "@/lib/cities/server-city";
 
 export const runtime = "nodejs";
 const CATALOG_SEARCH_RATE_LIMIT = {
@@ -19,17 +18,20 @@ const CATALOG_SEARCH_RATE_LIMIT = {
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      routeRateLimitKey(req, "ip", getClientIp(req)),
+      // MOBILE-B1: вошедший — ведро аккаунта, аноним — IP (CGNAT, `rate-limit/subject.ts`).
+      viewerRateLimitKey(req),
       CATALOG_SEARCH_RATE_LIMIT
     );
     if (rateLimit.limited) {
       return tooManyRequests(rateLimit.retryAfterSeconds);
     }
 
-    const query = parseQuery(new URL(req.url), catalogSearchQuerySchema);
+    const { city: citySlug, ...query } = parseQuery(new URL(req.url), catalogSearchQuerySchema);
     // EXP-021: apply the user's selected city (cookie-resolved, same source
     // as `/models`). Absent cookie → null → catalog shows all cities.
-    const city = await getServerCity();
+    // MOBILE-B1: явный `?city=<slug>` главнее куки (у приложения кук нет);
+    // неизвестный slug — 400 CITY_NOT_FOUND, а не молча «все города».
+    const city = await resolveRequestCity(citySlug);
     const data = await searchCatalog({ ...query, cityId: city?.id });
     return jsonOk(data);
   } catch (error) {

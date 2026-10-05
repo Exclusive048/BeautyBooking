@@ -1,26 +1,25 @@
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAuthSurfaceError } from "@/lib/auth/auth-surface-error";
+import { unlinkOAuthIdentity } from "@/lib/auth/oauth-unlink";
 import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
 /**
- * FIX-YANDEX-OAUTH — disconnect Yandex, bespoke-parallel to api/auth/vk/unlink.
- * Disable rather than delete (audit re-connects).
+ * FIX-YANDEX-OAUTH — отвязать Яндекс ID от профиля, параллельно api/auth/vk/unlink.
  *
- * RKN-FIX-12: token-zeroing removed — no token columns remain to zero.
+ * VK-YANDEX-UNLINK-01: связка удаляется целиком (раньше снимался только
+ * `isEnabled`, и вход через Яндекс ID продолжал вести в этот аккаунт). Последний
+ * способ входа отвязать нельзя — `409 LAST_LOGIN_METHOD`; правила —
+ * `src/lib/auth/oauth-unlink.ts`.
  */
 export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return jsonFail(401, "Требуется вход в аккаунт.", "UNAUTHORIZED");
 
-    await prisma.yandexLink.updateMany({
-      where: { userId: user.id },
-      data: { isEnabled: false },
-    });
+    await unlinkOAuthIdentity(user.id, "yandex");
 
     return jsonOk({ unlinked: true });
   } catch (error) {

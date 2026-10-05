@@ -48,6 +48,7 @@ vi.mock("@/lib/queue/queue", () => ({ enqueue: vi.fn() }));
 
 import { Prisma } from "@prisma/client";
 import { deleteAssetById } from "@/lib/media/service";
+import { MEDIA_PREVIEW_WIDTHS, mediaPreviewStorageKey } from "@/lib/media/preview-variants";
 
 describe("media/deleteAssetById order-of-operations", () => {
   beforeEach(() => {
@@ -89,13 +90,22 @@ describe("media/deleteAssetById order-of-operations", () => {
       calls.push("db.update");
       return {};
     });
-    deleteObject.mockImplementation(async () => {
-      calls.push("storage.delete");
+    deleteObject.mockImplementation(async (key: string) => {
+      calls.push(key === "key/abc.jpg" ? "storage.delete" : "storage.delete-preview");
     });
 
     await deleteAssetById("asset-1");
 
-    expect(calls).toEqual(["db.update", "storage.delete"]);
+    // MOBILE-B1: следом за оригиналом — весь набор превью `?w=`, тоже после
+    // пометки строки (иначе параллельный запрос записал бы вариант удалённого).
+    expect(calls).toEqual([
+      "db.update",
+      "storage.delete",
+      ...MEDIA_PREVIEW_WIDTHS.map(() => "storage.delete-preview"),
+    ]);
+    for (const width of MEDIA_PREVIEW_WIDTHS) {
+      expect(deleteObject).toHaveBeenCalledWith(mediaPreviewStorageKey("key/abc.jpg", width));
+    }
     expect(update).toHaveBeenCalledWith({
       where: { id: "asset-1" },
       data: expect.objectContaining({ deletedAt: expect.any(Date) }),

@@ -16,6 +16,7 @@ vi.mock("@/lib/logging/logger", () => ({
 }));
 
 const { runMediaPurge, PURGEABLE_KINDS, POLICY_PENDING_KINDS } = await import("@/lib/media/purge");
+const { MEDIA_PREVIEW_WIDTHS, mediaPreviewStorageKey } = await import("@/lib/media/preview-variants");
 
 const payload = (assets: Array<{ id: string; storageKey: string }>) => ({
   assets,
@@ -38,15 +39,39 @@ describe("runMediaPurge", () => {
     expect(res).toEqual({ objectsDeleted: 1, rowsDeleted: 1, failures: 0 });
   });
 
-  it("ПОРЯДОК: объект раньше строки — иначе теряется указатель", async () => {
+  it("ПОРЯДОК: объект (и его превью) раньше строки — иначе теряется указатель", async () => {
     const order: string[] = [];
-    deleteObject.mockImplementation(async () => void order.push("object"));
+    deleteObject.mockImplementation(async (key: string) => void order.push(key === "k1" ? "object" : "preview"));
     deleteMany.mockImplementation(async () => {
       order.push("row");
       return { count: 1 };
     });
     await runMediaPurge(payload([{ id: "a1", storageKey: "k1" }]));
-    expect(order).toEqual(["object", "row"]);
+    expect(order).toEqual(["object", ...MEDIA_PREVIEW_WIDTHS.map(() => "preview"), "row"]);
+  });
+
+  /**
+   * MOBILE-B1 — превью `?w=` (`lib/media/preview-variants.ts`) — производные
+   * байты того же фото (аватар — лицо): удаление аккаунта обязано их снести.
+   *
+   * @probe 2026-10-03 — из `runMediaPurge` убран вызов `deleteMediaPreviews`:
+   *        красные оба кейса ниже. Возвращено — зелёный.
+   */
+  it("MOBILE-B1: удаляет и все превью актива — ключи из storageKey снимка", async () => {
+    await runMediaPurge(payload([{ id: "a1", storageKey: "k1" }]));
+    for (const width of MEDIA_PREVIEW_WIDTHS) {
+      expect(deleteObject).toHaveBeenCalledWith(mediaPreviewStorageKey("k1", width));
+    }
+  });
+
+  it("MOBILE-B1: превью не удалилось — актив провален, строка остаётся", async () => {
+    deleteObject.mockImplementation(async (key: string) => {
+      if (key === mediaPreviewStorageKey("k1", 320)) throw new Error("s3 down");
+    });
+    await expect(runMediaPurge(payload([{ id: "a1", storageKey: "k1" }]))).rejects.toThrow(
+      /Media purge incomplete/,
+    );
+    expect(deleteMany).not.toHaveBeenCalled();
   });
 
   it("при провале хранилища строку НЕ удаляет — она последний указатель на объект", async () => {

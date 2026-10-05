@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cityQueryParamSchema } from "@/lib/cities/city-param";
 
 export const catalogEntityTypeSchema = z.enum(["all", "master", "studio"]);
 export type CatalogEntityType = z.infer<typeof catalogEntityTypeSchema>;
@@ -48,6 +49,8 @@ export const catalogSearchQuerySchema = z.object({
   // translated to (page - 1) * limit offset by the service. `cursor` continues
   // to power time-search-mode and any client that hasn't migrated.
   page: z.coerce.number().int().min(1).optional(),
+  // MOBILE-B1: slug города (`GET /api/cities`), главнее куки `mr-city-slug`.
+  city: cityQueryParamSchema,
 });
 
 export type CatalogSearchQuery = z.infer<typeof catalogSearchQuerySchema>;

@@ -48,6 +48,29 @@ export const RATE_LIMITS = {
   // (HARDENING-02). Still fail-closed on Redis outage (path in /api/payments).
   webhookIngress: { windowSeconds: 60, maxRequests: 300 },
 
+  // MOBILE-AUTH-A — входы нативного приложения, per IP (ключ прокси ещё и по
+  // шаблону роута, то есть у каждого эндпоинта своё ведро).
+  //  · `mobileAuth` — `otp/verify`, `otp/email/verify`, `logout`. Человек
+  //    вводит код единицы раз в минуту; перебор кода режет и собственная
+  //    блокировка OTP (телефон/почта + IP). 30/мин оставляет запас на NAT
+  //    оператора, где за одним IP — много абонентов.
+  //  · `mobileAuthRefresh` — `refresh`. Веб-`/api/auth/refresh` из лимита
+  //    изъят (его зовёт сам прокси), мобильный — нет: это публичная
+  //    транзакция в БД на любой присланный токен. Приложение обновляется раз в
+  //    ~2 часа на устройство, поэтому 60/мин на IP с запасом покрывает и NAT.
+  mobileAuth: { windowSeconds: 60, maxRequests: 30 },
+  mobileAuthRefresh: { windowSeconds: 60, maxRequests: 60 },
+
+  // MOBILE-B1 — байты медиа (`GET /api/media/file/*`: оригинал, `?w=`-превью,
+  // вырез аватара). Раньше — общий `publicApi` 120/мин. Экран ленты или
+  // каталога в приложении — 20–40 плиток, быстрая прокрутка — сотня-другая
+  // картинок в минуту; ответы `immutable`, повторно клиент их не просит, то
+  // есть счётчик растёт только от НОВЫХ картинок. Стоимость запроса — поток из
+  // хранилища; генерация превью ограничена набором ширин (≤6 на актив), то
+  // есть перебором её не раскачать. Ключ — по аккаунту для вошедших, по IP
+  // для анонимов (MOBILE-B1, `rateLimitAxisFor` в прокси).
+  mediaRead: { windowSeconds: 60, maxRequests: 300 },
+
   // Feed
   feedPortfolio: { windowSeconds: 60, maxRequests: 60 },
   feedStories: { windowSeconds: 60, maxRequests: 30 },

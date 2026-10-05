@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     const scope = resolveScope(req);
     const plan = await getCurrentPlan(user.id, scope);
     if (!plan.features.hotSlots) {
-      throw createFeatureGateError("hotSlots", "PRO");
+      throw createFeatureGateError("hotSlots", scope);
     }
 
     const providerId = await resolveProviderForScope(user.id, scope);
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     const scope = resolveScope(req);
     const plan = await getCurrentPlan(user.id, scope);
     if (!plan.features.hotSlots) {
-      throw createFeatureGateError("hotSlots", "PRO");
+      throw createFeatureGateError("hotSlots", scope);
     }
 
     const providerId = await resolveProviderForScope(user.id, scope);

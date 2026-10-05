@@ -11,6 +11,7 @@ import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { reviewIdParamSchema } from "@/lib/reviews/schemas";
 import { decodePublicId } from "@/lib/public-id";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { ensureMasterReviewAccess } from "@/lib/reviews/service";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -74,25 +75,11 @@ export async function POST(req: Request, ctx: RouteContext) {
       return jsonFail(400, "На отзыв уже есть ответ.", "ALREADY_EXISTS");
     }
 
-    const provider = await prisma.provider.findFirst({
-      where: { id: review.targetId },
-      select: {
-        ownerUserId: true,
-        masterProfile: { select: { userId: true } },
-      },
-    });
-
-    if (!provider) {
-      return jsonFail(404, "Профиль не найден.", "PROVIDER_NOT_FOUND");
-    }
-
-    const isOwner =
-      provider.ownerUserId === user.id ||
-      provider.masterProfile?.userId === user.id;
-
-    if (!isOwner) {
-      return jsonFail(403, "Недостаточно прав для этого действия.", "FORBIDDEN");
-    }
+    // MOBILE-STUDIO-C (G7): то же правило, что у ответа на отзыв
+    // (`ensureMasterReviewAccess`): владелец и администратор студии получают
+    // подсказку и для отзывов на студию и на её мастеров, а не только сам
+    // мастер. Нет прав — 403 `FORBIDDEN`.
+    await ensureMasterReviewAccess(review, user.id);
 
     const suggestion = await suggestReviewReply({
       reviewText: review.text ?? "",

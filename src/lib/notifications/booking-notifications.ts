@@ -549,11 +549,16 @@ export async function notifyBookingRescheduled(booking: BookingWithRelations): P
  * (часть NOTIFY-STUDIO-ADMIN-BOOKING-ACTIONS).
  *   · клиенту — «Запись перенесена» с новым временем (`notifyBookingRescheduled`);
  *   · мастеру, у которого запись теперь стоит, — время и клиент;
- *   · прежнему мастеру, если мастер сменился, — что запись передана.
+ *   · прежнему мастеру, если мастер сменился, — что запись передана;
+ *   · MOBILE-STUDIO-C (ops): остальной стороне студии (владелец и другие
+ *     администраторы), кроме того, кто перенёс, — что запись перенесена.
+ *     Раньше второй администратор узнавал о переносе только из календаря.
  */
 export async function notifyStudioBookingMoved(
   booking: BookingWithRelations,
   move: { previousMasterProviderId: string | null; masterChanged: boolean; timeChanged: boolean },
+  /** Кто перенёс — ему уведомление о собственном действии не шлём. */
+  options: { actorUserId?: string | null } = {},
 ): Promise<void> {
   if (move.timeChanged || move.masterChanged) {
     await notifyBookingRescheduled(booking);
@@ -581,12 +586,13 @@ export async function notifyStudioBookingMoved(
     });
   }
 
+  let previousUserId: string | null = null;
   if (move.masterChanged && move.previousMasterProviderId) {
     const previous = await prisma.provider.findUnique({
       where: { id: move.previousMasterProviderId },
       select: { ownerUserId: true, masterProfile: { select: { userId: true } } },
     });
-    const previousUserId = previous?.ownerUserId ?? previous?.masterProfile?.userId ?? null;
+    previousUserId = previous?.ownerUserId ?? previous?.masterProfile?.userId ?? null;
     if (previousUserId && previousUserId !== currentMasterUserId) {
       const title = "Запись передана другому мастеру";
       const body = `Администратор передал запись ${clientLabel} на ${serviceName} другому мастеру.`;
@@ -602,6 +608,38 @@ export async function notifyStudioBookingMoved(
       });
     }
   }
+
+  if (!move.timeChanged && !move.masterChanged) return;
+  const clientUserId = resolveClientUserId(booking);
+  const alreadyNotified = new Set([currentMasterUserId, previousUserId].filter((id): id is string => Boolean(id)));
+  const recipients = (await resolveProviderRecipientUserIds(booking)).filter(
+    (userId) => userId !== options.actorUserId && userId !== clientUserId && !alreadyNotified.has(userId),
+  );
+  if (recipients.length === 0) return;
+
+  const title = "Запись перенесена";
+  const masterName = booking.masterProvider?.name?.trim();
+  const details = [whenLabel, move.masterChanged && masterName ? `мастер ${masterName}` : null]
+    .filter(Boolean)
+    .join(", ");
+  const body = details
+    ? `Администратор студии перенёс запись ${clientLabel} на ${serviceName}: ${details}.`
+    : `Администратор студии перенёс запись ${clientLabel} на ${serviceName}.`;
+  const payload = buildBookingPayload(booking);
+  await Promise.all(
+    recipients.map((userId) =>
+      deliverNotification({
+        userId,
+        type: NotificationType.BOOKING_RESCHEDULED,
+        title,
+        body,
+        payloadJson: payload,
+        bookingId: booking.id,
+        pushUrl: providerNotificationPushUrl(booking, userId),
+        telegramText: buildTelegramText(title, body),
+      })
+    )
+  );
 }
 
 /**

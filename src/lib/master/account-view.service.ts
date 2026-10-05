@@ -1,8 +1,8 @@
 import { SubscriptionScope } from "@prisma/client";
 import { getCurrentPlan, type CurrentPlanInfo } from "@/lib/billing/get-current-plan";
 import { prisma } from "@/lib/prisma";
-import { listStudioMasterProfiles, personalMasterProviderWhere } from "@/lib/master/access";
-import { studioMasterBlockingBookingsWhere } from "@/lib/studio/leave-guard";
+import { personalMasterProviderWhere } from "@/lib/master/access";
+import { loadMasterStudioMembership } from "@/lib/master/studio-membership";
 
 /**
  * Server aggregator for `/cabinet/master/account` (31-final).
@@ -78,22 +78,12 @@ export type MasterAccountViewData = {
 /**
  * Профиль мастера, который уходит из студии, — тот же выбор, что у
  * `POST /api/cabinet/master/leave-studio`: профиль в студии, а до разделения
- * профилей — сам личный профиль со `studioId`.
+ * профилей — сам личный профиль со `studioId`. Общий загрузчик с
+ * `GET /api/master/profile` приложения (`studio-membership.ts`, MOBILE-POLISH).
  */
-async function loadStudioMembership(
-  userId: string,
-  personal: { id: string; studioId: string | null },
-): Promise<MasterAccountViewData["studioMembership"]> {
-  const studioProfiles = await listStudioMasterProfiles(userId);
-  const profileId = studioProfiles[0]?.id ?? (personal.studioId ? personal.id : null);
-  const studioProviderId = studioProfiles[0]?.studioProviderId ?? personal.studioId;
-  if (!profileId || !studioProviderId) return null;
-
-  const [studio, blockingBookings] = await Promise.all([
-    prisma.provider.findUnique({ where: { id: studioProviderId }, select: { name: true } }),
-    prisma.booking.count({ where: studioMasterBlockingBookingsWhere(studioProviderId, [profileId]) }),
-  ]);
-  return { studioName: studio?.name ?? "", blockingBookings };
+async function loadStudioMembership(userId: string): Promise<MasterAccountViewData["studioMembership"]> {
+  const membership = await loadMasterStudioMembership(userId);
+  return membership ? { studioName: membership.studioName, blockingBookings: membership.blockingBookings } : null;
 }
 
 export async function getMasterAccountView(input: {
@@ -139,7 +129,7 @@ export async function getMasterAccountView(input: {
         expiresAt: { gt: now },
       },
     }),
-    loadStudioMembership(input.userId, provider),
+    loadStudioMembership(input.userId),
   ]);
 
   if (!user) return null;

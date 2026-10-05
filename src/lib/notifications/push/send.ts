@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { webpush, isPushEnabled } from "@/lib/notifications/push/vapid";
+import { isMobilePushEnabled } from "@/lib/env";
+import { enqueueNativePush } from "@/lib/notifications/native-push/enqueue";
+import type { NativePushSource } from "@/lib/notifications/native-push/payload";
 
 type PushPayload = {
   title: string;
@@ -12,6 +15,16 @@ type PushPayload = {
    * переписку вместо десяти на десять сообщений).
    */
   tag?: string;
+};
+
+/**
+ * MOBILE-B2 — то же событие для нативного приложения. Тип уведомления нужен
+ * таблице push (`native-push/payload.ts`): что слать, каким общим текстом,
+ * какой экран открыть. Ссылка и тег берутся из веб-`payload`. Без `native`
+ * вызов работает как раньше — только веб-push.
+ */
+export type SendPushOptions = {
+  native?: Pick<NativePushSource, "type" | "notificationId" | "payloadJson">;
 };
 
 /**
@@ -38,8 +51,13 @@ function getStatusCode(error: unknown): number | null {
  * `process.exit(1)` the whole worker. Call sites still carry a `.catch` as a
  * belt-and-suspenders layer.
  */
-export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
-  if (!isPushEnabled) return;
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload,
+  options: SendPushOptions = {},
+): Promise<void> {
+  const native = options.native && isMobilePushEnabled ? options.native : null;
+  if (!isPushEnabled && !native) return;
 
   try {
     // FIX-EXP-NOTIFICATIONS (EXP-027/028): per-user push preference gates ALL
@@ -51,6 +69,13 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
       select: { pushNotificationsEnabled: true },
     });
     if (!profile?.pushNotificationsEnabled) return;
+
+    // MOBILE-B2: приложение — в очередь (отправляет воркер), веб — как прежде.
+    // `enqueueNativePush` не бросает.
+    if (native) {
+      await enqueueNativePush(userId, { ...native, webUrl: payload.url ?? null, tag: payload.tag ?? null });
+    }
+    if (!isPushEnabled) return;
 
     const subscriptions = await prisma.pushSubscription.findMany({
       where: { userId },

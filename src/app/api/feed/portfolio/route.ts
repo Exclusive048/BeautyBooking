@@ -6,24 +6,28 @@ import { listPortfolioFeed } from "@/lib/feed/portfolio.service";
 import { portfolioFeedQuerySchema } from "@/lib/feed/schemas";
 import { parseQuery } from "@/lib/validation";
 import { getSessionUser } from "@/lib/auth/session";
+import { resolveCityParam } from "@/lib/cities/server-city";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { viewerRateLimitKey } from "@/lib/rate-limit/subject";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
-import { getClientIp } from "@/lib/http/ip";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 
 export const runtime = "nodejs";
 
 const FEED_PORTFOLIO_CACHE_TTL_SECONDS = 60;
 
-function feedPortfolioCacheKey(cursor: string | undefined, limit: number): string {
-  return `feed:portfolio:cursor=${cursor ?? "first"}:limit=${limit}`;
+function feedPortfolioCacheKey(cursor: string | undefined, limit: number, cityId?: string): string {
+  // MOBILE-B1: город — часть результата, значит и ключа. Без города ключ
+  // прежний (веб города здесь не передаёт).
+  const base = `feed:portfolio:cursor=${cursor ?? "first"}:limit=${limit}`;
+  return cityId ? `${base}:city=${cityId}` : base;
 }
 
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      routeRateLimitKey(req, "ip", getClientIp(req)),
+      // MOBILE-B1: вошедший — ведро аккаунта, аноним — IP (CGNAT, `rate-limit/subject.ts`).
+      viewerRateLimitKey(req),
       RATE_LIMITS.feedPortfolio,
     );
     if (rateLimit.limited) {
@@ -31,6 +35,9 @@ export async function GET(req: Request) {
     }
 
     const query = parseQuery(new URL(req.url), portfolioFeedQuerySchema);
+    // MOBILE-B1: `?city=<slug>` — лента города; без параметра — все города, как на вебе.
+    const city = await resolveCityParam(query.city);
+    const cityId = city?.id;
     const user = await getSessionUser();
 
     // Cache only the unfiltered, anonymous hot path. Filtered queries (q,
@@ -46,7 +53,7 @@ export async function GET(req: Request) {
       !query.masterId;
 
     if (isCacheable) {
-      const cacheKey = feedPortfolioCacheKey(query.cursor, query.limit);
+      const cacheKey = feedPortfolioCacheKey(query.cursor, query.limit, cityId);
       try {
         const redis = await getRedisConnection();
         if (redis) {
@@ -62,6 +69,7 @@ export async function GET(req: Request) {
           limit: query.limit,
           cursor: query.cursor,
           currentUserId: undefined,
+          cityId,
         });
         if (redis) {
           await withRedisCommandTimeout(
@@ -91,6 +99,7 @@ export async function GET(req: Request) {
       near: query.near,
       masterId: query.masterId,
       currentUserId: user?.id,
+      cityId,
     });
     return jsonOk(data);
   } catch (error) {

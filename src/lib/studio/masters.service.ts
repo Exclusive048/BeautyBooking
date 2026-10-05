@@ -6,6 +6,10 @@ import { MembershipStatus, ProviderType } from "@prisma/client";
 import { isStudioMasterActive } from "@/lib/studio/master-eligibility";
 import { normalizeInviteEmail } from "@/lib/invites/access";
 import { discardStagedMaster } from "@/lib/invites/service";
+import {
+  buildStudioMasterServicesMatrix,
+  type StudioMasterServicesMatrixRow,
+} from "@/lib/studio/team-cabinet-json";
 
 export type StudioMasterServiceItem = {
   serviceId: string;
@@ -252,6 +256,52 @@ export async function getStudioMasterDetails(input: {
   };
 }
 
+/**
+ * MOBILE-STUDIO-C (team) — матрица услуг мастера для карточки в приложении:
+ * КАЖДАЯ услуга студии (и выключенные) с базовой ценой и длительностью и
+ * строкой мастера (`MasterService`: выполняет ли, свои цена/длительность,
+ * комиссия). `getStudioMasterDetails` отдаёт только существующие строки
+ * мастера — по ней нельзя включить услугу, которой у мастера ещё нет.
+ * Правка — `PUT /api/studio/masters/{id}/services` (`bulkUpdateMasterServices`).
+ *
+ * @throws 404 STUDIO_NOT_FOUND · 404 MASTER_NOT_FOUND
+ */
+export async function getStudioMasterServicesMatrix(input: {
+  studioId: string;
+  masterId: string;
+}): Promise<StudioMasterServicesMatrixRow[]> {
+  await assertBelongsToStudio("master", input.masterId, input.studioId);
+
+  const [services, masterRows] = await Promise.all([
+    prisma.service.findMany({
+      where: { studioId: input.studioId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        title: true,
+        isActive: true,
+        price: true,
+        basePrice: true,
+        durationMin: true,
+        baseDurationMin: true,
+      },
+    }),
+    prisma.masterService.findMany({
+      where: { masterProviderId: input.masterId, service: { studioId: input.studioId } },
+      select: {
+        serviceId: true,
+        isEnabled: true,
+        priceOverride: true,
+        durationOverrideMin: true,
+        commissionPct: true,
+      },
+    }),
+  ]);
+
+  return buildStudioMasterServicesMatrix(services, masterRows);
+}
+
 export async function bulkUpdateMasterServices(input: {
   studioId: string;
   masterId: string;
@@ -389,22 +439,7 @@ export async function revokeStudioMasterInvite(input: {
     throw new AppError("У мастера нет активного приглашения.", 409, "MASTER_NOT_INVITED");
   }
 
-  // STUDIO-INVITE-EMAIL-01: заготовка несёт ровно тот контакт, на который
-  // выписано приглашение (`createStudioMaster`). Поиск только по телефону
-  // приглашение по почте не находил: заготовка удалялась, а приглашение
-  // оставалось PENDING — приглашённый по-прежнему мог его принять.
-  const inviteEmail = normalizeInviteEmail(master.contactEmail);
-  const invite = inviteEmail
-    ? await prisma.studioInvite.findUnique({
-        where: { studioId_email: { studioId: studio.id, email: inviteEmail } },
-        select: { id: true, status: true },
-      })
-    : master.contactPhone
-      ? await prisma.studioInvite.findUnique({
-          where: { studioId_phone: { studioId: studio.id, phone: master.contactPhone } },
-          select: { id: true, status: true },
-        })
-      : null;
+  const invite = await findStudioMasterInvite(studio.id, master);
 
   if (invite && invite.status === MembershipStatus.PENDING) {
     await prisma.studioInvite.update({
@@ -419,4 +454,64 @@ export async function revokeStudioMasterInvite(input: {
   await discardStagedMaster(master.id);
 
   return { inviteId: invite?.id ?? null };
+}
+
+/**
+ * Приглашение, выписанное на контакт заготовки мастера.
+ *
+ * STUDIO-INVITE-EMAIL-01: заготовка несёт ровно тот контакт, на который
+ * выписано приглашение (`createStudioMaster`). Поиск только по телефону
+ * приглашение по почте не находил: заготовка удалялась, а приглашение
+ * оставалось PENDING — приглашённый по-прежнему мог его принять.
+ */
+async function findStudioMasterInvite(
+  studioId: string,
+  master: { contactPhone: string | null; contactEmail: string | null },
+): Promise<{ id: string; status: MembershipStatus } | null> {
+  const inviteEmail = normalizeInviteEmail(master.contactEmail);
+  if (inviteEmail) {
+    return prisma.studioInvite.findUnique({
+      where: { studioId_email: { studioId, email: inviteEmail } },
+      select: { id: true, status: true },
+    });
+  }
+  if (master.contactPhone) {
+    return prisma.studioInvite.findUnique({
+      where: { studioId_phone: { studioId, phone: master.contactPhone } },
+      select: { id: true, status: true },
+    });
+  }
+  return null;
+}
+
+/**
+ * MOBILE-STUDIO-C (team) — ожидающее приглашение заготовки мастера для
+ * «Отправить приглашение ещё раз». Повторный `POST /api/studio/masters` на тот
+ * же контакт уведомление не шлёт (только новое приглашение), поэтому повтор —
+ * отдельное действие. Канал — тот контакт, на который выписано приглашение.
+ *
+ * @throws 404 STUDIO_NOT_FOUND / MASTER_NOT_FOUND · 409 MASTER_NOT_INVITED
+ *   (приглашение принято, отозвано или его нет)
+ */
+export async function findPendingStudioMasterInvite(input: {
+  studioId: string;
+  masterId: string;
+}): Promise<{ inviteId: string; channel: "PHONE" | "EMAIL" }> {
+  const studio = await getStudioContext(input.studioId);
+
+  const master = await prisma.provider.findFirst({
+    where: { id: input.masterId, type: ProviderType.MASTER, studioId: studio.providerId },
+    select: { id: true, ownerUserId: true, contactPhone: true, contactEmail: true },
+  });
+  if (!master) {
+    throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
+  }
+  const invite = master.ownerUserId ? null : await findStudioMasterInvite(studio.id, master);
+  if (!invite || invite.status !== MembershipStatus.PENDING) {
+    throw new AppError("У мастера нет активного приглашения.", 409, "MASTER_NOT_INVITED");
+  }
+  return {
+    inviteId: invite.id,
+    channel: normalizeInviteEmail(master.contactEmail) ? "EMAIL" : "PHONE",
+  };
 }

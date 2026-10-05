@@ -72,6 +72,8 @@ export type KanbanData = {
   columns: Record<ColumnId, KanbanBookingItem[]>;
   /** STUDIO-MASTER-PROFILES (этап 3): показывать ли пометку «Личная / Студия». */
   showWorkContext: boolean;
+  /** MOBILE-MASTER-C: пояс кабинета (салона), в котором собраны `whenLabel`. */
+  timezone: string;
   stats: {
     total: number;
     pendingSum: number;
@@ -418,6 +420,7 @@ export const getMasterBookingsForKanban = cache(
         masterInStudio: input.workProfiles?.worksInStudio ?? Boolean(providerTz?.studioId),
         contexts: items.map((item) => item.workContext),
       }),
+      timezone: timeZone,
       stats: { total, pendingSum, confirmedSum },
     };
   },

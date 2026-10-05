@@ -13,10 +13,11 @@ import { prisma } from "@/lib/prisma";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 import { encodeCursor } from "@/lib/pagination/cursor";
 import * as cache from "@/lib/cache/cache";
-import { getClientIp } from "@/lib/http/ip";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { viewerRateLimitKey } from "@/lib/rate-limit/subject";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
+import { cityQueryParamSchema } from "@/lib/cities/city-param";
+import { resolveCityParam } from "@/lib/cities/server-city";
 
 const hotSlotsQuerySchema = z.object({
   from: z.string().datetime().optional(),
@@ -24,6 +25,8 @@ const hotSlotsQuerySchema = z.object({
   category: z.string().trim().min(1).optional(),
   tag: z.string().trim().min(1).optional(),
   geo: z.string().trim().min(1).optional(),
+  // MOBILE-B1: slug города (`GET /api/cities`) — окошки мастеров города.
+  city: cityQueryParamSchema,
   cursor: z.string().trim().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -91,12 +94,26 @@ const FEED_CACHE_TTL_SECONDS = 120;
  * Время округляется до сетки TTL: иначе `from`, по умолчанию равный `now`,
  * давал бы новый ключ каждую миллисекунду и кэш не попадал бы никогда.
  */
-function buildFeedCacheKey(from: Date, to: Date, category: string | undefined): string {
+function buildFeedCacheKey(
+  from: Date,
+  to: Date,
+  category: string | undefined,
+  cityId?: string,
+): string {
   const bucket = (date: Date) => Math.floor(date.getTime() / (FEED_CACHE_TTL_SECONDS * 1000));
-  return `hot-slots:feed:v1:${bucket(from)}:${bucket(to)}:${category ?? "-"}`;
+  const base = `hot-slots:feed:v1:${bucket(from)}:${bucket(to)}:${category ?? "-"}`;
+  // MOBILE-B1: город меняет результат — значит, он в ключе. Это id
+  // СУЩЕСТВУЮЩЕГО города (неизвестный slug отвергнут до сюда), то есть
+  // перебором `city` новых ключей не наплодить. Без города ключ прежний.
+  return cityId ? `${base}:city=${cityId}` : base;
 }
 
-async function buildHotSlotFeed(from: Date, to: Date, category: string | undefined): Promise<FeedItem[]> {
+async function buildHotSlotFeed(
+  from: Date,
+  to: Date,
+  category: string | undefined,
+  cityId?: string,
+): Promise<FeedItem[]> {
   // `now` нужен ценообразованию скидки; берём его в момент расчёта ленты,
   // а не запроса — при попадании в кэш расчёта не происходит вовсе.
   const now = new Date();
@@ -120,6 +137,7 @@ async function buildHotSlotFeed(from: Date, to: Date, category: string | undefin
             // влияют: личные записи от студии не зависят.
             publicUsername: { not: null },
             ...(category ? { categories: { has: category } } : {}),
+            ...(cityId ? { cityId } : {}),
           },
         ],
       },
@@ -245,7 +263,8 @@ export async function GET(req: Request) {
     // цена одного запроса на порядок выше обычного публичного чтения, а
     // варьируя `from`, можно промахиваться мимо кэша намеренно.
     const limitResult = await checkRateLimit(
-      routeRateLimitKey(req, "ip", getClientIp(req)),
+      // MOBILE-B1: вошедший — ведро аккаунта, аноним — IP (CGNAT, `rate-limit/subject.ts`).
+      viewerRateLimitKey(req),
       RATE_LIMITS.hotSlotsFeed,
     );
     if (limitResult.limited) {
@@ -263,10 +282,12 @@ export async function GET(req: Request) {
       return jsonFail(400, "Дата начала позже даты окончания.", "RANGE_INVALID");
     }
 
-    const cacheKey = buildFeedCacheKey(from, to, query.category);
+    // MOBILE-B1: `?city=<slug>` — лента города; без параметра — все города, как на вебе.
+    const city = await resolveCityParam(query.city);
+    const cacheKey = buildFeedCacheKey(from, to, query.category, city?.id);
     let items = await cache.get<FeedItem[]>(cacheKey);
     if (!items) {
-      items = await buildHotSlotFeed(from, to, query.category);
+      items = await buildHotSlotFeed(from, to, query.category, city?.id);
       await cache.set(cacheKey, items, FEED_CACHE_TTL_SECONDS);
     }
 

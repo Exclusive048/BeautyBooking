@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { AvailabilitySlotPreview } from "@/lib/search-by-time/types";
+import { hotSlotFixedDiscountKopeks } from "@/lib/hot-slots/pricing";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { providerPublicUrl, withQuery } from "@/lib/public-urls";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -28,11 +29,12 @@ function formatDiscount(slot: AvailabilitySlotPreview): string | null {
   if (slot.discountType === "PERCENT") {
     return `-${slot.discountValue}%`;
   }
-  // FIXED `discountValue` is in KOPEKS (the hot-slot pricing subtracts it from a
-  // kopeks price: `base − value`). The legacy `moneyRUB` (no ÷100) showed it 100×
-  // too large — SLOT-DISCOUNT-100X. Route through the canonical ÷100 ₽ boundary so
-  // the label matches the actual applied discount (`originalPrice − discountedPrice`).
-  return `-${UI_FMT.priceLabel(slot.discountValue)}`;
+  // HOT-SLOT-FIXED-UNIT: FIXED `discountValue` of a hot slot is in RUBLES (the
+  // rule is entered in ₽; SLOT-DISCOUNT-100X read it as kopeks only because the
+  // pricing then subtracted the raw value from a kopeks price — that was the bug,
+  // fixed in `hot-slots/pricing.ts`). Same ₽→kopeks step the pricing uses, then
+  // the canonical ÷100 label — matches `originalPrice − discountedPrice`.
+  return `-${UI_FMT.priceLabel(hotSlotFixedDiscountKopeks(slot.discountValue))}`;
 }
 
 export function SlotBubblesRow({ provider, serviceId, slots }: Props) {

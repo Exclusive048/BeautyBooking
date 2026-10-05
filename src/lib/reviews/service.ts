@@ -224,7 +224,12 @@ export async function listReviewTags(): Promise<{
   return { publicTags, privateTags };
 }
 
-async function ensureMasterReviewAccess(review: {
+/**
+ * Кто может отвечать на отзыв: правка ответа, ответ и (MOBILE-STUDIO-C)
+ * подсказка ответа `POST /api/reviews/{id}/suggest-reply` — одно правило.
+ * Его зеркало для списка кабинета студии — `canReplyToStudioReview`.
+ */
+export async function ensureMasterReviewAccess(review: {
   targetType: ReviewTargetType;
   targetId: string;
 }, currentUserId: string): Promise<void> {

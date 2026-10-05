@@ -43,6 +43,12 @@ export type ScheduleBookingCell = {
   proposedEndAtUtc: string | null;
   actionRequiredBy: "CLIENT" | "MASTER" | null;
   /**
+   * MOBILE-STUDIO-C (ops): пакет, в который входит запись. Отмена такой
+   * записи — только пакетом (`cancelBooking` → `PACKAGE_CANCEL_WHOLE`).
+   * У личной записи мастера — `null`.
+   */
+  bookingPackageId: string | null;
+  /**
    * STUDIO-MASTER-OWN-BOOKINGS-01 — запись с личной страницы мастера студии
    * (`Booking.studioId = null`). Календарь показывает её, чтобы админ видел
    * занятость мастера (LOGIC-01), но студия ею не управляет (`auth/ownership.ts`
@@ -90,10 +96,20 @@ export type ScheduleWeekDay = {
 
 export type ScheduleWeekRow = {
   master: ScheduleMasterColumn;
+  /**
+   * MOBILE-POLISH: загрузка по НАСТОЯЩЕМУ графику мастера (`loadStudioWeekCells`,
+   * как у приложения), а не «5 записей = 100%». Выходной — мастер недоступен
+   * или день нерабочий по графику.
+   */
   cells: Array<{
     dateKey: string;
     booked: number;
-    capacity: number;
+    /** Минуты записей дня. */
+    bookedMinutes: number;
+    /** Рабочие минуты без перерывов; `null` — день «Фиксированное время»; `0` — выходной. */
+    capacityMinutes: number | null;
+    /** Число фиксированных начал (день «Фиксированное время»), иначе `null`. */
+    fixedSlots: number | null;
     percent: number;
     isDayOff: boolean;
   }>;

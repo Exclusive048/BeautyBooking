@@ -7,10 +7,11 @@
  * «Ответ студии» regardless of whether an admin or a master typed them,
  * so we don't surface an identity hint.
  *
- * `canReply` enforces CRM scope at the service layer:
- *   OWNER / STUDIO_ADMIN  → true for every studio review
- *   MASTER (in studio)    → true only for reviews where `masterId`
- *                            matches the master's Provider id
+ * `canReply` enforces CRM scope at the service layer — the same rule the
+ * reply endpoint checks (`canReplyToStudioReview`, MOBILE-STUDIO-C):
+ *   OWNER / STUDIO_ADMIN  → reviews of the studio itself and of masters
+ *                            attached to this studio
+ *   MASTER (in studio)    → reviews whose target is the master's own profile
  */
 
 export type StudioReviewFilter = "all" | "no_reply" | "low_rating" | "five_star";
@@ -29,6 +30,12 @@ export type StudioReviewItem = {
   dateLabel: string;
   master: StudioReviewMasterChip | null;
   serviceName: string | null;
+  /**
+   * MOBILE-POLISH: запись, по которой оставлен отзыв, — только если это запись
+   * этой студии (`Booking.studioId`), иначе `null`. Внутренний id кабинета:
+   * карточка — `GET /api/cabinet/studio/bookings/{id}`.
+   */
+  bookingId: string | null;
   text: string;
   reply: {
     text: string;

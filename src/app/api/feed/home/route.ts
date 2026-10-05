@@ -2,12 +2,12 @@ import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { tooManyRequests } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
+import { resolveCityParam } from "@/lib/cities/server-city";
 import { listHomeFeedGroups } from "@/lib/feed/home-feed.service";
 import { homeFeedQuerySchema } from "@/lib/feed/schemas";
-import { getClientIp } from "@/lib/http/ip";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { routeRateLimitKey } from "@/lib/rate-limit/keys";
+import { viewerRateLimitKey } from "@/lib/rate-limit/subject";
 import { RATE_LIMITS } from "@/lib/rate-limit/configs";
 import { parseQuery } from "@/lib/validation";
 
@@ -22,7 +22,8 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
     const rateLimit = await checkRateLimit(
-      routeRateLimitKey(req, "ip", getClientIp(req)),
+      // MOBILE-B1: вошедший — ведро аккаунта, аноним — IP (CGNAT, `rate-limit/subject.ts`).
+      viewerRateLimitKey(req),
       RATE_LIMITS.feedHome,
     );
     if (rateLimit.limited) {
@@ -30,11 +31,14 @@ export async function GET(req: Request) {
     }
 
     const query = parseQuery(new URL(req.url), homeFeedQuerySchema);
+    // MOBILE-B1: `?city=<slug>` — лента города; без параметра — все города, как на вебе.
+    const city = await resolveCityParam(query.city);
     const user = await getSessionUser();
     const data = await listHomeFeedGroups({
       limit: query.limit,
       cursor: query.cursor,
       currentUserId: user?.id,
+      cityId: city?.id,
     });
     return jsonOk(data);
   } catch (error) {

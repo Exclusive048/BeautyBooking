@@ -3,6 +3,7 @@ import { jsonFail } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser, setSessionCookies } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
+import { unlinkAllPushDevices } from "@/lib/notifications/native-push/devices";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -39,6 +40,9 @@ export async function POST(req: Request) {
       },
       data: { revokedAt: now },
     });
+    // MOBILE-B2: отозваны все входы, включая приложение, — push-токены его
+    // установок тоже (этот веб-вход новый и устройств не имеет).
+    await unlinkAllPushDevices(prisma, user.id);
 
     const response = NextResponse.json(
       { ok: true, data: { revokedCount: result.count } },

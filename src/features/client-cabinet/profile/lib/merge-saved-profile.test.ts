@@ -35,6 +35,7 @@ function profile(overrides: {
     linked: {
       telegram: { linked: false, deliveryEnabled: false, username: null, connectedAt: null },
       vk: { linked: false, deliveryEnabled: false, connectedAt: null },
+      yandex: { linked: false, enabled: false, connectedAt: null },
     },
     stats: { visitsCount: 0, favoritesCount: 0, memberSince: "2026-01-01" },
     completion: {

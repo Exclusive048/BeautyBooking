@@ -13,6 +13,7 @@ import type { ConversationParticipant } from "@/lib/chat/conversation-access";
 import { buildChatAttachmentUrl } from "@/lib/media/private-delivery";
 import { decodeCursor, encodeCursor } from "@/lib/pagination/cursor";
 import { CHAT_THREAD_PAGE_SIZE, chatConversationsWindowStart } from "@/lib/chat/conversation-window";
+import { getChatBlockStates } from "@/lib/chat/blocks";
 
 /**
  * Per-pair conversation aggregator (33a, updated by chat-url-fix).
@@ -64,6 +65,10 @@ export type ConversationListItem = {
   unreadCount: number;
   hasOpenBooking: boolean;
   latestActivityAt: string;
+  /** MOBILE-POLISH (App Store 1.2): я заблокировал собеседника. */
+  blockedByMe: boolean;
+  /** MOBILE-POLISH: собеседник заблокировал меня — переписка закрыта. */
+  blockedByOther: boolean;
 };
 
 export type ConversationDetail = {
@@ -212,6 +217,8 @@ export async function listConversations(input: {
   // into a single conversation card.
   type Accumulator = {
     key: ConversationKey;
+    /** Собеседник-человек: клиент для мастера, владелец кабинета для клиента. */
+    otherUserId: string | null;
     partner: ConversationPartner;
     lastMessage: ConversationListItem["lastMessage"];
     unreadCount: number;
@@ -257,6 +264,8 @@ export async function listConversations(input: {
       });
       grouped.set(pairId, {
         key,
+        otherUserId:
+          perspective === "MASTER" ? booking.clientUserId : (booking.provider?.ownerUserId ?? null),
         partner,
         lastMessage,
         unreadCount: chat._count.messages,
@@ -282,18 +291,28 @@ export async function listConversations(input: {
   // Typical caller has ≤ a few dozen conversations — one round-trip
   // each is acceptable; collisions are rare and handled inside
   // `getOrCreateConversationSlug`.
-  const slugs = await Promise.all(
-    ordered.map((entry) => getOrCreateConversationSlug(entry.key)),
-  );
+  const [slugs, blocks] = await Promise.all([
+    Promise.all(ordered.map((entry) => getOrCreateConversationSlug(entry.key))),
+    // MOBILE-POLISH: блоки со всеми собеседниками — одним запросом.
+    getChatBlockStates(
+      userId,
+      ordered.map((entry) => entry.otherUserId),
+    ),
+  ]);
 
-  return ordered.map((entry, index) => ({
-    slug: slugs[index]!,
-    partner: entry.partner,
-    lastMessage: entry.lastMessage,
-    unreadCount: entry.unreadCount,
-    hasOpenBooking: entry.hasOpenBooking,
-    latestActivityAt: entry.latestActivityAt.toISOString(),
-  }));
+  return ordered.map((entry, index) => {
+    const block = entry.otherUserId ? blocks.get(entry.otherUserId) : undefined;
+    return {
+      slug: slugs[index]!,
+      partner: entry.partner,
+      lastMessage: entry.lastMessage,
+      unreadCount: entry.unreadCount,
+      hasOpenBooking: entry.hasOpenBooking,
+      latestActivityAt: entry.latestActivityAt.toISOString(),
+      blockedByMe: block?.blockedByMe ?? false,
+      blockedByOther: block?.blockedByOther ?? false,
+    };
+  });
 }
 
 type ProviderSrc = {

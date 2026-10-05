@@ -6,6 +6,15 @@ enum OtpChannel {
   EMAIL
 }
 
+/// MOBILE-AUTH-A — каким клиентом выпущена семья сессий. WEB — cookie-пара
+/// (`bh_session`/`bh_refresh`), MOBILE — токены в теле ответа
+/// `/api/mobile/v1/auth/*`, дальше `Authorization: Bearer`.
+enum SessionClientType {
+  WEB
+
+  MOBILE
+}
+
 enum AccountType {
   CLIENT
 
@@ -314,6 +323,26 @@ enum NotificationType {
   SCHEDULE_ENDING
 }
 
+/// MOBILE-B2 — через какой сервис доставляется push нативного приложения:
+/// FCM (Android с Google-сервисами), APNs (iOS), RuStore Push (Android без
+/// Google-сервисов). Строка `MobilePushDevice` — одна установка приложения.
+enum MobilePushProvider {
+  FCM
+
+  APNS
+
+  RUSTORE
+}
+
+/// MOBILE-B2 — окружение APNs, которому выдан токен устройства: сборка из
+/// Xcode / TestFlight-отладки получает токен SANDBOX, App Store — PRODUCTION.
+/// Токен одного окружения на хосте другого — `BadDeviceToken`.
+enum MobilePushApnsEnvironment {
+  SANDBOX
+
+  PRODUCTION
+}
+
 // === Media ===
 
 enum MediaEntityType {
@@ -485,6 +514,11 @@ enum AdminAuditAction {
   SETTINGS_FLAG_TOGGLED
 
   SETTINGS_APP_SETTING_UPDATED
+
+  // Жалобы на контент (MOBILE-POLISH, App Store 1.2)
+  CONTENT_REPORT_RESOLVED
+
+  CONTENT_REPORT_DISMISSED
 }
 
 /// RKN-FIX-10 — кто выполнил массовое чтение ПДн. Не роль пользователя, а
@@ -495,4 +529,31 @@ enum PdAccessActorType {
   MASTER
   STUDIO
   SYSTEM
+}
+
+/// MOBILE-POLISH (App Store 1.2) — на что пожаловался пользователь.
+/// PROVIDER — страница мастера или студии, CHAT — переписка (и, по желанию,
+/// одно сообщение в ней), MODEL_OFFER — предложение для моделей.
+enum ContentReportTargetType {
+  PROVIDER
+  REVIEW
+  PORTFOLIO_ITEM
+  CHAT
+  MODEL_OFFER
+}
+
+/// MOBILE-POLISH — причина жалобы. Для OTHER комментарий обязателен.
+enum ContentReportReason {
+  SPAM
+  OFFENSIVE
+  FRAUD
+  INAPPROPRIATE_CONTENT
+  OTHER
+}
+
+/// MOBILE-POLISH — состояние жалобы в очереди администратора.
+enum ContentReportStatus {
+  NEW
+  RESOLVED
+  DISMISSED
 }

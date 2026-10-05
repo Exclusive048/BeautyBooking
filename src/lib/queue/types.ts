@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { NativePushMessage } from "@/lib/notifications/native-push/types";
 
 export type TelegramSendPayload = {
   chatId: string;
@@ -16,6 +17,19 @@ export type VkSendPayload = {
   userId: string;
   text: string;
   randomId: number;
+};
+
+/**
+ * MOBILE-B2 — push в нативное приложение. Сообщение собрано при постановке
+ * (`buildNativePushMessage`: общий текст, id сущностей, путь экрана — без ПДн),
+ * а устройства воркер читает в момент отправки: разлогиненная установка или
+ * выключенный тумблер останавливают уже поставленную задачу. `deviceIds` — у
+ * повтора: только устройства, где прошлый раз был временный сбой.
+ */
+export type NativePushSendPayload = {
+  userId: string;
+  message: NativePushMessage;
+  deviceIds?: string[];
 };
 
 export type BookingReminderKind = "REMINDER_24H" | "REMINDER_2H";
@@ -120,6 +134,12 @@ export type VkSendJob = {
   payload: VkSendPayload;
 } & JobMeta;
 
+export type NativePushSendJob = {
+  id: string;
+  type: "push.native.send";
+  payload: NativePushSendPayload;
+} & JobMeta;
+
 export type BookingReminderJob = {
   id: string;
   type: "booking.reminder";
@@ -177,6 +197,7 @@ export type PlanEditedNotifyJob = {
 export type Job =
   | TelegramSendJob
   | VkSendJob
+  | NativePushSendJob
   | BookingReminderJob
   | VisualSearchIndexJob
   | SlotFreedJob
@@ -189,6 +210,7 @@ export type Job =
 
 export const TELEGRAM_SEND_JOB_TYPE = "telegram.send";
 export const VK_SEND_JOB_TYPE = "vk.send";
+export const NATIVE_PUSH_SEND_JOB_TYPE = "push.native.send";
 export const BOOKING_REMINDER_JOB_TYPE = "booking.reminder";
 export const VISUAL_SEARCH_INDEX_JOB_TYPE = "visual_search_index";
 export const SLOT_FREED_JOB_TYPE = "slot.freed";
@@ -229,6 +251,31 @@ function isVkSendPayload(value: unknown): value is VkSendPayload {
     typeof value.text === "string" &&
     typeof value.randomId === "number" &&
     Number.isInteger(value.randomId)
+  );
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (!isRecord(value) || Array.isArray(value)) return false;
+  return Object.values(value).every((item) => typeof item === "string");
+}
+
+function isNativePushSendPayload(value: unknown): value is NativePushSendPayload {
+  if (!isRecord(value)) return false;
+  if (typeof value.userId !== "string" || value.userId.length === 0) return false;
+  if (
+    typeof value.deviceIds !== "undefined" &&
+    !(Array.isArray(value.deviceIds) && value.deviceIds.every((id) => typeof id === "string"))
+  ) {
+    return false;
+  }
+  const message = value.message;
+  if (!isRecord(message)) return false;
+  return (
+    typeof message.type === "string" &&
+    typeof message.title === "string" &&
+    typeof message.body === "string" &&
+    typeof message.androidChannelId === "string" &&
+    isStringRecord(message.data)
   );
 }
 
@@ -323,6 +370,10 @@ export function isJob(value: unknown): value is Job {
     return isVkSendPayload(value.payload);
   }
 
+  if (value.type === NATIVE_PUSH_SEND_JOB_TYPE) {
+    return isNativePushSendPayload(value.payload);
+  }
+
   if (value.type === BOOKING_REMINDER_JOB_TYPE) {
     return isBookingReminderPayload(value.payload);
   }
@@ -395,6 +446,27 @@ export function createVkSendJob(
   return normalizeJobMeta({
     id: input?.id ?? randomUUID(),
     type: VK_SEND_JOB_TYPE,
+    payload,
+    attempts: input?.attempts ?? 0,
+    maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,
+    runAt: input?.scheduledAt ?? input?.runAt,
+    scheduledAt: input?.scheduledAt ?? input?.runAt,
+    createdAt: input?.createdAt ?? Date.now(),
+  });
+}
+
+export function createNativePushSendJob(
+  payload: NativePushSendPayload,
+  input?: Partial<
+    Pick<
+      NativePushSendJob,
+      "id" | "attempts" | "maxAttempts" | "runAt" | "scheduledAt" | "createdAt"
+    >
+  >
+): NativePushSendJob {
+  return normalizeJobMeta({
+    id: input?.id ?? randomUUID(),
+    type: NATIVE_PUSH_SEND_JOB_TYPE,
     payload,
     attempts: input?.attempts ?? 0,
     maxAttempts: input?.maxAttempts ?? DEFAULT_JOB_MAX_ATTEMPTS,

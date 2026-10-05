@@ -63,6 +63,12 @@ describe("provider links — source level", () => {
     "src/app/api/integrations/vk/disable/route.ts",
     "src/app/api/auth/vk/unlink/route.ts",
     "src/app/api/auth/yandex/unlink/route.ts",
+    // MOBILE-AUTH-A2: запись связок (веб и приложение) переехала из колбэков
+    // в общий сервис — правило едет вместе с ней.
+    "src/lib/auth/oauth-login.ts",
+    "src/lib/auth/oauth-mobile-callback.ts",
+    // VK-YANDEX-UNLINK-01: отвязка (удаление связки) — общий сервис.
+    "src/lib/auth/oauth-unlink.ts",
   ];
 
   it.each(ROUTES)("%s never writes or selects a provider token", (relativePath) => {

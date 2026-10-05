@@ -103,6 +103,8 @@ function toPeriodDto(row: PeriodRow): StoredPeriod {
 
 export type PeriodWriteOp =
   | { op: "trimEnd"; id: string; endsOn: string }
+  /** «Настроено до»: конец периода — дата или `null` (продлевается сам). */
+  | { op: "setEnd"; id: string; endsOn: string | null }
   | { op: "trimStart"; id: string; startsOn: string }
   | { op: "delete"; id: string }
   | { op: "create"; period: SchedulePatternDto };
@@ -158,7 +160,7 @@ export function planPeriodWrite(
 
 async function applyPeriodOpsTx(tx: Db, providerId: string, ops: PeriodWriteOp[]): Promise<void> {
   for (const op of ops) {
-    if (op.op === "trimEnd") {
+    if (op.op === "trimEnd" || op.op === "setEnd") {
       await tx.schedulePattern.update({ where: { id: op.id }, data: { endsOn: op.endsOn } });
     } else if (op.op === "trimStart") {
       await tx.schedulePattern.update({ where: { id: op.id }, data: { startsOn: op.startsOn } });
@@ -274,10 +276,57 @@ export async function writeSchedulePeriodTx(
 }
 
 /**
- * «Настроено до» / «продлевать автоматически». `endsOn = null` — последний
- * период становится бессрочным; дата — расписание кончается в неё, периоды
- * после неё удаляются. Не дальше горизонта и не раньше сегодня.
+ * Чистый план «Настроено до» / «продлевать автоматически» поверх периодов
+ * (по возрастанию начала, как `loadPeriodsTx`). Не дальше горизонта и не
+ * раньше сегодня.
+ *
+ *   - дата РАНЬШЕ нынешнего конца — укоротить: периоды после неё удаляются,
+ *     конец переходит на неё (как и было);
+ *   - дата ПОЗЖЕ нынешнего конца или `null` — продлить последний период до неё
+ *     (MOBILE-POLISH: раньше дата только укорачивала, и продлить можно было
+ *     лишь в два шага — `null`, потом дата; итог тот же, что у двух шагов);
+ *   - последний период кончился раньше вчерашнего дня — его не тянут через
+ *     прошлое (прошлое не переписывается, инвариант модуля): тот же график
+ *     продолжается копией с сегодняшнего дня, фаза цикла та же (`anchorOn`).
  */
+export function planScheduleEnd(periods: StoredPeriod[], endsOn: string | null, todayKey: string): PeriodWriteOp[] {
+  if (periods.length === 0) throw patternError("Сначала настройте график.");
+  if (endsOn !== null) {
+    if (!isDateKey(endsOn) || endsOn < todayKey) throw patternError("Проверьте дату окончания.");
+    if (endsOn > addDaysToDateKey(todayKey, SCHEDULE_HORIZON_DAYS)) {
+      throw patternError("Расписание можно настроить не дальше чем на 3 месяца вперёд.");
+    }
+  }
+
+  const ops: PeriodWriteOp[] = [];
+  const kept: StoredPeriod[] = [];
+  for (const period of periods) {
+    if (endsOn !== null && period.startsOn !== null && period.startsOn > endsOn) {
+      ops.push({ op: "delete", id: period.id });
+      continue;
+    }
+    kept.push(period);
+    if (endsOn !== null && (period.endsOn === null || period.endsOn > endsOn)) {
+      ops.push({ op: "setEnd", id: period.id, endsOn });
+    }
+  }
+
+  // Продлевается только ПОСЛЕДНИЙ период и только если дата его не удалила:
+  // разрыв между периодами (например, отпуск графиком) не заливается.
+  const last = periods[periods.length - 1];
+  if (last && kept.includes(last) && last.endsOn !== null && (endsOn === null || last.endsOn < endsOn)) {
+    if (last.endsOn >= addDaysToDateKey(todayKey, -1)) {
+      ops.push({ op: "setEnd", id: last.id, endsOn });
+    } else {
+      const { id: _id, ...rest } = last;
+      void _id;
+      ops.push({ op: "create", period: { ...rest, startsOn: todayKey, endsOn } });
+    }
+  }
+  return ops;
+}
+
+/** «Настроено до» / «продлевать автоматически» (`endsOn = null`) — `planScheduleEnd`. */
 export async function setScheduleEndTx(
   tx: Db,
   providerId: string,
@@ -286,25 +335,7 @@ export async function setScheduleEndTx(
 ): Promise<void> {
   await ensurePatternHistoryTx(tx, providerId);
   const periods = await loadPeriodsTx(tx, providerId);
-  if (periods.length === 0) throw patternError("Сначала настройте график.");
-
-  if (endsOn === null) {
-    const last = periods[periods.length - 1];
-    await tx.schedulePattern.update({ where: { id: last.id }, data: { endsOn: null } });
-    return;
-  }
-
-  if (!isDateKey(endsOn) || endsOn < todayKey) throw patternError("Проверьте дату окончания.");
-  if (endsOn > addDaysToDateKey(todayKey, SCHEDULE_HORIZON_DAYS)) {
-    throw patternError("Расписание можно настроить не дальше чем на 3 месяца вперёд.");
-  }
-  for (const period of periods) {
-    if (period.startsOn !== null && period.startsOn > endsOn) {
-      await tx.schedulePattern.delete({ where: { id: period.id } });
-    } else if (period.endsOn === null || period.endsOn > endsOn) {
-      await tx.schedulePattern.update({ where: { id: period.id }, data: { endsOn } });
-    }
-  }
+  await applyPeriodOpsTx(tx, providerId, planScheduleEnd(periods, endsOn, todayKey));
 }
 
 // ─── Неделя редактора «Часы» поверх графиков ─────────────────────────────────

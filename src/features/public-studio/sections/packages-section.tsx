@@ -1,7 +1,7 @@
 import { Section } from "@/components/ui/section";
 import { StudioBundleCard } from "@/features/public-studio/components/studio-bundle-card";
 import { getStudioProfile, getStudioMasters } from "@/features/public-studio/server/studio-query";
-import { getStudioBundles } from "@/features/public-studio/server/studio-packages.service";
+import { getStudioBundles } from "@/lib/providers/public-packages";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import * as UI_TEXT from "@/lib/ui/text";

@@ -13,6 +13,7 @@ import {
   type PlanNode,
   type PlanTier,
 } from "@/lib/billing/features";
+import { cheapestPlanTierWithFeature } from "@/lib/billing/required-plan";
 import { isSubscriptionActive } from "@/lib/billing/subscription-active";
 import { personalMasterProviderWhere } from "@/lib/master/access";
 
@@ -41,14 +42,30 @@ export type AnalyticsFeatureKey =
   | "analytics_cohorts"
   | "analytics_forecast";
 
-const FEATURE_REQUIRED_PLAN: Record<AnalyticsFeatureKey, PlanTier> = {
-  analytics_dashboard: "FREE",
-  analytics_revenue: "PRO",
-  analytics_clients: "PRO",
-  analytics_booking_insights: "PREMIUM",
-  analytics_cohorts: "PREMIUM",
-  analytics_forecast: "PREMIUM",
-};
+const ANALYTICS_FEATURE_KEYS: readonly AnalyticsFeatureKey[] = [
+  "analytics_dashboard",
+  "analytics_revenue",
+  "analytics_clients",
+  "analytics_booking_insights",
+  "analytics_cohorts",
+  "analytics_forecast",
+];
+
+/**
+ * Минимальный тариф отчёта для кабинета `scope`; MOBILE-STUDIO-C — и для
+ * замков разделов в `GET /api/cabinet/studio/analytics`. MOBILE-POLISH: из
+ * каталога (`billing/required-plan.ts`), а не константами — константы
+ * называли PREMIUM для тепловой карты, которая входит в PRO. Фичи, которой
+ * нет ни в одном тарифе, в каталоге аналитики не бывает (`PREMIUM` — запас).
+ */
+export function analyticsRequiredPlans(scope?: AnalyticsScope): Record<AnalyticsFeatureKey, PlanTier> {
+  return Object.fromEntries(
+    ANALYTICS_FEATURE_KEYS.map((key) => [key, cheapestPlanTierWithFeature(key, scope) ?? "PREMIUM"]),
+  ) as Record<AnalyticsFeatureKey, PlanTier>;
+}
+
+/** Самый дешёвый тариф отчёта среди обоих кабинетов (у аналитики они совпадают). */
+export const FEATURE_REQUIRED_PLAN: Record<AnalyticsFeatureKey, PlanTier> = analyticsRequiredPlans();
 
 const PLAN_SELECT = {
   id: true,
@@ -158,7 +175,7 @@ export async function ensureFeatureAccess(input: {
   if (!plan.features[input.feature]) {
     throw new AppError("Этот отчёт недоступен на вашем тарифе.", 403, "FEATURE_GATE", {
       feature: input.feature,
-      requiredPlan: FEATURE_REQUIRED_PLAN[input.feature],
+      requiredPlan: analyticsRequiredPlans(input.scope)[input.feature],
     });
   }
   return plan;

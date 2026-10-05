@@ -91,13 +91,32 @@ export async function listClientReviews(userId: string): Promise<ClientReviewIte
     },
   });
 
+  // MOBILE-CLIENT-01 (B1): отзыв на мастера (`targetType = provider`) адресован
+  // `Provider` по `targetId`, а `Review.master` заполняется ТОЛЬКО у отзыва на
+  // студию (`createReview`: мастер, оказавший услугу). Карточка соло-мастера
+  // читалась из пустой связи — «—» без аватара и ссылки. Одним запросом на всех.
+  const providerTargetIds = Array.from(
+    new Set(
+      rows
+        .filter((r) => r.targetType !== ReviewTargetType.studio)
+        .map((r) => r.targetId),
+    ),
+  );
+  const providerTargets = providerTargetIds.length
+    ? await prisma.provider.findMany({
+        where: { id: { in: providerTargetIds } },
+        select: { id: true, name: true, avatarUrl: true, publicUsername: true },
+      })
+    : [];
+  const providerTargetById = new Map(providerTargets.map((p) => [p.id, p]));
+
   const now = Date.now();
   return rows.map((r) => {
     const targetType = r.targetType === ReviewTargetType.studio ? "STUDIO" : "MASTER";
     const targetData =
       targetType === "STUDIO"
         ? r.studio?.provider
-        : r.master ?? null;
+        : providerTargetById.get(r.targetId) ?? r.master ?? null;
 
     return {
       id: r.id,

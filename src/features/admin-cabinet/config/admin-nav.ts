@@ -1,5 +1,6 @@
 import {
   BookMarked,
+  Flag,
   LayoutDashboard,
   MapPin,
   MessageSquareWarning,
@@ -17,6 +18,7 @@ export type AdminNavItemKey =
   | "users"
   | "billing"
   | "reviews"
+  | "reports"
   | "settings";
 
 export type AdminNavItem = {
@@ -85,6 +87,15 @@ export const ADMIN_NAV: ReadonlyArray<AdminNavItem> = [
     pageTitle: UI_TEXT.adminPanel.page.reviews.title,
     sublabel: UI_TEXT.adminPanel.page.reviews.sublabel,
     icon: MessageSquareWarning,
+  },
+  {
+    // MOBILE-POLISH (App Store 1.2): жалобы пользователей на контент.
+    key: "reports",
+    href: "/admin/reports",
+    label: UI_TEXT.adminPanel.nav.reports,
+    pageTitle: UI_TEXT.adminPanel.page.reports.title,
+    sublabel: UI_TEXT.adminPanel.page.reports.sublabel,
+    icon: Flag,
   },
   {
     key: "settings",

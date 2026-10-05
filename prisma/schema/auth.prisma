@@ -94,6 +94,8 @@ model UserProfile {
 
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  // MOBILE-B2: push-токены нативного приложения (одна строка на установку).
+  mobilePushDevices MobilePushDevice[]
   refreshSessions   RefreshSession[]
 
   consents UserConsent[]
@@ -159,6 +161,18 @@ model UserProfile {
   /// Reviews this user (acting as admin) soft-deleted. Backed by the
   /// optional `Review.deletedBy` relation added in the same commit.
   reviewsDeleted Review[] @relation("ReviewDeletedBy")
+
+  /// MOBILE-POLISH: жалобы на контент, которые отправил этот пользователь.
+  contentReports ContentReport[] @relation("ContentReportReporter")
+
+  /// MOBILE-POLISH: жалобы, решённые этим пользователем как администратором.
+  contentReportsResolved ContentReport[] @relation("ContentReportResolvedBy")
+
+  /// MOBILE-POLISH: кого этот пользователь заблокировал в переписке.
+  chatBlocksMade ChatBlock[] @relation("ChatBlockBlocker")
+
+  /// MOBILE-POLISH: кто заблокировал этого пользователя в переписке.
+  chatBlocksReceived ChatBlock[] @relation("ChatBlockBlocked")
 
   @@index([blockedAt])
 }
@@ -257,6 +271,30 @@ model RefreshSession {
   /// обнуляла бы живой access-токен). Nullable: строки, выпущенные до
   /// миграции, семьи не имеют и трактуются как legacy.
   familyId String?
+
+  /// MOBILE-AUTH-A: метаданные устройства — для будущего списка «где я вошёл»
+  /// (A3) и привязки push-токена к установке (B). Пишутся при выдаче
+  /// мобильной сессии из заголовков `X-Client-Platform` / `X-App-Version` /
+  /// `X-Device-Name` / `X-Installation-Id` / `User-Agent` (обрезаны по длине,
+  /// `src/lib/auth/session-client-meta.ts`) и наследуются ротацией внутри
+  /// семьи. Веб-сессии несут только `clientType = WEB` и, с MOBILE-AUTH-A3,
+  /// `userAgent` браузера (наружу — лишь сводка «Chrome, Windows»,
+  /// `src/lib/auth/session-families.ts`).
+  clientType SessionClientType @default(WEB)
+
+  platform String? @db.VarChar(16)
+
+  appVersion String? @db.VarChar(32)
+
+  deviceName String? @db.VarChar(100)
+
+  installationId String? @db.VarChar(64)
+
+  userAgent String? @db.VarChar(512)
+
+  /// Момент последней выдачи/обновления сессии (выдача, ротация, повторная
+  /// выдача преемника). На каждый запрос НЕ пишется — только на refresh.
+  lastUsedAt DateTime?
 
   rotatedToSession RefreshSession? @relation("RefreshSessionRotation", fields: [rotatedToSessionId], references: [id], onDelete: SetNull)
 

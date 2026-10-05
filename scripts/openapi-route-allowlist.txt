@@ -87,14 +87,11 @@
 /api/auth/telegram/link
 /api/auth/telegram/login
 /api/auth/telegram/unlink
-/api/auth/vk/unlink
 /api/billing/auto-renew
 /api/billing/cancel
 /api/billing/checkout
 /api/billing/mrr/snapshot/run
-/api/billing/plans
 /api/billing/renew/run
-/api/billing/status
 /api/bookings/my
 /api/bookings/recent-masters
 /api/bookings/upload-reference
@@ -104,19 +101,10 @@
 /api/bookings/{id}/ics
 /api/cabinet/master/dashboard/free-slots
 /api/cabinet/master/delete
-/api/cabinet/master/leave-studio
 /api/cabinet/master/public-username
-/api/cabinet/master/schedule
-/api/cabinet/studio/delete
-/api/cabinet/studio/members/{memberId}/remove
-/api/cabinet/studio/public-username
-/api/cabinet/user/bookings
 /api/cabinet/user/favorites
-/api/cabinet/user/profile
 /api/cabinet/user/profile/email/request-verify
 /api/cabinet/user/profile/email/verify
-/api/cabinet/user/reviews
-/api/catalog/autocomplete
 /api/catalog/global-categories
 /api/categories/my-proposals
 /api/categories/propose
@@ -126,10 +114,8 @@
 /api/chat/threads/{slug}/messages
 /api/chat/threads/{slug}/read
 /api/chat/upload-attachment
-/api/cities
 /api/favorites
 /api/favorites/toggle
-/api/feed/stories
 /api/health
 # reason: FIX-C2 — readiness-проба инфраструктуры (соседка /api/health), потребители
 # внутренние: балансировщик, compose, deploy.yml, мониторинг. Часть контракта
@@ -164,7 +150,6 @@
 /api/master/portfolio/media/{assetId}/classification
 /api/master/portfolio/reorder
 /api/master/portfolio/{id}/category
-/api/master/service-packages
 /api/master/service-packages/reorder
 /api/master/service-packages/{id}
 /api/master/services/reorder
@@ -174,9 +159,7 @@
 /api/master/settings/auto-publish-stories
 /api/masters/me/services
 /api/masters/{id}/bookings
-/api/me/delete
 /api/me/model-applications
-/api/me/plan
 /api/media/{id}/crop
 /api/model-applications/{applicationId}/confirm
 /api/model-offers/{code}/apply
@@ -189,8 +172,6 @@
 /api/notifications/unread-count
 /api/notifications/{id}
 /api/notifications/{id}/read
-/api/onboarding/professional/master
-/api/onboarding/professional/studio
 /api/openapi
 /api/payments/yookassa/webhook
 /api/profiles/master
@@ -198,28 +179,14 @@
 /api/providers/{id}/masters
 /api/public/bookings
 /api/public/bookings/{id}
-/api/public/model-offers
 /api/public/providers/{providerId}/booking-days
 /api/public/providers/{providerId}/review-summary
 /api/public/providers/{providerId}/slots
 /api/public/services/{id}/booking-config
 /api/reviews/tags
-/api/reviews/{id}/suggest-reply
-/api/search/availability
 /api/search/by-photo
 /api/search/services
-/api/studio/clients/{clientKey}/card
-/api/studio/clients/{clientKey}/card/photos
-/api/studio/clients/{clientKey}/card/photos/{photoId}
 /api/studio/dashboard/revenue
-/api/studio/schedule/requests
-/api/studio/schedule/requests/{id}
-/api/studio/schedule/requests/{id}/approve
-/api/studio/schedule/requests/{id}/reject
-/api/studio/service-packages
-/api/studio/service-packages/{id}
-/api/studio/services/{id}/booking-config
-/api/studio/services/{id}/unassign-master
 /api/studios/{id}/masters
 /api/studios/{id}/masters/{masterId}/schedule/buffer
 /api/studios/{id}/masters/{masterId}/schedule/overrides
@@ -240,9 +207,6 @@
 # reason: internal CSRF handshake для Telegram-логина, который погашен
 # kill-switch'ом (FZ-199). Соседи /auth/telegram/{link,login,unlink} уже здесь.
 /api/auth/telegram/login-init
-# reason: снятие привязки провайдера — не клиентский контракт; ровно так же
-# waived близнец /api/auth/vk/unlink (строка 83).
-/api/auth/yandex/unlink
 # reason: cron-эндпоинт за AVAILABILITY_CRON_TOKEN, вызывается планировщиком,
 # не клиентом. Соседи /billing/renew/run, /billing/mrr/snapshot/run,
 # /health/worker уже здесь.

@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { getViewer } from "@/features/public-profile/master/server/viewer";
-import { prisma } from "@/lib/prisma";
+import { isProviderOwner } from "@/lib/providers/owner";
 
 /**
  * FIX-MASTER-01 item 5 — is the current viewer the owner of this public
@@ -11,15 +11,12 @@ import { prisma } from "@/lib/prisma";
  *
  * Direct Prisma lookup on purpose: the public `/api/providers/{id}` DTO
  * deliberately omits `ownerUserId` (invariant #29 — internal ids never
- * leave public APIs), so ownership can only be resolved server-side.
+ * leave public APIs), so ownership can only be resolved server-side
+ * (`isProviderOwner`, shared with the JSON overview route — MOBILE-B3).
  * `cache()` dedupes within the request like the sibling `getProvider`.
  */
 export const isViewerProfileOwner = cache(async (providerId: string): Promise<boolean> => {
   const user = await getViewer();
   if (!user) return false;
-  const provider = await prisma.provider.findUnique({
-    where: { id: providerId },
-    select: { ownerUserId: true },
-  });
-  return provider?.ownerUserId === user.id;
+  return isProviderOwner(providerId, user.id);
 });

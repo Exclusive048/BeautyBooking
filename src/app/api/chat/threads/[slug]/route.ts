@@ -6,6 +6,7 @@ import { toAppError } from "@/lib/api/errors";
 import { resolveConversationSlug } from "@/lib/chat/conversation-slug";
 import { resolveConversationAccess } from "@/lib/chat/conversation-access";
 import { decodeThreadCursor, getConversationThread } from "@/lib/chat/conversation-aggregator";
+import { chatBlockReason, getConversationBlockState } from "@/lib/chat/blocks";
 import { getRequestId, logError } from "@/lib/logging/logger";
 
 export const runtime = "nodejs";
@@ -56,15 +57,22 @@ export async function GET(
       return jsonFail(400, "Не удалось загрузить сообщения. Обновите страницу.", "VALIDATION_ERROR");
     }
 
-    const detail = await getConversationThread({
-      key,
-      perspective,
-      viewerTimezone: tzHint || "Europe/Moscow",
-      before,
-    });
+    const [detail, block] = await Promise.all([
+      getConversationThread({
+        key,
+        perspective,
+        viewerTimezone: tzHint || "Europe/Moscow",
+        before,
+      }),
+      getConversationBlockState(key, user.userId),
+    ]);
     if (!detail) {
       return jsonFail(404, "Переписка не найдена.", "NOT_FOUND");
     }
+
+    // MOBILE-POLISH (App Store 1.2): блок в любую сторону закрывает отправку —
+    // `canSend: false`, флаги стороны и готовый текст для поля ввода.
+    const blockedReason = chatBlockReason(block);
 
     return jsonOk({
       slug: detail.slug,
@@ -72,10 +80,13 @@ export async function GET(
       olderCursor: detail.olderCursor,
       partner: detail.partner,
       perspective,
-      canSend: access.canSend,
+      canSend: access.canSend && !blockedReason,
       openBookingId: access.openBookingId,
       readonlyOnly: access.readonlyOnly,
       timezone: detail.timezone,
+      blockedByMe: block.blockedByMe,
+      blockedByOther: block.blockedByOther,
+      blockedReason,
     });
   } catch (error) {
     const appError = toAppError(error);

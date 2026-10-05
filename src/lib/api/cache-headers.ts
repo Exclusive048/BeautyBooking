@@ -57,6 +57,9 @@ export const PUBLIC_REFERENCE_API_PATHS = [
   "/api/reviews/tags",
   "/api/billing/plans",
   "/api/cities",
+  // MOBILE-AUTH-A: конфиг нативного приложения (версии, методы входа, фичи) —
+  // от зрителя не зависит.
+  "/api/mobile/v1/config",
 ] as const;
 
 /** Совпадение точное: ни у одного пути списка нет динамических сегментов. */

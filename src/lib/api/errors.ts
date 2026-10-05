@@ -19,6 +19,9 @@ const ERROR_CODES = [
   "BOOKING_CONFLICT",
   "BOOKING_NOT_FOUND",
   "BOOKING_TIME_REQUIRED",
+  // MOBILE-POLISH (App Store 1.2): переписка закрыта блокировкой — одна из
+  // сторон заблокировала другую (`ChatBlock`), отправка запрещена обеим.
+  "CHAT_BLOCKED",
   // 29.09 доработки · 26 (решение 26.1): предстоящие записи клиента
   // останавливают удаление аккаунта.
   "CLIENT_ACTIVE_BOOKINGS",
@@ -126,6 +129,9 @@ const ERROR_CODES = [
   "REFERENCE_PHOTO_USED",
   // SEC-16: тело запроса перевалило за планку размера (`lib/http/body-limit.ts`)
   "REQUEST_BODY_TOO_LARGE",
+  // MOBILE-POLISH (App Store 1.2): жалоба на собственный контент
+  // (своя страница, свой отзыв, своя работа, своё предложение, своё сообщение).
+  "REPORT_OWN_CONTENT",
   "REVIEW_ALREADY_EXISTS",
   "REVIEW_NOT_ALLOWED",
   "REVIEW_TARGET_NOT_FOUND",
@@ -182,6 +188,14 @@ const ERROR_CODES = [
   "YANDEX_OAUTH_FAILED",
   "YANDEX_PROFILE_FAILED",
   "YANDEX_ALREADY_LINKED",
+  // MOBILE-AUTH-A2/A3 — обмен одноразового кода OAuth-входа приложения и
+  // список сессий («завершить сеанс» чужой/несуществующей семьи).
+  "OAUTH_CODE_INVALID",
+  "SESSION_NOT_FOUND",
+  // VK-YANDEX-UNLINK-01 — отвязка оставила бы аккаунт без единого способа входа.
+  "LAST_LOGIN_METHOD",
+  // MOBILE-B1 — `?city=<slug>` назвал неизвестный или погашенный город.
+  "CITY_NOT_FOUND",
   "APP_PUBLIC_URL_MISSING",
   "TIME_RANGE_INVALID",
   "UNAUTHORIZED",

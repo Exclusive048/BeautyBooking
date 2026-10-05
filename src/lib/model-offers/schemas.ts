@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { timeToMinutes } from "@/lib/schedule/time";
+import { decodePublicId } from "@/lib/public-id";
 
 const dateLocalRegex = /^\d{4}-\d{2}-\d{2}$/;
 const timeLocalRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -77,10 +78,24 @@ export const rejectApplicationSchema = z.object({
 });
 
 export const publicModelOffersQuerySchema = z.object({
-  categoryId: z.string().trim().min(1).optional(),
+  // MOBILE-CLIENT-01 (B8): публичный справочник категорий
+  // (`/api/catalog/global-categories`) отдаёт `e_…`-id — декодируются здесь;
+  // сырой CUID (фильтр веба `/models`) проходит как есть (`decodePublicId`).
+  categoryId: z.string().trim().min(1).transform(decodePublicId).optional(),
+  // MOBILE-B1: slug города (`GET /api/cities`) — фильтр по `Provider.cityId`.
+  // Не-slug (название из `citySuggestions`) — прежний поиск по адресу.
   city: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(40).default(20),
+});
+
+/**
+ * MOBILE-CLIENT-01 (G1): адрес предложения — `ModelOffer.publicCode` (cuid).
+ * Форма шире cuid намеренно: код — непрозрачная строка, важна только граница
+ * длины и алфавита перед запросом в БД.
+ */
+export const publicModelOfferCodeParamSchema = z.object({
+  code: z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/),
 });
 
 export function isTimeWithinRange(input: {

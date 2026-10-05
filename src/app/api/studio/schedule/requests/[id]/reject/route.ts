@@ -1,4 +1,5 @@
 import { StudioRole } from "@prisma/client";
+import { z } from "zod";
 import { jsonFail, jsonOk } from "@/lib/api/contracts";
 import { toAppError } from "@/lib/api/errors";
 import { getSessionUser } from "@/lib/auth/session";
@@ -6,8 +7,27 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { resolveCurrentStudioAccess } from "@/lib/studio/current";
 import { prisma } from "@/lib/prisma";
 import { loadScheduleRequestWithRelations, notifyScheduleRequestRejected } from "@/lib/notifications/studio-notifications";
+import { SCHEDULE_REQUEST_REJECT_COMMENT_MAX } from "@/features/studio-cabinet/schedule-requests/lib/reject-comment";
 
 export const runtime = "nodejs";
+
+const COMMENT_REQUIRED = "Комментарий обязателен.";
+const COMMENT_TOO_LONG = `Комментарий — не длиннее ${SCHEDULE_REQUEST_REJECT_COMMENT_MAX} символов.`;
+
+/**
+ * MOBILE-POLISH: длина комментария ограничена и на сервере — он уходит мастеру
+ * в уведомлении. Отказ — 400 `VALIDATION_ERROR` с текстом и `fieldErrors.comment`.
+ */
+const bodySchema = z.object(
+  {
+    comment: z
+      .string({ error: COMMENT_REQUIRED })
+      .trim()
+      .min(1, COMMENT_REQUIRED)
+      .max(SCHEDULE_REQUEST_REJECT_COMMENT_MAX, COMMENT_TOO_LONG),
+  },
+  { error: COMMENT_REQUIRED },
+);
 
 function hasAdminRole(roles: StudioRole[]) {
   return roles.some((role) => role === StudioRole.ADMIN || role === StudioRole.OWNER);
@@ -26,11 +46,12 @@ export async function POST(
       return jsonFail(403, "Этот раздел доступен администратору студии.", "FORBIDDEN");
     }
 
-    const body = (await req.json().catch(() => null)) as { comment?: string } | null;
-    const comment = body?.comment?.trim();
-    if (!comment) {
-      return jsonFail(400, "Комментарий обязателен.", "VALIDATION_ERROR");
+    const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      const message = parsed.error.issues[0]?.message ?? COMMENT_REQUIRED;
+      return jsonFail(400, message, "VALIDATION_ERROR", undefined, { comment: message });
     }
+    const { comment } = parsed.data;
 
     const p = params instanceof Promise ? await params : params;
     const request = await prisma.scheduleChangeRequest.findFirst({

@@ -6,6 +6,8 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
+import { isStudioSurfaceBooking } from "@/lib/studio/booking-scope";
+import { canReplyToStudioReview } from "../lib/can-reply";
 import { formatReviewDateLabel } from "../lib/format";
 import type {
   StudioReviewFilter,
@@ -25,6 +27,9 @@ const PAGE_LIMIT = 20;
  * to own), computes filter counts from the FULL set, then applies the
  * requested filter + cursor pagination. Master + service names come
  * from a single batched booking join (no N+1).
+ *
+ * MOBILE-STUDIO-C (G7): `canReply` — по правилу сервера для цели отзыва
+ * (`canReplyToStudioReview`), а не «администратору — всё».
  *
  * Reply identity stays implicit. The UI labels every reply «Ответ
  * студии» regardless of who typed it — there is no `repliedByUserId`
@@ -88,7 +93,17 @@ async function resolveScope(studioId: string, currentUserId: string): Promise<Sc
   return { isStudioAdmin, masterProviderId };
 }
 
-export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Promise<StudioReviewsListData> {
+export type StudioReviewsSet = Omit<StudioReviewsListData, "items" | "nextCursor"> & {
+  /** Отзывы под фильтрами, новые сверху, — до пагинации. */
+  items: StudioReviewItem[];
+};
+
+/**
+ * Весь набор отзывов студии под фильтрами (без пагинации) со счётчиками по
+ * всему набору. Общий для веба (`loadStudioReviewsList`, курсор — id) и
+ * приложения (`GET /api/cabinet/studio/reviews`, курсор-смещение).
+ */
+export async function loadStudioReviewsSet(input: Omit<LoadStudioReviewsInput, "cursor">): Promise<StudioReviewsSet> {
   const scope = await resolveScope(input.studioId, input.currentUserId);
 
   const studio = await prisma.studio.findUnique({
@@ -96,7 +111,14 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
     select: { id: true, providerId: true },
   });
   if (!studio) {
-    return emptyResult();
+    const empty = emptyResult();
+    return {
+      items: [],
+      filterCounts: empty.filterCounts,
+      masterOptions: empty.masterOptions,
+      totalReviewsCount: empty.totalReviewsCount,
+      unansweredCount: empty.unansweredCount,
+    };
   }
 
   // Single broad query covers everything we need to render the page:
@@ -120,10 +142,13 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
       createdAt: true,
       masterId: true,
       bookingId: true,
+      targetType: true,
+      targetId: true,
       author: { select: { displayName: true, firstName: true, lastName: true } },
       master: { select: { id: true, name: true } },
       booking: {
         select: {
+          studioId: true,
           service: { select: { name: true, title: true } },
         },
       },
@@ -131,15 +156,50 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
     orderBy: [{ createdAt: "desc" }],
   });
 
-  const allMasters = await prisma.provider.findMany({
-    where: { type: ProviderType.MASTER, studioId: studio.providerId },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  // MOBILE-STUDIO-C (G7): цели отзывов на мастеров — одним запросом, для
+  // `canReply` по правилу сервера (`canReplyToStudioReview`).
+  const providerTargetIds = Array.from(
+    new Set(reviews.filter((r) => r.targetType === "provider").map((r) => r.targetId)),
+  );
+  const [allMasters, targetProviders] = await Promise.all([
+    prisma.provider.findMany({
+      where: { type: ProviderType.MASTER, studioId: studio.providerId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    providerTargetIds.length > 0
+      ? prisma.provider.findMany({
+          where: { id: { in: providerTargetIds } },
+          select: {
+            id: true,
+            type: true,
+            ownerUserId: true,
+            studioId: true,
+            masterProfile: { select: { userId: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
   const masterOptions: StudioReviewMasterChip[] = allMasters.map((m) => ({
     id: m.id,
     displayName: m.name,
   }));
+  const targetProviderById = new Map(
+    targetProviders.map((p) => [
+      p.id,
+      {
+        type: p.type,
+        ownerUserId: p.ownerUserId,
+        masterProfileUserId: p.masterProfile?.userId ?? null,
+        studioId: p.studioId,
+      },
+    ]),
+  );
+  const viewer = {
+    userId: input.currentUserId,
+    isStudioAdmin: scope.isStudioAdmin,
+    studioProviderId: studio.providerId,
+  };
 
   const now = new Date();
   const allItems: StudioReviewItem[] = reviews.map((r) => {
@@ -151,9 +211,11 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
       r.booking?.service?.title?.trim() ||
       r.booking?.service?.name?.trim() ||
       null;
-    const canReply = scope.isStudioAdmin
-      ? true
-      : Boolean(scope.masterProviderId && scope.masterProviderId === r.masterId);
+    const canReply = canReplyToStudioReview({
+      review: { targetType: r.targetType, targetId: r.targetId },
+      targetProvider: r.targetType === "provider" ? (targetProviderById.get(r.targetId) ?? null) : null,
+      viewer,
+    });
     return {
       id: r.id,
       clientName,
@@ -164,6 +226,9 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
         ? { id: r.master.id, displayName: r.master.name }
         : null,
       serviceName,
+      // MOBILE-POLISH: ссылка на запись — только на запись этой студии
+      // (личная запись мастера в кабинете студии не открывается — 404).
+      bookingId: r.bookingId && r.booking && isStudioSurfaceBooking(r.booking, studio.id) ? r.bookingId : null,
       text: r.text ?? "",
       reply:
         r.replyText && r.repliedAt
@@ -197,6 +262,19 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
     }
   });
 
+  return {
+    items: filtered,
+    filterCounts,
+    masterOptions,
+    totalReviewsCount: allItems.length,
+    unansweredCount: filterCounts.no_reply,
+  };
+}
+
+export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Promise<StudioReviewsListData> {
+  const set = await loadStudioReviewsSet(input);
+  const filtered = set.items;
+
   // Cursor pagination — cursor = id of the last visible review.
   const cursorIndex = input.cursor ? filtered.findIndex((r) => r.id === input.cursor) : -1;
   const startIndex = cursorIndex >= 0 ? cursorIndex + 1 : 0;
@@ -209,11 +287,11 @@ export async function loadStudioReviewsList(input: LoadStudioReviewsInput): Prom
 
   return {
     items: slice,
-    filterCounts,
+    filterCounts: set.filterCounts,
     nextCursor,
-    masterOptions,
-    totalReviewsCount: allItems.length,
-    unansweredCount: filterCounts.no_reply,
+    masterOptions: set.masterOptions,
+    totalReviewsCount: set.totalReviewsCount,
+    unansweredCount: set.unansweredCount,
   };
 }
 

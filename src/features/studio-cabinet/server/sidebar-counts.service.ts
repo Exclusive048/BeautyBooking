@@ -1,7 +1,7 @@
 import { studioReviewsWhere } from "@/lib/reviews/studio-scope";
 import { ScheduleChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getUnreadBadgeCount } from "@/lib/notifications/badge";
+import { getStudioNotificationCounts } from "@/lib/notifications/studio-feed";
 import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 
 export type StudioSidebarCounts = {
@@ -16,17 +16,22 @@ export type StudioSidebarCounts = {
  * acceptable since each is a small indexed count. If this becomes a
  * latency hotspot, wrap callers in `React.cache` per render or add a
  * short Redis TTL.
+ *
+ * MOBILE-POLISH: `notificationsUnread` — канал студии (`getStudioNotificationCounts`:
+ * непрочитанные уведомления студии + ожидающие заявки на график), как лента
+ * `/cabinet/studio/notifications`, на которую ведёт пункт, и бейдж приложения
+ * (`GET /api/cabinet/studio/context`). Раньше здесь считались ЛИЧНЫЕ
+ * уведомления (`context: "personal"`) — веб и приложение расходились.
  */
 export async function getStudioSidebarCounts(input: {
   studioId: string;
   userId: string;
-  phone: string | null;
 }): Promise<StudioSidebarCounts> {
   const studio = await prisma.studio.findUnique({
     where: { id: input.studioId },
     select: { id: true, providerId: true },
   });
-  const [scheduleRequestsPending, reviewsUnanswered, badge] = await Promise.all([
+  const [scheduleRequestsPending, reviewsUnanswered, notifications] = await Promise.all([
     prisma.scheduleChangeRequest.count({
       where: { studioId: input.studioId, status: ScheduleChangeRequestStatus.PENDING },
     }),
@@ -39,12 +44,12 @@ export async function getStudioSidebarCounts(input: {
         ...ACTIVE_REVIEW_FILTER,
       },
     }),
-    getUnreadBadgeCount({ userId: input.userId, phone: input.phone, context: "personal" }),
+    getStudioNotificationCounts(input.userId),
   ]);
 
   return {
     scheduleRequestsPending,
     reviewsUnanswered,
-    notificationsUnread: badge.count,
+    notificationsUnread: notifications.unreadCount,
   };
 }

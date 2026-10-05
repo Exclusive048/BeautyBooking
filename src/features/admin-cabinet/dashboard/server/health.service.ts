@@ -270,11 +270,16 @@ export async function getAdminHealth(): Promise<AdminHealth> {
   // rows. Both moderation outcomes leave the count: «одобрить» clears
   // `reportedAt` (approve-review.service), «удалить» soft-deletes the row and
   // `ACTIVE_REVIEW_FILTER` drops it. So this IS the open moderation queue.
+  // MOBILE-POLISH (App Store 1.2): плюс новые жалобы на контент (`ContentReport`
+  // NEW) — та же очередь модерации, другой раздел («Жалобы»).
   const [queue, complaints, metrics, worker, database, redis, aiSpend, vk] = await Promise.all([
     getQueueStats(),
-    prisma.review.count({
-      where: { reportedAt: { not: null }, ...ACTIVE_REVIEW_FILTER },
-    }),
+    Promise.all([
+      prisma.review.count({
+        where: { reportedAt: { not: null }, ...ACTIVE_REVIEW_FILTER },
+      }),
+      prisma.contentReport.count({ where: { status: "NEW" } }),
+    ]).then(([reviews, contentReports]) => reviews + contentReports),
     readApiMetrics(),
     readWorkerLiveness(),
     timed(() => checkDatabase()),

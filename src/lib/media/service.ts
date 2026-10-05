@@ -14,6 +14,7 @@ import { createLimitReachedError } from "@/lib/billing/guards";
 import type { SessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { getStorageProvider } from "@/lib/media/storage";
+import { deleteMediaPreviews } from "@/lib/media/preview-variants";
 import {
   MEDIA_ALLOWED_MIME_TYPES,
   MEDIA_MAX_FILE_SIZE_BYTES,
@@ -37,6 +38,7 @@ import { studioBannerSettingKey } from "@/lib/studios/portfolio-items-sync";
 import { invalidateSiteAssetCache } from "@/lib/media/site-asset-cache";
 import { enqueue } from "@/lib/queue/queue";
 import { logError } from "@/lib/logging/logger";
+import { invalidateMeIdentityCache } from "@/lib/users/me";
 
 type UploadMediaInput = {
   entityType: MediaEntityType;
@@ -129,6 +131,21 @@ export async function deleteAssetById(assetId: string): Promise<void> {
     await storage.deleteObject(asset.storageKey);
   } catch (error) {
     logError("Failed to delete media object from storage (record already soft-deleted)", {
+      assetId: asset.id,
+      storageKey: asset.storageKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // 3. MOBILE-B1: превью `?w=` — производные байты того же фото, переживать
+  //    оригинал не должны. Строго ПОСЛЕ пометки `deletedAt` (шаг 1): вариант,
+  //    записанный параллельным запросом до неё, удаляется здесь, после неё —
+  //    самим запросом (`lib/media/preview-variants.ts`). Отдельный try, чтобы
+  //    сбой оригинала не оставлял варианты и наоборот.
+  try {
+    await deleteMediaPreviews(getStorageProvider(), asset.storageKey);
+  } catch (error) {
+    logError("Failed to delete media previews from storage (record already soft-deleted)", {
       assetId: asset.id,
       storageKey: asset.storageKey,
       error: error instanceof Error ? error.message : String(error),
@@ -456,6 +473,21 @@ export async function listMediaAssets(
   return assets.map(toMediaAssetDto);
 }
 
+/**
+ * MOBILE-CLIENT-01: `GET /api/me` несёт аватар клиента (`avatarUrl`) и кэширует
+ * ответ (`users/me.ts`) — после загрузки или удаления USER-аватара кадр
+ * сбрасывается, иначе приложение до истечения TTL видело бы прежнюю картинку.
+ * Сбой сброса не отменяет уже выполненную операцию — кадр истечёт сам.
+ */
+async function invalidateClientAvatarCaches(entityType: MediaEntityType, entityId: string, kind: MediaKind) {
+  if (entityType !== MediaEntityType.USER || kind !== MediaKind.AVATAR) return;
+  await invalidateMeIdentityCache(entityId).catch((error) => {
+    logError("Failed to invalidate /api/me cache after avatar change", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+}
+
 export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInput): Promise<MediaAssetDto> {
   validateUploadBasics(input);
   const entityId = normalizeEntityId(input.entityId);
@@ -610,6 +642,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
   ) {
     await writeProviderAvatarUrl(entityId, buildAvatarDisplayUrl(readyAsset));
   }
+  await invalidateClientAvatarCaches(input.entityType, entityId, input.kind);
 
 
   if (
@@ -851,6 +884,7 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
     });
     await writeProviderAvatarUrl(asset.entityId, nextAvatar ? buildAvatarDisplayUrl(nextAvatar) : null);
   }
+  await invalidateClientAvatarCaches(asset.entityType, asset.entityId, asset.kind);
 
   if (
     asset.entityType === MediaEntityType.MASTER &&

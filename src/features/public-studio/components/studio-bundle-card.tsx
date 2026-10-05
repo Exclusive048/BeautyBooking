@@ -1,5 +1,5 @@
 import { Package, Clock, Sparkles } from "lucide-react";
-import type { StudioBundleView } from "@/features/public-studio/server/studio-packages.service";
+import type { StudioBundleView } from "@/lib/providers/public-packages";
 import type { StudioMaster } from "@/features/booking/lib/studio-booking";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";

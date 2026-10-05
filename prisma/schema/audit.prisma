@@ -111,3 +111,65 @@ model PdAccessLog {
   @@index([surface, createdAt(sort: Desc)])
   @@index([scopeProviderId, createdAt(sort: Desc)])
 }
+
+// === DOMAIN: User content reports (MOBILE-POLISH, App Store 1.2) ===
+//
+// Жалоба любого вошедшего пользователя на чужой контент: страницу мастера или
+// студии, отзыв, работу в портфолио, переписку, предложение для моделей.
+// Цель приходит ПУБЛИЧНЫМ идентификатором (адрес страницы, `e_…`, slug
+// переписки, код предложения), здесь хранится уже внутренний id — очередь
+// администратора открывает цель без повторного разбора.
+//
+// «Одна открытая жалоба автора на цель» держит `openKey` (уникален, пока
+// жалоба NEW; при решении обнуляется) — частичный уникальный индекс без
+// сырого SQL. Жалобы мастеров на отзывы о себе (`POST /api/reviews/{id}/report`)
+// живут по-прежнему в полях `Review.report*` и разбираются в «Отзывах».
+model ContentReport {
+  id String @id @default(cuid())
+
+  reporterUserId String
+
+  reporter UserProfile @relation("ContentReportReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+
+  targetType ContentReportTargetType
+
+  /// Внутренний id цели: Provider.id / Review.id / PortfolioItem.id /
+  /// ConversationSlug.id / ModelOffer.id.
+  targetId String
+
+  /// Провайдер, к которому относится контент (страница, владелец работы или
+  /// предложения, мастер переписки), — для ссылок в очереди. Без FK: жалоба
+  /// переживает удаление кабинета.
+  targetProviderId String?
+
+  /// CHAT: сообщение, на которое пожаловались (необязательно).
+  chatMessageId String?
+
+  reason ContentReportReason
+
+  /// До 1000 символов; для OTHER обязателен.
+  comment String? @db.VarChar(1000)
+
+  status ContentReportStatus @default(NEW)
+
+  /// `reporterUserId:targetType:targetId`, пока жалоба NEW; при решении — null.
+  openKey String? @unique @db.VarChar(200)
+
+  resolvedAt DateTime?
+
+  resolvedByUserId String?
+
+  resolvedBy UserProfile? @relation("ContentReportResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  /// Пометка администратора: что сделано («Отзыв удалён», «Нарушения нет»).
+  resolutionNote String? @db.VarChar(1000)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([targetType, status, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+  @@index([reporterUserId, createdAt(sort: Desc)])
+}

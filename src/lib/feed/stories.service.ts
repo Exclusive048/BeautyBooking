@@ -16,6 +16,16 @@ import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility"
 // v2 (STUDIO-PORTFOLIO-FEED): у элемента появилась подпись «мастер · услуга» —
 // кадры прежней формы её не несут, поэтому ключ новый, а не общий.
 export const FEED_STORIES_CACHE_KEY = "feed:stories:v2";
+/**
+ * MOBILE-B1 — истории города (`?city=<slug>`): свой ключ на город и множество-
+ * указатель этих ключей, чтобы `invalidateStoriesCache` гасил их вместе с
+ * общим (новая работа видна сразу и в ленте города). Общий ключ не меняется.
+ */
+export const FEED_STORIES_CITY_KEYS_INDEX = "feed:stories:v2:city-keys";
+
+export function feedStoriesCacheKey(cityId?: string): string {
+  return cityId ? `${FEED_STORIES_CACHE_KEY}:city:${cityId}` : FEED_STORIES_CACHE_KEY;
+}
 export const STORIES_LOOKBACK_CONFIG_KEY = "STORIES_LOOKBACK_HOURS";
 export const STORIES_LOOKBACK_HOURS_DEFAULT = 72;
 
@@ -70,7 +80,7 @@ async function resolveLookbackHours(): Promise<number> {
   return STORIES_LOOKBACK_HOURS_DEFAULT;
 }
 
-async function fetchStoriesFromDb(): Promise<StoriesPayload> {
+async function fetchStoriesFromDb(cityId?: string): Promise<StoriesPayload> {
   const lookbackHours = await resolveLookbackHours();
   const since = new Date(Date.now() - lookbackHours * 60 * 60 * 1000);
 
@@ -79,7 +89,12 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
       isPublic: true,
       createdAt: { gte: since },
       master: {
-        AND: [catalogVisibleProviderWhere(), { autoPublishStoriesEnabled: true }],
+        AND: [
+          catalogVisibleProviderWhere(),
+          { autoPublishStoriesEnabled: true },
+          // MOBILE-B1: истории города; без него — все города, как было.
+          ...(cityId ? [{ cityId }] : []),
+        ],
       },
     },
     select: {
@@ -140,13 +155,15 @@ async function fetchStoriesFromDb(): Promise<StoriesPayload> {
   return { groups, cachedAt: new Date().toISOString() };
 }
 
-export async function getActiveStoriesGroups(): Promise<StoriesPayload> {
+export async function getActiveStoriesGroups(options: { cityId?: string } = {}): Promise<StoriesPayload> {
+  const { cityId } = options;
+  const cacheKey = feedStoriesCacheKey(cityId);
   try {
     const redis = await getRedisConnection();
     if (redis) {
       const cached = await withRedisCommandTimeout(
         "feed:stories:get",
-        redis.get(FEED_STORIES_CACHE_KEY),
+        redis.get(cacheKey),
       );
       if (cached) {
         const parsed = JSON.parse(cached) as StoriesPayload;
@@ -156,23 +173,36 @@ export async function getActiveStoriesGroups(): Promise<StoriesPayload> {
       }
     }
 
-    const fresh = await fetchStoriesFromDb();
+    const fresh = await fetchStoriesFromDb(cityId);
 
     if (redis) {
       await withRedisCommandTimeout(
         "feed:stories:set",
-        redis.set(FEED_STORIES_CACHE_KEY, JSON.stringify(fresh), {
+        redis.set(cacheKey, JSON.stringify(fresh), {
           EX: STORIES_CACHE_TTL_SECONDS,
         }),
       ).catch((err: unknown) => {
         logError("Failed to cache stories", { error: String(err) });
       });
+      if (cityId) {
+        // Указатель живёт не меньше самого свежего из своих ключей: срок
+        // продлевается на каждом добавлении (как `sAdd` в `cache/redisClient`).
+        await Promise.all([
+          withRedisCommandTimeout("feed:stories:index-add", redis.sAdd(FEED_STORIES_CITY_KEYS_INDEX, cacheKey)),
+          withRedisCommandTimeout(
+            "feed:stories:index-expire",
+            redis.expire(FEED_STORIES_CITY_KEYS_INDEX, STORIES_CACHE_TTL_SECONDS),
+          ),
+        ]).catch((err: unknown) => {
+          logError("Failed to index city stories cache", { error: String(err) });
+        });
+      }
     }
 
     return fresh;
   } catch (err) {
     logError("getActiveStoriesGroups failed, falling back to DB", { error: String(err) });
-    return fetchStoriesFromDb();
+    return fetchStoriesFromDb(cityId);
   }
 }
 
@@ -181,6 +211,17 @@ export async function invalidateStoriesCache(): Promise<void> {
     const redis = await getRedisConnection();
     if (!redis) return;
     await withRedisCommandTimeout("feed:stories:del", redis.del(FEED_STORIES_CACHE_KEY));
+    // MOBILE-B1: и истории городов — по указателю.
+    const cityKeys = await withRedisCommandTimeout(
+      "feed:stories:index-members",
+      redis.sMembers(FEED_STORIES_CITY_KEYS_INDEX),
+    );
+    if (Array.isArray(cityKeys) && cityKeys.length > 0) {
+      await withRedisCommandTimeout(
+        "feed:stories:del-cities",
+        redis.del([...cityKeys, FEED_STORIES_CITY_KEYS_INDEX]),
+      );
+    }
   } catch (err) {
     logError("invalidateStoriesCache failed", { error: String(err) });
   }

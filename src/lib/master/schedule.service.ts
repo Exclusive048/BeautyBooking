@@ -4,6 +4,7 @@ import { masterPerformedBookingWhere } from "@/lib/bookings/master-booking-scope
 import { countClientFreeSlotsToday } from "@/lib/master/free-today";
 import { prisma } from "@/lib/prisma";
 import { ScheduleEngine } from "@/lib/schedule/engine";
+import { localDayRangeUtc } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
 import { resolveBookingRuntimeStatus } from "@/lib/bookings/flow";
 import {
@@ -72,6 +73,14 @@ export type ScheduleDay = {
   weekDay: WeekDay;
   isOff: boolean;
   workingIntervals: Array<{ startMin: number; endMin: number }>;
+  /** MOBILE-MASTER-C: перерывы дня из плана движка (`DayPlan.breaks`), минуты от полуночи салона. */
+  breaks: Array<{ startMin: number; endMin: number }>;
+  /**
+   * MOBILE-MASTER-C: день «Фиксированное время» — начала окошек `HH:MM` (время
+   * салона); `null` — обычный день. Рабочее окно такого дня хранится как
+   * 00:00–23:55 и часами работы не является.
+   */
+  fixedStarts: string[] | null;
   bookings: ScheduleBookingItem[];
   timeBlocks: ScheduleTimeBlockItem[];
 };
@@ -218,6 +227,13 @@ export const getMasterScheduleWeek = cache(
     // this is the sibling day-grouping axis. Slot generation is untouched.
     const todayIso = toLocalDateKey(now, master.timezone);
     const weekDays = getWeekDays(input.weekStart, now, todayIso);
+    // MOBILE-MASTER-C (rule 17, salon-tz): границы выборки записей и блоков —
+    // полночи САЛОНА первого дня и дня после последнего. Раньше это была
+    // полночь процесса (`input.weekStart`): на UTC-хосте утро понедельника
+    // мастера восточнее UTC (до 03:00 в Москве, до 10:00 во Владивостоке) в
+    // неделю не попадало.
+    const rangeStartUtc = localDayRangeUtc(weekDays[0]!.iso, master.timezone).startUtc;
+    const rangeEndUtc = localDayRangeUtc(weekDays[weekDays.length - 1]!.iso, master.timezone).endExclusiveUtc;
 
     // Day plans, bookings, and time blocks all in one parallel batch.
     const ctx = await ScheduleEngine.createContext({
@@ -235,7 +251,7 @@ export const getMasterScheduleWeek = cache(
         where: {
           // F1: performer predicate — see master-booking-scope.ts.
           ...masterPerformedBookingWhere(input.workProfiles?.allIds ?? master.id),
-          startAtUtc: { gte: input.weekStart, lt: weekEnd },
+          startAtUtc: { gte: rangeStartUtc, lt: rangeEndUtc },
           status: {
             notIn: [BookingStatus.CANCELLED, BookingStatus.REJECTED, BookingStatus.NO_SHOW],
           },
@@ -260,8 +276,8 @@ export const getMasterScheduleWeek = cache(
       prisma.timeBlock.findMany({
         where: {
           masterId: master.id,
-          startAt: { lt: weekEnd },
-          endAt: { gt: input.weekStart },
+          startAt: { lt: rangeEndUtc },
+          endAt: { gt: rangeStartUtc },
         },
         orderBy: { startAt: "asc" },
         select: {
@@ -359,6 +375,8 @@ export const getMasterScheduleWeek = cache(
         weekDay: wd,
         isOff: !plan.isWorking,
         workingIntervals: intervals,
+        breaks: plan.breaks.map((b) => parseInterval(b.start, b.end)),
+        fixedStarts: plan.fixedStarts ?? null,
         bookings: bookingsByDay.get(wd.iso) ?? [],
         timeBlocks: timeBlocksByDay.get(wd.iso) ?? [],
       };

@@ -38,11 +38,7 @@ export default async function StudioCabinetLayout({
 
   const [studioInfo, sidebarCounts, subscription] = await Promise.all([
     getStudioShellInfo(studioId),
-    getStudioSidebarCounts({
-      studioId,
-      userId: user.id,
-      phone: user.phone ?? null,
-    }),
+    getStudioSidebarCounts({ studioId, userId: user.id }),
     getCurrentSubscriptionRow(user.id, SubscriptionScope.STUDIO),
   ]);
 

@@ -22,6 +22,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     systemConfig: { findUnique: systemConfigFindUnique },
     userProfile: { findUnique: userFindUnique, updateMany: userUpdateMany },
+    // MOBILE-CLIENT-01: `/api/me` несёт и аватар клиента (здесь — не загружен).
+    mediaAsset: { findFirst: vi.fn(async () => null) },
   },
 }));
 

@@ -1,5 +1,3 @@
-import crypto from "crypto";
-import { cookies } from "next/headers";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import {
   cabinetRefererPath,
@@ -14,21 +12,11 @@ import {
 } from "@/lib/auth/oauth-start-error";
 import { getSessionUser } from "@/lib/auth/session";
 import { PHONE_VERIFY_START_PARAM, rememberPhoneVerifyReturn } from "@/lib/auth/phone-verify-return";
-import { buildVkAuthorizeUrl, requireVkRedirectUri } from "@/lib/vk/oauth";
-import { generateCodeChallenge, generateCodeVerifier } from "@/lib/vk/pkce";
-import { signVkCookieValue, VK_ID_STATE_COOKIE, VK_ID_STATE_TTL_SECONDS, VK_ID_VERIFIER_COOKIE } from "@/lib/vk/cookies";
+import { beginOAuthAuthorization, OAUTH_NOT_CONFIGURED_CODES } from "@/lib/auth/oauth-providers";
 import { consentFlagsFromParams, hasRequiredConsents } from "@/lib/legal/consent-flags";
-import { signConsentCookieValue, VK_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
-import { isProduction, isVkAuthEnabled } from "@/lib/env";
+import { isVkAuthEnabled } from "@/lib/env";
 
-const VK_NOT_CONFIGURED_CODES = new Set([
-  "VK_CLIENT_ID_MISSING",
-  "VK_CLIENT_SECRET_MISSING",
-  "VK_REDIRECT_URI_MISSING",
-  "VK_ID_CLIENT_ID_MISSING",
-  "VK_ID_CLIENT_SECRET_MISSING",
-  "VK_ID_REDIRECT_URI_MISSING",
-]);
+const VK_NOT_CONFIGURED_CODES = OAUTH_NOT_CONFIGURED_CODES.vk;
 
 /**
  * FIX-D1 — куда вернуть браузер при отказе.
@@ -77,34 +65,10 @@ export async function GET(req: Request): Promise<OAuthStartNavigation> {
     }
 
     try {
-      const state = crypto.randomBytes(32).toString("hex");
-      const codeVerifier = generateCodeVerifier();
-      const codeChallenge = generateCodeChallenge(codeVerifier);
-      const redirectUri = requireVkRedirectUri("auth");
-      const authUrl = buildVkAuthorizeUrl({ state, codeChallenge, redirectUri });
-
-      const cookieStore = await cookies();
-      cookieStore.set(VK_CONSENT_COOKIE, signConsentCookieValue(state, consentFlags), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: isProduction,
-        path: "/",
-        maxAge: VK_ID_STATE_TTL_SECONDS,
-      });
-      cookieStore.set(VK_ID_STATE_COOKIE, signVkCookieValue(state), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: isProduction,
-        path: "/",
-        maxAge: VK_ID_STATE_TTL_SECONDS,
-      });
-      cookieStore.set(VK_ID_VERIFIER_COOKIE, signVkCookieValue(codeVerifier), {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: isProduction,
-        path: "/",
-        maxAge: VK_ID_STATE_TTL_SECONDS,
-      });
+      // state + PKCE + три подписанные куки (согласия, state, verifier) — общий
+      // с мобильным стартом `beginOAuthAuthorization` (MOBILE-AUTH-A2): колбэк
+      // у них один и читает ровно эти куки.
+      const { authorizeUrl: authUrl } = await beginOAuthAuthorization("vk", consentFlags);
 
       // PHONE-OAUTH-PROOF-01: вход из кнопки «Подтвердить номер» в кабинете —
       // колбэк вернёт на ту же страницу с итогом (`phone-verify-return.ts`).

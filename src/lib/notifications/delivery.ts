@@ -151,19 +151,33 @@ async function deliverEmailNotification(
  * том, чего не случилось (откат), а ретрай джоба пришлёт его второй раз.
  */
 export function deliverExternalChannels(
-  record: { userId: string; type: NotificationType; title: string; body: string },
+  record: {
+    userId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    /** MOBILE-B2: id и payload записи — приложению (id сущностей, «прочитано» по нажатию). */
+    id?: string;
+    payloadJson?: unknown;
+  },
   urls: { pushUrl?: string; emailCtaUrl?: string; pushTag?: string } = {},
 ): void {
   // HARDENING-01 FIX-4: fire-and-forget MUST carry a .catch — a rejected
   // detached promise inside the worker (booking reminders run here) hits the
   // global unhandledRejection handler, which exits the whole worker process.
   // Mirrors the existing pattern in `admin-initiated.ts`.
-  void sendPushToUser(record.userId, {
-    title: record.title,
-    body: record.body,
-    url: urls.pushUrl,
-    tag: urls.pushTag,
-  }).catch((error) => {
+  void sendPushToUser(
+    record.userId,
+    {
+      title: record.title,
+      body: record.body,
+      url: urls.pushUrl,
+      tag: urls.pushTag,
+    },
+    // MOBILE-B2: тот же push в нативное приложение — общий текст по типу из
+    // таблицы `native-push/payload.ts`, а не `title`/`body` записи (в них ПДн).
+    { native: { type: record.type, notificationId: record.id ?? null, payloadJson: record.payloadJson } },
+  ).catch((error) => {
     logError("Push notification delivery failed", {
       userId: record.userId,
       type: record.type,

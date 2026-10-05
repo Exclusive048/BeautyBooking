@@ -8,6 +8,7 @@ import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
 import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
 import { deleteAssetById } from "@/lib/media/service";
+import { PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { logError } from "@/lib/logging/logger";
 import * as UI_TEXT from "@/lib/ui/text";
 import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
@@ -49,6 +50,9 @@ export type MasterContext = {
   ratingCount: number;
   autoPublishStoriesEnabled: boolean;
   cityId: string | null;
+  timezone: string;
+  publicUsername: string | null;
+  district: string;
 };
 
 export async function getMasterContext(masterId: string): Promise<MasterContext> {
@@ -73,6 +77,9 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       ratingCount: true,
       autoPublishStoriesEnabled: true,
       cityId: true,
+      timezone: true,
+      publicUsername: true,
+      district: true,
     },
   });
   if (!master || master.type !== "MASTER") {
@@ -100,6 +107,9 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       ratingCount: master.ratingCount,
       autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
       cityId: master.cityId,
+      timezone: master.timezone,
+      publicUsername: master.publicUsername,
+      district: master.district,
     };
   }
 
@@ -131,6 +141,9 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     ratingCount: master.ratingCount,
     autoPublishStoriesEnabled: master.autoPublishStoriesEnabled,
     cityId: master.cityId,
+    timezone: master.timezone,
+    publicUsername: master.publicUsername,
+    district: master.district,
   };
 }
 
@@ -184,6 +197,12 @@ export type MasterProfileData = {
     ratingCount: number;
     autoPublishStoriesEnabled: boolean;
     cityId: string | null;
+    /** MOBILE-MASTER-C: пояс салона (IANA) — в нём показывать время записей. */
+    timezone: string;
+    /** MOBILE-MASTER-C: адрес публичной страницы `/u/{publicUsername}`; здесь не генерируется (`null` — ещё не выдан). */
+    publicUsername: string | null;
+    /** MOBILE-MASTER-C: район (свободная строка профиля, может быть пустой). */
+    district: string;
   };
   services: MasterProfileServiceItem[];
   portfolio: MasterPortfolioItem[];
@@ -236,6 +255,9 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         ratingCount: context.ratingCount,
         autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
         cityId: context.cityId,
+        timezone: context.timezone,
+        publicUsername: context.publicUsername,
+        district: context.district,
       },
       services: services.map((service) => ({
         serviceId: service.id,
@@ -317,6 +339,9 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       ratingCount: context.ratingCount,
       autoPublishStoriesEnabled: context.autoPublishStoriesEnabled,
       cityId: context.cityId,
+      timezone: context.timezone,
+      publicUsername: context.publicUsername,
+      district: context.district,
     },
     services: services.map((service) => {
       const override = overrideByService.get(service.id);
@@ -835,15 +860,35 @@ export async function createSoloMasterService(
   return { id: created.id };
 }
 
-export async function listMasterPortfolio(masterId: string): Promise<{ items: MasterPortfolioItem[] }> {
+/** Работа в списке кабинета: + позиция ручного порядка мастера. */
+export type MasterPortfolioListItem = MasterPortfolioItem & { sortOrder: number };
+
+/** Предохранитель размера ответа; лимиты тарифов заметно ниже. */
+const MASTER_PORTFOLIO_LIST_LIMIT = 500;
+
+/**
+ * `GET /api/master/portfolio` (читает приложение; веб-кабинет — SSR
+ * `portfolio-view.service.ts`). Порядок — `PORTFOLIO_DISPLAY_ORDER`, тот же,
+ * что у каталога, публичной страницы и стрелок «выше / ниже»: иначе после
+ * перечитывания кабинет показывал свежие работы первыми, а не ручной порядок.
+ * `total` — все работы мастера, для счётчика лимита тарифа.
+ */
+export async function listMasterPortfolio(
+  masterId: string,
+): Promise<{ items: MasterPortfolioListItem[]; total: number }> {
   await getMasterContext(masterId);
-  const items = await prisma.portfolioItem.findMany({
-    where: { masterId },
-    include: { services: { select: { serviceId: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const where = { masterId };
+  const [items, total] = await Promise.all([
+    prisma.portfolioItem.findMany({
+      where,
+      include: { services: { select: { serviceId: true } } },
+      orderBy: PORTFOLIO_DISPLAY_ORDER,
+      take: MASTER_PORTFOLIO_LIST_LIMIT,
+    }),
+    prisma.portfolioItem.count({ where }),
+  ]);
   return {
+    total,
     items: items.map((item) => ({
       id: item.id,
       mediaUrl: item.mediaUrl,
@@ -854,6 +899,7 @@ export async function listMasterPortfolio(masterId: string): Promise<{ items: Ma
       inSearch: item.inSearch,
       isPublic: item.isPublic,
       createdAt: item.createdAt.toISOString(),
+      sortOrder: item.sortOrder,
     })),
   };
 }

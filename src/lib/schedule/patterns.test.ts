@@ -6,6 +6,7 @@ import {
   normalizePatternInput,
   periodTemplateIdOn,
   planPeriodWrite,
+  planScheduleEnd,
   weekSignature,
   type PeriodWriteOp,
 } from "@/lib/schedule/patterns";
@@ -51,7 +52,9 @@ function summarize(ops: PeriodWriteOp[]): string[] {
         ? `delete ${op.id}`
         : op.op === "trimEnd"
           ? `trimEnd ${op.id} → ${op.endsOn}`
-          : `trimStart ${op.id} → ${op.startsOn}`,
+          : op.op === "setEnd"
+            ? `setEnd ${op.id} → ${op.endsOn ?? "∞"}`
+            : `trimStart ${op.id} → ${op.startsOn}`,
   );
 }
 
@@ -190,5 +193,93 @@ describe("weekSignature", () => {
     const a = buildDefaultWeekSchedule();
     const b = a.map((day) => (day.dayOfWeek === 0 ? { ...day, endTime: "19:00" } : day));
     expect(weekSignature(a)).not.toBe(weekSignature(b));
+  });
+});
+
+/**
+ * MOBILE-POLISH — «Настроено до»: дата позже нынешнего конца продлевает
+ * расписание одним вызовом (раньше — только `null`, потом дата).
+ *
+ * @probe 2026-10-04: в `planScheduleEnd` убрана ветка продления — красные
+ * «продлить одним вызовом» и «итог как у двух шагов». Возвращено — зелёный.
+ */
+describe("planScheduleEnd", () => {
+  const today = "2026-10-04";
+
+  /** Применить план к периодам в памяти — сравнить итог, а не набор шагов. */
+  function apply(
+    periods: Array<ReturnType<typeof week>>,
+    ops: PeriodWriteOp[],
+  ): Array<{ id: string; startsOn: string | null; endsOn: string | null }> {
+    let next = periods.map((period) => ({ id: period.id, startsOn: period.startsOn, endsOn: period.endsOn }));
+    let created = 0;
+    for (const op of ops) {
+      if (op.op === "delete") next = next.filter((period) => period.id !== op.id);
+      else if (op.op === "setEnd" || op.op === "trimEnd")
+        next = next.map((period) => (period.id === op.id ? { ...period, endsOn: op.endsOn } : period));
+      else if (op.op === "trimStart")
+        next = next.map((period) => (period.id === op.id ? { ...period, startsOn: op.startsOn } : period));
+      else next.push({ id: `new${(created += 1)}`, startsOn: op.period.startsOn, endsOn: op.period.endsOn });
+    }
+    return next.sort((a, b) => (a.startsOn ?? "").localeCompare(b.startsOn ?? ""));
+  }
+
+  it("укоротить: как раньше", () => {
+    expect(summarize(planScheduleEnd([week("w", null, "2026-12-01")], "2026-11-01", today))).toEqual([
+      "setEnd w → 2026-11-01",
+    ]);
+  });
+
+  it("продлить одним вызовом: конец последнего периода переходит на дату", () => {
+    const periods = [week("a", null, "2026-10-09"), week("b", "2026-10-10", "2026-10-31")];
+    expect(summarize(planScheduleEnd(periods, "2026-12-01", today))).toEqual(["setEnd b → 2026-12-01"]);
+  });
+
+  it("итог как у двух шагов (`null`, потом дата)", () => {
+    const periods = [week("a", null, "2026-10-09"), week("b", "2026-10-10", "2026-10-31")];
+    const oneCall = apply(periods, planScheduleEnd(periods, "2026-12-01", today));
+    const step1 = apply(periods, planScheduleEnd(periods, null, today));
+    const afterStep1 = periods.map((period) => ({ ...period, ...step1.find((row) => row.id === period.id) }));
+    const twoSteps = apply(afterStep1, planScheduleEnd(afterStep1, "2026-12-01", today));
+    expect(oneCall).toEqual(twoSteps);
+    expect(oneCall.at(-1)).toEqual({ id: "b", startsOn: "2026-10-10", endsOn: "2026-12-01" });
+  });
+
+  it("та же дата — ничего не делать", () => {
+    expect(planScheduleEnd([week("w", null, "2026-11-01")], "2026-11-01", today)).toEqual([]);
+  });
+
+  it("`null` — последний период бессрочный; уже бессрочный — без шагов", () => {
+    expect(summarize(planScheduleEnd([week("w", null, "2026-11-01")], null, today))).toEqual(["setEnd w → ∞"]);
+    expect(planScheduleEnd([week("w", null, null)], null, today)).toEqual([]);
+  });
+
+  it("кончился вчера — продлевается сам (прошлое не задето)", () => {
+    expect(summarize(planScheduleEnd([week("w", null, "2026-10-03")], "2026-11-01", today))).toEqual([
+      "setEnd w → 2026-11-01",
+    ]);
+  });
+
+  it("кончился давно — продолжение копией с сегодня, прошлое не переписывается", () => {
+    const ops = planScheduleEnd([week("w", "2026-08-01", "2026-09-01")], "2026-11-01", today);
+    expect(summarize(ops)).toEqual(["create WEEK 2026-10-04…2026-11-01"]);
+    const created = ops[0];
+    expect(created?.op === "create" && created.period.anchorOn).toBe("2024-01-01");
+    expect(summarize(planScheduleEnd([week("w", "2026-08-01", "2026-09-01")], null, today))).toEqual([
+      "create WEEK 2026-10-04…∞",
+    ]);
+  });
+
+  it("дата раньше начала следующего периода — тот удаляется, прежний не продлевается", () => {
+    const periods = [week("a", null, "2026-10-09"), week("b", "2026-10-20", null)];
+    expect(summarize(planScheduleEnd(periods, "2026-10-15", today))).toEqual(["delete b"]);
+  });
+
+  it("проверка дат прежняя", () => {
+    expect(() => planScheduleEnd([], "2026-11-01", today)).toThrow("Сначала настройте график.");
+    expect(() => planScheduleEnd([week("w", null, null)], "2026-10-03", today)).toThrow("Проверьте дату окончания.");
+    expect(() => planScheduleEnd([week("w", null, null)], "2027-03-01", today)).toThrow(
+      "Расписание можно настроить не дальше чем на 3 месяца вперёд.",
+    );
   });
 });

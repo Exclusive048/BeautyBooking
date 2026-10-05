@@ -1,22 +1,20 @@
-import type { Prisma } from "@prisma/client";
-import { AccountType } from "@prisma/client";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
 import { withRequestContext } from "@/lib/api/with-request-context";
 import { AppError } from "@/lib/api/errors";
 import { failOAuthCallback } from "@/lib/auth/oauth-callback-error";
 import { fail } from "@/lib/api/response";
 import { resolveCabinetRedirect } from "@/lib/auth/cabinet-redirect";
 import {
-  applyProviderVerifiedPhoneSafe,
-} from "@/lib/auth/phone-provider-proof";
+  clearMobileOAuthFlowCookie,
+  readMobileOAuthFlowCookie,
+  type MobileOAuthFlow,
+} from "@/lib/auth/mobile-oauth-flow";
+import { linkOAuthIdentity, resolveOAuthLogin } from "@/lib/auth/oauth-login";
+import { completeMobileOAuthCallback, mobileOAuthStateInvalid } from "@/lib/auth/oauth-mobile-callback";
 import { phoneVerifyResultPath, takePhoneVerifyReturn } from "@/lib/auth/phone-verify-return";
-import { ensureClientRoleForUser } from "@/lib/auth/roles";
 import { getSessionUser, setSessionCookies } from "@/lib/auth/session";
-import { ensureFreeSubscriptionsForRoles } from "@/lib/billing/ensure-free-subscription";
 import { nextRedirect } from "@/lib/http/origin";
-import { logError, logInfo } from "@/lib/logging/logger";
-import { sendTelegramAlert } from "@/lib/monitoring/alerts";
+import { mobileAuthCallbackRedirect } from "@/lib/mobile/app-redirect";
 import { exchangeYandexCodeForToken, fetchYandexProfile, requireYandexRedirectUri } from "@/lib/yandex/oauth";
 import { yandexCallbackSchema } from "@/lib/yandex/schemas";
 import {
@@ -24,17 +22,19 @@ import {
   YANDEX_STATE_COOKIE,
   YANDEX_VERIFIER_COOKIE,
 } from "@/lib/yandex/cookies";
-import { hasRequiredConsents } from "@/lib/legal/consent-flags";
 import { readConsentCookieValue, YANDEX_CONSENT_COOKIE } from "@/lib/legal/oauth-consent-cookie";
-import { recordUserConsents } from "@/lib/legal/consent";
 import { extractClientIp } from "@/lib/http/ip";
 import { isProduction, isYandexAuthEnabled } from "@/lib/env";
 
 // FIX-YANDEX-OAUTH — callback route. Account-linking logic mirrors
 // api/auth/vk/callback EXACTLY (the security-sensitive new-vs-existing-user
-// branch + the "already linked to another user" 409 guard).
+// branch + the "already linked to another user" 409 guard). MOBILE-AUTH-A2:
+// with the logic now living in ONE service (`auth/oauth-login.ts`), the mirror
+// is structural rather than copy-paste.
 
-function clearYandexCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function clearYandexCookies(cookieStore: CookieStore) {
   // RKN-FIX-01: consent cookie is single-use alongside state/verifier.
   for (const name of [YANDEX_STATE_COOKIE, YANDEX_VERIFIER_COOKIE, YANDEX_CONSENT_COOKIE]) {
     cookieStore.set(name, "", {
@@ -45,37 +45,49 @@ function clearYandexCookies(cookieStore: Awaited<ReturnType<typeof cookies>>) {
       maxAge: 0,
     });
   }
+  // MOBILE-AUTH-A2: кука мобильного флоу — из той же одноразовой пачки (гасится,
+  // только если пришла: веб-колбэк без неё отвечает ровно как раньше).
+  clearMobileOAuthFlowCookie(cookieStore, "yandex");
 }
 
-function buildDisplayName(firstName?: string | null, lastName?: string | null) {
-  const fullName = `${firstName ?? ""} ${lastName ?? ""}`.trim();
-  return fullName || null;
-}
-
-/**
- * RKN-FIX-12: identity only — the token from the code exchange is used for
- * `fetchYandexProfile` in the caller's scope and never persisted.
- */
-async function upsertYandexLink(params: { userId: string; yandexUserId: string }) {
-  const existing = await prisma.yandexLink.findUnique({
-    where: { yandexUserId: params.yandexUserId },
-    select: { userId: true },
-  });
-
-  if (existing && existing.userId !== params.userId) {
-    throw new AppError("Этот аккаунт Яндекс ID уже привязан к другому пользователю.", 409, "YANDEX_ALREADY_LINKED");
+/** MOBILE-AUTH-A2: флоу начат приложением — см. VK-близнец. */
+function readYandexMobileFlow(cookieStore: CookieStore): MobileOAuthFlow | null {
+  try {
+    const expectedState = readSignedYandexCookieValue(cookieStore.get(YANDEX_STATE_COOKIE)?.value);
+    return readMobileOAuthFlowCookie(cookieStore, "yandex", expectedState);
+  } catch {
+    // Нечем проверить подпись — веб-ветка ответит прежним отказом.
+    return null;
   }
+}
 
-  await prisma.yandexLink.upsert({
-    where: { userId: params.userId },
-    create: {
-      userId: params.userId,
-      yandexUserId: params.yandexUserId,
-      isEnabled: true,
-    },
-    update: {
-      yandexUserId: params.yandexUserId,
-      isEnabled: true,
+/** MOBILE-AUTH-A2 — ветка приложения (см. VK-близнец и `oauth-mobile-callback.ts`). */
+async function completeYandexMobileCallback(req: Request, cookieStore: CookieStore, flow: MobileOAuthFlow) {
+  const codeVerifier = readSignedYandexCookieValue(cookieStore.get(YANDEX_VERIFIER_COOKIE)?.value);
+  const rawConsentCookie = cookieStore.get(YANDEX_CONSENT_COOKIE)?.value;
+  clearYandexCookies(cookieStore);
+
+  return completeMobileOAuthCallback(req, flow, {
+    consentFlags: readConsentCookieValue(rawConsentCookie, flow.state),
+    obtainIdentity: async () => {
+      const url = new URL(req.url);
+      const parsed = yandexCallbackSchema.safeParse({
+        code: url.searchParams.get("code"),
+        state: url.searchParams.get("state"),
+      });
+      if (!parsed.success) {
+        throw new AppError("Не удалось войти через Яндекс. Попробуйте ещё раз.", 400, "VALIDATION_ERROR");
+      }
+      if (parsed.data.state !== flow.state || !codeVerifier) {
+        throw mobileOAuthStateInvalid("yandex");
+      }
+      const token = await exchangeYandexCodeForToken({
+        code: parsed.data.code,
+        codeVerifier,
+        redirectUri: requireYandexRedirectUri(),
+      });
+      const profile = await fetchYandexProfile(token.accessToken);
+      return { provider: "yandex", profile };
     },
   });
 }
@@ -85,10 +97,21 @@ export async function GET(req: Request) {
     // AUTH-KILLSWITCH-ENFORCE-01: gate the callback too (the session-issuing
     // leg) — a gate on `start` alone is bypassable by hitting `callback`.
     if (!isYandexAuthEnabled) {
+      // MOBILE-AUTH-A2: флоу приложения получает отказ в приложение.
+      const cookieStore = await cookies();
+      if (readYandexMobileFlow(cookieStore)) {
+        clearYandexCookies(cookieStore);
+        return mobileAuthCallbackRedirect({ error: "provider_unavailable" });
+      }
       return fail("Этот способ входа недоступен.", 503, "SERVICE_UNAVAILABLE");
     }
 
     const cookieStore = await cookies();
+
+    const mobileFlow = readYandexMobileFlow(cookieStore);
+    if (mobileFlow) {
+      return completeYandexMobileCallback(req, cookieStore, mobileFlow);
+    }
 
     try {
       const url = new URL(req.url);
@@ -117,9 +140,11 @@ export async function GET(req: Request) {
 
       // RKN-FIX-01 — signature + state binding gate the flags (see the VK
       // callback and `oauth-consent-cookie.ts`).
-      const consentFlags = readConsentCookieValue(rawConsentCookie, expectedState);
-      const ipAddress = extractClientIp(req);
-      const userAgent = req.headers.get("user-agent");
+      const consent = {
+        flags: readConsentCookieValue(rawConsentCookie, expectedState),
+        ipAddress: extractClientIp(req),
+        userAgent: req.headers.get("user-agent"),
+      };
 
       const redirectUri = requireYandexRedirectUri();
       const token = await exchangeYandexCodeForToken({
@@ -129,43 +154,17 @@ export async function GET(req: Request) {
       });
 
       const profile = await fetchYandexProfile(token.accessToken);
-      const yandexUserId = profile.id;
+      const identity = { provider: "yandex" as const, profile };
       const sessionUser = await getSessionUser();
 
       if (sessionUser) {
-        await upsertYandexLink({
-          userId: sessionUser.id,
-          yandexUserId,
-        });
-
         // Session-link: registers nobody, so never blocked — flags honoured if
-        // the visitor came through the login form.
-        if (consentFlags) {
-          await recordUserConsents({ userId: sessionUser.id, flags: consentFlags, ipAddress, userAgent });
-        }
+        // the visitor came through the login form (`linkOAuthIdentity`).
+        const phoneOutcome = await linkOAuthIdentity({ identity, user: sessionUser, consent });
 
-        try {
-          await ensureFreeSubscriptionsForRoles(sessionUser.id, sessionUser.roles);
-        } catch (error) {
-          logError("ensureFreeSubscriptionsForRoles failed after yandex link", {
-            userProfileId: sessionUser.id,
-            error: error instanceof Error ? error.stack : error,
-          });
-          void sendTelegramAlert(
-            "A user logged in without a free subscription",
-            "auth:free-subscription:yandex-link"
-          );
-        }
-
-        // PHONE-OAUTH-PROOF-01: номер из аккаунта Яндекс ID подтверждён провайдером по
-        // SMS — засчитываем как владение (правила — `phone-provider-proof.ts`).
-        // Вход из кнопки «Подтвердить номер» возвращает на страницу-источник
-        // с итогом, остальные привязки — как прежде, в кабинет по роли.
-        const phoneOutcome = await applyProviderVerifiedPhoneSafe({
-          userId: sessionUser.id,
-          providerPhone: profile.phone,
-          provider: "yandex",
-        });
+        // PHONE-OAUTH-PROOF-01: вход из кнопки «Подтвердить номер» возвращает
+        // на страницу-источник с итогом, остальные привязки — как прежде, в
+        // кабинет по роли.
         const verifyReturn = await takePhoneVerifyReturn();
         const target = verifyReturn
           ? phoneVerifyResultPath(verifyReturn, "yandex", phoneOutcome ?? "error")
@@ -179,91 +178,12 @@ export async function GET(req: Request) {
         return response;
       }
 
-      const link = await prisma.yandexLink.findUnique({
-        where: { yandexUserId },
-        select: { userId: true },
-      });
-
-      let user = link
-        ? await prisma.userProfile.findUnique({
-            where: { id: link.userId },
-          })
-        : null;
-
-      if (!user && link) {
-        throw new AppError("Этот аккаунт Яндекс ID уже привязан к другому пользователю.", 409, "YANDEX_ALREADY_LINKED");
+      // RKN-FIX-01 fail-safe — no consent, no account (inside `resolveOAuthLogin`).
+      const resolution = await resolveOAuthLogin({ identity, consent });
+      if (!resolution.ok) {
+        return nextRedirect(req, "/login?error=consent");
       }
-
-      if (!user) {
-        // RKN-FIX-01 fail-safe — no consent, no account (see VK callback).
-        if (!hasRequiredConsents(consentFlags)) {
-          logInfo("Yandex auth refused: required consents missing", { stage: "new-user" });
-          return nextRedirect(req, "/login?error=consent");
-        }
-
-        user = await prisma.userProfile.create({
-          data: {
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            displayName: buildDisplayName(profile.firstName, profile.lastName),
-            // PHONE-OAUTH-PROOF-01: номер пишет `applyProviderVerifiedPhoneSafe`
-            // ниже (см. VK-близнец).
-            email: profile.email ?? undefined,
-            externalPhotoUrl: profile.avatarUrl ?? undefined,
-            roles: [AccountType.CLIENT],
-          },
-        });
-      } else {
-        const updateData: Prisma.UserProfileUpdateInput = {};
-        if (!user.firstName && profile.firstName) updateData.firstName = profile.firstName;
-        if (!user.lastName && profile.lastName) updateData.lastName = profile.lastName;
-        if (!user.displayName) {
-          const displayName = buildDisplayName(profile.firstName, profile.lastName);
-          if (displayName) updateData.displayName = displayName;
-        }
-        if (!user.email && profile.email) updateData.email = profile.email;
-        if (profile.avatarUrl && profile.avatarUrl !== user.externalPhotoUrl) {
-          updateData.externalPhotoUrl = profile.avatarUrl;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          user = await prisma.userProfile.update({
-            where: { id: user.id },
-            data: updateData,
-          });
-        }
-
-        const nextRoles = await ensureClientRoleForUser(user.id, user.roles);
-        if (nextRoles !== user.roles) {
-          user = { ...user, roles: nextRoles };
-        }
-      }
-
-      try {
-        await ensureFreeSubscriptionsForRoles(user.id, user.roles);
-      } catch (error) {
-        logError("ensureFreeSubscriptionsForRoles failed after yandex auth", {
-          userProfileId: user.id,
-          error: error instanceof Error ? error.stack : error,
-        });
-        void sendTelegramAlert(
-          "A user logged in without a free subscription",
-          "auth:free-subscription:yandex-auth"
-        );
-      }
-
-      await upsertYandexLink({
-        userId: user.id,
-        yandexUserId,
-      });
-
-      await applyProviderVerifiedPhoneSafe({ userId: user.id, providerPhone: profile.phone, provider: "yandex" });
-
-      // Registration + repeat login share this write (no-op unless a document
-      // version moved on).
-      if (consentFlags) {
-        await recordUserConsents({ userId: user.id, flags: consentFlags, ipAddress, userAgent });
-      }
+      const { user } = resolution;
 
       const redirectDecision = await resolveCabinetRedirect(user.id);
       const response = nextRedirect(req, redirectDecision.target);

@@ -6,6 +6,7 @@ import { getRequestId, logError } from "@/lib/logging/logger";
 import { ensureStudioRole } from "@/lib/studio/access";
 import { createStudioServiceSchema, studioServicesQuerySchema } from "@/lib/studio/schemas";
 import { createStudioService, getStudioServices } from "@/lib/studio/services.service";
+import { ensureStudioOnlinePaymentsAllowed } from "@/lib/studio/online-payments-gate";
 import { parseBody, parseQuery } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -48,6 +49,11 @@ export async function POST(req: Request) {
       userId: user.id,
       allowed: [StudioRole.OWNER, StudioRole.ADMIN],
     });
+
+    // MOBILE-STUDIO-C: онлайн-оплата при создании — тот же гейт, что у PATCH.
+    if (body.onlinePaymentEnabled === true) {
+      await ensureStudioOnlinePaymentsAllowed(user.id);
+    }
 
     const data = await createStudioService({
       ...body,

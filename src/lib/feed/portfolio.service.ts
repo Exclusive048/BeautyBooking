@@ -22,6 +22,16 @@ import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility"
 // «найти» ⊂ «открыть», поэтому фото у найденной работы всегда отдаётся.
 export const PUBLISHED_MASTER_WHERE = { master: catalogVisibleProviderWhere() };
 
+/**
+ * MOBILE-B1 — `PUBLISHED_MASTER_WHERE` в пределах города (`?city=<slug>` лент).
+ * Через `AND`, а не вторым ключом `master`: спред затёр бы предикат видимости.
+ * Без города — ровно прежний объект.
+ */
+export function publishedMasterWhere(cityId?: string): Prisma.PortfolioItemWhereInput {
+  if (!cityId) return PUBLISHED_MASTER_WHERE;
+  return { master: { AND: [catalogVisibleProviderWhere(), { cityId }] } };
+}
+
 type PortfolioServiceOption = {
   serviceId: string;
   title: string;
@@ -295,6 +305,8 @@ export async function listPortfolioFeed(input: {
   near?: string;
   masterId?: string;
   currentUserId?: string;
+  /** MOBILE-B1: только работы мастеров этого города (`City.id`). */
+  cityId?: string;
 }): Promise<{ items: PortfolioFeedItem[]; nextCursor: string | null }> {
   const pageSize = Math.max(1, Math.min(50, input.limit));
 
@@ -302,7 +314,7 @@ export async function listPortfolioFeed(input: {
     prisma.portfolioItem.findMany({
       where: {
         isPublic: true,
-        ...PUBLISHED_MASTER_WHERE,
+        ...publishedMasterWhere(input.cityId),
         ...(input.masterId ? { masterId: input.masterId } : {}),
         ...(input.q
           ? {

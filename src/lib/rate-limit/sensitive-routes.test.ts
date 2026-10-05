@@ -45,6 +45,16 @@ describe("isSensitiveRouteKey — LOGIC-14", () => {
   it("обычный публичный роут по-прежнему не чувствителен", () => {
     expect(isSensitiveRouteKey(proxyKey("GET", "/api/catalog/global-categories"))).toBe(false);
   });
+
+  // MOBILE-POLISH (App Store 1.2): жалобы и блокировка — записи, которые нельзя
+  // молча пропускать в память при обрыве Redis (флуд очереди модерации).
+  it("жалобы, решения по ним и блокировка в переписке fail-closed", () => {
+    expect(isSensitiveRouteKey(proxyKey("POST", "/api/reports"))).toBe(true);
+    expect(isSensitiveRouteKey(proxyKey("POST", "/api/admin/reports/ck1/resolve"))).toBe(true);
+    expect(isSensitiveRouteKey(proxyKey("POST", "/api/admin/reports/ck1/dismiss"))).toBe(true);
+    expect(isSensitiveRouteKey(proxyKey("POST", "/api/chat/threads/aB3dE5gH7j/block"))).toBe(true);
+    expect(isSensitiveRouteKey(proxyKey("DELETE", "/api/me/blocks/ck1"))).toBe(true);
+  });
 });
 
 /**

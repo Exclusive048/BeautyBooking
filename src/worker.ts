@@ -14,6 +14,7 @@ import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connect
 import { sendTelegramMessage } from "@/lib/telegram/client";
 import { getTelegramEnabled } from "@/lib/telegram/feature";
 import { processVkSendPayload } from "@/lib/vk/notify";
+import { processNativePushPayload } from "@/lib/notifications/native-push/send";
 import { logError, logInfo } from "@/lib/logging/logger";
 import { alertCritical } from "@/lib/monitoring";
 import { sendTelegramAlert } from "@/lib/monitoring/alerts";
@@ -32,6 +33,7 @@ import {
   MEDIA_CLEANUP_JOB_TYPE,
   MEDIA_PURGE_JOB_TYPE,
   MRR_SNAPSHOT_DAILY_JOB_TYPE,
+  NATIVE_PUSH_SEND_JOB_TYPE,
   PLAN_EDITED_NOTIFY_JOB_TYPE,
   SLOT_FREED_JOB_TYPE,
   TELEGRAM_SEND_JOB_TYPE,
@@ -792,12 +794,48 @@ async function processVkSend(
   });
 }
 
+/**
+ * MOBILE-B2: push в нативное приложение (FCM / APNs / RuStore). Повтор — только
+ * устройствам с временным сбоем (сеть, 429, 5xx): получившие push второй раз
+ * его не получат. Отвергнутые токены удалены внутри, повтором не лечатся.
+ */
+async function processNativePushSend(
+  job: Extract<Job, { type: typeof NATIVE_PUSH_SEND_JOB_TYPE }>
+): Promise<void> {
+  const scheduleAt = getJobScheduleAt(job);
+  if (typeof scheduleAt === "number" && scheduleAt > Date.now()) {
+    await enqueueRetry(job, scheduleAt - Date.now());
+    return;
+  }
+
+  const result = await processNativePushPayload(job.payload);
+  if (result.status !== "done" || result.retryDeviceIds.length === 0) return;
+
+  const nextAttempts = getJobAttempts(job) + 1;
+  const retryJob = { ...job, attempts: nextAttempts, payload: { ...job.payload, deviceIds: result.retryDeviceIds } };
+  if (nextAttempts < getJobMaxAttempts(job)) {
+    await enqueueRetry(retryJob, getRetryDelaySeconds(nextAttempts) * 1000);
+    return;
+  }
+
+  await moveToDeadQueue(retryJob);
+  logError("Worker dead letter job", {
+    jobId: job.id,
+    type: job.type,
+    attempts: nextAttempts,
+    maxAttempts: getJobMaxAttempts(job),
+    __skipAlert: true,
+  });
+}
+
 async function processJob(job: Job): Promise<void> {
   try {
     if (job.type === TELEGRAM_SEND_JOB_TYPE) {
       await processTelegramSend(job);
     } else if (job.type === VK_SEND_JOB_TYPE) {
       await processVkSend(job);
+    } else if (job.type === NATIVE_PUSH_SEND_JOB_TYPE) {
+      await processNativePushSend(job);
     } else if (job.type === BOOKING_REMINDER_JOB_TYPE) {
       await processBookingReminderJob(job);
     } else if (job.type === VISUAL_SEARCH_INDEX_JOB_TYPE) {

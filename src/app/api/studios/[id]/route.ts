@@ -1,4 +1,5 @@
 import { ok, fail } from "@/lib/api/response";
+import { jsonFail } from "@/lib/api/contracts";
 import { AppError, toAppError } from "@/lib/api/errors";
 import { formatZodError } from "@/lib/api/validation";
 import { requireAuth } from "@/lib/auth/guards";
@@ -8,61 +9,122 @@ import { getStudioProviderById, updateStudioProviderProfile } from "@/lib/studio
 import { isValidTimeZone } from "@/lib/schedule/timezone";
 import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { rejectForbiddenWords } from "@/lib/moderation/zod";
+import { z, type ZodError } from "zod";
+import { findForbiddenWordsIssue, rejectForbiddenWords } from "@/lib/moderation/zod";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
 };
 
+/**
+ * MOBILE-POLISH — текст отказа у КАЖДОГО поля: раньше `details.issues` несли
+ * сообщения Zod как есть («Too big: expected string to have <=120 characters»,
+ * «Invalid input: expected number, received string»), и приложение показывало
+ * их под полем. Ошибка типа поля — тот же текст, что и ошибка значения: человек
+ * видит, что поправить, а не что прислал клиент.
+ */
+const FIELD_MESSAGES = {
+  name: "Название — не длиннее 120 символов.",
+  tagline: "Подзаголовок — не длиннее 240 символов.",
+  address: "Проверьте адрес.",
+  district: "Проверьте район.",
+  categories: "Выберите не больше 20 категорий.",
+  category: "Название категории — от 1 до 120 символов.",
+  contactName: "Проверьте имя для связи.",
+  contactPhone: "Проверьте телефон.",
+  contactEmail: "Проверьте адрес почты.",
+  socialVk: "Ссылка ВКонтакте — не длиннее 200 символов.",
+  socialInstagram: "Ссылка Instagram — не длиннее 200 символов.",
+  description: "Описание — не длиннее 2000 символов.",
+  geo: "Выберите адрес из подсказок — так клиенты найдут вас на карте.",
+  isPublished: "Проверьте, показывать ли страницу студии.",
+  timezone: "Проверьте часовой пояс.",
+  bannerAssetId: "Выберите обложку ещё раз.",
+  catalogCoverAssetId: "Выберите главное фото ещё раз.",
+  minBookingHoursAhead: "Запись заранее — целое число часов от 0 до 168.",
+  maxBookingDaysAhead: `Запись вперёд — целое число дней от ${BOOKING_RULE_LIMITS.maxDaysAhead.min} до ${BOOKING_RULE_LIMITS.maxDaysAhead.max}.`,
+  cancellationDeadlineHours: "Срок бесплатной отмены — целое число часов от 0 до 168.",
+  lateCancelAction: "Выберите, что делать при поздней отмене.",
+  acceptNewClients: "Проверьте, принимаете ли вы новых клиентов.",
+  remindersEnabled: "Проверьте настройку напоминаний.",
+  body: "Проверьте правильность заполнения полей.",
+} as const;
+
+const text = (message: string) => z.string({ error: message }).trim();
+const integer = (message: string, min: number, max: number) =>
+  z.number({ error: message }).int(message).min(min, message).max(max, message);
+
 const updateSchema = z
-  .object({
-    // FORBIDDEN-WORDS-01: у названия и подзаголовка не было потолка длины вовсе.
-    name: z.string().trim().max(120).superRefine(rejectForbiddenWords("name")).optional(),
-    tagline: z.string().trim().max(240).superRefine(rejectForbiddenWords("text")).optional(),
-    address: z.string().trim().optional(),
-    district: z.string().trim().optional(),
-    categories: z.array(z.string().trim().min(1).max(120).superRefine(rejectForbiddenWords("name"))).max(20).optional(),
-    contactName: z.string().trim().nullable().optional(),
-    contactPhone: z.string().trim().nullable().optional(),
-    contactEmail: z.string().trim().email().nullable().optional(),
-    // FEAT-PROVIDER-SOCIALS: raw input (URL or handle); normalized + host/scheme
-    // validated server-side in updateStudioProviderProfile (the security boundary).
-    socialVk: z.string().trim().max(200).nullable().optional(),
-    socialInstagram: z.string().trim().max(200).nullable().optional(),
-    description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
-    geoLat: z.number().nullable().optional(),
-    geoLng: z.number().nullable().optional(),
-    isPublished: z.boolean().optional(),
-    // FIX-10: was `z.string().trim().optional()` — an empty/garbage tz persisted
-    // and then 500'd `partsFromDate` across calendar/booking surfaces. Mirror the
-    // master schema: bounded length + IANA validity.
-    timezone: z
-      .string()
-      .trim()
-      .min(3)
-      .max(64)
-      .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
-      .optional(),
-    bannerAssetId: z.string().trim().nullable().optional(),
-    // CATALOG-MAIN-PHOTO: главное фото карточки каталога — из портфолио студии.
-    catalogCoverAssetId: z.string().trim().min(1).max(64).nullable().optional(),
-    // FIX-STUDIO-POLICY-EDITABLE: правила записи студии. Границы — те же, что у
-    // мастерского редактора расписания (`editor-shared`), чтобы одно и то же
-    // значение не оказывалось валидным на одной поверхности и отвергнутым на
-    // другой. Запись делегируется `applyProviderBookingPolicy` (rule 5).
-    minBookingHoursAhead: z.number().int().min(0).max(168).optional(),
-    maxBookingDaysAhead: z
-      .number()
-      .int()
-      .min(BOOKING_RULE_LIMITS.maxDaysAhead.min)
-      .max(BOOKING_RULE_LIMITS.maxDaysAhead.max)
-      .optional(),
-    cancellationDeadlineHours: z.number().int().min(0).max(168).nullable().optional(),
-    lateCancelAction: z.enum(["none", "reminder", "fine"]).optional(),
-    acceptNewClients: z.boolean().optional(),
-    remindersEnabled: z.boolean().optional(),
-  })
+  .object(
+    {
+      // FORBIDDEN-WORDS-01: у названия и подзаголовка не было потолка длины вовсе.
+      name: text(FIELD_MESSAGES.name).max(120, FIELD_MESSAGES.name).superRefine(rejectForbiddenWords("name")).optional(),
+      tagline: text(FIELD_MESSAGES.tagline)
+        .max(240, FIELD_MESSAGES.tagline)
+        .superRefine(rejectForbiddenWords("text"))
+        .optional(),
+      address: text(FIELD_MESSAGES.address).optional(),
+      district: text(FIELD_MESSAGES.district).optional(),
+      categories: z
+        .array(
+          text(FIELD_MESSAGES.category)
+            .min(1, FIELD_MESSAGES.category)
+            .max(120, FIELD_MESSAGES.category)
+            .superRefine(rejectForbiddenWords("name")),
+          { error: FIELD_MESSAGES.categories },
+        )
+        .max(20, FIELD_MESSAGES.categories)
+        .optional(),
+      contactName: text(FIELD_MESSAGES.contactName).nullable().optional(),
+      contactPhone: text(FIELD_MESSAGES.contactPhone).nullable().optional(),
+      contactEmail: text(FIELD_MESSAGES.contactEmail).email(FIELD_MESSAGES.contactEmail).nullable().optional(),
+      // FEAT-PROVIDER-SOCIALS: raw input (URL or handle); normalized + host/scheme
+      // validated server-side in updateStudioProviderProfile (the security boundary).
+      socialVk: text(FIELD_MESSAGES.socialVk).max(200, FIELD_MESSAGES.socialVk).nullable().optional(),
+      socialInstagram: text(FIELD_MESSAGES.socialInstagram)
+        .max(200, FIELD_MESSAGES.socialInstagram)
+        .nullable()
+        .optional(),
+      description: text(FIELD_MESSAGES.description)
+        .max(2000, FIELD_MESSAGES.description)
+        .superRefine(rejectForbiddenWords("text"))
+        .nullable()
+        .optional(),
+      geoLat: z.number({ error: FIELD_MESSAGES.geo }).nullable().optional(),
+      geoLng: z.number({ error: FIELD_MESSAGES.geo }).nullable().optional(),
+      isPublished: z.boolean({ error: FIELD_MESSAGES.isPublished }).optional(),
+      // FIX-10: was `z.string().trim().optional()` — an empty/garbage tz persisted
+      // and then 500'd `partsFromDate` across calendar/booking surfaces. Mirror the
+      // master schema: bounded length + IANA validity.
+      timezone: text(FIELD_MESSAGES.timezone)
+        .min(3, FIELD_MESSAGES.timezone)
+        .max(64, FIELD_MESSAGES.timezone)
+        .refine(isValidTimeZone, { message: FIELD_MESSAGES.timezone })
+        .optional(),
+      bannerAssetId: text(FIELD_MESSAGES.bannerAssetId).nullable().optional(),
+      // CATALOG-MAIN-PHOTO: главное фото карточки каталога — из портфолио студии.
+      catalogCoverAssetId: text(FIELD_MESSAGES.catalogCoverAssetId)
+        .min(1, FIELD_MESSAGES.catalogCoverAssetId)
+        .max(64, FIELD_MESSAGES.catalogCoverAssetId)
+        .nullable()
+        .optional(),
+      // FIX-STUDIO-POLICY-EDITABLE: правила записи студии. Границы — те же, что у
+      // мастерского редактора расписания (`editor-shared`), чтобы одно и то же
+      // значение не оказывалось валидным на одной поверхности и отвергнутым на
+      // другой. Запись делегируется `applyProviderBookingPolicy` (rule 5).
+      minBookingHoursAhead: integer(FIELD_MESSAGES.minBookingHoursAhead, 0, 168).optional(),
+      maxBookingDaysAhead: integer(
+        FIELD_MESSAGES.maxBookingDaysAhead,
+        BOOKING_RULE_LIMITS.maxDaysAhead.min,
+        BOOKING_RULE_LIMITS.maxDaysAhead.max,
+      ).optional(),
+      cancellationDeadlineHours: integer(FIELD_MESSAGES.cancellationDeadlineHours, 0, 168).nullable().optional(),
+      lateCancelAction: z.enum(["none", "reminder", "fine"], { error: FIELD_MESSAGES.lateCancelAction }).optional(),
+      acceptNewClients: z.boolean({ error: FIELD_MESSAGES.acceptNewClients }).optional(),
+      remindersEnabled: z.boolean({ error: FIELD_MESSAGES.remindersEnabled }).optional(),
+    },
+    { error: FIELD_MESSAGES.body },
+  )
   .refine(
     (data) =>
       data.name !== undefined ||
@@ -90,6 +152,40 @@ const updateSchema = z
       data.remindersEnabled !== undefined,
     { message: "Заполните хотя бы одно поле." }
   );
+
+/**
+ * MOBILE-STUDIO-C (team) — отказ валидации тела человеческим текстом, а не
+ * машинным «поле: сообщение; …» (`formatZodError`), которое форма показывала
+ * как есть: запрещённые слова — их текст, пустой патч — «Заполните хотя бы
+ * одно поле.», остальное — общий текст и `details.issues` для подсветки полей.
+ * Статус и код прежние (400 `VALIDATION_ERROR`).
+ *
+ * MOBILE-POLISH: тексты `issues` — русские у каждого поля (`FIELD_MESSAGES`),
+ * и рядом `error.fieldErrors` — `{ поле: текст }` по имени поля (первая ошибка
+ * поля), как у остальных форм приложения.
+ */
+function bodyValidationFailure(error: ZodError) {
+  const issues = error.issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join(".") : "input",
+    message: issue.message,
+    code: issue.code,
+  }));
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const field = issue.path[0];
+    if (typeof field === "string" && !(field in fieldErrors)) fieldErrors[field] = issue.message;
+  }
+  const forbidden = findForbiddenWordsIssue(error);
+  // Единственная проверка уровня всего тела — «хотя бы одно поле».
+  const emptyPatch = error.issues.find((issue) => issue.code === "custom" && issue.path.length === 0);
+  return jsonFail(
+    400,
+    forbidden?.message ?? emptyPatch?.message ?? FIELD_MESSAGES.body,
+    "VALIDATION_ERROR",
+    { issues },
+    Object.keys(fieldErrors).length > 0 ? fieldErrors : undefined,
+  );
+}
 
 function coordsRequired() {
   // FIX-B14: прежняя форма клала МАШИННЫЙ КОД в поле `error`, где UI ждёт
@@ -135,7 +231,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   const body = await req.json().catch(() => null);
   const parsedBody = updateSchema.safeParse(body);
   if (!parsedBody.success) {
-    return fail(formatZodError(parsedBody.error), 400, "VALIDATION_ERROR");
+    return bodyValidationFailure(parsedBody.error);
   }
   const payload = parsedBody.data;
   const addressProvided = payload.address !== undefined;

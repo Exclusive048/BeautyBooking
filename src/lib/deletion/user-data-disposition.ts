@@ -75,6 +75,17 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
 
   // ── User-owned preferences: no reason to outlive the account ──────────────
   pushSubscriptions: { kind: "DELETED", reason: "delete-account: device push endpoints" },
+  mobilePushDevices: { kind: "DELETED", reason: "delete-account: native app push tokens (MOBILE-B2)" },
+  chatBlocksMade: {
+    kind: "DELETED",
+    reason: "delete-account: chat blocks this user set (MOBILE-POLISH) — ids only, a person-to-person preference",
+  },
+  chatBlocksReceived: {
+    kind: "DELETED",
+    reason:
+      "delete-account: chat blocks set ON this user (MOBILE-POLISH) — the deleted account can no " +
+      "longer write, so the block guards nothing; a new account is a new id",
+  },
   favorites: { kind: "DELETED", reason: "delete-account: portfolio bookmarks" },
   providerFavorites: {
     kind: "DELETED",
@@ -144,6 +155,17 @@ export const USER_RELATION_DISPOSITION: Record<string, RelationDisposition> = {
   },
   blockedBy: { kind: "RETAINED", reason: "Admin block metadata — moderation evidence" },
   blockedUsers: { kind: "RETAINED", reason: "Blocks this user issued as admin — moderation evidence" },
+  contentReports: {
+    kind: "RETAINED",
+    reason:
+      "Content reports this user filed (MOBILE-POLISH, App Store 1.2) — moderation evidence: an open " +
+      "report is still decided after the reporter leaves; the reporter renders as the anonymised profile. " +
+      "The optional comment is about someone else's content",
+  },
+  contentReportsResolved: {
+    kind: "RETAINED",
+    reason: "Moderation trail: which admin decided which content report (MOBILE-POLISH)",
+  },
   createdCategories: {
     kind: "RETAINED",
     reason: "Platform taxonomy (GlobalCategory): no PD, owned by the catalog rather than the author",

@@ -36,6 +36,7 @@ export function bookingToCell(row: StudioBookingRow): ScheduleBookingCell {
     proposedStartAtUtc: row.proposedStartAtUtc,
     proposedEndAtUtc: row.proposedEndAtUtc,
     actionRequiredBy: row.actionRequiredBy,
+    bookingPackageId: row.bookingPackageId,
     // Журнал студии показывает только записи, которыми студия управляет.
     isPersonal: false,
   };

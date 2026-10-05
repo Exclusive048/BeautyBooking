@@ -34,7 +34,13 @@ export type StudioServiceListItem = {
   /** GlobalCategory id, or `null` for uncategorized. */
   categoryId: string | null;
   isActive: boolean;
+  /** MOBILE-STUDIO-C: онлайн-оплата услуги (тумблер — по тарифу и системному флагу). */
+  onlinePaymentEnabled: boolean;
+  /** MOBILE-STUDIO-C: порядок в прайсе (`PATCH /api/studio/services/reorder`). */
+  sortOrder: number;
   bookings30d: number;
+  /** MOBILE-STUDIO-C: сколько мастеров назначено всего (`masters` в списке — первые 4). */
+  mastersCount: number;
   masters: StudioServiceMasterChip[];
 };
 

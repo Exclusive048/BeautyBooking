@@ -672,7 +672,14 @@ export const studioCabinet = {
     },
     weekView: {
       masterColumn: "Мастер",
-      occupancyTemplate: "{booked}/{total}",
+      // MOBILE-POLISH: загрузка по графику мастера — процент в ячейке,
+      // подробности в подсказке.
+      occupancyPercent: "{percent}%",
+      occupancyTitleMinutes: "Записей: {booked} · занято {bookedTime} из {capacityTime}",
+      occupancyTitleSlots: "Записей: {booked} · окон по графику: {slots}",
+      durationHours: "{h} ч",
+      durationHoursMinutes: "{h} ч {m} мин",
+      durationMinutes: "{m} мин",
       // Ячейка дня узкая (7 в ряд) — полное слово налезало на соседнюю. Полное — в `title`.
       dayOff: "Вых.",
       dayOffFull: "Выходной",

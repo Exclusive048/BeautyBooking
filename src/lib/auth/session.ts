@@ -1,17 +1,26 @@
 import crypto from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, SessionClientType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { env, isProduction } from "@/lib/env";
 import {
   REFRESH_TOKEN_TTL_SECONDS,
   signAccessToken,
-  signRefreshToken,
+  signAccessTokenWithExpiry,
+  signRefreshTokenWithExpiry,
   verifyToken,
   type SessionPayload,
 } from "./jwt";
+import { isBearerAuthorization, selectAccessToken } from "./bearer";
+import {
+  readWebSessionIssueMeta,
+  SESSION_DEVICE_META_KEYS,
+  type SessionDeviceMeta,
+  type SessionIssueMeta,
+} from "./session-client-meta";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
+import { unlinkPushDevicesOfFamilies } from "@/lib/notifications/native-push/devices";
 
 const ACCESS_COOKIE_MAX_AGE_SECONDS = 2 * 60 * 60;
 const REFRESH_COOKIE_MAX_AGE_SECONDS = REFRESH_TOKEN_TTL_SECONDS;
@@ -51,6 +60,26 @@ function isSecureCookie(): boolean {
 }
 
 type SessionCookiePayload = Omit<SessionPayload, "iat" | "exp" | "tokenType" | "jti" | "sid">;
+
+/**
+ * MOBILE-AUTH-A — пара токенов сессии без транспорта. Веб кладёт её в куки
+ * (`setSessionCookies` / `rotateSessionCookies` — тонкие адаптеры), мобильный
+ * клиент получает в теле ответа `/api/mobile/v1/auth/*`. Сроки — ровно те, что
+ * в токенах (для refresh — не позже срока строки `RefreshSession`).
+ */
+export type SessionTokens = {
+  accessToken: string;
+  accessTokenExpiresAt: Date;
+  refreshToken: string;
+  refreshTokenExpiresAt: Date;
+};
+
+export type RotatedSession = {
+  payload: SessionCookiePayload;
+  tokens: SessionTokens;
+  /** SESSION-LOSS-01: выдан повторно уже существующий преемник. */
+  reissued: boolean;
+};
 type RefreshTokenClaims = {
   sub: string;
   sid: string;
@@ -153,17 +182,27 @@ async function loadActiveSessionUser(userId: string, familyId?: string | null) {
   });
 }
 
+/**
+ * MOBILE-AUTH-A — обе точки чтения сессии принимают `Authorization: Bearer`
+ * наравне с кукой `bh_session`; заявлена схема Bearer — решает заголовок
+ * (`selectAccessToken`, правило — в `bearer.ts`). Проверка у обоих
+ * транспортов одна: `parseAccessTokenPayload` (тип, подпись, срок) и
+ * `loadActiveSessionUser` (живой пользователь + живая семья, SEC-13).
+ */
 async function getAccessSessionPayload(): Promise<SessionPayload | null> {
+  const headerStore = await headers();
+  const authorization = headerStore.get("authorization");
+  if (isBearerAuthorization(authorization)) {
+    return parseAccessTokenPayload(selectAccessToken(authorization, null));
+  }
   const cookieStore = await cookies();
   const token = cookieStore.get(getAccessCookieName())?.value;
   return parseAccessTokenPayload(token);
 }
 
 export function getAccessTokenFromRequest(req: Request): string | null {
-  const header = req.headers.get("cookie");
-  const allCookies = parseCookieHeader(header);
-  const token = allCookies[getAccessCookieName()];
-  return token || null;
+  const allCookies = parseCookieHeader(req.headers.get("cookie"));
+  return selectAccessToken(req.headers.get("authorization"), allCookies[getAccessCookieName()]);
 }
 
 export async function getSessionUserFromRequest(req: Request) {
@@ -217,17 +256,76 @@ function setRefreshCookie(response: NextResponse, refreshToken: string): void {
   expireLegacyRefreshCookie(response);
 }
 
-export async function setSessionCookies(response: NextResponse, payload: SessionCookiePayload): Promise<void> {
+function earliest(a: Date, b: Date | null | undefined): Date {
+  return b && b.getTime() < a.getTime() ? b : a;
+}
+
+/**
+ * MOBILE-AUTH-A — метаданные, которые новая строка семьи получает от
+ * предыдущей (ротация) с поверх-наложением свежих заголовков клиента
+ * (обновлённое приложение шлёт новую `X-App-Version`). В `data` попадают только
+ * заданные значения: у веб-строк меты нет, и запись остаётся прежней формы.
+ */
+type StoredSessionMeta = Partial<SessionDeviceMeta> & { clientType?: SessionClientType | null };
+
+function deviceMetaData(
+  previous: StoredSessionMeta | null | undefined,
+  override?: Partial<SessionDeviceMeta>,
+): Partial<SessionDeviceMeta> {
+  const data: Partial<SessionDeviceMeta> = {};
+  for (const key of SESSION_DEVICE_META_KEYS) {
+    const value = override?.[key] ?? previous?.[key] ?? null;
+    if (value !== null) data[key] = value;
+  }
+  return data;
+}
+
+function carriedSessionMeta(
+  previous: StoredSessionMeta | null | undefined,
+  override?: Partial<SessionDeviceMeta>,
+): Partial<SessionDeviceMeta> & { clientType?: SessionClientType } {
+  return {
+    ...(previous?.clientType ? { clientType: previous.clientType } : {}),
+    ...deviceMetaData(previous, override),
+  };
+}
+
+const SESSION_META_SELECT = {
+  clientType: true,
+  platform: true,
+  appVersion: true,
+  deviceName: true,
+  installationId: true,
+  userAgent: true,
+} as const;
+
+function surfaceOperation(clientType: SessionClientType | null | undefined, operation: string): string {
+  // Мобильные выдачи/ротации — отдельные метки: по ним видно, как живёт
+  // приложение, и веб-дашборды `refresh-rotate` / `session-issue` не меняются.
+  return clientType === "MOBILE" ? `mobile-${operation}` : operation;
+}
+
+/**
+ * MOBILE-AUTH-A — выдача новой сессии без транспорта: строка `RefreshSession`
+ * (новая семья) + пара токенов. Веб-адаптер — `setSessionCookies`.
+ */
+export async function issueSession(
+  payload: SessionCookiePayload,
+  meta?: SessionIssueMeta,
+): Promise<SessionTokens> {
   // SEC-13: новая сессия = новая семья. Идентификатор генерируем сами, а не
   // берём id строки, — тогда хватает одного запроса и семья остаётся
   // самостоятельным понятием, а не псевдонимом первой строки цепочки.
   const familyId = crypto.randomUUID();
+  const refreshExpiresAt = buildRefreshExpiresAt();
   const refreshSession = await prisma.refreshSession.create({
     data: {
       userId: payload.sub,
       jti: crypto.randomUUID(),
       familyId,
-      expiresAt: buildRefreshExpiresAt(),
+      expiresAt: refreshExpiresAt,
+      lastUsedAt: new Date(),
+      ...(meta ? carriedSessionMeta(meta) : {}),
     },
     select: {
       id: true,
@@ -235,16 +333,45 @@ export async function setSessionCookies(response: NextResponse, payload: Session
     },
   });
 
-  const accessToken = signAccessToken({ ...payload, fid: familyId });
-  const refreshToken = signRefreshToken({ sub: payload.sub, sid: refreshSession.id, jti: refreshSession.jti });
+  const access = signAccessTokenWithExpiry({ ...payload, fid: familyId });
+  const refresh = signRefreshTokenWithExpiry({
+    sub: payload.sub,
+    sid: refreshSession.id,
+    jti: refreshSession.jti,
+  });
 
-  setAccessCookie(response, accessToken);
-  setRefreshCookie(response, refreshToken);
   void recordSurfaceEvent({
     surface: "auth",
     outcome: "success",
-    operation: "session-issue",
+    operation: surfaceOperation(meta?.clientType, "session-issue"),
   });
+
+  return {
+    accessToken: access.token,
+    accessTokenExpiresAt: access.expiresAt,
+    refreshToken: refresh.token,
+    refreshTokenExpiresAt: earliest(refresh.expiresAt, refreshExpiresAt),
+  };
+}
+
+/**
+ * MOBILE-AUTH-A3 — User-Agent браузера для списка сессий. Читается из
+ * request-контекста (`headers()`), как и сама сессия в `getSessionUser`; вне
+ * запроса (скрипты, тесты) контекста нет — сессия выдаётся без меты, как до A3.
+ * Ротация наследует мету семьи, так что UA пишется один раз, при входе.
+ */
+async function readWebIssueMetaFromRequest(): Promise<SessionIssueMeta | undefined> {
+  try {
+    return readWebSessionIssueMeta(await headers());
+  } catch {
+    return undefined;
+  }
+}
+
+export async function setSessionCookies(response: NextResponse, payload: SessionCookiePayload): Promise<void> {
+  const tokens = await issueSession(payload, await readWebIssueMetaFromRequest());
+  setAccessCookie(response, tokens.accessToken);
+  setRefreshCookie(response, tokens.refreshToken);
 }
 
 export function setAccessSessionCookie(response: NextResponse, payload: SessionCookiePayload): void {
@@ -279,13 +406,20 @@ export function setAccessSessionCookie(response: NextResponse, payload: SessionC
  * отзывом семьи в проекте не было и до этого.
  */
 
-export async function rotateSessionCookies(
-  response: NextResponse,
-  refreshToken: string
-): Promise<SessionCookiePayload | null> {
+/**
+ * MOBILE-AUTH-A — `deviceMeta`: свежие заголовки мобильного клиента, которые
+ * ложатся поверх унаследованной меты семьи (новая версия приложения после
+ * обновления). Веб зовёт без неё — строка наследует то, что было.
+ * `lastUsedAt` ставится и новой строке, и повторно выданному преемнику.
+ */
+export async function rotateSession(
+  refreshToken: string,
+  options?: { deviceMeta?: Partial<SessionDeviceMeta> },
+): Promise<RotatedSession | null> {
   const claims = parseRefreshTokenClaims(refreshToken);
   if (!claims) return null;
 
+  const deviceMeta = options?.deviceMeta;
   const now = new Date();
   const rotated = await prisma.$transaction(async (tx) => {
     const claimed = await tx.refreshSession.updateMany({
@@ -321,7 +455,7 @@ export async function rotateSessionCookies(
           usedAt: null,
           expiresAt: { gt: now },
         },
-        select: { id: true, jti: true, familyId: true },
+        select: { id: true, jti: true, familyId: true, expiresAt: true, clientType: true },
       });
       if (!successor) return null;
       const reissueUser = await tx.userProfile.findFirst({
@@ -329,10 +463,18 @@ export async function rotateSessionCookies(
         select: { id: true, phone: true, roles: true },
       });
       if (!reissueUser) return null;
+      // Метаданные преемника уже унаследованы при его создании; освежаем
+      // только «когда пользовались» и то, что прислал клиент сейчас.
+      await tx.refreshSession.update({
+        where: { id: successor.id },
+        data: { lastUsedAt: now, ...deviceMetaData(null, deviceMeta) },
+      });
       return {
         user: reissueUser,
         nextSession: { id: successor.id, jti: successor.jti },
         familyId: successor.familyId ?? used.familyId ?? claims.sid,
+        refreshExpiresAt: successor.expiresAt,
+        clientType: successor.clientType,
         reissued: true,
       };
     }
@@ -353,18 +495,24 @@ export async function rotateSessionCookies(
     // умирал бы при каждом обновлении сессии. Строки, выпущенные до миграции,
     // семьи не имеют — для них семьёй становится их собственный id, так что
     // цепочка получает её со следующей ротации и дальше уже отзываема.
+    // MOBILE-AUTH-A: тем же чтением забирается мета семьи — новая строка её
+    // наследует (клиент, платформа, установка), иначе после первой же ротации
+    // «где я вошёл» терял бы устройство.
     const claimedSession = await tx.refreshSession.findUnique({
       where: { id: claims.sid },
-      select: { familyId: true },
+      select: { familyId: true, ...SESSION_META_SELECT },
     });
     const familyId = claimedSession?.familyId ?? claims.sid;
+    const refreshExpiresAt = buildRefreshExpiresAt();
 
     const nextSession = await tx.refreshSession.create({
       data: {
         userId: user.id,
         jti: crypto.randomUUID(),
         familyId,
-        expiresAt: buildRefreshExpiresAt(),
+        expiresAt: refreshExpiresAt,
+        lastUsedAt: now,
+        ...carriedSessionMeta(claimedSession, deviceMeta),
       },
       select: { id: true, jti: true },
     });
@@ -374,7 +522,14 @@ export async function rotateSessionCookies(
       data: { rotatedToSessionId: nextSession.id },
     });
 
-    return { user, nextSession, familyId, reissued: false };
+    return {
+      user,
+      nextSession,
+      familyId,
+      refreshExpiresAt,
+      clientType: claimedSession?.clientType ?? null,
+      reissued: false,
+    };
   });
 
   if (!rotated) return null;
@@ -384,23 +539,47 @@ export async function rotateSessionCookies(
     phone: rotated.user.phone ?? null,
     roles: rotated.user.roles,
   };
-  const accessToken = signAccessToken({ ...payload, fid: rotated.familyId });
-  const nextRefreshToken = signRefreshToken({
+  const access = signAccessTokenWithExpiry({ ...payload, fid: rotated.familyId });
+  const refresh = signRefreshTokenWithExpiry({
     sub: rotated.user.id,
     sid: rotated.nextSession.id,
     jti: rotated.nextSession.jti,
   });
 
-  setAccessCookie(response, accessToken);
-  setRefreshCookie(response, nextRefreshToken);
   void recordSurfaceEvent({
     surface: "auth",
     outcome: "success",
     // Повторная выдача преемника — отдельная метка: по ней видно, как часто
     // ответ ротации до клиента не доходит.
-    operation: rotated.reissued ? "refresh-rotate-reissue" : "refresh-rotate",
+    operation: surfaceOperation(
+      rotated.clientType,
+      rotated.reissued ? "refresh-rotate-reissue" : "refresh-rotate",
+    ),
   });
-  return payload;
+
+  return {
+    payload,
+    tokens: {
+      accessToken: access.token,
+      accessTokenExpiresAt: access.expiresAt,
+      refreshToken: refresh.token,
+      // Повторно выданный преемник живёт до срока СВОЕЙ строки, а не 30 дней
+      // от момента подписи.
+      refreshTokenExpiresAt: earliest(refresh.expiresAt, rotated.refreshExpiresAt),
+    },
+    reissued: rotated.reissued,
+  };
+}
+
+export async function rotateSessionCookies(
+  response: NextResponse,
+  refreshToken: string
+): Promise<SessionCookiePayload | null> {
+  const rotated = await rotateSession(refreshToken);
+  if (!rotated) return null;
+  setAccessCookie(response, rotated.tokens.accessToken);
+  setRefreshCookie(response, rotated.tokens.refreshToken);
+  return rotated.payload;
 }
 
 export async function revokeRefreshSessionByToken(
@@ -460,6 +639,12 @@ export async function revokeRefreshSessionByToken(
         revokedAt: new Date(),
       },
     });
+    // MOBILE-B2: выход отвязывает push-токены установки этой семьи — в той же
+    // транзакции (повторный выход идемпотентен: строк уже нет). Устройства
+    // привязываются только к семье (`fid`), у legacy-строк их не бывает.
+    if (session.familyId) {
+      await unlinkPushDevicesOfFamilies(tx, claims.sub, [session.familyId]);
+    }
     return revoked.count > 0 ? ("REVOKED" as const) : ("ALREADY_INACTIVE" as const);
   });
   return result;
@@ -523,4 +708,18 @@ export async function getSessionUser() {
   const payload = await getAccessSessionPayload();
   if (!payload?.sub) return null;
   return loadActiveSessionUser(payload.sub, payload.fid);
+}
+
+/**
+ * MOBILE-AUTH-A3 — пользователь сессии ВМЕСТЕ с семьёй, которой предъявлен
+ * токен (`fid`). Нужна списку сессий: «это устройство» = семья текущего
+ * access-токена, а не догадка по User-Agent. Проверка та же, что у
+ * `getSessionUser`; legacy-токен без `fid` даёт `familyId: null` — у него
+ * «текущей» строки в списке нет.
+ */
+export async function getSessionContext(): Promise<{ user: SessionUser; familyId: string | null } | null> {
+  const payload = await getAccessSessionPayload();
+  if (!payload?.sub) return null;
+  const user = await loadActiveSessionUser(payload.sub, payload.fid);
+  return user ? { user, familyId: payload.fid ?? null } : null;
 }

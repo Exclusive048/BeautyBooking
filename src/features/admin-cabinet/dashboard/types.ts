@@ -58,7 +58,9 @@ export type AdminEventType =
   | "registration_master"
   | "registration_client"
   | "subscription"
-  | "complaint";
+  | "complaint"
+  // MOBILE-POLISH (App Store 1.2): жалоба пользователя на контент.
+  | "content_report";
 
 export type AdminEventDotTone = "ok" | "new" | "sub" | "cancel" | "alert";
 

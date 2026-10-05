@@ -19,6 +19,7 @@ import {
 } from "../lib/time-grid";
 import { dayPlanHours, loadDayPlans } from "@/lib/schedule/day-plans";
 import { timeToMinutes } from "@/lib/schedule/time";
+import type { DayPlan } from "@/lib/schedule/types";
 import type {
   ScheduleBookingCell,
   ScheduleBreakCell,
@@ -31,6 +32,7 @@ import type {
   StudioScheduleData,
 } from "./types";
 import { isStudioSurfaceBooking, studioBookingsWhere } from "@/lib/studio/booking-scope";
+import { loadStudioWeekCells } from "./calendar-week.service";
 
 /**
  * Studio admin booking operations (create/move/cancel) are DIRECT —
@@ -87,12 +89,22 @@ function salonDayBounds(dateKey: string, timeZone: string): { start: Date; end: 
   };
 }
 
+type DayBuild = {
+  day: ScheduleDayData;
+  /**
+   * MOBILE-STUDIO-C (ops): план дня каждого АКТИВНОГО мастера (id колонки →
+   * план движка на `dateKey`). Веб берёт из него только окно сетки; приложению
+   * нужны сами часы и перерывы колонок.
+   */
+  plans: Map<string, DayPlan>;
+};
+
 async function buildDayData(
   studioId: string,
   providerId: string,
   dateKey: string,
   timeZone: string,
-): Promise<ScheduleDayData> {
+): Promise<DayBuild> {
   const { start: dayStart, end: dayEnd } = salonDayBounds(dateKey, timeZone);
 
   const [masters, bookings, blocks] = await Promise.all([
@@ -170,6 +182,7 @@ async function buildDayData(
         proposedStartAt: true,
         proposedEndAt: true,
         actionRequiredBy: true,
+        bookingPackageId: true,
         service: { select: { name: true, title: true, price: true } },
         serviceItems: { select: { priceSnapshot: true } },
       },
@@ -267,6 +280,7 @@ async function buildDayData(
           proposedStartAtUtc: null,
           proposedEndAtUtc: null,
           actionRequiredBy: null,
+          bookingPackageId: null,
           isPersonal: true,
         };
       }
@@ -289,6 +303,7 @@ async function buildDayData(
         serviceId: b.serviceId,
         priceKopeks: resolveBookingPriceKopeks(b),
         ...mapProposedReschedule(b),
+        bookingPackageId: b.bookingPackageId ?? null,
         isPersonal: false,
       };
     });
@@ -343,13 +358,22 @@ async function buildDayData(
     );
   }
 
+  const plans = new Map<string, DayPlan>();
+  for (const [masterId, byDate] of dayPlans) {
+    const plan = byDate.get(dateKey);
+    if (plan) plans.set(masterId, plan);
+  }
+
   return {
-    dateKey,
-    dayStartIso: dayStart.toISOString(),
-    gridWindow: resolveGridWindow(gridMinutes),
-    columns,
-    bookings: bookingCells,
-    breaks: breakCells,
+    day: {
+      dateKey,
+      dayStartIso: dayStart.toISOString(),
+      gridWindow: resolveGridWindow(gridMinutes),
+      columns,
+      bookings: bookingCells,
+      breaks: breakCells,
+    },
+    plans,
   };
 }
 
@@ -405,11 +429,8 @@ async function buildWeekData(
 ): Promise<ScheduleWeekData> {
   // Неделя — календарная арифметика над ключами дат, границы — в поясе салона.
   const weekStartKey = toDateKey(startOfUtcWeekMonday(parseDateKey(dateKey)));
-  const weekStart = salonDayBounds(weekStartKey, timeZone).start;
-  const weekEnd = salonDayBounds(addDaysToDateKey(weekStartKey, 6), timeZone).end;
 
-  const [masters, bookings] = await Promise.all([
-    prisma.provider.findMany({
+  const masters = await prisma.provider.findMany({
       where: { type: ProviderType.MASTER, studioId: providerId },
       select: {
         id: true,
@@ -425,20 +446,19 @@ async function buildWeekData(
         },
       },
       orderBy: { name: "asc" },
-    }),
-    prisma.booking.findMany({
-      where: {
-        ...studioBookingsWhere(studioId),
-        startAtUtc: { gte: weekStart, lt: weekEnd },
-        status: { notIn: ACTIVE_BOOKING_STATUSES_NOTIN },
-      },
-      select: {
-        masterProviderId: true,
-        providerId: true,
-        startAtUtc: true,
-      },
-    }),
-  ]);
+  });
+
+  // MOBILE-POLISH: ячейки — по НАСТОЯЩЕМУ графику мастера, тем же расчётом,
+  // что неделя приложения (`GET /api/cabinet/studio/calendar/week`): ёмкость —
+  // рабочие минуты без перерывов (или фиксированные начала), выходной — по
+  // графику. Раньше — «5 записей = 100%» и выходной только у неактивного.
+  const cellsByMaster = await loadStudioWeekCells({
+    studioId,
+    timezone: timeZone,
+    from: weekStartKey,
+    masters: masters.map((master) => ({ id: master.id, active: isStudioMasterActive(master) })),
+    now: new Date(),
+  });
 
   const days: ScheduleWeekDay[] = Array.from({ length: 7 }, (_, index) => {
     const key = addDaysToDateKey(weekStartKey, index);
@@ -449,26 +469,13 @@ async function buildWeekData(
       isToday: key === studioTodayKey,
     };
   });
-  const weekDayKeys = new Set(days.map((day) => day.dateKey));
-
-  const countsByMasterAndDay = new Map<string, Map<string, number>>();
-  for (const booking of bookings) {
-    if (!booking.startAtUtc) continue;
-    // День записи — по салону (rule 17), а не смещение в UTC-сутках.
-    const dayKey = toLocalDateKey(booking.startAtUtc, timeZone);
-    if (!weekDayKeys.has(dayKey)) continue;
-    const masterId = booking.masterProviderId ?? booking.providerId;
-    const byDay = countsByMasterAndDay.get(masterId) ?? new Map<string, number>();
-    byDay.set(dayKey, (byDay.get(dayKey) ?? 0) + 1);
-    countsByMasterAndDay.set(masterId, byDay);
-  }
 
   // STUDIO-BUGS-FIX-A bug #5: INVITED masters get zero capacity + isDayOff
   // across the whole week. They surface in the grid so admin sees they
   // exist, but with no schedulable hours.
   const rows: ScheduleWeekRow[] = masters.map((master) => {
     const active = isStudioMasterActive(master);
-    const byDay = countsByMasterAndDay.get(master.id) ?? new Map();
+    const cells = cellsByMaster.get(master.id) ?? [];
     return {
       master: {
         id: master.id,
@@ -479,19 +486,15 @@ async function buildWeekData(
         isAvailable: active,
         serviceIds: master.masterServices.map((row) => row.serviceId),
       },
-      cells: days.map((day) => {
-        const booked = byDay.get(day.dateKey) ?? 0;
-        const capacity = active ? DAILY_CAPACITY : 0;
-        const percent =
-          capacity > 0 ? Math.min(Math.round((booked / capacity) * 100), 100) : 0;
-        return {
-          dateKey: day.dateKey,
-          booked,
-          capacity,
-          percent,
-          isDayOff: !active,
-        };
-      }),
+      cells: cells.map((cell) => ({
+        dateKey: cell.date,
+        booked: cell.booked,
+        bookedMinutes: cell.bookedMinutes,
+        capacityMinutes: cell.capacityMinutes,
+        fixedSlots: cell.fixedSlots,
+        percent: cell.percent,
+        isDayOff: cell.isDayOff,
+      })),
     };
   });
 
@@ -504,7 +507,9 @@ async function loadServices(
 ): Promise<StudioScheduleData["services"]> {
   const [services, masterServices] = await Promise.all([
     prisma.service.findMany({
-      where: { studioId, isEnabled: true },
+      // MOBILE-STUDIO-C (ops): архивную услугу (`isActive: false`) создание
+      // записи отклоняет («Услуга не найдена.») — в выборе её быть не должно.
+      where: { studioId, isEnabled: true, isActive: true },
       select: {
         id: true,
         name: true,
@@ -558,7 +563,7 @@ export async function loadStudioScheduleData(input: {
   const studioTodayKey = toLocalDateKey(new Date(), studioTimezone);
   const effectiveDateKey = input.dateKey ?? studioTodayKey;
 
-  const [day, services, week] = await Promise.all([
+  const [{ day }, services, week] = await Promise.all([
     buildDayData(studio.id, studio.providerId, effectiveDateKey, studioTimezone),
     loadServices(studio.id, studio.providerId),
     input.view === "week"
@@ -575,6 +580,35 @@ export async function loadStudioScheduleData(input: {
     week,
     services,
   };
+}
+
+/**
+ * MOBILE-STUDIO-C (ops) — день календаря студии для приложения: та же сборка
+ * дня, что у веба (`buildDayData` + `computeKpis`), плюс план дня каждого
+ * активного мастера из движка расписания. Без каталога услуг и недели.
+ */
+export async function loadStudioScheduleDay(input: {
+  studioId: string;
+  dateKey?: string;
+  now?: Date;
+}): Promise<{
+  studioId: string;
+  timezone: string;
+  todayKey: string;
+  day: ScheduleDayData;
+  kpis: ScheduleKpis;
+  plans: Map<string, DayPlan>;
+} | null> {
+  const studio = await prisma.studio.findUnique({
+    where: { id: input.studioId },
+    select: { id: true, providerId: true, provider: { select: { timezone: true } } },
+  });
+  if (!studio) return null;
+
+  const timezone = studio.provider.timezone;
+  const todayKey = toLocalDateKey(input.now ?? new Date(), timezone);
+  const { day, plans } = await buildDayData(studio.id, studio.providerId, input.dateKey ?? todayKey, timezone);
+  return { studioId: studio.id, timezone, todayKey, day, kpis: computeKpis(day), plans };
 }
 
 void DAY_START_HOUR;
