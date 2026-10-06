@@ -37,6 +37,7 @@ import { env } from "@/lib/env";
 import { safeJsonLd } from "@/lib/seo/schema";
 import { SITE_ICONS } from "@/lib/seo/site-icons";
 import { APPLE_STARTUP_IMAGES } from "@/lib/pwa/apple-splash";
+import { versionedBrandUrl } from "@/lib/pwa/brand-asset-version";
 
 ensureVisualSearchStartupConfig();
 
@@ -114,7 +115,7 @@ export const metadata: Metadata = {
     siteName: UI_TEXT.brand.name,
     title: UI_TEXT.meta.title,
     description: UI_TEXT.meta.description,
-    images: [{ url: "/brand/og-mark.png", width: 1200, height: 1200, alt: UI_TEXT.brand.name }],
+    images: [{ url: versionedBrandUrl("/brand/og-mark.png"), width: 1200, height: 1200, alt: UI_TEXT.brand.name }],
   },
   twitter: {
     card: "summary_large_image",
@@ -154,7 +155,7 @@ const SITE_JSON_LD = {
       "@id": `${SITE_URL}/#organization`,
       name: UI_TEXT.brand.name,
       url: SITE_URL,
-      logo: `${SITE_URL}/brand/icon-512.png`,
+      logo: `${SITE_URL}${versionedBrandUrl("/brand/icon-512.png")}`,
       ...(env.NEXT_PUBLIC_VK_COMMUNITY_URL ? { sameAs: [env.NEXT_PUBLIC_VK_COMMUNITY_URL] } : {}),
     },
     {

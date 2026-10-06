@@ -11,6 +11,7 @@
  * `apple-splash.test.ts` проверяет, что за каждым адресом лежит файл нужного
  * размера. Ориентация — только портретная, как у манифеста.
  */
+import { versionedBrandUrl } from "./brand-asset-version";
 
 type AppleSplashDevice = {
   /** CSS-ширина экрана в портретной ориентации. */
@@ -46,9 +47,12 @@ export function appleSplashUrl(device: AppleSplashDevice): string {
   return `/splash/apple-splash-${width}-${height}.png`;
 }
 
-/** `appleWebApp.startupImage` для `metadata` корневого layout. */
+/**
+ * `appleWebApp.startupImage` для `metadata` корневого layout. Адрес — с `?v=`
+ * версии набора: на заставке знак, и iOS держит прежнюю (BRAND-ICONS-CACHE-01).
+ */
 export const APPLE_STARTUP_IMAGES = APPLE_SPLASH_DEVICES.map((device) => ({
-  url: appleSplashUrl(device),
+  url: versionedBrandUrl(appleSplashUrl(device)),
   media:
     `(device-width: ${device.width}px) and (device-height: ${device.height}px)` +
     ` and (-webkit-device-pixel-ratio: ${device.ratio}) and (orientation: portrait)`,

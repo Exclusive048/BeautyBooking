@@ -9,6 +9,7 @@ import { PublicMasterProfilePage } from "@/features/public-profile/master/public
 import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-profile-page";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { buildProviderSchema, safeJsonLd } from "@/lib/seo/schema";
+import { versionedBrandUrl } from "@/lib/pwa/brand-asset-version";
 import { withQuery } from "@/lib/public-urls";
 import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
@@ -177,7 +178,7 @@ async function findProviderForMeta(username: string) {
 }
 
 /** Общая картинка бренда — та же, что `openGraph.images` в `app/layout.tsx`. */
-const BRAND_OG_IMAGE = { url: "/brand/og-mark.png", width: 1200, height: 1200 } as const;
+const BRAND_OG_IMAGE = { url: versionedBrandUrl("/brand/og-mark.png"), width: 1200, height: 1200 } as const;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username: raw } = await Promise.resolve(params);

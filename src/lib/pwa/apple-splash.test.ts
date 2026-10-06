@@ -39,12 +39,14 @@ describe("заставки iOS", () => {
       const [, width, height, ratio] = image.media.match(
         /device-width: (\d+)px\) and \(device-height: (\d+)px\) and \(-webkit-device-pixel-ratio: (\d)\)/,
       )!;
-      expect(image.url).toBe(`/splash/apple-splash-${Number(width) * Number(ratio)}-${Number(height) * Number(ratio)}.png`);
+      expect(image.url.split("?")[0]).toBe(
+        `/splash/apple-splash-${Number(width) * Number(ratio)}-${Number(height) * Number(ratio)}.png`,
+      );
     }
   });
 
   it("каждому экрану — одна заставка, и лишних файлов нет", () => {
-    const urls = APPLE_STARTUP_IMAGES.map((image) => image.url);
+    const urls = APPLE_STARTUP_IMAGES.map((image) => image.url.split("?")[0]!);
     expect(new Set(urls).size).toBe(urls.length);
     const files = readdirSync(SPLASH_DIR).map((name) => `/splash/${name}`);
     expect(files.sort()).toEqual([...urls].sort());
