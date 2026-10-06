@@ -33,8 +33,13 @@ const NEXT_TEMPLATE_FAVICON_MD5 = "c30c7d42707a47a3f4591831641e50dc";
 
 type IconLink = { url: string; sizes: string; type: string };
 
+// Адреса несут `?v=` версии набора (BRAND-ICONS-CACHE-01) — файл по пути без него.
+function publicPath(url: string): string {
+  return path.join(PUBLIC_DIR, url.split("?")[0]!);
+}
+
 function readPublic(url: string): Buffer {
-  return readFileSync(path.join(PUBLIC_DIR, url));
+  return readFileSync(publicPath(url));
 }
 
 function describeFile(bytes: Buffer): { type: string; sizes: string } {
@@ -73,7 +78,7 @@ describe("SITE_ICONS", () => {
   });
 
   it("apple-touch-icon без прозрачных углов (иначе iOS дорисует чёрные)", async () => {
-    const file = path.join(PUBLIC_DIR, SITE_ICONS.apple[0].url);
+    const file = publicPath(SITE_ICONS.apple[0].url);
     const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const last = info.width - 1;
     const alphaAt = (x: number, y: number) => data[(y * info.width + x) * info.channels + 3];
