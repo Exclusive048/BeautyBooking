@@ -222,13 +222,13 @@ export function LoginShowcase({ heroImageUrl, stats }: LoginShowcaseProps) {
 
       {/* Content */}
       <div className="relative z-2 flex h-full flex-col justify-between p-10">
-        {/* Brand block — gradient iconmark + white wordmark over the dark
-            stage. `textClassName="text-white"` overrides the wordmark's
-            gradient text-clip so it stays readable on the burgundy backdrop;
-            the iconmark keeps its gradient for brand identity (proven
-            legible on this pane pre-redesign). */}
+        {/* Brand block — iconmark + white wordmark over the dark stage.
+            `textClassName="text-white"` overrides the wordmark's gradient
+            text-clip so it stays readable on the burgundy backdrop; the
+            mark is `fixedDark` — the pane is dark in BOTH themes, and the
+            theme-following light mark would sink into it. */}
         <div className="login-rise" style={{ animationDelay: RISE_DELAY.brand }}>
-          <BrandLogo variant="full" size="md" href={null} textClassName="text-white" />
+          <BrandLogo variant="full" size="md" href={null} mark="fixedDark" textClassName="text-white" />
           <p className="mt-1.5 font-mono text-3xs tracking-[0.08em] text-white/60">
             {UI_TEXT.brand.tagline}
           </p>

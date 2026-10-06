@@ -110,6 +110,21 @@
        both themes — the tone is light/medium and works on both. */
     --brand-accent: 198 169 126;
 
+    /* === Знак логотипа (BRAND-ICONS-03, набор «Наложение») ===
+       Градиент четырёх полупрозрачных лепестков `<LogoMark>`. Пара к `.dark`:
+       в светлой теме — бордо → малина → тёплый розовый (`mark-light` набора),
+       в тёмной — розовый → светло-розовый (`mark-dark`). Один инлайн-SVG
+       меняет цвет вместе с темой — без второго файла и без мигания. */
+    --logo-mark-from: 114 8 8;
+    --logo-mark-via: 161 7 40;
+    --logo-mark-to: 212 74 106;
+    /* Тот же знак на поверхности, тёмной в ОБЕИХ темах (панель бренда /login):
+       всегда тёмная версия знака. В `.dark` НЕ переопределяется — как
+       `--login-accent-*`: светлая версия на бордовой панели не видна. */
+    --logo-mark-fixed-from: 212 74 106;
+    --logo-mark-fixed-via: 240 131 155;
+    --logo-mark-fixed-to: 254 198 211;
+
     /* === Aliases — kept for backward compat === */
     --bg: var(--bg-page);
     --background: var(--bg-page);
@@ -260,6 +275,11 @@
     --brand-deep: 86 5 5;
     --brand-pane: 58 4 12;
     --brand-accent: 198 169 126;
+
+    /* Знак логотипа — тёмная версия (`mark-dark`), пара к :root. */
+    --logo-mark-from: 212 74 106;
+    --logo-mark-via: 240 131 155;
+    --logo-mark-to: 254 198 211;
 
     --bg: var(--bg-page);
     --background: var(--bg-page);

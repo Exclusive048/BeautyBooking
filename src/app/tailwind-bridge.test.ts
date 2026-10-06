@@ -92,6 +92,15 @@ describe("UI-06 — мост токен ↔ класс", () => {
       "info",
       "decor-primary",
       "decor-magenta",
+      // BRAND-ICONS-03: стопы градиента знака (`<LogoMark>`). Снятый мост не
+      // обесцветит знак, а молча перекрасит его в цвет текста предка
+      // (`currentColor` стопа наследуется) — в шапке это незаметно на глаз.
+      "logo-mark-from",
+      "logo-mark-via",
+      "logo-mark-to",
+      "logo-mark-fixed-from",
+      "logo-mark-fixed-via",
+      "logo-mark-fixed-to",
     ];
     const keys = new Set(bridges().map((b) => b.key));
     for (const name of used) {

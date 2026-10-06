@@ -133,7 +133,7 @@ export function MasterSidebar({
       {/* Brand block — iconmark + wordmark via <BrandLogo> with the
           page-context subtitle as an adjacent <p>. Replaces the
           legacy CSS «М» monogram with the SVG mark from the brand
-          kit (`/brand/logo.svg`). */}
+          kit (`<LogoMark>`, follows the theme). */}
       <div className="border-b border-border-subtle px-5 py-5">
         <BrandLogo
           variant="full"

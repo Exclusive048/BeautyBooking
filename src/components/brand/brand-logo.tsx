@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import { LogoMark } from "@/components/brand/logo-mark";
+import { LogoMark, type LogoMarkVariant } from "@/components/brand/logo-mark";
 import * as UI_TEXT from "@/lib/ui/text";
 
 export type BrandLogoVariant = "full" | "iconOnly" | "monoText";
 export type BrandLogoSize = "xs" | "sm" | "md" | "lg" | "xl";
-export type BrandLogoMark = "gradient" | "mono";
+export type BrandLogoMark = LogoMarkVariant;
 
 type Preset = {
   icon: number;
@@ -26,9 +26,10 @@ type Props = {
    * `monoText` — wordmark only, rendered in `text-main`. */
   variant?: BrandLogoVariant;
   size?: BrandLogoSize;
-  /** Iconmark style. Default `gradient` — colour version of the
-   * brand mark; `mono` for placement on solid brand-coloured
-   * surfaces where the colour version would blend in. */
+  /** Iconmark colours. Default `themed` — follows the site theme
+   * (light / dark version of the mark); `fixedDark` — the dark version
+   * in both themes, for surfaces that are dark regardless of theme
+   * (the login brand pane), where the light version would vanish. */
   mark?: BrandLogoMark;
   /** Pass `null` to render without an enclosing `<Link>` (useful in
    * hero sections that should not navigate). Default `"/"`. */
@@ -40,20 +41,17 @@ type Props = {
    * CSS specificity — used on dark hero surfaces. */
   textClassName?: string;
   iconClassName?: string;
-  /** Defaults to true on `xl` size (login hero) — we want LCP to
-   * include the logo. */
-  priority?: boolean;
 };
 
 /**
  * Universal brand logo (brand-kit).
  *
- * Pairs the SVG iconmark from `/brand/` with the wordmark
+ * Pairs the inline SVG iconmark (`<LogoMark>`) with the wordmark
  * «МастерРядом». Single source of truth for logo presentation
  * across the cabinet, marketing, auth and error surfaces.
  *
  * Visual contract:
- *   - `full` (default) — gradient mark + gradient-clipped wordmark
+ *   - `full` (default) — theme-aware mark + gradient-clipped wordmark
  *   - `iconOnly` — just the SVG mark
  *   - `monoText` — wordmark only (no icon), single colour
  *
@@ -64,27 +62,20 @@ type Props = {
 export function BrandLogo({
   variant = "full",
   size = "md",
-  mark = "gradient",
+  mark = "themed",
   href = "/",
   className,
   textClassName,
   iconClassName,
-  priority,
 }: Props) {
   const preset = SIZE_PRESETS[size];
   const shouldShowMark = variant !== "monoText";
   const shouldShowText = variant !== "iconOnly";
-  const usePriority = priority ?? size === "xl";
 
   const content = (
     <span className={cn("inline-flex items-center", preset.gap, className)}>
       {shouldShowMark ? (
-        <LogoMark
-          size={preset.icon}
-          variant={mark}
-          priority={usePriority}
-          className={iconClassName}
-        />
+        <LogoMark size={preset.icon} variant={mark} className={iconClassName} />
       ) : null}
       {shouldShowText ? (
         <span
