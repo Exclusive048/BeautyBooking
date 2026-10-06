@@ -7,6 +7,7 @@ import { ArrowRight, Check, ChevronLeft, Mail, Phone } from "lucide-react";
 import { withConsentQuery } from "@/components/auth/social-consent";
 import TelegramLoginButton from "@/components/auth/telegram-login-button";
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { LogoMark } from "@/components/brand/logo-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OtpInput, type OtpState } from "@/components/ui/otp-input";
@@ -577,10 +578,13 @@ export default function LoginClient({
               ) : null}
             </div>
 
-            {/* Header */}
+            {/* Header. Знак рядом с «МастерРядом» — только на десктопе: на
+                телефоне логотип и так стоит строкой выше (brand row). Следует
+                за темой, как в шапке (`LogoMark`, BRAND-ICONS-03). */}
             <div className="mb-5">
-              <h1 className="font-display text-[2rem] font-medium leading-[1.1] tracking-tight text-text-main">
+              <h1 className="flex items-center gap-3 font-display text-[2rem] font-medium leading-[1.1] tracking-tight text-text-main">
                 {step === "input" ? T.titleLogin : T.codeStepTitle}
+                {step === "input" ? <LogoMark size={40} className="hidden lg:inline-block" /> : null}
               </h1>
               {step === "code" ? (
                 <p className="mt-2 text-sm text-text-sec">

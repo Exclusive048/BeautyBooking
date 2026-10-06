@@ -177,7 +177,7 @@ async function findProviderForMeta(username: string) {
 }
 
 /** Общая картинка бренда — та же, что `openGraph.images` в `app/layout.tsx`. */
-const BRAND_OG_IMAGE = { url: "/brand/icon-512.png", width: 512, height: 512 } as const;
+const BRAND_OG_IMAGE = { url: "/brand/og-mark.png", width: 1200, height: 1200 } as const;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username: raw } = await Promise.resolve(params);

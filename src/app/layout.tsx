@@ -114,7 +114,7 @@ export const metadata: Metadata = {
     siteName: UI_TEXT.brand.name,
     title: UI_TEXT.meta.title,
     description: UI_TEXT.meta.description,
-    images: [{ url: "/brand/icon-512.png", width: 512, height: 512, alt: UI_TEXT.brand.name }],
+    images: [{ url: "/brand/og-mark.png", width: 1200, height: 1200, alt: UI_TEXT.brand.name }],
   },
   twitter: {
     card: "summary_large_image",

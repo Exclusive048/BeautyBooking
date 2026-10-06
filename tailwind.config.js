@@ -61,6 +61,15 @@ module.exports = {
         "brand-deep": "rgb(var(--brand-deep) / <alpha-value>)",
         "brand-pane": "rgb(var(--brand-pane) / <alpha-value>)",
         "brand-accent": "rgb(var(--brand-accent) / <alpha-value>)",
+        // Градиент знака логотипа (BRAND-ICONS-03): стопы `<LogoMark>` красятся
+        // как `text-logo-mark-* [stop-color:currentColor]`. `logo-mark-*` — за
+        // темой, `logo-mark-fixed-*` — для поверхностей, тёмных в обеих темах.
+        "logo-mark-from": "rgb(var(--logo-mark-from) / <alpha-value>)",
+        "logo-mark-via": "rgb(var(--logo-mark-via) / <alpha-value>)",
+        "logo-mark-to": "rgb(var(--logo-mark-to) / <alpha-value>)",
+        "logo-mark-fixed-from": "rgb(var(--logo-mark-fixed-from) / <alpha-value>)",
+        "logo-mark-fixed-via": "rgb(var(--logo-mark-fixed-via) / <alpha-value>)",
+        "logo-mark-fixed-to": "rgb(var(--logo-mark-fixed-to) / <alpha-value>)",
         // HARDENING-MISC-01 — мост для СОСТОЯНИЙ. CSS-переменные для них давно
         // объявлены в globals.css (и в светлой, и в тёмной теме), а вот моста в
         // tailwind не было — поэтому `bg-success` / `text-destructive` и т.п.
