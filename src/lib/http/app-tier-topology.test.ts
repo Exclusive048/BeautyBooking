@@ -436,3 +436,62 @@ describe("AUTO-DEPLOY-01 · deploy.yml: автозапуск по CI, снимо
     expect(notify).toMatch(/secure: true/);
   });
 });
+
+/**
+ * SEO-WWW-01 (2026-10-08) — `www.masterryadom.ru` переадресуется на основной
+ * адрес. DNS-запись `www` смотрит на сервер, а роутера для неё не было:
+ * браузер видел самоподписанный сертификат traefik и 404.
+ *
+ * Регулярка и подстановка проверяются ПОВЕДЕНИЕМ: метка проходит те же два
+ * шага, что на сервере (compose снимает `$$`, traefik подставляет `${1}`),
+ * и прогоняется по настоящим адресам.
+ *
+ * @probe 2026-10-08:
+ *   • `replacement=https://masterryadom.ru/` (без `$${1}`) — красный: путь и
+ *     query теряются;
+ *   • `replacement=…/${1}` (одинарный `$`) — красный: compose съел бы его как
+ *     переменную окружения;
+ *   • роутер перенесён на `web` — красный: переадресация пропадала бы на
+ *     время `up -d`.
+ */
+describe("SEO-WWW-01 · www → основной адрес", () => {
+  const maintenance = serviceBlock("maintenance");
+  const l = labelsOf(maintenance!);
+
+  /** То, что увидит traefik: compose превращает `$$` в `$`. */
+  function applyRedirect(url: string): string | null {
+    const regex = new RegExp(l["traefik.http.middlewares.www-to-apex.redirectregex.regex"] ?? "(?!)");
+    const composed = (l["traefik.http.middlewares.www-to-apex.redirectregex.replacement"] ?? "").replace(/\$\$/g, "$");
+    if (!regex.test(url)) return null;
+    // traefik (Go regexp) пишет группу как ${1}; JS — $1.
+    return url.replace(regex, composed.replace(/\$\{(\d+)\}/g, "$$$1"));
+  }
+
+  it("в метке compose подстановка экранирована `$$`", () => {
+    const raw = l["traefik.http.middlewares.www-to-apex.redirectregex.replacement"] ?? "";
+    expect(raw).toMatch(/\$\$\{1\}/);
+  });
+
+  it("путь и query сохраняются, переадресация постоянная", () => {
+    expect(applyRedirect("https://www.masterryadom.ru/")).toBe("https://masterryadom.ru/");
+    expect(applyRedirect("https://www.masterryadom.ru/u/anna-sokolova?ref=vk")).toBe(
+      "https://masterryadom.ru/u/anna-sokolova?ref=vk",
+    );
+    expect(applyRedirect("https://masterryadom.ru/catalog"), "основной адрес не переадресуется").toBeNull();
+    expect(l["traefik.http.middlewares.www-to-apex.redirectregex.permanent"]).toBe("true");
+  });
+
+  it("роутер www: только websecure, сертификат LE, middleware переадресации, живёт на maintenance", () => {
+    expect(l["traefik.http.routers.www.rule"]).toBe("Host(`www.masterryadom.ru`)");
+    expect(l["traefik.http.routers.www.entrypoints"]).toBe("websecure");
+    expect(l["traefik.http.routers.www.tls"]).toBe("true");
+    expect(l["traefik.http.routers.www.tls.certresolver"]).toBe("letsencrypt");
+    expect(l["traefik.http.routers.www.middlewares"]).toBe("www-to-apex");
+    for (const name of ["web", "api"]) {
+      expect(
+        labelsOf(serviceBlock(name)!)["traefik.http.routers.www.rule"],
+        `роутер www у ${name}: пересоздаётся деплоем, переадресация пропадала бы на время up -d`,
+      ).toBeUndefined();
+    }
+  });
+});

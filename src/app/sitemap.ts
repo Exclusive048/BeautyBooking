@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { catalogVisibleProviderWhere, SELLS_OWN_SERVICES_WHERE } from "@/lib/providers/catalog-visibility";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { logError } from "@/lib/logging/logger";
 
@@ -37,14 +39,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = buildStaticRoutes(baseUrl);
   const dynamicRoutes: MetadataRoute.Sitemap = [];
 
+  // SEO-SITEMAP-02: профили — ровно те, что показывает каталог (видимость +
+  // город + расписание + свои услуги). Включённой видимости мало: она стоит с
+  // рождения кабинета, и в sitemap попадали пустые страницы без услуг и
+  // расписания — Google их сканирует и не индексирует.
+  const where: Prisma.ProviderWhereInput = {
+    AND: [catalogVisibleProviderWhere(), SELLS_OWN_SERVICES_WHERE, { publicUsername: { not: null } }],
+  };
+
   try {
     let cursor: string | null = null;
 
     while (true) {
-      const rows: Array<{ id: string; publicUsername: string | null; updatedAt: Date }> =
+      const rows: Array<{ id: string; publicUsername: string | null }> =
         await prisma.provider.findMany({
-          where: { isPublished: true, publicUsername: { not: null } },
-          select: { id: true, publicUsername: true, updatedAt: true },
+          where,
+          select: { id: true, publicUsername: true },
           orderBy: { id: "asc" },
           take: PAGE_SIZE + 1,
           ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -55,9 +65,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const page = rows.slice(0, PAGE_SIZE);
       for (const row of page) {
         if (!row.publicUsername) continue;
+        // SEO-SITEMAP-02: `lastModified` намеренно нет. `Provider.updatedAt`
+        // сдвигает воркер каждые 30 минут (пересчёт «свободно сегодня» и
+        // снимка свободного времени), то есть дата менялась без изменения
+        // страницы — и Google, заметив это, перестаёт доверять lastmod сайта.
         dynamicRoutes.push({
           url: `${baseUrl}/u/${row.publicUsername}`,
-          lastModified: row.updatedAt,
           changeFrequency: "weekly",
           priority: 0.8,
         });
