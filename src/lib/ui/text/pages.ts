@@ -170,8 +170,11 @@ export const pages = {
       "Запись онлайн в студию «{name}». Услуги, цены, отзывы и свободные окна.",
     masterDescriptionFallback:
       "Запись онлайн к мастеру {name}. Услуги, цены, отзывы и свободные окна.",
+    studioDescriptionNoName: "Запись онлайн в студию. Услуги, цены, отзывы и свободные окна.",
+    masterDescriptionNoName: "Запись онлайн к мастеру. Услуги, цены, отзывы и свободные окна.",
     titleTemplate: "{name} — запись онлайн",
     nameFallback: "Мастер",
+    studioNameFallback: "Студия",
     servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
     ogBookOnline: "Записаться онлайн",
     ogReviews: "отзывов",
@@ -195,8 +198,11 @@ export const pages = {
       "Запись онлайн в студию «{name}». Выберите услуги и свободное время.",
     masterDescriptionFallback:
       "Запись онлайн к мастеру {name}. Выберите услуги и свободное время.",
+    studioDescriptionNoName: "Запись онлайн в студию. Выберите услуги и свободное время.",
+    masterDescriptionNoName: "Запись онлайн к мастеру. Выберите услуги и свободное время.",
     titleTemplate: "{name} — запись онлайн",
     nameFallback: "Мастер",
+    studioNameFallback: "Студия",
   },
   modelOffer: {
     notFoundTitle: "Предложение не найдено | МастерРядом",

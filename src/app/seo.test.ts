@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: { provider: { findMany } } }));
 
 import robots from "@/app/robots";
 import sitemap, { dynamic as sitemapDynamic } from "@/app/sitemap";
+import { catalogVisibleProviderWhere, SELLS_OWN_SERVICES_WHERE } from "@/lib/providers/catalog-visibility";
 
 beforeEach(() => findMany.mockReset());
 
@@ -51,5 +52,35 @@ describe("sitemap", () => {
     );
     expect(urls).not.toContain("https://masterryadom.ru/blog");
     expect(urls).not.toContain("https://masterryadom.ru/careers");
+  });
+
+  // SEO-SITEMAP-02: в sitemap — ровно профили каталога. Одной видимости мало:
+  // она включена с рождения кабинета, и туда попадали пустые страницы.
+  // @probe 2026-10-08 — вернуть `where: { isPublished: true, publicUsername: … }`
+  //        → красный «нет условия каталога»; убрать SELLS_OWN_SERVICES_WHERE →
+  //        красный «нет условия своих услуг».
+  it("профили — те же, что в каталоге: видимость + город + расписание + свои услуги", async () => {
+    // Предикат несёт «сегодня» — фиксируем дату, чтобы обе стороны её делили.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    try {
+      findMany.mockResolvedValueOnce([]);
+      await sitemap();
+      const where = findMany.mock.calls[0]![0].where as { AND?: unknown[] };
+      expect(where.AND, "нет условия каталога").toEqual(
+        expect.arrayContaining([catalogVisibleProviderWhere(), { publicUsername: { not: null } }]),
+      );
+      expect(where.AND, "нет условия своих услуг").toEqual(expect.arrayContaining([SELLS_OWN_SERVICES_WHERE]));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // @probe 2026-10-08 — вернуть `lastModified: row.updatedAt` → красный.
+  it("у профилей нет lastmod: updatedAt двигает воркер каждые 30 минут", async () => {
+    findMany.mockResolvedValueOnce([{ id: "p1", publicUsername: "anna-sokolova" }]);
+    const entry = (await sitemap()).find((e) => e.url === "https://masterryadom.ru/u/anna-sokolova");
+    expect(entry).toBeDefined();
+    expect(entry!.lastModified).toBeUndefined();
   });
 });

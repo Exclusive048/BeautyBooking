@@ -58,12 +58,18 @@ function buildDescription(input: {
   description: string | null;
   tagline: string | null;
 }): string {
-  const base =
-    input.description?.trim() ||
-    input.tagline?.trim() ||
-    (input.type === "STUDIO"
-      ? UI_TEXT.pages.publicBooking.studioDescriptionFallback.replace("{name}", input.name)
-      : UI_TEXT.pages.publicBooking.masterDescriptionFallback.replace("{name}", input.name));
+  // Без названия шаблон печатал «в студию «»» — для такого профиля своя строка.
+  const name = input.name.trim();
+  const t = UI_TEXT.pages.publicBooking;
+  const fallback =
+    input.type === "STUDIO"
+      ? name
+        ? t.studioDescriptionFallback.replace("{name}", name)
+        : t.studioDescriptionNoName
+      : name
+        ? t.masterDescriptionFallback.replace("{name}", name)
+        : t.masterDescriptionNoName;
+  const base = input.description?.trim() || input.tagline?.trim() || fallback;
   return truncateText(base, 160);
 }
 
@@ -106,7 +112,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
   // R2-02-F: guard the empty-name edge case (no bare " — запись онлайн").
-  const titleName = provider.name.trim() || UI_TEXT.pages.publicBooking.nameFallback;
+  const titleName =
+    provider.name.trim() ||
+    (provider.type === "STUDIO"
+      ? UI_TEXT.pages.publicBooking.studioNameFallback
+      : UI_TEXT.pages.publicBooking.nameFallback);
   const title = UI_TEXT.pages.publicBooking.titleTemplate.replace("{name}", titleName);
   const description = buildDescription({
     name: provider.name,

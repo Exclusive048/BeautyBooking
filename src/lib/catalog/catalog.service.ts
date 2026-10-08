@@ -24,6 +24,7 @@ import { distanceMetersFrom, rankByDistance, type GeoPoint } from "@/lib/catalog
 import { freeSlotKeysForWhen } from "@/lib/schedule/free-slot-keys-shared";
 import {
   catalogVisibleProviderWhere,
+  SELLS_OWN_SERVICES_WHERE,
 } from "@/lib/providers/catalog-visibility";
 
 // AUDIT (section 6):
@@ -587,14 +588,7 @@ function buildWhere(
 
   // STUDIO-MASTER-PROFILES: в каталоге — профили, которым есть что продать
   // СВОЕГО. Мастер студии без своих услуг находится через студию.
-  and.push({
-    services: {
-      some: {
-        isEnabled: true,
-        isActive: true,
-      },
-    },
-  });
+  and.push(SELLS_OWN_SERVICES_WHERE);
 
   if (input.entityType === "master") {
     and.push({ type: ProviderType.MASTER });

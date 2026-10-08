@@ -115,6 +115,16 @@ export function catalogPresenceConditions(
  * на студийную услугу идёт только через студию, иначе она становилась ЛИЧНОЙ
  * записью мастера (`booking-core` теперь такую запись отклоняет).
  */
+/**
+ * Условие карточки каталога поверх видимости: у профиля есть хотя бы одна СВОЯ
+ * включённая услуга (STUDIO-MASTER-PROFILES — мастер студии без своих услуг
+ * находится через студию). Кладётся в `AND` рядом с предикатом видимости:
+ * каталог и sitemap отбирают одно и то же множество профилей.
+ */
+export const SELLS_OWN_SERVICES_WHERE = {
+  services: { some: { isEnabled: true, isActive: true } },
+} satisfies Prisma.ProviderWhereInput;
+
 export function catalogVisibleProviderWhere(now: Date = new Date()): Prisma.ProviderWhereInput {
   const conditions = catalogPresenceConditions(now);
   return {

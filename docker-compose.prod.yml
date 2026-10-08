@@ -307,6 +307,22 @@ services:
       - "traefik.http.middlewares.maintenance-json.errors.status=502-504"
       - "traefik.http.middlewares.maintenance-json.errors.service=maintenance"
       - "traefik.http.middlewares.maintenance-json.errors.query=/api/maintenance"
+      # SEO-WWW-01: www → основной адрес, 301 с путём и query. DNS-запись `www`
+      # смотрит на этот сервер, а роутера для неё не было: браузер видел
+      # самоподписанный сертификат traefik и 404. Роутер живёт здесь, а не у
+      # web: maintenance не пересоздаётся деплоем, и переадресация не
+      # пропадает на время `up -d`. Сертификат для www выпускает тот же LE;
+      # сервис указан только потому, что роутеру он обязателен — до него
+      # запрос не доходит, ответ отдаёт middleware.
+      - "traefik.http.routers.www.rule=Host(`www.masterryadom.ru`)"
+      - "traefik.http.routers.www.entrypoints=websecure"
+      - "traefik.http.routers.www.tls=true"
+      - "traefik.http.routers.www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.www.middlewares=www-to-apex"
+      - "traefik.http.routers.www.service=maintenance"
+      - "traefik.http.middlewares.www-to-apex.redirectregex.regex=^https?://www[.]masterryadom[.]ru/(.*)"
+      - "traefik.http.middlewares.www-to-apex.redirectregex.replacement=https://masterryadom.ru/$${1}"
+      - "traefik.http.middlewares.www-to-apex.redirectregex.permanent=true"
     # 🔴 Healthcheck здесь НАМЕРЕННО отсутствует. Docker-провайдер traefik не
     # читает метки контейнера, пока его healthcheck в состоянии `starting`, а
     # именно на этих метках определены middleware `maintenance-*`, на которые

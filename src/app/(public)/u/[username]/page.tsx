@@ -57,10 +57,17 @@ function buildDescription(input: {
     );
   }
 
+  // Без названия шаблон печатал «в студию «»» — для такого профиля своя строка.
+  const name = input.name.trim();
+  const t = UI_TEXT.pages.publicProfile;
   const fallback =
     input.type === "STUDIO"
-      ? UI_TEXT.pages.publicProfile.studioDescriptionFallback.replace("{name}", input.name)
-      : UI_TEXT.pages.publicProfile.masterDescriptionFallback.replace("{name}", input.name);
+      ? name
+        ? t.studioDescriptionFallback.replace("{name}", name)
+        : t.studioDescriptionNoName
+      : name
+        ? t.masterDescriptionFallback.replace("{name}", name)
+        : t.masterDescriptionNoName;
   return truncateText(fallback, 160);
 }
 
@@ -199,7 +206,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // R2-02-F: guard the empty-name edge case so the title never renders a bare
   // " — запись онлайн" (leading dash) when a provider has a blank name.
-  const titleName = provider.name.trim() || UI_TEXT.pages.publicProfile.nameFallback;
+  const titleName =
+    provider.name.trim() ||
+    (provider.type === "STUDIO"
+      ? UI_TEXT.pages.publicProfile.studioNameFallback
+      : UI_TEXT.pages.publicProfile.nameFallback);
   const title = UI_TEXT.pages.publicProfile.titleTemplate.replace("{name}", titleName);
   const description = buildDescription({
     name: provider.name,
