@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import {
   OperatorSlotPicker,
   type OperatorSlot,
@@ -113,9 +114,9 @@ export function MoveBookingDialog({
       <div className="space-y-4">
         {mode === "master" ? (
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.masterLabel}
-            </span>
+            </FieldLabel>
             {/* STUDIO-RESCHEDULE-VALIDATION-A #1а: gate masters who
                 don't perform this service. Per spec visibility-over-
                 hiding — render the option but `disabled` so the

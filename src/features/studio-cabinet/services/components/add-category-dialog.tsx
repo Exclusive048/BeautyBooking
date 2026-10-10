@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -64,9 +65,9 @@ export function AddCategoryDialog({ open, onClose }: Props) {
       <div className="space-y-4">
         <p className="text-sm text-text-sec">{T.subtitle}</p>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.nameLabel}
-          </span>
+          </FieldLabel>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}

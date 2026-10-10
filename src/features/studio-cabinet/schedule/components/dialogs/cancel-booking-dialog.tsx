@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -73,9 +74,9 @@ export function CancelBookingDialog({
           .replace("{service}", serviceTitle)}
       </p>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">
+        <FieldLabel>
           {T.reasonLabel}
-        </span>
+        </FieldLabel>
         <Textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}

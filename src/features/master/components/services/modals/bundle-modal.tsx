@@ -20,6 +20,7 @@ import { computeBundlePricing } from "../lib/compute-bundle-pricing";
 import { toKopeks } from "@/lib/money/kopeks";
 import { formatDuration } from "../lib/format";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.bundle;
@@ -193,12 +194,12 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
 
         <div>
           <div className="flex items-baseline gap-2">
-            <label className="eyebrow">
+            <span className="eyebrow">
               {T.servicesLabel}
-            </label>
+            </span>
             <span className="text-3xs text-text-sec">· {T.servicesHint}</span>
           </div>
-          <div className="mt-1.5 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-bg-card">
+          <div className="mt-2 max-h-64 overflow-auto rounded-xl border border-border-subtle bg-bg-card">
             {allServices.length === 0 ? (
               <p className="p-4 text-center text-sm italic text-text-sec">{T.servicesEmpty}</p>
             ) : (
@@ -234,13 +235,10 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
         </div>
 
         <div>
-          <label
-            htmlFor={discountValueId}
-            className="eyebrow"
-          >
+          <FieldLabel htmlFor={discountValueId} tone="eyebrow">
             {T.discountLabel}
-          </label>
-          <div className="mt-1.5 flex items-center gap-2">
+          </FieldLabel>
+          <div className="flex items-center gap-2">
             <Select
               value={discountType}
               onChange={(event) => setDiscountType(event.target.value as DiscountType)}
@@ -359,13 +357,10 @@ function Field({
   const controlId = useId();
   return (
     <div>
-      <label
-        htmlFor={controlId}
-        className="eyebrow"
-      >
+      <FieldLabel htmlFor={controlId} tone="eyebrow">
         {label}
-      </label>
-      <div className="mt-1.5">{children(controlId)}</div>
+      </FieldLabel>
+      {children(controlId)}
     </div>
   );
 }

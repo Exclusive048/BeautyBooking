@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminReviewRow } from "@/features/admin-cabinet/reviews/types";
 
@@ -58,12 +59,9 @@ export function DeleteReviewDialog({
         <p className="text-xs text-danger-text">{T.warning}</p>
       </div>
       <div>
-        <label
-          htmlFor="delete-review-reason"
-          className="mb-1.5 block text-xs font-medium text-text-sec"
-        >
+        <FieldLabel htmlFor="delete-review-reason" tone="muted">
           {T.reasonLabel}
-        </label>
+        </FieldLabel>
         <Textarea
           id="delete-review-reason"
           value={reason}

@@ -14,6 +14,7 @@ import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Select } from "@/components/ui/select";
 import { FileInput } from "@/components/ui/file-input";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.upload;
 
@@ -294,17 +295,13 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
         ) : null}
 
         <div>
-          <label
-            htmlFor={defaultCategorySelectId}
-            className="eyebrow"
-          >
+          <FieldLabel htmlFor={defaultCategorySelectId} tone="eyebrow">
             {T.defaultCategoryLabel}
-          </label>
+          </FieldLabel>
           <Select
             id={defaultCategorySelectId}
             value={defaultCategoryId}
             onChange={(event) => setDefaultCategoryId(event.target.value)}
-            className="mt-1.5"
           >
             <option value="">{T.defaultCategoryNone}</option>
             {categories.map((category) => (

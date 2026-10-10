@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { SCHEDULE_REQUEST_REJECT_COMMENT_MAX } from "../lib/reject-comment";
@@ -77,9 +78,9 @@ export function RejectDialog({ open, onClose, requestId, providerName, onResolve
         {T.body.replace("{provider}", providerName)}
       </p>
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-text-main">
+        <FieldLabel className="text-sm">
           {T.commentLabel}
-        </span>
+        </FieldLabel>
         <Textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}

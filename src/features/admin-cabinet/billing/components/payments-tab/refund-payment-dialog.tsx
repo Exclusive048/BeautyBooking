@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { moneyRUBFromKopeks } from "@/lib/format";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminPaymentRow } from "@/features/admin-cabinet/billing/types";
@@ -54,12 +55,9 @@ export function RefundPaymentDialog({
         {T.body.replace("{amount}", moneyRUBFromKopeks(payment.amountKopeks))}
       </p>
       <div>
-        <label
-          htmlFor="refund-reason"
-          className="mb-1.5 block text-xs font-medium text-text-sec"
-        >
+        <FieldLabel htmlFor="refund-reason" tone="muted">
           {T.reasonLabel}
-        </label>
+        </FieldLabel>
         <Textarea
           id="refund-reason"
           value={reason}

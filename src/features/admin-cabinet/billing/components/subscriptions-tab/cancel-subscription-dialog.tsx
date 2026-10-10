@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
 import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
@@ -63,12 +64,9 @@ export function CancelSubscriptionDialog({
     >
       <p className="text-sm text-text-main">{body}</p>
       <div>
-        <label
-          htmlFor="cancel-reason"
-          className="mb-1.5 block text-xs font-medium text-text-sec"
-        >
+        <FieldLabel htmlFor="cancel-reason" tone="muted">
           {T.reasonLabel}
-        </label>
+        </FieldLabel>
         <Textarea
           id="cancel-reason"
           value={reason}

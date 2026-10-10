@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Notice } from "@/components/ui/notice";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import {
   CATEGORY_ICON_MAX_LENGTH,
   CATEGORY_ICON_PRESETS,
@@ -111,9 +112,9 @@ export function CreateCategoryDialog({ editing, parentOptions, onClose, onSubmit
         }}
       >
         <div>
-          <label htmlFor={nameId} className="mb-1.5 block text-xs font-medium text-text-sec">
+          <FieldLabel htmlFor={nameId} tone="muted">
             {T.nameLabel}
-          </label>
+          </FieldLabel>
           <div className="flex items-center gap-3">
             <span
               aria-hidden
@@ -142,7 +143,7 @@ export function CreateCategoryDialog({ editing, parentOptions, onClose, onSubmit
         </div>
 
         <fieldset>
-          <legend className="mb-1.5 block text-xs font-medium text-text-sec">{T.iconLabel}</legend>
+          <legend className="mb-2 block text-xs font-medium text-text-sec">{T.iconLabel}</legend>
           <div className="flex flex-wrap gap-1.5">
             {CATEGORY_ICON_PRESETS.map((preset) => (
               <ChipButton
@@ -186,9 +187,9 @@ export function CreateCategoryDialog({ editing, parentOptions, onClose, onSubmit
         </fieldset>
 
         <div>
-          <label htmlFor={parentId} className="mb-1.5 block text-xs font-medium text-text-sec">
+          <FieldLabel htmlFor={parentId} tone="muted">
             {T.parentLabel}
-          </label>
+          </FieldLabel>
           <Select id={parentId} value={parent} onChange={(event) => setParent(event.target.value)}>
             <option value="">{T.parentPlaceholder}</option>
             {filteredParents.map((p) => (

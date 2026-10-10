@@ -44,6 +44,7 @@ import { mergeAnyMasterSlots } from "./any-master-slots";
 import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 import { Button } from "@/components/ui/button";
 import { FileInput } from "@/components/ui/file-input";
+import { FieldLabel } from "@/components/ui/field-label";
 
 type MasterAvailability = {
   serviceAvailable: boolean;
@@ -871,17 +872,16 @@ function renderBookingConfig(input: {
         <div className="space-y-3">
           {bookingConfig.questions.map((question) => (
             <label key={question.id} className="block text-xs text-text-muted">
-              <span className="text-sm text-text">
+              <FieldLabel className="text-sm font-normal text-text">
                 {question.text}
                 {question.required ? <span className="text-danger-text"> *</span> : null}
-              </span>
+              </FieldLabel>
               <Input
                 type="text"
                 value={answers[question.id] ?? ""}
                 onChange={(event) =>
                   setAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                 }
-                className="mt-1"
                 placeholder={UI_TEXT.publicProfile.booking.bookingAnswerPlaceholder}
               />
             </label>

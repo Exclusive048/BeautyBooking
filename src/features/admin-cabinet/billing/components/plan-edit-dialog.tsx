@@ -20,6 +20,7 @@ import type {
   AdminPlanInheritanceCandidate,
 } from "@/features/admin-cabinet/billing/types";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.adminPanel.billing.editDialog;
 
@@ -226,9 +227,9 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                   {T.sections.main}
                 </p>
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-text-sec">
+                  <FieldLabel tone="muted">
                     {T.fields.nameLabel}
-                  </span>
+                  </FieldLabel>
                   <Input
                     value={name}
                     onChange={(event) => {
@@ -254,9 +255,9 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                 </div>
 
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-text-sec">
+                  <FieldLabel tone="muted">
                     {T.fields.sortOrderLabel}
-                  </span>
+                  </FieldLabel>
                   <Input
                     inputMode="numeric"
                     value={sortOrder}
@@ -273,9 +274,9 @@ export function PlanEditDialog({ open, plan, candidates, onClose, onSubmit }: Pr
                   {T.sections.inheritance}
                 </p>
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-text-sec">
+                  <FieldLabel tone="muted">
                     {T.fields.inheritsFromLabel}
-                  </span>
+                  </FieldLabel>
                   <Select
                     value={inheritsFromPlanId ?? ""}
                     onChange={(event) =>

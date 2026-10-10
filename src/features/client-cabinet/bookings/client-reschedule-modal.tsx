@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Notice } from "@/components/ui/notice";
+import { FieldLabel } from "@/components/ui/field-label";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -62,6 +63,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
   const [date, setDate] = useState<string>(() => todayDateKey());
   const [slotIso, setSlotIso] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const dateInputId = useId();
   const [error, setError] = useState<string | null>(null);
 
   // FIX-STUDIO-02 (F5): request a SINGLE day. The `/slots` endpoint treats
@@ -155,11 +157,12 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
           <div className="mt-0.5 text-text-sec">{booking.provider.name}</div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="eyebrow">
+        <div>
+          <FieldLabel htmlFor={dateInputId} tone="eyebrow">
             {T.chooseDate}
-          </label>
+          </FieldLabel>
           <Input
+            id={dateInputId}
             type="date"
             value={date}
             min={todayDateKey()}
@@ -171,9 +174,9 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
         </div>
 
         <div className="space-y-1.5">
-          <label className="eyebrow">
+          <FieldLabel tone="eyebrow">
             {T.chooseTime}
-          </label>
+          </FieldLabel>
           {zoneLabel ? (
             <div className="flex items-center gap-1 text-xs font-medium text-accent-text">
               <CalendarIcon className="h-3 w-3 shrink-0" aria-hidden />

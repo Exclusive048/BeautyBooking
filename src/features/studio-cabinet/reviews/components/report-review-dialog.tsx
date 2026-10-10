@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -84,7 +85,7 @@ export function ReportReviewDialog({ reviewId, onClose }: Props) {
     >
       <p className="text-sm text-text-sec">{T.subtitle}</p>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.reasonLabel}</span>
+        <FieldLabel>{T.reasonLabel}</FieldLabel>
         <Select
           value={reason}
           onChange={(e) => setReason(e.target.value as typeof reason)}
@@ -98,7 +99,7 @@ export function ReportReviewDialog({ reviewId, onClose }: Props) {
         </Select>
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.commentLabel}</span>
+        <FieldLabel>{T.commentLabel}</FieldLabel>
         <Textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}

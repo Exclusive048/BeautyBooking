@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { FileInput } from "@/components/ui/file-input";
+import { FieldLabel } from "@/components/ui/field-label";
 
 type ApplyResponse = {
   application: {
@@ -171,10 +172,10 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
 
       {/* Photo upload */}
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-foreground">
+        <FieldLabel className="text-sm">
           {UI_TEXT.pages.modelOffer.applyPhotoLabel}
           <span className="ml-1 text-destructive" aria-hidden>*</span>
-        </span>
+        </FieldLabel>
         <div className="relative flex min-h-[80px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/40 px-4 py-4 text-center transition hover:bg-muted/70">
           <ImagePlus className="h-6 w-6 text-muted-foreground" aria-hidden />
           {files.length > 0 ? (
@@ -197,9 +198,9 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
 
       {/* Note */}
       <label className="block">
-        <span className="mb-1.5 block text-sm font-medium text-foreground">
+        <FieldLabel className="text-sm">
           {UI_TEXT.pages.modelOffer.applyNoteLabel}
-        </span>
+        </FieldLabel>
         <Textarea
           rows={3}
           value={note}

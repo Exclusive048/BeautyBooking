@@ -9,6 +9,7 @@ import { ResilientImage } from "@/components/ui/resilient-image";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { FieldLabel } from "@/components/ui/field-label";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { categoryLabel } from "@/lib/catalog/category-icon";
@@ -149,9 +150,9 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
 
         <div className="space-y-3">
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.nameLabel}
-            </span>
+            </FieldLabel>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -161,9 +162,9 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-text-main">
+              <FieldLabel>
                 {T.priceLabel}
-              </span>
+              </FieldLabel>
               <Input
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
@@ -176,9 +177,9 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-text-main">
+              <FieldLabel>
                 {T.durationLabel}
-              </span>
+              </FieldLabel>
               <Input
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
@@ -192,9 +193,9 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
             </label>
           </div>
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.categoryLabel}
-            </span>
+            </FieldLabel>
             <Select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}

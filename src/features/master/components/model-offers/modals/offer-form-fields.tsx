@@ -8,6 +8,7 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { MAX_REQUIREMENTS, commitRequirementDraft } from "../lib/requirements";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import { UI_FMT } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.create;
@@ -83,7 +84,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
           value={state.serviceId}
           disabled={serviceReadOnly}
           onChange={(event) => update("serviceId", event.target.value)}
-          className="mt-1.5 disabled:cursor-not-allowed disabled:opacity-60"
+          className="disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="">{T.servicePlaceholder}</option>
           {services.map((service) => {
@@ -110,7 +111,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
           value={state.dateLocal}
           onChange={(event) => update("dateLocal", event.target.value)}
           placeholder={T.datePlaceholder}
-          className="mt-1.5 h-11 rounded-xl px-3 text-sm"
+          className="h-11 rounded-xl px-3 text-sm"
         />
       </div>
 
@@ -123,7 +124,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
             step={900}
             value={state.timeStartLocal}
             onChange={(event) => update("timeStartLocal", event.target.value)}
-            className="mt-1.5 h-11 rounded-xl px-3 text-sm"
+            className="h-11 rounded-xl px-3 text-sm"
           />
         </div>
         <div>
@@ -134,7 +135,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
             step={900}
             value={state.timeEndLocal}
             onChange={(event) => update("timeEndLocal", event.target.value)}
-            className="mt-1.5 h-11 rounded-xl px-3 text-sm"
+            className="h-11 rounded-xl px-3 text-sm"
           />
         </div>
       </div>
@@ -150,7 +151,7 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
           value={state.priceRubles}
           onChange={(event) => update("priceRubles", event.target.value)}
           placeholder={T.pricePlaceholder}
-          className="mt-1.5 h-11 rounded-xl px-3 text-sm"
+          className="h-11 rounded-xl px-3 text-sm"
         />
         {priceKopeks === 0 ? (
           <p className="mt-1.5 text-xs text-success-text">
@@ -182,9 +183,9 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
 
 function Label({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="text-sm font-medium text-text-main">
+    <FieldLabel htmlFor={htmlFor} className="text-sm">
       {children}
-    </label>
+    </FieldLabel>
   );
 }
 
@@ -217,7 +218,7 @@ function RequirementsField({
   const atLimit = value.length >= MAX_REQUIREMENTS;
 
   return (
-    <div className="mt-1.5 space-y-2">
+    <div className="space-y-2">
       <Input
         id={inputId}
         type="text"

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { AvatarEditor } from "@/features/media/components/avatar-editor";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -86,15 +87,15 @@ export function EditMasterProfileDialog({ studioId, detail, open, onClose }: Pro
     >
       <p className="text-sm text-text-sec">{T.subtitle}</p>
       <div>
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.photoLabel}</span>
+        <FieldLabel>{T.photoLabel}</FieldLabel>
         <AvatarEditor entityType="MASTER" entityId={detail.providerId} sizeClassName="h-20 w-20" />
       </div>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.nameLabel}</span>
+        <FieldLabel>{T.nameLabel}</FieldLabel>
         <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.taglineLabel}</span>
+        <FieldLabel>{T.taglineLabel}</FieldLabel>
         <Input
           value={tagline}
           onChange={(e) => setTagline(e.target.value)}
@@ -103,7 +104,7 @@ export function EditMasterProfileDialog({ studioId, detail, open, onClose }: Pro
         />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">{T.descriptionLabel}</span>
+        <FieldLabel>{T.descriptionLabel}</FieldLabel>
         <Textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}

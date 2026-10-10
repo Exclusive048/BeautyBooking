@@ -403,7 +403,7 @@
   input:focus, textarea:focus, select:focus {
     outline: none;
     border-color: rgb(var(--border-focus));
-    box-shadow: 0 0 0 2px rgb(var(--border-focus) / 0.22), 0 0 0 7px rgb(var(--border-focus) / 0.12);
+    box-shadow: 0 0 0 2px rgb(var(--border-focus) / 0.22), 0 0 0 3px rgb(var(--border-focus) / 0.12);
   }
   option { background-color: rgb(var(--surface)); color: rgb(var(--text)); }
 
@@ -510,10 +510,15 @@
     background-color: rgb(var(--bg-input-focus));
   }
 
+  /* FIELD-LABEL-01 — ореол фокуса 3px, а не 7px. Широкий ореол ложился на
+     подпись над полем: при зазоре 6–8px подпись сфокусированного поля
+     «прилипала» к нему (замечание владельца 2026-10-10 — «Название» в новой
+     услуге, «Имя клиента» в ручной записи). Видимость фокуса держат смена
+     цвета рамки и внутреннее кольцо 1px; внешнее — только мягкий отсвет. */
   .lux-input:focus-visible {
     background-color: rgb(var(--bg-input-focus));
     border-color: rgb(var(--border-focus));
-    box-shadow: 0 0 0 1px rgb(var(--border-focus) / 0.34), 0 0 0 7px rgb(var(--border-focus) / 0.16);
+    box-shadow: 0 0 0 1px rgb(var(--border-focus) / 0.34), 0 0 0 3px rgb(var(--border-focus) / 0.16);
   }
 
   /* UI-07 — три класса, потерянные тем же коммитом `68c17f9`, что и `lux-*`

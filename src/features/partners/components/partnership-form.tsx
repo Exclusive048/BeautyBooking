@@ -12,6 +12,7 @@ import { isTelegramEnabled } from "@/lib/env.client";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { HoneypotField } from "@/components/ui/honeypot-field";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.partners.form;
 
@@ -304,12 +305,9 @@ function Field({ label, error, children }: FieldProps) {
   const controlId = useId();
   return (
     <div>
-      <label
-        htmlFor={controlId}
-        className="mb-1.5 block text-sm font-medium text-text-main"
-      >
+      <FieldLabel htmlFor={controlId} className="text-sm">
         {label}
-      </label>
+      </FieldLabel>
       {children(controlId)}
       {error ? (
         <p className="mt-1 text-sm text-danger-text">{error}</p>

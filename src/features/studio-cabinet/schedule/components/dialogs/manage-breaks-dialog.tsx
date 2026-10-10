@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import { formatLocalHm } from "@/lib/schedule/timezone";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -194,9 +195,9 @@ export function ManageBreaksDialog({
           </p>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.masterLabel}
-            </span>
+            </FieldLabel>
             <Select
               value={masterId}
               onChange={(e) => setMasterId(e.target.value)}
@@ -215,10 +216,10 @@ export function ManageBreaksDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-text-main">
+              <FieldLabel>
                 {T.startLabel}{" "}
                 <span className="font-normal text-text-sec">· {TV.salonTimeInputHint}</span>
-              </span>
+              </FieldLabel>
               <Input
                 type="datetime-local"
                 value={startAt}
@@ -227,10 +228,10 @@ export function ManageBreaksDialog({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-text-main">
+              <FieldLabel>
                 {T.endLabel}{" "}
                 <span className="font-normal text-text-sec">· {TV.salonTimeInputHint}</span>
-              </span>
+              </FieldLabel>
               <Input
                 type="datetime-local"
                 value={endAt}
@@ -241,9 +242,9 @@ export function ManageBreaksDialog({
           </div>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.noteLabel}
-            </span>
+            </FieldLabel>
             <Input
               value={note}
               onChange={(e) => setNote(e.target.value)}

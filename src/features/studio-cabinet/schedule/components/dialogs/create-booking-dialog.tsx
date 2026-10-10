@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -166,9 +167,9 @@ export function CreateBookingDialog({
     <ModalSurface open={open} onClose={handleClose} title={T.title}>
       <div className="space-y-4">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.masterLabel}
-          </span>
+          </FieldLabel>
           <Select
             value={selectedMasterId}
             onChange={(e) => {
@@ -189,9 +190,9 @@ export function CreateBookingDialog({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.serviceLabel}
-          </span>
+          </FieldLabel>
           <Select
             value={serviceId}
             onChange={(e) => {
@@ -225,9 +226,9 @@ export function CreateBookingDialog({
         ) : null}
 
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.clientLabel}
-          </span>
+          </FieldLabel>
           <Input
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
@@ -241,9 +242,9 @@ export function CreateBookingDialog({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.phoneLabel}
-          </span>
+          </FieldLabel>
           {/* STUDIO-BOOKINGS-FIX-A #3в: real-time validation
               feedback via `normalizeRussianPhone` — same helper
               the submit path already used. Red border + inline

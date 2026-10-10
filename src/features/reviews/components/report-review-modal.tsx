@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { FormDialog } from "@/components/ui/form-dialog";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -25,6 +26,8 @@ const REASONS: { value: ReportReason; label: string }[] = [
 ];
 
 export function ReportReviewModal({ reviewId, open, onClose, onSuccess }: Props) {
+  const reasonId = useId();
+  const commentId = useId();
   const t = UI_TEXT.reviews;
   const [reason, setReason] = useState<ReportReason | "">("");
   const [comment, setComment] = useState("");
@@ -73,8 +76,9 @@ export function ReportReviewModal({ reviewId, open, onClose, onSuccess }: Props)
       <p className="text-sm text-text-sec">{t.reportModalDesc}</p>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-text-sec">{t.reportReasonLabel}</label>
+        <FieldLabel htmlFor={reasonId} tone="muted">{t.reportReasonLabel}</FieldLabel>
         <Select
+          id={reasonId}
           value={reason}
           onChange={(e) => setReason(e.target.value as ReportReason | "")}
           className="w-full"
@@ -87,8 +91,9 @@ export function ReportReviewModal({ reviewId, open, onClose, onSuccess }: Props)
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-text-sec">{t.reportCommentLabel}</label>
+        <FieldLabel htmlFor={commentId} tone="muted">{t.reportCommentLabel}</FieldLabel>
         <Textarea
+          id={commentId}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder={t.reportCommentPlaceholder}

@@ -33,7 +33,7 @@ export function MasterPicker({ masters, selectedMasterId, onChange }: Props) {
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-4">
       <label className="block">
-        <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-text-main">
+        <span className="mb-2 flex items-center gap-1.5 text-xs font-medium text-text-main">
           <Users className="h-3.5 w-3.5" aria-hidden />
           {T.label}
         </span>

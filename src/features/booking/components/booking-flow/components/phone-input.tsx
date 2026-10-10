@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatRussianPhone } from "@/features/booking/components/booking-flow/lib/format-phone";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 
 type Props = {
   value: string;
@@ -30,10 +31,10 @@ export function PhoneInput({ value, onChange, required, autoFocus, error }: Prop
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-text-main">
+      <FieldLabel>
         {T.phoneLabel}
         {required ? <span className="ml-0.5 text-danger-text">*</span> : null}
-      </span>
+      </FieldLabel>
       <Input
         type="tel"
         inputMode="numeric"

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
   SlotPickerOptimized,
@@ -143,6 +144,7 @@ export function RescheduleModal({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotLabel, setSlotLabel] = useState<string>("");
   const [comment, setComment] = useState("");
+  const commentId = useId();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -422,10 +424,11 @@ export function RescheduleModal({
               </div>
 
               <div>
-                <label className="mb-1 block eyebrow text-2xs">
+                <FieldLabel htmlFor={commentId} tone="eyebrow" className="text-2xs">
                   {T.commentLabel}
-                </label>
+                </FieldLabel>
                 <Textarea
+                  id={commentId}
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
                   placeholder={T.commentPlaceholder}
