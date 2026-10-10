@@ -18,38 +18,45 @@ import { describe, expect, it } from "vitest";
  * Shebang у скриптов проекта не нужен: все гейты запускаются `node scripts/…`
  * из `package.json`, бит исполнения в git не стоит. Поэтому правило простое:
  * модуль, импортируемый тестом, shebang не несёт. Набор модулей выводится из
- * самих тестов (статический `from "…mjs"` и `import("…mjs")`), а не из списка.
+ * импортов (статический `from "…mjs"` и `import("…mjs")`), а не из списка, —
+ * и не только из тестов: vitest грузит и то, что тест получает транзитивно
+ * (`src/lib/testing/source-scan.ts` → `scripts/lib/strip-comments.mjs`,
+ * GATE-COMMENT-BLINDNESS). Поэтому импортёры — все `.ts`/`.tsx`/`.mjs`.
  *
  * @probe 2026-10-10: в `scripts/check-dead-classes.mjs` возвращена первая
  *        строка `#!/usr/bin/env node` → красный «модули, которые импортируют
  *        тесты, без shebang» с `scripts/check-dead-classes.mjs` в списке.
  *        Восстановлено.
+ * @probe 2026-10-10 (GATE-COMMENT-BLINDNESS): shebang дописан в
+ *        `scripts/lib/strip-comments.mjs`, который ни один тест не импортирует
+ *        напрямую → красный с ним в списке (при прежнем наборе «только
+ *        импорты тестов» прошёл бы зелёным). Восстановлено.
  */
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ["src", "scripts", "prisma"];
 const SKIP_DIRS = new Set(["node_modules", ".next", "generated"]);
-const TEST_FILE = /\.test\.tsx?$/;
+const IMPORTER_FILE = /\.(?:tsx?|mjs)$/;
 const MJS_IMPORT = /(?:from\s+|import\s*\(\s*)["'](\.{1,2}\/[^"']+\.mjs)["']/g;
 
-function listTestFiles(dir: string, out: string[]): void {
+function listImporterFiles(dir: string, out: string[]): void {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) listTestFiles(join(dir, entry.name), out);
-    } else if (TEST_FILE.test(entry.name)) {
+      if (!SKIP_DIRS.has(entry.name)) listImporterFiles(join(dir, entry.name), out);
+    } else if (IMPORTER_FILE.test(entry.name)) {
       out.push(join(dir, entry.name));
     }
   }
 }
 
-function testImportedMjsModules(): string[] {
-  const testFiles: string[] = [];
+function importedMjsModules(): string[] {
+  const importers: string[] = [];
   for (const dir of SCAN_DIRS) {
     const abs = join(ROOT, dir);
-    if (existsSync(abs)) listTestFiles(abs, testFiles);
+    if (existsSync(abs)) listImporterFiles(abs, importers);
   }
   const modules = new Set<string>();
-  for (const file of testFiles) {
+  for (const file of importers) {
     const source = readFileSync(file, "utf8");
     for (const match of source.matchAll(MJS_IMPORT)) {
       const target = resolve(dirname(file), match[1]!);
@@ -60,12 +67,14 @@ function testImportedMjsModules(): string[] {
 }
 
 describe("VITEST-MJS-CRLF-DOCBLOCK · модули, которые импортируют тесты, без shebang", () => {
-  const modules = testImportedMjsModules();
+  const modules = importedMjsModules();
 
   it("набор выведен из тестов и не пуст", () => {
     // Не-вакуумность: разборщик обязан находить хотя бы известные импорты.
     expect(modules).toContain("scripts/check-dead-classes.mjs");
     expect(modules).toContain("scripts/raw-sql-objects.mjs");
+    // транзитивный: тесты импортируют `source-scan.ts`, а не сам модуль
+    expect(modules).toContain("scripts/lib/strip-comments.mjs");
   });
 
   it("модули, которые импортируют тесты, без shebang", () => {
