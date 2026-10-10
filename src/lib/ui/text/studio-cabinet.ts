@@ -690,6 +690,7 @@ export const studioCabinet = {
     },
     errors: {
       create: "Не удалось создать запись. Попробуйте ещё раз.",
+      // error-hint-ok: своя причина — время, скорее всего, занято
       move: "Не удалось перенести запись. Возможно, это время уже занято.",
       cancel: "Не удалось отменить запись. Попробуйте ещё раз.",
       // BOOKING-STUDIO-RESCHEDULE-PARITY-01: accept/decline of a client-proposed
