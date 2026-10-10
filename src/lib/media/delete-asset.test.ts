@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { findUnique, update, embeddingDeleteMany, deleteObject, getStorageProvider, logError } = vi.hoisted(() => ({
+const { findUnique, update, updateMany, embeddingDeleteMany, deleteObject, getStorageProvider, logError } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   update: vi.fn(),
+  updateMany: vi.fn(),
   embeddingDeleteMany: vi.fn(),
   deleteObject: vi.fn(),
   getStorageProvider: vi.fn(),
@@ -14,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
     mediaAsset: {
       findUnique,
       update,
+      updateMany,
     },
     mediaAssetEmbedding: { deleteMany: embeddingDeleteMany },
     $transaction: async (ops: Array<Promise<unknown>>) => Promise.all(ops),
@@ -54,6 +56,8 @@ describe("media/deleteAssetById order-of-operations", () => {
   beforeEach(() => {
     findUnique.mockReset();
     update.mockReset();
+    updateMany.mockReset();
+    updateMany.mockResolvedValue({ count: 1 });
     embeddingDeleteMany.mockReset();
     embeddingDeleteMany.mockResolvedValue({ count: 0 });
     deleteObject.mockReset();
@@ -150,5 +154,75 @@ describe("media/deleteAssetById order-of-operations", () => {
     expect(data.visualMeta).toBe(Prisma.DbNull);
     expect(data).not.toHaveProperty("visualIndexed");
     expect(embeddingDeleteMany).toHaveBeenCalledWith({ where: { assetId: "asset-3" } });
+  });
+});
+
+// MEDIA-STORAGE-ORPHAN-SWEEP: отметка «байты убраны» — только когда из хранилища
+// ушли и оригинал, и превью. Без неё удаление повторит ежечасная уборка.
+//
+// @probe 2026-10-10: в `deleteAssetById` снят `storageCleared = false` в ветке
+// оригинала — красный «хранилище не удалило оригинал» (сначала проба прошла
+// зелёной: тест ронял и превью, и отметку снимала вторая ветка — отказ сужен до
+// оригинала); то же в ветке превью — красный «оригинал удалён, превью — нет».
+// Восстановлено, 8/8 зелёно.
+describe("media/deleteAssetById — отметка storageDeletedAt", () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+    update.mockReset();
+    update.mockResolvedValue({});
+    updateMany.mockReset();
+    updateMany.mockResolvedValue({ count: 1 });
+    embeddingDeleteMany.mockReset();
+    embeddingDeleteMany.mockResolvedValue({ count: 0 });
+    deleteObject.mockReset();
+    getStorageProvider.mockReset();
+    getStorageProvider.mockReturnValue({ name: "test", deleteObject });
+    logError.mockReset();
+    findUnique.mockResolvedValue({ id: "asset-9", storageKey: "key/9.jpg", deletedAt: null });
+  });
+
+  it("оригинал и превью удалены — отметка ставится у мягко удалённой строки", async () => {
+    deleteObject.mockResolvedValue(undefined);
+
+    await deleteAssetById("asset-9");
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "asset-9", deletedAt: { not: null }, storageDeletedAt: null },
+      data: { storageDeletedAt: expect.any(Date) },
+    });
+  });
+
+  it("хранилище не удалило оригинал — отметки нет (уборка повторит)", async () => {
+    // Отказывает только оригинал: превью удалились, отметку обязан снять
+    // именно сбой оригинала.
+    deleteObject.mockImplementation(async (key: string) => {
+      if (key === "key/9.jpg") throw new Error("TenantSuspended");
+    });
+
+    await expect(deleteAssetById("asset-9")).resolves.toBeUndefined();
+
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("оригинал удалён, превью — нет: отметки тоже нет", async () => {
+    deleteObject.mockImplementation(async (key: string) => {
+      if (key !== "key/9.jpg") throw new Error("preview delete failed");
+    });
+
+    await deleteAssetById("asset-9");
+
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("сбой самой отметки не роняет удаление", async () => {
+    deleteObject.mockResolvedValue(undefined);
+    updateMany.mockRejectedValue(new Error("db down"));
+
+    await expect(deleteAssetById("asset-9")).resolves.toBeUndefined();
+    expect(logError).toHaveBeenCalledWith(
+      "Failed to mark media storage as deleted",
+      expect.objectContaining({ assetId: "asset-9" }),
+    );
   });
 });
