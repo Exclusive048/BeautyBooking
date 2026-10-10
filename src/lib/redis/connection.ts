@@ -306,6 +306,20 @@ export async function getRedisConnection(): Promise<RedisClient | null> {
   return getOrCreateClient("command");
 }
 
+/**
+ * Соединение команд, если процесс его УЖЕ открыл (или открывает), — без создания
+ * нового. `null` — процесс к Redis ещё не обращался.
+ *
+ * Для путей, которым Redis полезен, но не обязан: пауза алерта из `logError`
+ * (OPS-ALERT-COOLDOWN-ON-LOGERROR). Открыть соединение ради алерта значило бы
+ * повесить скрипт, который в остальном Redis не трогает: клиент с вечным
+ * `reconnectStrategy` держит цикл событий, и `npm run deploy:post`, записавший
+ * одну ошибку, не завершился бы сам.
+ */
+export function peekRedisConnection(): Promise<RedisClient | null> | null {
+  return g.__bhRedisCommand ?? null;
+}
+
 export async function getRedisSubscriberConnection(): Promise<RedisClient | null> {
   return getOrCreateClient("subscriber");
 }

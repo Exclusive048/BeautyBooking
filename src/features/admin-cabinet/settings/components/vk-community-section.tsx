@@ -6,6 +6,7 @@ import { Check, ExternalLink, Loader2, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import type { VkCommunityView } from "@/features/admin-cabinet/settings/types";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
@@ -161,8 +162,8 @@ export function VkCommunitySection({ initial }: Props) {
         </ol>
       </div>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-text-sec">{t.tokenLabel}</span>
+      <label className="block">
+        <FieldLabel tone="muted">{t.tokenLabel}</FieldLabel>
         <Input
           type="password"
           value={token}
@@ -176,7 +177,7 @@ export function VkCommunitySection({ initial }: Props) {
           maxLength={512}
           disabled={busy || urlProblem !== null}
         />
-        <span className="text-2xs text-text-sec">{t.tokenHint}</span>
+        <span className="mt-1.5 block text-2xs text-text-sec">{t.tokenHint}</span>
       </label>
     </SectionCard>
   );

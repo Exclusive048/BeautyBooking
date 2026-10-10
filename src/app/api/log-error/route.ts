@@ -59,6 +59,9 @@ export async function POST(req: Request) {
       digest,
       url,
       userAgent,
+      // Под одним текстом — любое падение страницы: пауза алерта — по самой
+      // ошибке, а не по общему тексту (OPS-ALERT-COOLDOWN-ON-LOGERROR).
+      __alertGroup: message ?? digest,
     });
 
     return ok({});

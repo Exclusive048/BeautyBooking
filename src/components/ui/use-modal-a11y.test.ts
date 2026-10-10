@@ -28,6 +28,7 @@ import { describe, expect, it } from "vitest";
 import {
   FOCUSABLE_SELECTOR,
   decideFocusTrap,
+  getFocusable,
   type FocusTrapDecision,
 } from "./use-modal-a11y";
 
@@ -228,5 +229,28 @@ describe("decideFocusTrap — edge cases", () => {
       container,
     });
     expect(result.kind).toBe("ignore");
+  });
+});
+
+describe("getFocusable", () => {
+  // Минимальный двойник: `querySelectorAll` отдаёт то, что совпало с
+  // селектором, а `getAttribute` — tabindex элемента.
+  const el = (tabindex: string | null) =>
+    ({ getAttribute: (name: string) => (name === "tabindex" ? tabindex : null) }) as unknown as HTMLElement;
+
+  it("пропускает кнопку с tabindex=-1 (невидимую подложку окна)", () => {
+    // Подложка «клик мимо закрывает» — `<button tabindex="-1">`. Селектор её
+    // ловит (`button:not([disabled])`), но шагом табуляции она не является.
+    const backdrop = el("-1");
+    const replace = el(null);
+    const close = el("0");
+    const container = {
+      querySelectorAll: () => [backdrop, replace, close],
+    } as unknown as HTMLElement;
+    expect(getFocusable(container)).toEqual([replace, close]);
+  });
+
+  it("без контейнера — пустой список", () => {
+    expect(getFocusable(null)).toEqual([]);
   });
 });

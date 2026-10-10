@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Notice } from "@/components/ui/notice";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -103,13 +104,10 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
         {step === "email" ? (
           <>
             <p className="text-sm text-text-sec">{T.modalDescription}</p>
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email-verify-input"
-                className="eyebrow"
-              >
+            <div>
+              <FieldLabel htmlFor="email-verify-input" tone="eyebrow">
                 {T.emailLabel}
-              </label>
+              </FieldLabel>
               <div className="relative">
                 <Mail
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-sec"
@@ -152,13 +150,10 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
               Код отправлен на <b className="text-text-main">{email}</b>.
               Проверьте почту и папку «Спам».
             </p>
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email-code-input"
-                className="eyebrow"
-              >
+            <div>
+              <FieldLabel htmlFor="email-code-input" tone="eyebrow">
                 {T.codeLabel}
-              </label>
+              </FieldLabel>
               <Input
                 id="email-code-input"
                 type="text"
@@ -172,7 +167,7 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
                 className="text-center font-mono text-2xl tracking-[0.4em]"
                 autoFocus
               />
-              <p className="text-xs text-text-sec">{T.codeHint}</p>
+              <p className="mt-1.5 text-xs text-text-sec">{T.codeHint}</p>
             </div>
             {error ? <ErrorBox message={error} /> : null}
             <ResendRow

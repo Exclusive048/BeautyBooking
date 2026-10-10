@@ -5,6 +5,7 @@ import { Lock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { cn } from "@/lib/cn";
 import type { MasterAnalyticsPeriodId } from "@/lib/master/analytics-period";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -145,8 +146,8 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
             {T.customPickerHeading}
           </p>
           <div className="flex items-end gap-2">
-            <label className="flex flex-1 flex-col gap-1">
-              <span className="text-2xs text-text-sec">{T.customFromLabel}</span>
+            <label className="block flex-1">
+              <FieldLabel tone="muted" className="text-2xs font-normal">{T.customFromLabel}</FieldLabel>
               <Input
                 type="date"
                 value={fromValue}
@@ -156,8 +157,8 @@ export function PeriodChips({ active, customAvailable, rangeFromKey, rangeToKey 
               />
             </label>
             <span className="pb-2.5 text-sm text-text-sec">—</span>
-            <label className="flex flex-1 flex-col gap-1">
-              <span className="text-2xs text-text-sec">{T.customToLabel}</span>
+            <label className="block flex-1">
+              <FieldLabel tone="muted" className="text-2xs font-normal">{T.customToLabel}</FieldLabel>
               <Input
                 type="date"
                 value={toValue}

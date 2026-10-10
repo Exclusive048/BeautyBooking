@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -94,9 +95,9 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
     >
       <p className="text-sm text-text-sec">{T.subtitle}</p>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">
+        <FieldLabel>
           {T.phoneLabel}
-        </span>
+        </FieldLabel>
         <Input
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -107,9 +108,9 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
         />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">
+        <FieldLabel>
           {T.nameLabel}
-        </span>
+        </FieldLabel>
         <Input
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
@@ -118,9 +119,9 @@ export function InviteMasterDialog({ studioId, open, onClose }: Props) {
         />
       </label>
       <label className="block">
-        <span className="mb-1 block text-xs font-medium text-text-main">
+        <FieldLabel>
           {T.taglineLabel}
-        </span>
+        </FieldLabel>
         <Input
           value={tagline}
           onChange={(e) => setTagline(e.target.value)}

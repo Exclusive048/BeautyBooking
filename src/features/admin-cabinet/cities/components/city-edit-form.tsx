@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { FieldLabel } from "@/components/ui/field-label";
 import { CityTagBadge } from "@/features/admin-cabinet/cities/components/city-tag-badge";
 import * as UI_TEXT from "@/lib/ui/text";
 import { RF_ADMIN_TIMEZONES, buildTimezoneOptions } from "@/lib/ui/timezone-options";
@@ -223,9 +224,9 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-text-sec">
+      <FieldLabel tone="muted">
         {label}
-      </span>
+      </FieldLabel>
       {children}
       {hint ? <span className="mt-1 block text-xs text-text-sec/70">{hint}</span> : null}
     </label>

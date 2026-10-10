@@ -6,6 +6,7 @@ import { Check, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import type { SeoValues } from "@/features/admin-cabinet/settings/types";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
@@ -117,8 +118,8 @@ export function SeoSection({ initial }: Props) {
         </>
       }
     >
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-text-sec">{t.titleLabel}</span>
+      <label className="block">
+        <FieldLabel tone="muted">{t.titleLabel}</FieldLabel>
         <Input
           value={draft.seoTitle}
           onChange={(event) => setDraft((prev) => ({ ...prev, seoTitle: event.target.value }))}
@@ -127,8 +128,8 @@ export function SeoSection({ initial }: Props) {
           disabled={status === "saving"}
         />
       </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-text-sec">{t.descriptionLabel}</span>
+      <label className="block">
+        <FieldLabel tone="muted">{t.descriptionLabel}</FieldLabel>
         <Textarea
           value={draft.seoDescription}
           onChange={(event) =>

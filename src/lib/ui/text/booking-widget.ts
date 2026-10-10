@@ -30,15 +30,12 @@ export const bookingWidget = {
     noServicesMaster: "У мастера пока нет услуг в этой студии",
     priceOnRequest: "Цена по запросу",
     duration: "{min} мин",
-    durationHours: "{h} ч",
-    durationHoursMin: "{h} ч {m} мин",
   },
   masterStep: {
     title: "Кто из мастеров?",
     subtitle: "Все делают «{service}»",
     anyMaster: "Любой свободный",
     anyMasterSub: "по ближайшему окошку",
-    pickThis: "Выбрать",
     noMasters: "По выбранной услуге пока нет доступных мастеров.",
     back: "Назад к услуге",
   },
@@ -110,7 +107,6 @@ export const bookingWidget = {
     newClientsClosed: "Мастер временно не принимает новых клиентов.",
     forbidden: "Записаться к самому себе нельзя.",
     generic: "Не удалось создать запись. Попробуйте ещё раз.",
-    networkGeneric: "Не удалось связаться с сервером. Попробуйте ещё раз.",
   },
   success: {
     title: "Вы записаны",
@@ -118,5 +114,4 @@ export const bookingWidget = {
     hint: "Мы пришлём напоминание перед визитом.",
     backToStudio: "Вернуться к странице студии",
   },
-  progressLabel: "{done} из {total}",
 } as const;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -18,6 +18,7 @@ import type {
   AdminUserRow,
 } from "@/features/admin-cabinet/users/types";
 import { Badge } from "@/components/ui/badge";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.adminPanel.users.planChange;
 
@@ -79,6 +80,8 @@ export function PlanChangeDialog({
   onClose,
   onSubmit,
 }: Props) {
+  const periodId = useId();
+  const reasonId = useId();
   const scope = scopeForUser(user);
   const scopedPlans = scope
     ? [...plans]
@@ -219,10 +222,11 @@ export function PlanChangeDialog({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-text-sec">
+            <FieldLabel htmlFor={periodId} tone="muted">
               {T.periodLabel}
-            </label>
+            </FieldLabel>
             <Select
+              id={periodId}
               value={String(period)}
               onChange={(event) =>
                 setPeriod(Number(event.target.value) as 1 | 3 | 6 | 12)
@@ -237,10 +241,11 @@ export function PlanChangeDialog({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-text-sec">
+            <FieldLabel htmlFor={reasonId} tone="muted">
               {T.reasonLabel}
-            </label>
+            </FieldLabel>
             <Textarea
+              id={reasonId}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder={T.reasonPlaceholder}

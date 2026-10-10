@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.catalog.rejectDialog;
@@ -66,12 +67,9 @@ export function RejectConfirmDialog({
           {T.description}
         </p>
         <div>
-          <label
-            htmlFor="reject-reason"
-            className="mb-1.5 block text-xs font-medium text-text-sec"
-          >
+          <FieldLabel htmlFor="reject-reason" tone="muted">
             {T.reasonLabel}
-          </label>
+          </FieldLabel>
           <Textarea
             id="reject-reason"
             value={reason}

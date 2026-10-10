@@ -6,6 +6,7 @@ import { ModalSurface } from "@/components/ui/modal-surface";
 import { Notice } from "@/components/ui/notice";
 import { StarRatingInput } from "@/components/ui/star-rating-input";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { ClientBookingDTO } from "@/lib/client-cabinet/bookings.service";
@@ -74,13 +75,10 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
           <StarRatingInput value={rating} onChange={setRating} />
         </div>
 
-        <div className="space-y-1.5">
-          <label
-            htmlFor="review-text"
-            className="eyebrow"
-          >
+        <div>
+          <FieldLabel htmlFor="review-text" tone="eyebrow">
             {T.title}
-          </label>
+          </FieldLabel>
           <Textarea
             id="review-text"
             value={text}
@@ -89,7 +87,7 @@ export function ClientReviewModal({ booking, onClose, onSuccess }: Props) {
             rows={4}
             maxLength={1000}
           />
-          <div className="text-right font-mono text-xs text-text-sec">
+          <div className="mt-1.5 text-right font-mono text-xs text-text-sec">
             {text.length}/1000
           </div>
         </div>

@@ -10,6 +10,7 @@ import { LegalConsentGroup } from "@/features/auth/components/legal-consent-grou
 import type { ConsentFlags } from "@/lib/legal/consent-flags";
 import type { BookingUser } from "@/features/booking/lib/studio-booking";
 import { Switch } from "@/components/ui/switch";
+import { FieldLabel } from "@/components/ui/field-label";
 import { formatRussianPhoneInput } from "@/lib/phone/input-format";
 
 type Props = {
@@ -71,9 +72,9 @@ export function YouStep({
       {isGuest ? (
         <div className="space-y-3 rounded-xl border border-border-subtle bg-bg-card p-4">
           <div>
-            <label htmlFor="guest-name" className="text-xs font-medium text-text-muted">
+            <FieldLabel htmlFor="guest-name" tone="muted" className="text-text-muted">
               {UI_TEXT.bookingWidget.youStep.nameLabel}
-            </label>
+            </FieldLabel>
             <Input
               id="guest-name"
               type="text"
@@ -81,15 +82,14 @@ export function YouStep({
               value={guestName}
               onChange={(event) => onGuestNameChange(event.target.value)}
               placeholder={UI_TEXT.bookingWidget.youStep.namePlaceholder}
-              className="mt-1"
             />
             {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
             <p className="mt-1 text-xs text-text-muted">{UI_TEXT.common.ownNameHint}</p>
           </div>
           <div>
-            <label htmlFor="guest-phone" className="text-xs font-medium text-text-muted">
+            <FieldLabel htmlFor="guest-phone" tone="muted" className="text-text-muted">
               {UI_TEXT.bookingWidget.youStep.phoneLabel}
-            </label>
+            </FieldLabel>
             <Input
               id="guest-phone"
               type="tel"
@@ -97,7 +97,6 @@ export function YouStep({
               value={guestPhone}
               onChange={(event) => onGuestPhoneChange(event.target.value)}
               placeholder={UI_TEXT.bookingWidget.youStep.phonePlaceholder}
-              className="mt-1"
             />
           </div>
           <div className="text-xs text-text-muted">
@@ -123,9 +122,9 @@ export function YouStep({
               вовсе, и запись падала без способа это исправить. */}
           {!me.phone ? (
             <div>
-              <label htmlFor="auth-phone" className="text-xs font-medium text-text-muted">
+              <FieldLabel htmlFor="auth-phone" tone="muted" className="text-text-muted">
                 {UI_TEXT.bookingWidget.youStep.phoneLabel}
-              </label>
+              </FieldLabel>
               <Input
                 id="auth-phone"
                 type="tel"
@@ -133,7 +132,6 @@ export function YouStep({
                 value={guestPhone}
                 onChange={(event) => onGuestPhoneChange(event.target.value)}
                 placeholder={UI_TEXT.bookingWidget.youStep.phonePlaceholder}
-                className="mt-1"
               />
             </div>
           ) : null}
@@ -149,15 +147,15 @@ export function YouStep({
       </label>
 
       <div>
-        <label htmlFor="booking-comment" className="text-xs font-medium text-text-muted">
+        <FieldLabel htmlFor="booking-comment" tone="muted" className="text-text-muted">
           {UI_TEXT.bookingWidget.youStep.commentLabel}
-        </label>
+        </FieldLabel>
         <Textarea
           id="booking-comment"
           value={comment}
           onChange={(event) => onCommentChange(event.target.value)}
           placeholder={UI_TEXT.bookingWidget.youStep.commentPlaceholder}
-          className="mt-1 min-h-[72px]"
+          className="min-h-[72px]"
         />
       </div>
     </section>

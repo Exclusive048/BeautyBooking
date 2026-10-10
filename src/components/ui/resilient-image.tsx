@@ -6,7 +6,20 @@ import { cn } from "@/lib/cn";
 import { cropAreaImageStyle, toCropArea } from "@/lib/media/crop-geometry";
 import { IMAGE_FALLBACK_SRC, isOptimizableImageSrc } from "./image-host";
 
-type ResilientImageProps = {
+/**
+ * Режим размера (RESILIENT-IMAGE-FILL-SIZES). Fixed-size — `width` + `height`
+ * (аватар с известными размерами); `sizes` по умолчанию выводится из `width`.
+ * Fill — без размеров: картинка заполняет родителя (у него `position: relative`
+ * и заданные размеры), и `sizes` ОБЯЗАТЕЛЕН: молчаливый дефолт `100vw`
+ * заставлял бы оптимизатор отдавать картинку шириной во весь экран в плитку
+ * на треть экрана — без ошибки сборки, теста и следа на глаз. Нужна ширина
+ * экрана — так и пишется: `sizes="100vw"`.
+ */
+type ResilientImageSizing =
+  | { width: number; height: number; sizes?: string }
+  | { width?: undefined; height?: undefined; sizes: string };
+
+type ResilientImageProps = ResilientImageSizing & {
   src: string;
   alt: string;
   cropX?: number | null;
@@ -23,12 +36,6 @@ type ResilientImageProps = {
    * картинка исказится. В fixed-size режиме молча остаётся `focal`.
    */
   cropFit?: "focal" | "exact";
-  // Fixed-size mode (for avatars with known dimensions)
-  width?: number;
-  height?: number;
-  // Fill mode: fills the parent (parent must have position:relative + explicit dimensions)
-  // Used automatically when width/height are not provided
-  sizes?: string;
   quality?: number;
   priority?: boolean;
   loading?: "lazy" | "eager";
@@ -198,7 +205,7 @@ export function ResilientImage({
           src={src}
           alt={alt}
           fill
-          sizes={sizes ?? "100vw"}
+          sizes={sizes}
           quality={quality}
           priority={priority}
           loading={loading}
@@ -217,7 +224,7 @@ export function ResilientImage({
       src={src}
       alt={alt}
       fill
-      sizes={sizes ?? "100vw"}
+      sizes={sizes}
       quality={quality}
       priority={priority}
       loading={loading}

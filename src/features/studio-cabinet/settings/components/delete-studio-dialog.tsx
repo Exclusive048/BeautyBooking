@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { FieldLabel } from "@/components/ui/field-label";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -67,9 +68,9 @@ export function DeleteStudioDialog({ studioName, open, onClose }: Props) {
       <div className="space-y-3">
         <p className="text-sm text-text-sec">{T.deleteDialogBody}</p>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.deleteConfirmLabel.replace("{name}", studioName)}
-          </span>
+          </FieldLabel>
           <Input
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}

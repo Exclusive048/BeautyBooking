@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.adminPanel.reports;
@@ -57,9 +58,9 @@ export function ReportDecisionDialog({ kind, onClose, onConfirm }: Props) {
     >
       <p className="text-sm text-text-main">{copy.body}</p>
       <div>
-        <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium text-text-sec">
+        <FieldLabel htmlFor={inputId} tone="muted">
           {copy.noteLabel}
-        </label>
+        </FieldLabel>
         <Textarea
           id={inputId}
           value={note}

@@ -117,7 +117,6 @@ export const adminPanel = {
       exportCta: "Скачать в Excel",
       exportPeriodLabel: "Период выгрузки",
       exportPeriod: (days: number) => `${days} дней`,
-      exportTruncatedNote: (rows: string) => `Выгружены последние ${rows} событий`,
       loadMore: "Показать ещё",
       loadMoreFailed: "Не удалось загрузить события. Попробуйте ещё раз.",
       exportFailed: "Не удалось выгрузить события. Попробуйте ещё раз.",
@@ -179,7 +178,6 @@ export const adminPanel = {
       queuePendingSuffix: "ждёт",
       queuePendingHint:
         "Задачи в очереди Redis, включая отложенные напоминания с временем запуска в будущем",
-      smsNotConfigured: "Не настроен",
       metricUnavailable: "—",
       metricUnavailableHint: "Метрика появится после подключения мониторинга",
       noDataYetHint: "Данных ещё нет: появятся через минуту после старта приложения",
@@ -317,12 +315,8 @@ export const adminPanel = {
       masters: "Мастеров",
       studios: "Студий",
       visible: "Видим",
-      actions: "Действия",
     },
     rowActions: {
-      merge: "Слить с оригиналом",
-      edit: "Редактировать",
-      delete: "Удалить",
       toggleVisible: "Переключить видимость",
     },
     autoCreated: {
@@ -388,11 +382,9 @@ export const adminPanel = {
     },
     mergeDialog: {
       title: "Объединить города",
-      step1Title: "Выберите целевой город",
       step1Hint: "Все мастера и студии из «{source}» перейдут в выбранный город",
       targetLabel: "Целевой город",
       targetPlaceholder: "— Выберите —",
-      step2Title: "Подтвердите объединение",
       step2Body:
         "{mastersCount} мастеров и {studiosCount} студий из «{source}» будут перенесены в «{target}». Город «{source}» будет удалён. Это действие нельзя отменить.",
       cancel: "Отмена",
@@ -422,7 +414,6 @@ export const adminPanel = {
       deleted: "Город удалён",
       merged: "Города объединены",
       visibilityToggled: "Видимость изменена",
-      errorBlockedDelete: "Нельзя удалить: есть привязанные провайдеры",
       errorGeneric: "Не удалось выполнить действие. Попробуйте ещё раз.",
     },
   },
@@ -450,7 +441,6 @@ export const adminPanel = {
       plan: "Тариф",
       city: "Город",
       created: "Зарегистрирован",
-      actions: "Действия",
     },
     roleBadge: {
       client: "Клиент",
@@ -470,11 +460,6 @@ export const adminPanel = {
       trial: "trial",
       pastDue: "PAST DUE",
       change: "Сменить тариф",
-    },
-    rowActions: {
-      more: "Меню",
-      viewSubscription: "Открыть подписку",
-      changeTariff: "Сменить тариф",
     },
     planChange: {
       title: "Смена тарифа",
@@ -512,7 +497,6 @@ export const adminPanel = {
     },
     pagination: {
       loadMore: "Загрузить ещё",
-      loading: "Загружаем…",
     },
     toasts: {
       planChanged: "Тариф изменён",
@@ -532,14 +516,12 @@ export const adminPanel = {
       pendingSubtitle: "сумма",
       failed7d: "Отказы за 7 дней",
       failed7dSuffix: "от попыток",
-      noData: "—",
     },
     tabs: {
       navAria: "Разделы биллинга",
       plans: "Тарифы",
       subs: "Активные подписки",
       payments: "Платежи и история",
-      comingSoonTooltip: "Доступно в следующем релизе",
     },
     plans: {
       featuredBadge: "POPULAR",
@@ -608,7 +590,6 @@ export const adminPanel = {
       limitOnlyRelaxParent: "Лимит можно только ослаблять относительно родителя.",
       limitStricter: "Значение строже родительского лимита.",
       unlimited: "Безлимит",
-      unlimitedHint: "Без ограничений",
     },
     scope: {
       master: "Мастер",
@@ -624,6 +605,7 @@ export const adminPanel = {
       errorGeneric: "Не удалось сохранить. Попробуйте ещё раз.",
       subscriptionCancelled: "Подписка отменена",
       paymentRefunded: "Платёж возвращён",
+      // error-hint-ok: возврат идёт через ЮКассу — сразу повторять бесполезно, «позже» точнее
       refundError: "Не удалось вернуть платёж. Попробуйте позже.",
       cancelError: "Не удалось отменить подписку. Попробуйте ещё раз.",
     },
@@ -653,7 +635,6 @@ export const adminPanel = {
         hint: "Подписки появятся, когда мастера или студии оплатят план.",
       },
       loadMore: "Загрузить ещё",
-      loading: "Загружаем…",
     },
     payments: {
       pendingHeader: "Ожидают подтверждения",
@@ -731,7 +712,6 @@ export const adminPanel = {
       reportedBadge: "Зарепортено",
       urgentBadge: "Срочно",
       reportLabel: "Причина жалобы",
-      reportCommentLabel: "Комментарий",
       noReports: "Без жалоб",
       authorDeleted: "Удалённый аккаунт",
       targetMaster: "мастера",
@@ -1007,7 +987,6 @@ export const adminPanel = {
           notIndexed: "Не проиндексировано",
         },
         disabledHint: "Флаг «Визуальный поиск» выключен. Включите его выше, чтобы индексация работала.",
-        loadFailed: "Не удалось загрузить статистику. Попробуйте ещё раз.",
         runFailed: "Не удалось запустить индексацию. Попробуйте ещё раз.",
         empty: "Нечего индексировать — все портфолио уже обработаны.",
       },
@@ -1022,14 +1001,8 @@ export const adminPanel = {
           broken: "Битые ссылки",
         },
         empty: "Ничего убирать не нужно — медиа-каталог чистый.",
-        loadFailed: "Не удалось загрузить статистику. Попробуйте ещё раз.",
         runFailed: "Не удалось запустить очистку. Попробуйте ещё раз.",
       },
-    },
-    toasts: {
-      seoSaved: "SEO-настройки сохранены",
-      flagsSaved: "Флаги сохранены",
-      errorGeneric: "Не удалось сохранить. Попробуйте ещё раз.",
     },
   },
 } as const;

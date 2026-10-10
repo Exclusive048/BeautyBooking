@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { Pencil, Star, Tag, Trash2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Pencil, Star, Tag, Trash2, X } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -11,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { cn } from "@/lib/cn";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
+import { useConfirm } from "@/hooks/use-confirm";
+import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioPortfolioAttributionData } from "@/lib/studios/portfolio-items";
@@ -52,9 +55,14 @@ export function PortfolioEditor({
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [assets, setAssets] = useState<MediaAssetDto[]>([]);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // Предпросмотр держит id фото, а не адрес: из просмотра его можно заменить
+  // и удалить, а после замены показывается уже новое фото.
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const closePreview = useCallback(() => setPreviewUrl(null), []);
+  const previewCloseRef = useRef<HTMLButtonElement>(null);
+  const closePreview = useCallback(() => setPreviewId(null), []);
+  const isHydrated = useIsHydrated();
+  const { confirm, modal: confirmModal } = useConfirm();
 
   // UI-13 — у лайтбокса не было НИЧЕГО из контракта диалога: ни Escape, ни
   // focus-trap, ни возврата фокуса, ни блокировки прокрутки фона. Закрыть
@@ -62,7 +70,15 @@ export function PortfolioEditor({
   // клавиатуры выход находился наощупь, а колесо прокручивало страницу
   // ПОД полноэкранным чёрным слоем. Исключение в ESLint обосновано верно,
   // но оно про позиционирование — a11y-контракт им не покрывается.
-  useOverlayA11y({ open: previewUrl !== null, onClose: closePreview, containerRef: previewRef });
+  // Фото исчезло из списка (удалили) — просмотр закрывается сам.
+  const previewIndex = previewId === null ? -1 : assets.findIndex((asset) => asset.id === previewId);
+  const previewAsset = previewIndex >= 0 ? assets[previewIndex] : null;
+  useOverlayA11y({
+    open: previewAsset !== null,
+    onClose: closePreview,
+    containerRef: previewRef,
+    initialFocusRef: previewCloseRef,
+  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +150,10 @@ export function PortfolioEditor({
         form.set("file", file);
 
         const result = await fetchJsonWithAuth<{ asset: MediaAssetDto }>("/api/media", { method: "POST", body: form });
+        if (replaceAssetId) {
+          // Заменили из просмотра — просмотр показывает новое фото.
+          setPreviewId((current) => (current === replaceAssetId ? result.asset.id : current));
+        }
         await load();
         // Новое фото студии — сразу спросить, кто и что делал (замена
         // сохраняет прежнюю подпись, поэтому для неё не спрашиваем).
@@ -184,6 +204,9 @@ export function PortfolioEditor({
 
   const remove = useCallback(
     async (id: string) => {
+      // Удаление необратимо — как в портфолио мастера, сначала подтверждение.
+      const ok = await confirm({ message: mediaText.confirmRemove, variant: "danger" });
+      if (!ok) return;
       setBusy(true);
       setError(null);
       try {
@@ -195,8 +218,13 @@ export function PortfolioEditor({
         setBusy(false);
       }
     },
-    [load, mediaText.deleteFailed]
+    [confirm, load, mediaText.confirmRemove, mediaText.deleteFailed]
   );
+
+  const startReplace = useCallback((id: string) => {
+    setReplaceTargetId(id);
+    replaceInputRef.current?.click();
+  }, []);
 
   const makeCover = useCallback(
     async (id: string) => {
@@ -311,7 +339,7 @@ export function PortfolioEditor({
             <Button
               variant="wrapper"
               className="relative h-full w-full"
-              onClick={() => setPreviewUrl(asset.url)}
+              onClick={() => setPreviewId(asset.id)}
               aria-label={mediaText.openPreviewAriaTemplate.replace("{n}", String(index + 1))}
             >
               <ResilientImage
@@ -370,10 +398,7 @@ export function PortfolioEditor({
               <div className="absolute right-0 top-0 flex flex-col">
                 <PhotoActionButton
                   label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
-                  onClick={() => {
-                    setReplaceTargetId(asset.id);
-                    replaceInputRef.current?.click();
-                  }}
+                  onClick={() => startReplace(asset.id)}
                   disabled={busy}
                 >
                   <Pencil className="h-4 w-4" aria-hidden />
@@ -405,28 +430,75 @@ export function PortfolioEditor({
         />
       ) : null}
 
-      {previewUrl ? (
-        <div
-          ref={previewRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label={mediaText.closePreviewAria}
-          tabIndex={-1}
-          className="fixed inset-0 z-modal flex items-center justify-center bg-black/70 p-4"
-        >
-          <Button variant="wrapper" className="absolute inset-0" onClick={closePreview} aria-label={mediaText.closePreviewAria} />
-          <div className="relative h-[90vh] w-[90vw]">
-            <ResilientImage
-              src={previewUrl}
-              alt={mediaText.previewAlt}
-              sizes="90vw"
-              fit="contain"
-              className="rounded-2xl bg-bg-card object-contain"
-              unoptimized
+      {/* Просмотр фото во весь экран. Был светлой карточкой на 90% экрана:
+          фото «contain» оставляло сверху и снизу огромные светлые поля, своих
+          кнопок у просмотра не было, а сквозь затемнение просвечивали кнопки
+          плиток («закрыть» и «изменить» искали за полями — замечание владельца
+          2026-10-10). Теперь фон тёмный, фото занимает всё свободное место, а
+          «Заменить», «Удалить» и «Закрыть» — на самом просмотре. Через портал:
+          предок с transform сделал бы `fixed` относительным к себе. */}
+      {isHydrated && previewAsset
+        ? createPortal(
+          <div
+            ref={previewRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={mediaText.previewDialogAria}
+            tabIndex={-1}
+            className="fixed inset-0 z-modal bg-black/95"
+          >
+            <Button
+              variant="wrapper"
+              size="none"
+              tabIndex={-1}
+              className="absolute inset-0 cursor-default"
+              onClick={closePreview}
+              aria-label={mediaText.closePreviewAria}
             />
-          </div>
-        </div>
-      ) : null}
+            <div className="pointer-events-none absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] top-[calc(env(safe-area-inset-top,0px)+3.5rem)] sm:inset-x-16 sm:bottom-8 sm:top-16">
+              <ResilientImage
+                key={previewAsset.id}
+                src={previewAsset.url}
+                alt={mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}
+                sizes="100vw"
+                fit="contain"
+                className="object-contain"
+                unoptimized
+              />
+            </div>
+            <div className="absolute right-1 top-[calc(env(safe-area-inset-top,0px)+0.25rem)] flex items-center sm:right-4 sm:top-4">
+              {canEdit ? (
+                <>
+                  <PhotoActionButton
+                    label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
+                    onClick={() => startReplace(previewAsset.id)}
+                    disabled={busy}
+                  >
+                    <Pencil className="h-4 w-4" aria-hidden />
+                  </PhotoActionButton>
+                  <PhotoActionButton
+                    label={`${mediaText.removePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
+                    onClick={() => {
+                      // Подтверждение — своим окном; два окна с ловушкой фокуса
+                      // разом не открываем.
+                      const id = previewAsset.id;
+                      closePreview();
+                      void remove(id);
+                    }}
+                    disabled={busy}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  </PhotoActionButton>
+                </>
+              ) : null}
+              <PhotoActionButton ref={previewCloseRef} label={mediaText.closePreviewAria} onClick={closePreview}>
+                <X className="h-4 w-4" aria-hidden />
+              </PhotoActionButton>
+            </div>
+          </div>,
+          document.body,
+        )
+        : null}
 
       <FileInput
         ref={addInputRef}
@@ -452,6 +524,7 @@ export function PortfolioEditor({
           e.currentTarget.value = "";
         }}
       />
+      {confirmModal}
     </div>
   );
 }

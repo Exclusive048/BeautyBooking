@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles, User } from "lucide
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
 import {
   EMPTY_CONSENT_FLAGS,
@@ -570,7 +571,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           {!me ? (
             <>
               <label className="block text-sm">
-                <span className="mb-1 block text-text-sec">{T.nameLabel}</span>
+                <FieldLabel tone="muted" className="text-sm font-normal">{T.nameLabel}</FieldLabel>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -582,7 +583,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                 </span>
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>
+                <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={T.phonePlaceholder} inputMode="tel" />
               </label>
             </>
@@ -595,14 +596,14 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
               `package-booking-flow.tsx`. */}
           {me && !me.phone ? (
             <label className="block text-sm">
-              <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>
+              <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={T.phonePlaceholder} inputMode="tel" />
             </label>
           ) : null}
           {/* RKN-FIX-02 — guest consent per purpose (server-enforced). */}
           {!me ? <LegalConsentGroup compact value={consent} onChange={setConsent} /> : null}
           <label className="block text-sm">
-            <span className="mb-1 block text-text-sec">{T.commentLabel}</span>
+            <FieldLabel tone="muted" className="text-sm font-normal">{T.commentLabel}</FieldLabel>
             <Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder={T.commentPlaceholder} />
           </label>
           <div className="flex items-center justify-between border-t border-border-subtle pt-3">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { StarRatingInput } from "@/components/ui/star-rating-input";
 import { Textarea } from "@/components/ui/textarea";
+import { FieldLabel } from "@/components/ui/field-label";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { ClientReviewItem } from "@/lib/client-cabinet/reviews.service";
@@ -85,13 +86,10 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
         <StarRatingInput value={rating} onChange={setRating} />
       </div>
 
-      <div className="space-y-1.5">
-        <label
-          htmlFor="edit-review-text"
-          className="eyebrow"
-        >
+      <div>
+        <FieldLabel htmlFor="edit-review-text" tone="eyebrow">
           {UI_TEXT.clientCabinet.reviews.textLabel}
-        </label>
+        </FieldLabel>
         <Textarea
           id="edit-review-text"
           value={text}
@@ -100,7 +98,7 @@ export function EditReviewModal({ review, onClose, onSuccess }: Props) {
           rows={4}
           maxLength={1000}
         />
-        <div className="text-right font-mono text-xs text-text-sec">
+        <div className="mt-1.5 text-right font-mono text-xs text-text-sec">
           {text.length}/1000
         </div>
       </div>

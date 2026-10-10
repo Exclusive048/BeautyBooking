@@ -10,14 +10,7 @@ export const homeGuest = {
     "Маникюр, стрижка, брови, массаж — выберите услугу, удобное время и мастера в вашем районе",
   searchPlaceholder: "Какая услуга?",
   searchCta: "Найти мастера",
-  statsRating: "средний рейтинг",
   statsBookings: "завершённых записей",
-  hotSlots: {
-    title: "Горящие окошки",
-    titleAccent: "сегодня",
-    subtitle: "Скидки до 30% на освободившиеся окошки",
-    seeAll: "Все горящие окошки",
-  },
   howItWorks: {
     title: "Как это",
     titleAccent: "работает",
@@ -31,16 +24,11 @@ export const homeGuest = {
     // advertise a specific (currently killed) delivery channel on the guest home.
     step3Text: "Напоминания перед визитом, отзывы после",
   },
-  categories: {
-    title: "Что мы предлагаем",
-    titleAccent: "",
-  },
   topMasters: {
     title: "Топ мастеров",
     titleAccent: "этого месяца",
     subtitle: "По количеству записей и оценкам клиентов",
     seeAll: "Смотреть всех мастеров",
-    loading: "Загружаем рейтинг…",
   },
   becomeMaster: {
     title: "Вы мастер красоты?",

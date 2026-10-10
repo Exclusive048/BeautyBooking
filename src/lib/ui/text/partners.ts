@@ -56,6 +56,7 @@ export const partners = {
     optional: "(необязательно)",
     submit: "Отправить заявку",
     submitting: "Отправляем…",
+    // error-hint-ok: канон плюс запасной канал — почта партнёрского отдела
     genericError:
       "Не удалось отправить. Попробуйте ещё раз или напишите на partners@masterryadom.ru.",
     success: {

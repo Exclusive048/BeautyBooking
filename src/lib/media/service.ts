@@ -125,11 +125,15 @@ export async function deleteAssetById(assetId: string): Promise<void> {
 
   // 2. Best-effort delete from storage. Swallow errors — a transient S3 outage
   //    must not surface to the user when the logical delete already succeeded.
-  //    TODO: weekly cron to sweep S3 for files without a live MediaAsset row.
+  //    MEDIA-STORAGE-ORPHAN-SWEEP: неудача не теряется — без отметки
+  //    `storageDeletedAt` (шаг 4) удаление повторит ежечасная уборка воркера
+  //    (`sweepDeletedAssetStorage`, `media/cleanup.ts`).
+  let storageCleared = true;
   try {
     const storage = getStorageProvider();
     await storage.deleteObject(asset.storageKey);
   } catch (error) {
+    storageCleared = false;
     logError("Failed to delete media object from storage (record already soft-deleted)", {
       assetId: asset.id,
       storageKey: asset.storageKey,
@@ -145,9 +149,32 @@ export async function deleteAssetById(assetId: string): Promise<void> {
   try {
     await deleteMediaPreviews(getStorageProvider(), asset.storageKey);
   } catch (error) {
+    storageCleared = false;
     logError("Failed to delete media previews from storage (record already soft-deleted)", {
       assetId: asset.id,
       storageKey: asset.storageKey,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // 4. Отметка «байты убраны» — только когда ушли и оригинал, и превью. Сбой
+  //    самой отметки не страшен: уборка повторит удаление, оно идемпотентно.
+  if (storageCleared) await markAssetStorageDeleted(asset.id);
+}
+
+/**
+ * MEDIA-STORAGE-ORPHAN-SWEEP — отметить, что объект удалённого фото убран из
+ * хранилища. Только у мягко удалённой строки и только один раз.
+ */
+async function markAssetStorageDeleted(assetId: string): Promise<void> {
+  try {
+    await prisma.mediaAsset.updateMany({
+      where: { id: assetId, deletedAt: { not: null }, storageDeletedAt: null },
+      data: { storageDeletedAt: new Date() },
+    });
+  } catch (error) {
+    logError("Failed to mark media storage as deleted", {
+      assetId,
       error: error instanceof Error ? error.message : String(error),
     });
   }

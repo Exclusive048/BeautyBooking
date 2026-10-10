@@ -5,28 +5,19 @@ export const billing = {
     checkoutFailed: "Не удалось создать оплату. Попробуйте ещё раз.",
   },
   featureGate: {
-    ctaLabel: "Посмотреть тарифы",
     loading: "Загружаем…",
-    title: "Только для тарифа {plan}",
-    description: "Перейдите на {plan}, чтобы разблокировать эту функцию.",
-    notificationsTitle: "Уведомления в Telegram и ВКонтакте — тариф PRO",
-    notificationsHint: "Подключите Telegram или ВКонтакте, чтобы не пропустить ни одной записи",
-    cta: "Перейти на PRO",
     // FIX-27 — unified locked-state card. {plan} is the required tier derived
     // from the live plan-config (findMinPlanName over /api/billing/plans),
     // never a hardcoded string (closes PLAN-GATE-HINT-DIVERGENCE).
     tierBadge: "Доступно на тарифе {plan}",
     upgradeCta: "Перейти на {plan}",
     telegramLocked: "Уведомления в Telegram доступны на платном тарифе.",
-    vkLocked: "Уведомления во ВКонтакте доступны на платном тарифе.",
   },
   period: {
     month: "1 месяц",
     months3: "3 месяца",
     months6: "6 месяцев",
     year: "12 месяцев",
-    yearSavings: (amount: number) => `Экономия ${amount}₽ в год`,
-    yearDiscount: "−20%",
     savingsBadge: (pct: number) => `−${pct}%`,
     perMonth: "/мес",
   },
@@ -65,12 +56,9 @@ export const billing = {
   },
   currentFeatures: {
     sectionTitle: (planName: string) => `Что включено в тариф «${planName}»`,
-    included: "Включено",
-    notIncluded: "Недоступно",
     upgradeHint: "Доступно на более высоком тарифе",
     unlimitedValue: "Без ограничений",
     limitValue: (n: number) => `до ${n}`,
-    upgradeCta: "Сменить тариф",
   },
   paywall: {
     title: "Доступно на тарифе PRO",
@@ -97,7 +85,6 @@ export const billing = {
     subtitle: "Настройте публичную ссылку и поделитесь профилем.",
     usernameLabel: "Публичный адрес",
     usernameHint: "Только латинские буквы, цифры и дефис. Мин. 3 символа.",
-    urlPreview: (username: string) => `masterryadom.ru/u/${username}`,
     copyLink: "Скопировать ссылку",
     copied: "Скопировано",
     qrTitle: "QR-код профиля",
@@ -112,7 +99,6 @@ export const billing = {
     saveUsername: "Сохранить",
     saving: "Сохраняем…",
     saveFailed: "Не удалось сохранить. Попробуйте ещё раз.",
-    saved: "Сохранено",
     openProfile: "Открыть профиль",
   },
 } as const;

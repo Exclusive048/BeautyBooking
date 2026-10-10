@@ -12,7 +12,6 @@ export const homeFeed = {
   },
   card: {
     priceFrom: "от",
-    ratingLabel: "рейтинг",
     // HOME-FEED-COLLAGE: плитка-карусель работ одного автора (48 часов).
     worksCounter: "{current} / {total}",
     previousWork: "Предыдущая работа",
@@ -29,7 +28,6 @@ export const homeFeed = {
       close: "Закрыть",
       previous: "Предыдущее",
       next: "Следующее",
-      paused: "Пауза",
       counter: "{current} / {total}",
       // UI-33: сам кадр — единственное содержимое просмотрщика. Слово
       // «сторис» в alt не повторяем: им уже подписан диалог.

@@ -1,5 +1,3 @@
-import { pluralize } from "@/lib/utils/pluralize";
-
 /**
  * Отзывы: список и жалоба (публичный профиль, кабинет мастера) и форма отзыва
  * (публичный профиль, «Мои записи», управление записью гостя). Отдельным
@@ -7,37 +5,9 @@ import { pluralize } from "@/lib/utils/pluralize";
  * (29 kB) ради двух веток — 29.09 доработки · 18.
  */
 export const reviews = {
-  title: "Отзывы",
-  subtitle: "Что клиенты говорят о вашей работе",
-  rating: "Рейтинг",
-  statsTitle: "Рейтинг",
-  totalReviews: (n: number) => `${n} ${pluralize(n, "отзыв", "отзыва", "отзывов")}`,
-  canImprove: "Что можно улучшить",
-  noPrivateTags: "Пока нет приватных меток",
-  sortLabel: "Сортировать",
-  loading: "Загружаем отзывы…",
-  loadFailed: "Не удалось загрузить отзывы. Попробуйте ещё раз.",
-  empty: "Отзывов пока нет — попросите первых клиентов поделиться впечатлениями",
-  emptyHint: "Клиенты оставляют отзыв после завершённой записи",
-  noText: "Без комментария",
-  privateTagsTitle: "Можно улучшить",
-  masterReply: "Ответ мастера",
-  reply: "Ответить",
-  replyPlaceholder: "Напишите ответ клиенту…",
-  replyPrompt: "Напишите ответ клиенту…",
-  replySave: "Отправить",
-  replyCancel: "Отмена",
-  replyFailed: "Не удалось отправить ответ. Попробуйте ещё раз.",
-  suggestReply: "Предложить ответ",
-  suggestReplyLoading: "Подбираем ответ…",
-  suggestReplyFailed: "Не удалось сгенерировать ответ. Попробуйте ещё раз.",
   report: "Пожаловаться",
-  reportPrompt: "Причина жалобы",
   reportFailed: "Не удалось отправить жалобу. Попробуйте ещё раз.",
   reportedAt: "Жалоба отправлена",
-  reportSent: "Жалоба отправлена. Мы рассмотрим её в ближайшее время.",
-  reportAlreadySent: "Вы уже пожаловались на этот отзыв",
-  reportOwnReview: "Нельзя пожаловаться на свой отзыв",
   reportModalTitle: "Пожаловаться на отзыв",
   reportModalDesc: "Укажите причину. Мы рассмотрим жалобу и примем меры, если нарушение подтвердится.",
   reportReasonLabel: "Причина",
@@ -50,14 +20,6 @@ export const reviews = {
   reportReasonInappropriate: "Неприемлемые фото или текст",
   reportReasonOther: "Другое",
   reportReasonPlaceholder: "— выберите причину —",
-  verified: "Проверенный отзыв",
-  sortBy: {
-    label: "Сортировать",
-    newest: "Сначала новые",
-    oldest: "Сначала старые",
-    highest: "Высокий рейтинг",
-    lowest: "Низкий рейтинг",
-  },
   form: {
     title: "Оставить отзыв",
     starAria: "{star} звёзд",

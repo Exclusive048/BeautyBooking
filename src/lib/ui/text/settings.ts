@@ -1,21 +1,9 @@
 export const settings = {
-  title: "Настройки",
-  subtitle: "Профиль, правила записи и напоминания",
-  sections: {
-    publicPage: "Публичная страница",
-    bookingRules: "Правила записи",
-    proFeatures: "Дополнительные услуги",
-  },
   publicLink: {
     copied: "Скопировано",
     copy: "Скопировать",
     editUsername: "Изменить",
     open: "Открыть",
-  },
-  telegram: {
-    title: "Уведомления в Telegram",
-    hint: "Получайте уведомления о новых записях прямо в Telegram",
-    connect: "Подключить",
   },
   vk: {
     // FIX-B14: исходы стартовой ноги `/api/integrations/vk/start`. Она —
@@ -31,24 +19,9 @@ export const settings = {
       consentRequired: "Подтвердите согласия в профиле — без них подключение недоступно.",
     },
   },
-  autoConfirm: {
-    title: "Автоподтверждение записей",
-    hint: "Новые записи подтверждаются без вашего участия",
-  },
-  cancellation: {
-    title: "Политика отмены",
-    hint: "Клиент может отменить запись не позднее чем за указанное время",
-  },
-  danger: {
-    title: "Удаление кабинета",
-    hint: "Это действие необратимо. Все данные, записи и история будут удалены.",
-    cta: "Удалить кабинет",
-  },
   hotSlots: {
     title: "Горящие окошки",
     description: "Автоскидки на ближайшие свободные окошки.",
-    hint: "Предлагайте скидку на свободные окошки и заполняйте расписание",
-    configure: "Настроить",
     whenToApply: "Когда применять",
     trigger48: "За 48 ч.",
     trigger24: "За 24 ч.",
@@ -67,32 +40,17 @@ export const settings = {
     unavailable: "Правило пока недоступно.",
     loadFailed: "Не удалось загрузить настройки. Попробуйте ещё раз.",
     saveFailed: "Не удалось сохранить правило. Попробуйте ещё раз.",
-    smartPrice: {
-      label: "Умная цена",
-      hint: "Автоматически публиковать горящие окошки за выбранное время",
-      enabled: "Включена",
-      disabled: "Выключена",
-    },
-  },
-  billing: {
-    featureGate: {
-      title: "Доступно на тарифе PRO",
-      hint: "Перейдите на PRO, чтобы разблокировать эту функцию.",
-      cta: "Перейти на PRO",
-    },
   },
   notifications: {
     telegram: {
       title: "Уведомления Telegram",
       connected: "Подключено",
       notConnected: "Не подключено",
-      connect: "Подключить",
       // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect live ONLY in the
       // profile «Связанные аккаунты» card. Notification surfaces toggle delivery
       // and, when the account isn't linked yet, point to the canonical card.
       connectInProfile: "Подключить в профиле →",
       hint: "Если уведомления прервались, откройте бота и нажмите «Запустить».",
-      connectFailed: "Не удалось подключить Telegram. Попробуйте ещё раз.",
       updateFailed: "Не удалось обновить настройки Telegram. Попробуйте ещё раз.",
     },
     // VK-COMMUNITY-NOTIFY-01: секция живёт ТОЛЬКО в общих настройках

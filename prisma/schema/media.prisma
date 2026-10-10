@@ -44,6 +44,11 @@ model MediaAsset {
 
   deletedAt DateTime?
 
+  /// MEDIA-STORAGE-ORPHAN-SWEEP: объект удалённого фото (и его превью `?w=`) убран
+  /// из хранилища. Пусто при `deletedAt` — удаление байтов не прошло (хранилище
+  /// недоступно), и ежечасная уборка воркера повторит его (`media/cleanup.ts`).
+  storageDeletedAt DateTime?
+
   @@index([entityType, entityId, kind, deletedAt])
   @@index([storageKey])
   @@index([createdByUserId])

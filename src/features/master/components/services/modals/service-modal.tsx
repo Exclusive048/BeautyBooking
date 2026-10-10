@@ -19,6 +19,7 @@ import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatDuration } from "../lib/format";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.service;
 
@@ -426,7 +427,7 @@ export function ServiceModal({
 /**
  * Подпись поля, программно связанная со своим контролом.
  *
- * `<label>` не оборачивает контрол (между ними обёртка отступа), поэтому
+ * `<label>` не оборачивает контрол, поэтому
  * связь держится на `htmlFor`/`id`. Идентификатор выдаёт сам `Field` и
  * отдаёт его children функцией — так его нельзя забыть проставить, а поле
  * с несколькими контролами (селект + кнопка создания категории) само
@@ -442,13 +443,10 @@ function Field({
   const controlId = useId();
   return (
     <div>
-      <label
-        htmlFor={controlId}
-        className="eyebrow"
-      >
+      <FieldLabel htmlFor={controlId} tone="eyebrow">
         {label}
-      </label>
-      <div className="mt-1.5">{children(controlId)}</div>
+      </FieldLabel>
+      {children(controlId)}
     </div>
   );
 }

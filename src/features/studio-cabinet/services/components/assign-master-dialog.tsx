@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioServiceMasterChip } from "../lib/types";
@@ -78,9 +79,9 @@ export function AssignMasterDialog({
           </div>
         ) : (
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.masterLabel}
-            </span>
+            </FieldLabel>
             <Select
               value={masterId}
               onChange={(e) => setMasterId(e.target.value)}

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { ChipButton } from "@/components/ui/chip-button";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.cabinetMaster.modelOffers.modals.reject;
 
@@ -104,8 +105,8 @@ export function RejectApplicationModal({ open, onClose, applicationId, clientNam
       </div>
 
       {customNeeded ? (
-        <div className="mt-4 space-y-1.5">
-          <label className="text-sm font-medium text-text-main">{T.customLabel}</label>
+        <label className="mt-4 block">
+          <FieldLabel className="text-sm">{T.customLabel}</FieldLabel>
           <Textarea
             value={customText}
             onChange={(event) => setCustomText(event.target.value)}
@@ -114,7 +115,7 @@ export function RejectApplicationModal({ open, onClose, applicationId, clientNam
             maxLength={500}
             className="rounded-xl"
           />
-        </div>
+        </label>
       ) : null}
 
       {error ? (

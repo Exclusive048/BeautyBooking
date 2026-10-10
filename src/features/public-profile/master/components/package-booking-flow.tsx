@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Clock, Package, Pencil, Sparkles } from "lucide-react
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
 import {
   EMPTY_CONSENT_FLAGS,
@@ -537,7 +538,7 @@ export function PackageBookingFlow({
           {!me ? (
             <>
               <label className="block text-sm">
-                <span className="mb-1 block text-text-sec">{T.nameLabel}</span>
+                <FieldLabel tone="muted" className="text-sm font-normal">{T.nameLabel}</FieldLabel>
                 <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -549,7 +550,7 @@ export function PackageBookingFlow({
                 </span>
               </label>
               <label className="block text-sm">
-                <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>
+                <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
                 <Input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -568,7 +569,7 @@ export function PackageBookingFlow({
               запись падала на «Проверьте телефон» без поля, куда его ввести. */}
           {me && !me.phone ? (
             <label className="block text-sm">
-              <span className="mb-1 block text-text-sec">{T.phoneLabel}</span>
+              <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -581,7 +582,7 @@ export function PackageBookingFlow({
               the package booking without both required ones. */}
           {!me ? <LegalConsentGroup compact value={consent} onChange={setConsent} /> : null}
           <label className="block text-sm">
-            <span className="mb-1 block text-text-sec">{T.commentLabel}</span>
+            <FieldLabel tone="muted" className="text-sm font-normal">{T.commentLabel}</FieldLabel>
             <Input
               value={comment}
               onChange={(e) => setComment(e.target.value)}

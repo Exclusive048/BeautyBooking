@@ -21,6 +21,7 @@ import { TagInput } from "./tag-input";
 import { Select } from "@/components/ui/select";
 import { ChipButton } from "@/components/ui/chip-button";
 import { FileInput } from "@/components/ui/file-input";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.cabinetMaster.portfolioPage.edit;
 
@@ -249,17 +250,13 @@ export function EditItemModal({
 
           <div className="space-y-4">
             <div>
-              <label
-                htmlFor={categorySelectId}
-                className="eyebrow"
-              >
+              <FieldLabel htmlFor={categorySelectId} tone="eyebrow">
                 {T.categoryLabel}
-              </label>
+              </FieldLabel>
               <Select
                 id={categorySelectId}
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
-                className="mt-1.5"
               >
                 <option value="">{T.categoryNone}</option>
                 {categories.map((category) => (
@@ -271,13 +268,13 @@ export function EditItemModal({
             </div>
 
             <div>
-              <label className="eyebrow">
+              <FieldLabel tone="eyebrow">
                 {T.servicesLabel}
-              </label>
+              </FieldLabel>
               {services.length === 0 ? (
-                <p className="mt-1.5 text-xs italic text-text-sec">{T.servicesEmpty}</p>
+                <p className="text-xs italic text-text-sec">{T.servicesEmpty}</p>
               ) : (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   {services.map((service) => {
                     const active = serviceIds.includes(service.id);
                     return (
@@ -295,20 +292,15 @@ export function EditItemModal({
             </div>
 
             <div>
-              <label
-                htmlFor={tagsInputId}
-                className="eyebrow"
-              >
+              <FieldLabel htmlFor={tagsInputId} tone="eyebrow">
                 {T.tagsLabel}
-              </label>
-              <div className="mt-1.5">
-                <TagInput
-                  inputId={tagsInputId}
-                  value={tagIds}
-                  options={masterTags}
-                  onChange={setTagIds}
-                />
-              </div>
+              </FieldLabel>
+              <TagInput
+                inputId={tagsInputId}
+                value={tagIds}
+                options={masterTags}
+                onChange={setTagIds}
+              />
             </div>
 
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-text-main">

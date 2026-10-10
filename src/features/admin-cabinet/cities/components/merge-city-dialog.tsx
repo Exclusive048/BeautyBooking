@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminCityRow } from "@/features/admin-cabinet/cities/types";
 
@@ -61,9 +62,9 @@ export function MergeCityDialog({
             {T.step1Hint.replace("{source}", source.name)}
           </p>
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-sec">
+            <FieldLabel tone="muted">
               {T.targetLabel}
-            </span>
+            </FieldLabel>
             <Select
               value={targetId}
               onChange={(event) => setTargetId(event.target.value)}

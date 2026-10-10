@@ -4,8 +4,6 @@ export const common = {
   cancel: "Отмена",
   close: "Закрыть",
   noLimit: "Без ограничений",
-  notSpecified: "Не указано",
-  noPhoto: "Нет фото",
   home: "Главная",
   minutesShort: "мин",
   minutesShortLetter: "м",
@@ -15,8 +13,6 @@ export const common = {
   // везде, «4,2 млн ₽», «12 тыс». Склеивает `UI_FMT.countShort` / `moneyShort`.
   thousandShort: "тыс",
   millionShort: "млн",
-  requiredField: "Обязательное поле",
-  namePlaceholder: "Имя",
   // FIX-NAME-HINT: подсказка под полем имени на ВСЕХ поверхностях записи —
   // и там, где имя вводит мастер/администратор вручную, и там, где клиент
   // вводит своё. Ключей два, потому что причина разная («найти в списке» —

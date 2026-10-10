@@ -11,6 +11,7 @@ import { LogoMark } from "@/components/brand/logo-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OtpInput, type OtpState } from "@/components/ui/otp-input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { LegalConsentGroup } from "@/features/auth/components/legal-consent-group";
 import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
 import { parseInternalPath } from "@/lib/http/safe-redirect";
@@ -798,9 +799,9 @@ export default function LoginClient({
                   className="space-y-4"
                 >
                   <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-text-label">
+                    <FieldLabel className="text-sm text-text-label">
                       {mode === "email" ? T.codeFromEmail : T.codeLabel}
-                    </label>
+                    </FieldLabel>
                     <OtpInput
                       value={code}
                       onChange={(next) => {

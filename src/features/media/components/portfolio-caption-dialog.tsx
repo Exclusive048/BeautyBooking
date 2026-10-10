@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import type { StudioPortfolioAttributionData } from "@/lib/studios/portfolio-items";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -55,8 +56,8 @@ export function PortfolioCaptionDialog({ open, onClose, masters, services, initi
       <div className="space-y-4">
         <p className="text-sm text-text-sec">{T.captionDialogHint}</p>
 
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-text-main">{T.captionMasterLabel}</span>
+        <label className="block">
+          <FieldLabel className="text-sm">{T.captionMasterLabel}</FieldLabel>
           <Select
             value={performerId ?? ""}
             onChange={(event) => setPerformerId(event.target.value || null)}
@@ -70,8 +71,8 @@ export function PortfolioCaptionDialog({ open, onClose, masters, services, initi
           </Select>
         </label>
 
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-text-main">{T.captionServiceLabel}</span>
+        <label className="block">
+          <FieldLabel className="text-sm">{T.captionServiceLabel}</FieldLabel>
           <Select
             value={serviceId ?? ""}
             onChange={(event) => setServiceId(event.target.value || null)}

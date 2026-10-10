@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Select } from "@/components/ui/select";
+import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -164,9 +165,9 @@ export function AddServiceDialog({
     <ModalSurface open={open} onClose={handleClose} title={T.title}>
       <div className="space-y-4">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.nameLabel}
-          </span>
+          </FieldLabel>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -177,9 +178,9 @@ export function AddServiceDialog({
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.priceLabel}
-            </span>
+            </FieldLabel>
             <Input
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -192,9 +193,9 @@ export function AddServiceDialog({
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-text-main">
+            <FieldLabel>
               {T.durationLabel}
-            </span>
+            </FieldLabel>
             <Input
               value={duration}
               onChange={(e) => setDuration(e.target.value)}

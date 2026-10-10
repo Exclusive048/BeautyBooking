@@ -2,12 +2,6 @@ export const notificationsCenter = {
   title: "Уведомления",
   subtitle: "Приглашения и всё важное по вашим записям — в одном месте.",
   invitesTitle: "Приглашения в студии",
-  timelineTitle: "Что происходило",
-  // `phoneRequired` removed (NOTIFICATIONS-REDESIGN-01): the invites card now
-  // renders only when there ARE invites, and invites are matched by phone
-  // server-side — so «добавьте телефон» was advice that could only ever show
-  // to someone who had no invites to see. Its only caller is gone.
-  emptyTimeline: "Здесь пока пусто — попробуйте другой раздел.",
   noActiveInvites: "Нет активных приглашений.",
   // NOTIFICATIONS-REDESIGN-01: filters were channel-based (Все/Мастер/Студия/
   // Система/Приглашения) and identical for every viewer — a pure client was

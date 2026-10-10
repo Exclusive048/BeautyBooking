@@ -18,6 +18,7 @@ import type {
   StudioPackageView,
 } from "../server/packages-data.service";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.studioCabinet.servicesV2.packageDialog;
 const E = UI_TEXT.studioCabinet.servicesV2.errors;
@@ -175,9 +176,9 @@ export function PackageModal({
     >
       <div className="space-y-4">
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.nameLabel}
-          </span>
+          </FieldLabel>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}

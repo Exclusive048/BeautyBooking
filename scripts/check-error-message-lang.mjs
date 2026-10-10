@@ -54,12 +54,18 @@
  *   в отчёте (`--report`), но не валят гейт: их корректность определяется
  *   источником строки, а не этим вызовом.
  * - Шаблонные литералы проверяются по статическим частям: `Лимит ${n}` — ок.
+ * - Комментарии вырезаются до разбора (`scripts/lib/strip-comments.mjs`,
+ *   GATE-COMMENT-BLINDNESS): вызов, упомянутый в прозе JSDoc, — не вызов. До
+ *   этого гейт краснел на документации, объяснявшей форму дефекта (FIX-C6), и
+ *   считал 22 «нелитеральных» сайта, которые были комментариями. Номера строк
+ *   сохраняются — сканер оставляет переводы строк на месте.
  *
  * Запуск: `node scripts/check-error-message-lang.mjs [--report]`
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { stripComments } from "./lib/strip-comments.mjs";
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, "src");
@@ -257,7 +263,7 @@ const allowed = [];
 const unregisteredFactories = [];
 
 for (const file of files) {
-  const source = readFileSync(file, "utf8");
+  const source = stripComments(readFileSync(file, "utf8"));
   const rel = relative(ROOT, file).replace(/\\/g, "/");
 
   for (const pattern of CALLS) {

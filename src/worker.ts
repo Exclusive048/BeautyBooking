@@ -59,7 +59,7 @@ import {
 import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
 import { requeueAfterPipelineChangeOnce } from "@/lib/visual-search/reindex";
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
-import { runMediaCleanup } from "@/lib/media/cleanup";
+import { runMediaCleanupJob } from "@/lib/media/cleanup";
 import { runMediaPurge } from "@/lib/media/purge";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
 import { runWeeklyStatsJob } from "@/lib/master/weekly-stats-job";
@@ -681,7 +681,7 @@ async function processMediaCleanupJob(
     return;
   }
 
-  await runMediaCleanup();
+  await runMediaCleanupJob();
 }
 
 /**

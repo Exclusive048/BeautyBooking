@@ -18,6 +18,7 @@ import { hasRequiredConsents, type ConsentFlags } from "@/lib/legal/consent-flag
 import type { ServiceBookingConfig } from "@/features/booking/lib/booking-config";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 import { FileInput } from "@/components/ui/file-input";
+import { FieldLabel } from "@/components/ui/field-label";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 const TB = UI_TEXT.publicProfile.booking;
@@ -161,10 +162,10 @@ export function FormPhase({
 
       <div>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-text-main">
+          <FieldLabel>
             {T.nameLabel}
             <span className="ml-0.5 text-danger-text">*</span>
-          </span>
+          </FieldLabel>
           <Input
             value={clientName}
             onChange={(event) => onChangeName(event.target.value)}
@@ -180,7 +181,7 @@ export function FormPhase({
 
       <div>
         <label className="block">
-          <span className="mb-1 block text-xs text-text-sec">{T.commentLabel}</span>
+          <FieldLabel tone="muted" className="font-normal">{T.commentLabel}</FieldLabel>
           <Textarea
             value={comment}
             onChange={(event) => onChangeComment(event.target.value)}
@@ -222,9 +223,9 @@ export function FormPhase({
 
           {bookingConfig.requiresReferencePhoto ? (
             <div>
-              <p className="mb-1.5 block text-xs text-text-sec">
+              <FieldLabel tone="muted" className="font-normal">
                 {TB.referencePhotoLabel} <span className="text-danger-text">*</span>
-              </p>
+              </FieldLabel>
               <label htmlFor={referencePhotoId} className="inline-block">
                 <FileInput
                   id={referencePhotoId}
@@ -269,17 +270,17 @@ export function FormPhase({
           {bookingConfig.questions.length > 0 ? (
             <div className="space-y-2.5">
               {bookingConfig.questions.map((question) => (
-                <div key={question.id}>
-                  <label className="mb-1 block text-sm text-text-main">
+                <label key={question.id} className="block">
+                  <FieldLabel className="text-sm font-normal">
                     {question.text}
                     {question.required ? <span className="text-danger-text"> *</span> : null}
-                  </label>
+                  </FieldLabel>
                   <Input
                     value={bookingAnswers[question.id] ?? ""}
                     onChange={(event) => onChangeAnswer(question.id, event.target.value)}
                     placeholder={TB.bookingAnswerPlaceholder}
                   />
-                </div>
+                </label>
               ))}
             </div>
           ) : null}
