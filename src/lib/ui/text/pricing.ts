@@ -48,10 +48,6 @@ export const pricing = {
     STUDIO_PRO: "Для растущей студии",
     STUDIO_PREMIUM: "Для большой команды и сети",
   },
-  comparison: {
-    toggle: "Сравнить функции по тарифам",
-    featuresHeader: "Функция",
-  },
   // LAUNCH-PROMO-01: до 1 ноября все тарифы бесплатны (`lib/billing/launch-promo.ts`).
   launchPromo: {
     eyebrow: "Акция запуска",

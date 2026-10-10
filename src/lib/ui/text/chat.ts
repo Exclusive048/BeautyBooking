@@ -60,7 +60,6 @@ export const chat = {
     composeHintMaster: "у клиента сейчас нет записи к вам",
     composeHintClient: "у вас нет активной записи",
     bookCta: "Записаться",
-    openBookingCta: "Открыть запись",
     call: "Позвонить",
     back: "Назад",
     // MOBILE-POLISH (App Store 1.2): блокировка собеседника.

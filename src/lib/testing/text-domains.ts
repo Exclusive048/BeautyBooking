@@ -164,3 +164,165 @@ export function clientDomainsFrom(entry: string): { reach: ClientReach; domains:
   }
   return { reach, domains };
 }
+
+/**
+ * Как модуль читает КЛЮЧИ текстов (UI-TEXT-DEAD-KEY-SWEEP): путь от домена и
+ * вид обращения. Сторож «ключ без читателя» (`lib/ui/text-dead-keys.test.ts`)
+ * собирает их по дереву и судит, у какого ключа читателей нет.
+ *
+ * - `read` — цепочка дошла до конца: `UI_TEXT.a.b.c`, в том числе через
+ *   псевдоним (`const T = UI_TEXT.a; T.b.c`) и деструктуризацию
+ *   (`const { b } = UI_TEXT.a`). Псевдоним прослеживается по имени в файле.
+ * - `whole` — поддерево ушло значением, и что из него читают дальше, отсюда не
+ *   видно: индекс (`T[key]`), аргумент, проп, спред, `return`, `Object.keys`,
+ *   экспортированный псевдоним, позиция типа (`keyof typeof T`). Такое
+ *   поддерево сторож считает прочитанным ЦЕЛИКОМ — ошибка в безопасную сторону:
+ *   пропустить мёртвый ключ можно, объявить мёртвым живой — нет.
+ *
+ * Путь может быть длиннее ключа (`T.items.map`, `T.title.replace`) — укорачивает
+ * его сторож, он знает дерево ключей.
+ */
+export type TextKeyAccess = { path: string[]; kind: "read" | "whole" };
+
+const MAX_ALIAS_DEPTH = 6;
+
+function isPassThrough(node: ts.Node): boolean {
+  return (
+    ts.isNonNullExpression(node) ||
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node)
+  );
+}
+
+export function readTextKeyAccessFromSource(text: string, fileName: string): TextKeyAccess[] {
+  const kind = /\.tsx$/.test(fileName) ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, kind);
+  const namespaces = readTextUsageFromSource(text, fileName).namespaces;
+  const out: TextKeyAccess[] = [];
+  if (namespaces.length === 0) return out;
+
+  // Все идентификаторы файла по имени — для прослеживания псевдонимов.
+  const byName = new Map<string, ts.Identifier[]>();
+  const collect = (node: ts.Node) => {
+    if (ts.isIdentifier(node)) {
+      const list = byName.get(node.text) ?? [];
+      list.push(node);
+      byName.set(node.text, list);
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(source);
+
+  const isReference = (id: ts.Identifier): boolean => {
+    const p = id.parent;
+    if (ts.isPropertyAccessExpression(p) && p.name === id) return false;
+    if (ts.isQualifiedName(p) && p.right === id) return false;
+    if ((ts.isPropertyAssignment(p) || ts.isPropertySignature(p) || ts.isMethodDeclaration(p)) && p.name === id) {
+      return false;
+    }
+    if (ts.isBindingElement(p) && p.propertyName === id) return false;
+    if (ts.isVariableDeclaration(p) && p.name === id) return false;
+    if (ts.isBindingElement(p) && p.name === id) return false;
+    if (ts.isParameter(p) && p.name === id) return false;
+    if (ts.isImportSpecifier(p) || ts.isNamespaceImport(p) || ts.isImportClause(p)) return false;
+    if (ts.isJsxAttribute(p) && p.name === id) return false;
+    // Тип с тем же именем (`<T>`, `Props<T>`) — не переменная: значение в
+    // позиции типа читается только через `typeof`, а это TypeQuery.
+    if (ts.isTypeParameterDeclaration(p) || ts.isTypeReferenceNode(p)) return false;
+    return true;
+  };
+
+  const trackAlias = (name: string, path: string[], depth: number) => {
+    for (const ref of byName.get(name) ?? []) {
+      if (isReference(ref)) walk(ref, path, depth + 1);
+    }
+  };
+
+  function walk(start: ts.Node, basePath: string[], depth: number): void {
+    if (depth > MAX_ALIAS_DEPTH) {
+      out.push({ path: basePath, kind: "whole" });
+      return;
+    }
+    const path = [...basePath];
+    let cur: ts.Node = start;
+    for (;;) {
+      const parent = cur.parent;
+      if (ts.isPropertyAccessExpression(parent) && parent.expression === cur) {
+        path.push(parent.name.text);
+        cur = parent;
+      } else if (ts.isQualifiedName(parent) && parent.left === cur) {
+        path.push(parent.right.text);
+        cur = parent;
+      } else if (isPassThrough(parent)) {
+        cur = parent;
+      } else {
+        break;
+      }
+    }
+    if (path.length === 0) {
+      // Пространство имён целиком — его форму судит text-client-graph.test.ts;
+      // здесь это «всё прочитано».
+      out.push({ path, kind: "whole" });
+      return;
+    }
+    const parent = cur.parent;
+    if (isInTypePosition(cur) || ts.isTypeQueryNode(parent)) {
+      out.push({ path, kind: "whole" });
+      return;
+    }
+    if (ts.isElementAccessExpression(parent) && parent.expression === cur) {
+      out.push({ path, kind: "whole" });
+      return;
+    }
+    if (ts.isVariableDeclaration(parent) && parent.initializer === cur) {
+      const statement = parent.parent?.parent;
+      const exported =
+        statement !== undefined &&
+        ts.isVariableStatement(statement) &&
+        (statement.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+      if (exported) {
+        out.push({ path, kind: "whole" });
+        return;
+      }
+      if (ts.isIdentifier(parent.name)) {
+        out.push({ path, kind: "read" });
+        trackAlias(parent.name.text, path, depth);
+        return;
+      }
+      if (ts.isObjectBindingPattern(parent.name)) {
+        out.push({ path, kind: "read" });
+        for (const element of parent.name.elements) {
+          if (element.dotDotDotToken) {
+            out.push({ path, kind: "whole" });
+            continue;
+          }
+          const key = element.propertyName ?? element.name;
+          if (!ts.isIdentifier(key) && !ts.isStringLiteral(key)) {
+            out.push({ path, kind: "whole" });
+            continue;
+          }
+          const sub = [...path, key.text];
+          out.push({ path: sub, kind: "read" });
+          if (ts.isIdentifier(element.name)) trackAlias(element.name.text, sub, depth);
+          else out.push({ path: sub, kind: "whole" });
+        }
+        return;
+      }
+      out.push({ path, kind: "whole" });
+      return;
+    }
+    // Значение ушло дальше (вызов, проп, шаблон, `return`, …). Для листа это
+    // обычное чтение, для поддерева — «целиком»: решает сторож по дереву ключей.
+    out.push({ path, kind: "whole" });
+  }
+
+  const names = new Set(namespaces);
+  for (const name of names) {
+    for (const ref of byName.get(name) ?? []) {
+      if (!isReference(ref)) continue;
+      walk(ref, [], 0);
+    }
+  }
+  return out;
+}

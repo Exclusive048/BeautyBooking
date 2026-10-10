@@ -6,11 +6,8 @@
  * `LoginHeroImageManager` and `SiteLogoManager` still reference it. */
 export const admin = {
   media: {
-    siteLogoTitle: "Логотип сайта",
-    siteLogoDescription: "Используется в navbar рядом с МастерРядом.",
     loginHeroTitle: "Фото для страницы входа",
     loginHeroDescription: "Большое изображение в левой части страницы /login.",
-    focalPoint: "Точка фокуса",
     uploadImage: "Загрузить изображение",
     replaceImage: "Заменить изображение",
     removeImage: "Удалить изображение",

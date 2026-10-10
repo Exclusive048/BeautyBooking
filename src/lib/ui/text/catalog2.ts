@@ -7,8 +7,6 @@ export const catalog2 = {
   searchBar: {
     searchPlaceholder: "Услуга или имя мастера",
     findCta: "Найти",
-    filtersLabel: "Фильтры",
-    todayLabel: "Сегодня",
     // CATALOG-DATE-TIME-FILTER: блок «Когда» возвращён (снимок свободного времени).
     whenLabel: "Когда",
     todayChip: "Сегодня",
@@ -32,16 +30,7 @@ export const catalog2 = {
     priceFrom: (min: string) => `от ${min}`,
     priceRange: (min: string, max: string) => `${min} – ${max}`,
   },
-  categories: {
-    all: "Все",
-    nails: "Ногти",
-    hair: "Волосы",
-    brows: "Брови",
-    skin: "Кожа",
-  },
   resultsHeader: {
-    eyebrowTemplate: "Каталог · {city} · {category}",
-    eyebrowNoCategory: "Каталог · {city}",
     // Без выбранного города прежний `eyebrowNoCategory.replace("{city}", "")`
     // печатал «Каталог · » с висящей точкой.
     eyebrow: "Каталог",
@@ -73,56 +62,20 @@ export const catalog2 = {
     map: "Карта",
     list: "Список",
   },
-  chips: {
-    today: "Свободно сегодня",
-    verified: "Только проверенные",
-    premium: "PREMIUM",
-    home: "Выезд на дом",
-    resetAll: "Сбросить все",
-    pricePrefix: "до",
-    ratingPrefix: "от",
-  },
   filters: {
-    service: "Услуга",
-    price: "Цена",
-    rating: "Рейтинг",
-    when: "Когда",
-    district: "Район / метро",
     additional: "Дополнительно",
-    apply: "Показать",
-    moreServices: "+ Ещё {count} услуг",
-    districtSearchPlaceholder: "Поиск метро или района",
-    ratingAny: "Любой",
-    ratingFromTemplate: "От {value} ★",
     categoriesShowAll: "Показать все ({count})",
     categoriesCollapse: "Свернуть",
   },
   searchAutocomplete: {
-    loading: "Ищем…",
     empty: "Ничего не найдено по запросу «{query}»",
     categoriesGroup: "Категории",
     providersGroup: "Мастера",
   },
-  when: {
-    today: "Сегодня",
-    tomorrow: "Завтра",
-    weekend: "В выходные",
-    week: "На неделе",
-    pickDate: "Выбрать дату",
-  },
-  additional: {
-    home: "Выезд на дом",
-    verified: "Только проверенные",
-    premium: "PREMIUM-мастера",
-    withReviews: "С отзывами клиентов",
-    acceptCard: "Принимают карту",
-  },
   card: {
     fromPrice: "от",
     premiumBadge: "PREMIUM",
-    saveAria: "Сохранить мастера",
     saveTooltip: "Сохранить мастера",
-    saveTodoToast: "Скоро будет доступно",
     distanceKm: "км",
     // CATALOG-RANKING-01: was `"({count})"` → «4.9 (47)». The catalog now
     // ranks by a Bayesian score weighted by review volume, so the volume is
@@ -137,11 +90,6 @@ export const catalog2 = {
       dateOnly: "Свободно {date}",
       bookingOpen: "Запись открыта",
     },
-  },
-  empty: {
-    title: "Никого не нашли по этим фильтрам",
-    description: "Попробуйте смягчить фильтры или сбросить их.",
-    resetCta: "Сбросить фильтры",
   },
   pagination: {
     nextAria: "Следующая страница",

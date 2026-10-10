@@ -12,7 +12,6 @@ export const guestManage = {
   pageTitle: "Ваша запись",
   packageLabel: "Пакет услуг",
   masterLabel: "Мастер",
-  addressLabel: "Адрес",
   status: {
     NEW: "Ждёт подтверждения",
     PENDING: "Ждёт подтверждения",

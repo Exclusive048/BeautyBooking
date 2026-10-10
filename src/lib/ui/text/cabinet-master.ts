@@ -15,7 +15,6 @@ export const cabinetMaster = {
     scheduleStudioTemplate: "В студии «{name}»",
   },
   brand: {
-    title: "МастерРядом",
     subtitle: "Кабинет мастера",
   },
   nav: {
@@ -41,10 +40,6 @@ export const cabinetMaster = {
     },
     ariaLabel: "Навигация кабинета мастера",
   },
-  topbar: {
-    breadcrumbHome: "Кабинет",
-    newBookingCta: "Новая запись",
-  },
   pageHeader: {
     breadcrumbHome: "Кабинет",
     notificationsAria: "Уведомления",
@@ -63,18 +58,15 @@ export const cabinetMaster = {
       pendingBadge: "Ожидает одобрения",
     },
     saveStatus: {
-      idle: "",
       saving: "Сохраняем",
       saved: "Сохранено",
       error: "Не удалось сохранить. Попробуйте ещё раз.",
-      retry: "Повторить",
     },
     tabs: {
       calendar: "Календарь",
       breaks: "Перерывы",
       rules: "Правила",
       visibility: "Видимость",
-      soonHint: "Скоро",
     },
     slotStep: {
       // COPY-BEAUTY-01 — «шаг слота / квант» заменены на язык мастера:
@@ -107,14 +99,11 @@ export const cabinetMaster = {
       title: "График работы",
       noneTitle: "График не настроен",
       noneHint: "Настройте график — клиенты увидят свободные окошки.",
-      endedHint: "Расписание закончилось — клиенты не видят окошек. Настройте график заново.",
       notStartedHint: (date: string) => `Расписание начнётся ${date}.`,
       weekdaysSummary: (days: string) => `По дням недели: ${days}`,
       cycleSummary: (work: number, off: number) => `${work} через ${off}`,
       customCycleSummary: (days: number) =>
         `Свой график на ${days} ${pluralize(days, "день", "дня", "дней")}`,
-      weeksSummary: (weeks: number) =>
-        `Чередование: ${weeks} ${pluralize(weeks, "неделя", "недели", "недель")}`,
       weeksDaysSummary: (weeks: string) => `Недели чередуются: ${weeks}`,
       allDaysOff: "Все дни выходные",
       manualSummary: "Дни отмечаю сам",
@@ -146,7 +135,6 @@ export const cabinetMaster = {
     // SCHEDULE-PATTERNS-01 (этап 3): календарь на 3 месяца и палитра рабочих
     // дней. Кисть — рабочий день палитры; «как по графику» снимает правку.
     calendar: {
-      title: "Календарь",
       hint: "Нажмите на день, чтобы изменить его, или выберите кисть и отмечайте дни подряд.",
       brushHint: (name: string) => `Нажимайте на дни — они станут «${name}». Нажмите на кисть ещё раз, чтобы снять её.`,
       brushesLabel: "Кисти",
@@ -325,22 +313,6 @@ export const cabinetMaster = {
       },
     },
     placeholders: {
-      exceptions: {
-        title: "Особые дни и отпуск",
-        body: "Здесь появятся одноразовые изменения расписания: отгулы, особые часы на конкретные даты, отпуск.",
-      },
-      breaks: {
-        title: "Регулярные перерывы",
-        body: "Тут можно будет настроить повторяющиеся перерывы — обед, мастер-классы, регулярные паузы между записями.",
-      },
-      rules: {
-        title: "Правила записи",
-        body: "Пауза между записями, за сколько можно отменить, автоподтверждение и напоминания.",
-      },
-      visibility: {
-        title: "Видимость и публикация",
-        body: "Ваша страница, показ в каталоге и на сколько вперёд открыта запись.",
-      },
       comingSoon: "Скоро",
     },
     rules: {
@@ -395,8 +367,6 @@ export const cabinetMaster = {
         title: "Снижайте цену для близких окошек",
         body:
           "Если до окошка осталось мало времени — автоматически предложите скидку. Клиенты подтянутся, окошко не пропадёт.",
-        locked: "Доступно в PRO и выше",
-        lockedCta: "Обновить тариф",
         triggerTitle: "Скидка включается",
         triggerSubtitle: "За сколько до начала окошко считается «горящим»",
         discountTitle: "Размер скидки",
@@ -413,7 +383,6 @@ export const cabinetMaster = {
           "20": "−20%",
           "30": "−30%",
         },
-        gateError: "Горящие окошки доступны на PRO и выше. Обновите тариф, чтобы включить.",
       },
     },
     visibility: {
@@ -466,27 +435,9 @@ export const cabinetMaster = {
         },
       },
       recurring: {
-        title: "Повторяющиеся перерывы",
-        subtitle:
-          "Фиксированные паузы внутри рабочего дня — обед, перекуры, медитация.",
-        addCta: "Добавить",
-        emptyBody: "Пока нет повторяющихся перерывов.",
         deleteAria: "Удалить",
         deleteConfirm: "Удалить перерыв?",
         fallbackTitle: "Перерыв",
-      },
-      modal: {
-        title: "Новый перерыв",
-        nameLabel: "Название (необязательно)",
-        namePlaceholder: "Обед, Кофе-пауза…",
-        daysLabel: "Дни недели",
-        quickWeekdays: "Пн-Пт",
-        quickEveryday: "Каждый день",
-        quickWeekend: "Сб-Вс",
-        startLabel: "Начало",
-        endLabel: "Конец",
-        submit: "Добавить",
-        cancel: "Отмена",
       },
     },
     errors: {
@@ -504,7 +455,6 @@ export const cabinetMaster = {
     personalLink: "Личные уведомления",
     markAllRead: "Прочитать всё",
     markRead: "Отметить прочитанным",
-    open: "Открыть",
     settingsAria: "Настройки уведомлений",
     kpi: {
       unreadLabel: "Непрочитанных",
@@ -548,10 +498,8 @@ export const cabinetMaster = {
     actions: {
       confirm: "Подтвердить",
       decline: "Отклонить",
-      declinePrompt: "Причина отказа (необязательно):",
       reply: "Ответить",
       toBooking: "К записи",
-      toClient: "К клиенту",
       toReview: "К отзыву",
       statusConfirmed: "Запись подтверждена",
       statusRejected: "Запись отклонена",
@@ -561,13 +509,6 @@ export const cabinetMaster = {
       statusInProgress: "В работе",
       statusHandled: "Вы уже ответили",
     },
-    timeAgoNow: "только что",
-    timeAgoMinutes: "{n} мин назад",
-    timeAgoHours: "{n} ч назад",
-    timeAgoDays: "{n} дн назад",
-    noticeSplit:
-      "Здесь всё про клиентов и записи. Приглашения, оплата и аккаунт — на странице ",
-    noticeSplitLink: "Личные уведомления",
     errors: {
       markRead: "Не удалось отметить прочитанным. Попробуйте ещё раз.",
       markAllRead: "Не удалось отметить все прочитанными. Попробуйте ещё раз.",
@@ -735,9 +676,6 @@ export const cabinetMaster = {
       emptyBody:
         "Нажмите на клиента в списке слева — увидите его историю и заметки.",
       loadFailed: "Не удалось открыть карточку клиента. Попробуйте ещё раз.",
-      contactPhone: "Телефон",
-      contactEmail: "Email",
-      contactTelegram: "Telegram",
       contactNone: "Без контактов",
       sourceMarketplace: "Через МастерРядом",
       sourceManual: "Добавлен вручную",
@@ -755,7 +693,6 @@ export const cabinetMaster = {
       modelApplicantPluralFew: "раза",
       modelApplicantPluralMany: "раз",
       copyAria: "Скопировать контакт",
-      copySuccess: "Скопировано",
       // MASTER-CLIENTS-FIX-A #7в: manual tag-editor is parked in
       // backlog — auto-tagging already covers VIP/Постоянная/Новая/
       // Спящая via `classifyClient` (badges above). Surface this in
@@ -774,9 +711,6 @@ export const cabinetMaster = {
         heading: "Заметки мастера",
         empty: "Заметок пока нет",
         editLabel: "Редактировать",
-        // MASTER-CLIENTS-FIX-A #6: realised in this commit — kept
-        // for backwards-compatibility but no longer shown.
-        editComingSoon: "Доступно скоро",
         // MASTER-CLIENTS-FIX-A #6: edit-mode UI text. Keeps the
         // tone consistent with other master cabinet edit forms
         // (settings auto-save / schedule edit etc.). Notes are
@@ -791,7 +725,6 @@ export const cabinetMaster = {
       history: {
         heading: "История визитов",
         empty: "Визитов пока нет",
-        allLink: "Все →",
         noRating: "без оценки",
       },
       actions: {
@@ -886,9 +819,6 @@ export const cabinetMaster = {
       },
       statusBadges: {
         pending: "Ждёт решения",
-        approvedWaitingClient: "Ждём клиента",
-        confirmed: "В записи",
-        rejected: "Отклонена",
       },
     },
     modals: {
@@ -964,9 +894,6 @@ export const cabinetMaster = {
         cancel: "Отмена",
         errorPropose: "Не удалось предложить время. Попробуйте ещё раз.",
       },
-      confirmDelete: {
-        remove: "Удалить",
-      },
     },
     empty: {
       offersTitle: "Здесь пока пусто",
@@ -1006,8 +933,6 @@ export const cabinetMaster = {
       utilizationLabel: "Загрузка",
       prevTemplate: "было {value}",
       prevNoData: "нет данных за прошлый период",
-      ppShort: "пунктов",
-      ofMaxHint: "от самого загруженного времени",
     },
     revenue: {
       heading: "Динамика выручки",
@@ -1032,14 +957,11 @@ export const cabinetMaster = {
     topServices: {
       heading: "Топ услуг по выручке",
       subtitleTemplate: "За {period}",
-      bookingsLabel: "записей",
       emptyTitle: "Нет данных",
       emptyBody: "За выбранный период не было завершённых записей.",
     },
     lock: {
-      title: "Доступно в PRO",
       body: "Получите расширенную аналитику — доход, услуги, карта загрузки.",
-      cta: "Перейти на PRO",
     },
     funnel: {
       heading: "Воронка клиента",
@@ -1107,7 +1029,6 @@ export const cabinetMaster = {
       savedLabel: "Сохранено",
       emptyValue: "Не заполнено",
       editAriaLabel: "Редактировать",
-      cancelAriaLabel: "Отмена",
       errorMessage: "Не удалось сохранить. Попробуйте ещё раз.",
     },
     header: {
@@ -1150,8 +1071,6 @@ export const cabinetMaster = {
       // клиента прокидывается?»). Ссылка на страницу ВК — отдельное поле в
       // секции «Соцсети», её эта строка не заменяет.
       linkAction: "Привязать",
-      accountFootnoteText: "Эти поля редактируются в",
-      accountFootnoteCta: "настройках аккаунта",
       // PHONE-CLAIM-01: прежний текст обещал «здесь не меняется» — теперь
       // номер редактируется (заявка без SMS-подтверждения, см.
       // lib/auth/phone-claim.ts), и подсказка описывает ровно это.
@@ -1165,7 +1084,6 @@ export const cabinetMaster = {
       subtitle: "2–3 предложения о вашем подходе и опыте",
       placeholder: "Расскажите коротко о вашем подходе и опыте",
       counterTemplate: "{value} / {max}",
-      counterMax: "600",
     },
     location: {
       title: "Локация",
@@ -1173,8 +1091,6 @@ export const cabinetMaster = {
       cityLabel: "Город",
       cityAutoHint: "Определяется по адресу",
       cityNotSet: "Не задан",
-      districtLabel: "Район",
-      districtPlaceholder: "Например: Тверской район",
       addressLabel: "Адрес",
       addressPlaceholder: "Введите адрес",
       addressSuggestEmpty: "Ничего не нашлось",
@@ -1198,8 +1114,6 @@ export const cabinetMaster = {
       emptyTitle: "Добавьте первую услугу",
       emptyBody: "Без услуг клиенты не смогут записаться. Это занимает 30 секунд.",
       emptyCta: "Перейти к услугам",
-      countTemplate: "{count}",
-      priceMissing: "цена скрыта",
     },
     portfolio: {
       title: "Портфолио",
@@ -1317,10 +1231,6 @@ export const cabinetMaster = {
     },
     crop: {
       title: "Обрезать фото",
-      cancel: "Отмена",
-      submit: "Сохранить",
-      submitting: "Сохраняем…",
-      errorCrop: "Не удалось сохранить обрезку. Попробуйте ещё раз.",
     },
     reorder: {
       errorMessage: "Не удалось изменить порядок. Попробуйте ещё раз.",
@@ -1351,17 +1261,8 @@ export const cabinetMaster = {
       identityHeading: "Контакты для входа",
       phoneLabel: "Телефон",
       emailLabel: "Email",
-      verifiedBadge: "Подтверждён",
       notSetLabel: "Не задан",
-      changeSoonHint: "Скоро · потребуется подтверждение",
       connectionsHeading: "Связанные аккаунты",
-      // FIX-EXTERNAL-GATING-01 (G-2): the subtitle names ONLY the external
-      // providers currently enabled — built from the same flags the rows gate
-      // on, so it can never advertise a killed/disabled provider. Joined with
-      // «или» when more than one is enabled.
-      connectionsSubtitle: (providers: string[]) =>
-        `Привяжите ${providers.join(" или ")} — для входа и оповещений.`,
-      connectionsProviderNames: { telegram: "Telegram", vk: "ВКонтакте" },
       // CONSOLIDATE-EXTERNAL-LINKING-01: connect/disconnect live in ONE place —
       // the profile «Связанные аккаунты» card. The security tab points there;
       // delivery toggles stay in the Notifications tab.
@@ -1446,7 +1347,6 @@ export const cabinetMaster = {
       disabled: "Отключённые",
     },
     categoryAccordion: {
-      addServiceLink: "Добавить услугу в эту категорию",
       uncategorisedName: "Без категории",
     },
     bundlesAccordion: {
@@ -1611,9 +1511,6 @@ export const cabinetMaster = {
       decline: "Отклонить",
       reschedule: "Перенести",
       cancel: "Отменить",
-      chat: "Чат с клиентом",
-      declinePrompt: "Укажите причину отказа — она будет отправлена клиенту:",
-      cancelPrompt: "Укажите причину отмены — она будет отправлена клиенту:",
       actionError: "Не удалось обновить запись. Попробуйте ещё раз.",
       awaitingClientResponse:
         "Запрос переноса отправлен — ждём ответ клиента.",
@@ -1686,7 +1583,6 @@ export const cabinetMaster = {
       awaitingClientResponse:
         "Запрос переноса отправлен — ждём ответ клиента.",
       cancel: "Отменить",
-      cancelPrompt: "Укажите причину отмены — она будет отправлена клиенту:",
       cancelTitle: "Отменить запись",
       cancelLabel: "Причина отмены",
       cancelPlaceholder: "Например: «Заболела, переношу на следующую неделю»",
@@ -1724,7 +1620,6 @@ export const cabinetMaster = {
       packageCancelError: "Не удалось отменить пакет. Попробуйте ещё раз.",
     },
     empty: "Пока пусто",
-    declineReasonPrompt: "Укажите причину отказа — она будет отправлена клиенту:",
     declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
     confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
   },
@@ -1743,7 +1638,6 @@ export const cabinetMaster = {
       nextClientLabel: "Следующий клиент",
       nextClientIn: "через",
       minutesShort: "мин",
-      noNextClient: "Сегодня записей больше нет",
     },
     kpi: {
       todayRevenue: "Выручка сегодня",
@@ -1770,13 +1664,8 @@ export const cabinetMaster = {
       confirmAction: "Подтвердить",
       declineAction: "Отклонить",
       chatAction: "Открыть чат",
-      moreAction: "Действия",
       rescheduleAction: "Перенести",
       cancelAction: "Отменить",
-      cancelConfirmTitle: "Отменить запись?",
-      cancelConfirmMessage:
-        "Клиент получит уведомление об отмене. Вернуть запись не получится.",
-      cancelConfirmCta: "Отменить запись",
       cancelFailed: "Не удалось отменить запись. Попробуйте ещё раз.",
       // MASTER-DASHBOARD-FIX-A #3: tooltips for disabled actions
       // whose time window has passed. Backend rejects with 409
@@ -1849,8 +1738,6 @@ export const cabinetMaster = {
     bookingActions: {
       confirmError: "Не удалось подтвердить запись. Попробуйте ещё раз.",
       declineError: "Не удалось отклонить запись. Попробуйте ещё раз.",
-      declineReasonPrompt:
-        "Укажите причину отказа — она будет отправлена клиенту:",
       declineTitle: "Отклонить запись",
       declineLabel: "Причина отказа",
       declinePlaceholder: "Например: «Конфликт по времени»",
@@ -1869,17 +1756,5 @@ export const cabinetMaster = {
     // PWA-UX-BATCH-01: подзаголовка у «Главной» больше нет — на телефоне
     // шапка отнимала экран, а строка ничего не сообщала.
     home: { title: "Главная" },
-    bookings: { title: "Записи", subtitle: "Ждут подтверждения и уже подтверждённые" },
-    notifications: { title: "Уведомления", subtitle: "Всё по работе с клиентами" },
-    schedule: { title: "Расписание", subtitle: "Свободные окошки и план дня" },
-    scheduleSettings: { title: "Настройки расписания", subtitle: "Часы работы, перерывы, особые дни" },
-    clients: { title: "Клиенты", subtitle: "Ваши клиенты и история визитов" },
-    reviews: { title: "Отзывы", subtitle: "Оценки и обратная связь от клиентов" },
-    analytics: { title: "Аналитика", subtitle: "Динамика выручки и поведение клиентов" },
-    profile: { title: "Мой профиль", subtitle: "Имя, услуги, портфолио и публичная страница" },
-    accountSettings: { title: "Настройки аккаунта", subtitle: "Безопасность, уведомления, подписка" },
-    modelOffers: { title: "Модели", subtitle: "Поиск моделей на бесплатные процедуры" },
-    billing: { title: "Подписка", subtitle: "Ваш тариф и платежи" },
-    fallback: { title: "Кабинет мастера", subtitle: "" },
   },
 } as const;

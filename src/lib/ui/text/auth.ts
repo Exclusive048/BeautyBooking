@@ -1,8 +1,6 @@
 export const auth = {
   menu: "Меню",
   loginPage: {
-    heroTitle: "Запишитесь к мастеру без звонков",
-    heroSubtitle: "Выбирайте по фото и отзывам, а время выбирайте онлайн",
     // LOGIN-TILES-01 (2026-10-03, макет владельца): один заголовок на все
     // способы входа — способ выбирают плитки ниже, а не заголовок. Прежние
     // «Вход по номеру телефона» / «Вход по email» / «Вход в аккаунт» и их
@@ -19,10 +17,8 @@ export const auth = {
     getCode: "Получить код",
     consentHint: "Отметьте обязательные согласия, чтобы продолжить",
     phoneLabel: "Телефон",
-    phonePlaceholder: "+79001234567",
     phonePlaceholderMask: "+7 (___) ___-__-__",
     codeLabel: "Код из SMS",
-    codePlaceholder: "123456",
     invalidPhone: "Проверьте номер: он должен начинаться с +7, например +79001234567",
     sendCodeFailed: "Не удалось отправить код. Попробуйте ещё раз.",
     enterCode: "Введите код",
@@ -34,13 +30,7 @@ export const auth = {
     // redirect. Also announced via an aria-live region, since the visual
     // confirmation is a colour sweep on the code grid.
     codeAccepted: "Код принят",
-    changePhone: "Отправить ещё раз",
-    returnAfterLogin: "После входа вы вернётесь на:",
-    or: "ИЛИ",
-    socialLoginLabel: "Войти с помощью",
     noAccountHint: "Без пароля — аккаунт создадим при первом входе",
-    telegramSectionTitle: "Войти через Telegram",
-    vkSectionTitle: "Войти через VK",
     // RKN-FIX-01: two separate required consents now — the wording no longer
     // names the privacy policy (an informational document), but the offer and
     // the personal-data consent, which is what actually gates registration.
@@ -68,15 +58,9 @@ export const auth = {
     // cookie). Причина внутренняя и, как правило, преходящая.
     oauthStartFailed:
       "Не удалось начать вход через этот сервис. Попробуйте ещё раз.",
-    heroFeature1: "Находите мастеров по портфолио и отзывам",
-    heroFeature2: "Записывайтесь онлайн — без звонков",
-    heroFeature3: "Напоминания и перенос в пару кликов",
-    socialProofMasters: "2 000+",
     // FIX-EXP-CONTENT-GRAMMAR (EXP-008): `stats.masters` counts all published
     // providers (masters + studios) — truthful label is «специалистов».
     socialProofMastersLabel: "мастеров на платформе",
-    socialProofBookings: "15 000+",
-    socialProofBookingsLabel: "успешных записей",
     resendCode: "Отправить повторно",
     resendCodeTimer: "Повторить через",
     resendCodeSeconds: "сек",
@@ -88,9 +72,6 @@ export const auth = {
     codeSentToEmail: "Код отправлен на почту",
     changeEmail: "Изменить email",
     codeFromEmail: "Код из письма",
-    emailNotConfigured: "Вход по email временно недоступен",
-    brandSubtitle: "Маркетплейс мастеров красоты",
-    heroTitleAccent: "30 секунд",
     // LOGIN-REDESIGN-01 — brand-stage copy.
     // Headline is split into words for the word-rise animation; the accented
     // word carries the shimmer. Kept as one visible phrase.
@@ -102,10 +83,6 @@ export const auth = {
     brandHeadlineWith: "с",
     brandHeadlineAccent: "тебя",
     brandTagline: "Запись к мастеру за 30 секунд — без звонков и переписок. Выбирайте по работам, платите после процедуры.",
-    // Vertical marquee of benefit cards on the brand stage. These are product
-    // benefits (no invented person, no invented quote, no fabricated rating) —
-    // real trust framing, kept as a purely visual device.
-    marqueeAria: "Преимущества платформы",
     // AUTH-GATE-01 — graceful state for a direct hit on /login when NO login
     // method is enabled (phone gated off and no email/VK/Yandex/Telegram).
     // Deliberately not an error: nothing is broken, the door is just not open
@@ -130,13 +107,5 @@ export const auth = {
     loginButton: "Войти через Telegram",
     botNotConfigured: "Вход через Telegram сейчас недоступен.",
     loginFailed: "Не удалось войти через Telegram. Попробуйте ещё раз.",
-  },
-  vk: {
-    loginButton: "Войти через VK",
-    loginFailed: "Не удалось войти через VK. Попробуйте ещё раз.",
-  },
-  yandex: {
-    loginButton: "Войти через Яндекс",
-    loginFailed: "Не удалось войти через Яндекс. Попробуйте ещё раз.",
   },
 } as const;

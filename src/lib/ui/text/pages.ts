@@ -1,37 +1,7 @@
 export const pages = {
   models: {
-    title: "Предложения для моделей | МастерРядом",
-    description:
-      "Бесплатные и льготные процедуры для моделей от мастеров красоты. Стрижки, окрашивание, маникюр и другие услуги.",
-    brand: "МастерРядом",
-    heading: "Стать моделью",
-    headingHighlight: "бесплатно",
-    lead:
-      "Мастера ищут моделей для практики и портфолио. Получите услугу бесплатно или со скидкой.",
-    heroBadge: "Только у нас",
-    heroStats: "Сотни предложений каждую неделю",
-    cityLabel: "Город",
-    cityPlaceholder: "Введите город",
-    categoryLabel: "Категория",
-    categoryAll: "Все категории",
-    filterAll: "Все",
-    submit: "Найти",
-    empty:
-      "Пока нет активных предложений.",
-    emptyHint: "Попробуйте изменить фильтры или заходите позже — мастера регулярно добавляют новые предложения.",
-    emptyFilteredHint: "Попробуйте выбрать другую категорию или сбросить фильтры.",
-    emptyCta: "Перейти в каталог",
-    cityFallback: "Город не указан",
-    categoryFallback: "Категория",
     priceFree: "Бесплатно для модели",
     badgeFree: "Бесплатно для модели",
-    badgeDiscount: "Скидка",
-    applyAction: "Откликнуться",
-    applyActionArrow: "Откликнуться →",
-    ratingLabel: "★",
-    paginationPrev: "← Назад",
-    paginationNext: "Вперёд →",
-    filterChipAriaLabel: "Фильтр по категории",
   },
   support: {
     // Page-level keys removed — see top-level UI_TEXT.support.* for new wrapper UI.
@@ -106,12 +76,6 @@ export const pages = {
     goHome: "На главную",
     login: "Войти",
   },
-  globalError: {
-    title: "Что-то пошло не так",
-    subtitle: "Что-то сломалось. Попробуйте обновить страницу.",
-    retry: "Попробовать ещё раз",
-    goHome: "На главную",
-  },
   blog: {
     navLabel: "Блог",
     title: "Блог — МастерРядом",
@@ -178,17 +142,6 @@ export const pages = {
     nameFallback: "Мастер",
     studioNameFallback: "Студия",
     servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
-    ogBookOnline: "Записаться онлайн",
-    ogReviews: "отзывов",
-    ogMaster: "Мастер",
-    ogStudio: "Студия",
-    debugReasons: {
-      unpublished: "найден, но профиль не опубликован",
-      aliasUnpublished: "найден алиас, но профиль не опубликован",
-      invalid: "некорректный username",
-      notFound: "username не найден",
-      redirectAlias: "редирект по алиасу на",
-    },
   },
   publicClient: {
     title: "Профиль клиента | МастерРядом",
@@ -222,7 +175,6 @@ export const pages = {
     bookingWindowLabel: "Окно записи",
     durationLabel: "Длительность услуги",
     priceLabel: "Стоимость",
-    originalPriceLabel: "Обычная цена",
     requirementsTitle: "Требования к модели",
     requirementsEmpty: "Особых требований нет — подходит всем.",
     applyTitle: "Откликнуться на предложение",
@@ -244,8 +196,5 @@ export const pages = {
     applySuccessTitle: "Заявка отправлена",
     applySuccessText: "Мастер рассмотрит её и свяжется с вами.",
     applySuccessLink: "Мои заявки →",
-    closedTitle: "Предложение закрыто",
-    closedText: "Это предложение уже закрыто. Посмотрите другие.",
-    closedCta: "Смотреть все предложения",
   },
 } as const;
