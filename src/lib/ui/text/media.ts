@@ -44,7 +44,9 @@ export const media = {
     deleteFailed: "Не удалось удалить фото. Попробуйте ещё раз.",
     replacePhotoAria: "Заменить фото",
     removePhotoAria: "Удалить фото",
+    confirmRemove: "Удалить это фото из портфолио?",
     closePreviewAria: "Закрыть предпросмотр",
+    previewDialogAria: "Просмотр фото",
     // UI-33: единственный потомок кнопки открытия — картинка, поэтому без
     // этих двух ключей у кнопки не было доступного имени вовсе.
     openPreviewAriaTemplate: "Открыть фото № {n}",

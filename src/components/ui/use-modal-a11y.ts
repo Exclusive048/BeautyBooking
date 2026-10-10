@@ -44,9 +44,17 @@ export const FOCUSABLE_SELECTOR = [
   '[contenteditable="true"]',
 ].join(",");
 
-function getFocusable(container: HTMLElement | null): HTMLElement[] {
+// Exported for test discoverability (`use-modal-a11y.test.ts`).
+export function getFocusable(container: HTMLElement | null): HTMLElement[] {
   if (!container) return [];
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  // `button:not([disabled])` ловит и кнопку с `tabindex="-1"` — невидимую
+  // подложку «клик мимо закрывает». Шагом табуляции она не является: браузер
+  // её пропускает. Считай её ловушка первой/последней, Tab с края уводил бы
+  // фокус из окна, а начальный фокус вставал бы на подложку без кольца —
+  // так и было в просмотре фото портфолио студии (2026-10-10).
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) => element.getAttribute("tabindex") !== "-1",
+  );
 }
 
 /**

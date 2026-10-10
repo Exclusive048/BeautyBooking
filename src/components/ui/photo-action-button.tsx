@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -14,6 +14,8 @@ type Props = {
   expanded?: boolean;
   className?: string;
   "data-testid"?: string;
+  /** `ref` — обычный проп (React 19): начальный фокус окна просмотра фото. */
+  ref?: Ref<HTMLButtonElement>;
 };
 
 /**
@@ -30,9 +32,11 @@ export function PhotoActionButton({
   expanded,
   className,
   "data-testid": testId,
+  ref,
 }: Props) {
   return (
     <Button
+      ref={ref}
       type="button"
       variant="wrapper"
       size="none"

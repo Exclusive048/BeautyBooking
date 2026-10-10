@@ -132,6 +132,7 @@ colors: {
 | Кнопка | `<Button variant="primary|secondary|ghost|danger|icon|wrapper|inverted" size="sm|md|lg|icon|none">` (дефолты: `primary`, `md`); `ref` — обычный проп |
 | Кнопка без стилей проекта | `<BareButton>` — только для сред без Tailwind (`app/global-error.tsx`) |
 | Поле ввода | `<Input variant="default|bare">`, `<Textarea variant="default|bare">` (для форм с явной отправкой; `bare` — поле внутри чужой рамки: строка поиска в шапке, поле чата); `ref` — обычный проп |
+| Подпись над полем формы | `<FieldLabel htmlFor tone="default|muted|eyebrow">` — зазор до поля один на продукт (`mb-2`), без `htmlFor` рендерит `<span>` (внутри `<label>`-обёртки). Свой `block mb-1` / голый `<label className="eyebrow">` над полем не собирать — сторож `components/ui/field-label-inventory.test.ts` (FIELD-LABEL-01; исключение — строки inline-редактирования §7, реестр в стороже) |
 | Inline-edit (кабинет, §7) | `<InlineEditInput underline="always|focus|none">`, `<InlineEditTextarea>`, `<InlineEditField empty multiline>` (режим чтения), `<InlineEditPencil aria-label>` — `components/ui/inline-edit.tsx` |
 | Оценка 1–5 | `<StarRatingInput value onChange size="md|lg">` (бордовые звёзды, как в `clientReviews.js`) |
 | Выбор файла | `<FileInput mode="hidden|label-target|overlay">` + кнопка-триггер `Button variant="secondary"` (или `Button asChild` над `<span>` внутри `<label>`); видимый нативный `type="file"` запрещён |
@@ -149,7 +150,7 @@ colors: {
 | Чекбокс | `<Checkbox size="sm|md">` |
 | Вкладки и фильтры списка | `<Tabs items value onChange ariaLabel>` (item: `badge` — счётчик, `icon`, `disabled`, `testId`) для 4+ вариантов или со счётчиком; `<SegmentedTabs options value onChange ariaLabel disabled>` для 2–3 вариантов (option: `badge`, `icon`). Один вид во всех кабинетах (решение 22.2) |
 | Селект | `<Select variant="default|borderless">` (`borderless` — внутри чужой рамки, сортировка «иконка + список»); `ref` — обычный проп |
-| Кнопка-значок поверх фото | `<PhotoActionButton label onClick>` — зона 40px, кружок 32px на тёмном стекле, видна всегда (не «при наведении») |
+| Кнопка-значок поверх фото | `<PhotoActionButton label onClick>` — зона 40px, кружок 32px на тёмном стекле, видна всегда (не «при наведении»); `ref` — обычный проп (начальный фокус окна просмотра). Просмотр фото во весь экран — тёмная подложка `bg-black/95` порталом, кнопки — на ней, а не за полями фото (портфолио студии, 2026-10-10) |
 | Короткое сообщение (итог действия) | `const toast = useToast()` → `toast.success(text)` / `toast.error(text)` / `toast.info(text)` (`src/components/ui/toast.tsx`). `window.alert` запрещён (`no-alert` = error) |
 
 **Правило (29.09 доработки · 22, UI-26):** сырой `<button>` / `<input>` / `<select>` / `<textarea>` (и любой `<m.button>`) вне `src/components/ui/` не пишется — сторож `src/components/ui/raw-controls-inventory.test.ts`, инвентарь пуст. Даже подложки, скрытый выбор файла, ползунок и ловушка для ботов идут через примитивы (решение владельца 22.1). Исключение, если оно когда-нибудь понадобится, — посайтово: `{/* raw-control-ok: <причина> */}` строкой выше тега. Никаких локальных копий компонентов в `features/`.

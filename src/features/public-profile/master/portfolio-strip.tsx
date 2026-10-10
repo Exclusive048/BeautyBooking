@@ -6,6 +6,7 @@ import { X, ZoomIn } from "lucide-react";
 import { HOVER_LIFT, IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { fetchJson } from "@/lib/http/client";
@@ -139,13 +140,15 @@ export function PortfolioStrip({ items }: Props) {
           by ModalSurface; gains role="dialog"/aria-modal, focus-trap,
           scroll-lock + Escape close — all previously absent. */}
       <ModalSurface open={Boolean(selectedId)} onClose={closeViewer} size="xl">
-        <Button variant="wrapper"
+        {/* Крестик — на тёмном стекле: светлый кружок на светлой карточке
+            поверх фото был почти не виден (замечание владельца 2026-10-10). */}
+        <PhotoActionButton
+          label={UI_TEXT.publicProfile.portfolio.close}
           onClick={closeViewer}
-          aria-label={UI_TEXT.publicProfile.portfolio.close}
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-bg-input transition hover:bg-bg-card"
+          className="absolute right-2 top-2 z-10"
         >
-          <X className="h-4 w-4 text-text-sec" aria-hidden />
-        </Button>
+          <X className="h-4 w-4" aria-hidden />
+        </PhotoActionButton>
 
         {error ? <div className="py-6 text-center text-sm text-danger-text">{error}</div> : null}
 
@@ -157,7 +160,9 @@ export function PortfolioStrip({ items }: Props) {
 
         {selectedItem ? (
           <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="relative aspect-[3/4] max-h-[72vh] w-full">
+            {/* Тёмная рамка: фото «contain» другой пропорции оставляет поля,
+                и светлыми они читались как пустые блоки над и под снимком. */}
+            <div className="relative aspect-[3/4] max-h-[72vh] w-full overflow-hidden rounded-2xl bg-black">
               <ResilientImage
                 src={selectedItem.mediaUrl}
                 alt={
@@ -167,7 +172,8 @@ export function PortfolioStrip({ items }: Props) {
                 }
                 sizes="(max-width: 1024px) 90vw, 50vw"
                 quality={90}
-                className="rounded-2xl object-contain"
+                fit="contain"
+                className="object-contain"
               />
             </div>
             <div>
