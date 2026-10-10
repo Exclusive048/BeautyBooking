@@ -13,6 +13,7 @@ import { parseQuery } from "@/lib/validation";
 import { uploadMediaAsset } from "@/lib/media/service";
 import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
 import { MEDIA_ATTACHMENT_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
+import { isStorageUnavailableError } from "@/lib/media/storage/unavailable";
 
 type RouteContext = {
   params: Promise<{ clientKey: string }>;
@@ -101,6 +102,8 @@ export async function POST(req: Request, ctx: RouteContext) {
         requestId: getRequestId(req),
         route: "POST /api/studio/clients/{clientKey}/card/photos",
         stack: error instanceof Error ? error.stack : undefined,
+        // STORAGE-UNAVAILABLE-01: об отказе хранилища алертит адаптер — один раз.
+        __skipAlert: isStorageUnavailableError(error),
       });
     }
     return jsonFail(appError.status, appError.message, appError.code, appError.details);

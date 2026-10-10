@@ -1,6 +1,7 @@
 import { Readable } from "stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { StorageProvider, StorageReadResult, StorageWriteInput } from "@/lib/media/storage/types";
+import { toStorageFailure } from "@/lib/media/storage/unavailable";
 import { env } from "@/lib/env";
 
 /**
@@ -141,15 +142,22 @@ export class S3StorageProvider implements StorageProvider {
     });
   }
 
+  // STORAGE-UNAVAILABLE-01: недоступность хранилища (аккаунт приостановлен,
+  // 5xx, сеть) уходит наружу `StorageUnavailableError` — 503 и один алерт на
+  // причину; прочие ошибки бросаются как раньше (`unavailable.ts`).
   async putObject(input: StorageWriteInput): Promise<void> {
-    await this.client.send(
-      new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: input.key,
-        Body: input.bytes,
-        ContentType: input.contentType,
-      })
-    );
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: input.key,
+          Body: input.bytes,
+          ContentType: input.contentType,
+        })
+      );
+    } catch (error) {
+      throw toStorageFailure("putObject", error);
+    }
   }
 
   async getObject(key: string, contentType: string): Promise<StorageReadResult | null> {
@@ -173,7 +181,7 @@ export class S3StorageProvider implements StorageProvider {
       };
     } catch (error) {
       if (isMissingObjectError(error)) return null;
-      throw error;
+      throw toStorageFailure("getObject", error);
     }
   }
 
@@ -187,7 +195,7 @@ export class S3StorageProvider implements StorageProvider {
       );
     } catch (error) {
       if (isMissingObjectError(error)) return;
-      throw error;
+      throw toStorageFailure("deleteObject", error);
     }
   }
 }

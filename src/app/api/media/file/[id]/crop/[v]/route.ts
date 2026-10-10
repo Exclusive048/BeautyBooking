@@ -11,6 +11,10 @@ import { renderCroppedImage } from "@/lib/media/crop-render";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
+import {
+  isStorageUnavailableError,
+  storageUnavailableHeaders,
+} from "@/lib/media/storage/unavailable";
 import { buildAvatarDisplayUrl, cropVersionToken } from "@/lib/media/types";
 import { prisma } from "@/lib/prisma";
 
@@ -113,13 +117,24 @@ export async function GET(req: Request, ctx: RouteContext) {
     });
   } catch (error) {
     const appError = toAppError(error);
+    // STORAGE-UNAVAILABLE-01: хранилище недоступно — один алерт с паузой уже
+    // отправил адаптер; здесь только лог, иначе каждая аватарка на странице
+    // слала бы свой алерт.
+    const storageDown = isStorageUnavailableError(error);
     if (appError.status >= 500) {
       logError("GET /api/media/file/[id]/crop/[v] failed", {
         requestId: getRequestId(req),
         route: "GET /api/media/file/{id}/crop/{v}",
         stack: error instanceof Error ? error.stack : undefined,
+        __skipAlert: storageDown,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code);
+    const response = jsonFail(appError.status, appError.message, appError.code);
+    if (storageDown) {
+      for (const [name, value] of Object.entries(storageUnavailableHeaders())) {
+        response.headers.set(name, value);
+      }
+    }
+    return response;
   }
 }

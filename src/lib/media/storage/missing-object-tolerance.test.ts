@@ -53,6 +53,10 @@ vi.mock("@/lib/env", () => ({
   },
 }));
 
+// STORAGE-UNAVAILABLE-01: таймаут ниже — недоступность хранилища, адаптер шлёт
+// о ней алерт; здесь Telegram не нужен.
+vi.mock("@/lib/monitoring/alerts", () => ({ sendTelegramAlert: vi.fn(async () => true) }));
+
 const { S3StorageProvider } = await import("@/lib/media/storage/s3");
 
 function awsError(name: string, httpStatusCode?: number): Error {

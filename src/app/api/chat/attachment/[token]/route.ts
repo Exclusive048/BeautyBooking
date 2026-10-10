@@ -5,6 +5,10 @@ import { toAppError } from "@/lib/api/errors";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { verifyChatAttachmentToken } from "@/lib/media/private-delivery";
 import { getMediaFile } from "@/lib/media/service";
+import {
+  isStorageUnavailableError,
+  storageUnavailableHeaders,
+} from "@/lib/media/storage/unavailable";
 import { recordSurfaceEvent } from "@/lib/monitoring/status";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -91,11 +95,14 @@ export async function GET(req: Request, ctx: RouteContext) {
   } catch (error) {
     const appError = toAppError(error);
     const requestId = getRequestId(req);
+    // STORAGE-UNAVAILABLE-01: алерт о недоступном хранилище шлёт адаптер, один.
+    const storageDown = isStorageUnavailableError(error);
     if (appError.status >= 500) {
       logError("GET /api/chat/attachment/[token] failed", {
         requestId,
         route: "GET /api/chat/attachment/{token}",
         stack: error instanceof Error ? error.stack : undefined,
+        __skipAlert: storageDown,
       });
     }
     if (appError.status === 401 || appError.status === 403) {
@@ -106,6 +113,12 @@ export async function GET(req: Request, ctx: RouteContext) {
         code: appError.code,
       });
     }
-    return jsonFail(appError.status, appError.message, appError.code);
+    const response = jsonFail(appError.status, appError.message, appError.code);
+    if (storageDown) {
+      for (const [name, value] of Object.entries(storageUnavailableHeaders())) {
+        response.headers.set(name, value);
+      }
+    }
+    return response;
   }
 }

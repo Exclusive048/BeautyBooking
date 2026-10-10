@@ -10,6 +10,7 @@ import {
 } from "@/lib/media/types";
 import { MEDIA_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
 import { readValidatedImageUpload } from "@/lib/media/validate-image-upload";
+import { isStorageUnavailableError } from "@/lib/media/storage/unavailable";
 
 export const runtime = "nodejs";
 
@@ -109,6 +110,8 @@ export async function POST(req: Request) {
         requestId,
         route: "POST /api/media",
         stack: error instanceof Error ? error.stack : undefined,
+        // STORAGE-UNAVAILABLE-01: об отказе хранилища алертит адаптер — один раз.
+        __skipAlert: isStorageUnavailableError(error),
       });
     }
     return jsonFail(appError.status, appError.message, appError.code);

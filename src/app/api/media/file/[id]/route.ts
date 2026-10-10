@@ -22,6 +22,10 @@ import {
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { getMediaFile, isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
+import {
+  isStorageUnavailableError,
+  storageUnavailableHeaders,
+} from "@/lib/media/storage/unavailable";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -263,11 +267,15 @@ export async function GET(req: Request, ctx: RouteContext) {
     }
 
     const requestId = getRequestId(req);
+    // STORAGE-UNAVAILABLE-01: алерт о недоступном хранилище — один, с паузой,
+    // его шлёт адаптер; по запросу — только лог.
+    const storageDown = isStorageUnavailableError(error);
     if (appError.status >= 500) {
       logError("GET /api/media/file/[id] failed", {
         requestId,
         route: "GET /api/media/file/{id}",
         stack: error instanceof Error ? error.stack : undefined,
+        __skipAlert: storageDown,
       });
     }
 
@@ -287,6 +295,12 @@ export async function GET(req: Request, ctx: RouteContext) {
       });
     }
 
-    return jsonFail(appError.status, appError.message, appError.code);
+    const response = jsonFail(appError.status, appError.message, appError.code);
+    if (storageDown) {
+      for (const [name, value] of Object.entries(storageUnavailableHeaders())) {
+        response.headers.set(name, value);
+      }
+    }
+    return response;
   }
 }
