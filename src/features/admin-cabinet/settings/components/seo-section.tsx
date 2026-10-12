@@ -1,15 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AnimatePresence, m } from "framer-motion";
 import { Check, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FieldLabel } from "@/components/ui/field-label";
+import { Notice } from "@/components/ui/notice";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import type { SeoValues } from "@/features/admin-cabinet/settings/types";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import {
+  SITE_SEO_DESCRIPTION_MAX,
+  SITE_SEO_TITLE_MAX,
+  normalizeSiteSeoText,
+} from "@/lib/seo/site-seo-shared";
 import { DISTANCE } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -17,9 +23,13 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 type Props = {
   initial: SeoValues;
+  /** Текст из кода — он на сайте, пока поле пустое (SEO-ADMIN-01). */
+  defaults: SeoValues;
 };
 
-export function SeoSection({ initial }: Props) {
+const tooLong = (value: string, max: number) => normalizeSiteSeoText(value).length > max;
+
+export function SeoSection({ initial, defaults }: Props) {
   const t = UI_TEXT.adminPanel.settings.sections.seo;
 
   const [baseline, setBaseline] = useState<SeoValues>(initial);
@@ -33,9 +43,15 @@ export function SeoSection({ initial }: Props) {
       draft.seoDescription.trim() !== baseline.seoDescription.trim(),
     [draft, baseline],
   );
+  const draftTooLong =
+    tooLong(draft.seoTitle, SITE_SEO_TITLE_MAX) || tooLong(draft.seoDescription, SITE_SEO_DESCRIPTION_MAX);
+  // Сохранённое до пределов и длиннее их сайт не показывает — говорим прямо.
+  const storedTooLong =
+    tooLong(baseline.seoTitle, SITE_SEO_TITLE_MAX) ||
+    tooLong(baseline.seoDescription, SITE_SEO_DESCRIPTION_MAX);
 
   const handleSave = async () => {
-    if (!dirty || status === "saving") return;
+    if (!dirty || draftTooLong || status === "saving") return;
     setStatus("saving");
     setErrorMessage(null);
 
@@ -111,36 +127,86 @@ export function SeoSection({ initial }: Props) {
             variant="primary"
             size="sm"
             onClick={() => void handleSave()}
-            disabled={!dirty || status === "saving"}
+            disabled={!dirty || draftTooLong || status === "saving"}
           >
             {t.saveButton}
           </Button>
         </>
       }
     >
-      <label className="block">
-        <FieldLabel tone="muted">{t.titleLabel}</FieldLabel>
-        <Input
-          value={draft.seoTitle}
-          onChange={(event) => setDraft((prev) => ({ ...prev, seoTitle: event.target.value }))}
-          placeholder={t.titlePlaceholder}
-          maxLength={120}
-          disabled={status === "saving"}
-        />
-      </label>
-      <label className="block">
-        <FieldLabel tone="muted">{t.descriptionLabel}</FieldLabel>
-        <Textarea
-          value={draft.seoDescription}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, seoDescription: event.target.value }))
-          }
-          placeholder={t.descriptionPlaceholder}
-          maxLength={240}
-          rows={3}
-          disabled={status === "saving"}
-        />
-      </label>
+      {storedTooLong ? <Notice tone="warning">{t.storedTooLong}</Notice> : null}
+      <SeoField
+        label={t.titleLabel}
+        hint={t.titleHint}
+        value={draft.seoTitle}
+        placeholder={defaults.seoTitle}
+        max={SITE_SEO_TITLE_MAX}
+        disabled={status === "saving"}
+        onChange={(value) => setDraft((prev) => ({ ...prev, seoTitle: value }))}
+      />
+      <SeoField
+        multiline
+        label={t.descriptionLabel}
+        hint={t.descriptionHint}
+        value={draft.seoDescription}
+        placeholder={defaults.seoDescription}
+        max={SITE_SEO_DESCRIPTION_MAX}
+        disabled={status === "saving"}
+        onChange={(value) => setDraft((prev) => ({ ...prev, seoDescription: value }))}
+      />
     </SectionCard>
+  );
+}
+
+type SeoFieldProps = {
+  label: string;
+  hint: string;
+  value: string;
+  placeholder: string;
+  max: number;
+  disabled: boolean;
+  multiline?: boolean;
+  onChange: (value: string) => void;
+};
+
+/**
+ * Поле со счётчиком знаков. Предел не режет ввод (`maxLength` молча обрезал бы
+ * вставленный текст посреди слова) — превышение видно счётчиком, а сохранить
+ * нельзя, пока текст длиннее.
+ */
+function SeoField({ label, hint, value, placeholder, max, disabled, multiline, onChange }: SeoFieldProps) {
+  const t = UI_TEXT.adminPanel.settings.sections.seo;
+  const id = useId();
+  const hintId = `${id}-hint`;
+  const length = normalizeSiteSeoText(value).length;
+  const over = length > max;
+  const fieldProps = {
+    id,
+    value,
+    placeholder,
+    disabled,
+    "aria-describedby": hintId,
+    "aria-invalid": over || undefined,
+  };
+
+  return (
+    <div>
+      <FieldLabel tone="muted" htmlFor={id}>
+        {label}
+      </FieldLabel>
+      {multiline ? (
+        <Textarea {...fieldProps} rows={3} onChange={(event) => onChange(event.target.value)} />
+      ) : (
+        <Input {...fieldProps} onChange={(event) => onChange(event.target.value)} />
+      )}
+      <div id={hintId} className="mt-1.5 flex items-start justify-between gap-3 text-xs">
+        <span className={over ? "text-danger-text" : "text-text-sec"}>
+          {over ? t.tooLong.replace("{max}", String(max)) : hint}
+        </span>
+        <span className={over ? "shrink-0 tabular-nums text-danger-text" : "shrink-0 tabular-nums text-text-sec"}>
+          {t.charCounter.replace("{current}", String(length)).replace("{max}", String(max))}
+        </span>
+      </div>
+    </div>
   );
 }

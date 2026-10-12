@@ -29,7 +29,7 @@ export function AdminSettings({ data }: Props) {
 
       <SystemFlagsSection initial={data.flags} />
 
-      <SeoSection initial={data.seo} />
+      <SeoSection initial={data.seo.values} defaults={data.seo.defaults} />
 
       <VkCommunitySection initial={data.vkCommunity} />
 

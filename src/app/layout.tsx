@@ -37,6 +37,7 @@ import { env } from "@/lib/env";
 import { safeJsonLd } from "@/lib/seo/schema";
 import { BRAND_OG_IMAGE, SITE_OPEN_GRAPH, SITE_TITLE_TEMPLATE } from "@/lib/seo/page-metadata";
 import { SITE_ICONS } from "@/lib/seo/site-icons";
+import { getSiteSeo } from "@/lib/seo/site-seo";
 import { APPLE_STARTUP_IMAGES } from "@/lib/pwa/apple-splash";
 import { versionedBrandUrl } from "@/lib/pwa/brand-asset-version";
 
@@ -139,8 +140,9 @@ export const metadata: Metadata = {
  * с брендом.
  * Адрес — из env, а не литерал: на стенде с другим доменом разметка не
  * указывает на чужой сайт.
+ * SEO-ADMIN-01: описание сайта — то же, что у главной (настройка в админке).
  */
-const SITE_JSON_LD = {
+const siteJsonLd = (description: string) => ({
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -158,7 +160,7 @@ const SITE_JSON_LD = {
       name: UI_TEXT.brand.name,
       alternateName: [...UI_TEXT.meta.alternateNames],
       url: SITE_URL,
-      description: UI_TEXT.meta.description,
+      description,
       inLanguage: "ru",
       publisher: { "@id": `${SITE_URL}/#organization` },
       potentialAction: {
@@ -171,7 +173,7 @@ const SITE_JSON_LD = {
       },
     },
   ],
-};
+});
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = await getNonce();
@@ -189,6 +191,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieNoticeAcknowledged = hasAcknowledgedCookieNotice(
     (await cookies()).get(COOKIE_NOTICE_COOKIE)?.value,
   );
+  // SEO-ADMIN-01: из кэша; на главной — тот же вызов, что в её метаданных.
+  const siteSeo = await getSiteSeo();
   return (
     <html lang="ru" className={playfair.variable} suppressHydrationWarning>
       <head>
@@ -196,7 +200,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: LOCAL_SW_RESET_SCRIPT }} />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: safeJsonLd(SITE_JSON_LD) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(siteJsonLd(siteSeo.description)) }}
         />
       </head>
       <body>
