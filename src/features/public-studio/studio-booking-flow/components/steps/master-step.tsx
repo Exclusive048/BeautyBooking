@@ -81,7 +81,9 @@ export function MasterStep({
               }`}
               aria-pressed={selectedMasterId === ANY_MASTER_ID}
             >
-              <div className="flex items-center gap-3">
+              {/* `w-full`: кнопка центрирует содержимое, и без него аватар и имя
+                  сдвигались к середине карточки — у каждой на свою ширину имени. */}
+              <div className="flex w-full items-center gap-3">
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-accent/60 to-primary/60 text-white" aria-hidden>
                   <Sparkles className="h-4 w-4" />
                 </span>
@@ -108,7 +110,7 @@ export function MasterStep({
                   }`}
                   aria-pressed={isSelected}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex w-full items-center gap-3">
                     <MasterAvatar
                       name={master.name}
                       avatarUrl={master.avatarUrl}

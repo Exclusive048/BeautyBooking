@@ -11,7 +11,6 @@ import { resolvePublicAppUrl } from "@/lib/app-url";
 import { buildProviderSchema, safeJsonLd } from "@/lib/seo/schema";
 import { versionedBrandUrl } from "@/lib/pwa/brand-asset-version";
 import { withQuery } from "@/lib/public-urls";
-import { SelectedServicesProvider } from "@/features/public-profile/master/selected-services-context";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { getNonce } from "@/lib/csp/nonce";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -427,13 +426,11 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
         />
       ) : null}
       <Suspense fallback={<PublicProfilePageSkeleton />}>
-        <SelectedServicesProvider>
-          <PublicMasterProfilePage
-            providerId={result.providerId}
-            initialServiceId={initialServiceId}
-            initialSlotStartAt={initialSlotStartAt}
-          />
-        </SelectedServicesProvider>
+        <PublicMasterProfilePage
+          providerId={result.providerId}
+          initialServiceId={initialServiceId}
+          initialSlotStartAt={initialSlotStartAt}
+        />
       </Suspense>
     </>
   );

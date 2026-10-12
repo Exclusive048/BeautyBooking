@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ProviderServiceDto } from "@/lib/providers/dto";
@@ -8,6 +7,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { groupServicesByCategory } from "@/lib/providers/group-services";
+import { StudioBookingLink } from "@/features/public-studio/studio-booking-dialog";
 
 // Client-only render key for the uncategorized bucket (never a DB id — rule 12).
 const UNCATEGORIZED_CHIP_KEY = "__uncat__";
@@ -26,7 +26,8 @@ type Props = {
  * SAME shared `groupServicesByCategory` helper as the wizard + master profile
  * (one grouping source; groups by `categoryName` LABEL, never a raw id — rule
  * 12). The former homegrown name-substring grouping (`buildGroups`) is retired.
- * Presentational only — each service still deep-links into the booking flow.
+ * BOOKING-WIDGET-DIALOG: «Записаться» у услуги открывает окно записи с этой
+ * услугой (дальше мастер и время); запасной `href` — страница записи.
  */
 export function StudioServicesList({ studio, services, hideBooking }: Props) {
   // Same grouping as the wizard: category order asc, uncategorized bucket last,
@@ -96,10 +97,10 @@ export function StudioServicesList({ studio, services, hideBooking }: Props) {
         {visibleGroups.map((group) => (
           <div key={group.categoryName ?? "__uncat"} className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <h3 className="font-display text-sm font-semibold text-text-main">
+              <h3 className="min-w-0 break-words font-display text-sm font-semibold text-text-main">
                 {group.categoryName ?? UI_TEXT.publicStudio.categoryOther}
               </h3>
-              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs text-text-sec">
+              <span className="shrink-0 rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs text-text-sec">
                 {group.services.length}
               </span>
             </div>
@@ -107,8 +108,11 @@ export function StudioServicesList({ studio, services, hideBooking }: Props) {
               {group.services.map((service) => (
                 <article key={service.id} className="rounded-xl border border-border-subtle bg-bg-input/60 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-text-main">{service.name}</div>
+                    {/* Длинное название переносится внутри колонки, кнопка не сжимается:
+                        без `min-w-0` flex-элемент не уже своего содержимого и уводит
+                        карточку за край экрана. */}
+                    <div className="min-w-0 flex-1">
+                      <div className="break-words text-sm font-semibold text-text-main">{service.name}</div>
                       <div className="mt-1 text-xs text-text-sec">
                         {service.price > 0
                           ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
@@ -116,13 +120,14 @@ export function StudioServicesList({ studio, services, hideBooking }: Props) {
                       </div>
                     </div>
                     {hideBooking ? null : (
-                      <Button asChild size="sm" className="h-8 rounded-lg px-2.5 text-xs">
-                        <Link
+                      <Button asChild size="sm" className="h-9 shrink-0 rounded-lg px-3 text-xs">
+                        <StudioBookingLink
                           href={studioBookingUrl(studio, { serviceId: service.id }, "studio-services") ?? "#"}
-                          aria-label={`${UI_TEXT.publicStudio.goToBooking}: ${service.name}`}
+                          request={{ serviceId: service.id }}
+                          aria-label={UI_TEXT.publicStudio.bookServiceAria(service.name)}
                         >
-                          {UI_TEXT.publicStudio.addService}
-                        </Link>
+                          {UI_TEXT.publicStudio.book}
+                        </StudioBookingLink>
                       </Button>
                     )}
                   </div>

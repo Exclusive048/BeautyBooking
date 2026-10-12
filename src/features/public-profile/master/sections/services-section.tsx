@@ -6,10 +6,9 @@ import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
-  initialServiceId: string | null;
 };
 
-export async function ServicesSection({ providerId, initialServiceId }: Props) {
+export async function ServicesSection({ providerId }: Props) {
   let view = null;
   let hasError = false;
   // FIX-MASTER-01 item 5: the owner must not be offered the package-booking
@@ -44,7 +43,6 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
       <ServicesSectionClient
         services={view.provider.services}
         bundles={view.bundles}
-        initialServiceId={initialServiceId}
         providerId={view.provider.id}
         providerTimezone={view.provider.timezone}
         providerBufferMin={view.providerBufferMin}
@@ -52,6 +50,9 @@ export async function ServicesSection({ providerId, initialServiceId }: Props) {
         // the studio flow). Gates the "Записаться на пакет" CTA. Owner view
         // suppresses it too (self-booking is server-rejected).
         packageBookable={view.provider.type === "MASTER" && !view.provider.studioId && !isOwner}
+        // BOOKING-WIDGET-DIALOG: владелец не записывается к себе — «Записаться»
+        // у услуги ему не показывается.
+        bookable={!isOwner}
       />
     </div>
   );

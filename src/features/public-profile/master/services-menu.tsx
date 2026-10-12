@@ -12,11 +12,14 @@ import { groupServicesByCategory } from "@/lib/providers/group-services";
 
 type Props = {
   services: ProviderServiceDto[];
-  selectedServiceIds: string[];
-  onAdd: (service: ProviderServiceDto) => void;
+  /**
+   * BOOKING-WIDGET-DIALOG: «Записаться» открывает окно записи с этой услугой.
+   * Нет — кнопок нет (страницу смотрит её владелец).
+   */
+  onBook?: (service: ProviderServiceDto) => void;
 };
 
-export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
+export function ServicesMenu({ services, onBook }: Props) {
   // FIX-R2-04-C: group the services menu by attached category (presentational).
   const groups = useMemo(() => groupServicesByCategory(services), [services]);
   return (
@@ -33,10 +36,10 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
         {groups.map((group) => (
           <div key={group.categoryName ?? "__uncat"} className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <h3 className="font-display text-sm font-semibold text-text-main">
+              <h3 className="min-w-0 break-words font-display text-sm font-semibold text-text-main">
                 {group.categoryName ?? UI_TEXT.publicProfile.services.categoryOther}
               </h3>
-              <span className="rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs text-text-sec">
+              <span className="shrink-0 rounded-full bg-bg-input px-2 py-0.5 font-mono text-3xs text-text-sec">
                 {group.services.length}
               </span>
             </div>
@@ -46,42 +49,38 @@ export function ServicesMenu({ services, selectedServiceIds, onAdd }: Props) {
               animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: STAGGER } } }}
             >
-              {group.services.map((service) => {
-                const isSelected = selectedServiceIds.includes(service.id);
-                return (
-                  <m.article
-                    key={service.id}
-                    variants={{
-                      hidden: { opacity: 0, y: DISTANCE.rise },
-                      visible: { opacity: 1, y: 0, transition: MOTION.base },
-                    }}
-                    className={`group rounded-2xl border border-border-subtle bg-bg-input/70 p-4 hover:bg-bg-card hover:shadow-card ${HOVER_LIFT}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-medium text-text-main">{service.name}</div>
-                        <div className="mt-1 text-sm text-text-sec">
-                          {service.price > 0
-                            ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
-                            : UI_TEXT.publicProfile.services.priceOnRequest}
-                        </div>
+              {group.services.map((service) => (
+                <m.article
+                  key={service.id}
+                  variants={{
+                    hidden: { opacity: 0, y: DISTANCE.rise },
+                    visible: { opacity: 1, y: 0, transition: MOTION.base },
+                  }}
+                  className={`group rounded-2xl border border-border-subtle bg-bg-input/70 p-4 hover:bg-bg-card hover:shadow-card ${HOVER_LIFT}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    {/* Длинное название переносится внутри колонки, кнопка не сжимается. */}
+                    <div className="min-w-0 flex-1">
+                      <div className="break-words text-sm font-medium text-text-main">{service.name}</div>
+                      <div className="mt-1 text-sm text-text-sec">
+                        {service.price > 0
+                          ? UI_FMT.priceDurationLabel(service.price, service.durationMin)
+                          : UI_TEXT.publicProfile.services.priceOnRequest}
                       </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => onAdd(service)}
-                        disabled={isSelected}
-                        className="flex items-center gap-1.5 rounded-full border-border-subtle bg-bg-card px-3 py-1.5 hover:border-primary/50 hover:shadow-card"
-                      >
-                        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-bg-input text-xs" aria-hidden="true">
-                          +
-                        </span>
-                        <span>{UI_TEXT.publicProfile.services.add}</span>
-                      </Button>
                     </div>
-                  </m.article>
-                );
-              })}
+                    {onBook ? (
+                      <Button
+                        size="sm"
+                        onClick={() => onBook(service)}
+                        aria-label={UI_TEXT.publicProfile.services.bookAria(service.name)}
+                        className="h-9 shrink-0 rounded-lg px-3 text-xs"
+                      >
+                        {UI_TEXT.publicProfile.services.book}
+                      </Button>
+                    ) : null}
+                  </div>
+                </m.article>
+              ))}
             </m.div>
           </div>
         ))}

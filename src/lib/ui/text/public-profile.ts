@@ -112,18 +112,17 @@ export const publicProfile = {
     // оформление — как у соседней «Портфолио», разводить их не за что.
     empty: "Пока нет услуг",
     title: "Услуги",
-    add: "Добавить",
+    // BOOKING-WIDGET-DIALOG: кнопка у услуги открывает окно записи с этой услугой.
+    book: "Записаться",
+    bookAria: (service: string) => `Записаться: ${service}`,
     priceOnRequest: "Цена по запросу",
     categoryOther: "Другие услуги",
   },
   portfolio: {
     title: "Портфолио",
     empty: "Пока нет работ",
-    viewError: "Не удалось загрузить работу. Попробуйте ещё раз.",
     untitledWork: "Работа мастера",
-    indexedBadge: "✓ В поиске",
-    close: "Закрыть",
-    loading: "Загружаем работу…",
+    openWork: "Открыть фото: {title}",
   },
   reviews: {
     title: "Отзывы",
@@ -148,14 +147,11 @@ export const publicProfile = {
   },
   booking: {
     title: "Запись",
-    // FIX-BATCH-C Defect 2: distinct empty states.
-    // `emptyTitle`/`emptyDesc` = genuine no-services-at-all (empty catalog).
-    // `selectServiceTitle`/`selectServiceDesc` = has services but the client
-    // hasn't picked one yet (empty cart) — must NOT claim the master has no services.
+    // FIX-BATCH-C Defect 2: `emptyTitle`/`emptyDesc` — у мастера нет услуг
+    // вовсе; иначе карточка записи зовёт в окно записи (BOOKING-WIDGET-DIALOG).
     emptyTitle: "Онлайн-запись пока недоступна",
     emptyDesc: "Мастер ещё не добавил услуги для записи. Загляните позже или свяжитесь с ним напрямую.",
-    selectServiceTitle: "Выберите услугу, чтобы записаться",
-    selectServiceDesc: "Отметьте услугу в списке — и мы подберём свободное время.",
+    ctaHint: "Выберите услугу и свободное время — запись займёт минуту.",
     bookingOnPhone: "Запись на номер",
     submitFailed: "Не удалось создать запись. Попробуйте ещё раз.",
     // LOGIC-10: ответ «этот же запрос ещё выполняется» — не отказ и не
@@ -259,6 +255,8 @@ export const publicProfile = {
     footnoteFormPay: "Оплата на месте — картой или наличными",
     formContactsEyebrow: "Ваши контакты",
     formBackToSelection: "Изменить время",
+    // BOOKING-WIDGET-DIALOG: из выбора времени — назад к списку услуг.
+    changeService: "Сменить услугу",
     phoneLabel: "Телефон",
     phonePlaceholder: "+7 (___) ___-__-__",
     nameLabel: "Имя",

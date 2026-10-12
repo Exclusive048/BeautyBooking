@@ -52,9 +52,9 @@ export function CitySelector() {
   // Deactivated-city fallback: cookie may hold a slug that's no longer in
   // /api/cities (deactivated, or lost all published providers). We do NOT
   // clear the cookie — temporary deactivation should not destroy the user's
-  // choice. Display the generic "Сменить город" label instead of the name.
+  // choice. Display the generic "Сменить город" label instead of the name
+  // («Город» on phones — see `chooseShort`).
   const currentCity = cities.find((c) => c.slug === currentSlug) ?? null;
-  const buttonLabel = currentCity?.name ?? T.choose;
 
   const handleSelect = (slug: string) => {
     setCurrentCitySlug(slug);
@@ -65,7 +65,9 @@ export function CitySelector() {
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    // `min-w-0` на обёртке и кнопке: на узком телефоне (320px) подпись
+    // обрезается многоточием, а не уезжает под кнопки справа в шапке.
+    <div ref={containerRef} className="relative min-w-0">
       <Button variant="wrapper"
         onClick={() => {
           if (!open) void mutate();
@@ -74,9 +76,16 @@ export function CitySelector() {
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={T.label}
-        className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm font-medium text-text-main transition-colors hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5 py-1 text-sm font-medium text-text-main transition-colors hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        <span className="max-w-[140px] truncate">{buttonLabel}</span>
+        {currentCity ? (
+          <span className="min-w-0 max-w-[140px] truncate">{currentCity.name}</span>
+        ) : (
+          <>
+            <span className="min-w-0 truncate sm:hidden">{T.chooseShort}</span>
+            <span className="hidden min-w-0 max-w-[140px] truncate sm:inline">{T.choose}</span>
+          </>
+        )}
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           aria-hidden

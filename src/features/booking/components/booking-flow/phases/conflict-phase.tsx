@@ -16,7 +16,7 @@ type Props = {
  */
 export function ConflictPhase({ onRetry }: Props) {
   return (
-    <div className="p-5 text-center">
+    <div className="py-5 text-center">
       <AlertCircle
         className="mx-auto mb-3 h-10 w-10 text-warning-text"
         aria-hidden

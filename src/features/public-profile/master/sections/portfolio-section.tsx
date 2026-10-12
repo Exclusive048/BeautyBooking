@@ -1,34 +1,35 @@
-import { PortfolioStrip } from "@/features/public-profile/master/portfolio-strip";
+import { PortfolioStrip, type PortfolioWork } from "@/features/public-profile/master/portfolio-strip";
 import { logPublicBlockError } from "@/features/public-profile/master/server/block-error";
 import { emptyOnRefusal } from "@/features/public-profile/master/server/refusal";
-import { getViewer } from "@/features/public-profile/master/server/viewer";
 import { listPortfolioFeed } from "@/lib/feed/portfolio.service";
+import { workSubjectTitle } from "@/lib/feed/work-caption";
 import * as UI_TEXT from "@/lib/ui/text";
-
-type PortfolioItemPreview = {
-  id: string;
-  mediaUrl: string;
-  visualSearchReady: boolean;
-  caption: string | null;
-  primaryServiceTitle: string | null;
-  masterName: string;
-};
 
 type Props = {
   providerId: string;
 };
 
-async function fetchPortfolio(providerId: string): Promise<PortfolioItemPreview[]> {
-  const viewer = await getViewer();
+/**
+ * Работы мастера для ленты на его странице. Наружу — только то, что ей нужно:
+ * подпись — услуга (иначе одобренная категория), без имени мастера — страница
+ * и так его (замечание владельца 2026-10-12); пометка «в поиске» — для
+ * кабинета, публике её не отдаём.
+ */
+async function fetchPortfolio(providerId: string): Promise<PortfolioWork[]> {
   const feed = await emptyOnRefusal(
-    () => listPortfolioFeed({ limit: 8, masterId: providerId, currentUserId: viewer?.id }),
+    () => listPortfolioFeed({ limit: 8, masterId: providerId }),
     { items: [], nextCursor: null },
   );
-  return feed.items;
+  return feed.items.map((item) => ({
+    id: item.id,
+    mediaUrl: item.mediaUrl,
+    caption: item.caption,
+    subject: workSubjectTitle(item.primaryServiceTitle, item.categoryTitle),
+  }));
 }
 
 export async function PortfolioSection({ providerId }: Props) {
-  let items: PortfolioItemPreview[] = [];
+  let items: PortfolioWork[] = [];
   let hasError = false;
 
   try {

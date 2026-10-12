@@ -20,10 +20,19 @@ type Props = {
   masters: StudioMaster[];
   selectedServiceId: string;
   prefilledMaster: StudioMaster | null;
+  /** Свой подзаголовок — окно записи мастера (у него нет «команды»). */
+  subtitle?: string;
   onPick: (serviceId: string) => void;
 };
 
-export function ServiceStep({ services, masters, selectedServiceId, prefilledMaster, onPick }: Props) {
+export function ServiceStep({
+  services,
+  masters,
+  selectedServiceId,
+  prefilledMaster,
+  subtitle: subtitleOverride,
+  onPick,
+}: Props) {
   const [query, setQuery] = useState("");
   // Сценарий «к мастеру»: только его услуги (сценарий студии — все).
   const baseServices = useMemo(() => servicesPerformedBy(services, prefilledMaster), [services, prefilledMaster]);
@@ -60,7 +69,9 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
   const heading = prefilledMaster
     ? UI_TEXT.bookingWidget.serviceStep.titleMaster.replace("{master}", prefilledMaster.name.split(" ")[0] ?? "")
     : UI_TEXT.bookingWidget.serviceStep.titleStudio;
-  const subtitle = prefilledMaster
+  const subtitle = subtitleOverride
+    ? subtitleOverride
+    : prefilledMaster
     ? UI_TEXT.bookingWidget.serviceStep.subtitleMaster
     : UI_TEXT.bookingWidget.serviceStep.subtitleStudio.replace("{count}", String(baseServices.length));
 
@@ -150,16 +161,18 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                         variant={isSelected ? "primary" : "secondary"}
                         size="none"
                         onClick={() => onPick(service.id)}
-                        className={`w-full rounded-xl border px-4 py-3.5 text-left transition ${
+                        className={`h-full w-full rounded-xl border px-4 py-3.5 text-left transition ${
                           isSelected
                             ? "border-primary ring-2 ring-primary/30"
                             : "border-border-subtle hover:border-primary/60"
                         }`}
                         aria-pressed={isSelected}
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex w-full items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold">{service.name}</div>
+                            {/* Название целиком в две строки: многоточие прятало, чем «Маникюр + покрытие
+                                гель-лак» отличается от соседней услуги. */}
+                            <div className="line-clamp-2 break-words text-sm font-semibold">{service.name}</div>
                             <div className="mt-1 text-xs opacity-80">
                               {service.durationMin
                                 ? UI_TEXT.bookingWidget.serviceStep.duration.replace(
@@ -173,7 +186,7 @@ export function ServiceStep({ services, masters, selectedServiceId, prefilledMas
                                 : UI_TEXT.bookingWidget.serviceStep.priceOnRequest}
                             </div>
                           </div>
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-medium uppercase tracking-wider text-accent-text">
+                          <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-3xs font-medium uppercase tracking-wider text-accent-text">
                             {isSelected ? "✓" : UI_TEXT.bookingWidget.serviceStep.pick}
                           </span>
                         </div>

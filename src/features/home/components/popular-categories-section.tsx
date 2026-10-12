@@ -82,29 +82,32 @@ export function PopularCategoriesSection() {
         </Link>
       </div>
 
+      {/* Плитки одного размера, сколько бы строк ни заняло название:
+          `auto-rows-fr` выравнивает ряды, `h-full` растягивает плитку на ячейку,
+          значок — в слоте постоянной высоты, название центрируется в остатке. */}
       <m.div
         variants={container}
         initial="hidden"
         whileInView="visible"
         viewport={VIEWPORT_ONCE}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
+        className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
       >
         {categories.map((cat) => (
-          <m.div key={cat.id} variants={item}>
+          <m.div key={cat.id} variants={item} className="h-full">
             <Link
               href={buildCatalogUrl({ globalCategoryId: cat.id })}
-              className="group flex flex-col items-center gap-3 rounded-2xl border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"
+              className="group flex h-full flex-col items-center gap-3 rounded-2xl border border-border-subtle/60 bg-bg-card/80 p-4 text-center transition-colors hover:border-primary/30 hover:bg-primary/5 sm:p-5"
             >
-              {cat.icon ? (
-                <span className="text-3xl" aria-hidden>
-                  {cat.icon}
-                </span>
-              ) : (
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-accent-text text-base font-bold">
-                  {cat.title.charAt(0)}
-                </div>
-              )}
-              <span className="text-sm font-medium leading-tight text-text-main group-hover:text-accent-text">
+              <span className="flex h-10 shrink-0 items-center justify-center" aria-hidden>
+                {cat.icon ? (
+                  <span className="text-3xl leading-none">{cat.icon}</span>
+                ) : (
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-base font-bold text-accent-text">
+                    {cat.title.charAt(0)}
+                  </span>
+                )}
+              </span>
+              <span className="flex min-w-0 max-w-full flex-1 items-center justify-center break-words text-sm font-medium leading-tight text-text-main hyphens-auto group-hover:text-accent-text">
                 {cat.title}
               </span>
             </Link>

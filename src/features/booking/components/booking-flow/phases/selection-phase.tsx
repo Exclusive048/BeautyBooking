@@ -24,13 +24,18 @@ type Props = {
   onSelectDate: (dateKey: string) => void;
   onSelectSlot: (slot: BookingFlowSlot) => void;
   onContinue: () => void;
+  /** Вернуться к выбору услуги; без него кнопки нет (услуга у мастера одна). */
+  onChangeService?: () => void;
 };
 
 /**
  * Phase 1 of the booking flow — pick a date AND a time on the same
- * screen (matches the design reference). The summary at the bottom
- * only renders once both are chosen, keeping the screen quiet during
- * the initial pick.
+ * screen (matches the design reference).
+ *
+ * BOOKING-WIDGET-DIALOG: выбор времени сам ведёт к контактам, поэтому
+ * «Продолжить» со сводкой видны только после возврата сюда с выбранным
+ * временем («Изменить время») — выключенная кнопка под сеткой ничего не
+ * объясняла.
  */
 export function SelectionPhase({
   providerId,
@@ -44,17 +49,29 @@ export function SelectionPhase({
   onSelectDate,
   onSelectSlot,
   onContinue,
+  onChangeService,
 }: Props) {
   const canContinue = Boolean(selectedDateKey && selectedSlot);
 
   return (
-    <div className="space-y-5 p-5">
-      <ServiceHeader
-        serviceName={serviceName}
-        servicePrice={servicePrice}
-        serviceDurationMin={serviceDurationMin}
-        slot={selectedSlot}
-      />
+    <div className="space-y-5">
+      {/* На телефоне кнопка уходит под цену — рядом с ней строка «длительность ·
+          услуга» ломалась посередине. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-56">
+          <ServiceHeader
+            serviceName={serviceName}
+            servicePrice={servicePrice}
+            serviceDurationMin={serviceDurationMin}
+            slot={selectedSlot}
+          />
+        </div>
+        {onChangeService ? (
+          <Button type="button" variant="secondary" size="sm" onClick={onChangeService} className="shrink-0">
+            {T.changeService}
+          </Button>
+        ) : null}
+      </div>
 
       <DateGrid
         providerId={providerId}
@@ -75,24 +92,20 @@ export function SelectionPhase({
       ) : null}
 
       {canContinue ? (
-        <SummaryBlock
-          serviceName={serviceName}
-          servicePrice={servicePrice}
-          serviceDurationMin={serviceDurationMin}
-          slot={selectedSlot}
-          dateKey={selectedDateKey}
-        />
+        <>
+          <SummaryBlock
+            serviceName={serviceName}
+            servicePrice={servicePrice}
+            serviceDurationMin={serviceDurationMin}
+            slot={selectedSlot}
+            dateKey={selectedDateKey}
+          />
+          <Button size="lg" onClick={onContinue} className="w-full gap-1.5">
+            {T.continueCta}
+            <ArrowRight className="h-4 w-4" aria-hidden strokeWidth={1.8} />
+          </Button>
+        </>
       ) : null}
-
-      <Button
-        size="lg"
-        disabled={!canContinue}
-        onClick={onContinue}
-        className="w-full gap-1.5"
-      >
-        {T.continueCta}
-        <ArrowRight className="h-4 w-4" aria-hidden strokeWidth={1.8} />
-      </Button>
 
       <Footnote variant="selection" />
     </div>

@@ -138,7 +138,11 @@ export function useInitialFocus(
     const id = window.requestAnimationFrame(() => {
       const explicit = initialFocusRef?.current ?? null;
       if (explicit) {
-        explicit.focus();
+        // Без прокрутки: окно открывается с начала. Явная цель — обычно
+        // «якорь» вокруг содержимого, и когда он выше экрана (окно записи с
+        // длинным списком услуг на ПК), браузер прокручивал к его верху и
+        // прятал заголовок окна.
+        explicit.focus({ preventScroll: true });
         return;
       }
       const focusable = getFocusable(containerRef.current);

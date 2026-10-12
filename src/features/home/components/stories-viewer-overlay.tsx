@@ -29,7 +29,7 @@ import { useStoriesViewer, type ViewerState } from "@/features/home/stories-view
 import { markItemViewed } from "@/features/home/stories-viewed-storage";
 import type { StoriesGroup, StoryItem } from "@/features/home/types/stories";
 import { formatRelativeTime } from "@/lib/utils/relative-time";
-import { formatWorkCaption } from "@/lib/feed/work-caption";
+import { formatWorkCaption, workSubjectTitle } from "@/lib/feed/work-caption";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -219,7 +219,10 @@ function ViewerInner({ state, onClose, onNext, onPrev, onItemViewed }: InnerProp
 
   const profileHref = profileHrefFor(group);
   const totalItems = group.items.length;
-  const workCaption = formatWorkCaption(item.performerName, item.serviceTitle);
+  const workCaption = formatWorkCaption(
+    item.performerName,
+    workSubjectTitle(item.serviceTitle, item.categoryTitle),
+  );
   const counterText = T.counter
     .replace("{current}", String(state.activeItemIdx + 1))
     .replace("{total}", String(totalItems));

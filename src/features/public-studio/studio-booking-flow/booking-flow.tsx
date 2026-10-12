@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import {
@@ -10,6 +10,7 @@ import {
   fetchMasterAvailability,
   fetchStudioMasters,
   fetchStudioProfile,
+  servicesPerformedBy,
   todayKey,
   type BookingUser,
   type SlotItem,
@@ -31,6 +32,7 @@ import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import { studioBookingUrl } from "@/lib/public-urls";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import { BookingHero } from "./components/booking-hero";
 import { StepsBar, type WizardStep } from "./components/steps-bar";
 import { StepTransition } from "./components/step-transition";
@@ -45,6 +47,7 @@ import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-
 import { Button } from "@/components/ui/button";
 import { FileInput } from "@/components/ui/file-input";
 import { FieldLabel } from "@/components/ui/field-label";
+import { ModalSurface } from "@/components/ui/modal-surface";
 
 type MasterAvailability = {
   serviceAvailable: boolean;
@@ -57,7 +60,15 @@ type Props = {
   initialMasterId?: string;
   initialMasterKey?: string;
   initialServiceId?: string;
+  /**
+   * BOOKING-WIDGET-DIALOG: мастер записи в окне поверх страницы студии
+   * (кнопки «Записаться» профиля). Без него — отдельная страница
+   * `/u/[студия]/booking` для прямых ссылок.
+   */
+  dialog?: { open: boolean; onClose: () => void };
 };
+
+const STEP_ORDER: readonly WizardStep[] = ["service", "master", "when", "you"];
 
 function buildLoginUrl(nextPath: string): string {
   const params = new URLSearchParams({ next: nextPath });
@@ -74,7 +85,7 @@ function newIdempotencyKey(): string {
     : `bk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey, initialServiceId }: Props) {
+export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey, initialServiceId, dialog }: Props) {
   const viewerTimeZone = useViewerTimeZoneContext();
   const [studio, setStudio] = useState<ProviderProfileDto | null>(null);
   const [masters, setMasters] = useState<StudioMaster[]>([]);
@@ -117,19 +128,19 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null);
-  const [success, setSuccess] = useState<null | {
-    serviceName: string;
-    masterName: string;
-    dateLabel: string;
-    timeLabel: string;
-    /** GUEST-MANAGE-LINK: ссылка «Управлять записью» — только гостю. */
-    manageUrl: string | null;
-  }>(null);
+  // GUEST-MANAGE-LINK: `manageUrl` — ссылка «Управлять записью», только гостю.
+  const [success, setSuccess] = useState<SuccessState | null>(null);
+  const stepsRef = useRef<HTMLDivElement>(null);
+  const focusAnchorRef = useRef<HTMLDivElement>(null);
 
   // Scenario: B if a master is locked in (initial param or single-master prefill);
   // A otherwise (studio-wide). FOUNDATION already wired ?master= parsing.
   const isScenarioB = Boolean(initialMasterId || initialMasterKey);
-  const [step, setStep] = useState<WizardStep>("service");
+  // BOOKING-WIDGET-DIALOG: услуга уже выбрана («Записаться» у услуги, ссылка
+  // из каталога) — шаг услуги пройден, мастер записи открывается со следующего.
+  const [step, setStep] = useState<WizardStep>(() =>
+    initialServiceId ? (isScenarioB ? "when" : "master") : "service",
+  );
   const [direction, setDirection] = useState<1 | -1>(1);
 
   const selectedService = useMemo(
@@ -207,15 +218,14 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
       ? formatZoneLabel({ iso: selectedSlot.startAtUtc, timeZone: salonTz })
       : "";
 
-  const prefilledMaster = useMemo(
-    () =>
-      initialMasterId
-        ? masters.find((m) => m.id === initialMasterId) ??
-          masters.find((m) => m.publicUsername?.toLowerCase() === initialMasterKey?.toLowerCase()) ??
-          null
-        : null,
-    [initialMasterId, initialMasterKey, masters],
-  );
+  // Мастер из ссылки — по id либо по адресу страницы. Раньше адрес без id
+  // не читался вовсе (сценарий «к мастеру» без его услуг и шапки).
+  const prefilledMaster = useMemo(() => {
+    const byId = initialMasterId ? masters.find((m) => m.id === initialMasterId) : undefined;
+    if (byId) return byId;
+    const key = initialMasterKey?.trim().toLowerCase();
+    return key ? masters.find((m) => m.publicUsername?.toLowerCase() === key) ?? null : null;
+  }, [initialMasterId, initialMasterKey, masters]);
 
   // Goto helpers
   const goNext = useCallback(
@@ -236,15 +246,44 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     },
     [isScenarioB],
   );
+  const goTo = useCallback(
+    (target: WizardStep) => {
+      setDirection(STEP_ORDER.indexOf(target) >= STEP_ORDER.indexOf(step) ? 1 : -1);
+      setStep(target);
+    },
+    [step],
+  );
 
+  // В окне новый шаг — с начала: после выбора услуги внизу длинного списка
+  // следующий шаг открывался прокрученным до середины.
+  const prevStepRef = useRef(step);
+  useEffect(() => {
+    if (prevStepRef.current === step) return;
+    prevStepRef.current = step;
+    if (!dialog) return;
+    const scroller = focusAnchorRef.current?.closest('[role="dialog"]');
+    if (scroller && scroller.scrollTop > 0) scroller.scrollTo({ top: 0, behavior: scrollBehavior() });
+  }, [dialog, step]);
+
+  // В окне на странице студии вход возвращает на страницу записи с той же
+  // услугой и мастером — иначе после входа окно пришлось бы собирать заново.
+  // Пока профиль студии грузится, её адреса ещё нет — ссылку на вход до этого
+  // момента не показывают, а сборка по id сообщала бы о пропавшем адресе.
   const nextPath =
-    typeof window !== "undefined"
+    typeof window !== "undefined" && !dialog
       ? `${window.location.pathname}${window.location.search}${window.location.hash}`
-      : studioBookingUrl(
-          { id: studioId, publicUsername: studio?.publicUsername ?? null },
-          undefined,
-          "studio-booking-flow",
-        ) ?? "#";
+      : studio
+        ? studioBookingUrl(
+            { id: studioId, publicUsername: studio.publicUsername ?? null },
+            dialog
+              ? {
+                  serviceId: serviceId || undefined,
+                  masterId: masterId && masterId !== ANY_MASTER_ID ? masterId : undefined,
+                }
+              : undefined,
+            "studio-booking-flow",
+          ) ?? "#"
+        : "#";
   const loginHref = buildLoginUrl(nextPath);
   const studioBackHref = studio?.publicUsername ? `/u/${studio.publicUsername}` : `/u/${studioId}`;
 
@@ -298,6 +337,19 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   useEffect(() => {
     setSlotLabel("");
   }, [serviceId]);
+
+  // Услуга из ссылки, которой у студии (или у мастера из ссылки) нет, —
+  // назад к выбору услуги, а не тупик «нет окошек».
+  useEffect(() => {
+    if (!studio || !serviceId) return;
+    if (isScenarioB && !prefilledMaster && masters.length > 0) return;
+    const allowed = servicesPerformedBy(studio.services, prefilledMaster);
+    if (!allowed.some((service) => service.id === serviceId)) {
+      setServiceId("");
+      setDirection(-1);
+      setStep("service");
+    }
+  }, [isScenarioB, masters.length, prefilledMaster, serviceId, studio]);
 
   // Fetch availability per master when service or date changes.
   // EXP-024: only assigned masters — no probing (and no 409s) for masters
@@ -442,15 +494,6 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     ? guestValid
     : !!me && (!authNeedsPhone || guestPhone.trim().length > 0);
 
-  const submitDisabled =
-    !studio ||
-    !selectedService ||
-    !resolvedMasterId ||
-    !slotLabel ||
-    !contactsReady ||
-    submitLoading ||
-    referenceUploading;
-
   const done = useMemo<ReadonlySet<WizardStep>>(() => {
     const set = new Set<WizardStep>();
     if (serviceId) set.add("service");
@@ -555,12 +598,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         return;
       }
 
-      const masterName =
-        resolvedMasterId === masterId && masterId !== ANY_MASTER_ID
-          ? masters.find((m) => m.id === resolvedMasterId)?.name ?? ""
-          : masterId === ANY_MASTER_ID
-          ? UI_TEXT.bookingWidget.summary.anyMaster
-          : masters.find((m) => m.id === resolvedMasterId)?.name ?? "";
+      // Запись уже на конкретного мастера (при «Любой свободный» — того, у кого
+      // было это окошко), и в итоге он назван по имени, а не «любой свободный».
+      const masterName = masters.find((m) => m.id === resolvedMasterId)?.name ?? "";
 
       const successZoneLabel = zonesDifferForViewer({
         iso: slot.startAtUtc,
@@ -585,6 +625,133 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
 
   // --- rendering -------------------------------------------------------------
 
+  // BOOKING-WIDGET-DIALOG: главная кнопка не бывает «мёртвой». Пройдены
+  // услуга, мастер и время и открыт шаг «Вы» — «Записаться» (недостающие
+  // контакты называет проверка в `onSubmit`); иначе — «Продолжить» к первому
+  // незаполненному шагу. Раньше кнопка была выключена с «Заполните все шаги»,
+  // и было непонятно, куда идти.
+  const firstIncomplete: WizardStep = !serviceId
+    ? "service"
+    : !isScenarioB && !masterId
+      ? "master"
+      : !slotLabel
+        ? "when"
+        : "you";
+  const canSubmitNow = firstIncomplete === "you" && step === "you";
+  const ready = firstIncomplete === "you" && !!resolvedMasterId && contactsReady;
+  const scrollToSteps = () => {
+    if (!dialog) stepsRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+  };
+  const primaryAction: { label: string; onClick: () => void; disabled: boolean } | null = canSubmitNow
+    ? {
+        label: submitLoading ? UI_TEXT.bookingWidget.summary.submitting : UI_TEXT.bookingWidget.summary.submit,
+        onClick: () => void onSubmit(),
+        disabled: submitLoading || referenceUploading,
+      }
+    : firstIncomplete !== step
+      ? {
+          label: UI_TEXT.bookingWidget.summary.continue,
+          onClick: () => {
+            goTo(firstIncomplete);
+            scrollToSteps();
+          },
+          disabled: false,
+        }
+      : dialog
+        ? // В окне выбор на шаге сам ведёт дальше — кнопке здесь нечего делать.
+          null
+        : { label: UI_TEXT.bookingWidget.summary.continue, onClick: scrollToSteps, disabled: false };
+
+  const selectedMasterName = resolvedMasterId ? masters.find((m) => m.id === resolvedMasterId)?.name ?? null : null;
+  const selectedTimeLabel = selectedSlot ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: salonTz }) : null;
+
+  if (dialog) {
+    const subtitle = studio
+      ? prefilledMaster
+        ? `${prefilledMaster.name} · ${studio.name}`
+        : studio.name
+      : undefined;
+    const closeFooter = (
+      <Button type="button" variant={success ? "primary" : "secondary"} onClick={dialog.onClose}>
+        {UI_TEXT.common.close}
+      </Button>
+    );
+
+    let body: ReactNode;
+    let footer: ReactNode = null;
+    if (loading) {
+      body = <DialogSkeleton />;
+    } else if (loadError || !studio) {
+      body = (
+        <div className="rounded-2xl border border-danger-border bg-danger-surface p-5 text-sm text-danger-text">
+          {loadError ?? UI_TEXT.publicStudio.bookingError}
+        </div>
+      );
+      footer = closeFooter;
+    } else if (success) {
+      body = <SuccessBody success={success} />;
+      footer = closeFooter;
+    } else {
+      const summaryParts = [
+        masterId === ANY_MASTER_ID ? UI_TEXT.bookingWidget.summary.anyMaster : selectedMasterName,
+        selectedTimeLabel ? `${formatDateLabel(selectedDate)} · ${selectedTimeLabel}` : null,
+        selectedService && selectedService.price > 0 ? UI_FMT.priceLabel(selectedService.price) : null,
+      ].filter((part): part is string => Boolean(part));
+      body = (
+        <div ref={focusAnchorRef} tabIndex={-1} className="space-y-4 outline-none">
+          <StepsBar active={step} done={done} scenarioB={isScenarioB} />
+          {renderStepBody()}
+          {step !== "you" ? renderError() : null}
+        </div>
+      );
+      footer = (
+        <div className="flex w-full min-w-0 items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-text-main">
+              {selectedService?.name ?? statusLabel}
+            </div>
+            {summaryParts.length > 0 ? (
+              <div className="truncate text-xs text-text-sec">{summaryParts.join(" · ")}</div>
+            ) : null}
+            {selectedSlotZoneLabel ? (
+              <div className="truncate text-2xs text-accent-text">
+                {UI_TEXT.bookingWidget.summary.salonTimeNote} {selectedSlotZoneLabel}
+              </div>
+            ) : null}
+          </div>
+          {primaryAction ? (
+            <Button
+              type="button"
+              size="lg"
+              onClick={primaryAction.onClick}
+              disabled={primaryAction.disabled}
+              className="shrink-0"
+            >
+              {primaryAction.label}
+            </Button>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <ModalSurface
+        open={dialog.open}
+        onClose={dialog.onClose}
+        fullScreenOnMobile
+        stickyFooter
+        size="lg"
+        header={{ title: UI_TEXT.bookingWidget.dialogTitle, subtitle }}
+        // Без этого фокус встаёт в поиск услуг, и на телефоне клавиатура
+        // закрывает список при открытии окна.
+        initialFocusRef={focusAnchorRef}
+        footer={footer}
+      >
+        {body}
+      </ModalSurface>
+    );
+  }
+
   if (loading) {
     return <BookingFlowSkeleton />;
   }
@@ -599,22 +766,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   if (success) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-card p-6 sm:p-8">
-        <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-success-text">
-          ✓
-        </div>
-        <h2 className="mt-4 font-display text-2xl font-semibold text-text">{UI_TEXT.bookingWidget.success.title}</h2>
-        <p className="mt-2 text-sm text-text-muted">
-          {UI_TEXT.bookingWidget.success.detailsTemplate
-            .replace("{service}", success.serviceName)
-            .replace("{master}", success.masterName || UI_TEXT.bookingWidget.summary.anyMaster)
-            .replace("{when}", `${success.dateLabel} · ${success.timeLabel}`)}
-        </p>
-        <p className="mt-2 text-xs text-text-muted">{UI_TEXT.bookingWidget.success.hint}</p>
-        {success.manageUrl ? (
-          <div className="mt-4">
-            <GuestManageLinkCard manageUrl={success.manageUrl} />
-          </div>
-        ) : null}
+        <SuccessBody success={success} />
         <a
           href={studioBackHref}
           className="mt-5 inline-flex rounded-xl bg-muted px-4 py-2 text-sm font-medium text-text hover:bg-muted/70"
@@ -638,142 +790,177 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
           backHref={studioBackHref}
         />
 
-        <StepsBar active={step} done={done} scenarioB={isScenarioB} />
+        <div ref={stepsRef} className="scroll-mt-24 space-y-4">
+          <StepsBar active={step} done={done} scenarioB={isScenarioB} />
 
-        <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 sm:p-6">
-          <StepTransition step={step} direction={direction}>
-            {step === "service" ? (
-              <ServiceStep
-                services={studio.services}
-                masters={masters}
-                selectedServiceId={serviceId}
-                prefilledMaster={prefilledMaster}
-                onPick={(id) => {
-                  setServiceId(id);
-                  goNext("service");
-                }}
-              />
-            ) : null}
-
-            {step === "master" ? (
-              <MasterStep
-                masters={assignedMasters}
-                availabilityByMaster={availabilityByMaster}
-                selectedMasterId={masterId}
-                selectedServiceName={selectedService?.name ?? ""}
-                salonTimeZone={salonTz}
-                onPick={(id) => {
-                  setMasterId(id);
-                  goNext("master");
-                }}
-                onBack={() => goBack("master")}
-              />
-            ) : null}
-
-            {step === "when" ? (
-              <WhenStep
-                slots={slots}
-                loading={loadingSlots}
-                selectedDate={selectedDate}
-                onDateChange={(date) => {
-                  setSelectedDate(date);
-                  setSlotLabel("");
-                }}
-                selectedSlotLabel={slotLabel}
-                onSlotChange={(label) => {
-                  setSlotLabel(label);
-                  goNext("when");
-                }}
-                salonTimeZone={salonTz}
-                viewerTimeZone={viewerTimeZone}
-                selectedMasterName={
-                  resolvedMasterId
-                    ? masters.find((m) => m.id === resolvedMasterId)?.name ?? ""
-                    : ""
-                }
-                isAnyMaster={masterId === ANY_MASTER_ID}
-                horizonDays={horizonDays}
-                onBack={() => goBack("when")}
-              />
-            ) : null}
-
-            {step === "you" ? (
-              <YouStep
-                me={me}
-                meLoading={meLoading}
-                guestName={guestName}
-                guestPhone={guestPhone}
-                onGuestNameChange={setGuestName}
-                onGuestPhoneChange={setGuestPhone}
-                consent={consent}
-                onConsentChange={setConsent}
-                comment={comment}
-                onCommentChange={setComment}
-                silentMode={silentMode}
-                onSilentChange={setSilentMode}
-                loginHref={loginHref}
-                onBack={() => goBack("you")}
-              />
-            ) : null}
-          </StepTransition>
-
-          {step === "you" && bookingConfig
-            ? renderBookingConfig({
-                bookingConfig,
-                bookingConfigLoading,
-                bookingConfigError,
-                referencePreviewUrl,
-                referenceUploading,
-                referenceUploadError,
-                onReferenceUpload: handleReferenceUpload,
-                answers: bookingAnswers,
-                setAnswers: setBookingAnswers,
-              })
-            : null}
-
-          {step === "you" ? (
-            <div className="mt-4 space-y-3">
-              <BookingError
-                code={submitErrorCode}
-                fallback={submitError ?? undefined}
-                minBookingHoursAhead={null}
-                maxBookingDaysAhead={null}
-              />
-            </div>
-          ) : null}
+          <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 sm:p-6">{renderStepBody()}</div>
         </div>
       </div>
 
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <BookingSummary
           serviceName={selectedService?.name ?? null}
-          masterName={
-            resolvedMasterId ? masters.find((m) => m.id === resolvedMasterId)?.name ?? null : null
-          }
+          masterName={selectedMasterName}
           isAnyMaster={masterId === ANY_MASTER_ID}
           dateLabel={selectedDate ? formatDateLabel(selectedDate) : null}
-          timeLabel={
-            selectedSlot ? UI_FMT.timeShort(selectedSlot.startAtUtc, { timeZone: salonTz }) : null
-          }
+          timeLabel={selectedTimeLabel}
           zoneLabel={selectedSlotZoneLabel}
           totalKopeks={selectedService?.price ?? null}
           cancellationDeadlineHours={studio.cancellationDeadlineHours ?? null}
-          submitDisabled={submitDisabled}
-          submitLoading={submitLoading}
-          onSubmit={onSubmit}
+          ready={ready}
+          actionLabel={primaryAction?.label ?? UI_TEXT.bookingWidget.summary.continue}
+          actionDisabled={primaryAction?.disabled ?? false}
+          onAction={primaryAction?.onClick ?? scrollToSteps}
           statusLabel={statusLabel}
         />
-        {step !== "you" ? (
-          <div className="mt-3">
-            <BookingError
-              code={submitErrorCode}
-              fallback={submitError ?? undefined}
-              minBookingHoursAhead={null}
-              maxBookingDaysAhead={null}
-            />
-          </div>
-        ) : null}
+        {step !== "you" ? <div className="mt-3">{renderError()}</div> : null}
       </aside>
+    </div>
+  );
+
+  function renderError() {
+    return (
+      <BookingError
+        code={submitErrorCode}
+        fallback={submitError ?? undefined}
+        minBookingHoursAhead={null}
+        maxBookingDaysAhead={null}
+      />
+    );
+  }
+
+  function renderStepBody() {
+    if (!studio) return null;
+    return (
+      <>
+        <StepTransition step={step} direction={direction}>
+          {step === "service" ? (
+            <ServiceStep
+              services={studio.services}
+              masters={masters}
+              selectedServiceId={serviceId}
+              prefilledMaster={prefilledMaster}
+              onPick={(id) => {
+                setServiceId(id);
+                goNext("service");
+              }}
+            />
+          ) : null}
+
+          {step === "master" ? (
+            <MasterStep
+              masters={assignedMasters}
+              availabilityByMaster={availabilityByMaster}
+              selectedMasterId={masterId}
+              selectedServiceName={selectedService?.name ?? ""}
+              salonTimeZone={salonTz}
+              onPick={(id) => {
+                setMasterId(id);
+                goNext("master");
+              }}
+              onBack={() => goBack("master")}
+            />
+          ) : null}
+
+          {step === "when" ? (
+            <WhenStep
+              slots={slots}
+              loading={loadingSlots}
+              selectedDate={selectedDate}
+              onDateChange={(date) => {
+                setSelectedDate(date);
+                setSlotLabel("");
+              }}
+              selectedSlotLabel={slotLabel}
+              onSlotChange={(label) => {
+                setSlotLabel(label);
+                goNext("when");
+              }}
+              salonTimeZone={salonTz}
+              viewerTimeZone={viewerTimeZone}
+              selectedMasterName={selectedMasterName ?? ""}
+              isAnyMaster={masterId === ANY_MASTER_ID}
+              horizonDays={horizonDays}
+              onBack={() => goBack("when")}
+            />
+          ) : null}
+
+          {step === "you" ? (
+            <YouStep
+              me={me}
+              meLoading={meLoading}
+              guestName={guestName}
+              guestPhone={guestPhone}
+              onGuestNameChange={setGuestName}
+              onGuestPhoneChange={setGuestPhone}
+              consent={consent}
+              onConsentChange={setConsent}
+              comment={comment}
+              onCommentChange={setComment}
+              silentMode={silentMode}
+              onSilentChange={setSilentMode}
+              loginHref={loginHref}
+              onBack={() => goBack("you")}
+            />
+          ) : null}
+        </StepTransition>
+
+        {step === "you" && bookingConfig
+          ? renderBookingConfig({
+              bookingConfig,
+              bookingConfigLoading,
+              bookingConfigError,
+              referencePreviewUrl,
+              referenceUploading,
+              referenceUploadError,
+              onReferenceUpload: handleReferenceUpload,
+              answers: bookingAnswers,
+              setAnswers: setBookingAnswers,
+            })
+          : null}
+
+        {step === "you" ? <div className="mt-4 space-y-3">{renderError()}</div> : null}
+      </>
+    );
+  }
+}
+
+type SuccessState = {
+  serviceName: string;
+  masterName: string;
+  dateLabel: string;
+  timeLabel: string;
+  manageUrl: string | null;
+};
+
+function SuccessBody({ success }: { success: SuccessState }) {
+  return (
+    <div>
+      <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-success-text">
+        ✓
+      </div>
+      <h2 className="mt-4 font-display text-2xl font-semibold text-text">{UI_TEXT.bookingWidget.success.title}</h2>
+      <p className="mt-2 text-sm text-text-muted">
+        {UI_TEXT.bookingWidget.success.detailsTemplate
+          .replace("{service}", success.serviceName)
+          .replace("{master}", success.masterName || UI_TEXT.bookingWidget.summary.anyMaster)
+          .replace("{when}", `${success.dateLabel} · ${success.timeLabel}`)}
+      </p>
+      <p className="mt-2 text-xs text-text-muted">{UI_TEXT.bookingWidget.success.hint}</p>
+      {success.manageUrl ? (
+        <div className="mt-4">
+          <GuestManageLinkCard manageUrl={success.manageUrl} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DialogSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="h-14 animate-pulse rounded-xl bg-muted/40" />
+      <div className="h-72 animate-pulse rounded-2xl bg-muted/40" />
     </div>
   );
 }

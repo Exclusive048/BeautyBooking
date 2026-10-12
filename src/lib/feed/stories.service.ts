@@ -4,6 +4,7 @@ import { encodePublicId } from "@/lib/public-id";
 import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connection";
 import { logError } from "@/lib/logging/logger";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
+import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * V2: getActiveStoriesGroups (used by /api/feed/stories)
@@ -46,6 +47,11 @@ export type StoriesGroupItem = {
    */
   performerName: string | null;
   serviceTitle: string | null;
+  /**
+   * Одобренная категория работы — подпись, когда услуга не привязана. В кадрах
+   * из кэша, собранных до поля, его нет — читать как `null`.
+   */
+  categoryTitle?: string | null;
 };
 
 export type StoriesGroup = {
@@ -111,6 +117,7 @@ async function fetchStoriesFromDb(cityId?: string): Promise<StoriesPayload> {
         },
       },
       performer: { select: { name: true } },
+      globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
       services: {
         select: { service: { select: { name: true, title: true } } },
         orderBy: { createdAt: "asc" },
@@ -143,6 +150,7 @@ async function fetchStoriesFromDb(cityId?: string): Promise<StoriesPayload> {
       createdAt: item.createdAt.toISOString(),
       performerName: item.performer?.name ?? null,
       serviceTitle: service ? service.title?.trim() || service.name : null,
+      categoryTitle: publicCategoryTitle(item.globalCategory),
     });
   }
 

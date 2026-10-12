@@ -34,6 +34,11 @@ type Props = {
   /** Pass `null` to render without an enclosing `<Link>` (useful in
    * hero sections that should not navigate). Default `"/"`. */
   href?: string | null;
+  /** Applied to the OUTERMOST element — the `<Link>` when `href` is set.
+   * It used to land on the inner `<span>`, so the topbar's
+   * `hidden lg:inline-flex` hid only the wordmark: an empty link stayed
+   * in the flex row (an extra gap next to the city picker on phones)
+   * and in the Tab order. */
   className?: string;
   /** Override wordmark colour. By default `variant="full"` renders
    * the wordmark with a brand-gradient text-clip; passing
@@ -73,7 +78,7 @@ export function BrandLogo({
   const shouldShowText = variant !== "iconOnly";
 
   const content = (
-    <span className={cn("inline-flex items-center", preset.gap, className)}>
+    <span className={cn("inline-flex items-center", preset.gap, !href && className)}>
       {shouldShowMark ? (
         <LogoMark size={preset.icon} variant={mark} className={iconClassName} />
       ) : null}
@@ -99,7 +104,7 @@ export function BrandLogo({
       <Link
         href={href}
         aria-label={UI_TEXT.brand.name}
-        className="inline-flex items-center"
+        className={cn("inline-flex items-center", className)}
       >
         {content}
       </Link>

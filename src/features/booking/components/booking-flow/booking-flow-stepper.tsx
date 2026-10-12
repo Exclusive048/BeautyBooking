@@ -32,6 +32,7 @@ import {
 import { toCanonicalPhone, maskRussianPhone } from "@/features/booking/components/booking-flow/lib/format-phone";
 import { EMPTY_CONSENT_FLAGS, type ConsentFlags } from "@/lib/legal/consent-flags";
 import type {
+  BookingFlowPhase,
   ConfirmedBooking,
 } from "@/features/booking/components/booking-flow/types";
 
@@ -58,8 +59,10 @@ type Props = {
   serviceDurationMin: number;
   providerTimezone: string;
   initialSlotStartAt?: string | null;
-  /** Optional: hint for the master-profile-back link in legacy callers (currently unused). */
-  masterProfileUrl?: string;
+  /** Окно записи ведёт по фазе полосу шагов и прячет её на успехе. */
+  onPhaseChange?: (phase: BookingFlowPhase) => void;
+  /** Есть другие услуги — на выборе времени можно вернуться к выбору услуги. */
+  onChangeService?: () => void;
 };
 
 type SessionUser = { displayName: string | null; phone: string | null };
@@ -107,10 +110,10 @@ function asConfirmedBooking(
  *   selection → form → success
  *           └→ conflict ─→ selection
  *
- * Renames itself "BookingFlowStepper" only for import-stability with
- * the existing 32a public profile (booking-section-client imports
- * this symbol). Internally there's no stepper anymore — phases are a
- * pure state machine with framer-motion crossfade between them.
+ * BOOKING-WIDGET-DIALOG: живёт внутри окна записи мастера
+ * (`MasterBookingDialog`) — рамки и полей своих нет, их даёт окно. Выбор
+ * времени сразу ведёт к контактам, как шаги окна студии: раньше после выбора
+ * времени надо было найти кнопку «Продолжить» ниже сетки.
  */
 export function BookingFlowStepper({
   providerId,
@@ -121,6 +124,8 @@ export function BookingFlowStepper({
   serviceDurationMin,
   providerTimezone,
   initialSlotStartAt,
+  onPhaseChange,
+  onChangeService,
 }: Props) {
   const idempotencyKeyRef = useRef<string>(
     typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`,
@@ -183,6 +188,10 @@ export function BookingFlowStepper({
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    onPhaseChange?.(state.phase);
+  }, [onPhaseChange, state.phase]);
 
   // Service change in the parent — reset selection
   const lastServiceIdRef = useRef(serviceId);
@@ -511,7 +520,7 @@ export function BookingFlowStepper({
   }, [state.confirmedBooking, toast]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
+    <div>
       <AnimatePresence mode="wait" initial={false}>
         <m.div
           key={state.phase}
@@ -531,8 +540,12 @@ export function BookingFlowStepper({
               selectedDateKey={state.selectedDateKey}
               selectedSlot={state.selectedSlot}
               onSelectDate={(dateKey) => dispatch({ type: "selectDate", dateKey })}
-              onSelectSlot={(slot) => dispatch({ type: "selectSlot", slot })}
+              onSelectSlot={(slot) => {
+                dispatch({ type: "selectSlot", slot });
+                dispatch({ type: "continueToForm" });
+              }}
               onContinue={() => dispatch({ type: "continueToForm" })}
+              onChangeService={onChangeService}
             />
           ) : null}
 

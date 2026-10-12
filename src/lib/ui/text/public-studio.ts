@@ -1,8 +1,5 @@
 export const publicStudio = {
   heroBook: "Записаться онлайн",
-  // FIX-STUDIO-02 (known-open 1): honest label for the floating affordance
-  // that scrolls to services (was mislabelled «Записаться онлайн»).
-  toServices: "К услугам",
   // FIX-STUDIO-02 (owner parity): shown in place of the booking CTAs when the
   // viewer owns this studio (self-booking is server-rejected). Mirrors the
   // master-side owner notice.
@@ -12,9 +9,8 @@ export const publicStudio = {
   teamTitle: "Мастера студии",
   teamSubtitle: "Выберите мастера и посмотрите его работы",
   servicesTitle: "Услуги",
-  servicesSubtitle: "Выберите услугу и добавьте её в запись",
+  servicesSubtitle: "Выберите услугу — дальше мастер и свободное время",
   book: "Записаться",
-  openBookingFlow: "Открыть запись",
   galleryFallback: "Фотографии студии",
   noMasters: "Пока нет доступных мастеров",
   gradeTop: "Топ",
@@ -28,7 +24,6 @@ export const publicStudio = {
   openMaster: "Открыть профиль",
   blockLoadFailed: "Не удалось загрузить этот раздел. Попробуйте ещё раз.",
   profileLoadFailed: "Не удалось загрузить профиль студии. Попробуйте ещё раз.",
-  bookingLoadFailed: "Не удалось открыть форму записи. Попробуйте ещё раз.",
   studioDataLoadFailed: "Не удалось загрузить данные студии. Попробуйте ещё раз.",
   servicesLoadFailed: "Не удалось загрузить услуги. Попробуйте ещё раз.",
   reviewsLoadFailed: "Не удалось загрузить отзывы. Попробуйте ещё раз.",
@@ -45,17 +40,18 @@ export const publicStudio = {
   dateInvalid: "Не удалось открыть этот день. Выберите другой.",
   guestNameRequired: "Укажите имя.",
   guestPhoneRequired: "Укажите телефон.",
-  addService: "＋",
   servicePriceOnRequest: "Цена по запросу",
   // FIX-BATCH-B: category grouping ported from the booking wizard (R2-04-C).
   // `categoryAll` = the "all" filter chip; `categoryOther` = uncategorized bucket label.
   categoryAll: "Все",
   categoryOther: "Другие услуги",
   noServices: "Услуги пока не добавлены",
-  goToBooking: "К записи",
+  // BOOKING-WIDGET-DIALOG: кнопка «Записаться» у услуги — имя для чтения с экрана.
+  bookServiceAria: (service: string) => `Записаться: ${service}`,
   sectionPhotos: "Фотографии студии",
   sectionPhotosSubtitle: "Интерьер, команда и атмосфера",
   photoAltTemplate: "Фотография студии № {n}",
+  openPhotoAria: "Открыть фото: {title}",
   sectionReviews: "Отзывы",
   sectionReviewsSubtitle: "Последние отзывы клиентов",
   reviewLeave: "Оставить отзыв",

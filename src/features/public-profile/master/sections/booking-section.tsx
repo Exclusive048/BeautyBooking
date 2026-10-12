@@ -6,10 +6,11 @@ import * as UI_TEXT from "@/lib/ui/text";
 
 type Props = {
   providerId: string;
+  initialServiceId: string | null;
   initialSlotStartAt: string | null;
 };
 
-export async function BookingSection({ providerId, initialSlotStartAt }: Props) {
+export async function BookingSection({ providerId, initialServiceId, initialSlotStartAt }: Props) {
   let provider = null;
   let studioPublicUsername: string | null = null;
   let hasError = false;
@@ -48,6 +49,7 @@ export async function BookingSection({ providerId, initialSlotStartAt }: Props) 
     <div className="fade-in-up">
       <BookingSectionClient
         provider={provider}
+        initialServiceId={initialServiceId}
         initialSlotStartAt={initialSlotStartAt}
         studioPublicUsername={studioPublicUsername}
       />

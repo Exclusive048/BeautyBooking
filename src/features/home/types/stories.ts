@@ -5,6 +5,8 @@ export type StoryItem = {
   /** Подпись «мастер · услуга» (STUDIO-PORTFOLIO-FEED); старый кадр кэша — undefined. */
   performerName?: string | null;
   serviceTitle?: string | null;
+  /** Одобренная категория работы — подпись, когда услуга не привязана. */
+  categoryTitle?: string | null;
 };
 
 export type StoriesGroup = {

@@ -7,6 +7,7 @@ import {
   loadMasterServiceOverridesMap,
   publishedMasterWhere,
 } from "@/lib/feed/portfolio.service";
+import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
 import {
   decodeFeedPosition,
   encodeFeedPosition,
@@ -32,6 +33,8 @@ export type HomeFeedWork = {
   /** Мастер студии, выполнивший работу (только у фото студии). */
   performerName: string | null;
   primaryServiceTitle: string | null;
+  /** Одобренная категория работы — подпись, когда услуга не привязана. */
+  categoryTitle: string | null;
   totalPrice: number;
 };
 
@@ -167,6 +170,7 @@ export async function listHomeFeedGroups(input: {
           select: { id: true, name: true, publicUsername: true, ratingAvg: true },
         },
         performer: { select: { name: true } },
+        globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
         // include-ok: услуги одной работы — их единицы, выбираются при загрузке фото.
         services: {
           select: {
@@ -217,6 +221,7 @@ export async function listHomeFeedGroups(input: {
           caption: row.caption ?? null,
           performerName: row.performer?.name ?? null,
           primaryServiceTitle: snapshot.primaryServiceTitle,
+          categoryTitle: publicCategoryTitle(row.globalCategory),
           totalPrice: snapshot.totalPrice,
         } satisfies HomeFeedWork;
       }),

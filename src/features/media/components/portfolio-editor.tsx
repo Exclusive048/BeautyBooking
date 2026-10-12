@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { createPortal } from "react-dom";
-import { Pencil, Star, Tag, Trash2, X } from "lucide-react";
+import { Pencil, Star, Tag, Trash2 } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -11,9 +10,8 @@ import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { Button } from "@/components/ui/button";
 import { PhotoActionButton } from "@/components/ui/photo-action-button";
 import { cn } from "@/lib/cn";
-import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
+import { PhotoViewer } from "@/components/ui/photo-viewer";
 import { useConfirm } from "@/hooks/use-confirm";
-import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { StudioPortfolioAttributionData } from "@/lib/studios/portfolio-items";
@@ -58,27 +56,14 @@ export function PortfolioEditor({
   // Предпросмотр держит id фото, а не адрес: из просмотра его можно заменить
   // и удалить, а после замены показывается уже новое фото.
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const previewCloseRef = useRef<HTMLButtonElement>(null);
   const closePreview = useCallback(() => setPreviewId(null), []);
-  const isHydrated = useIsHydrated();
   const { confirm, modal: confirmModal } = useConfirm();
 
-  // UI-13 — у лайтбокса не было НИЧЕГО из контракта диалога: ни Escape, ни
-  // focus-trap, ни возврата фокуса, ни блокировки прокрутки фона. Закрыть
-  // его можно было только кликом по невидимой кнопке-подложке, то есть с
-  // клавиатуры выход находился наощупь, а колесо прокручивало страницу
-  // ПОД полноэкранным чёрным слоем. Исключение в ESLint обосновано верно,
-  // но оно про позиционирование — a11y-контракт им не покрывается.
-  // Фото исчезло из списка (удалили) — просмотр закрывается сам.
+  // Фото исчезло из списка (удалили) — просмотр закрывается сам. Контракт
+  // диалога (Escape, ловушка и возврат фокуса, блокировка прокрутки — UI-13)
+  // держит общий `PhotoViewer`.
   const previewIndex = previewId === null ? -1 : assets.findIndex((asset) => asset.id === previewId);
   const previewAsset = previewIndex >= 0 ? assets[previewIndex] : null;
-  useOverlayA11y({
-    open: previewAsset !== null,
-    onClose: closePreview,
-    containerRef: previewRef,
-    initialFocusRef: previewCloseRef,
-  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -430,75 +415,48 @@ export function PortfolioEditor({
         />
       ) : null}
 
-      {/* Просмотр фото во весь экран. Был светлой карточкой на 90% экрана:
-          фото «contain» оставляло сверху и снизу огромные светлые поля, своих
-          кнопок у просмотра не было, а сквозь затемнение просвечивали кнопки
-          плиток («закрыть» и «изменить» искали за полями — замечание владельца
-          2026-10-10). Теперь фон тёмный, фото занимает всё свободное место, а
-          «Заменить», «Удалить» и «Закрыть» — на самом просмотре. Через портал:
-          предок с transform сделал бы `fixed` относительным к себе. */}
-      {isHydrated && previewAsset
-        ? createPortal(
-          <div
-            ref={previewRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={mediaText.previewDialogAria}
-            tabIndex={-1}
-            className="fixed inset-0 z-modal bg-black/95"
-          >
-            <Button
-              variant="wrapper"
-              size="none"
-              tabIndex={-1}
-              className="absolute inset-0 cursor-default"
-              onClick={closePreview}
-              aria-label={mediaText.closePreviewAria}
-            />
-            <div className="pointer-events-none absolute inset-x-2 bottom-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] top-[calc(env(safe-area-inset-top,0px)+3.5rem)] sm:inset-x-16 sm:bottom-8 sm:top-16">
-              <ResilientImage
-                key={previewAsset.id}
-                src={previewAsset.url}
-                alt={mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}
-                sizes="100vw"
-                fit="contain"
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-            <div className="absolute right-1 top-[calc(env(safe-area-inset-top,0px)+0.25rem)] flex items-center sm:right-4 sm:top-4">
-              {canEdit ? (
-                <>
-                  <PhotoActionButton
-                    label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
-                    onClick={() => startReplace(previewAsset.id)}
-                    disabled={busy}
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden />
-                  </PhotoActionButton>
-                  <PhotoActionButton
-                    label={`${mediaText.removePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
-                    onClick={() => {
-                      // Подтверждение — своим окном; два окна с ловушкой фокуса
-                      // разом не открываем.
-                      const id = previewAsset.id;
-                      closePreview();
-                      void remove(id);
-                    }}
-                    disabled={busy}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </PhotoActionButton>
-                </>
-              ) : null}
-              <PhotoActionButton ref={previewCloseRef} label={mediaText.closePreviewAria} onClick={closePreview}>
-                <X className="h-4 w-4" aria-hidden />
+      {/* Просмотр фото во весь экран (общий `PhotoViewer`). Был светлой
+          карточкой на 90% экрана: фото «contain» оставляло огромные светлые
+          поля, своих кнопок у просмотра не было («закрыть» и «изменить» искали
+          за полями — замечание владельца 2026-10-10). «Заменить» и «Удалить» —
+          на самом просмотре; фото листаются. */}
+      <PhotoViewer
+        items={assets.map((asset, index) => ({
+          key: asset.id,
+          src: asset.url,
+          alt: mediaText.photoAltTemplate.replace("{n}", String(index + 1)),
+        }))}
+        index={previewIndex >= 0 ? previewIndex : null}
+        onIndexChange={(index) => setPreviewId(assets[index]?.id ?? null)}
+        onClose={closePreview}
+        unoptimized
+        actions={
+          canEdit && previewAsset ? (
+            <>
+              <PhotoActionButton
+                label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
+                onClick={() => startReplace(previewAsset.id)}
+                disabled={busy}
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
               </PhotoActionButton>
-            </div>
-          </div>,
-          document.body,
-        )
-        : null}
+              <PhotoActionButton
+                label={`${mediaText.removePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
+                onClick={() => {
+                  // Подтверждение — своим окном; два окна с ловушкой фокуса
+                  // разом не открываем.
+                  const id = previewAsset.id;
+                  closePreview();
+                  void remove(id);
+                }}
+                disabled={busy}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </PhotoActionButton>
+            </>
+          ) : null
+        }
+      />
 
       <FileInput
         ref={addInputRef}

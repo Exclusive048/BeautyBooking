@@ -61,7 +61,7 @@ export function SuccessPhase({ booking, onCancel }: Props) {
     : "";
 
   return (
-    <div className="space-y-5 p-5">
+    <div className="space-y-5">
       <div className="flex items-center gap-2">
         {pending ? (
           <Hourglass className="h-5 w-5 text-warning-text" aria-hidden strokeWidth={2} />

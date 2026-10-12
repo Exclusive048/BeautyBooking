@@ -3585,6 +3585,11 @@ export const openApiSpec = {
           studioName: { type: "string", nullable: true },
           serviceIds: { type: "array", items: { type: "string" } },
           primaryServiceTitle: { type: "string", nullable: true },
+          categoryTitle: {
+            type: "string",
+            nullable: true,
+            description: "Одобренная категория работы — подпись, когда услуга к работе не привязана.",
+          },
           totalDurationMin: { type: "integer" },
           totalPrice: { type: "integer" },
           favoritesCount: { type: "integer" },
@@ -3666,6 +3671,11 @@ export const openApiSpec = {
           caption: { type: "string", nullable: true },
           performerName: { type: "string", nullable: true },
           primaryServiceTitle: { type: "string", nullable: true },
+          categoryTitle: {
+            type: "string",
+            nullable: true,
+            description: "Одобренная категория работы — подпись, когда услуга к работе не привязана.",
+          },
           totalPrice: { type: "integer" },
         },
       },
@@ -4122,6 +4132,11 @@ export const openApiSpec = {
           createdAt: { type: "string", format: "date-time" },
           performerName: { type: "string", nullable: true },
           serviceTitle: { type: "string", nullable: true },
+          categoryTitle: {
+            type: "string",
+            nullable: true,
+            description: "Одобренная категория работы — подпись, когда услуга к работе не привязана. Может отсутствовать.",
+          },
         },
       },
       FeedStoriesGroup: {
