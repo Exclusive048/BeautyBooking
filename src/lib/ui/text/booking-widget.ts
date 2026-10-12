@@ -1,5 +1,7 @@
 export const bookingWidget = {
   backToStudio: "К странице студии",
+  // BOOKING-WIDGET-DIALOG: окно записи на странице студии.
+  dialogTitle: "Запись",
   hero: {
     studioLabel: "Студия",
     bookingToMaster: "Записываетесь к",
@@ -19,7 +21,10 @@ export const bookingWidget = {
   serviceStep: {
     titleStudio: "Какую услугу выбираем?",
     subtitleStudio: "{count} услуг от команды",
-    titleMaster: "Что хотите сделать у {master}?",
+    // BOOKING-WIDGET-DIALOG: окно записи к мастеру.
+    subtitleSolo: "Потом выберем удобное время",
+    // Имя — в именительном падеже: склонять имена мы не умеем, а «у Виктория» резало глаз.
+    titleMaster: "Что сделает {master}?",
     subtitleMaster: "Только то, что делает мастер",
     searchPlaceholder: "Найти услугу — «маникюр», «балаяж»…",
     searchEmpty: "Ничего не нашлось. Попробуйте по-другому.",
@@ -37,11 +42,13 @@ export const bookingWidget = {
     anyMaster: "Любой свободный",
     anyMasterSub: "по ближайшему окошку",
     noMasters: "По выбранной услуге пока нет доступных мастеров.",
-    back: "Назад к услуге",
+    // «Назад», как у остальных шагов: «Назад к услуге» на телефоне сжимало
+    // заголовок шага в две строки и обрезало подзаголовок.
+    back: "Назад",
   },
   whenStep: {
     title: "Когда вам удобно?",
-    subtitleMaster: "Свободное время {master}",
+    subtitleMaster: "Свободные окошки · {master}",
     subtitleAny: "Ближайшие окошки команды",
     morning: "Утро",
     day: "День",
@@ -89,7 +96,9 @@ export const bookingWidget = {
     anyMaster: "любой свободный",
     total: "Итого к оплате",
     submit: "Записаться",
-    submitDisabled: "Заполните все шаги",
+    // BOOKING-WIDGET-DIALOG: кнопка не выключается — ведёт к первому
+    // незаполненному шагу.
+    continue: "Продолжить",
     submitting: "Создаём запись…",
     freeCancelTemplate: "Бесплатная отмена за {hours} ч",
     freeCancelHint: "Мы напомним о записи",

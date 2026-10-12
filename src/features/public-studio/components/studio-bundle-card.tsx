@@ -33,18 +33,18 @@ export function StudioBundleCard({ bundle, studioTimezone, masters, hideBooking 
       />
       <div className="relative">
         <div className="mb-3 flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-bg-card/85 text-accent-text">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-bg-card/85 text-accent-text">
             <Package className="h-4 w-4" aria-hidden strokeWidth={1.6} />
           </span>
-          <h3 className="font-display text-base text-text-main">{bundle.name}</h3>
+          <h3 className="min-w-0 break-words font-display text-base text-text-main">{bundle.name}</h3>
         </div>
 
         <div className="mb-4 text-xs uppercase tracking-wider text-text-sec">{T.includesLabel}</div>
         <ul className="mb-4 space-y-1.5">
           {bundle.serviceNames.map((name) => (
-            <li key={name} className="flex items-center gap-2 text-sm text-text-main">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-primary/60" />
-              {name}
+            <li key={name} className="flex items-start gap-2 text-sm text-text-main">
+              <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60" />
+              <span className="min-w-0 break-words">{name}</span>
             </li>
           ))}
         </ul>
@@ -60,7 +60,7 @@ export function StudioBundleCard({ bundle, studioTimezone, masters, hideBooking 
               </div>
             ) : null}
           </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-bg-card/85 px-2.5 py-1 text-xs text-text-sec">
+          <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-bg-card/85 px-2.5 py-1 text-xs text-text-sec">
             <Clock className="h-3 w-3" aria-hidden strokeWidth={1.8} />
             {T.durationTemplate.replace("{minutes}", String(bundle.totalDurationMin))}
           </div>

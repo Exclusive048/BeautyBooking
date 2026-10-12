@@ -136,11 +136,12 @@ const eslintConfig = defineConfig([
       // zones / hold-to-pause / swipe-down dismiss / 5s auto-advance) that
       // conflicts with ModalSurface's backdrop + focus-trap — invariant #27.
       "src/features/home/components/stories-viewer-overlay.tsx",
-      // full-bleed 90vw image preview on bg-black; ModalSurface's card chrome
-      // would box/letterbox it unless neutralized by className (possible since
-      // `cn` became tailwind-merge). Residual hazard (not yet portaled) tracked
-      // in BACKLOG — OVERLAY-FULLBLEED-PORTAL-PRIMITIVE.
-      "src/features/media/components/portfolio-editor.tsx",
+      // PHOTO-VIEWER-01 (2026-10-12): the full-bleed photo viewer PRIMITIVE —
+      // createPortals to body + `useOverlayA11y` (focus trap, return focus,
+      // scroll lock, Escape). Readers: portfolio editor (cabinet), master
+      // portfolio strip and studio photos (public pages). It replaced the
+      // editor's own copy, which held this exemption before.
+      "src/components/ui/photo-viewer.tsx",
     ],
     rules: {
       "no-restricted-syntax": "off",

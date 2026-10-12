@@ -97,6 +97,16 @@ export const NOT_A_CLASS = new Set([
   "mr-marketing-banner-dismissed",
   // Якорь раздела справки (`href="#fixed-vs-flexible"`), совпал с `fixed`.
   "fixed-vs-flexible",
+  // Id раздела справки (`help-content.tsx`). Стал кандидатом, когда
+  // `auto-rows-fr` (ровная сетка «Популярных категорий», 2026-10-12) оживил
+  // пространство `auto-*` в бандле.
+  "auto-confirm",
+  // Значения кода: файл `not-found` App Router и исход `"not-found"` в роутах,
+  // состояние нотифаера `"not-initialized"` в панели состояния. Стали
+  // кандидатами, когда `sm:not-sr-only` (подписи шагов окна записи на ПК,
+  // 2026-10-12) оживил пространство `not-*` в бандле.
+  "not-found",
+  "not-initialized",
 ]);
 
 /**

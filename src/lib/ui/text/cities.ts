@@ -11,6 +11,8 @@ export const cities = {
   timezoneNotAllowed: "Выберите часовой пояс России.",
   selector: {
     choose: "Сменить город",
+    // Телефон (< sm): полная подпись не помещается в шапку рядом с кнопками.
+    chooseShort: "Город",
     label: "Выбор города",
     separator: "·",
   },

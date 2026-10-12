@@ -8,7 +8,10 @@ import { MapSection } from "@/features/public-profile/master/sections/map-sectio
 import { BookingSection } from "@/features/public-profile/master/sections/booking-section";
 import { OwnerProfileNotice } from "@/features/public-profile/master/sections/owner-profile-notice";
 import { SectionNav } from "@/features/public-profile/master/section-nav";
-import { MobileBookingCta } from "@/features/public-profile/master/mobile-booking-cta";
+import {
+  MasterBookingProvider,
+  MasterFloatingBooking,
+} from "@/features/public-profile/master/booking-dialog-context";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
 import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
 import { ServicesSkeleton } from "@/components/blocks/skeletons/ServicesSkeleton";
@@ -29,8 +32,11 @@ type Props = {
  * Left column scrolls through services / portfolio / reviews / about
  * (each anchored by `id` so SectionNav can highlight the active one
  * via IntersectionObserver). Right column hosts the sticky booking
- * widget on lg+. On mobile the booking widget collapses into a
- * fixed bottom drawer via <MobileBookingCta />.
+ * card on lg+.
+ *
+ * BOOKING-WIDGET-DIALOG: запись — окно по шагам (`MasterBookingDialog`).
+ * Его открывают «Записаться» у услуги (с этой услугой), карточка записи и
+ * плавающая кнопка на телефоне (`MasterFloatingBooking`).
  *
  * Sections use a shared cached aggregator (`getMasterPublicProfileView`)
  * so all sections de-duplicate to a single Prisma roundtrip per
@@ -38,8 +44,8 @@ type Props = {
  * partial loads.
  *
  * Owner view (FIX-MASTER-01 item 5): when the viewer owns this profile the
- * booking widget and the mobile booking CTA are replaced with an owner
- * notice — self-booking is server-rejected anyway, so the affordance was a
+ * booking card, the service «Записаться» buttons and the floating CTA are
+ * replaced with an owner notice — self-booking is server-rejected anyway, so the affordance was a
  * guaranteed dead end.
  */
 export async function PublicMasterProfilePage({
@@ -49,8 +55,10 @@ export async function PublicMasterProfilePage({
 }: Props) {
   const isOwner = await isViewerProfileOwner(providerId);
   return (
-    <>
-      <div className="space-y-5 pb-24 lg:pb-0">
+    <MasterBookingProvider>
+      {/* `pb-24`: последняя секция не уходит под плавающую «Записаться»; у
+          владельца кнопки нет — и места под неё тоже. */}
+      <div className={isOwner ? "space-y-5" : "space-y-5 pb-24 lg:pb-0"}>
         <Suspense fallback={<HeroSkeleton />}>
           <HeroSection providerId={providerId} />
         </Suspense>
@@ -61,10 +69,7 @@ export async function PublicMasterProfilePage({
           <div className="min-w-0 space-y-8">
             <div id="services" className="scroll-mt-24">
               <Suspense fallback={<ServicesSkeleton />}>
-                <ServicesSection
-                  providerId={providerId}
-                  initialServiceId={initialServiceId}
-                />
+                <ServicesSection providerId={providerId} />
               </Suspense>
             </div>
 
@@ -99,16 +104,16 @@ export async function PublicMasterProfilePage({
             </Suspense>
           </div>
 
-          <div
-            id="booking"
-            className="h-fit lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-auto"
-          >
+          {/* Запись идёт в окне, здесь только короткая карточка — без своей
+              прокрутки, иначе обёртка срезала её тень. */}
+          <div id="booking" className="h-fit lg:sticky lg:top-20">
             {isOwner ? (
               <OwnerProfileNotice />
             ) : (
               <Suspense fallback={<BookingSkeleton />}>
                 <BookingSection
                   providerId={providerId}
+                  initialServiceId={initialServiceId}
                   initialSlotStartAt={initialSlotStartAt}
                 />
               </Suspense>
@@ -117,7 +122,7 @@ export async function PublicMasterProfilePage({
         </div>
       </div>
 
-      {isOwner ? null : <MobileBookingCta />}
-    </>
+      {isOwner ? null : <MasterFloatingBooking />}
+    </MasterBookingProvider>
   );
 }

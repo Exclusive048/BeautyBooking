@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { fetchJson } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { providerPublicUrl, studioBookingUrl } from "@/lib/public-urls";
+import { StudioBookingLink } from "@/features/public-studio/studio-booking-dialog";
 import { ResilientImage } from "@/components/ui/resilient-image";
 
 export type StudioMasterCard = {
@@ -178,8 +179,12 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
                   {UI_TEXT.publicStudio.openMaster}
                 </Link>
                 {hideBooking ? null : (
+                  // BOOKING-WIDGET-DIALOG: окно записи к этому мастеру — с шага услуги.
+                  // `master.id` — профиль мастера в студии, как в списке мастеров окна.
                   <Button asChild size="sm" className="ml-auto h-8 rounded-lg px-2.5 text-xs">
-                    <Link href={bookingHref}>{UI_TEXT.publicStudio.book}</Link>
+                    <StudioBookingLink href={bookingHref} request={{ masterId: master.id }}>
+                      {UI_TEXT.publicStudio.book}
+                    </StudioBookingLink>
                   </Button>
                 )}
               </div>

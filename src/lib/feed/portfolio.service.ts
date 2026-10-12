@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { decodePublicId, encodePublicId } from "@/lib/public-id";
 import { Prisma } from "@prisma/client";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
+import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
 
 /**
  * FEED-UNPUBLISHED-MASTER (2026-09-15). Лента портфолио на главной для
@@ -63,6 +64,11 @@ export type PortfolioFeedItem = {
   // `serviceIds` removed (rule 12) — unused publicly; the booking deep-link
   // uses `serviceOptions[].serviceId` (booking-flow exception) on the detail.
   primaryServiceTitle: string | null;
+  /**
+   * Одобренная категория работы (`publicCategoryTitle`) — подпись работы, когда
+   * `primaryServiceTitle` пуст.
+   */
+  categoryTitle: string | null;
   totalDurationMin: number;
   totalPrice: number;
   favoritesCount: number;
@@ -358,6 +364,7 @@ export async function listPortfolioFeed(input: {
           },
         },
         performer: { select: { name: true } },
+        globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
         services: {
           include: {
             service: {
@@ -424,6 +431,7 @@ export async function listPortfolioFeed(input: {
       studioName: row.master.studio?.name ?? null,
       performerName: row.performer?.name ?? null,
       primaryServiceTitle: snapshot.primaryServiceTitle,
+      categoryTitle: publicCategoryTitle(row.globalCategory),
       totalDurationMin: snapshot.totalDurationMin,
       totalPrice: snapshot.totalPrice,
       favoritesCount: row._count.favorites,
@@ -482,6 +490,7 @@ export async function listHomePortfolioFeed(input: {
           },
         },
         performer: { select: { name: true } },
+        globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
         services: {
           include: {
             service: {
@@ -548,6 +557,7 @@ export async function listHomePortfolioFeed(input: {
       studioName: row.master.studio?.name ?? null,
       performerName: row.performer?.name ?? null,
       primaryServiceTitle: snapshot.primaryServiceTitle,
+      categoryTitle: publicCategoryTitle(row.globalCategory),
       totalDurationMin: snapshot.totalDurationMin,
       totalPrice: snapshot.totalPrice,
       favoritesCount: row._count.favorites,
@@ -582,6 +592,7 @@ export async function getPortfolioDetail(
         },
       },
       performer: { select: { name: true } },
+      globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
       services: {
         include: {
           service: {
@@ -691,6 +702,7 @@ export async function getPortfolioDetail(
     studioName: item.master.studio?.name ?? null,
     performerName: item.performer?.name ?? null,
     primaryServiceTitle: snapshot.primaryServiceTitle,
+    categoryTitle: publicCategoryTitle(item.globalCategory),
     totalDurationMin: snapshot.totalDurationMin,
     totalPrice: snapshot.totalPrice,
     serviceOptions: snapshot.serviceOptions,

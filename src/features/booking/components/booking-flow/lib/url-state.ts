@@ -31,3 +31,20 @@ export function clearBookingIdFromUrl(): void {
   url.searchParams.delete(BOOKING_ID_PARAM);
   window.history.replaceState({}, "", url.toString());
 }
+
+/**
+ * BOOKING-WIDGET-DIALOG: закрытое окно записи убирает из адреса параметры, с
+ * которыми его открыли (`?serviceId=`, `?slotStartAt=`…), — иначе обновление
+ * страницы открыло бы его снова.
+ */
+export function clearSearchParamsFromUrl(names: readonly string[]): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  let changed = false;
+  for (const name of names) {
+    if (!url.searchParams.has(name)) continue;
+    url.searchParams.delete(name);
+    changed = true;
+  }
+  if (changed) window.history.replaceState({}, "", url.toString());
+}

@@ -1,81 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { m } from "framer-motion";
-import { X, ZoomIn } from "lucide-react";
 import { HOVER_LIFT, IMAGE_ZOOM } from "@/components/ui/motion-classes";
 import { Button } from "@/components/ui/button";
-import { ModalSurface } from "@/components/ui/modal-surface";
-import { PhotoActionButton } from "@/components/ui/photo-action-button";
+import { PhotoViewer } from "@/components/ui/photo-viewer";
 import { ResilientImage } from "@/components/ui/resilient-image";
-import { UI_FMT } from "@/lib/ui/fmt";
-import { fetchJson } from "@/lib/http/client";
 import { MOTION, STAGGER } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 
-type PortfolioItemPreview = {
+export type PortfolioWork = {
   id: string;
   mediaUrl: string;
-  visualSearchReady: boolean;
+  /** Описание работы от мастера. */
   caption: string | null;
-  primaryServiceTitle: string | null;
-  masterName: string;
-};
-
-type PortfolioDetail = PortfolioItemPreview & {
-  serviceOptions: Array<{
-    serviceId: string;
-    title: string;
-    durationMin: number;
-    price: number;
-  }>;
+  /** Что на фото: услуга, иначе одобренная категория (`workSubjectTitle`). */
+  subject: string | null;
 };
 
 type Props = {
-  items: PortfolioItemPreview[];
+  items: PortfolioWork[];
 };
 
+function workAlt(item: PortfolioWork): string {
+  return item.caption ?? item.subject ?? UI_TEXT.publicProfile.portfolio.untitledWork;
+}
 
+/**
+ * Портфолио на странице мастера. Подпись работы — услуга, без имени мастера:
+ * чья это страница, и так видно. Плитка открывает просмотр во весь экран с
+ * листанием (`PhotoViewer`) — фото видно сразу, без ожидания карточки работы.
+ */
 export function PortfolioStrip({ items }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<PortfolioDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  function closeViewer() {
-    setSelectedId(null);
-    setSelectedItem(null);
-    setError(null);
-  }
-
-  const selectedPreview = useMemo(
-    () => items.find((item) => item.id === selectedId) ?? null,
-    [items, selectedId]
-  );
-
-  useEffect(() => {
-    if (!selectedId) return;
-
-    let cancelled = false;
-    async function loadDetail() {
-      try {
-        const data = await fetchJson<{ item: PortfolioDetail }>(`/api/portfolio/${selectedId}`, {
-          cache: "no-store",
-        });
-        if (!cancelled) setSelectedItem(data.item);
-      } catch {
-        // Чтение: своя строка просмотра (раньше обрыв сети не ловился вовсе).
-        if (!cancelled) {
-          setSelectedItem(null);
-          setError(UI_TEXT.publicProfile.portfolio.viewError);
-        }
-      }
-    }
-
-    void loadDetail();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const closeViewer = useCallback(() => setViewerIndex(null), []);
 
   return (
     <section className="lux-card rounded-3xl p-5">
@@ -91,7 +49,7 @@ export function PortfolioStrip({ items }: Props) {
           animate="visible"
           variants={{ hidden: {}, visible: { transition: { staggerChildren: STAGGER } } }}
         >
-          {items.map((item) => (
+          {items.map((item, index) => (
             <m.div
               key={item.id}
               variants={{
@@ -101,100 +59,48 @@ export function PortfolioStrip({ items }: Props) {
             >
               <Button
                 variant="wrapper"
-                onClick={() => {
-                  setError(null);
-                  setSelectedItem(null);
-                  setSelectedId(item.id);
-                }}
-                className={`group w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 text-left hover:shadow-card ${HOVER_LIFT}`}
+                size="none"
+                onClick={() => setViewerIndex(index)}
+                aria-label={UI_TEXT.publicProfile.portfolio.openWork.replace("{title}", workAlt(item))}
+                className={`group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 hover:shadow-card ${HOVER_LIFT}`}
               >
-                <div className="relative aspect-square overflow-hidden">
-                  {item.visualSearchReady ? (
-                    <div className="absolute left-2 top-2 z-10 rounded-full bg-success/90 px-2 py-1 text-2xs font-semibold text-white">
-                      {UI_TEXT.publicProfile.portfolio.indexedBadge}
-                    </div>
-                  ) : null}
-                  <ResilientImage
-                    src={item.mediaUrl}
-                    alt={item.caption ?? item.primaryServiceTitle ?? UI_TEXT.publicProfile.portfolio.untitledWork}
-                    sizes="(max-width: 640px) 50vw, 33vw"
-                    quality={90}
-                    className={`object-cover ${IMAGE_ZOOM}`}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-200 group-hover:bg-black/25 group-hover:opacity-100">
-                    <ZoomIn className="h-6 w-6 text-white drop-shadow" aria-hidden />
-                  </div>
-                </div>
-                <div className="p-2 text-xs text-text-sec">
-                  {item.primaryServiceTitle ?? item.caption ?? item.masterName}
-                </div>
+                <ResilientImage
+                  src={item.mediaUrl}
+                  alt={workAlt(item)}
+                  sizes="(max-width: 640px) 50vw, 33vw"
+                  quality={90}
+                  className={`object-cover ${IMAGE_ZOOM}`}
+                />
+                {item.subject ? (
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 via-black/25 to-transparent px-2.5 pb-2 pt-8 text-left">
+                    <span className="block truncate text-xs font-medium text-white/90">{item.subject}</span>
+                  </span>
+                ) : null}
               </Button>
             </m.div>
           ))}
         </m.div>
       )}
 
-      {/* OVERLAY-PORTAL-REFACTOR-01: was a hand-rolled `fixed inset-0` lightbox.
-          Now portals through <ModalSurface size="xl"> (max-w-4xl preserved).
-          Backdrop-click close (was an explicit wrapper Button) is now handled
-          by ModalSurface; gains role="dialog"/aria-modal, focus-trap,
-          scroll-lock + Escape close — all previously absent. */}
-      <ModalSurface open={Boolean(selectedId)} onClose={closeViewer} size="xl">
-        {/* Крестик — на тёмном стекле: светлый кружок на светлой карточке
-            поверх фото был почти не виден (замечание владельца 2026-10-10). */}
-        <PhotoActionButton
-          label={UI_TEXT.publicProfile.portfolio.close}
-          onClick={closeViewer}
-          className="absolute right-2 top-2 z-10"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </PhotoActionButton>
-
-        {error ? <div className="py-6 text-center text-sm text-danger-text">{error}</div> : null}
-
-        {!error && !selectedItem ? (
-          <div className="flex min-h-[240px] items-center justify-center text-sm text-text-sec">
-            {UI_TEXT.publicProfile.portfolio.loading}
-          </div>
-        ) : null}
-
-        {selectedItem ? (
-          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-            {/* Тёмная рамка: фото «contain» другой пропорции оставляет поля,
-                и светлыми они читались как пустые блоки над и под снимком. */}
-            <div className="relative aspect-[3/4] max-h-[72vh] w-full overflow-hidden rounded-2xl bg-black">
-              <ResilientImage
-                src={selectedItem.mediaUrl}
-                alt={
-                  selectedItem.caption ??
-                  selectedItem.primaryServiceTitle ??
-                  UI_TEXT.publicProfile.portfolio.untitledWork
-                }
-                sizes="(max-width: 1024px) 90vw, 50vw"
-                quality={90}
-                fit="contain"
-                className="object-contain"
-              />
-            </div>
-            <div>
-              <div className="text-lg font-semibold text-text-main">{selectedItem.masterName}</div>
-              <div className="mt-2 text-sm text-text-sec">
-                {selectedItem.caption ?? selectedPreview?.caption ?? ""}
-              </div>
-              {selectedItem.serviceOptions.length > 0 ? (
-                <div className="mt-4 space-y-2">
-                  {selectedItem.serviceOptions.map((service) => (
-                    <div key={service.serviceId} className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2">
-                      <span className="text-sm text-text-main">{service.title}</span>
-                      <span className="text-sm font-medium text-text-sec">{UI_FMT.priceLabel(service.price)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-      </ModalSurface>
+      <PhotoViewer
+        items={items.map((item) => ({
+          key: item.id,
+          src: item.mediaUrl,
+          alt: workAlt(item),
+          caption:
+            item.subject || item.caption ? (
+              <>
+                {item.subject ? <span className="block font-medium text-white">{item.subject}</span> : null}
+                {item.caption && item.caption !== item.subject ? (
+                  <span className="mt-1 block text-white/70">{item.caption}</span>
+                ) : null}
+              </>
+            ) : null,
+        }))}
+        index={viewerIndex}
+        onIndexChange={setViewerIndex}
+        onClose={closeViewer}
+      />
     </section>
   );
 }

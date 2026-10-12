@@ -1,6 +1,8 @@
 import { ProviderType } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
+import { workSubjectTitle } from "@/lib/feed/work-caption";
+import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
 import { logError } from "@/lib/logging/logger";
 import { buildMediaFileUrl } from "@/lib/media/types";
 import { prisma } from "@/lib/prisma";
@@ -145,6 +147,52 @@ export async function getStudioPortfolioAttribution(
       title: service.title?.trim() || service.name,
     })),
   };
+}
+
+export type StudioPortfolioCaption = {
+  /** Мастер студии, выполнивший работу. */
+  performerName: string | null;
+  /** Услуга, иначе одобренная категория работы (`workSubjectTitle`). */
+  subject: string | null;
+};
+
+/**
+ * Подписи фото на публичной странице студии — по строкам работ: исполнитель
+ * («Имя Фамилия») и услуга, ключ — id файла. Только чтение: строки сводят к
+ * правилу кабинет и пост-деплой, а публичная страница базу не пишет. Фото без
+ * строки (баннер, ещё не сведённое) остаётся без подписи.
+ */
+export async function getStudioPortfolioCaptions(
+  studioProviderId: string,
+): Promise<Map<string, StudioPortfolioCaption>> {
+  const items = await prisma.portfolioItem.findMany({
+    where: { masterId: studioProviderId, isPublic: true },
+    select: {
+      mediaUrl: true,
+      performer: { select: { name: true } },
+      globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
+      services: {
+        select: { service: { select: { name: true, title: true } } },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
+    },
+  });
+
+  const captions = new Map<string, StudioPortfolioCaption>();
+  for (const item of items) {
+    const assetId = assetIdFromMediaUrl(item.mediaUrl);
+    if (!assetId) continue;
+    const service = item.services[0]?.service;
+    captions.set(assetId, {
+      performerName: item.performer?.name?.trim() || null,
+      subject: workSubjectTitle(
+        service ? service.title?.trim() || service.name : null,
+        publicCategoryTitle(item.globalCategory),
+      ),
+    });
+  }
+  return captions;
 }
 
 /**

@@ -3,6 +3,13 @@ export const common = {
   loading: "Загрузка…",
   cancel: "Отмена",
   close: "Закрыть",
+  // PHOTO-VIEWER-01: просмотр фото во весь экран (`components/ui/photo-viewer.tsx`).
+  photoViewer: {
+    dialog: "Просмотр фото",
+    previous: "Предыдущее фото",
+    next: "Следующее фото",
+    counter: "{current} из {total}",
+  },
   noLimit: "Без ограничений",
   home: "Главная",
   minutesShort: "мин",

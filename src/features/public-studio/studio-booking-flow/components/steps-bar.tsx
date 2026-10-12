@@ -24,7 +24,7 @@ export function StepsBar({ active, done, scenarioB }: Props) {
     <div
       role="list"
       aria-label={UI_TEXT.bookingWidget.steps.ariaLabel}
-      className="flex items-stretch gap-0 rounded-xl border border-border-subtle bg-bg-card p-2 sm:p-2.5"
+      className="flex items-stretch gap-1 rounded-xl border border-border-subtle bg-bg-card p-2 sm:gap-0 sm:p-2.5"
     >
       {visible.map((step, i) => {
         const isDone = done.has(step.id);
@@ -35,9 +35,11 @@ export function StepsBar({ active, done, scenarioB }: Props) {
             role="listitem"
             key={step.id}
             aria-current={isActive ? "step" : undefined}
-            className={`relative flex min-w-0 flex-1 items-center gap-1.5 px-1 py-1 sm:gap-3 sm:px-3 ${
-              dimmed ? "opacity-60" : "opacity-100"
-            }`}
+            // На телефоне подпись — только у текущего шага, остальные — номер или
+            // галочка: четыре подписи в 335 px обрезались до «Усл…», «Мас…».
+            className={`relative flex min-w-0 items-center gap-1.5 px-1 py-1 sm:flex-1 sm:gap-3 sm:px-3 ${
+              isActive ? "flex-1" : "flex-none"
+            } ${dimmed ? "opacity-60" : "opacity-100"}`}
           >
             <span
               className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg font-mono text-2xs font-bold ${
@@ -57,7 +59,11 @@ export function StepsBar({ active, done, scenarioB }: Props) {
               <div className="eyebrow hidden text-text-muted sm:block">
                 {UI_TEXT.bookingWidget.steps.stepLabel.replace("{n}", String(i + 1))}
               </div>
-              <div className={`truncate text-xs ${isActive || isDone ? "font-semibold text-text" : "text-text"} sm:text-sm`}>
+              <div
+                className={`truncate text-xs ${isActive || isDone ? "font-semibold text-text" : "text-text"} sm:text-sm ${
+                  isActive ? "" : "sr-only sm:not-sr-only"
+                }`}
+              >
                 {step.label}
               </div>
             </div>

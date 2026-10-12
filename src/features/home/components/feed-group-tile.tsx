@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FavoriteToggleButton } from "@/components/ui/favorite-toggle-button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { cn } from "@/lib/cn";
-import { formatWorkCaption } from "@/lib/feed/work-caption";
+import { formatWorkCaption, workSubjectTitle } from "@/lib/feed/work-caption";
 import type { HomeFeedGroup } from "@/lib/feed/home-feed.service";
 import { MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -57,7 +57,10 @@ export function FeedGroupTile({
   const total = group.works.length;
   const current = group.works[Math.min(active, total - 1)] ?? group.works[0]!;
   const profileHref = group.authorPublicUsername ? `/u/${group.authorPublicUsername}` : null;
-  const workCaption = formatWorkCaption(current.performerName, current.primaryServiceTitle);
+  const workCaption = formatWorkCaption(
+    current.performerName,
+    workSubjectTitle(current.primaryServiceTitle, current.categoryTitle),
+  );
   const priceRub = current.totalPrice > 0 ? UI_FMT.priceLabel(current.totalPrice) : null;
   const rating = group.authorRatingAvg > 0 ? UI_FMT.decimal(group.authorRatingAvg, 1) : null;
   const isCarousel = total > 1;
@@ -83,7 +86,10 @@ export function FeedGroupTile({
       className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain scrollbar-hide"
     >
       {group.works.map((work, index) => {
-        const caption = formatWorkCaption(work.performerName, work.primaryServiceTitle);
+        const caption = formatWorkCaption(
+          work.performerName,
+          workSubjectTitle(work.primaryServiceTitle, work.categoryTitle),
+        );
         return (
           <div
             key={work.id}

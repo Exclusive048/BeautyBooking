@@ -126,7 +126,7 @@ export function FormPhase({
     hasName && hasPhone && consentReady && !submitLoading && !referenceUploading;
 
   return (
-    <div className="space-y-4 p-5">
+    <div className="space-y-4">
       <Button variant="wrapper"
         onClick={onBack}
         className="inline-flex items-center gap-1 text-xs text-text-sec transition hover:text-text-main"

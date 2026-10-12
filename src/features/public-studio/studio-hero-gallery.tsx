@@ -1,14 +1,12 @@
 "use client";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { buildYandexMapsUrl } from "@/lib/maps/yandex";
 import * as UI_TEXT from "@/lib/ui/text";
-import { withQuery } from "@/lib/public-urls";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { CropArea } from "@/lib/media/crop-geometry";
+import { StudioBookingLink } from "@/features/public-studio/studio-booking-dialog";
 
 type StudioHeroData = {
   name: string;
@@ -38,15 +36,6 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref, hideBooking
     address: studio.address,
     lat: studio.geoLat ?? null,
     lon: studio.geoLng ?? null,
-  });
-  const searchParams = useSearchParams();
-  const master = searchParams?.get("master") ?? undefined;
-  const masterId = searchParams?.get("masterId") ?? undefined;
-  const bookingUrl = withQuery(bookingHref, {
-    serviceId: searchParams?.get("serviceId") ?? undefined,
-    master: master ?? undefined,
-    masterId: master ? undefined : masterId,
-    slotStartAt: searchParams?.get("slotStartAt") ?? undefined,
   });
 
   const heroImages = imageItems.slice(0, 5);
@@ -117,8 +106,10 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref, hideBooking
           </div>
 
           {hideBooking ? null : (
+            // BOOKING-WIDGET-DIALOG: окно записи с первого шага; ссылки с
+            // `?serviceId=` / `?master=` открывают его сами (StudioBookingAutoOpen).
             <Button asChild>
-              <Link href={bookingUrl}>{UI_TEXT.publicStudio.heroBook}</Link>
+              <StudioBookingLink href={bookingHref}>{UI_TEXT.publicStudio.heroBook}</StudioBookingLink>
             </Button>
           )}
         </div>

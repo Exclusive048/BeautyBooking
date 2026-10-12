@@ -15,9 +15,16 @@ type Props = {
   zoneLabel?: string | null;
   totalKopeks: number | null;
   cancellationDeadlineHours: number | null;
-  submitDisabled: boolean;
-  submitLoading: boolean;
-  onSubmit: () => void;
+  /** Всё выбрано и контакты заполнены — зелёная плашка статуса. */
+  ready: boolean;
+  /**
+   * BOOKING-WIDGET-DIALOG: кнопка не выключается «пока не заполнено всё» —
+   * мастер записи сам решает, что она делает сейчас: «Продолжить» к первому
+   * незаполненному шагу или «Записаться».
+   */
+  actionLabel: string;
+  actionDisabled: boolean;
+  onAction: () => void;
   statusLabel: string;
 };
 
@@ -30,12 +37,12 @@ export function BookingSummary({
   zoneLabel,
   totalKopeks,
   cancellationDeadlineHours,
-  submitDisabled,
-  submitLoading,
-  onSubmit,
+  ready,
+  actionLabel,
+  actionDisabled,
+  onAction,
   statusLabel,
 }: Props) {
-  const ready = !submitDisabled;
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-card p-5 shadow-sm">
       <div
@@ -94,15 +101,11 @@ export function BookingSummary({
         type="button"
         variant="primary"
         size="lg"
-        onClick={onSubmit}
-        disabled={submitDisabled || submitLoading}
+        onClick={onAction}
+        disabled={actionDisabled}
         className="mt-4 w-full"
       >
-        {submitLoading
-          ? UI_TEXT.bookingWidget.summary.submitting
-          : ready
-          ? UI_TEXT.bookingWidget.summary.submit
-          : UI_TEXT.bookingWidget.summary.submitDisabled}
+        {actionLabel}
       </Button>
 
       {cancellationDeadlineHours && cancellationDeadlineHours > 0 ? (

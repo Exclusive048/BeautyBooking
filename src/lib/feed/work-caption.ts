@@ -1,4 +1,16 @@
 /**
+ * Что на фото: привязанная услуга, иначе одобренная категория работы
+ * (`publicCategoryTitle`, `work-category.ts`) — у работ мастера услугу при
+ * загрузке выбирают по желанию, а категорию — всегда.
+ */
+export function workSubjectTitle(
+  serviceTitle: string | null | undefined,
+  categoryTitle: string | null | undefined,
+): string | null {
+  return serviceTitle?.trim() || categoryTitle?.trim() || null;
+}
+
+/**
  * STUDIO-PORTFOLIO-FEED (2026-09-24) — подпись работы на фото: «мастер · услуга».
  *
  * Одна функция на ленту и истории, чтобы подпись читалась одинаково.
