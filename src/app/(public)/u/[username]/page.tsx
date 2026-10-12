@@ -9,7 +9,10 @@ import { PublicMasterProfilePage } from "@/features/public-profile/master/public
 import { PublicStudioProfilePage } from "@/features/public-studio/public-studio-profile-page";
 import { resolvePublicAppUrl } from "@/lib/app-url";
 import { buildProviderSchema, safeJsonLd } from "@/lib/seo/schema";
-import { versionedBrandUrl } from "@/lib/pwa/brand-asset-version";
+import { BRAND_OG_IMAGE, SITE_OPEN_GRAPH } from "@/lib/seo/page-metadata";
+import { buildProviderDescription, buildProviderTitle } from "@/lib/seo/provider-meta";
+import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
+import { targetReviewsWhere } from "@/lib/reviews/review-scope";
 import { withQuery } from "@/lib/public-urls";
 import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { getNonce } from "@/lib/csp/nonce";
@@ -28,46 +31,6 @@ type Props = {
 
 function normalizeUsername(input: string) {
   return input.trim().toLowerCase();
-}
-
-function truncateText(text: string, maxLength = 160): string {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, Math.max(maxLength - 1, 0)).trim()}…`;
-}
-
-function buildDescription(input: {
-  name: string;
-  type: "MASTER" | "STUDIO";
-  description: string | null;
-  services: Array<{ name: string }>;
-}): string {
-  const bio = input.description?.trim();
-  if (bio) return truncateText(bio, 160);
-
-  const serviceNames = input.services
-    .map((service) => service.name.trim())
-    .filter((name) => name.length > 0)
-    .slice(0, 5);
-
-  if (serviceNames.length > 0) {
-    return truncateText(
-      UI_TEXT.pages.publicProfile.servicesDescriptionTemplate.replace("{services}", serviceNames.join(", ")),
-      160
-    );
-  }
-
-  // Без названия шаблон печатал «в студию «»» — для такого профиля своя строка.
-  const name = input.name.trim();
-  const t = UI_TEXT.pages.publicProfile;
-  const fallback =
-    input.type === "STUDIO"
-      ? name
-        ? t.studioDescriptionFallback.replace("{name}", name)
-        : t.studioDescriptionNoName
-      : name
-        ? t.masterDescriptionFallback.replace("{name}", name)
-        : t.masterDescriptionNoName;
-  return truncateText(fallback, 160);
 }
 
 type ReviewAuthor = {
@@ -174,17 +137,46 @@ async function findProviderForMeta(username: string) {
       ratingAvg: true,
       ratingCount: true,
       updatedAt: true,
-      services: {
-        where: { isActive: true },
-        select: { name: true, price: true, durationMin: true },
-        take: 10,
-      },
+      city: { select: { name: true } },
+      services: PUBLIC_SERVICES_SELECT,
     },
   });
 }
 
-/** Общая картинка бренда — та же, что `openGraph.images` в `app/layout.tsx`. */
-const BRAND_OG_IMAGE = { url: versionedBrandUrl("/brand/og-mark.png"), width: 1200, height: 1200 } as const;
+/**
+ * Услуги для заголовка, описания и разметки: те, что видит посетитель
+ * (включены и активны — как в `catalogVisibleProviderWhere`), в порядке показа.
+ */
+const PUBLIC_SERVICES_SELECT = {
+  where: { isEnabled: true, isActive: true },
+  orderBy: { sortOrder: "asc" },
+  take: 10,
+  select: {
+    name: true,
+    title: true,
+    price: true,
+    durationMin: true,
+    globalCategory: PORTFOLIO_CATEGORY_INCLUDE,
+  },
+} as const;
+
+type PublicServiceRow = {
+  name: string;
+  title: string | null;
+  price: number;
+  durationMin: number;
+  globalCategory: Parameters<typeof publicCategoryTitle>[0];
+};
+
+/** Название — как на странице: своё у услуги, иначе название из справочника. */
+function toMetaServices(services: PublicServiceRow[]) {
+  return services.map((service) => ({
+    name: service.title?.trim() || service.name,
+    price: service.price,
+    durationMin: service.durationMin,
+    categoryTitle: publicCategoryTitle(service.globalCategory),
+  }));
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username: raw } = await Promise.resolve(params);
@@ -203,20 +195,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = resolvePublicAppUrl();
   const canonicalUrl = baseUrl ? `${baseUrl}${canonicalPath}` : canonicalPath;
 
-  // R2-02-F: guard the empty-name edge case so the title never renders a bare
-  // " — запись онлайн" (leading dash) when a provider has a blank name.
-  const titleName =
-    provider.name.trim() ||
-    (provider.type === "STUDIO"
-      ? UI_TEXT.pages.publicProfile.studioNameFallback
-      : UI_TEXT.pages.publicProfile.nameFallback);
-  const title = UI_TEXT.pages.publicProfile.titleTemplate.replace("{name}", titleName);
-  const description = buildDescription({
+  const metaInput = {
     name: provider.name,
     type: provider.type,
     description: provider.description,
-    services: provider.services,
-  });
+    cityName: provider.city?.name ?? null,
+    services: toMetaServices(provider.services),
+  };
+  const title = buildProviderTitle(metaInput);
+  const description = buildProviderDescription(metaInput);
 
   // Превью-картинку отдаёт `/api/og/profile` только опубликованному профилю
   // (иначе 404). Страница по ссылке открывается и без публикации, поэтому
@@ -228,7 +215,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogImageUrl = baseUrl ? `${baseUrl}${ogImagePath}` : ogImagePath;
   const ogImage = provider.isPublished
     ? { url: ogImageUrl, width: 1200, height: 630, alt: provider.name }
-    : { ...BRAND_OG_IMAGE, url: ogImageUrl, alt: UI_TEXT.brand.name };
+    : { ...BRAND_OG_IMAGE, url: ogImageUrl };
 
   return {
     title,
@@ -236,6 +223,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     metadataBase: baseUrl ? new URL(baseUrl) : undefined,
     alternates: { canonical: canonicalPath },
     openGraph: {
+      ...SITE_OPEN_GRAPH,
       title,
       description,
       url: canonicalUrl,
@@ -317,18 +305,23 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
       type: true,
       description: true,
       address: true,
-      district: true,
       geoLat: true,
       geoLng: true,
       ratingAvg: true,
       ratingCount: true,
       avatarUrl: true,
-      services: {
-        where: { isActive: true },
-        select: { name: true, price: true, durationMin: true },
-        take: 10,
-      },
-      reviewsAbout: {
+      city: { select: { name: true } },
+      services: PUBLIC_SERVICES_SELECT,
+    },
+  });
+
+  // Отзывы для разметки — по тому же правилу, что список на странице и рейтинг
+  // (`targetReviewsWhere`: только неудалённые, инв. #17). Раньше мастер читал
+  // `reviewsAbout` без фильтра удаления — снятый модерацией отзыв попадал в
+  // разметку для поисковиков.
+  const seoReviews = seoProvider
+    ? await prisma.review.findMany({
+        where: targetReviewsWhere(seoProvider.type === "STUDIO" ? "studio" : "provider", seoProvider.id),
         orderBy: { createdAt: "desc" },
         take: 3,
         select: {
@@ -339,32 +332,7 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
             select: { displayName: true, firstName: true, lastName: true },
           },
         },
-      },
-      studioProfile: {
-        select: {
-          reviews: {
-            orderBy: { createdAt: "desc" },
-            take: 3,
-            select: {
-              rating: true,
-              text: true,
-              createdAt: true,
-              author: {
-                select: { displayName: true, firstName: true, lastName: true },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  const reviewsForSchema = seoProvider
-    ? mapReviewsForSchema(
-        seoProvider.type === "STUDIO"
-          ? seoProvider.studioProfile?.reviews ?? []
-          : seoProvider.reviewsAbout ?? []
-      )
+      })
     : [];
 
   const schema = seoProvider
@@ -377,13 +345,13 @@ export default async function PublicUsernamePage({ params, searchParams }: Props
           publicUsername: seoProvider.publicUsername ?? null,
           avatarUrl: seoProvider.avatarUrl ?? null,
           address: seoProvider.address ?? null,
-          district: seoProvider.district ?? null,
+          cityName: seoProvider.city?.name ?? null,
           geoLat: seoProvider.geoLat ?? null,
           geoLng: seoProvider.geoLng ?? null,
           ratingAvg: seoProvider.ratingAvg ?? 0,
           ratingCount: seoProvider.ratingCount ?? 0,
-          services: seoProvider.services ?? [],
-          reviews: reviewsForSchema,
+          services: toMetaServices(seoProvider.services),
+          reviews: mapReviewsForSchema(seoReviews),
         },
         resolvePublicAppUrl()
       )

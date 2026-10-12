@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeJsonLd } from "./schema";
+import { buildProviderSchema, safeJsonLd } from "./schema";
 
 /**
  * FAST-WINS-BATCH-A — SEC-2 closure (SECURITY-AUDIT-A finding).
@@ -51,5 +51,32 @@ describe("safeJsonLd", () => {
     expect(safeJsonLd({})).toBe("{}");
     expect(safeJsonLd(null)).toBe("null");
     expect(safeJsonLd("plain")).toBe('"plain"');
+  });
+});
+
+describe("buildProviderSchema", () => {
+  const base = {
+    id: "p1",
+    type: "MASTER" as const,
+    name: "Анна",
+    description: null,
+    publicUsername: "anna",
+    avatarUrl: "/api/media/file/abc/crop/1",
+    address: "ул. Ленина, 1",
+    cityName: "Липецк",
+    geoLat: null,
+    geoLng: null,
+    ratingAvg: 0,
+    ratingCount: 0,
+    services: [{ name: "Маникюр", price: 150_000, durationMin: 60 }],
+  };
+
+  it("SEO-02: цена услуги — в рублях (в БД копейки), город — addressLocality", () => {
+    const schema = buildProviderSchema(base, "https://masterryadom.ru");
+    expect(schema?.makesOffer).toEqual([
+      expect.objectContaining({ price: 1500, priceCurrency: "RUB" }),
+    ]);
+    expect(schema?.address).toMatchObject({ addressLocality: "Липецк", addressCountry: "RU" });
+    expect(schema?.image).toBe("https://masterryadom.ru/api/media/file/abc/crop/1");
   });
 });

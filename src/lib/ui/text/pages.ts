@@ -78,7 +78,7 @@ export const pages = {
   },
   blog: {
     navLabel: "Блог",
-    title: "Блог — МастерРядом",
+    title: "Блог",
     description:
       "Анонсы новых функций, обновления платформы и полезные материалы для мастеров и клиентов.",
     heroBadge: "Блог",
@@ -115,7 +115,7 @@ export const pages = {
   },
   giftCards: {
     navLabel: "Подарочные сертификаты",
-    title: "Подарочные сертификаты — МастерРядом",
+    title: "Подарочные сертификаты",
     description: "Подарочные сертификаты на услуги красоты. Скоро на МастерРядом.",
     heading: "Подарочные сертификаты",
     heroText:
@@ -131,24 +131,31 @@ export const pages = {
     footerText: "Подарочные сертификаты появятся совсем скоро.",
   },
   publicProfile: {
-    notFoundTitle: "Профиль не найден | МастерРядом",
+    notFoundTitle: "Профиль не найден",
     studioDescriptionFallback:
       "Запись онлайн в студию «{name}». Услуги, цены, отзывы и свободные окна.",
     masterDescriptionFallback:
       "Запись онлайн к мастеру {name}. Услуги, цены, отзывы и свободные окна.",
     studioDescriptionNoName: "Запись онлайн в студию. Услуги, цены, отзывы и свободные окна.",
     masterDescriptionNoName: "Запись онлайн к мастеру. Услуги, цены, отзывы и свободные окна.",
-    titleTemplate: "{name} — запись онлайн",
+    // SEO-02: в заголовке — кто это и где: по «маникюр Липецк» и по имени
+    // мастера ищут чаще, чем по «запись онлайн».
+    titleTemplate: "{name} — {specialty}",
+    titleCityTemplate: "{name} — {specialty}, {city}",
+    // Специализация уже в названии («Студия «Аура»», «Маникюр у Ани»).
+    titleNameCityTemplate: "{name}, {city}",
+    masterSpecialtyFallback: "мастер красоты",
+    studioSpecialty: "студия красоты",
     nameFallback: "Мастер",
     studioNameFallback: "Студия",
-    servicesDescriptionTemplate: "Услуги: {services}. Запись онлайн.",
+    servicesDescriptionTemplate: "{services}. Цены, отзывы и свободное время — онлайн-запись на МастерРядом.",
   },
   publicClient: {
-    title: "Профиль клиента | МастерРядом",
+    title: "Профиль клиента",
     unavailable: "Публичный профиль клиента недоступен.",
   },
   publicBooking: {
-    notFoundTitle: "Запись онлайн | МастерРядом",
+    notFoundTitle: "Запись онлайн",
     studioDescriptionFallback:
       "Запись онлайн в студию «{name}». Выберите услуги и свободное время.",
     masterDescriptionFallback:
@@ -160,10 +167,10 @@ export const pages = {
     studioNameFallback: "Студия",
   },
   modelOffer: {
-    notFoundTitle: "Предложение не найдено | МастерРядом",
+    notFoundTitle: "Предложение не найдено",
     notFoundDescription: "Предложение для моделей недоступно или было закрыто.",
     titleTemplate: "{service} для моделей",
-    descriptionTemplate: "Предложение от мастера {name}: {date} {start}-{end}.",
+    descriptionTemplate: "Мастер {name} ищет модель: {date}, {start}–{end}. Услуга со скидкой за участие в практике.",
     backToOffers: "← Все предложения",
     masterLabel: "Мастер",
     masterProfileCta: "Профиль мастера →",

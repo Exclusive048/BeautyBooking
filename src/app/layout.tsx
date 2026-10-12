@@ -35,6 +35,7 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { ensureVisualSearchStartupConfig } from "@/lib/visual-search/config";
 import { env } from "@/lib/env";
 import { safeJsonLd } from "@/lib/seo/schema";
+import { BRAND_OG_IMAGE, SITE_OPEN_GRAPH, SITE_TITLE_TEMPLATE } from "@/lib/seo/page-metadata";
 import { SITE_ICONS } from "@/lib/seo/site-icons";
 import { APPLE_STARTUP_IMAGES } from "@/lib/pwa/apple-splash";
 import { versionedBrandUrl } from "@/lib/pwa/brand-asset-version";
@@ -96,26 +97,15 @@ export const metadata: Metadata = {
   },
   title: {
     default: UI_TEXT.meta.title,
-    template: `%s | ${UI_TEXT.brand.name}`,
+    template: SITE_TITLE_TEMPLATE,
   },
   description: UI_TEXT.meta.description,
-  keywords: [
-    "запись к мастеру",
-    "онлайн запись красота",
-    "маникюр запись",
-    "стрижки онлайн",
-    "мастер красоты рядом",
-    "салон красоты",
-    "массаж запись",
-    "бьюти мастер",
-  ],
+  keywords: [...UI_TEXT.meta.keywords],
   openGraph: {
-    type: "website",
-    locale: "ru_RU",
-    siteName: UI_TEXT.brand.name,
+    ...SITE_OPEN_GRAPH,
     title: UI_TEXT.meta.title,
     description: UI_TEXT.meta.description,
-    images: [{ url: versionedBrandUrl("/brand/og-mark.png"), width: 1200, height: 1200, alt: UI_TEXT.brand.name }],
+    images: [{ ...BRAND_OG_IMAGE }],
   },
   twitter: {
     card: "summary_large_image",
@@ -144,6 +134,9 @@ export const metadata: Metadata = {
 /**
  * SEO-01: разметка сайта для поисковиков — организация (логотип и название в
  * выдаче) и сайт с поиском по каталогу (строка поиска прямо в результатах).
+ * SEO-02: `alternateName` — как ещё пишут название («Мастер Рядом», латиницей,
+ * доменом): по нему Google подписывает сайт в выдаче и связывает такие запросы
+ * с брендом.
  * Адрес — из env, а не литерал: на стенде с другим доменом разметка не
  * указывает на чужой сайт.
  */
@@ -154,6 +147,7 @@ const SITE_JSON_LD = {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
       name: UI_TEXT.brand.name,
+      alternateName: [...UI_TEXT.meta.alternateNames],
       url: SITE_URL,
       logo: `${SITE_URL}${versionedBrandUrl("/brand/icon-512.png")}`,
       ...(env.NEXT_PUBLIC_VK_COMMUNITY_URL ? { sameAs: [env.NEXT_PUBLIC_VK_COMMUNITY_URL] } : {}),
@@ -162,6 +156,7 @@ const SITE_JSON_LD = {
       "@type": "WebSite",
       "@id": `${SITE_URL}/#website`,
       name: UI_TEXT.brand.name,
+      alternateName: [...UI_TEXT.meta.alternateNames],
       url: SITE_URL,
       description: UI_TEXT.meta.description,
       inLanguage: "ru",

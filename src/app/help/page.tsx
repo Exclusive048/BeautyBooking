@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,7 @@ import {
 } from "@/features/help/content/help-content";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Помощь",
-  description:
-    "База знаний для мастеров и студий — как настроить профиль, расписание, работу с клиентами.",
-  alternates: { canonical: "/help" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.help, { path: "/help" });
 
 type PageProps = {
   searchParams: Promise<{ tab?: string }>;

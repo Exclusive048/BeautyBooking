@@ -6,6 +6,8 @@ import { resolvePublicUsername } from "@/lib/publicUsername";
 import { StudioBookingFlow } from "@/features/public-studio/studio-booking-flow/booking-flow";
 import { BookingSkeleton } from "@/components/blocks/skeletons/BookingSkeleton";
 import { resolvePublicAppUrl } from "@/lib/app-url";
+import { SITE_OPEN_GRAPH } from "@/lib/seo/page-metadata";
+import { truncateAtWord } from "@/lib/seo/provider-meta";
 import { withQuery } from "@/lib/public-urls";
 import { looksLikeProviderId, resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -47,11 +49,6 @@ async function isStudioUnbookable(studioId: string): Promise<boolean> {
   return enabledServices === 0 || activeMasters === 0;
 }
 
-function truncateText(text: string, maxLength = 160): string {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, Math.max(maxLength - 1, 0)).trim()}…`;
-}
-
 function buildDescription(input: {
   name: string;
   type: "MASTER" | "STUDIO";
@@ -69,8 +66,8 @@ function buildDescription(input: {
       : name
         ? t.masterDescriptionFallback.replace("{name}", name)
         : t.masterDescriptionNoName;
-  const base = input.description?.trim() || input.tagline?.trim() || fallback;
-  return truncateText(base, 160);
+  const collapse = (text: string | null) => text?.replace(/\s+/g, " ").trim() ?? "";
+  return truncateAtWord(collapse(input.description) || collapse(input.tagline) || fallback);
 }
 
 async function findProviderForMeta(username: string) {
@@ -131,10 +128,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     metadataBase: baseUrl ? new URL(baseUrl) : undefined,
     alternates: { canonical: canonicalPath },
     openGraph: {
+      ...SITE_OPEN_GRAPH,
       title,
       description,
       url: canonicalUrl,
-      type: "website",
       images: provider.avatarUrl ? [provider.avatarUrl] : undefined,
     },
     twitter: {

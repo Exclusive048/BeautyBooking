@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
@@ -6,12 +7,7 @@ import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
 import { CTABlock } from "@/features/marketing/sections/cta-block";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Как работает",
-  description:
-    "Маркетплейс для записи к мастерам красоты — без звонков и хаоса в мессенджерах. Каталог в реальном времени, кабинет для мастера, общая система уведомлений.",
-  alternates: { canonical: "/how-it-works" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.howItWorks, { path: "/how-it-works" });
 
 const T = UI_TEXT.howItWorks;
 

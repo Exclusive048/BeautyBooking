@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import SupportPageClient from "./support-client";
@@ -9,12 +10,7 @@ import { resolveSupportContactFromUser } from "@/lib/support/contact";
 import type { SupportContactOption } from "@/lib/support/contact-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Поддержка",
-  description:
-    "Сообщите об ошибке или предложите улучшение МастерРядом. Мы ответим в течение дня.",
-  alternates: { canonical: "/support" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.support, { path: "/support" });
 
 const T = UI_TEXT.support;
 

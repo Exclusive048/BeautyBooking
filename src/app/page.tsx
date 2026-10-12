@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
+import * as UI_TEXT from "@/lib/ui/text";
 import { HomePage as HomeFeedPage } from "@/features/home/components/home-page";
 import { getSessionUser } from "@/lib/auth/session";
 import { getPublicStats } from "@/lib/stats/public-stats";
 import { logError } from "@/lib/logging/logger";
 
-export const metadata: Metadata = {
-  // FIX-EXP-CONTENT-GRAMMAR (EXP-001): brand-first homepage title via `absolute`
-  // so the root template ("%s | МастерРядом") doesn't append a second brand.
-  title: { absolute: "МастерРядом — запись к мастерам онлайн" },
-  description:
-    "Найди мастера маникюра, массажа или стрижки рядом. Онлайн-запись.",
-  alternates: { canonical: "/" },
-};
+// FIX-EXP-CONTENT-GRAMMAR (EXP-001): brand-first homepage title via `absolute`
+// so the root template ("%s | МастерРядом") doesn't append a second brand.
+// SEO-02: те же заголовок и описание, что у корневого layout, — главная и
+// превью ссылки на неё говорят одно.
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta, { path: "/", absoluteTitle: true });
 
 export default async function HomePage() {
   const [user, stats] = await Promise.all([

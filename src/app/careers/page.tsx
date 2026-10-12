@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Карьера",
-  description: "Информация о будущих вакансиях в МастерРядом.",
-  alternates: { canonical: "/careers" },
-  // SEO-01: вакансий пока нет — тонкий контент не индексируется.
-  robots: { index: false, follow: true },
-};
+// SEO-01: вакансий пока нет — тонкий контент не индексируется.
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.careers, {
+  path: "/careers",
+  noindex: true,
+});
 
 const T = UI_TEXT.careers;
 
