@@ -1,4 +1,5 @@
 import * as UI_TEXT from "@/lib/ui/text";
+import { pluralize } from "@/lib/utils/pluralize";
 
 /**
  * 29.09 доработки · 24 (UI-20) — единственное место форматирования дат, чисел
@@ -225,10 +226,33 @@ export const UI_FMT = {
     if (count <= 0) return UI_TEXT.common.novice;
     return `⭐ ${UI_FMT.decimal(rating, 1)} (${count})`;
   },
+  /**
+   * «45 мин» / «1 час» / «1 час 15 мин» / «2 часа 30 мин» — длительность услуги,
+   * пакета или записи (SERVICE-DURATION-GRID): от часа — часами явно, а не
+   * «75 мин». Ноль и отрицательное — «0 мин»; где ноль значит «нет данных» —
+   * {@link UI_FMT.durationLabelOrDash}.
+   */
   durationLabel(minutes: number): string {
-    if (minutes <= 0) return "0 мин";
-    if (minutes % 60 === 0) return `${minutes / 60} ч`;
-    return `${minutes} мин`;
+    const total = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 0;
+    const hours = Math.floor(total / 60);
+    const rest = total % 60;
+    const minutesPart = `${rest}${NBSP}${UI_TEXT.common.minutesShort}`;
+    if (hours === 0) return minutesPart;
+    const hourWord = pluralize(
+      hours,
+      UI_TEXT.common.hourOne,
+      UI_TEXT.common.hourFew,
+      UI_TEXT.common.hourMany,
+    );
+    const hoursPart = `${hours}${NBSP}${hourWord}`;
+    return rest === 0 ? hoursPart : `${hoursPart} ${minutesPart}`;
+  },
+  /** Как {@link UI_FMT.durationLabel}, но «—» для `null` и ≤0. */
+  durationLabelOrDash(minutes: number | null | undefined): string {
+    if (minutes === null || minutes === undefined || !Number.isFinite(minutes) || minutes <= 0) {
+      return FALLBACK_LABEL;
+    }
+    return UI_FMT.durationLabel(minutes);
   },
   /** «1 412» — счётчик с разрядами. */
   count(value: number): string {
@@ -269,7 +293,7 @@ export const UI_FMT = {
     if (!unit) return UI_FMT.priceLabel(kopeks);
     return rubles(UI_FMT.countShort(rublesValue));
   },
-  /** «X XXX ₽ • N мин». */
+  /** «X XXX ₽ • 1 час 15 мин». */
   priceDurationLabel(priceKopeks: number, minutes: number): string {
     return `${UI_FMT.priceLabel(priceKopeks)} • ${UI_FMT.durationLabel(minutes)}`;
   },

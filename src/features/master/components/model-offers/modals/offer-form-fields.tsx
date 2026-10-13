@@ -91,9 +91,9 @@ export function OfferFormFields({ state, onChange, services, serviceReadOnly }: 
             const meta =
               service.regularPrice && service.regularPrice > 0
                 ? T.serviceMetaTemplate
-                    .replace("{minutes}", String(service.durationMin))
+                    .replace("{duration}", UI_FMT.durationLabel(service.durationMin))
                     .replace("{price}", UI_FMT.priceLabelOrDash(service.regularPrice))
-                : T.serviceMetaNoPrice.replace("{minutes}", String(service.durationMin));
+                : UI_FMT.durationLabel(service.durationMin);
             return (
               <option key={service.id} value={service.id}>
                 {service.title} · {meta}

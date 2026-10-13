@@ -63,7 +63,7 @@ export function OfferCard({ offer, variant = "active", services, now }: Props) {
             <Clock className="h-3.5 w-3.5" aria-hidden />
             <span>{timeRange}</span>
             <span aria-hidden>·</span>
-            <span>{T.durationTemplate.replace("{minutes}", String(offer.durationMin))}</span>
+            <span>{UI_FMT.durationLabel(offer.durationMin)}</span>
           </div>
         </div>
         <Badge variant={isArchive ? "muted" : offer.status === "ACTIVE" ? "success" : "warning"}>

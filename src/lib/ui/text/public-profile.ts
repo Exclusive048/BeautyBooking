@@ -61,7 +61,6 @@ export const publicProfile = {
     eyebrow: "Комплекты",
     heading: "Услуги в комплекте",
     includesLabel: "В комплект входит",
-    durationTemplate: "{minutes} мин",
     finalPriceLabel: "Цена комплекта",
     youSaveTemplate: "Экономия {amount}",
     bookingComingSoon: "Запись на пакеты — скоро",

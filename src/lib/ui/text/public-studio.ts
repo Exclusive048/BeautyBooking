@@ -65,7 +65,7 @@ export const publicStudio = {
     subtitle: "Несколько услуг в один визит со скидкой комплекта",
     includesLabel: "ВКЛЮЧАЕТ",
     finalPriceLabel: "ИТОГО",
-    durationTemplate: "⏱ {minutes} мин",
+    durationTemplate: "⏱ {duration}",
     youSaveTemplate: "Экономия {amount}",
     bookCta: "Записаться на пакет",
   },

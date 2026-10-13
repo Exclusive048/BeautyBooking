@@ -17,9 +17,13 @@ import type {
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatDuration } from "../lib/format";
 import { Select } from "@/components/ui/select";
 import { FieldLabel } from "@/components/ui/field-label";
+import { UI_FMT } from "@/lib/ui/fmt";
+import {
+  SERVICE_DURATION_OPTIONS,
+  snapServiceDurationMin,
+} from "@/lib/services/service-duration";
 
 const T = UI_TEXT.cabinetMaster.servicesPage.service;
 
@@ -35,8 +39,6 @@ type Props = {
   /** When false, online-payment toggle is disabled with a "Доступно в PRO" tooltip. */
   onlinePaymentsAvailable: boolean;
 };
-
-const DURATION_OPTIONS = [15, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240];
 
 /**
  * Service create/edit modal. Fields: name, category, duration, price,
@@ -62,7 +64,11 @@ export function ServiceModal({
   // `{open ? <Modal /> : null}` keeps initial state fresh.
   const [name, setName] = useState(service?.name ?? "");
   const [categoryId, setCategoryId] = useState(service?.globalCategoryId ?? "");
-  const [duration, setDuration] = useState(service?.durationMin ?? 60);
+  // SERVICE-DURATION-GRID: длительность мимо сетки (заведена до неё) выбор
+  // показывает ближайшей ступенью — сохранится то, что видно в списке.
+  const [duration, setDuration] = useState(() =>
+    service ? snapServiceDurationMin(service.durationMin) : 60
+  );
   const [priceRubles, setPriceRubles] = useState<string>(
     service && service.price > 0 ? String(Math.round(service.price / 100)) : ""
   );
@@ -334,9 +340,9 @@ export function ServiceModal({
                 onChange={(event) => setDuration(Number(event.target.value))}
 
               >
-                {DURATION_OPTIONS.map((min) => (
+                {SERVICE_DURATION_OPTIONS.map((min) => (
                   <option key={min} value={min}>
-                    {formatDuration(min)}
+                    {UI_FMT.durationLabel(min)}
                   </option>
                 ))}
               </Select>

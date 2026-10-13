@@ -11,15 +11,14 @@ import { FieldLabel } from "@/components/ui/field-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
-import {
-  SERVICE_DURATION_STEP_MIN,
-  SERVICE_PRICE_STEP_RUB,
-  snapServiceDuration,
-  snapServicePrice,
-} from "../lib/service-steps";
+import { UI_FMT } from "@/lib/ui/fmt";
+import { SERVICE_DURATION_OPTIONS } from "@/lib/services/service-duration";
+import { SERVICE_PRICE_STEP_RUB, snapServicePrice } from "../lib/service-steps";
 import type { StudioCategoryPickerOption } from "../lib/types";
 
 const T = UI_TEXT.studioCabinet.servicesV2.addServiceDialog;
+/** Час — как у новой услуги мастера. */
+const DEFAULT_DURATION_MIN = 60;
 const E = UI_TEXT.studioCabinet.servicesV2.errors;
 
 type Props = {
@@ -39,7 +38,9 @@ export function AddServiceDialog({
   const [options, setOptions] = useState(pickerOptions);
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
-  const [duration, setDuration] = useState("");
+  // SERVICE-DURATION-GRID: длительность — выбор из общей сетки (как у мастера),
+  // а не свободное число: «110 мин» в прайсе больше не появляется.
+  const [duration, setDuration] = useState(DEFAULT_DURATION_MIN);
   const [categoryId, setCategoryId] = useState(pickerOptions[0]?.id ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function AddServiceDialog({
     setOptions(pickerOptions);
     setTitle("");
     setPrice("");
-    setDuration("");
+    setDuration(DEFAULT_DURATION_MIN);
     setCategoryId(pickerOptions[0]?.id ?? "");
     setError(null);
     setProposing(false);
@@ -120,18 +121,11 @@ export function AddServiceDialog({
     // отправка с клавиатуры (Enter в поле) blur не вызывает, и без этого
     // сохранилось бы несогласованное с подсказкой значение.
     const snappedPrice = snapServicePrice(price);
-    const snappedDuration = snapServiceDuration(duration);
     if (snappedPrice !== price) setPrice(snappedPrice);
-    if (snappedDuration !== duration) setDuration(snappedDuration);
 
     const priceNum = Number.parseInt(snappedPrice, 10);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
       setError(E.priceInvalid);
-      return;
-    }
-    const durationNum = Number.parseInt(snappedDuration, 10);
-    if (!Number.isFinite(durationNum) || durationNum < 1) {
-      setError(E.durationInvalid);
       return;
     }
     if (!categoryId) {
@@ -148,7 +142,7 @@ export function AddServiceDialog({
           studioId,
           title: title.trim(),
           basePrice: priceNum * 100,
-          baseDurationMin: durationNum,
+          baseDurationMin: duration,
           globalCategoryId: categoryId,
         }),
       });
@@ -196,16 +190,17 @@ export function AddServiceDialog({
             <FieldLabel>
               {T.durationLabel}
             </FieldLabel>
-            <Input
+            <Select
               value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              onBlur={(e) => setDuration(snapServiceDuration(e.target.value))}
+              onChange={(e) => setDuration(Number(e.target.value))}
               disabled={submitting}
-              inputMode="numeric"
-              type="number"
-              min={SERVICE_DURATION_STEP_MIN}
-              step={SERVICE_DURATION_STEP_MIN}
-            />
+            >
+              {SERVICE_DURATION_OPTIONS.map((min) => (
+                <option key={min} value={min}>
+                  {UI_FMT.durationLabel(min)}
+                </option>
+              ))}
+            </Select>
           </label>
         </div>
 

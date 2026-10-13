@@ -15,11 +15,10 @@ import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { categoryLabel } from "@/lib/catalog/category-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import {
-  SERVICE_DURATION_STEP_MIN,
-  SERVICE_PRICE_STEP_RUB,
-  snapServiceDuration,
-  snapServicePrice,
-} from "../lib/service-steps";
+  SERVICE_DURATION_OPTIONS,
+  snapServiceDurationMin,
+} from "@/lib/services/service-duration";
+import { SERVICE_PRICE_STEP_RUB, snapServicePrice } from "../lib/service-steps";
 import type {
   StudioCategoryPickerOption,
   StudioServiceDetail,
@@ -48,7 +47,9 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
   const router = useRouter();
   const [name, setName] = useState(detail.name);
   const [price, setPrice] = useState(String(Math.round(detail.priceKopeks / 100)));
-  const [duration, setDuration] = useState(String(detail.durationMin));
+  // SERVICE-DURATION-GRID: выбор из общей сетки. Длительность мимо сетки
+  // (заведена до неё) показывается ближайшей ступенью — сохранится то, что видно.
+  const [duration, setDuration] = useState(() => snapServiceDurationMin(detail.durationMin));
   const [categoryId, setCategoryId] = useState(detail.categoryId ?? "");
   const [isActive, setIsActive] = useState(detail.isActive);
   const [saving, setSaving] = useState(false);
@@ -61,7 +62,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
   useEffect(() => {
     setName(detail.name);
     setPrice(String(Math.round(detail.priceKopeks / 100)));
-    setDuration(String(detail.durationMin));
+    setDuration(snapServiceDurationMin(detail.durationMin));
     setCategoryId(detail.categoryId ?? "");
     setIsActive(detail.isActive);
   }, [detail.id, detail.name, detail.priceKopeks, detail.durationMin, detail.categoryId, detail.isActive]);
@@ -82,18 +83,11 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
     // FIX-SERVICE-STEPS: сетка применяется и на сохранении — blur не срабатывает
     // при отправке с клавиатуры, а сохранить надо ровно то, что показано.
     const snappedPrice = snapServicePrice(price);
-    const snappedDuration = snapServiceDuration(duration);
     if (snappedPrice !== price) setPrice(snappedPrice);
-    if (snappedDuration !== duration) setDuration(snappedDuration);
 
     const priceNum = Number.parseInt(snappedPrice, 10);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
       setError(E.priceInvalid);
-      return;
-    }
-    const durationNum = Number.parseInt(snappedDuration, 10);
-    if (!Number.isFinite(durationNum) || durationNum < 1) {
-      setError(E.durationInvalid);
       return;
     }
     setSaving(true);
@@ -107,7 +101,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
           studioId,
           title: name.trim(),
           basePrice: priceNum * 100,
-          baseDurationMin: durationNum,
+          baseDurationMin: duration,
           // CATEGORY-UNIFICATION-A: send globalCategoryId (or null) — that's
           // what the public catalog filters on. Legacy ServiceCategory FK
           // is no longer managed from the new UI.
@@ -186,16 +180,17 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
               <FieldLabel>
                 {T.durationLabel}
               </FieldLabel>
-              <Input
+              <Select
                 value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                onBlur={(e) => setDuration(snapServiceDuration(e.target.value))}
+                onChange={(e) => setDuration(Number(e.target.value))}
                 disabled={saving}
-                inputMode="numeric"
-                type="number"
-                min={SERVICE_DURATION_STEP_MIN}
-                step={SERVICE_DURATION_STEP_MIN}
-              />
+              >
+                {SERVICE_DURATION_OPTIONS.map((min) => (
+                  <option key={min} value={min}>
+                    {UI_FMT.durationLabel(min)}
+                  </option>
+                ))}
+              </Select>
             </label>
           </div>
           <label className="block">

@@ -73,7 +73,7 @@ export function BundleCard({
           </div>
           <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-bg-card/85 px-2.5 py-1 text-xs text-text-sec">
             <Clock className="h-3 w-3" aria-hidden strokeWidth={1.8} />
-            {T.durationTemplate.replace("{minutes}", String(bundle.totalDurationMin))}
+            {UI_FMT.durationLabel(bundle.totalDurationMin)}
           </div>
         </div>
 

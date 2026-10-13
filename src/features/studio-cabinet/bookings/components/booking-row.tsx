@@ -148,10 +148,7 @@ export function BookingRow({
           <div className="text-sm text-text-main">{row.service.name}</div>
           {row.service.durationMin > 0 ? (
             <div className="text-2xs text-text-sec">
-              {T.table.durationTemplate.replace(
-                "{min}",
-                String(row.service.durationMin),
-              )}
+              {UI_FMT.durationLabel(row.service.durationMin)}
             </div>
           ) : null}
         </td>

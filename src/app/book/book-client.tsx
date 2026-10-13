@@ -27,16 +27,6 @@ type PortfolioDetail = {
   nearestSlots: Array<{ startAt: string }>;
 };
 
-function formatDuration(min: number): string {
-  const hours = Math.floor(min / 60);
-  const minutes = min % 60;
-  if (hours > 0 && minutes > 0) {
-    return `${hours}${UI_TEXT.common.hoursShortLetter} ${minutes}${UI_TEXT.common.minutesShortLetter}`;
-  }
-  if (hours > 0) return `${hours}${UI_TEXT.common.hoursShortLetter}`;
-  return `${minutes}${UI_TEXT.common.minutesShortLetter}`;
-}
-
 export default function BookFromPortfolioClient() {
   const params = useSearchParams();
   const viewerTimeZone = useViewerTimeZoneContext();
@@ -115,7 +105,7 @@ export default function BookFromPortfolioClient() {
             <ul className="mt-2 space-y-1 text-sm text-text-sec">
               {detail.serviceOptions.map((service) => (
                 <li key={service.serviceId}>
-                  • {service.title} - {formatDuration(service.durationMin)} / {UI_FMT.priceLabel(service.price)}
+                  • {service.title} - {UI_FMT.durationLabel(service.durationMin)} / {UI_FMT.priceLabel(service.price)}
                 </li>
               ))}
             </ul>
@@ -124,7 +114,7 @@ export default function BookFromPortfolioClient() {
           <div className="rounded-xl border border-border-subtle bg-bg-input/70 p-3 text-sm">
             <div className="font-semibold text-text-main">{UI_TEXT.feed.total}</div>
             <div className="mt-1 text-text-sec">
-              {formatDuration(detail.totalDurationMin)} / {UI_FMT.priceLabel(detail.totalPrice)}
+              {UI_FMT.durationLabel(detail.totalDurationMin)} / {UI_FMT.priceLabel(detail.totalPrice)}
             </div>
           </div>
 

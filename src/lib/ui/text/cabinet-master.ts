@@ -769,7 +769,6 @@ export const cabinetMaster = {
       countTemplateMany: "{count} предложений",
     },
     offerCard: {
-      durationTemplate: "{minutes} мин",
       extraBusyTemplate: "+{minutes} мин подготовка",
       regularPriceTemplate: "обычно {price}",
       discountBadgeTemplate: "−{percent}%",
@@ -828,8 +827,7 @@ export const cabinetMaster = {
           "Опубликуйте окно — клиенты подадут заявку и приложат фото-портфолио.",
         serviceLabel: "Услуга",
         servicePlaceholder: "— Выберите услугу —",
-        serviceMetaTemplate: "{minutes} мин · обычно {price}",
-        serviceMetaNoPrice: "{minutes} мин",
+        serviceMetaTemplate: "{duration} · обычно {price}",
         dateLabel: "Дата",
         datePlaceholder: "ГГГГ-ММ-ДД",
         timeStartLabel: "Начало окошка",
@@ -1373,10 +1371,6 @@ export const cabinetMaster = {
         "Без услуг клиенты не могут записаться. Начните с самой популярной — потом добавите остальные и пакеты.",
       cta: "Добавить услугу",
     },
-    durationFormat: {
-      minutesShort: "мин",
-      hoursShort: "ч",
-    },
     bundleRow: {
       sumLabel: "Сумма",
       discountLabel: "Скидка",
@@ -1526,7 +1520,7 @@ export const cabinetMaster = {
     reschedule: {
       modalTitle: "Перенести запись",
       currentLabel: "Текущее время",
-      durationLabel: "Длительность услуги — {N} мин",
+      durationLabel: "Длительность услуги — {duration}",
       newDateLabel: "Новая дата",
       newTimeLabel: "Новое время",
       cancel: "Отмена",

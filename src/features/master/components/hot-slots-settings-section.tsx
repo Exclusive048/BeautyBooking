@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { moneyRUBPlainFromKopeks } from "@/lib/format";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 
 type RuleState = {
   isEnabled: boolean;
@@ -267,7 +268,7 @@ export function HotSlotsSettingsSection({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs text-text-main">{service.title}</p>
                       <p className="truncate text-xs text-text-sec">
-                        {moneyRUBPlainFromKopeks(service.effectivePrice)} {UI_TEXT.common.currencyRub} / {service.effectiveDurationMin} {UI_TEXT.common.minutesShort}
+                        {moneyRUBPlainFromKopeks(service.effectivePrice)} {UI_TEXT.common.currencyRub} / {UI_FMT.durationLabel(service.effectiveDurationMin)}
                       </p>
                     </div>
                     <Switch
