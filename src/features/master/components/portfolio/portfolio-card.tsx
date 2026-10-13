@@ -178,7 +178,7 @@ export function PortfolioCard({
     <>
       <div
         className={cn(
-          "group relative aspect-square overflow-hidden rounded-xl border border-border-subtle bg-bg-input transition-shadow",
+          "group relative aspect-[4/5] overflow-hidden rounded-xl border border-border-subtle bg-bg-input transition-shadow",
           "hover:shadow-card",
           !item.isPublic && "opacity-95"
         )}
@@ -196,7 +196,7 @@ export function PortfolioCard({
           className="relative block h-full w-full"
         >
           <ResilientImage
-            src={item.mediaUrl}
+            src={item.displayUrl}
             alt={T.imageAltTemplate.replace("{n}", number)}
             loading="lazy"
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"

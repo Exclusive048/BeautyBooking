@@ -6,6 +6,7 @@ import {
   SubscriptionStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
 
 export type FavoriteKind = "master" | "studio";
 
@@ -77,9 +78,11 @@ async function getFirstPortfolioPhotos(
     ORDER BY "masterId", "createdAt" DESC
   `;
 
+  // PORTFOLIO-CROP-01: фото — так, как его обрезал мастер.
+  const displayUrl = await loadPortfolioDisplayUrls(rows.map((row) => row.mediaUrl));
   const out = new Map<string, string>();
   for (const row of rows) {
-    out.set(row.masterId, row.mediaUrl);
+    out.set(row.masterId, displayUrl(row.mediaUrl));
   }
   return out;
 }

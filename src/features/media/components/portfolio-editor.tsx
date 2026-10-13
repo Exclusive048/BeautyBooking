@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { Pencil, Star, Tag, Trash2 } from "lucide-react";
+import { Crop, Image as ImageIcon, Pencil, Star, Tag, Trash2 } from "lucide-react";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import type { MediaEntityType } from "@prisma/client";
 import type { MediaAssetDto } from "@/lib/media/types";
@@ -9,6 +9,9 @@ import { MEDIA_PORTFOLIO_LIMIT } from "@/lib/media/types";
 import { usePlanFeatures } from "@/lib/billing/use-plan-features";
 import { Button } from "@/components/ui/button";
 import { PhotoActionButton } from "@/components/ui/photo-action-button";
+import { ModalSurface } from "@/components/ui/modal-surface";
+import { CropPicker } from "@/features/media/components/crop-picker";
+import { PORTFOLIO_ASPECT_RATIO } from "@/lib/media/crop-geometry";
 import { cn } from "@/lib/cn";
 import { PhotoViewer } from "@/components/ui/photo-viewer";
 import { useConfirm } from "@/hooks/use-confirm";
@@ -32,6 +35,13 @@ type Props = {
    * выключает выбор совсем, `null` — «не выбрано, главным будет самое новое».
    */
   initialCatalogCoverAssetId?: string | null;
+  /**
+   * PORTFOLIO-CROP-01: фото, выбранное баннером студии. Его область — 16:9
+   * (правится в разделе «Профиль»), а область у фото одна: обрезка 4:5 здесь
+   * сломала бы шапку страницы. Поэтому плитка баннера показывает исходник и
+   * кнопки обрезки у неё нет.
+   */
+  bannerAssetId?: string | null;
 };
 
 function buildListUrl(entityType: MediaEntityType, entityId: string): string {
@@ -48,6 +58,7 @@ export function PortfolioEditor({
   entityId,
   canEdit = true,
   initialCatalogCoverAssetId,
+  bannerAssetId = null,
 }: Props) {
   const addInputRef = useRef<HTMLInputElement | null>(null);
   const replaceInputRef = useRef<HTMLInputElement | null>(null);
@@ -74,6 +85,10 @@ export function PortfolioEditor({
   const captionsEnabled = entityType === "STUDIO" && canEdit;
   const [attribution, setAttribution] = useState<StudioPortfolioAttributionData | null>(null);
   const [captionAssetId, setCaptionAssetId] = useState<string | null>(null);
+  const [cropAssetId, setCropAssetId] = useState<string | null>(null);
+  const cropAsset = cropAssetId ? (assets.find((asset) => asset.id === cropAssetId) ?? null) : null;
+  // Плитка и просмотр показывают выбранный кадр (вырез 4:5); баннер — исходник.
+  const shownUrl = (asset: MediaAssetDto) => (asset.id === bannerAssetId ? asset.url : asset.displayUrl);
   const [dropActive, setDropActive] = useState(false);
   const plan = usePlanFeatures(entityType === "STUDIO" ? "STUDIO" : "MASTER");
   const portfolioText = UI_TEXT.master.profile.portfolio;
@@ -320,7 +335,7 @@ export function PortfolioEditor({
 
       <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
         {assets.map((asset, index) => (
-          <div key={asset.id} className="group relative aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
+          <div key={asset.id} className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-border-subtle bg-bg-input">
             <Button
               variant="wrapper"
               className="relative h-full w-full"
@@ -328,18 +343,28 @@ export function PortfolioEditor({
               aria-label={mediaText.openPreviewAriaTemplate.replace("{n}", String(index + 1))}
             >
               <ResilientImage
-                src={asset.url}
+                src={shownUrl(asset)}
                 alt={mediaText.photoAltTemplate.replace("{n}", String(index + 1))}
                 sizes="(max-width: 768px) 50vw, 25vw"
                 className="object-cover"
               />
             </Button>
 
-            {asset.id === effectiveCoverId ? (
-              <span className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-3xs font-semibold text-white shadow-card">
-                <Star className="h-3 w-3 fill-current" aria-hidden />
-                {mediaText.coverBadge}
-              </span>
+            {asset.id === effectiveCoverId || asset.id === bannerAssetId ? (
+              <div className="pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1">
+                {asset.id === effectiveCoverId ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-3xs font-semibold text-white shadow-card">
+                    <Star className="h-3 w-3 fill-current" aria-hidden />
+                    {mediaText.coverBadge}
+                  </span>
+                ) : null}
+                {asset.id === bannerAssetId ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-bg-card/90 px-2 py-0.5 text-3xs font-semibold text-text-main shadow-card">
+                    <ImageIcon className="h-3 w-3" aria-hidden />
+                    {mediaText.bannerBadge}
+                  </span>
+                ) : null}
+              </div>
             ) : null}
 
             {coverEnabled && canEdit && effectiveCoverId !== null && asset.id !== effectiveCoverId ? (
@@ -381,6 +406,15 @@ export function PortfolioEditor({
                 значок «Главное фото», снизу полоса подписи. */}
             {canEdit ? (
               <div className="absolute right-0 top-0 flex flex-col">
+                {asset.id !== bannerAssetId ? (
+                  <PhotoActionButton
+                    label={`${mediaText.cropPhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
+                    onClick={() => setCropAssetId(asset.id)}
+                    disabled={busy}
+                  >
+                    <Crop className="h-4 w-4" aria-hidden />
+                  </PhotoActionButton>
+                ) : null}
                 <PhotoActionButton
                   label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(index + 1))}`}
                   onClick={() => startReplace(asset.id)}
@@ -423,7 +457,7 @@ export function PortfolioEditor({
       <PhotoViewer
         items={assets.map((asset, index) => ({
           key: asset.id,
-          src: asset.url,
+          src: shownUrl(asset),
           alt: mediaText.photoAltTemplate.replace("{n}", String(index + 1)),
         }))}
         index={previewIndex >= 0 ? previewIndex : null}
@@ -433,6 +467,21 @@ export function PortfolioEditor({
         actions={
           canEdit && previewAsset ? (
             <>
+              {previewAsset.id !== bannerAssetId ? (
+                <PhotoActionButton
+                  label={`${mediaText.cropPhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
+                  onClick={() => {
+                    // Окно обрезки — своей ловушкой фокуса, поэтому просмотр
+                    // сначала закрывается.
+                    const id = previewAsset.id;
+                    closePreview();
+                    setCropAssetId(id);
+                  }}
+                  disabled={busy}
+                >
+                  <Crop className="h-4 w-4" aria-hidden />
+                </PhotoActionButton>
+              ) : null}
               <PhotoActionButton
                 label={`${mediaText.replacePhotoAria}: ${mediaText.photoAltTemplate.replace("{n}", String(previewIndex + 1))}`}
                 onClick={() => startReplace(previewAsset.id)}
@@ -457,6 +506,38 @@ export function PortfolioEditor({
           ) : null
         }
       />
+
+      {/* PORTFOLIO-CROP-01: рамка — формат работы (4:5), как у плиток здесь, на
+          странице студии и в карточке каталога; окно открывается на сохранённой
+          области. «Применить» сохраняет область, список перечитывается — плитка
+          показывает новый вырез. */}
+      {cropAsset ? (
+        <ModalSurface
+          open
+          onClose={() => setCropAssetId(null)}
+          title={UI_TEXT.media.crop.titleWork}
+          className="max-w-2xl"
+          fullScreenOnMobile
+        >
+          <CropPicker
+            key={cropAsset.id}
+            assetId={cropAsset.id}
+            imageUrl={cropAsset.url}
+            shape="rect"
+            aspectRatio={PORTFOLIO_ASPECT_RATIO}
+            initialCropX={cropAsset.cropX}
+            initialCropY={cropAsset.cropY}
+            initialCropWidth={cropAsset.cropWidth}
+            initialCropHeight={cropAsset.cropHeight}
+            previewSizes={[120, 64]}
+            onSave={() => {
+              setCropAssetId(null);
+              void load();
+            }}
+            onSkip={() => setCropAssetId(null)}
+          />
+        </ModalSurface>
+      ) : null}
 
       <FileInput
         ref={addInputRef}

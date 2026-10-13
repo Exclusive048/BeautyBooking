@@ -15,6 +15,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     provider: { findUnique: providerFindUnique },
     portfolioItem: { findMany: portfolioFindMany, count: portfolioCount },
+    // PORTFOLIO-CROP-01: области обрезки работ; без ассетов ссылки остаются как есть.
+    mediaAsset: { findMany: vi.fn(async () => []) },
   },
 }));
 vi.mock("@/lib/billing/get-current-plan", () => ({ getCurrentPlan: vi.fn() }));

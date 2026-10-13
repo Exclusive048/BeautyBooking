@@ -5,7 +5,8 @@ import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import * as UI_TEXT from "@/lib/ui/text";
 import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
 import { resolveSocialFieldsOrThrow } from "@/lib/providers/resolve-social-link";
-import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
+import { getStudioBanner, getStudioBannerAssetId, setStudioBannerAssetId } from "@/lib/studios/banner";
+import type { CropArea } from "@/lib/media/crop-geometry";
 import { syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
 import { getStudioCatalogCoverAssetId, setStudioCatalogCoverAssetId } from "@/lib/studios/catalog-cover";
 import {
@@ -35,7 +36,12 @@ export type StudioProviderPrivateDto = {
   timezone: string;
   bufferBetweenBookingsMin: number;
   bannerAssetId: string | null;
+  /** Исходник баннера — редактору обрезки. */
   bannerUrl: string | null;
+  /** PORTFOLIO-CROP-01: баннер для показа — вырез по выбранной области 16:9. */
+  bannerDisplayUrl: string | null;
+  /** Выбранная область 16:9 — редактор открывается на ней. */
+  bannerCrop: CropArea | null;
   /** CATALOG-MAIN-PHOTO: главное фото карточки каталога (из портфолио студии). */
   catalogCoverAssetId: string | null;
   // FIX-STUDIO-POLICY-EDITABLE: правила записи студии — читаются и правятся
@@ -86,9 +92,9 @@ export async function getStudioProviderById(
 
   if (!provider || provider.type !== ProviderType.STUDIO) return null;
 
-  const [bannerAssetId, bannerUrl, catalogCoverAssetId] = await Promise.all([
+  const [bannerAssetId, banner, catalogCoverAssetId] = await Promise.all([
     getStudioBannerAssetId(provider.id),
-    getStudioBannerUrl(provider.id),
+    getStudioBanner(provider.id),
     getStudioCatalogCoverAssetId(provider.id),
   ]);
 
@@ -114,7 +120,9 @@ export async function getStudioProviderById(
     timezone: provider.timezone,
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
-    bannerUrl,
+    bannerUrl: banner?.url ?? null,
+    bannerDisplayUrl: banner?.displayUrl ?? null,
+    bannerCrop: banner?.crop ?? null,
     catalogCoverAssetId,
     minBookingHoursAhead: provider.minBookingHoursAhead,
     maxBookingDaysAhead: provider.maxBookingDaysAhead,
@@ -306,9 +314,9 @@ export async function updateStudioProviderProfile(
     await applyProviderBookingPolicy(provider.id, policy);
   }
 
-  const [bannerAssetId, bannerUrl, catalogCoverAssetId] = await Promise.all([
+  const [bannerAssetId, banner, catalogCoverAssetId] = await Promise.all([
     getStudioBannerAssetId(provider.id),
-    getStudioBannerUrl(provider.id),
+    getStudioBanner(provider.id),
     getStudioCatalogCoverAssetId(provider.id),
   ]);
 
@@ -334,7 +342,9 @@ export async function updateStudioProviderProfile(
     timezone: provider.timezone,
     bufferBetweenBookingsMin: provider.bufferBetweenBookingsMin,
     bannerAssetId,
-    bannerUrl,
+    bannerUrl: banner?.url ?? null,
+    bannerDisplayUrl: banner?.displayUrl ?? null,
+    bannerCrop: banner?.crop ?? null,
     catalogCoverAssetId,
     minBookingHoursAhead: policy.minHoursAhead,
     maxBookingDaysAhead: policy.maxDaysAhead,

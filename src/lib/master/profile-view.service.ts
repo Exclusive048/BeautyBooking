@@ -173,7 +173,8 @@ function composeView(input: {
     publicCount: portfolioPublicCount,
     items: data.portfolio.slice(0, 6).map((item) => ({
       id: item.id,
-      mediaUrl: item.mediaUrl,
+      // PORTFOLIO-CROP-01: превью — так, как работу видят клиенты.
+      mediaUrl: item.displayUrl,
       isPublic: item.isPublic,
     })),
   };

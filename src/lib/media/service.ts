@@ -20,7 +20,7 @@ import {
   MEDIA_MAX_FILE_SIZE_BYTES,
   MEDIA_PORTFOLIO_LIMIT,
   MEDIA_USER_STORAGE_QUOTA_BYTES,
-  buildAvatarDisplayUrl,
+  buildMediaDisplayUrl,
   toMediaAssetDto,
   type MediaAssetDto,
 } from "@/lib/media/types";
@@ -354,7 +354,7 @@ async function writeProviderAvatarUrl(providerId: string, nextUrl: string | null
   });
 }
 
-/** CROP-PUBLIC-01 — всё, что нужно `buildAvatarDisplayUrl`. */
+/** CROP-PUBLIC-01 — всё, что нужно `buildMediaDisplayUrl`. */
 const AVATAR_URL_SELECT = {
   id: true,
   cropX: true,
@@ -667,7 +667,7 @@ export async function uploadMediaAsset(user: SessionUser, input: UploadMediaInpu
     input.kind === MediaKind.AVATAR &&
     (input.entityType === MediaEntityType.MASTER || input.entityType === MediaEntityType.STUDIO)
   ) {
-    await writeProviderAvatarUrl(entityId, buildAvatarDisplayUrl(readyAsset));
+    await writeProviderAvatarUrl(entityId, buildMediaDisplayUrl(readyAsset));
   }
   await invalidateClientAvatarCaches(input.entityType, entityId, input.kind);
 
@@ -909,7 +909,7 @@ export async function deleteMediaAsset(user: SessionUser, assetId: string): Prom
       orderBy: { createdAt: "desc" },
       select: AVATAR_URL_SELECT,
     });
-    await writeProviderAvatarUrl(asset.entityId, nextAvatar ? buildAvatarDisplayUrl(nextAvatar) : null);
+    await writeProviderAvatarUrl(asset.entityId, nextAvatar ? buildMediaDisplayUrl(nextAvatar) : null);
   }
   await invalidateClientAvatarCaches(asset.entityType, asset.entityId, asset.kind);
 
@@ -958,6 +958,9 @@ export async function updateMediaCrop(
   // ТЕКУЩИЙ аватар кабинета (тот же выбор, что при удалении: последний READY).
   // У логотипа сайта ссылка из кэша шапки — сбросить (29.09 доработки · 20).
   if (updated.entityType === MediaEntityType.SITE) await invalidateSiteAssetCache();
+  // PORTFOLIO-CROP-01: работы в историях показываются вырезом, а истории
+  // кэшируются на 5 минут — без сброса новый кадр появился бы там не сразу.
+  if (updated.kind === MediaKind.PORTFOLIO) await invalidateStoriesCache();
   if (
     updated.kind === MediaKind.AVATAR &&
     (updated.entityType === MediaEntityType.MASTER || updated.entityType === MediaEntityType.STUDIO)
@@ -974,7 +977,7 @@ export async function updateMediaCrop(
       select: { id: true },
     });
     if (current?.id === updated.id) {
-      await writeProviderAvatarUrl(updated.entityId, buildAvatarDisplayUrl(updated));
+      await writeProviderAvatarUrl(updated.entityId, buildMediaDisplayUrl(updated));
     }
   }
 
@@ -1030,6 +1033,6 @@ export async function getAvatarUrlForEntity(input: {
     select: AVATAR_URL_SELECT,
   });
 
-  if (avatar) return buildAvatarDisplayUrl(avatar);
+  if (avatar) return buildMediaDisplayUrl(avatar);
   return input.externalUrl ?? null;
 }

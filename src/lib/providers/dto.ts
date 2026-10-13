@@ -67,7 +67,14 @@ export type ProviderProfileDto = {
   studioMasterProfileId: string | null;
   name: string;
   avatarUrl: string | null;
+  /** Исходник баннера студии. */
   bannerUrl: string | null;
+  /**
+   * PORTFOLIO-CROP-01: баннер для показа — вырез 16:9 по выбранной области
+   * (без области — исходник). Показывать его, а не `bannerUrl` с наводкой на
+   * центр области: так шапка совпадает с тем, что выбрал админ студии.
+   */
+  bannerDisplayUrl: string | null;
   /** Область кадра баннера (доли исходника); `null` — кадр не выбирали. */
   bannerCrop: CropArea | null;
   tagline: string;

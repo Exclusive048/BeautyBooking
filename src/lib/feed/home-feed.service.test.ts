@@ -85,6 +85,8 @@ vi.mock("@/lib/prisma", () => ({
     },
     userFavorite: { findMany: userFavoriteFindMany },
     masterService: { findMany: vi.fn(async () => []) },
+    // PORTFOLIO-CROP-01: области обрезки работ; без ассетов ссылки остаются как есть.
+    mediaAsset: { findMany: vi.fn(async () => []) },
   },
 }));
 

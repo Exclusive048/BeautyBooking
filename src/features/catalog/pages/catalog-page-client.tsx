@@ -215,7 +215,7 @@ function CatalogSkeletonGrid() {
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card">
-          <div className="aspect-[16/10] animate-pulse bg-muted md:aspect-[4/3]" />
+          <div className="aspect-[16/10] animate-pulse bg-muted" />
           <div className="space-y-2 p-3 md:p-4">
             <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
             <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />

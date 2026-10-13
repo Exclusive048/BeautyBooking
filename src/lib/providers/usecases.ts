@@ -84,6 +84,7 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
   if (provider.type === ProviderType.STUDIO) {
     const banner = await getStudioBanner(provider.id);
     profile.bannerUrl = banner?.url ?? null;
+    profile.bannerDisplayUrl = banner?.displayUrl ?? null;
     profile.bannerCrop = banner?.crop ?? null;
     return profile;
   }

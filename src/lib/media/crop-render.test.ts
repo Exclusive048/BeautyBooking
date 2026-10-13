@@ -1,6 +1,13 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { cropAreaToPixels, renderCroppedImage } from "@/lib/media/crop-render";
+import { MediaKind } from "@prisma/client";
+import {
+  AVATAR_CROP_MAX_SIDE_PX,
+  cropAreaToPixels,
+  cropMaxSideForKind,
+  renderCroppedImage,
+} from "@/lib/media/crop-render";
+import { MEDIA_MAX_IMAGE_SIDE_PX } from "@/lib/media/image-resize";
 
 /**
  * CROP-PUBLIC-01 — вырез совпадает с областью, выбранной в кроппере.
@@ -70,6 +77,34 @@ describe("renderCroppedImage", () => {
     const small = await renderCroppedImage(await quadrants(), { x: 0, y: 0, width: 0.1, height: 0.15 }, 640);
     const smallMeta = await sharp(small).metadata();
     expect(smallMeta.width).toBe(120); // 0.1 × 1200 — не растянуто до 640
+  });
+});
+
+describe("PORTFOLIO-CROP-01 — вырез работы портфолио", () => {
+  it("потолок стороны: аватар — 640, работа — потолок загрузки", () => {
+    expect(cropMaxSideForKind(MediaKind.AVATAR)).toBe(AVATAR_CROP_MAX_SIDE_PX);
+    expect(cropMaxSideForKind(MediaKind.PORTFOLIO)).toBe(MEDIA_MAX_IMAGE_SIDE_PX);
+  });
+
+  it("вырез 4:5 работы не уменьшается до размера аватара", async () => {
+    // 640×800 — вся высота исходника, по ширине слева.
+    const out = await renderCroppedImage(
+      await quadrants(),
+      { x: 0, y: 0, width: 640 / 1200, height: 1 },
+      cropMaxSideForKind(MediaKind.PORTFOLIO),
+    );
+    const meta = await sharp(out).metadata();
+    expect([meta.width, meta.height]).toEqual([640, 800]);
+  });
+
+  it("`?w=` уменьшает вырез до ширины превью и не растягивает", async () => {
+    const area = { x: 0, y: 0, width: 640 / 1200, height: 1 };
+    const preview = await renderCroppedImage(await quadrants(), area, MEDIA_MAX_IMAGE_SIDE_PX, 320);
+    const previewMeta = await sharp(preview).metadata();
+    expect([previewMeta.width, previewMeta.height]).toEqual([320, 400]);
+
+    const wide = await renderCroppedImage(await quadrants(), area, MEDIA_MAX_IMAGE_SIDE_PX, 1280);
+    expect((await sharp(wide).metadata()).width).toBe(640);
   });
 });
 

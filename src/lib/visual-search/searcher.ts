@@ -1,5 +1,7 @@
 import { MediaAssetStatus, MediaKind, Prisma } from "@prisma/client";
 import { logInfo } from "@/lib/logging/logger";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
+import { buildMediaFileUrl } from "@/lib/media/types";
 import { prisma } from "@/lib/prisma";
 import type {
   VisualSearchProviderResult,
@@ -228,7 +230,7 @@ function buildProviderResults(input: {
       .slice(0, MAX_PROVIDER_PHOTOS)
       .map((photo) => ({
         assetId: photo.assetId,
-        url: `/api/media/file/${photo.assetId}`,
+        url: buildMediaFileUrl(photo.assetId),
         similarity: photo.similarity,
       }));
 
@@ -432,9 +434,17 @@ async function runSearch(imageBytes: Uint8Array): Promise<VisualSearchResponse> 
     resultCount: results.length,
   });
 
+  // PORTFOLIO-CROP-01: фото в выдаче — так, как его обрезал автор.
+  const displayUrl = await loadPortfolioDisplayUrls(
+    results.flatMap((result) => result.matchingPhotos.map((photo) => photo.url)),
+  );
+
   return {
     ok: true,
-    results,
+    results: results.map((result) => ({
+      ...result,
+      matchingPhotos: result.matchingPhotos.map((photo) => ({ ...photo, url: displayUrl(photo.url) })),
+    })),
     category: classification.category,
   };
 }

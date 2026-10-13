@@ -180,14 +180,14 @@ export function CatalogCard({
       }}
       className="group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition-all duration-200 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
     >
-      {/* CATALOG-CARD-COMPACT: на телефоне кадр 16:10 — карточка в один столбец
-          ниже почти на треть; с `md` ячейки у́же, там прежние 4:3. Фото —
+      {/* CATALOG-CARD-COMPACT: кадр 16:10 — карточка в один столбец ниже
+          почти на треть. PORTFOLIO-CROP-01: в кадре две работы 4:5 рядом,
+          целиком, на всех ширинах (пропорции задаёт `PhotoCarousel`). Фото —
           все публичные работы, первым идёт выбранное главное. */}
       <div className="relative">
         <PhotoCarousel
           photos={item.photos}
           alt={item.title}
-          className="aspect-[16/10] md:aspect-[4/3]"
           dotsClassName="md:group-hover:opacity-0"
           placeholder={
             <div

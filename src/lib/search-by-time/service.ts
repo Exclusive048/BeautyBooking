@@ -12,6 +12,7 @@ import { ACTIVE_REVIEW_FILTER } from "@/lib/reviews/soft-delete";
 import { CARD_PHOTO_LIMIT, composeCardPhotos } from "@/lib/catalog/card-photos";
 import { PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { loadStudioCardPhotos } from "@/lib/studios/catalog-cover";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 
 const DEFAULT_SEARCH_TIMEZONE = env.DEFAULT_TIMEZONE;
@@ -272,9 +273,18 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchInput): 
   // ranking; it is stripped before the public response (rule 12).
   type RankableItem = AvailabilityProviderItem & { providerId: string };
   const items: RankableItem[] = [];
-  const studioPhotos = await loadStudioCardPhotos(
-    providers.filter((provider) => provider.type === ProviderType.STUDIO).map((provider) => provider.id),
-  );
+  // PORTFOLIO-CROP-01: карточка показывает работы так, как их обрезал мастер.
+  const [studioPhotos, displayUrl] = await Promise.all([
+    loadStudioCardPhotos(
+      providers.filter((provider) => provider.type === ProviderType.STUDIO).map((provider) => provider.id),
+    ),
+    loadPortfolioDisplayUrls(
+      providers.flatMap((provider) => [
+        ...provider.portfolioItems.map((item) => item.mediaUrl),
+        ...provider.masters.flatMap((master) => master.portfolioItems.map((item) => item.mediaUrl)),
+      ]),
+    ),
+  ]);
 
   await Promise.all(
     providers.map(async (provider) => {
@@ -324,9 +334,9 @@ export async function searchAvailabilityByTime(input: AvailabilitySearchInput): 
           provider.type === ProviderType.STUDIO
             ? composeCardPhotos(
                 studioPhotos.get(provider.id) ?? [],
-                provider.masters.flatMap((master) => master.portfolioItems.map((item) => item.mediaUrl)),
+                provider.masters.flatMap((master) => master.portfolioItems.map((item) => displayUrl(item.mediaUrl))),
               )
-            : composeCardPhotos(provider.portfolioItems.map((item) => item.mediaUrl)),
+            : composeCardPhotos(provider.portfolioItems.map((item) => displayUrl(item.mediaUrl))),
         address: provider.address || null,
         district: provider.district || null,
         geoLat: provider.geoLat ?? null,

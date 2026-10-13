@@ -17,7 +17,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/logging/logger", () => ({ logInfo: vi.fn(), logError: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { $queryRaw: mocks.queryRaw, provider: { findMany: mocks.providerFindMany } },
+  prisma: {
+    $queryRaw: mocks.queryRaw,
+    provider: { findMany: mocks.providerFindMany },
+    // PORTFOLIO-CROP-01: области обрезки работ; без ассетов ссылки остаются как есть.
+    mediaAsset: { findMany: vi.fn(async () => []) },
+  },
 }));
 vi.mock("@/lib/visual-search/config", () => ({ assertVisualSearchEnabled: vi.fn(async () => {}) }));
 vi.mock("@/lib/visual-search/classifier", () => ({

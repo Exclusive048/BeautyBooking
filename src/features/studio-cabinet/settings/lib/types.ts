@@ -72,6 +72,11 @@ export type StudioGeneralData = {
   timezone: string;
   /** CATALOG-MAIN-PHOTO: выбранное главное фото карточки каталога (id работы портфолио). */
   catalogCoverAssetId: string | null;
+  /**
+   * PORTFOLIO-CROP-01: фото портфолио, выбранное баннером. Его обрезка — 16:9
+   * (раздел «Профиль»), поэтому в портфолио его 4:5 не обрезают.
+   */
+  bannerAssetId: string | null;
   address: {
     cityName: string | null;
     address: string | null;

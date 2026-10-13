@@ -3,6 +3,8 @@ import { getMasterContext } from "@/lib/master/profile.service";
 import { findCatalogCoverId, PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { prisma } from "@/lib/prisma";
 import { personalMasterProviderWhere } from "@/lib/master/access";
+import type { CropArea } from "@/lib/media/crop-geometry";
+import { loadPortfolioMediaView } from "@/lib/media/portfolio-display";
 
 /**
  * Server aggregator for `/cabinet/master/portfolio` (31b).
@@ -32,7 +34,12 @@ export function parsePortfolioFilter(value: string | null | undefined): Portfoli
 
 export type PortfolioItemView = {
   id: string;
+  /** Исходник — редактору обрезки. */
   mediaUrl: string;
+  /** PORTFOLIO-CROP-01: для показа — вырез по сохранённой области. */
+  displayUrl: string;
+  /** Сохранённая область обрезки (доли), чтобы редактор открывался на ней. */
+  crop: CropArea | null;
   /** Parsed from mediaUrl when path matches `/api/media/file/{id}/...`.
    * UI uses it for the crop endpoint; null when the item was created via
    * a raw URL upload (rare; old data path). */
@@ -191,9 +198,13 @@ export async function getMasterPortfolioView(input: {
   const globalIndexById = new Map<string, number>();
   allItems.forEach((item, index) => globalIndexById.set(item.id, index));
 
+  const media = await loadPortfolioMediaView(filtered.map((item) => item.mediaUrl));
+
   const items: PortfolioItemView[] = filtered.map((item) => ({
     id: item.id,
     mediaUrl: item.mediaUrl,
+    displayUrl: media.displayUrl(item.mediaUrl),
+    crop: media.cropOf(item.mediaUrl),
     mediaAssetId: extractMediaAssetIdFromUrl(item.mediaUrl),
     ownerProviderId: item.masterId,
     isPublic: item.isPublic,

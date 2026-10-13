@@ -1,7 +1,7 @@
 import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getAvatarUrlForEntity } from "@/lib/media/service";
-import { buildAvatarDisplayUrl, buildMediaFileUrl } from "@/lib/media/types";
+import { buildMediaDisplayUrl, buildMediaFileUrl } from "@/lib/media/types";
 import {
   SITE_LOGIN_HERO_SETTING_KEY,
   SITE_LOGO_SETTING_KEY,
@@ -75,7 +75,7 @@ async function loadSiteAssetBySettingKey(
   // области. Картинка экрана входа (PORTFOLIO) — исходником: её кадр задаёт
   // `object-position` на месте показа.
   return {
-    url: kind === MediaKind.AVATAR ? buildAvatarDisplayUrl(asset) : buildMediaFileUrl(asset.id),
+    url: kind === MediaKind.AVATAR ? buildMediaDisplayUrl(asset) : buildMediaFileUrl(asset.id),
   };
 }
 
