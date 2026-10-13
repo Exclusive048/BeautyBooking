@@ -285,6 +285,33 @@ jobs:
             # ЛОКАЛЬНЫЙ postgres из профиля db; миграция идёт по DATABASE_URL.
             $COMPOSE_BASE --profile db run --rm --no-deps migrate
 
+            echo "=== 5/7 (а) Разовая очистка базы — только по запросу scripts/db-reset-request.json ==="
+            # DB-RESET-01: запрос срабатывает один раз (отметка в SystemConfig) и
+            # только до своей даты notAfter; правила — src/lib/ops/database-reset.ts.
+            # Стоит ПОСЛЕ снимка 4/7 (он и есть точка возврата) и ДО сида тарифов
+            # и deploy:post: они заново заводят тарифы, категории и админов.
+            # Провал = стоп до рестарта. Скрипт останавливается до изменений в
+            # базе, если не удалось удалить файлы фото или очистить Redis.
+            if [ -f scripts/db-reset-request.json ]; then
+              RESET_LOG="$(mktemp)"
+              if ! $COMPOSE_BASE --profile db run --rm --no-deps migrate npm run --silent ops:reset-db -- --apply >"$RESET_LOG" 2>&1; then
+                cat "$RESET_LOG"
+                rm -f "$RESET_LOG"
+                echo "❌ Очистка базы не завершена — деплой остановлен до рестарта (подробности выше)."
+                exit 1
+              fi
+              cat "$RESET_LOG"
+              if grep -q '^DB_RESET_RESULT=applied' "$RESET_LOG"; then
+                # Снимок 4/7 — состояние до очистки. Копия с другим префиксом не
+                # попадает под ретенцию pre-deploy-* и не уйдёт через 7 деплоев.
+                $SUDO cp "$BACKUP_DIR/$SNAPSHOT_NAME" "$BACKUP_DIR/pre-reset-$SNAPSHOT_NAME"
+                echo "Снимок до очистки сохранён вне ротации: $BACKUP_DIR/pre-reset-$SNAPSHOT_NAME"
+              fi
+              rm -f "$RESET_LOG"
+            else
+              echo "Запроса нет — пропуск."
+            fi
+
             echo "=== 5/7 (б) Тарифы: каталог + стартовая акция (идемпотентно) ==="
             # BILLING-CATALOG-01: тарифы рождаются из кода (src/lib/billing/plan-catalog.ts),
             # тем же worker-образом, что миграции (в web/api нет tsx и исходников).
