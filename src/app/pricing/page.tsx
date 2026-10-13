@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,12 +17,7 @@ import { getSessionUserId } from "@/lib/auth/session";
 import { isLaunchPromoActive } from "@/lib/billing/launch-promo";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Тарифы",
-  description:
-    "Подписка вместо комиссий. Тарифы для мастеров и студий — выберите план под свою нагрузку.",
-  alternates: { canonical: "/pricing" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.pricing, { path: "/pricing" });
 
 const T = UI_TEXT.pricing;
 

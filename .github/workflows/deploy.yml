@@ -460,7 +460,12 @@ jobs:
             echo "EOF_TEXT"
           } >> "$GITHUB_OUTPUT"
 
+      # Уведомление — не часть деплоя: сбой канала (12.10 раннер GitHub не
+      # дождался smtp.yandex.ru — «Connection timeout») не должен красить
+      # прогон, в котором сам деплой прошёл. Отказ виден предупреждением ниже.
       - name: Telegram
+        id: tg
+        continue-on-error: true
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
@@ -492,7 +497,9 @@ jobs:
           fi
 
       - name: Почта
+        id: mail
         if: steps.smtp.outputs.ok == 'true'
+        continue-on-error: true
         # SMTP Яндекса, порт 465 = implicit TLS (secure: true). From обязан быть
         # логином или его алиасом — noreply@ это алиас деплой-ящика (MAIL-MIGRATION-01).
         uses: dawidd6/action-send-mail@v3
@@ -506,3 +513,8 @@ jobs:
           to: ${{ secrets.NOTIFY_EMAIL_TO }}
           subject: ${{ steps.msg.outputs.subject }}
           body: ${{ steps.msg.outputs.text }}
+
+      - name: Уведомление не доставлено
+        if: steps.tg.outcome == 'failure' || steps.mail.outcome == 'failure'
+        run: |
+          echo "::warning::Уведомление о деплое не доставлено (Telegram: ${{ steps.tg.outcome }}, почта: ${{ steps.mail.outcome }}). Итог деплоя — в шаге Deploy этого прогона."

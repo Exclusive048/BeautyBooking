@@ -875,7 +875,12 @@ export default function CatalogPageClient({
                 {TH.eyebrow}
               </p>
               {countPending ? (
-                <Skeleton className="h-7 w-44 lg:h-12 lg:w-72" />
+                <>
+                  {/* SEO-02: пока счётчик не пришёл (в том числе в HTML с
+                      сервера), у страницы всё равно есть заголовок h1. */}
+                  <h1 className="sr-only">{TH.pendingTitle}</h1>
+                  <Skeleton className="h-7 w-44 lg:h-12 lg:w-72" />
+                </>
               ) : (
                 <h1 className="font-display text-xl leading-tight text-text-main sm:text-2xl lg:text-5xl lg:leading-[1.1]">
                   {resultsTitle(resultCount)}

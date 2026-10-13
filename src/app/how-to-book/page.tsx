@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { StepsSection } from "@/features/marketing/sections/steps-section";
@@ -6,12 +7,7 @@ import { TextWithImage } from "@/features/marketing/sections/text-with-image";
 import { CTABlock } from "@/features/marketing/sections/cta-block";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Как записаться",
-  description:
-    "Запись к мастеру красоты за 5 простых шагов. Без звонков, без переписки в мессенджерах — открыли, выбрали, записались.",
-  alternates: { canonical: "/how-to-book" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.howToBook, { path: "/how-to-book" });
 
 const T = UI_TEXT.howToBook;
 

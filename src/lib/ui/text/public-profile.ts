@@ -1,13 +1,10 @@
 export const publicProfile = {
   page: {
-    loading: "Загружаем профиль мастера…",
-    redirecting: "Открываем страницу студии…",
     blockLoadFailed: "Не удалось загрузить блок. Попробуйте ещё раз.",
     profileLoadFailed: "Не удалось загрузить профиль. Попробуйте ещё раз.",
     bookingLoadFailed: "Не удалось загрузить запись. Попробуйте ещё раз.",
     servicesLoadFailed: "Не удалось загрузить услуги. Попробуйте ещё раз.",
     reviewsLoadFailed: "Не удалось загрузить отзывы. Попробуйте ещё раз.",
-    notFound: "Профиль не найден",
     masterNotFound: "Мастер не найден",
     masterNotFoundDesc: "Профиль мастера не опубликован или находится на доработке.",
     masterUnpublishedDesc: "Профиль мастера временно скрыт. Возможно, он вернётся совсем скоро.",
@@ -24,7 +21,6 @@ export const publicProfile = {
     ownerViewHint: "Так вашу страницу видят клиенты. Запись к самому себе недоступна.",
     ownerViewEditCta: "Редактировать профиль",
     bookNow: "Записаться",
-    sectionReviews: "Отзывы",
   },
   hero: {
     share: "Поделиться",

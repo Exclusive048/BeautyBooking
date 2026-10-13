@@ -4,8 +4,10 @@ import { MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useId, useMemo, useRef, type Ref, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
+import { FieldLabel } from "@/components/ui/field-label";
 import { Textarea } from "@/components/ui/textarea";
 import { SocialLinkPreview } from "@/components/ui/social-link-preview";
+import { SOCIAL_KINDS, type SocialKind } from "@/lib/providers/social-links";
 import type { AddressStatus, AddressSuggestion } from "@/lib/maps/use-address-with-geocode";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel } from "@/lib/ui/zone-label";
@@ -17,8 +19,7 @@ type Props = {
   address: string;
   phone: string;
   email: string;
-  instagram: string;
-  vk: string;
+  socials: Record<SocialKind, string>;
   addressInputRef: Ref<HTMLInputElement>;
   addressStatus?: AddressStatus | null;
   addressSuggestions: AddressSuggestion[];
@@ -35,8 +36,7 @@ type Props = {
   onAddressChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
   onEmailChange: (value: string) => void;
-  onInstagramChange: (value: string) => void;
-  onVkChange: (value: string) => void;
+  onSocialChange: (kind: SocialKind, value: string) => void;
 };
 
 // FIX-STUDIO-FORM-BORDERS: переопределений больше нет — поля выглядят как во
@@ -61,8 +61,7 @@ export function StudioProfileForm({
   address,
   phone,
   email,
-  instagram,
-  vk,
+  socials,
   addressInputRef,
   addressStatus,
   addressSuggestions,
@@ -78,11 +77,11 @@ export function StudioProfileForm({
   onAddressChange,
   onPhoneChange,
   onEmailChange,
-  onInstagramChange,
-  onVkChange,
+  onSocialChange,
 }: Props) {
   const studioFormText = UI_TEXT.studio.profileForm;
   const addressInputId = useId();
+  const socialInputId = useId();
   const addressStatusTone =
     addressStatus?.tone === "success"
       ? "text-success-text"
@@ -311,29 +310,24 @@ export function StudioProfileForm({
                 placeholder={studioFormText.emailPlaceholder}
               />
             </div>
-            {/* FIX-STUDIO-SOCIAL-PERSIST: Telegram contact input removed
-                (FZ-199 killswitch — don't collect data the platform won't
-                surface). VK + Instagram ARE persisted (FEAT-PROVIDER-SOCIALS,
-                `Provider.social{Vk,Instagram}`) — прежняя редакция этого
-                комментария утверждала обратное и успела устареть. */}
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-text-label">{studioFormText.vkLabel}</div>
-              <Input
-                value={vk}
-                onChange={(event) => onVkChange(event.target.value)}
-                placeholder={studioFormText.vkPlaceholder}
-              />
-              <SocialLinkPreview kind="vk" value={vk} />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <div className="text-xs font-medium text-text-label">{studioFormText.instagramLabel}</div>
-              <Input
-                value={instagram}
-                onChange={(event) => onInstagramChange(event.target.value)}
-                placeholder={studioFormText.instagramPlaceholder}
-              />
-              <SocialLinkPreview kind="instagram" value={instagram} />
-            </div>
+            {/* FEAT-PROVIDER-SOCIALS: ссылки на сообщества и каналы
+                (`Provider.social{Vk,Instagram,Telegram,Max}`). SOCIAL-TG-MAX:
+                ссылка на канал Telegram — не интеграция с Telegram (килсвитч
+                FZ-199 гасит вход и доставку), поэтому поле есть. */}
+            {SOCIAL_KINDS.map((kind) => (
+              <div key={kind}>
+                <FieldLabel htmlFor={`${socialInputId}-${kind}`} className="text-text-label">
+                  {UI_TEXT.social.kinds[kind].label}
+                </FieldLabel>
+                <Input
+                  id={`${socialInputId}-${kind}`}
+                  value={socials[kind]}
+                  onChange={(event) => onSocialChange(kind, event.target.value)}
+                  placeholder={UI_TEXT.social.kinds[kind].placeholder}
+                />
+                <SocialLinkPreview kind={kind} value={socials[kind]} />
+              </div>
+            ))}
           </div>
         </div>
       </div>

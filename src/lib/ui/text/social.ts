@@ -1,16 +1,22 @@
-// FEAT-PROVIDER-SOCIALS: shared strings for the VK / Instagram community-link
-// inputs (studio + master cabinets), their live preview, and the public icons.
+// FEAT-PROVIDER-SOCIALS: shared strings for the VK / Instagram / Telegram / MAX
+// community-link inputs (studio + master cabinets), their live preview, and the
+// public icons. `kinds` — по виду ссылки (`SocialKind`), в порядке показа.
 export const social = {
-  vkLabel: "VK",
-  instagramLabel: "Instagram",
-  vkPlaceholder: "vk.ru/studio или @studio",
-  instagramPlaceholder: "instagram.com/studio или @studio",
-  vkAria: "Сообщество ВКонтакте",
-  instagramAria: "Страница в Instagram",
+  kinds: {
+    vk: { label: "VK", placeholder: "vk.ru/studio или @studio", aria: "Сообщество ВКонтакте" },
+    instagram: {
+      label: "Instagram",
+      placeholder: "instagram.com/studio или @studio",
+      aria: "Страница в Instagram",
+    },
+    // SOCIAL-TG-MAX
+    telegram: { label: "Telegram", placeholder: "t.me/studio или @studio", aria: "Канал в Telegram" },
+    max: { label: "MAX", placeholder: "max.ru/studio или ссылка-приглашение", aria: "Канал в MAX" },
+  },
   previewTemplate: "Ссылка: {label}",
-  invalid: "Не распознали ссылку. Укажите адрес на vk.ru или instagram.com.",
+  invalidTemplate: "Не распознали ссылку. Укажите адрес на {host}.",
   masterSectionTitle: "Соцсети",
-  masterSectionSubtitle: "Ссылки на ваши сообщества — покажем в публичном профиле",
+  masterSectionSubtitle: "Ссылки на ваши сообщества и каналы — покажем в публичном профиле",
   editAria: "Изменить ссылку",
   notSet: "Не указано",
 } as const;

@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { PenLine } from "lucide-react";
 import * as UI_TEXT from "@/lib/ui/text";
 import { InfoPageLayout } from "@/components/layout/info-page-layout";
 
-export const metadata: Metadata = {
-  title: UI_TEXT.pages.blog.title,
-  description: UI_TEXT.pages.blog.description,
-  // SEO-01: страница-заглушка «скоро» — тонкий контент не индексируется.
-  robots: { index: false, follow: true },
-};
+// SEO-01: страница-заглушка «скоро» — тонкий контент не индексируется.
+export const metadata: Metadata = pageMetadata(UI_TEXT.pages.blog, { noindex: true });
 
 const COMING_SOON_POSTS = UI_TEXT.pages.blog.comingSoonPosts;
 

@@ -1,21 +1,17 @@
-import { prisma } from "@/lib/prisma";
-import type { SeoValues } from "@/features/admin-cabinet/settings/types";
+import type { SeoSectionData } from "@/features/admin-cabinet/settings/types";
+import { SITE_SEO_DEFAULTS, readStoredSiteSeo } from "@/lib/seo/site-seo";
 
-const SEO_KEYS = {
-  seoTitle: "siteSeoTitle",
-  seoDescription: "siteSeoDescription",
-} as const;
-
-export async function getSeoValues(): Promise<SeoValues> {
-  const rows = await prisma.appSetting.findMany({
-    where: { key: { in: [SEO_KEYS.seoTitle, SEO_KEYS.seoDescription] } },
-    select: { key: true, value: true },
-  });
-
-  const byKey = new Map(rows.map((row) => [row.key, row.value]));
-
+export async function getSeoSectionData(): Promise<SeoSectionData> {
+  const stored = await readStoredSiteSeo();
   return {
-    seoTitle: byKey.get(SEO_KEYS.seoTitle) ?? "",
-    seoDescription: byKey.get(SEO_KEYS.seoDescription) ?? "",
+    values: {
+      seoTitle: stored.title ?? "",
+      seoDescription: stored.description ?? "",
+    },
+    // Текст из кода — подсказкой в пустом поле: видно, что будет на сайте.
+    defaults: {
+      seoTitle: SITE_SEO_DEFAULTS.title,
+      seoDescription: SITE_SEO_DEFAULTS.description,
+    },
   };
 }

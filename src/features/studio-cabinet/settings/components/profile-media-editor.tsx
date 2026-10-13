@@ -10,6 +10,7 @@ import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-p
 import { StudioProfileHero } from "@/features/studio-cabinet/components/studio-profile-hero";
 import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { SOCIAL_FIELD, SOCIAL_KINDS, type SocialKind } from "@/lib/providers/social-links";
 import * as UI_TEXT from "@/lib/ui/text";
 import { FileInput } from "@/components/ui/file-input";
 
@@ -29,13 +30,13 @@ import { FileInput } from "@/components/ui/file-input";
  * id. We pass `providerId` here. (The sibling `GeneralForm`/`ArchiveToggle`
  * had been PATCHing `studioId` → 404; fixed alongside this port.)
  *
- * FIX-STUDIO-SOCIAL-PERSIST: the Telegram contact input was removed
- * (FZ-199 killswitch — don't collect what the platform won't surface).
- *
- * FEAT-PROVIDER-SOCIALS: VK + Instagram are now real free-text community
- * links — loaded from + saved to `Provider.social{Vk,Instagram}` via the same
- * `PATCH /api/studios/[id]`. Normalized + host/scheme-validated server-side;
- * a live preview mirrors the normalizer under each input.
+ * FEAT-PROVIDER-SOCIALS: VK / Instagram / Telegram / MAX are real free-text
+ * community links — loaded from + saved to `Provider.social{Vk,Instagram,
+ * Telegram,Max}` via the same `PATCH /api/studios/[id]`. Normalized +
+ * host/scheme-validated server-side; a live preview mirrors the normalizer
+ * under each input. SOCIAL-TG-MAX: поле Telegram — ссылка на канал студии, а
+ * не прежний «контакт в Telegram» (его убрал FIX-STUDIO-SOCIAL-PERSIST):
+ * килсвитч FZ-199 гасит вход и доставку, ссылку на канал он не касается.
  */
 
 type StudioProfileData = {
@@ -53,6 +54,8 @@ type StudioProfileData = {
     timezone: string;
     socialVk: string | null;
     socialInstagram: string | null;
+    socialTelegram: string | null;
+    socialMax: string | null;
     description: string | null;
     avatarUrl: string | null;
     isPublished: boolean;
@@ -65,6 +68,8 @@ type Props = {
   providerId: string;
   studioId: string;
 };
+
+const EMPTY_SOCIALS: Record<SocialKind, string> = { vk: "", instagram: "", telegram: "", max: "" };
 
 export function ProfileMediaEditor({ providerId }: Props) {
   const t = UI_TEXT.studio.profilePage;
@@ -82,10 +87,11 @@ export function ProfileMediaEditor({ providerId }: Props) {
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [isPublished, setIsPublished] = useState(false);
-  // FEAT-PROVIDER-SOCIALS: free-text community links, now persisted. Telegram
-  // input removed (FZ-199 killswitch).
-  const [instagram, setInstagram] = useState("");
-  const [vk, setVk] = useState("");
+  // FEAT-PROVIDER-SOCIALS: free-text community links, persisted.
+  const [socials, setSocials] = useState<Record<SocialKind, string>>(EMPTY_SOCIALS);
+  const setSocial = useCallback((kind: SocialKind, value: string) => {
+    setSocials((prev) => ({ ...prev, [kind]: value }));
+  }, []);
   // FIX-STUDIO-TZ-FROM-ADDRESS: read-only — сервер выводит зону из города адреса.
   const [timezone, setTimezone] = useState<string | null>(null);
 
@@ -134,8 +140,12 @@ export function ProfileMediaEditor({ providerId }: Props) {
       setContactName(studio.contactName ?? "");
       setContactPhone(studio.contactPhone ?? "");
       setContactEmail(studio.contactEmail ?? "");
-      setVk(studio.socialVk ?? "");
-      setInstagram(studio.socialInstagram ?? "");
+      setSocials({
+        vk: studio.socialVk ?? "",
+        instagram: studio.socialInstagram ?? "",
+        telegram: studio.socialTelegram ?? "",
+        max: studio.socialMax ?? "",
+      });
       setIsPublished(studio.isPublished);
       setBannerUrl(studio.bannerUrl);
       setBannerAssetId(studio.bannerAssetId ?? null);
@@ -187,8 +197,9 @@ export function ProfileMediaEditor({ providerId }: Props) {
         contactPhone: contactPhone.trim() || null,
         contactEmail: contactEmail.trim() || null,
         // FEAT-PROVIDER-SOCIALS: raw input; server normalizes + validates.
-        socialVk: vk.trim() || null,
-        socialInstagram: instagram.trim() || null,
+        ...Object.fromEntries(
+          SOCIAL_KINDS.map((kind) => [SOCIAL_FIELD[kind], socials[kind].trim() || null]),
+        ),
         isPublished,
       };
 
@@ -331,8 +342,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         address={addressText}
         phone={contactPhone}
         email={contactEmail}
-        instagram={instagram}
-        vk={vk}
+        socials={socials}
         addressInputRef={addressInputRef}
         addressStatus={addressStatus}
         addressSuggestions={addressSuggestions}
@@ -348,8 +358,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         onAddressChange={handleAddressChange}
         onPhoneChange={setContactPhone}
         onEmailChange={setContactEmail}
-        onInstagramChange={setInstagram}
-        onVkChange={setVk}
+        onSocialChange={setSocial}
       />
 
       <FileInput

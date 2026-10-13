@@ -205,6 +205,120 @@ describe("🔴 SECURITY — hostile input is rejected/sanitized, never a live da
   });
 });
 
+/**
+ * SOCIAL-TG-MAX: каналы в Telegram и MAX.
+ *
+ * @probe 2026-10-12 — (1) в правиле Telegram снята ветка `s` (веб-превью):
+ *   красный «t.me/s/<ник> — тот же канал; ссылка на пост — канал»;
+ *   (2) `TELEGRAM_RESERVED` — пустое множество: красный «служебные адреса
+ *   t.me — не каналы»; (3) у MAX ветка `join`/`u` отдаёт первый сегмент без
+ *   кода (`return first`): красные четыре — «приглашение… — с кодом», «join /
+ *   u без кода… — отказ», «опасный ввод — отказ» (`max.ru/join/<script>`
+ *   прошёл), «идемпотентен». Возвращено — 50/50 зелёные.
+ */
+describe("normalizeSocialLink — Telegram", () => {
+  it("ник, @ник и ссылка t.me — один канал", () => {
+    for (const input of ["masterryadom", "@masterryadom", "t.me/masterryadom", "https://t.me/masterryadom?x=1"]) {
+      expect(normalizeSocialLink("telegram", input)).toEqual({
+        status: "ok",
+        url: "https://t.me/masterryadom",
+        handle: "masterryadom",
+      });
+    }
+  });
+
+  it("telegram.me, www., http — к https://t.me/", () => {
+    expect(normalizeSocialLink("telegram", "http://telegram.me/anna_nails")).toMatchObject({
+      url: "https://t.me/anna_nails",
+    });
+    expect(normalizeSocialLink("telegram", "www.t.me/anna_nails")).toMatchObject({
+      url: "https://t.me/anna_nails",
+    });
+  });
+
+  it("t.me/s/<ник> — тот же канал; ссылка на пост — канал", () => {
+    expect(normalizeSocialLink("telegram", "https://t.me/s/anna_nails")).toEqual({
+      status: "ok",
+      url: "https://t.me/anna_nails",
+      handle: "anna_nails",
+    });
+    expect(normalizeSocialLink("telegram", "t.me/anna_nails/1234")).toMatchObject({
+      url: "https://t.me/anna_nails",
+    });
+  });
+
+  it("закрытый канал: t.me/+код и старая форма joinchat — к t.me/+код", () => {
+    const code = "AbCdEf123_-xyz";
+    expect(normalizeSocialLink("telegram", `https://t.me/+${code}`)).toEqual({
+      status: "ok",
+      url: `https://t.me/+${code}`,
+      handle: `+${code}`,
+    });
+    expect(normalizeSocialLink("telegram", `t.me/joinchat/${code}`)).toMatchObject({
+      url: `https://t.me/+${code}`,
+    });
+    expect(normalizeSocialLink("telegram", `+${code}`)).toMatchObject({ url: `https://t.me/+${code}` });
+  });
+
+  it("служебные адреса t.me — не каналы", () => {
+    for (const input of ["t.me/share/url?url=x", "t.me/proxy?server=x", "t.me/addstickers/pack", "joinchat", "t.me/joinchat"]) {
+      expect(normalizeSocialLink("telegram", input)).toEqual({ status: "invalid" });
+    }
+  });
+
+  it("ник не по правилам Telegram и чужой хост — отказ", () => {
+    for (const input of ["ab", "anna.nails", "anna-nails", "a".repeat(33), "https://evil.com/anna_nails", "https://t.me.evil.com/x", "t.me/+short", "t.me/c/12345/6"]) {
+      expect(normalizeSocialLink("telegram", input)).toEqual({ status: "invalid" });
+    }
+  });
+
+  it("идемпотентен на сохранённом адресе", () => {
+    for (const stored of ["https://t.me/anna_nails", "https://t.me/+AbCdEf123_-xyz"]) {
+      expect(resolveStoredSocialLink("telegram", stored)).toEqual({ value: stored });
+    }
+  });
+});
+
+describe("normalizeSocialLink — MAX", () => {
+  it("открытый канал: ник, @ник, max.ru/<ник>", () => {
+    for (const input of ["m_chernosliv", "@m_chernosliv", "max.ru/m_chernosliv", "https://www.max.ru/m_chernosliv"]) {
+      expect(normalizeSocialLink("max", input)).toEqual({
+        status: "ok",
+        url: "https://max.ru/m_chernosliv",
+        handle: "m_chernosliv",
+      });
+    }
+  });
+
+  it("приглашение в закрытый канал и ссылка на профиль — с кодом", () => {
+    const code = "CwXUzqEKVqUs88rFnlSOUIjkbKpbiJIhxKKKkbUoJS0";
+    expect(normalizeSocialLink("max", `https://max.ru/join/${code}`)).toEqual({
+      status: "ok",
+      url: `https://max.ru/join/${code}`,
+      handle: `join/${code}`,
+    });
+    expect(normalizeSocialLink("max", `max.ru/u/${code}`)).toMatchObject({ url: `https://max.ru/u/${code}` });
+  });
+
+  it("join / u без кода, служебные и чужие адреса — отказ", () => {
+    for (const input of ["max.ru/join", "join", "u", "max.ru/u/", "https://max.ru/:share?text=x", "https://web.max.ru/-71234567890", "https://max.ru.evil.com/x", "max.ru"]) {
+      expect(normalizeSocialLink("max", input)).toEqual({ status: "invalid" });
+    }
+  });
+
+  it("опасный ввод — отказ", () => {
+    for (const input of ["javascript:alert(1)", "javascript://max.ru/%0aalert(1)", "max.ru/join/<script>", "data:text/html,x"]) {
+      expect(normalizeSocialLink("max", input)).toEqual({ status: "invalid" });
+    }
+  });
+
+  it("идемпотентен на сохранённом адресе", () => {
+    for (const stored of ["https://max.ru/m_chernosliv", "https://max.ru/join/CwXUzqEKVqUs88rFnlSOUIjk"]) {
+      expect(resolveStoredSocialLink("max", stored)).toEqual({ value: stored });
+    }
+  });
+});
+
 describe("resolveStoredSocialLink (server persist helper)", () => {
   it("returns null for empty (clear)", () => {
     expect(resolveStoredSocialLink("vk", "")).toEqual({ value: null });

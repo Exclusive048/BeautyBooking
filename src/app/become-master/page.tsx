@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
@@ -16,12 +17,7 @@ import {
 import * as UI_TEXT from "@/lib/ui/text";
 import { UI_FMT } from "@/lib/ui/fmt";
 
-export const metadata: Metadata = {
-  title: "Стать мастером",
-  description:
-    "Подключите кабинет на МастерРядом — без комиссий с услуг. История клиентов, расписание, аналитика и новые клиенты из каталога.",
-  alternates: { canonical: "/become-master" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.becomeMaster, { path: "/become-master" });
 
 const T = UI_TEXT.becomeMaster;
 

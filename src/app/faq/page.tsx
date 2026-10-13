@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FAQItem } from "@/features/faq/components/faq-item";
@@ -6,12 +7,7 @@ import { FAQ_DATA } from "@/features/faq/content/faq-content";
 import { safeJsonLd } from "@/lib/seo/schema";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Часто спрашивают",
-  description:
-    "Ответы на популярные вопросы о МастерРядом: регистрация, отмена записи, тарифы для мастеров, работа в студии, горящие окошки.",
-  alternates: { canonical: "/faq" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.faq, { path: "/faq" });
 
 const FAQ_JSON_LD = {
   "@context": "https://schema.org",

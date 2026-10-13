@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import { SocialLinkPreview } from "@/components/ui/social-link-preview";
 import {
   normalizeSocialLink,
+  SOCIAL_FIELD,
   socialDisplayLabel,
   type SocialKind,
 } from "@/lib/providers/social-links";
@@ -16,8 +17,8 @@ import { InlineEditField, InlineEditInput, InlineEditPencil } from "@/components
 const T = UI_TEXT.social;
 
 /**
- * FEAT-PROVIDER-SOCIALS — master-cabinet inline-edit row for a VK / Instagram
- * community link. Mirrors `EditableFieldRow`'s autosave lifecycle but:
+ * FEAT-PROVIDER-SOCIALS — master-cabinet inline-edit row for a VK / Instagram /
+ * Telegram / MAX community link. Mirrors `EditableFieldRow`'s autosave lifecycle but:
  *  - shows a live preview (`<SocialLinkPreview>`) using the shared normalizer;
  *  - never saves an invalid link (the preview flags it, save is blocked);
  *  - stores the CLIENT-normalized URL (server re-validates — idempotent), so
@@ -36,7 +37,7 @@ export function SocialEditableRow({
   value: string | null;
 }) {
   const inputId = useId();
-  const fieldKey = kind === "vk" ? "socialVk" : "socialInstagram";
+  const fieldKey = SOCIAL_FIELD[kind];
   const [isEditing, setIsEditing] = useState(false);
   const [savedValue, setSavedValue] = useState(value ?? "");
   const [draft, setDraft] = useState(value ?? "");
@@ -145,7 +146,8 @@ export function SocialEditableRow({
           <InlineEditField
             onClick={enterEdit}
             empty={isEmpty}
-            className="mt-1"
+            // Приглашение MAX / Telegram — длинный код без пробелов.
+            className="mt-1 truncate"
           >
             {isEmpty ? T.notSet : displayLabel}
           </InlineEditField>

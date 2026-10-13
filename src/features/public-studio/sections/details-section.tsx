@@ -80,9 +80,17 @@ export async function StudioDetailsSection({ studioId }: Props) {
               <Badge>{UI_TEXT.publicStudio.noCategories}</Badge>
             )}
           </div>
-          {/* FEAT-PROVIDER-SOCIALS: VK / Instagram community icons (shown only
-              when set; each href re-validated in the shared component). */}
-          <ProviderSocialLinks vk={studio.socialVk} instagram={studio.socialInstagram} />
+          {/* FEAT-PROVIDER-SOCIALS / SOCIAL-TG-MAX: VK / Instagram / Telegram /
+              MAX icons (shown only when set; each href re-validated in the
+              shared component). */}
+          <ProviderSocialLinks
+            links={{
+              vk: studio.socialVk,
+              instagram: studio.socialInstagram,
+              telegram: studio.socialTelegram,
+              max: studio.socialMax,
+            }}
+          />
         </CardContent>
       </Card>
     </div>

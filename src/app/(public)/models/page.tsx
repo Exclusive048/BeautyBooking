@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { Button } from "@/components/ui/button";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { CategoryFilter } from "@/features/model-offers/components/category-filter";
@@ -13,12 +14,7 @@ import { formatModelOfferCount } from "@/lib/model-offers/offer-count";
 import { getModelOfferUserState } from "@/lib/model-offers/user-state";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Для моделей",
-  description:
-    "Услуги со скидкой за участие в практике мастера. В каждом предложении указано время услуги, время на съёмку и фото.",
-  alternates: { canonical: "/models" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.models, { path: "/models" });
 
 type PageProps = {
   searchParams: Promise<{

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { FeatureGrid } from "@/features/marketing/sections/feature-grid";
@@ -6,12 +7,7 @@ import { TextWithImage } from "@/features/marketing/sections/text-with-image";
 import { PartnershipForm } from "@/features/partners/components/partnership-form";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "Сотрудничество",
-  description:
-    "Школы, бренды, медиа, бьюти-сообщества и технологические партнёры — расскажите о вашем предложении.",
-  alternates: { canonical: "/partners" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.partners, { path: "/partners" });
 
 const T = UI_TEXT.partners;
 

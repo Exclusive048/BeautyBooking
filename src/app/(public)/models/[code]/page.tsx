@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getSessionUser } from "@/lib/auth/session";
 import { getPublicModelOffer } from "@/lib/model-offers/public.service";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { ModelOfferApplyForm } from "@/features/model-offers/components/public-model-offer-apply";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -31,14 +32,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  return {
-    title: UI_TEXT.pages.modelOffer.titleTemplate.replace("{service}", offer.service.title),
-    description: UI_TEXT.pages.modelOffer.descriptionTemplate
-      .replace("{name}", offer.master.name)
-      .replace("{date}", offer.dateLocal)
-      .replace("{start}", offer.timeRangeStartLocal)
-      .replace("{end}", offer.timeRangeEndLocal),
-  };
+  return pageMetadata(
+    {
+      title: UI_TEXT.pages.modelOffer.titleTemplate.replace("{service}", offer.service.title),
+      description: UI_TEXT.pages.modelOffer.descriptionTemplate
+        .replace("{name}", offer.master.name)
+        .replace("{date}", offer.dateLocal)
+        .replace("{start}", offer.timeRangeStartLocal)
+        .replace("{end}", offer.timeRangeEndLocal),
+    },
+    { path: `/models/${offer.publicCode}` },
+  );
 }
 
 export default async function ModelOfferPage({ params }: PageProps) {

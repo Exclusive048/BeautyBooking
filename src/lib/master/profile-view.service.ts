@@ -5,6 +5,7 @@ import {
   type ProfileCompletion,
 } from "@/lib/master/profile-completion";
 import { prisma } from "@/lib/prisma";
+import type { SocialKind } from "@/lib/providers/social-links";
 import { personalMasterProviderWhere } from "@/lib/master/access";
 
 /**
@@ -74,10 +75,7 @@ export type MasterProfileViewData = {
     bio: string | null;
   };
   /** FEAT-PROVIDER-SOCIALS: free-text community links (normalized safe URL or null). */
-  socials: {
-    vk: string | null;
-    instagram: string | null;
-  };
+  socials: Record<SocialKind, string | null>;
   location: {
     address: string | null;
     district: string | null;
@@ -224,6 +222,8 @@ function composeView(input: {
     socials: {
       vk: data.master.socialVk,
       instagram: data.master.socialInstagram,
+      telegram: data.master.socialTelegram,
+      max: data.master.socialMax,
     },
     location: {
       address: data.master.address || null,

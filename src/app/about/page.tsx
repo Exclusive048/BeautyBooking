@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo/page-metadata";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
@@ -7,12 +8,7 @@ import { StepsSection } from "@/features/marketing/sections/steps-section";
 import { CTABlock } from "@/features/marketing/sections/cta-block";
 import * as UI_TEXT from "@/lib/ui/text";
 
-export const metadata: Metadata = {
-  title: "О компании",
-  description:
-    "Маркетплейс мастеров красоты — от записи до отзыва без звонков и хаоса в мессенджерах.",
-  alternates: { canonical: "/about" },
-};
+export const metadata: Metadata = pageMetadata(UI_TEXT.meta.pages.about, { path: "/about" });
 
 const T = UI_TEXT.about;
 

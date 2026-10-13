@@ -35,6 +35,7 @@ export const catalog2 = {
     // печатал «Каталог · » с висящей точкой.
     eyebrow: "Каталог",
     titleTemplate: "{count} {plural} рядом",
+    pendingTitle: "Мастера красоты рядом",
     subtitleAvailable: "свободны на этой неделе",
     // FIX-EXP-CONTENT-GRAMMAR (EXP-008): the count is all published providers
     // (masters AND studios), so the truthful collective is «специалист», not

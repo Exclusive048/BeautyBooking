@@ -106,6 +106,8 @@ export async function PATCH(req: Request) {
       ...(body.timezone !== undefined ? { timezone: body.timezone } : {}),
       ...(body.socialVk !== undefined ? { socialVk: body.socialVk } : {}),
       ...(body.socialInstagram !== undefined ? { socialInstagram: body.socialInstagram } : {}),
+      ...(body.socialTelegram !== undefined ? { socialTelegram: body.socialTelegram } : {}),
+      ...(body.socialMax !== undefined ? { socialMax: body.socialMax } : {}),
     });
     return jsonProfileOk(data);
   } catch (error) {

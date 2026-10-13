@@ -1,3 +1,5 @@
+import { kopeksToRubles, toKopeks } from "@/lib/money/kopeks";
+
 export type ProviderSchemaInput = {
   id: string;
   type: "MASTER" | "STUDIO";
@@ -6,11 +8,13 @@ export type ProviderSchemaInput = {
   publicUsername: string | null;
   avatarUrl: string | null;
   address: string | null;
-  district: string | null;
+  /** Город — `addressLocality` (раньше туда шёл район). */
+  cityName: string | null;
   geoLat: number | null;
   geoLng: number | null;
   ratingAvg: number;
   ratingCount: number;
+  /** `price` — в копейках, как в БД; в разметку уходит в рублях. */
   services: Array<{ name: string; price: number; durationMin: number }>;
   reviews?: Array<{
     rating: number;
@@ -36,14 +40,17 @@ export function buildProviderSchema(input: ProviderSchemaInput, baseUrl?: string
   }
 
   if (input.avatarUrl) {
-    schema.image = input.avatarUrl;
+    // Аватар хранится путём сайта (`/api/media/file/…`), а разметке нужен
+    // полный адрес.
+    schema.image = baseUrl && input.avatarUrl.startsWith("/") ? `${baseUrl}${input.avatarUrl}` : input.avatarUrl;
   }
 
-  if (input.address || input.district) {
+  if (input.address || input.cityName) {
     schema.address = {
       "@type": "PostalAddress",
       streetAddress: input.address ?? undefined,
-      addressLocality: input.district ?? undefined,
+      addressLocality: input.cityName ?? undefined,
+      addressCountry: "RU",
     };
   }
 
@@ -68,7 +75,9 @@ export function buildProviderSchema(input: ProviderSchemaInput, baseUrl?: string
     .slice(0, 10)
     .map((service) => ({
       "@type": "Offer",
-      price: service.price,
+      // SEO-02: цена хранится в копейках — без перевода поисковик видел
+      // услугу за 1 500 ₽ как за 150 000 ₽.
+      price: kopeksToRubles(toKopeks(service.price)),
       priceCurrency: "RUB",
       itemOffered: {
         "@type": "Service",

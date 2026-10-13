@@ -49,6 +49,8 @@ function providerRow(overrides: Record<string, unknown> = {}) {
     avatarUrl: null,
     socialVk: null,
     socialInstagram: null,
+    socialTelegram: null,
+    socialMax: null,
     isPublished: true,
     ratingAvg: 4.8,
     ratingCount: 12,

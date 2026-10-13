@@ -16,6 +16,12 @@ export type SeoValues = {
   seoDescription: string;
 };
 
+/** SEO-ADMIN-01: сохранённое + текст из кода, который будет на сайте при пустом поле. */
+export type SeoSectionData = {
+  values: SeoValues;
+  defaults: SeoValues;
+};
+
 export type QueueStatsView = {
   pending: number;
   processing: number;
@@ -58,7 +64,7 @@ export type VkCommunityView = {
 
 export type AdminSettingsSnapshot = {
   flags: SystemFlags;
-  seo: SeoValues;
+  seo: SeoSectionData;
   vkCommunity: VkCommunityView;
   queue: QueueSnapshot;
   visualSearch: VisualSearchStatsView;
