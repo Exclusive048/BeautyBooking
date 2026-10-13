@@ -173,8 +173,21 @@ export function CreateBookingDialog({
           <Select
             value={selectedMasterId}
             onChange={(e) => {
-              setSelectedMasterId(e.target.value);
+              const nextMasterId = e.target.value;
+              setSelectedMasterId(nextMasterId);
               setSlot(null);
+              // UX-PASS-01: список услуг сужается до услуг нового мастера, а
+              // выбранная раньше оставалась в состоянии невидимой — окошки и
+              // отправка шли с услугой, которую мастер не делает.
+              if (
+                serviceId &&
+                nextMasterId &&
+                !services
+                  .find((service) => service.id === serviceId)
+                  ?.masterIds.includes(nextMasterId)
+              ) {
+                setServiceId("");
+              }
             }}
             disabled={submitting}
           >

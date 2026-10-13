@@ -24,11 +24,13 @@
  *     for the rule (matches the booking `assertX` family pattern).
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FOCUSABLE_SELECTOR,
+  createOverlayKeydownHandler,
   decideFocusTrap,
   getFocusable,
+  openOverlayLayer,
   type FocusTrapDecision,
 } from "./use-modal-a11y";
 
@@ -252,5 +254,99 @@ describe("getFocusable", () => {
 
   it("без контейнера — пустой список", () => {
     expect(getFocusable(null)).toEqual([]);
+  });
+});
+
+/**
+ * UX-PASS-01 — вложенные слои: клавиши решает только верхний.
+ *
+ * Оба слоя слушают `window`, поэтому событие получают ОБА обработчика — в
+ * порядке регистрации (внешний первым). Тест так и раздаёт событие.
+ *
+ * @probe 2026-10-13 — из `createOverlayKeydownHandler` убрана строка
+ *        `if (!layer.isTopmost()) return;`: красные все три — «Escape…»
+ *        (`expected [ 'outer', 'inner' ] to deeply equal [ 'inner' ]`),
+ *        «Tab…» (`expected "vi.fn()" to not be called at all, but actually
+ *        been called 1 times` — внешний слой увёл фокус) и «закрытый…»
+ *        (`expected [ 'outer' ] to deeply equal []`). Возвращено — 23/23.
+ * @probe 2026-10-13 — в `openOverlayLayer().close()` убрано удаление из
+ *        стопки: красный «закрытый верхний слой…» (`expected [] to deeply
+ *        equal [ 'outer' ]`). Возвращено — 23/23.
+ */
+describe("стопка оверлеев — вложенные слои", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const keyEvent = (key: string) => {
+    const preventDefault = vi.fn();
+    return { event: { key, shiftKey: false, preventDefault } as unknown as KeyboardEvent, preventDefault };
+  };
+
+  it("Escape закрывает только верхний слой", () => {
+    const closed: string[] = [];
+    const outer = openOverlayLayer();
+    const inner = openOverlayLayer();
+    const handlers = [
+      createOverlayKeydownHandler({ layer: outer, onEscape: () => closed.push("outer"), getContainer: () => null }),
+      createOverlayKeydownHandler({ layer: inner, onEscape: () => closed.push("inner"), getContainer: () => null }),
+    ];
+    const { event } = keyEvent("Escape");
+    for (const handle of handlers) handle(event);
+    expect(closed).toEqual(["inner"]);
+    inner.close();
+    outer.close();
+  });
+
+  it("Tab запирает только верхний слой", () => {
+    const outerFocus = vi.fn();
+    const outerButton = { getAttribute: () => null, focus: outerFocus } as unknown as HTMLElement;
+    const outerContainer = {
+      querySelectorAll: () => [outerButton],
+      contains: (other: unknown) => other === outerButton,
+    } as unknown as HTMLElement;
+    const innerFocus = vi.fn();
+    const innerButton = { getAttribute: () => null, focus: innerFocus } as unknown as HTMLElement;
+    const innerContainer = {
+      querySelectorAll: () => [innerButton],
+      contains: (other: unknown) => other === innerButton,
+    } as unknown as HTMLElement;
+    // Фокус — на кнопке внутреннего окна (отдельный портал, вне внешнего).
+    vi.stubGlobal("document", { activeElement: innerButton });
+
+    const outer = openOverlayLayer();
+    const inner = openOverlayLayer();
+    const handlers = [
+      createOverlayKeydownHandler({ layer: outer, onEscape: () => undefined, getContainer: () => outerContainer }),
+      createOverlayKeydownHandler({ layer: inner, onEscape: () => undefined, getContainer: () => innerContainer }),
+    ];
+    const { event, preventDefault } = keyEvent("Tab");
+    for (const handle of handlers) handle(event);
+
+    // Единственная кнопка внутреннего окна — Tab по кругу на неё же;
+    // внешний слой фокус не трогает.
+    expect(outerFocus).not.toHaveBeenCalled();
+    expect(innerFocus).toHaveBeenCalledTimes(1);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    inner.close();
+    outer.close();
+  });
+
+  it("закрытый верхний слой возвращает клавиши следующему", () => {
+    const closed: string[] = [];
+    const outer = openOverlayLayer();
+    const inner = openOverlayLayer();
+    const handleOuter = createOverlayKeydownHandler({
+      layer: outer,
+      onEscape: () => closed.push("outer"),
+      getContainer: () => null,
+    });
+    handleOuter(keyEvent("Escape").event);
+    expect(closed).toEqual([]);
+    inner.close();
+    inner.close(); // идемпотентно: второй вызов не снимает чужой слой
+    handleOuter(keyEvent("Escape").event);
+    expect(closed).toEqual(["outer"]);
+    outer.close();
   });
 });

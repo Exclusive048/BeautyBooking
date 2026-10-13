@@ -33,7 +33,9 @@ import { cn } from "@/lib/cn";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import * as UI_TEXT from "@/lib/ui/text";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { placeMenu } from "@/lib/ui/menu-placement";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 
 const T = UI_TEXT.cabinetMaster.schedule.bookingCard;
 
@@ -58,6 +60,9 @@ type Props = {
 
 type ActionId = "confirm" | "decline" | "reschedule" | "cancel";
 
+/** Ширина меню (`w-48`). */
+const MENU_WIDTH_PX = 192;
+
 /**
  * 3-dots popover menu on each week-grid booking card.
  *
@@ -68,6 +73,11 @@ type ActionId = "confirm" | "decline" | "reschedule" | "cancel";
  * it floats above everything regardless of the parent's stacking /
  * clipping context. Position is recomputed on open + on scroll /
  * resize while open.
+ *
+ * UX-PASS-01: у нижнего края экрана меню открывается вверх (общее правило
+ * `lib/ui/menu-placement.ts`, высота меню — по факту отрисовки), а отказ
+ * сервера показывается тостом: «Отклонить» и «Отменить» закрывают меню до
+ * запроса, и строка ошибки внутри закрытого меню не была видна никому.
  */
 export function BookingCardActionsMenu({
   bookingId,
@@ -78,12 +88,12 @@ export function BookingCardActionsMenu({
   actionRequiredBy = null,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const { prompt, modal: promptModal } = usePrompt();
   const noShow = useMarkNoShow(bookingId);
   const { cancelBooking, modal: packageModal } = useMasterBookingCancel();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<ActionId | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -95,19 +105,15 @@ export function BookingCardActionsMenu({
   const reposition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    const MENU_WIDTH = 192; // matches w-48
-    // Prefer aligning the menu's right edge with the trigger's right edge.
-    let left = rect.right - MENU_WIDTH;
-    if (left < 8) left = 8;
-    const right = left + MENU_WIDTH;
-    if (right > window.innerWidth - 8) {
-      left = window.innerWidth - 8 - MENU_WIDTH;
-    }
-    setCoords({
-      top: rect.bottom + 4,
-      left,
-    });
+    // Правый край меню — по правому краю кнопки, в границах экрана; внизу не
+    // помещается — вверх. Меню на первом проходе отрисовано невидимым, поэтому
+    // его высота уже известна.
+    setCoords(
+      placeMenu(trigger.getBoundingClientRect(), {
+        width: MENU_WIDTH_PX,
+        height: menuRef.current?.offsetHeight ?? 0,
+      }),
+    );
   }, []);
 
   useLayoutEffect(() => {
@@ -143,7 +149,6 @@ export function BookingCardActionsMenu({
   const patchStatus = useCallback(
     async (action: ActionId, status: "CONFIRMED" | "REJECTED" | "CANCELLED", comment?: string) => {
       setBusy(action);
-      setError(null);
       try {
         await fetchJsonWithAuth<unknown>(`/api/master/bookings/${bookingId}/status`, {
           method: "PATCH",
@@ -153,12 +158,13 @@ export function BookingCardActionsMenu({
         setOpen(false);
         startTransition(() => router.refresh());
       } catch (err) {
-        setError(serverMessageOr(err, T.actionError));
+        setOpen(false);
+        toast.error(serverMessageOr(err, T.actionError));
       } finally {
         setBusy(null);
       }
     },
-    [bookingId, router],
+    [bookingId, router, toast],
   );
 
   const handleConfirm = () => {
@@ -189,12 +195,11 @@ export function BookingCardActionsMenu({
     // BOOKING-FLOW-AUDIT-RESIDUALS: компонент пакета — с предложением
     // отменить весь пакет (`useMasterBookingCancel`).
     setBusy("cancel");
-    setError(null);
     try {
       const cancelled = await cancelBooking(bookingId, comment);
       if (cancelled) startTransition(() => router.refresh());
     } catch (err) {
-      setError(serverMessageOr(err, T.actionError));
+      toast.error(serverMessageOr(err, T.actionError));
     } finally {
       setBusy(null);
     }
@@ -246,12 +251,13 @@ export function BookingCardActionsMenu({
   const confirmTooltip = UI_TEXT.cabinetMaster.dashboard.bookings.confirmWindowExpiredTooltip;
 
   const menuContent =
-    open && coords ? (
+    open ? (
       <div
         ref={menuRef}
         role="menu"
         className="fixed z-popover w-48 overflow-hidden rounded-xl border border-border-subtle bg-bg-card shadow-card"
-        style={{ top: coords.top, left: coords.left }}
+        // Первый проход — невидимым: `reposition` меряет высоту меню.
+        style={coords ? { top: coords.top, left: coords.left } : { top: 0, left: 0, visibility: "hidden" }}
         onClick={(event) => event.stopPropagation()}
       >
         {canConfirmOrDecline ? (
@@ -305,11 +311,6 @@ export function BookingCardActionsMenu({
             {UI_TEXT.cabinetMaster.bookings.card.noShow}
           </MenuItem>
         ) : null}
-        {error ? (
-          <p className="border-t border-border-subtle px-3 py-2 text-2xs text-danger-text">
-            {error}
-          </p>
-        ) : null}
       </div>
     ) : null;
 
@@ -323,7 +324,11 @@ export function BookingCardActionsMenu({
             event.stopPropagation();
             setOpen((v) => !v);
           }}
-          className="grid h-6 w-6 place-items-center rounded-md bg-black/10 text-current opacity-0 transition-opacity hover:bg-black/20 focus-visible:opacity-100 group-hover:opacity-100 md:opacity-0 [&[aria-expanded=true]]:opacity-100"
+          // UX-PASS-01: на сенсорном экране наведения нет — кнопка видна
+          // всегда; «появляется при наведении» — только с `md` и только там,
+          // где наведение есть (`hover: hover`), иначе на планшете меню
+          // открывалось лишь со второго касания.
+          className="grid h-6 w-6 place-items-center rounded-md bg-black/10 text-current opacity-100 transition-opacity hover:bg-black/20 focus-visible:opacity-100 md:[@media(hover:hover)]:opacity-0 md:group-hover:opacity-100 [&[aria-expanded=true]]:opacity-100"
           aria-expanded={open}
         >
           <MoreVertical className="h-3.5 w-3.5" aria-hidden />

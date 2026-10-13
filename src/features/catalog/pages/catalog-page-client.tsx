@@ -853,9 +853,16 @@ export default function CatalogPageClient({
 
       {/* Main layout: sidebar + content */}
       <div className="flex gap-6">
-        {/* Sidebar — desktop only */}
+        {/* Sidebar — desktop only.
+            UX-PASS-01: липкая панель — свой слой (`position: sticky` создаёт
+            контекст наложения), и без z-index карточки выдачи, идущие в DOM
+            позже, рисовались поверх неё: календарь «Когда» и подсказки района
+            выезжают за панель вправо и проваливались под карточку. `z-10` —
+            над карточками (они `isolate`, их внутренние `z-10` наружу не
+            выходят), но под липкой строкой поиска (`z-sticky`) с её
+            подсказками. */}
         <aside className="hidden w-64 shrink-0 lg:block">
-          <div className="sticky top-[calc(var(--topbar-h)+6.5rem)] rounded-2xl border border-border bg-card/80 p-5">
+          <div className="sticky top-[calc(var(--topbar-h)+6.5rem)] z-10 rounded-2xl border border-border bg-card/80 p-5">
             <CatalogSidebar {...filterProps} />
           </div>
         </aside>

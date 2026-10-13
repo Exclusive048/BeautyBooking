@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CitiesEmpty } from "@/features/admin-cabinet/cities/components/cities-empty";
 import { CitiesHeader } from "@/features/admin-cabinet/cities/components/cities-header";
@@ -13,7 +13,9 @@ import {
 import { DeleteCityConfirm } from "@/features/admin-cabinet/cities/components/delete-city-confirm";
 import { DuplicateGroupsModal } from "@/features/admin-cabinet/cities/components/duplicate-groups-modal";
 import { MergeCityDialog } from "@/features/admin-cabinet/cities/components/merge-city-dialog";
+import { useServerRows } from "@/features/admin-cabinet/lib/server-rows";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { scrollBehavior } from "@/lib/ui/scroll";
 import * as UI_TEXT from "@/lib/ui/text";
 import type {
   AdminCitiesCounts,
@@ -50,7 +52,10 @@ export function CitiesTable({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [rows, setRows] = useState<AdminCityRow[]>(initialRows);
+  // UX-PASS-01: строки — из ответа сервера (смена фильтра или поиска,
+  // `router.refresh()` после правки). Прежний блок «синхронизации» был
+  // пустым, и таблица навсегда держала строки первой загрузки.
+  const [rows, setRows] = useServerRows<AdminCityRow>(initialRows);
   const [busyId, setBusyId] = useState<string | null>(null);
   const toast = useToast();
   const [, startTransition] = useTransition();
@@ -62,15 +67,6 @@ export function CitiesTable({
   >(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminCityRow | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
-
-  // Keep local rows in sync when the server prop changes (e.g. URL
-  // filter changed → page re-rendered → fresh prop reaches us).
-  if (rows !== initialRows && rows.length !== initialRows.length) {
-    // Only fully replace when length differs — otherwise our optimistic
-    // updates would be lost in the round-trip.
-    // (Edge case; the alternative — useEffect — would still allow
-    // optimistic value to flash before re-sync.)
-  }
 
   const selectedCity =
     selectedId !== null
@@ -89,6 +85,32 @@ export function CitiesTable({
     },
     [pathname, router, searchParams],
   );
+
+  // UX-PASS-01: на телефоне и планшете панель города стоит под таблицей —
+  // выбранный город открывался где-то внизу, и казалось, что клик не
+  // сработал. После выбора прокручиваем к панели (на ПК она рядом, липкая).
+  const detailRef = useRef<HTMLDivElement>(null);
+  const scrollToDetailRef = useRef(false);
+  const scrollToDetail = useCallback(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    detailRef.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+  }, []);
+
+  useEffect(() => {
+    if (!scrollToDetailRef.current || selectedId === null) return;
+    scrollToDetailRef.current = false;
+    scrollToDetail();
+  }, [selectedId, scrollToDetail]);
+
+  const selectCity = (id: string) => {
+    if (id === selectedId) {
+      scrollToDetail();
+      return;
+    }
+    // Панель покажет город, когда адрес с `?selected=` вернётся с сервера.
+    scrollToDetailRef.current = true;
+    updateSelectedParam(id);
+  };
 
   const patchRow = (id: string, patch: Partial<AdminCityRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -230,7 +252,7 @@ export function CitiesTable({
                     city={row}
                     selected={row.id === selectedId}
                     busy={busyId === row.id}
-                    onSelect={() => updateSelectedParam(row.id)}
+                    onSelect={() => selectCity(row.id)}
                     onToggleVisible={() => void handleToggleVisible(row)}
                   />
                 ))
@@ -239,7 +261,10 @@ export function CitiesTable({
           </table>
         </div>
 
-        <div className="lg:sticky lg:top-[calc(var(--topbar-h)+1rem)] lg:self-start">
+        <div
+          ref={detailRef}
+          className="scroll-mt-[calc(var(--topbar-h)+6rem)] lg:sticky lg:top-[calc(var(--topbar-h)+1rem)] lg:self-start"
+        >
           <CitiesDetailPanel
             city={selectedCity}
             duplicateGroups={duplicateGroups}

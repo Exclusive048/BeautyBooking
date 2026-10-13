@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Notice } from "@/components/ui/notice";
 import { FieldLabel } from "@/components/ui/field-label";
-import { formatLocalHm } from "@/lib/schedule/timezone";
+import { formatLocalHm, toLocalDateKey } from "@/lib/schedule/timezone";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
@@ -40,11 +40,14 @@ const fetcher = (url: string) =>
   // Модаль работает и у гостя по ссылке «Управлять записью» — без ухода на вход.
   fetchJson<SlotsApiResponse>(url, { credentials: "include" });
 
-function todayDateKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
+/**
+ * UX-PASS-01: «сегодня» — по часам САЛОНА (rule 17), как и окошки ниже. Раньше
+ * день брался по часам браузера: клиент из Москвы, переносящий запись в
+ * екатеринбургской студии около полуночи, открывал вчерашний по меркам салона
+ * день, а `min` не пускал на сегодняшний салонный.
+ */
+function todayDateKey(timeZone: string): string {
+  return toLocalDateKey(new Date(), timeZone);
 }
 
 type Props = {
@@ -60,7 +63,7 @@ type Props = {
 };
 
 export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess }: Props) {
-  const [date, setDate] = useState<string>(() => todayDateKey());
+  const [date, setDate] = useState<string>(() => todayDateKey(booking.provider.timezone));
   const [slotIso, setSlotIso] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const dateInputId = useId();
@@ -165,7 +168,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
             id={dateInputId}
             type="date"
             value={date}
-            min={todayDateKey()}
+            min={todayDateKey(booking.provider.timezone)}
             onChange={(e) => {
               setDate(e.target.value);
               setSlotIso(null);

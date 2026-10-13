@@ -134,7 +134,11 @@ export function DayGrid({
       >
           {/* Time axis sticky left */}
           <div className="sticky left-0 z-30 bg-bg-card">
-            <div className="h-12 border-b border-r border-border-subtle bg-bg-card" />
+            {/* UX-PASS-01: угол над осью времени закреплён и сверху — раньше он
+                уезжал вверх вместе с осью, и подписи часов наезжали на шапки
+                мастеров. Колонка оси (z-30) выше шапок (z-20), угол — выше
+                подписей внутри неё. */}
+            <div className="sticky top-0 z-10 h-12 border-b border-r border-border-subtle bg-bg-card" />
             <TimeAxis gridWindow={gridWindow} />
           </div>
 

@@ -124,7 +124,9 @@ export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
   const attachmentUrl = message.attachmentUrl;
   const hasAttachment = Boolean(attachmentUrl);
   return (
-    <div className={cn("max-w-[520px]", isMine ? "self-end" : "self-start")}>
+    // UX-PASS-01: потолок — не шире 85% ленты. Один `max-w-[520px]` на
+    // телефоне шире экрана, и длинная ссылка растягивала пузырь за край.
+    <div className={cn("min-w-0 max-w-[min(520px,85%)]", isMine ? "self-end" : "self-start")}>
       {hasAttachment && attachmentUrl ? (
         <a
           href={attachmentUrl}
@@ -156,7 +158,9 @@ export function MessageBubble({ message, isMine, viewerTimezone }: Props) {
       {hasBody ? (
         <div
           className={cn(
-            "px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words",
+            // UX-PASS-01: `anywhere`, а не `break-words` — ссылка без пробелов
+            // переносится и при подсчёте ширины пузыря, а не только при отрисовке.
+            "px-3.5 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]",
             isMine
               ? "bg-brand-gradient text-white shadow-sm"
               : "bg-bg-card text-text-main border border-border-subtle",

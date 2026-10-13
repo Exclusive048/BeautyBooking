@@ -248,6 +248,78 @@ function useOverlayOpenMarker(open: boolean): void {
 }
 
 /**
+ * UX-PASS-01 — стопка открытых модальных слоёв.
+ *
+ * Escape и ловушка Tab слушают `window`, поэтому у вложенных слоёв (окно
+ * подтверждения поверх модалки, модалка поверх листа «Ещё») слушали ОБА:
+ * Escape закрывал оба слоя разом, а ловушка внешнего слоя видела фокус «вне
+ * себя» (внутренний слой — отдельный портал в `body`) и уводила его на свою
+ * первую кнопку — Tab во внутреннем окне не работал. Теперь клавиши решает
+ * только верхний слой стопки; закрылся он — решает следующий.
+ *
+ * Порядок — порядок открытия: слой встаёт наверх в эффекте `open`, а
+ * перерисовка с новым `onClose` его не переставляет (обработчик берёт
+ * `onClose` из ref).
+ */
+export type OverlayLayer = {
+  /** Этот слой — верхний: клавиши решает он. */
+  isTopmost: () => boolean;
+  /** Снять слой со стопки (идемпотентно). */
+  close: () => void;
+};
+
+const overlayStack: object[] = [];
+
+export function openOverlayLayer(): OverlayLayer {
+  const token = {};
+  overlayStack.push(token);
+  let closed = false;
+  return {
+    isTopmost: () => overlayStack[overlayStack.length - 1] === token,
+    close: () => {
+      if (closed) return;
+      closed = true;
+      const index = overlayStack.indexOf(token);
+      if (index !== -1) overlayStack.splice(index, 1);
+    },
+  };
+}
+
+/** Tab / Shift+Tab по кругу внутри контейнера (решение — `decideFocusTrap`). */
+function trapTabKey(event: KeyboardEvent, container: HTMLElement | null): void {
+  if (!container) return;
+  const decision = decideFocusTrap({
+    shiftKey: event.shiftKey,
+    focusable: getFocusable(container),
+    activeElement: document.activeElement as HTMLElement | null,
+    container,
+  });
+  if (decision.kind === "ignore") return;
+  event.preventDefault();
+  if (decision.kind === "wrap") decision.target.focus();
+}
+
+// Exported for test discoverability (`use-modal-a11y.test.ts`).
+export function createOverlayKeydownHandler({
+  layer,
+  onEscape,
+  getContainer,
+}: {
+  layer: OverlayLayer;
+  onEscape: () => void;
+  getContainer: () => HTMLElement | null;
+}): (event: KeyboardEvent) => void {
+  return (event) => {
+    if (!layer.isTopmost()) return;
+    if (event.key === "Escape") {
+      onEscape();
+      return;
+    }
+    if (event.key === "Tab") trapTabKey(event, getContainer());
+  };
+}
+
+/**
  * UI-13 — весь контракт модального оверлея одним вызовом.
  *
  * Три focus-хука выше существовали и раньше, но контракт ими не
@@ -279,18 +351,31 @@ export function useOverlayA11y({
 }): void {
   useBodyScrollLock(open);
   useOverlayOpenMarker(open);
+
+  // `onClose` у вызывающих часто — новая стрелка на каждую перерисовку.
+  // Эффект слоя от неё не зависит: иначе каждая перерисовка снимала бы слой и
+  // ставила его заново — НАВЕРХ стопки, поверх уже открытого вложенного.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Escape и ловушка Tab — одним обработчиком верхнего слоя (UX-PASS-01).
   useEffect(() => {
     if (!open) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
+    const layer = openOverlayLayer();
+    const handleKey = createOverlayKeydownHandler({
+      layer,
+      onEscape: () => onCloseRef.current(),
+      getContainer: () => containerRef.current,
+    });
     window.addEventListener("keydown", handleKey);
     return () => {
       window.removeEventListener("keydown", handleKey);
+      layer.close();
     };
-  }, [open, onClose]);
+  }, [open, containerRef]);
 
   useReturnFocus(open);
   useInitialFocus(open, containerRef, initialFocusRef);
-  useFocusTrap(containerRef, open);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -92,7 +92,14 @@ export function TimeGrid({
       ? formatZoneLabel({ iso: refInstant, timeZone: providerTimezone })
       : "";
 
+  // UX-PASS-01: номер запроса. Дни щёлкают быстрее, чем отвечает сервер, и
+  // ответ прежнего дня, пришедший последним, перезаписывал окошки выбранного
+  // (фильтр по `dayKey` ниже не спасал — он сравнивает с днём ЭТОГО запроса).
+  // Чужой или устаревший ответ (и ответ после размонтирования) не пишет ничего.
+  const requestSeqRef = useRef(0);
+
   const loadSlots = useCallback(async () => {
+    const seq = ++requestSeqRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -130,16 +137,21 @@ export function TimeGrid({
         // single-day request above this is already exact, but the filter
         // guards any midnight-boundary edge.
         .filter((slot) => slot.dayKey === dateKey);
+      if (seq !== requestSeqRef.current) return;
       setSlots(parsed);
     } catch (error) {
+      if (seq !== requestSeqRef.current) return;
       setError(serverMessageOr(error, UI_TEXT.publicProfile.slots.loadFailed));
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) setLoading(false);
     }
   }, [dateKey, providerId, providerTimezone, serviceId]);
 
   useEffect(() => {
     void loadSlots();
+    return () => {
+      requestSeqRef.current += 1;
+    };
   }, [loadSlots]);
 
   // Cursor filter at render (not in the fetch) — the day's slots are the same

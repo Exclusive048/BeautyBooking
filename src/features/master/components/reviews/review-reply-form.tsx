@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import * as UI_TEXT from "@/lib/ui/text";
-import { fetchJsonWithAuth } from "@/lib/http/client";
+import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { ChipButton } from "@/components/ui/chip-button";
 
 const T = UI_TEXT.cabinetMaster.reviews.reply;
@@ -59,8 +59,9 @@ export function ReviewReplyForm({ reviewId, initialText, onCancel, onSaved }: Pr
       onSaved();
       startTransition(() => router.refresh());
     } catch (err) {
-      const message = err instanceof Error ? err.message : null;
-      setError(message ?? (isEdit ? T.errorEdit : T.errorCreate));
+      // UX-PASS-01: строка сервера (окно правки, ответ уже есть) — дословно,
+      // иначе своя; сырое `err.message` печатало дефолт клиента (FIX-C8).
+      setError(serverMessageOr(err, isEdit ? T.errorEdit : T.errorCreate));
     } finally {
       setBusy(false);
     }

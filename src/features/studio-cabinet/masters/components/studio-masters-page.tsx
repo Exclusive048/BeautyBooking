@@ -1,3 +1,4 @@
+import { StackedDetailAnchor } from "../../components/stacked-detail-anchor";
 import { MastersFilters } from "./masters-filters";
 import { MastersHeader } from "./masters-header";
 import { MastersList } from "./masters-list";
@@ -10,6 +11,10 @@ import type {
   StudioMasterFilter,
   StudioMastersListData,
 } from "../server/types";
+
+// UX-PASS-01: ниже xl карточка мастера стоит под списком — выбор строки
+// прокручивает к ней (`StackedDetailAnchor`).
+const STACKED_DETAIL_QUERY = "(max-width: 1279.98px)";
 
 type Props = {
   studioId: string;
@@ -46,13 +51,16 @@ export function StudioMastersPage({
           />
         </div>
 
-        <div>
+        <StackedDetailAnchor
+          selectionKey={detail?.id ?? null}
+          stackedQuery={STACKED_DETAIL_QUERY}
+        >
           {detail ? (
             <MasterDetailPanel studioId={studioId} detail={detail} />
           ) : (
             <MasterDetailEmpty />
           )}
-        </div>
+        </StackedDetailAnchor>
       </div>
     </div>
   );

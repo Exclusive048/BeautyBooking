@@ -103,6 +103,9 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   const [masterId, setMasterId] = useState(initialMasterId ?? "");
   const [slotLabel, setSlotLabel] = useState("");
   const [availabilityByMaster, setAvailabilityByMaster] = useState<Record<string, MasterAvailability>>({});
+  // UX-PASS-01: перезапрос окошек без смены даты — «Повторить» после сбоя
+  // загрузки и обновление после «это время уже занято».
+  const [availabilityNonce, setAvailabilityNonce] = useState(0);
 
   const [me, setMe] = useState<BookingUser | null>(null);
   const [meLoading, setMeLoading] = useState(true);
@@ -204,6 +207,18 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     return resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.slots ?? [] : [];
   }, [anyMasterSlots, availabilityByMaster, resolvedMasterId]);
   const slotByLabel = useMemo(() => new Map(slots.map((slot) => [slot.label, slot])), [slots]);
+  // UX-PASS-01: сбой загрузки окошек — не «свободных окошек нет». Раньше
+  // ошибка мастера лежала в `availabilityByMaster` и не доходила до шага
+  // «Когда»: человек видел «на эту дату свободных окошек нет» и уходил.
+  // «Любой мастер»: окошек нет ни у кого, а хоть у одного — сбой.
+  const slotsError = useMemo(() => {
+    if (slots.length > 0) return null;
+    if (anyMasterSlots) {
+      const failed = availableMasters.find((master) => availabilityByMaster[master.id]?.error);
+      return failed ? availabilityByMaster[failed.id]?.error ?? null : null;
+    }
+    return resolvedMasterId ? availabilityByMaster[resolvedMasterId]?.error ?? null : null;
+  }, [anyMasterSlots, availabilityByMaster, availableMasters, resolvedMasterId, slots.length]);
   const selectedSlot = slotLabel ? slotByLabel.get(slotLabel) ?? null : null;
 
   // FIX-BATCH-C Defect 1 (QA-107/FIX-22): slot times are shown in the SALON's
@@ -391,7 +406,7 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
     return () => {
       cancelled = true;
     };
-  }, [assignedMasters, selectedDate, serviceId]);
+  }, [assignedMasters, availabilityNonce, selectedDate, serviceId]);
 
   // If service has a config (questions / reference photo) — load it
   useEffect(() => {
@@ -454,12 +469,16 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
   }, [initialMasterKey, masterId, masters]);
 
   // If selected slot disappears, reset
+  // UX-PASS-01: и когда окошек не осталось вовсе (другой мастер, у которого
+  // этот день пуст). Прежний ранний выход на пустом списке оставлял выбранное
+  // время чужого мастера: шаг «Когда» значился пройденным, а запись падала на
+  // «Выберите время». Пока окошки грузятся — не судим.
   useEffect(() => {
-    if (!slots.length) return;
+    if (loadingSlots) return;
     if (slotLabel && !slots.some((slot) => slot.label === slotLabel)) {
       setSlotLabel("");
     }
-  }, [slots, slotLabel]);
+  }, [loadingSlots, slots, slotLabel]);
 
   // --- handlers --------------------------------------------------------------
 
@@ -595,6 +614,15 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         idempotencyKeyRef.current = newIdempotencyKey();
         setSubmitError(result.error || UI_TEXT.bookingWidget.errors.generic);
         setSubmitErrorCode(result.code ?? null);
+        // UX-PASS-01: время заняли — назад к окошкам, со свежим списком и без
+        // занятого: раньше человек оставался на «Вы» с тем же временем, и
+        // повтор упирался в тот же отказ. Причина остаётся видна на шаге.
+        if (result.code === "SLOT_CONFLICT" || result.code === "BOOKING_CONFLICT") {
+          setSlotLabel("");
+          setAvailabilityNonce((n) => n + 1);
+          setDirection(-1);
+          setStep("when");
+        }
         return;
       }
 
@@ -618,6 +646,13 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
         }`,
         manageUrl: result.manageUrl,
       });
+    } catch {
+      // UX-PASS-01: обрыв сети (`createBooking` бросает только его) раньше
+      // уходил необработанным — кнопка просто переставала крутиться. Ключ
+      // идемпотентности НЕ меняем: запрос мог дойти, и повтор с тем же ключом
+      // вернёт уже созданную запись, а не вторую (инв. #28).
+      setSubmitError(UI_TEXT.publicProfile.bookingWidget.errorNetwork);
+      setSubmitErrorCode(null);
     } finally {
       setSubmitLoading(false);
     }
@@ -855,6 +890,8 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
               selectedServiceName={selectedService?.name ?? ""}
               salonTimeZone={salonTz}
               onPick={(id) => {
+                // UX-PASS-01: время выбирали у другого мастера — выбираем заново.
+                if (id !== masterId) setSlotLabel("");
                 setMasterId(id);
                 goNext("master");
               }}
@@ -874,8 +911,13 @@ export function StudioBookingFlow({ studioId, initialMasterId, initialMasterKey,
               selectedSlotLabel={slotLabel}
               onSlotChange={(label) => {
                 setSlotLabel(label);
+                // Отказ относился к прежнему времени — новое его не наследует.
+                setSubmitError(null);
+                setSubmitErrorCode(null);
                 goNext("when");
               }}
+              error={slotsError}
+              onRetry={() => setAvailabilityNonce((n) => n + 1)}
               salonTimeZone={salonTz}
               viewerTimeZone={viewerTimeZone}
               selectedMasterName={selectedMasterName ?? ""}

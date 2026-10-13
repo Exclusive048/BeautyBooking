@@ -38,7 +38,8 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import { UI_FMT } from "@/lib/ui/fmt";
 import { DISTANCE, MOTION } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
-import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { useConfirm } from "@/hooks/use-confirm";
 import { Tabs } from "@/components/ui/tabs";
 
 // NOTIFICATIONS-REDESIGN-01: was `"all" | "master" | "studio" | "system" |
@@ -272,6 +273,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const { hasMaster, hasStudio } = useActiveRole();
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
   const toast = useToast();
+  const { confirm, modal: confirmModal } = useConfirm();
   const bookingActionText = t.bookingActions;
 
   const emitBellRefresh = (notificationId?: string) => {
@@ -367,6 +369,18 @@ export function NotificationsCenterPage({ initialData }: Props) {
     emitBellRefresh();
   }, []);
 
+  // UX-PASS-01: 409 — запись уже подтвердили, отклонили или отменили в другом
+  // месте. Перечитываем центр: живой статус записи уберёт кнопки, на которые
+  // нажимать больше нечего.
+  const reloadAfterStaleAction = async (error: unknown) => {
+    if (!(error instanceof ApiClientError) || error.status !== 409) return;
+    try {
+      await reloadCenterData();
+    } catch {
+      // ignore refresh errors
+    }
+  };
+
   const handleBookingConfirm = async (noteId: string, payload: unknown) => {
     const booking = parseBookingPayload(payload);
     if (!booking) {
@@ -401,8 +415,10 @@ export function NotificationsCenterPage({ initialData }: Props) {
         // ignore refresh errors
       }
       showActionNotice("success", bookingActionText.confirmSuccess);
-    } catch {
-      showActionNotice("error", bookingActionText.confirmFailed);
+    } catch (error) {
+      // UX-PASS-01: отказ сервера («Статус записи изменился…») — дословно.
+      showActionNotice("error", serverMessageOr(error, bookingActionText.confirmFailed));
+      await reloadAfterStaleAction(error);
     } finally {
       setActionPendingId(null);
     }
@@ -414,6 +430,15 @@ export function NotificationsCenterPage({ initialData }: Props) {
       showActionNotice("error", bookingActionText.resolveForDeclineFailed);
       return;
     }
+    // UX-PASS-01: отказ отменяет запись клиента и вернуть его нельзя —
+    // одно касание по «Отклонить» рядом с «Подтвердить» стоило записи.
+    const ok = await confirm({
+      title: bookingActionText.declineConfirmTitle,
+      message: bookingActionText.declineConfirmMessage,
+      confirmLabel: UI_TEXT.actions.decline,
+      variant: "danger",
+    });
+    if (!ok) return;
     setActionPendingId(noteId);
     try {
       await fetchJsonWithAuth<unknown>(`/api/bookings/${booking.bookingId}/cancel`, {
@@ -444,8 +469,9 @@ export function NotificationsCenterPage({ initialData }: Props) {
         // ignore refresh errors
       }
       showActionNotice("success", bookingActionText.declineSuccess);
-    } catch {
-      showActionNotice("error", bookingActionText.declineFailed);
+    } catch (error) {
+      showActionNotice("error", serverMessageOr(error, bookingActionText.declineFailed));
+      await reloadAfterStaleAction(error);
     } finally {
       setActionPendingId(null);
     }
@@ -813,6 +839,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
           )}
         </div>
       )}
+      {confirmModal}
     </section>
   );
 }

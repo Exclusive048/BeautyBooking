@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/toast";
 import { BOOKING_RULE_LIMITS } from "@/lib/schedule/editor-shared";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -63,6 +64,7 @@ function parseIntInRange(raw: string, min: number, max: number): number | null {
  */
 export function PolicyForm({ providerId, data }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => toDraft(data));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +127,9 @@ export function PolicyForm({ providerId, data }: Props) {
           remindersEnabled: draft.remindersEnabled,
         }),
       });
+      // UX-PASS-01: успешное сохранение ничем не отмечалось — кнопка просто
+      // гасла, и было непонятно, применились ли правила.
+      toast.success(UI_TEXT.common.saved);
       router.refresh();
     } catch (error) {
       setError(serverMessageOr(error, TX.error));

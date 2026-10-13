@@ -18,12 +18,27 @@ export function ServicesSearch({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [draft, setDraft] = useState(initial);
+  // UX-PASS-01: черновик поиска знал только начальное значение — «Сбросить»,
+  // переход «назад» и смена фильтра со сбросом `q` оставляли в поле старый
+  // текст, а следующая правка возвращала его в адрес. Пропс синхронизируется
+  // в поле, кроме эха собственной отправки (иначе ответ сервера стирал бы
+  // буквы, набранные за время запроса).
+  const [seenSearch, setSeenSearch] = useState(initial);
+  const [pushedSearch, setPushedSearch] = useState(initial);
+  if (initial !== seenSearch) {
+    setSeenSearch(initial);
+    if (initial !== pushedSearch) {
+      setPushedSearch(initial);
+      setDraft(initial);
+    }
+  }
 
   useEffect(() => {
     if (draft === initial) return;
     const timer = setTimeout(() => {
       const next = new URLSearchParams(searchParams.toString());
       const trimmed = draft.trim();
+      setPushedSearch(trimmed);
       if (trimmed) next.set("q", trimmed);
       else next.delete("q");
       next.delete("service");

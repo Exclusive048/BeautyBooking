@@ -13,6 +13,8 @@ const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
 type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
+  /** UX-PASS-01: сохранённый срез — в снапшот страницы (см. `RulesTab`). */
+  onSnapshotPatch: (patch: Partial<ScheduleEditorSnapshot>) => void;
 };
 
 /**
@@ -31,7 +33,7 @@ type Props = {
  * disk for a future activation if we decide to re-introduce a multi-day
  * shortcut. They are simply not mounted today.
  */
-export function BreaksTab({ initialSnapshot }: Props) {
+export function BreaksTab({ initialSnapshot, onSnapshotPatch }: Props) {
   const [draft, setDraft] = useState<number>(() => initialSnapshot.bufferBetweenBookingsMin);
   const [baseline, setBaseline] = useState<number>(
     () => initialSnapshot.bufferBetweenBookingsMin
@@ -46,11 +48,12 @@ export function BreaksTab({ initialSnapshot }: Props) {
     baseline,
     save: async (value) => {
       try {
-        await fetchJsonWithAuth<unknown>(endpoint, {
+        const saved = await fetchJsonWithAuth<ScheduleEditorSnapshot>(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ bufferBetweenBookingsMin: value }),
         });
+        onSnapshotPatch({ bufferBetweenBookingsMin: saved.bufferBetweenBookingsMin });
       } catch (error) {
         return { ok: false, message: serverMessageOr(error, T.errors.save) };
       }

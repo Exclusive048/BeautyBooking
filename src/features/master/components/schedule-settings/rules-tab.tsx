@@ -30,6 +30,12 @@ type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
   /** From `getCurrentPlan().features.hotSlots` — false → render locked card. */
   hotSlotsAllowed: boolean;
+  /**
+   * UX-PASS-01: сохранённый срез — в снапшот страницы. Вкладки монтируются по
+   * одной и черновик берут из него; без этого возврат на вкладку показывал
+   * старые значения, а следующее автосохранение отправляло их целиком.
+   */
+  onSnapshotPatch: (patch: Partial<ScheduleEditorSnapshot>) => void;
 };
 
 /**
@@ -40,7 +46,7 @@ type Props = {
  * server returns 403 with code FEATURE_GATE; we surface the localised
  * message via the shared save-status chip.
  */
-export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
+export function RulesTab({ initialSnapshot, hotSlotsAllowed, onSnapshotPatch }: Props) {
   const [draft, setDraft] = useState<Draft>(() => ({
     bookingRules: initialSnapshot.bookingRules,
     hotSlots: initialSnapshot.hotSlots,
@@ -61,7 +67,7 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
     baseline,
     save: async (value) => {
       try {
-        await fetchJsonWithAuth<unknown>(endpoint, {
+        const saved = await fetchJsonWithAuth<ScheduleEditorSnapshot>(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -69,6 +75,12 @@ export function RulesTab({ initialSnapshot, hotSlotsAllowed }: Props) {
             hotSlots: value.hotSlots,
             slotStepMin: value.slotStepMin,
           }),
+        });
+        // UX-PASS-01: значения — из ответа сервера (он их нормализует).
+        onSnapshotPatch({
+          bookingRules: saved.bookingRules,
+          hotSlots: saved.hotSlots,
+          slotStepMin: saved.slotStepMin,
         });
       } catch (error) {
         // Горящие окошки закрыты тарифом — своя строка поверхности (с

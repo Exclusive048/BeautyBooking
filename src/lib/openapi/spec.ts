@@ -4746,7 +4746,7 @@ export const openApiSpec = {
       },
       ClientBookingsData: {
         type: "object",
-        required: ["bookings", "kpi"],
+        required: ["bookings", "kpi", "statusCounts"],
         properties: {
           bookings: {
             type: "array",
@@ -4772,6 +4772,18 @@ export const openApiSpec = {
               },
               finishedCount: { type: "integer" },
               spentLast90dKopeks: { type: "integer" },
+            },
+          },
+          statusCounts: {
+            type: "object",
+            description:
+              "UX-PASS-01: число записей на каждой вкладке статуса — с учётом `search`/`dateFrom`/`dateTo`, без фильтра `status`.",
+            required: ["all", "upcoming", "finished", "cancelled"],
+            properties: {
+              all: { type: "integer" },
+              upcoming: { type: "integer" },
+              finished: { type: "integer" },
+              cancelled: { type: "integer" },
             },
           },
         },

@@ -55,6 +55,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
       cityId: currentCity?.id,
       page,
       limit,
+      withTotal: true,
     }),
     getModelOfferUserState(),
   ]);
@@ -74,7 +75,7 @@ export default async function ModelsPage({ searchParams }: PageProps) {
         <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="font-display text-2xl text-text-main lg:text-3xl">{listTitle}</h2>
           {offers.items.length > 0 ? (
-            <p className="text-sm text-text-sec tabular-nums">{formatModelOfferCount(offers.items.length)}</p>
+            <p className="text-sm text-text-sec tabular-nums">{formatModelOfferCount(offers.total ?? offers.items.length)}</p>
           ) : null}
         </div>
 
@@ -98,12 +99,12 @@ export default async function ModelsPage({ searchParams }: PageProps) {
               <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                 {page > 1 ? (
                   <Button asChild variant="secondary">
-                    <Link href={buildPageHref({ page: page - 1, categoryId })}>← Назад</Link>
+                    <Link href={buildPageHref({ page: page - 1, categoryId })}>{T.list.prevPage}</Link>
                   </Button>
                 ) : null}
                 {offers.nextPage ? (
                   <Button asChild variant="secondary">
-                    <Link href={buildPageHref({ page: offers.nextPage, categoryId })}>Вперёд →</Link>
+                    <Link href={buildPageHref({ page: offers.nextPage, categoryId })}>{T.list.nextPage}</Link>
                   </Button>
                 ) : null}
               </div>

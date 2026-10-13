@@ -1,5 +1,9 @@
+"use client";
+
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 import type { BookingFlowSlot } from "@/features/booking/components/booking-flow/types";
 
 const T = UI_TEXT.publicProfile.bookingWidget;
@@ -11,6 +15,8 @@ type Props = {
   serviceDurationMin: number;
   slot: BookingFlowSlot | null;
   dateKey: string | null;
+  /** Пояс салона: время окошка — по его часам (rule 17, salon-tz). */
+  timeZone: string;
   compact?: boolean;
 };
 
@@ -45,10 +51,24 @@ export function SummaryBlock({
   serviceDurationMin,
   slot,
   dateKey,
+  timeZone,
   compact,
 }: Props) {
   const effectivePrice = resolveEffectivePrice(slot, servicePrice);
   const slotTime = slot ? slot.label.slice(-5) : null;
+  // UX-PASS-01: итог перед «Записаться» — последнее место, где человек сверяет
+  // время. Сетка подписывает зону салона, а итог её терял: «14:00» читалось по
+  // своим часам. Метка — только когда пояса зрителя и салона расходятся.
+  const viewerTz = useViewerTimeZoneContext();
+  const zoneLabel =
+    slot &&
+    zonesDifferForViewer({
+      iso: slot.startAtUtc,
+      salonTimeZone: timeZone,
+      viewerTimeZone: viewerTz,
+    })
+      ? formatZoneLabel({ iso: slot.startAtUtc, timeZone })
+      : "";
 
   return (
     <div className="rounded-xl bg-bg-page p-3 text-sm">
@@ -63,6 +83,9 @@ export function SummaryBlock({
         <span className="text-text-sec">
           {dateKey ? formatDateLong(dateKey) : T.summaryDateTimePending}
           {slotTime ? ` · ${slotTime}` : ""}
+          {zoneLabel ? (
+            <span className="ml-1 font-mono text-xs text-accent-text">{zoneLabel}</span>
+          ) : null}
         </span>
         <span className="font-mono text-xs text-text-sec">
           {UI_FMT.durationLabel(serviceDurationMin)}

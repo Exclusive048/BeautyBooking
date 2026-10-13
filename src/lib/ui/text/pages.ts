@@ -192,6 +192,7 @@ export const pages = {
     applyPhotoLabel: "Фото для заявки",
     applyPhotoHint: "До 3 фото — обычные снимки с телефона подойдут",
     applyPhotoSelected: "Выбрано: {names}",
+    applyPhotoTrimmed: "Взяли первые 3 фото — больше к заявке не прикрепить.",
     applyNoteLabel: "Сообщение мастеру",
     applyNotePlaceholder: "Коротко расскажите о себе",
     applyConsentText: "Разрешаю съёмку и публикацию фото в портфолио мастера",

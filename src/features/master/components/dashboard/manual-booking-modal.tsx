@@ -69,10 +69,25 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
 
   // `?prefillTime=ISO` (клик по пустой ячейке расписания) выбирает день этой
   // ячейки и — если окошко свободно — само окошко; это делает пикер.
-  // Закрытая модаль выбор не хранит.
-  useEffect(() => {
-    if (!isOpen) setSlot(null);
-  }, [isOpen]);
+  //
+  // UX-PASS-01: модаль смонтирована всегда (открывает её `?manual=1`), и форма
+  // переживала закрытие: следующее открытие показывало имя, телефон и
+  // комментарий прошлого клиента и прошлую ошибку. Каждое открытие начинается
+  // с чистой формы; услуга остаётся — её удобно повторить. Сброс — при
+  // открытии, а не при закрытии (иначе поля пустели бы на глазах, пока окно
+  // уходит), и во время рендера по смене `isOpen` — без прохода со старыми
+  // значениями.
+  const [openSeen, setOpenSeen] = useState(isOpen);
+  if (openSeen !== isOpen) {
+    setOpenSeen(isOpen);
+    if (isOpen) {
+      setSlot(null);
+      setClientName("");
+      setClientPhone("");
+      setNotes("");
+      setError(null);
+    }
+  }
 
   // fix-04a: ESC + body-scroll-lock effects were dropped along with
   // the bespoke fixed-inset wrapper. `<ModalSurface>` now provides

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Heart, MapPin, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import { useToast } from "@/components/ui/toast";
 import { PhotoCarousel } from "@/features/catalog/components/photo-carousel";
 import { cn } from "@/lib/cn";
 import { moneyRUBFromKopeks } from "@/lib/format";
@@ -91,6 +92,7 @@ export function CatalogCard({
   onLoginRequired,
 }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [favorited, setFavorited] = useState(initialFavorited);
   const [favoritePending, setFavoritePending] = useState(false);
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
@@ -125,10 +127,15 @@ export function CatalogCard({
       setFavorited(!next);
       if (error instanceof ApiClientError && error.status === 401) {
         onLoginRequired?.();
-      } else if (error instanceof ApiClientError && error.status === 429) {
-        setFavoriteError(UI_TEXT.common.favoriteToggle.errorRateLimited);
       } else {
-        setFavoriteError(serverMessageOr(error, UI_TEXT.common.favoriteToggle.errorGeneric));
+        // UX-PASS-01: отказ — тостом. Одной подсказки `title` на телефоне
+        // не видно: сердце молча возвращалось назад.
+        const message =
+          error instanceof ApiClientError && error.status === 429
+            ? UI_TEXT.common.favoriteToggle.errorRateLimited
+            : serverMessageOr(error, UI_TEXT.common.favoriteToggle.errorGeneric);
+        setFavoriteError(message);
+        toast.error(message);
       }
     } finally {
       setFavoritePending(false);
@@ -178,7 +185,7 @@ export function CatalogCard({
         // карусели всплывал сюда и уводил в профиль вместо своего действия.
         if (e.key === "Enter" && e.target === e.currentTarget) router.push(href);
       }}
-      className="group relative flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition-all duration-200 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
+      className="group relative isolate flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-card transition-all duration-200 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-glow/40"
     >
       {/* CATALOG-CARD-COMPACT: кадр 16:10 — карточка в один столбец ниже
           почти на треть. PORTFOLIO-CROP-01: в кадре две работы 4:5 рядом,

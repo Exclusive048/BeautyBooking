@@ -10,6 +10,8 @@ export const models = {
     countLabelFew: "{count} предложения",
     countLabelMany: "{count} предложений",
     categoryAll: "Все услуги",
+    prevPage: "← Назад",
+    nextPage: "Вперёд →",
   },
   card: {
     durationServiceLabel: "Услуга",

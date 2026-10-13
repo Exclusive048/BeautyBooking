@@ -99,6 +99,7 @@ export function SelectionPhase({
             serviceDurationMin={serviceDurationMin}
             slot={selectedSlot}
             dateKey={selectedDateKey}
+            timeZone={providerTimezone}
           />
           <Button size="lg" onClick={onContinue} className="w-full gap-1.5">
             {T.continueCta}

@@ -7,6 +7,7 @@ import { ApproveReviewDialog } from "@/features/admin-cabinet/reviews/components
 import { DeleteReviewDialog } from "@/features/admin-cabinet/reviews/components/delete-review-dialog";
 import { ReviewCard } from "@/features/admin-cabinet/reviews/components/review-card";
 import { ReviewsEmpty } from "@/features/admin-cabinet/reviews/components/reviews-empty";
+import { useCursorPagedRows } from "@/features/admin-cabinet/lib/server-rows";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type {
@@ -35,7 +36,12 @@ export function ReviewsList({ rows: initialRows, nextCursor, tab }: Props) {
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [rows, setRows] = useState<AdminReviewRow[]>(initialRows);
+  // UX-PASS-01: строки — из ответа сервера; «Загрузить ещё» дописывает
+  // страницу, смена вкладки или поиска начинает список заново.
+  const [rows, setRows] = useCursorPagedRows<AdminReviewRow>(initialRows, {
+    cursor: searchParams?.get("cursor") ?? null,
+    resetKey: `${tab}|${searchParams?.get("q") ?? ""}`,
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
   const toast = useToast();
   const [approveTarget, setApproveTarget] = useState<AdminReviewRow | null>(null);

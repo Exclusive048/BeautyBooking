@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import type { CatalogSort } from "@/lib/catalog/schemas";
 import { cn } from "@/lib/cn";
@@ -30,9 +31,42 @@ type Props = {
 
 export function SortMenu({ value, onChange, compact = false }: Props) {
   const current = OPTIONS.find((o) => o.value === value) ?? OPTIONS[0];
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const [open, setOpen] = useState(false);
+
+  // UX-PASS-01: `<details>` сам закрывается только повторным нажатием на
+  // заголовок — список висел поверх выдачи после нажатия мимо, а Escape не
+  // делал ничего. Закрываем так же, как календарь «Когда».
+  useEffect(() => {
+    if (!open) return;
+    const close = () => {
+      if (detailsRef.current) detailsRef.current.open = false;
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (detailsRef.current && target instanceof Node && !detailsRef.current.contains(target)) {
+        close();
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      close();
+      detailsRef.current?.querySelector("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   return (
-    <details className="relative inline-block">
+    <details
+      ref={detailsRef}
+      className="relative inline-block"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary
         aria-label={compact ? `${T.label}: ${current.label}` : undefined}
         className={cn(
@@ -56,10 +90,9 @@ export function SortMenu({ value, onChange, compact = false }: Props) {
           return (
             <Button variant="wrapper" aria-pressed={active}
               key={opt.value}
-              onClick={(e) => {
+              onClick={() => {
                 onChange(opt.value);
-                const detailsEl = e.currentTarget.closest("details");
-                if (detailsEl) detailsEl.open = false;
+                if (detailsRef.current) detailsRef.current.open = false;
               }}
               className={
                 "flex h-9 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition-colors " +

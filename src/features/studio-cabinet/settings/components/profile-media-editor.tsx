@@ -99,8 +99,13 @@ export function ProfileMediaEditor({ providerId }: Props) {
   // FIX-STUDIO-TZ-FROM-ADDRESS: read-only — сервер выводит зону из города адреса.
   const [timezone, setTimezone] = useState<string | null>(null);
 
+  // UX-PASS-01: свой ref поля адреса — при неподтверждённом адресе фокус
+  // возвращается в поле (ref хука — заглушка).
+  const addressFieldRef = useRef<HTMLInputElement | null>(null);
+  // Адрес, сохранённый на сервере: неподтверждённым считается только ИЗМЕНЁННЫЙ
+  // текст — старый адрес без координат не блокирует сохранение остальных полей.
+  const persistedAddressRef = useRef("");
   const {
-    inputRef: addressInputRef,
     addressText,
     addressCoords,
     addressStatus,
@@ -151,6 +156,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
           ? { lat: studio.geoLat, lng: studio.geoLng }
           : null;
       setAddressSnapshot({ text: studio.address, coords });
+      persistedAddressRef.current = studio.address;
       setContactName(studio.contactName ?? "");
       setContactPhone(studio.contactPhone ?? "");
       setContactEmail(studio.contactEmail ?? "");
@@ -194,14 +200,27 @@ export function ProfileMediaEditor({ providerId }: Props) {
   }, []);
 
   const save = async (): Promise<void> => {
+    const trimmedAddress = addressText.trim();
+    const coordsReady =
+      !trimmedAddress ||
+      (addressCoords && Number.isFinite(addressCoords.lat) && Number.isFinite(addressCoords.lng));
+    // UX-PASS-01: новый адрес без координат раньше молча не отправлялся, а
+    // кнопка всё равно показывала «Сохранено» — человек уходил со старым
+    // адресом на странице. Теперь сохранение останавливается с подсказкой.
+    if (
+      trimmedAddress &&
+      !coordsReady &&
+      trimmedAddress !== persistedAddressRef.current.trim()
+    ) {
+      setError(t.addressNotConfirmed);
+      setSaved(false);
+      addressFieldRef.current?.focus();
+      return;
+    }
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      const trimmedAddress = addressText.trim();
-      const coordsReady =
-        !trimmedAddress ||
-        (addressCoords && Number.isFinite(addressCoords.lat) && Number.isFinite(addressCoords.lng));
       const payload: Record<string, unknown> = {
         name: name.trim(),
         tagline: tagline.trim(),
@@ -232,6 +251,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         body: JSON.stringify(payload),
       });
       setIsPublished(saved.studio.isPublished);
+      persistedAddressRef.current = saved.studio.address;
       // Сервер мог пересчитать зону по новому адресу — показываем результат
       // сразу, а не до следующей загрузки страницы.
       setTimezone(saved.studio.timezone || null);
@@ -354,7 +374,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         phone={contactPhone}
         email={contactEmail}
         socials={socials}
-        addressInputRef={addressInputRef}
+        addressInputRef={addressFieldRef}
         addressStatus={addressStatus}
         addressSuggestions={addressSuggestions}
         isAddressSuggestOpen={isAddressSuggestOpen}

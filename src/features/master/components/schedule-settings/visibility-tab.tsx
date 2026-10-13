@@ -14,6 +14,8 @@ const T = UI_TEXT.cabinetMaster.scheduleSettings;
 
 type Props = {
   initialSnapshot: ScheduleEditorSnapshot;
+  /** UX-PASS-01: сохранённый срез — в снапшот страницы (см. `RulesTab`). */
+  onSnapshotPatch: (patch: Partial<ScheduleEditorSnapshot>) => void;
 };
 
 /**
@@ -21,7 +23,7 @@ type Props = {
  * Auto-saves through the same PATCH endpoint as Hours / Rules; status
  * chip is shared via SaveStatusProvider.
  */
-export function VisibilityTab({ initialSnapshot }: Props) {
+export function VisibilityTab({ initialSnapshot, onSnapshotPatch }: Props) {
   const [draft, setDraft] = useState<VisibilityDto>(() => initialSnapshot.visibility);
   const [baseline, setBaseline] = useState<VisibilityDto>(() => initialSnapshot.visibility);
 
@@ -35,11 +37,12 @@ export function VisibilityTab({ initialSnapshot }: Props) {
     baseline,
     save: async (value) => {
       try {
-        await fetchJsonWithAuth<unknown>(endpoint, {
+        const saved = await fetchJsonWithAuth<ScheduleEditorSnapshot>(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ visibility: value }),
         });
+        onSnapshotPatch({ visibility: saved.visibility });
       } catch (error) {
         return { ok: false, message: serverMessageOr(error, T.errors.save) };
       }

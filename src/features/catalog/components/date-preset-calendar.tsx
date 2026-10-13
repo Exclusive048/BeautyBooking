@@ -10,7 +10,7 @@ type Props = {
   minDate: Date;
   /**
    * CATALOG-DATE-TIME-FILTER: дни позже — тоже. Каталог знает свободное время
-   * только на горизонт снимка (14 дней), дальний день дал бы пустую выдачу.
+   * только на горизонт снимка (`FREE_SLOT_HORIZON_DAYS`, 30 дней), дальний день дал бы пустую выдачу.
    */
   maxDate?: Date;
   onSelect: (date: Date) => void;

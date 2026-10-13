@@ -1,5 +1,5 @@
-import type { BookingStatus } from "@prisma/client";
 import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
+import type { StudioBookingStatusGroup } from "../lib/status-groups";
 import type { BookingsTimeRange } from "../lib/time-range-filter";
 import type {
   MasterOption,
@@ -15,7 +15,7 @@ import { BookingsTable } from "./bookings-table";
 type Props = {
   studioId: string;
   range: BookingsTimeRange;
-  status: BookingStatus | "all";
+  status: StudioBookingStatusGroup | "all";
   masterId: string | "all";
   search: string;
   list: StudioBookingsListData;

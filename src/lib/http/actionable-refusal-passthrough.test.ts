@@ -328,6 +328,10 @@ const ACTIONABLE_REFUSAL_SURFACES = [
   "src/features/master/components/account/account/danger-zone-card.tsx",
   "src/features/master/components/account/security/sessions-card.tsx",
   "src/features/master/components/bookings/booking-card-actions.tsx",
+  // UX-PASS-01: отмена из канбана (окно 60 минут, пакет целиком) и ответ на
+  // отзыв (окно правки) — раньше `err.message` мимо чокпоинта.
+  "src/features/master/components/bookings/booking-manage-actions.tsx",
+  "src/features/master/components/reviews/review-reply-form.tsx",
   "src/features/master/components/bookings/use-mark-no-show.tsx",
   "src/features/master/components/clients/client-detail-panel.tsx",
   "src/features/master/components/clients/client-notes-editor.tsx",

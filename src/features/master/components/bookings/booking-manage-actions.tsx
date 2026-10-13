@@ -8,6 +8,7 @@ import { useMasterBookingCancel } from "@/features/master/components/bookings/us
 import { RescheduleModal } from "@/features/master/components/schedule/reschedule-modal";
 import { usePrompt } from "@/hooks/use-prompt";
 import { isBookingPastModifyWindow } from "@/lib/bookings/action-state";
+import { serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.bookings;
@@ -69,7 +70,10 @@ export function BookingManageActions({ bookingId, startAtUtc, durationMin, statu
       const cancelled = await cancelBooking(bookingId, comment);
       if (cancelled) startTransition(() => router.refresh());
     } catch (err) {
-      setError(err instanceof Error ? err.message : T.card.cancelError);
+      // UX-PASS-01: действенный отказ сервера (окно отмены, пакет целиком,
+      // статус сменился) — дословно; иначе своя строка поверхности. Сырое
+      // `err.message` печатало и подставленный дефолт клиента (FIX-C8).
+      setError(serverMessageOr(err, T.card.cancelError));
     } finally {
       setBusy(null);
     }

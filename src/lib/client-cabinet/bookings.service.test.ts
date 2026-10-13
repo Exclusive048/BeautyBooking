@@ -273,3 +273,42 @@ describe("новые поля (G3)", () => {
     expect((await getClientBooking(USER, "bk-1"))?.reviewDeadlineUtc).toBeNull();
   });
 });
+
+/**
+ * UX-PASS-01 — числа на вкладках статуса не зависят от выбранной вкладки.
+ *
+ * @probe 2026-10-13 — `statusCounts` посчитан по `filtered` (как прежний
+ *        клиентский счёт по ответу): краснеет «вкладка статуса не меняет числа»
+ *        (`expected { all: 1, upcoming: 1, …(2) } to deeply equal { all: 3,
+ *        upcoming: 1, …(2) }`). Возвращено — 17/17.
+ */
+describe("statusCounts (UX-PASS-01)", () => {
+  const rows = () => [
+    row({ id: "up" }),
+    row({
+      id: "done",
+      status: "FINISHED",
+      startAtUtc: new Date("2026-09-20T10:00:00Z"),
+      endAtUtc: new Date("2026-09-20T11:00:00Z"),
+    }),
+    row({
+      id: "off",
+      status: "REJECTED",
+      service: { id: "svc-2", name: "Педикюр", price: 200000, durationMin: 60 },
+      serviceItems: [{ titleSnapshot: "Педикюр", priceSnapshot: 200000, durationSnapshotMin: 60 }],
+    }),
+  ];
+
+  it("вкладка статуса не меняет числа", async () => {
+    bookingFindMany.mockResolvedValue(rows());
+    const { bookings, statusCounts } = await listClientBookings(USER, { status: "upcoming" });
+    expect(bookings.map((b) => b.id)).toEqual(["up"]);
+    expect(statusCounts).toEqual({ all: 3, upcoming: 1, finished: 1, cancelled: 1 });
+  });
+
+  it("поиск сужает и числа — вкладка покажет столько, сколько написано", async () => {
+    bookingFindMany.mockResolvedValue(rows());
+    const { statusCounts } = await listClientBookings(USER, { status: "cancelled", search: "педикюр" });
+    expect(statusCounts).toEqual({ all: 1, upcoming: 0, finished: 0, cancelled: 1 });
+  });
+});

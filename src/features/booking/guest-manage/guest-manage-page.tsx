@@ -82,7 +82,6 @@ export function GuestManagePage({ token, state }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      setConfirmOpen(false);
       setNotice(T.cancelled);
       router.refresh();
     } catch (error) {
@@ -91,6 +90,10 @@ export function GuestManagePage({ token, state }: Props) {
       setError(serverMessageOr(error, T.cancelFailed));
     } finally {
       setCancelling(false);
+      // UX-PASS-01: окно подтверждения закрывается и при отказе — иначе
+      // причина отказа появлялась на странице ПОД открытым окном, и человек
+      // видел лишь, что кнопка перестала крутиться.
+      setConfirmOpen(false);
     }
   }
 

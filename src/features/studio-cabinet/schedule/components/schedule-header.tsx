@@ -121,7 +121,10 @@ export function ScheduleHeader({
 
   const handleToday = () => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("date", toDateKey(new Date()));
+    // UX-PASS-01: `toDateKey(new Date())` — дата по UTC, и у студии восточнее
+    // Москвы после полуночи салона «Сегодня» открывало вчерашний день. Без
+    // `?date` страница сама берёт сегодняшний день САЛОНА (salon-tz).
+    params.delete("date");
     navigateTo(params);
   };
 
