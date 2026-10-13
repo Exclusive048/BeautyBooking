@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
+import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,9 @@ const WEEKDAYS_SHORT = T.weekdaysShort;
 const MONTHS_GENITIVE = T.monthsGenitive;
 const DAYS_BATCH_SIZE = 28;
 const PAGE_SIZE = 7;
+const LAST_PAGE = Math.ceil(DAYS_BATCH_SIZE / PAGE_SIZE) - 1;
+/** Потолок `limit` у `/booking-days` (рабочих дней за запрос). */
+const BOOKING_DAYS_PAGE_LIMIT = 14;
 
 type Props = {
   providerId: string;
@@ -58,6 +62,14 @@ function cellIndexOf(baseFromDate: Date, dateKey: string): number {
   const [y, m, d] = dateKey.split("-").map(Number);
   const target = Date.UTC(y ?? 2000, (m ?? 1) - 1, d ?? 1);
   return Math.round((target - baseFromDate.getTime()) / 86_400_000);
+}
+
+/** Страница полосы, на которой лежит `dateKey` (вне полосы — край). */
+function pageOf(baseFromDate: Date, dateKey: string | null): number {
+  if (!dateKey) return 0;
+  const index = cellIndexOf(baseFromDate, dateKey);
+  if (index <= 0) return 0;
+  return Math.min(Math.floor(index / PAGE_SIZE), LAST_PAGE);
 }
 
 function buildCells(
@@ -114,7 +126,10 @@ export function DateGrid({
     const [y, m, d] = todayKey.split("-").map(Number);
     return new Date(Date.UTC(y ?? 2000, (m ?? 1) - 1, d ?? 1));
   });
-  const [page, setPage] = useState(0);
+  // UX-PASS-01: полоса открывается на неделе выбранного дня. Возврат с
+  // контактов и ссылка с готовым окошком (`initialSlotStartAt`) раньше
+  // показывали первую неделю, а выбранный день — где-то за стрелками.
+  const [page, setPage] = useState(() => pageOf(baseFromDate, selectedDateKey ?? minDateKey));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -127,15 +142,29 @@ export function DateGrid({
         String(baseFromDate.getUTCMonth() + 1).padStart(2, "0"),
         String(baseFromDate.getUTCDate()).padStart(2, "0"),
       ].join("-");
-      const url = new URL(
-        `/api/public/providers/${providerId}/booking-days`,
-        window.location.origin,
-      );
-      url.searchParams.set("from", fromKey);
-      url.searchParams.set("limit", String(14));
-      const data = await fetchJson<{ days: Array<{ date: string }> }>(url.toString(), { cache: "no-store" });
+      // UX-PASS-01: полоса — 28 дней, а `/booking-days` отдаёт за раз не больше
+      // 14 РАБОЧИХ. У мастера без выходных последние две недели раньше
+      // оставались серыми. Догружаем с `nextFrom`, пока не покрыли полосу;
+      // меньше 14 дней в ответе — сервер дошёл до конца своего обзора.
+      const stripEndKey = addDaysToDateKey(fromKey, DAYS_BATCH_SIZE);
       const set = new Set<string>();
-      for (const day of data.days) set.add(day.date);
+      let cursor = fromKey;
+      for (let round = 0; round < DAYS_BATCH_SIZE / BOOKING_DAYS_PAGE_LIMIT; round += 1) {
+        const url = new URL(
+          `/api/public/providers/${providerId}/booking-days`,
+          window.location.origin,
+        );
+        url.searchParams.set("from", cursor);
+        url.searchParams.set("limit", String(BOOKING_DAYS_PAGE_LIMIT));
+        const data = await fetchJson<{ days: Array<{ date: string }>; nextFrom?: string }>(
+          url.toString(),
+          { cache: "no-store" },
+        );
+        for (const day of data.days) set.add(day.date);
+        if (data.days.length < BOOKING_DAYS_PAGE_LIMIT || !data.nextFrom) break;
+        if (data.nextFrom >= stripEndKey || data.nextFrom <= cursor) break;
+        cursor = data.nextFrom;
+      }
       setWorkingDays(set);
     } catch (error) {
       // Лимит запросов (429) — дословно; прочее — строка полосы дней.
@@ -152,12 +181,12 @@ export function DateGrid({
   // PACKAGE-SOLO-WIZARD-01: when a floor day arrives (the previous package
   // component ends later than today), page the strip forward to it — otherwise
   // the client faces a week of greyed cells and has to hunt with the chevrons.
+  // UX-PASS-01: только ВПЕРЁД — выбранный день позже порога остаётся на экране.
   useEffect(() => {
     if (!minDateKey) return;
-    const index = cellIndexOf(baseFromDate, minDateKey);
-    if (index <= 0) return;
-    const lastPage = Math.ceil(DAYS_BATCH_SIZE / PAGE_SIZE) - 1;
-    setPage(Math.min(Math.floor(index / PAGE_SIZE), lastPage));
+    const floorPage = pageOf(baseFromDate, minDateKey);
+    if (floorPage <= 0) return;
+    setPage((current) => Math.max(current, floorPage));
   }, [minDateKey, baseFromDate]);
 
   const cells = buildCells(workingDays, baseFromDate, DAYS_BATCH_SIZE);

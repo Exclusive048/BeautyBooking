@@ -1,10 +1,13 @@
-import { BookingStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { StudioBookingsPage } from "@/features/studio-cabinet/bookings/components/studio-bookings-page";
 import {
   parseBookingsTimeRange,
   type BookingsTimeRange,
 } from "@/features/studio-cabinet/bookings/lib/time-range-filter";
+import {
+  parseStudioBookingStatusGroup,
+  studioBookingStatusFilter,
+} from "@/features/studio-cabinet/bookings/lib/status-groups";
 import { listStudioBookings } from "@/features/studio-cabinet/bookings/server/bookings-list.service";
 import {
   loadStudioBookingsKpis,
@@ -28,13 +31,6 @@ type Props = {
 
 export const dynamic = "force-dynamic";
 
-function parseStatus(value: string | undefined): BookingStatus | "all" {
-  if (!value || value === "all") return "all";
-  return (Object.values(BookingStatus) as string[]).includes(value)
-    ? (value as BookingStatus)
-    : "all";
-}
-
 // STUDIO-CLIENT-WRITE-DIALOG-A: the inline `loadShellExtras` here was
 // extracted to `shell-extras.service.ts` so the clients page can reuse
 // the same shape (CreateBookingDialog needs `scheduleMasters[]` +
@@ -53,7 +49,8 @@ export default async function StudioBookingsRoute({ searchParams }: Props) {
 
   const params = searchParams instanceof Promise ? await searchParams : searchParams;
   const range: BookingsTimeRange = parseBookingsTimeRange(params?.range);
-  const status = parseStatus(params?.status);
+  // UX-PASS-01: фильтр — группа статусов (`status-groups.ts`), а не одиночный enum.
+  const status = parseStudioBookingStatusGroup(params?.status);
   const masterId = params?.master ?? "all";
   const search = params?.q?.trim() ?? "";
   const cursor = params?.cursor ?? null;
@@ -61,7 +58,7 @@ export default async function StudioBookingsRoute({ searchParams }: Props) {
   const [list, kpis, masterOptions, shellExtras] = await Promise.all([
     listStudioBookings({
       studioId,
-      filters: { range, status, masterId, search },
+      filters: { range, status: studioBookingStatusFilter(status), masterId, search },
       cursor,
     }),
     loadStudioBookingsKpis(studioId),

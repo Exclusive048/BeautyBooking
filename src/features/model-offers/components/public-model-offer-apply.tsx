@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiClientError, fetchJson, getErrorMessageByCode } from "@/lib/http/client";
+import { ApiClientError, fetchJson, getErrorMessageByCode, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { FileInput } from "@/components/ui/file-input";
 import { FieldLabel } from "@/components/ui/field-label";
@@ -40,6 +40,11 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [trimmed, setTrimmed] = useState(false);
+  // UX-PASS-01: уже загруженные фото этого выбора (по позиции файла). Повтор
+  // после отказа заявки берёт их, а не грузит заново — на телефоне это долго
+  // и оставляло в хранилище копии.
+  const uploadedRef = useRef<string[]>([]);
 
   const fileNames = useMemo(() => files.map((file) => file.name).join(", "), [files]);
 
@@ -59,7 +64,10 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
   const currentUserId = userId;
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const list = Array.from(event.target.files ?? []).slice(0, MAX_FILES);
+    const picked = Array.from(event.target.files ?? []);
+    const list = picked.slice(0, MAX_FILES);
+    uploadedRef.current = [];
+    setTrimmed(picked.length > MAX_FILES);
     setFiles(list);
     setSuccess(false);
     setErrorText(null);
@@ -67,7 +75,12 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
 
   async function uploadAssets(): Promise<string[]> {
     const mediaIds: string[] = [];
-    for (const file of files) {
+    for (const [index, file] of files.entries()) {
+      const uploaded = uploadedRef.current[index];
+      if (uploaded) {
+        mediaIds.push(uploaded);
+        continue;
+      }
       const formData = new FormData();
       formData.set("file", file);
       formData.set("entityType", "USER");
@@ -79,6 +92,7 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
         body: formData,
       });
 
+      uploadedRef.current[index] = data.asset.id;
       mediaIds.push(data.asset.id);
     }
 
@@ -119,13 +133,15 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
       });
 
       setSuccess(true);
+      uploadedRef.current = [];
+      setTrimmed(false);
       setFiles([]);
       setNote("");
       setConsent(false);
     } catch (error) {
       if (error instanceof ApiClientError) {
         const mapped = getErrorMessageByCode(error.code);
-        setErrorText(mapped ?? error.message ?? UI_TEXT.pages.modelOffer.applyDefaultError);
+        setErrorText(mapped ?? serverMessageOr(error, UI_TEXT.pages.modelOffer.applyDefaultError));
       } else {
         setErrorText(UI_TEXT.pages.modelOffer.applyDefaultError);
       }
@@ -194,6 +210,9 @@ export function ModelOfferApplyForm({ offerCode, userId, loginHref }: Props) {
             aria-label={UI_TEXT.pages.modelOffer.applyPhotoLabel}
           />
         </div>
+        {trimmed ? (
+          <p className="mt-1.5 text-xs text-text-sec">{UI_TEXT.pages.modelOffer.applyPhotoTrimmed}</p>
+        ) : null}
       </label>
 
       {/* Note */}

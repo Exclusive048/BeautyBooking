@@ -36,6 +36,20 @@ export function DeleteAccountModal({
   const [deleteReviews, setDeleteReviews] = useState(false);
   const [value, setValue] = useState("");
 
+  // UX-PASS-01: компонент не размонтируется при закрытии (`key` выше сбрасывал
+  // только оболочку окна), поэтому повторное открытие показывало отмеченное
+  // «я понимаю» и введённый номер — удаление в один клик. Сброс — при каждом
+  // открытии, правкой состояния во время рендера (без эффекта с setState).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setChecked(false);
+      setDeleteReviews(false);
+      setValue("");
+    }
+  }
+
   // DELETION-03: без телефона подтверждаем словом — иначе аккаунты, созданные
   // через почту/VK/Яндекс (а в проде почта — основной вход), удалить нельзя.
   const confirmByPhone = Boolean(phone);

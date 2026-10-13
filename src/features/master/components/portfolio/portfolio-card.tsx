@@ -18,6 +18,7 @@ import type {
   PortfolioTagOption,
 } from "@/lib/master/portfolio-view.service";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
+import { placeMenu, type MenuPosition } from "@/lib/ui/menu-placement";
 import * as UI_TEXT from "@/lib/ui/text";
 import { EditItemModal } from "./modals/edit-item-modal";
 
@@ -25,35 +26,23 @@ const T = UI_TEXT.cabinetMaster.portfolioPage.card;
 const M = UI_TEXT.cabinetMaster.portfolioPage.menu;
 const R = UI_TEXT.cabinetMaster.portfolioPage.reorder;
 
-/** Ширина меню «⋮» и отступ от края экрана. */
+/** Ширина меню «⋮». */
 const MENU_WIDTH_PX = 224;
-const MENU_EDGE_PX = 8;
 /** Высота пункта меню (`min-h-11`) и вертикальные поля списка. */
 const MENU_ITEM_PX = 44;
 const MENU_PADDING_PX = 8;
 /** Прокрутка страницы, после которой меню у кнопки закрывается. */
 const MENU_SCROLL_CLOSE_PX = 24;
 
-type MenuPosition = { top: number; left: number };
-
 /**
  * Меню открывается у кнопки, но в границах экрана: шире плитки на телефоне,
  * поэтому у левой колонки оно не должно уезжать за край, а у нижнего ряда —
- * под нижнюю навигацию (тогда открывается вверх).
+ * под нижнюю навигацию (тогда открывается вверх). Правило общее —
+ * `lib/ui/menu-placement.ts` (UX-PASS-01: им же пользуются меню услуг и
+ * записей в расписании).
  */
-function placeMenu(anchor: DOMRect, itemCount: number): MenuPosition {
-  const height = itemCount * MENU_ITEM_PX + MENU_PADDING_PX;
-  const left = Math.min(
-    Math.max(MENU_EDGE_PX, anchor.right - MENU_WIDTH_PX),
-    window.innerWidth - MENU_WIDTH_PX - MENU_EDGE_PX,
-  );
-  // Нижняя навигация телефона закрывает низ экрана (`--bottom-nav-h` ставит
-  // `BottomTabBar`; на ПК — 0).
-  const bottomNav =
-    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bottom-nav-h")) || 0;
-  const below = anchor.bottom + 4;
-  const fitsBelow = below + height <= window.innerHeight - bottomNav - MENU_EDGE_PX;
-  return { left, top: fitsBelow ? below : Math.max(MENU_EDGE_PX, anchor.top - height - 4) };
+function placeCardMenu(anchor: DOMRect, itemCount: number): MenuPosition {
+  return placeMenu(anchor, { width: MENU_WIDTH_PX, height: itemCount * MENU_ITEM_PX + MENU_PADDING_PX });
 }
 
 type Props = {
@@ -226,7 +215,7 @@ export function PortfolioCard({
               // Координаты — сразу: к вызову функции-обновителя React уже
               // обнулит `currentTarget`.
               const anchor = event.currentTarget.getBoundingClientRect();
-              setMenuPos((prev) => (prev ? null : placeMenu(anchor, menuItemCount)));
+              setMenuPos((prev) => (prev ? null : placeCardMenu(anchor, menuItemCount)));
             }}
             disabled={busy}
             data-testid="portfolio-card-menu"

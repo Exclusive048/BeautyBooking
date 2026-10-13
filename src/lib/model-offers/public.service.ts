@@ -52,11 +52,15 @@ export type PublicModelOffersQuery = {
   city?: string;
   page: number;
   limit: number;
+  /** Посчитать и все подходящие предложения (`total`) — заголовок `/models`. */
+  withTotal?: boolean;
 };
 
 export type PublicModelOffersResult = {
   items: PublicModelOfferItem[];
   nextPage: number | null;
+  /** Есть только при `withTotal`. */
+  total?: number;
 };
 
 export type PublicModelOfferFilters = {
@@ -236,6 +240,9 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
   const take = Math.min(Math.max(input.limit, 1), 40);
   const skip = Math.max(input.page - 1, 0) * take;
 
+  // UX-PASS-01: заголовок `/models` показывал размер страницы («12
+  // предложений» при сорока) — число всей выдачи считается отдельно.
+  const totalPromise = input.withTotal ? prisma.modelOffer.count({ where }) : null;
   const offers = await prisma.modelOffer.findMany({
     where,
     orderBy: [{ dateLocal: "asc" }, { timeRangeStartLocal: "asc" }, { createdAt: "desc" }],
@@ -314,6 +321,7 @@ export async function listPublicModelOffers(input: PublicModelOffersQuery): Prom
       })
       .filter((item): item is PublicModelOfferItem => Boolean(item)),
     nextPage: hasMore ? input.page + 1 : null,
+    ...(totalPromise ? { total: await totalPromise } : {}),
   };
 }
 

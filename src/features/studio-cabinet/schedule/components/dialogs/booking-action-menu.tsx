@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightLeft, Check, Clock, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,8 @@ import { formatZoneLabel } from "@/lib/ui/zone-label";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { ScheduleBookingCell, ScheduleMasterColumn } from "../../server/types";
-import {
-  bookingDecisionUrl,
-  isPendingClientReschedule,
-} from "../../lib/reschedule-decision";
+import { bookingDecisionUrl } from "../../lib/reschedule-decision";
+import { studioCellActions } from "../../lib/cell-actions";
 import { CancelBookingDialog } from "./cancel-booking-dialog";
 import { MoveBookingDialog } from "./move-booking-dialog";
 
@@ -59,10 +57,20 @@ export function BookingActionMenu({
   // только у соло-мастеров), и до подтверждения клиент не получает напоминаний.
   // Подтвердить мог только назначенный мастер из своего кабинета; `/confirm`
   // администратора студии пускает (как сторону провайдера), не было кнопки.
-  // Время здесь не сверяется (чтение часов в рендере — нечистый рендер): на
-  // уже начавшуюся запись сервер ответит «Запись уже началась», и это видно.
-  const awaitsConfirmation =
-    booking !== null && (booking.status === "PENDING" || booking.status === "NEW");
+  // UX-PASS-01: какие пункты показать, решает общее правило студии
+  // (`resolveStudioBookingActions`, как у сервера и приложения). Раньше
+  // «Перенести» и «Отменить» были у любой записи, включая отменённую и
+  // завершённую, — сервер отклонял каждое. Часы читаются один раз на запись
+  // (`useMemo`), то есть на момент открытия меню; сервер остаётся судьёй.
+  const actions = useMemo(
+    () => (booking ? studioCellActions(booking) : null),
+    [booking],
+  );
+  const awaitsConfirmation = actions?.confirm ?? false;
+  const studioRescheduleTurn =
+    actions !== null && (actions.acceptReschedule || actions.declineReschedule);
+  const canMove = actions?.move ?? false;
+  const canCancel = actions?.cancel ?? false;
 
   function handleClose() {
     setMoveMode(null);
@@ -141,7 +149,7 @@ export function BookingActionMenu({
               </div>
             ) : null}
 
-            {isPendingClientReschedule(booking) && booking.proposedStartAtUtc ? (
+            {studioRescheduleTurn && booking.proposedStartAtUtc ? (
               <div className="space-y-2 rounded-lg border border-warning-border bg-warning-surface p-3">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-warning-text">
                   <RefreshCw className="h-3.5 w-3.5" aria-hidden />
@@ -173,26 +181,32 @@ export function BookingActionMenu({
                   ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                  <Button
-                    variant="primary"
-                    disabled={rsBusy !== null}
-                    onClick={() =>
-                      void handleRescheduleDecision(booking.id, "accept")
-                    }
-                  >
-                    <Check className="h-3.5 w-3.5" aria-hidden />
-                    {T.reschedule.accept}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={rsBusy !== null}
-                    onClick={() =>
-                      void handleRescheduleDecision(booking.id, "decline")
-                    }
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden />
-                    {T.reschedule.decline}
-                  </Button>
+                  {/* UX-PASS-01: прошедшее предложение принять нельзя (сервер
+                      откажет) — остаётся только отказ от переноса. */}
+                  {actions?.acceptReschedule ? (
+                    <Button
+                      variant="primary"
+                      disabled={rsBusy !== null}
+                      onClick={() =>
+                        void handleRescheduleDecision(booking.id, "accept")
+                      }
+                    >
+                      <Check className="h-3.5 w-3.5" aria-hidden />
+                      {T.reschedule.accept}
+                    </Button>
+                  ) : null}
+                  {actions?.declineReschedule ? (
+                    <Button
+                      variant="secondary"
+                      disabled={rsBusy !== null}
+                      onClick={() =>
+                        void handleRescheduleDecision(booking.id, "decline")
+                      }
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                      {T.reschedule.decline}
+                    </Button>
+                  ) : null}
                 </div>
                 {rsError ? (
                   <p
@@ -205,31 +219,39 @@ export function BookingActionMenu({
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setMoveMode("master")}
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden />
-                {T.actions.moveToMaster}
-              </Button>
-              <Button variant="secondary" onClick={() => setMoveMode("time")}>
-                <Clock className="h-3.5 w-3.5" aria-hidden />
-                {T.actions.moveTime}
-              </Button>
-              {/* STUDIO-CLEANUP-FIX-A #1г: «Детали записи» Button
-                  removed. It was a pure no-op (`onClick={handleClose}`
-                  + clientPhone in browser tooltip but no dialog
-                  content) — user complained it was «пустышка». The
-                  per-booking info card above already shows client,
-                  service, time, and price, so the button added zero
-                  value. If a richer detail view is needed later,
-                  it's a separate feature. */}
-              <Button variant="danger" onClick={() => setCancelOpen(true)}>
-                <X className="h-3.5 w-3.5" aria-hidden />
-                {T.actions.cancel}
-              </Button>
-            </div>
+            {canMove || canCancel ? (
+              <div className="grid grid-cols-1 gap-2">
+                {canMove ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setMoveMode("master")}
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden />
+                      {T.actions.moveToMaster}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setMoveMode("time")}>
+                      <Clock className="h-3.5 w-3.5" aria-hidden />
+                      {T.actions.moveTime}
+                    </Button>
+                  </>
+                ) : null}
+                {/* STUDIO-CLEANUP-FIX-A #1г: «Детали записи» Button
+                    removed. It was a pure no-op (`onClick={handleClose}`
+                    + clientPhone in browser tooltip but no dialog
+                    content) — user complained it was «пустышка». The
+                    per-booking info card above already shows client,
+                    service, time, and price, so the button added zero
+                    value. If a richer detail view is needed later,
+                    it's a separate feature. */}
+                {canCancel ? (
+                  <Button variant="danger" onClick={() => setCancelOpen(true)}>
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                    {T.actions.cancel}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </ModalSurface>

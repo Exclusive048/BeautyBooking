@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,8 @@ type Props = {
   onWizardApplied?: (info: WizardAppliedInfo, snapshot: ScheduleEditorSnapshot) => void;
 };
 
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function formatDateKey(dateKey: string): string {
   // Ключ даты салона — календарная дата без пояса, поэтому подпись в UTC.
   return UI_FMT.dateShort(dateKeyIso(dateKey), { timeZone: "UTC" });
@@ -56,10 +58,22 @@ export function SchedulePlanCard({
   const [wizardOpen, setWizardOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [requestSent, setRequestSent] = useState(false);
+  // UX-PASS-01: «Настроено до» сохранялось на каждое нажатие в поле даты —
+  // промежуточное «0002-…» уходило на сервер, и поле прыгало обратно. Теперь
+  // правка живёт черновиком и уходит по уходу из поля или Enter — только
+  // целая дата в допустимом диапазоне и только если изменилась. Пока запрос в
+  // полёте, поле и переключатель выключены (ref — от двойной отправки: Enter
+  // и следом blur).
+  const [endDraft, setEndDraft] = useState<string | null>(null);
+  const [savingEnd, setSavingEnd] = useState(false);
+  const savingEndRef = useRef(false);
   const lastKey = addDaysToDateKey(plan.todayKey, SCHEDULE_HORIZON_DAYS);
   const autoExtend = plan.hasSchedule && plan.configuredUntil === null;
 
   const saveEnd = async (endsOn: string | null) => {
+    if (savingEndRef.current) return;
+    savingEndRef.current = true;
+    setSavingEnd(true);
     setError(null);
     saveStatus?.setStatus("saving");
     try {
@@ -75,7 +89,22 @@ export function SchedulePlanCard({
       setError(message);
       saveStatus?.setErrorMessage(message);
       saveStatus?.setStatus("error");
+    } finally {
+      savingEndRef.current = false;
+      setSavingEnd(false);
+      // Успех — поле покажет сохранённое из снапшота, отказ — прежнее.
+      setEndDraft(null);
     }
+  };
+
+  const commitEndDraft = () => {
+    if (endDraft === null || savingEndRef.current) return;
+    const valid = DATE_KEY_RE.test(endDraft) && endDraft >= plan.todayKey && endDraft <= lastKey;
+    if (!valid || endDraft === plan.configuredUntil) {
+      setEndDraft(null);
+      return;
+    }
+    void saveEnd(endDraft);
   };
 
   const nextStart = plan.upcoming[0]?.startsOn ?? null;
@@ -154,6 +183,8 @@ export function SchedulePlanCard({
             <Switch
               checked={autoExtend}
               onCheckedChange={(next) => void saveEnd(next ? null : lastKey)}
+              disabled={savingEnd}
+              aria-busy={savingEnd}
               aria-label={T.autoExtendLabel}
             />
           </label>
@@ -164,11 +195,18 @@ export function SchedulePlanCard({
                 type="date"
                 min={plan.todayKey}
                 max={lastKey}
-                value={plan.configuredUntil}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value && value !== plan.configuredUntil) void saveEnd(value);
+                value={endDraft ?? plan.configuredUntil}
+                onChange={(event) => setEndDraft(event.target.value)}
+                onBlur={commitEndDraft}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commitEndDraft();
+                  } else if (event.key === "Escape") {
+                    setEndDraft(null);
+                  }
                 }}
+                disabled={savingEnd}
                 className="h-11 w-auto rounded-xl px-3 text-sm"
               />
             </label>

@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookingStatus } from "@/lib/prisma-enums";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import * as UI_TEXT from "@/lib/ui/text";
+import {
+  STUDIO_BOOKING_STATUS_GROUP_IDS,
+  type StudioBookingStatusGroup,
+} from "../lib/status-groups";
 import type { BookingsTimeRange } from "../lib/time-range-filter";
 import type {
   MasterOption,
@@ -23,18 +26,19 @@ const RANGES: Array<{ id: BookingsTimeRange; labelKey: keyof typeof T.ranges }> 
   { id: "all", labelKey: "all" },
 ];
 
-const STATUSES: BookingStatus[] = [
-  BookingStatus.PENDING,
-  BookingStatus.CONFIRMED,
-  BookingStatus.IN_PROGRESS,
-  BookingStatus.FINISHED,
-  BookingStatus.NO_SHOW,
-  BookingStatus.CANCELLED,
-];
+// UX-PASS-01: пункты фильтра — группы статусов (`status-groups.ts`); подпись
+// группы — подпись её главного статуса.
+const STATUS_GROUP_LABELS: Record<StudioBookingStatusGroup, string> = {
+  awaiting: T.statusLabels.PENDING,
+  confirmed: T.statusLabels.CONFIRMED,
+  finished: T.statusLabels.FINISHED,
+  cancelled: T.statusLabels.CANCELLED,
+  no_show: T.statusLabels.NO_SHOW,
+};
 
 type Props = {
   range: BookingsTimeRange;
-  status: BookingStatus | "all";
+  status: StudioBookingStatusGroup | "all";
   masterId: string | "all";
   search: string;
   counts: StudioBookingsRangeCounts;
@@ -52,12 +56,27 @@ export function BookingsFilters({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [draft, setDraft] = useState(search);
+  // UX-PASS-01: черновик поиска знал только начальное значение — «Сбросить»,
+  // переход «назад» и смена фильтра со сбросом `q` оставляли в поле старый
+  // текст, а следующая правка возвращала его в адрес. Пропс синхронизируется
+  // в поле, кроме эха собственной отправки (иначе ответ сервера стирал бы
+  // буквы, набранные за время запроса).
+  const [seenSearch, setSeenSearch] = useState(search);
+  const [pushedSearch, setPushedSearch] = useState(search);
+  if (search !== seenSearch) {
+    setSeenSearch(search);
+    if (search !== pushedSearch) {
+      setPushedSearch(search);
+      setDraft(search);
+    }
+  }
 
   useEffect(() => {
     if (draft === search) return;
     const timer = setTimeout(() => {
       const next = new URLSearchParams(searchParams.toString());
       const trimmed = draft.trim();
+      setPushedSearch(trimmed);
       if (trimmed) next.set("q", trimmed);
       else next.delete("q");
       next.delete("cursor");
@@ -103,9 +122,9 @@ export function BookingsFilters({
           onChange={(e) => set("status", e.target.value)}
         >
           <option value="all">{T.statusAll}</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {T.statusLabels[s] ?? s}
+          {STUDIO_BOOKING_STATUS_GROUP_IDS.map((group) => (
+            <option key={group} value={group}>
+              {STATUS_GROUP_LABELS[group]}
             </option>
           ))}
         </Select>

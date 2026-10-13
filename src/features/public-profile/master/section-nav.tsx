@@ -90,14 +90,24 @@ export function SectionNav() {
   function scrollTo(id: SectionId) {
     const el = document.getElementById(id);
     if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 80;
+    // UX-PASS-01: секция встаёт под шапкой сайта и под самой полосой — обе
+    // липкие; прежние «- 80» прятали заголовок секции под полосой вкладок.
+    const scroller = scrollerRef.current;
+    const topbar = scroller
+      ? parseFloat(getComputedStyle(scroller).getPropertyValue("--topbar-h")) || 0
+      : 0;
+    const offset = topbar + (scroller?.offsetHeight ?? 0) + 8;
+    const y = el.getBoundingClientRect().top + window.scrollY - offset;
     window.scrollTo({ top: y, behavior: scrollBehavior() });
   }
 
+  // UX-PASS-01: липнет под шапкой сайта (`top-[var(--topbar-h)]`), а не к
+  // краю окна — шапка тоже липкая и выше по слою, и при `top-0` полоса
+  // уходила под неё: вкладки становились недоступны ровно после прокрутки.
   return (
     <div
       ref={scrollerRef}
-      className="scrollbar-hide sticky top-0 z-sticky -mx-4 snap-x overflow-x-auto border-b border-border-subtle bg-bg-page/90 px-4 scroll-px-4 backdrop-blur-md sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0"
+      className="scrollbar-hide sticky top-[var(--topbar-h)] z-sticky -mx-4 snap-x overflow-x-auto border-b border-border-subtle bg-bg-page/90 px-4 scroll-px-4 backdrop-blur-md sm:-mx-6 sm:px-6 sm:scroll-px-6 lg:mx-0 lg:px-0 lg:scroll-px-0"
     >
       <div className="flex min-w-max gap-1 py-1">
         {SECTIONS.map(({ id, label, Icon }) => {

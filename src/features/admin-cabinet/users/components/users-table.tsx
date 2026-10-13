@@ -12,6 +12,7 @@ import {
   PlanChangeDialog,
   type PlanChangeValue,
 } from "@/features/admin-cabinet/users/components/plan-change-dialog";
+import { useCursorPagedRows } from "@/features/admin-cabinet/lib/server-rows";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type {
@@ -37,7 +38,12 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [rows, setRows] = useState<AdminUserRow[]>(initialRows);
+  // UX-PASS-01: строки — из ответа сервера; «Загрузить ещё» дописывает
+  // страницу, смена роли / тарифа / поиска начинает список заново.
+  const [rows, setRows] = useCursorPagedRows<AdminUserRow>(initialRows, {
+    cursor: searchParams?.get("cursor") ?? null,
+    resetKey: ["role", "plan", "q"].map((key) => searchParams?.get(key) ?? "").join("|"),
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
   const toast = useToast();
   const [, startTransition] = useTransition();
@@ -94,8 +100,10 @@ export function UsersTable({ rows: initialRows, plans, nextCursor }: Props) {
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
-        <div className="hidden md:block">
-          <table className="w-full">
+        {/* UX-PASS-01: на планшете и узком окне шесть колонок не помещаются —
+            таблица прокручивается внутри карточки, а не обрезается краем. */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr className="border-b border-border-subtle text-left text-2xs uppercase tracking-wider text-text-sec">
                 <th className="px-4 py-3 font-medium">{T.columns.user}</th>

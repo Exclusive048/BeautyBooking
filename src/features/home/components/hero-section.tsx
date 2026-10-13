@@ -131,13 +131,13 @@ export function HeroSection({ stats }: Props) {
                 <span className="font-mono text-base font-semibold tabular-nums text-text-main">
                   {UI_FMT.count(stats.bookings)}
                 </span>
-                <span className="ml-1.5 text-sm text-text-sec">{T.statsBookings}</span>
+                <span className="ml-1.5 text-sm text-text-sec">{T.statsBookings(stats.bookings)}</span>
               </div>
               <div className="px-5 text-center last:pr-0 sm:px-7">
                 <span className="font-mono text-base font-semibold tabular-nums text-text-main">
                   {UI_FMT.count(stats.services)}
                 </span>
-                <span className="ml-1.5 text-sm text-text-sec">услуг</span>
+                <span className="ml-1.5 text-sm text-text-sec">{T.statsServices(stats.services)}</span>
               </div>
             </div>
           ) : null}

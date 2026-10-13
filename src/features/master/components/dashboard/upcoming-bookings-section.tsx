@@ -6,14 +6,6 @@ import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.bookings;
 
-function pluralizeBookings(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "запись";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "записи";
-  return "записей";
-}
-
 type Props = {
   /** Bookings already in the future relative to "now" — not the entire day. */
   upcoming: DashboardBooking[];
@@ -34,10 +26,8 @@ export function UpcomingBookingsSection({
   showWorkContext = false,
 }: Props) {
   const visible = upcoming.slice(0, VISIBLE_LIMIT);
-  const subtitle = T.subtitleTemplate
-    .replace("{count}", String(upcoming.length))
-    .replace("{plural}", pluralizeBookings(upcoming.length))
-    .concat(totalTodayCount > 0 ? ` из ${totalTodayCount}` : "");
+  // UX-PASS-01: склонение и «из N» — в тексте домена, а не в компоненте.
+  const subtitle = T.subtitle(upcoming.length, totalTodayCount);
 
   return (
     <section className="rounded-2xl border border-border-subtle bg-bg-card">

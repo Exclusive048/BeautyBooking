@@ -89,10 +89,16 @@ export function StudioHeroGallery({ studio, imageItems, bookingHref, hideBooking
         >
           {Array.from({ length: 4 }).map((_, index) => {
             const item = secondary[index] ?? null;
+            // UX-PASS-01: на телефоне пустая клетка — серый квадрат под
+            // главным фото; там показываем только реальные фото. На ПК сетка
+            // 2×2 держит высоту колонки рядом с главным фото — клетки остаются.
             return (
               <div
                 key={index}
-                className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-bg-input/35 md:aspect-auto md:h-full"
+                className={cn(
+                  "relative aspect-[4/5] overflow-hidden rounded-2xl bg-bg-input/35 md:aspect-auto md:h-full",
+                  !item && "hidden md:block",
+                )}
               >
                 {item ? (
                   <ResilientImage

@@ -64,9 +64,15 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
     setDuration(String(detail.durationMin));
     setCategoryId(detail.categoryId ?? "");
     setIsActive(detail.isActive);
+  }, [detail.id, detail.name, detail.priceKopeks, detail.durationMin, detail.categoryId, detail.isActive]);
+
+  // UX-PASS-01: сообщения сбрасываются только при смене услуги. Раньше их
+  // сбрасывал и `router.refresh()` после сохранения (новые поля → эффект
+  // выше), и «Сохранено» исчезало, не успев показаться.
+  useEffect(() => {
     setError(null);
     setStatusMessage(null);
-  }, [detail.id, detail.name, detail.priceKopeks, detail.durationMin, detail.categoryId, detail.isActive]);
+  }, [detail.id]);
 
   async function handleSave() {
     if (!name.trim()) {
@@ -224,6 +230,7 @@ export function ServiceDetailPanel({ studioId, detail, pickerOptions }: Props) {
           <Switch
             checked={isActive}
             onCheckedChange={(value) => setIsActive(value)}
+            disabled={saving}
           />
         </div>
 

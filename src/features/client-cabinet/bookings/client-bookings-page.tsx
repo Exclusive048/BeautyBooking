@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { ResilientImage } from "@/components/ui/resilient-image";
 import { StatTile, StatTileGrid } from "@/components/ui/stat-tile";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useFocusHighlight } from "@/hooks/use-focus-highlight";
 import { ICS_FAILURE_PARAM, type IcsExportFailure } from "@/lib/bookings/ics-export-outcome";
 import { moneyRUBFromKopeks } from "@/lib/format";
@@ -39,6 +40,7 @@ import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone
 import type {
   ClientBookingDTO,
   ClientBookingsPayload,
+  ClientBookingStatusCounts,
 } from "@/lib/client-cabinet/bookings.service";
 import { groupBookingsByMonth } from "./lib/group-by-month";
 import { buildYandexMapsLink } from "./lib/maps-link";
@@ -59,6 +61,11 @@ const fetcher = (url: string) =>
 
 /** REVIEW-PROMPT-01 — deep-link «открыть форму отзыва по этой записи». */
 const REVIEW_PARAM = "review";
+
+/** UX-PASS-01: запрос уходит, когда человек перестал печатать. */
+const SEARCH_DEBOUNCE_MS = 300;
+
+const EMPTY_COUNTS: ClientBookingStatusCounts = { all: 0, upcoming: 0, finished: 0, cancelled: 0 };
 
 export function ClientBookingsPage() {
   // NAV-ATTENTION-01: счётчики «ждёт действия» (нижняя навигация, сайдбар)
@@ -84,14 +91,19 @@ export function ClientBookingsPage() {
   } | null>(null);
   const { confirm, modal: confirmModal } = useConfirm();
 
+  // UX-PASS-01: поиск — с паузой (раньше запрос на каждую букву), а прежний
+  // список остаётся на экране, пока грузится новый: без `keepPreviousData`
+  // каждая буква и каждая вкладка сбрасывали список в скелетон.
+  const debouncedSearch = useDebouncedValue(filter.search.trim(), SEARCH_DEBOUNCE_MS);
   const queryString = new URLSearchParams({
     status: filter.status,
-    ...(filter.search ? { search: filter.search } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
   }).toString();
 
   const { data, mutate, isLoading, error } = useSWR<ClientBookingsPayload>(
     `/api/cabinet/user/bookings?${queryString}`,
     fetcher,
+    { keepPreviousData: true },
   );
 
   const bookings = useMemo(() => data?.bookings ?? [], [data]);
@@ -155,13 +167,9 @@ export function ClientBookingsPage() {
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
-  const statusCounts = useMemo(() => {
-    const all = bookings.length;
-    const upcoming = bookings.filter((b) => b.isUpcoming).length;
-    const finished = bookings.filter((b) => b.isFinished).length;
-    const cancelled = bookings.filter((b) => b.isCancelled).length;
-    return { all, upcoming, finished, cancelled };
-  }, [bookings]);
+  // UX-PASS-01: числа вкладок считает сервер без фильтра статуса — по
+  // отфильтрованному ответу у неактивных вкладок всегда стоял 0.
+  const statusCounts = data?.statusCounts ?? EMPTY_COUNTS;
 
   // RESCHEDULE-CLIENT-APPROVAL: `/confirm` применяет предложенное мастером
   // время, `/decline-reschedule` возвращает прежнее (инв. #32 — тот же
@@ -421,7 +429,7 @@ function FilterBar({
 }: {
   filter: Filter;
   onChange: (f: Filter) => void;
-  counts: { all: number; upcoming: number; finished: number; cancelled: number };
+  counts: ClientBookingStatusCounts;
 }) {
   const options: Array<{ value: Filter["status"]; label: string; count: number }> = [
     { value: "all", label: T.filterAll, count: counts.all },

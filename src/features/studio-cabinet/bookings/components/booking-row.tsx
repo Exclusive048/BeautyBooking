@@ -13,6 +13,10 @@ import {
 } from "@/features/studio-cabinet/schedule/lib/booking-status-display";
 import { BookingActionMenu } from "@/features/studio-cabinet/schedule/components/dialogs/booking-action-menu";
 import type { ScheduleMasterColumn } from "@/features/studio-cabinet/schedule/server/types";
+import {
+  studioCellActions,
+  studioCellHasActions,
+} from "@/features/studio-cabinet/schedule/lib/cell-actions";
 import { bookingToCell } from "../lib/booking-to-cell";
 import {
   SOURCE_BADGE_CLASS,
@@ -73,6 +77,9 @@ export function BookingRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const sourceDisplay = getBookingSourceDisplay(row.source);
   const tone = bookingToneFromStatus(row.status);
+  // UX-PASS-01: у отменённой и завершённой записи действий нет — кнопка «…»
+  // открывала меню, где каждое действие сервер отклонял.
+  const hasActions = studioCellHasActions(studioCellActions(bookingToCell(row)));
 
   return (
     <>
@@ -172,13 +179,15 @@ export function BookingRow({
           </span>
         </td>
         <td className="px-2 py-3 align-top">
-          <Button variant="wrapper"
-            onClick={() => setMenuOpen(true)}
-            className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
-            aria-label={T.actions.menu}
-          >
-            <MoreHorizontal className="h-4 w-4" aria-hidden />
-          </Button>
+          {hasActions ? (
+            <Button variant="wrapper"
+              onClick={() => setMenuOpen(true)}
+              className="inline-grid h-8 w-8 place-items-center rounded-lg text-text-sec transition-colors hover:bg-bg-input hover:text-text-main"
+              aria-label={T.actions.menu}
+            >
+              <MoreHorizontal className="h-4 w-4" aria-hidden />
+            </Button>
+          ) : null}
         </td>
       </tr>
 

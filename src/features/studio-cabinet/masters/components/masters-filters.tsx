@@ -32,6 +32,20 @@ export function MastersFilters({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [draft, setDraft] = useState(search);
+  // UX-PASS-01: черновик поиска знал только начальное значение — «Сбросить»,
+  // переход «назад» и смена фильтра со сбросом `q` оставляли в поле старый
+  // текст, а следующая правка возвращала его в адрес. Пропс синхронизируется
+  // в поле, кроме эха собственной отправки (иначе ответ сервера стирал бы
+  // буквы, набранные за время запроса).
+  const [seenSearch, setSeenSearch] = useState(search);
+  const [pushedSearch, setPushedSearch] = useState(search);
+  if (search !== seenSearch) {
+    setSeenSearch(search);
+    if (search !== pushedSearch) {
+      setPushedSearch(search);
+      setDraft(search);
+    }
+  }
 
   // Debounce search input → URL.
   useEffect(() => {
@@ -39,6 +53,7 @@ export function MastersFilters({
     const timer = setTimeout(() => {
       const next = new URLSearchParams(searchParams.toString());
       const trimmed = draft.trim();
+      setPushedSearch(trimmed);
       if (trimmed) next.set("q", trimmed);
       else next.delete("q");
       next.delete("master");

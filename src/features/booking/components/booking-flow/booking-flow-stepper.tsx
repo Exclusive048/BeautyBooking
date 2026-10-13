@@ -38,6 +38,10 @@ import type {
 
 const T = UI_TEXT.publicProfile.bookingWidget;
 
+function newIdempotencyKey(): string {
+  return typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`;
+}
+
 type Props = {
   providerId: string;
   /**
@@ -127,9 +131,7 @@ export function BookingFlowStepper({
   onPhaseChange,
   onChangeService,
 }: Props) {
-  const idempotencyKeyRef = useRef<string>(
-    typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`,
-  );
+  const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
   const toast = useToast();
 
   const [state, dispatch] = useReducer(
@@ -408,8 +410,7 @@ export function BookingFlowStepper({
         }
         dispatch({ type: "submitConflict" });
         // Rotate idempotency key so the retry isn't treated as a duplicate.
-        idempotencyKeyRef.current =
-          typeof crypto !== "undefined" ? crypto.randomUUID() : `bk-${Date.now()}`;
+        idempotencyKeyRef.current = newIdempotencyKey();
         return;
       }
 
@@ -446,6 +447,11 @@ export function BookingFlowStepper({
 
       writeBookingIdToUrl(created.booking.id);
       dispatch({ type: "submitSuccess", booking: fallbackConfirmation });
+      // UX-PASS-01: запись создана — следующая (после отмены этой или «Записаться
+      // ещё») — уже другой запрос. С прежним ключом сервер 10 минут отдавал бы
+      // кэш этой брони вместо новой (инв. #28). Обрыв сети ключ НЕ меняет:
+      // запрос мог дойти, и повтор с тем же ключом вернёт уже созданную бронь.
+      idempotencyKeyRef.current = newIdempotencyKey();
 
       // Quietly fetch the safe DTO so the success card gets the
       // provider address and proper name. Best-effort — failure leaves
@@ -511,6 +517,8 @@ export function BookingFlowStepper({
       // After successful cancel — clear URL state and return to selection
       // for a fresh attempt. The widget stays mounted.
       clearBookingIdFromUrl();
+      // UX-PASS-01: дальше — новая запись, значит и новый ключ.
+      idempotencyKeyRef.current = newIdempotencyKey();
       dispatch({ type: "retryFromConflict" });
     } catch (error) {
       // 29.09 доработки · 10–11: отказ не молчит — запись по-прежнему на
@@ -558,6 +566,7 @@ export function BookingFlowStepper({
               serviceDurationMin={serviceDurationMin}
               selectedDateKey={state.selectedDateKey}
               selectedSlot={state.selectedSlot}
+              providerTimezone={providerTimezone}
               clientName={state.clientName}
               clientPhone={state.clientPhone}
               comment={state.comment}

@@ -30,8 +30,14 @@ import { ApiClientError, fetchJson, readApiResponse, serverMessageOr } from "@/l
 import * as UI_TEXT from "@/lib/ui/text";
 import { GuestManageLinkCard } from "@/features/booking/components/guest-manage-link-card";
 import { fetchRetryingDuplicates } from "@/lib/http/idempotent-retry";
+import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
+import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
 
 const T = UI_TEXT.publicStudio.packageBooking;
+
+function newIdempotencyKey(): string {
+  return typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`;
+}
 
 type Props = {
   open: boolean;
@@ -60,9 +66,8 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   const components = bundle.components;
   // LOGIC-09: ключ идемпотентности живёт весь визард — повтор сабмита обязан
   // вернуть тот же пакет, а не «это время занято».
-  const idempotencyKeyRef = useRef<string>(
-    typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`,
-  );
+  const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
+  const viewerTz = useViewerTimeZoneContext();
   // LOGIC-26: дни визарда — в tz студии, а не посетителя (`studioTimezone`
   // здесь уже есть пропом; прежний `buildDays` его просто не использовал).
   const days = useMemo(() => buildDayOptions(14, studioTimezone), [studioTimezone]);
@@ -94,6 +99,13 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
   const fmtTime = useCallback(
     (iso: string) => UI_FMT.timeShort(iso, { timeZone: studioTimezone }),
     [studioTimezone],
+  );
+  // UX-PASS-01: услуги пакета бывают в разные дни, а строка показывала только
+  // «14:00–15:30» — без даты. Дата и время — по часам студии (salon-tz).
+  const fmtWhen = useCallback(
+    (startIso: string, endIso: string) =>
+      `${UI_FMT.dateShort(startIso, { timeZone: studioTimezone })}, ${fmtTime(startIso)}–${fmtTime(endIso)}`,
+    [fmtTime, studioTimezone],
   );
   const masterName = useCallback(
     (id: string) => masters.find((m) => m.id === id)?.name ?? "",
@@ -147,6 +159,25 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       masterBufferMin: selectedBufferMin,
     }).getTime();
   }, [activeIndex, components, placements, selectedMasterId, masters]);
+
+  // UX-PASS-01: метка зоны студии (rule 17) — у окошек, выбранных услуг и на
+  // проверке; раньше в визарде пакета студии её не было нигде. Только когда
+  // пояс зрителя другой; смещение — по реальному моменту (DST).
+  const firstPlaced = components[0] ? placements[components[0].serviceId] : undefined;
+  const zoneRefInstant =
+    proposal?.components[0]?.startAtUtc ??
+    firstPlaced?.slot.startAtUtc ??
+    slots[0]?.startAtUtc ??
+    null;
+  const zoneLabel =
+    zoneRefInstant &&
+    zonesDifferForViewer({
+      iso: zoneRefInstant,
+      salonTimeZone: studioTimezone,
+      viewerTimeZone: viewerTz,
+    })
+      ? formatZoneLabel({ iso: zoneRefInstant, timeZone: studioTimezone })
+      : "";
 
   // Masters who actually perform the active component's service (EXP-024).
   const assignedMasters = useMemo(() => {
@@ -332,6 +363,9 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       const created = await readApiResponse<{ manageUrl?: string | null } | undefined>(res);
       setManageUrl(created?.manageUrl ?? null);
       setPhase("success");
+      // UX-PASS-01: пакет создан — следующий визард с этой кнопки уже другой
+      // запрос (иначе 10 минут — кэш этого пакета). Обрыв сети ключ не меняет.
+      idempotencyKeyRef.current = newIdempotencyKey();
     } catch (error) {
       if (!(error instanceof ApiClientError)) {
         setError(T.networkError);
@@ -361,6 +395,9 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
       {phase === "build" ? (
         <div className="space-y-4">
           <p className="text-sm text-text-sec">{T.buildHint}</p>
+          {zoneLabel ? (
+            <p className="font-mono text-xs text-accent-text">{zoneLabel}</p>
+          ) : null}
 
           <ol className="space-y-2">
             {components.map((component, index) => {
@@ -385,7 +422,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <Clock className="h-3 w-3" aria-hidden />
-                            {fmtTime(placement.slot.startAtUtc)}–{fmtTime(placement.slot.endAtUtc)}
+                            {fmtWhen(placement.slot.startAtUtc, placement.slot.endAtUtc)}
                           </span>
                         </div>
                       </div>
@@ -526,6 +563,9 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
           </Button>
+          {zoneLabel ? (
+            <p className="font-mono text-xs text-accent-text">{zoneLabel}</p>
+          ) : null}
           <ul className="space-y-2">
             {proposal.components.map((c, i) => (
               <li
@@ -541,7 +581,7 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <Clock className="h-3 w-3" aria-hidden />
-                      {fmtTime(c.startAtUtc)}–{fmtTime(c.endAtUtc)}
+                      {fmtWhen(c.startAtUtc, c.endAtUtc)}
                     </span>
                   </div>
                 </div>
@@ -568,33 +608,29 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
           </Button>
-          {!me ? (
-            <>
-              <label className="block text-sm">
-                <FieldLabel tone="muted" className="text-sm font-normal">{T.nameLabel}</FieldLabel>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={T.namePlaceholder}
-                />
-                {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
-                <span className="mt-1 block text-xs text-text-sec">
-                  {UI_TEXT.common.ownNameHint}
-                </span>
-              </label>
-              <label className="block text-sm">
-                <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={T.phonePlaceholder} inputMode="tel" />
-              </label>
-            </>
-          ) : (
+          {/* UX-PASS-01: поле имени — всем, у кого имени нет (в том числе
+              вошедшему через VK/Яндекс/почту), — см. `package-booking-flow.tsx`. */}
+          {me?.displayName?.trim() ? (
             <div className="rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2 text-sm text-text-sec">
-              {T.bookingAs.replace("{name}", me.displayName ?? name)}
+              {T.bookingAs.replace("{name}", me.displayName.trim())}
             </div>
+          ) : (
+            <label className="block text-sm">
+              <FieldLabel tone="muted" className="text-sm font-normal">{T.nameLabel}</FieldLabel>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={T.namePlaceholder}
+              />
+              {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
+              <span className="mt-1 block text-xs text-text-sec">
+                {UI_TEXT.common.ownNameHint}
+              </span>
+            </label>
           )}
           {/* BOOKING-AUTH-NO-PHONE-01: вошедший без телефона в профиле — см.
               `package-booking-flow.tsx`. */}
-          {me && !me.phone ? (
+          {!me?.phone ? (
             <label className="block text-sm">
               <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={T.phonePlaceholder} inputMode="tel" />

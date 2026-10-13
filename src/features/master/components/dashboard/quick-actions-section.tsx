@@ -3,6 +3,7 @@
 import { ImagePlus, Lock, Plus, Share2, UserPlus } from "lucide-react";
 import { QuickActionTile } from "@/features/master/components/dashboard/quick-action-tile";
 import { useManualBooking } from "@/features/master/components/manual-booking/manual-booking-provider";
+import { useToast } from "@/components/ui/toast";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.quickActions;
@@ -21,6 +22,7 @@ type Props = {
  */
 export function QuickActionsSection({ publicProfileUrl }: Props) {
   const { open: openManualBooking } = useManualBooking();
+  const toast = useToast();
 
   const handleAddBooking = () => {
     openManualBooking();
@@ -32,16 +34,22 @@ export function QuickActionsSection({ publicProfileUrl }: Props) {
       try {
         await navigator.share({ url: publicProfileUrl });
         return;
-      } catch {
-        // User dismissed share sheet — fall through to clipboard.
+      } catch (error) {
+        // Шторку закрыли сами — это не отказ, копировать молча не нужно.
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // Иначе (share недоступен в контексте) — к буферу обмена.
       }
     }
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(publicProfileUrl);
-      } catch {
-        // No-op — the failure isn't worth a banner here.
-      }
+    // UX-PASS-01: копирование шло молча — и успех, и отказ были невидимы.
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      toast.error(T.shareCopyFailed);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+      toast.success(T.shareCopied);
+    } catch {
+      toast.error(T.shareCopyFailed);
     }
   };
 

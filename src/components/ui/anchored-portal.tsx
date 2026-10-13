@@ -14,6 +14,7 @@ import { createPortal } from "react-dom";
 import { FOCUSABLE_SELECTOR } from "@/components/ui/use-modal-a11y";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
 import { cn } from "@/lib/cn";
+import { menuTopNearAnchor } from "@/lib/ui/menu-placement";
 
 /**
  * Всплывающая панель у якоря — порталом в `body`, слой `z-popover`
@@ -37,6 +38,14 @@ import { cn } from "@/lib/cn";
  * пункт; мышью или касанием — в саму панель без кольца (иначе первый пункт
  * выглядел бы выбранным), и Tab ведёт в пункты. Escape и Tab за крайний пункт
  * закрывают панель и возвращают фокус на якорь.
+ *
+ * UX-PASS-01: панель публикует переменную `--anchored-max-h` — сколько места
+ * есть на экране от её верха до нижнего края (при `flip` вверх — от края до
+ * якоря), за вычетом отступа. Высокое содержимое берёт её классом
+ * `max-h-[var(--anchored-max-h)] overflow-y-auto` и прокручивается внутри:
+ * у `position: fixed` иначе низ меню на невысоком экране был недостижим.
+ * Сама панель не обрезает и не прокручивает (у содержимого тень и масштаб
+ * анимации), поэтому вызывающим, которые переменную не читают, ничего не меняется.
  */
 type Props = {
   open: boolean;
@@ -49,11 +58,20 @@ type Props = {
   offset?: number;
   /** Перенести фокус в панель при открытии (меню — да). */
   autoFocus?: boolean;
+  /**
+   * UX-PASS-01: у нижнего края экрана (с учётом нижней навигации телефона)
+   * открываться над якорем. Для меню строк списка — нижняя строка иначе
+   * открывала меню за край экрана.
+   */
+  flip?: boolean;
   className?: string;
   children: ReactNode;
 };
 
 const EDGE_GAP_PX = 8;
+
+/** UX-PASS-01: доступная панели высота (px) — см. JSDoc компонента. */
+const MAX_HEIGHT_VAR = "--anchored-max-h";
 
 function focusAnchor(anchor: HTMLElement | null) {
   if (!anchor) return;
@@ -68,6 +86,7 @@ export function AnchoredPortal({
   align = "start",
   offset = 8,
   autoFocus = true,
+  flip = false,
   className,
   children,
 }: Props) {
@@ -84,7 +103,16 @@ export function AnchoredPortal({
     if (!anchor || !panel) return;
     const rect = anchor.getBoundingClientRect();
     const viewportWidth = document.documentElement.clientWidth;
-    panel.style.top = `${rect.bottom + offset}px`;
+    // Высота меряется без прежнего потолка — иначе урезанная в прошлый раз
+    // панель «помещалась» бы и решение о направлении скакало.
+    panel.style.removeProperty(MAX_HEIGHT_VAR);
+    const top = flip ? menuTopNearAnchor(rect, panel.offsetHeight, offset) : rect.bottom + offset;
+    panel.style.top = `${top}px`;
+    const opensUp = top < rect.bottom;
+    const available = opensUp
+      ? rect.top - offset - EDGE_GAP_PX
+      : window.innerHeight - top - EDGE_GAP_PX;
+    panel.style.setProperty(MAX_HEIGHT_VAR, `${Math.max(0, Math.floor(available))}px`);
     if (align === "end") {
       panel.style.left = "auto";
       panel.style.right = `${Math.max(EDGE_GAP_PX, viewportWidth - rect.right)}px`;
@@ -93,7 +121,7 @@ export function AnchoredPortal({
       panel.style.left = `${Math.max(EDGE_GAP_PX, rect.left)}px`;
     }
     panel.style.visibility = "visible";
-  }, [anchorRef, align, offset]);
+  }, [anchorRef, align, offset, flip]);
 
   useLayoutEffect(() => {
     if (!open) return;

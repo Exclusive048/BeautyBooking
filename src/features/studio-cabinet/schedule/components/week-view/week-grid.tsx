@@ -48,7 +48,10 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
         <table className="min-w-full">
           <thead className="bg-bg-input/40">
             <tr>
-              <th className="sticky left-0 z-10 min-w-[200px] bg-bg-input/40 px-3 py-2 text-left eyebrow">
+              {/* UX-PASS-01: полупрозрачный фон закреплённой ячейки пропускал
+                  заголовки дней при прокрутке вбок. Плотная подложка карточки +
+                  тот же оттенок шапки сверху — вид прежний, просвета нет. */}
+              <th className="sticky left-0 z-10 min-w-[200px] bg-bg-card bg-[linear-gradient(rgb(var(--bg-input)/0.4),rgb(var(--bg-input)/0.4))] px-3 py-2 text-left eyebrow">
                 {T.masterColumn}
               </th>
               {week.days.map((day) => (
@@ -68,7 +71,10 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
             {week.rows.map((row) => (
               <tr key={row.master.id} className="border-t border-border-subtle">
                 <td className="sticky left-0 z-10 min-w-[200px] bg-bg-card px-3 py-2.5">
-                  <div className="flex items-center gap-2">
+                  {/* UX-PASS-01: ячейка таблицы растёт под длинное имя, и
+                      `truncate` не срабатывал — колонка мастера съедала неделю.
+                      Ширина строки ограничена (200px с отступами ячейки). */}
+                  <div className="flex max-w-[176px] items-center gap-2">
                     {row.master.avatarUrl ? (
                       <ResilientImage
                         src={row.master.avatarUrl}
@@ -85,7 +91,10 @@ export function WeekGrid({ week }: { week: ScheduleWeekData }) {
                         {initials(row.master.name)}
                       </span>
                     )}
-                    <span className="truncate text-sm font-semibold text-text-main">
+                    <span
+                      className="min-w-0 truncate text-sm font-semibold text-text-main"
+                      title={row.master.name}
+                    >
                       {row.master.name}
                     </span>
                   </div>

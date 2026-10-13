@@ -141,8 +141,10 @@ export function CatalogTable({ initialRows, parentOptions, counts }: Props) {
 
       <div className="overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-card">
         {/* Mobile: cards stacked. Desktop: table. */}
-        <div className="hidden md:block">
-          <table className="w-full">
+        {/* UX-PASS-01: шесть колонок на планшете не помещаются — таблица
+            прокручивается внутри карточки, а не обрезается краем. */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[760px]">
             <thead>
               <tr className="border-b border-border-subtle text-left text-2xs uppercase tracking-wider text-text-sec">
                 <th className="px-4 py-3 font-medium">{T.columns.category}</th>

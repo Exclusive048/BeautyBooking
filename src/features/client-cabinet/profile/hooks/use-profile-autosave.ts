@@ -10,7 +10,6 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 const DEBOUNCE_MS = 700;
 const SAVED_FADE_MS = 1800;
-const ERROR_FADE_MS = 3000;
 
 type Options = {
   /** Called with the server's fresh profile DTO after a successful save. */
@@ -24,9 +23,10 @@ type Options = {
  * we hand the fresh DTO back so the page can reconcile (e.g. completion
  * percent recalculates server-side).
  *
- * On failure we surface `error` for ~3s, then fade to idle. Rapid retries
- * after a failure naturally re-attempt — the pending patch is preserved
- * across rejections so partial work isn't lost.
+ * On failure the patch goes back into the pending set (newer edits win) and
+ * `error` stays on screen until the next save succeeds — the next edit
+ * re-sends the failed fields together with the new ones. No automatic retry:
+ * a refusal like «email уже занят» would only repeat.
  */
 export function useProfileAutosave({ onSaved }: Options) {
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -76,9 +76,14 @@ export function useProfileAutosave({ onSaved }: Options) {
       // тогда как канон индикатора («Попробуйте ещё раз») на 409 — неверный
       // совет. Своя строка остаётся дефолтом для обрыва сети и 5xx.
       setErrorMessage(serverMessageOr(caught, UI_TEXT.clientCabinet.profilePage.saveStatus.error));
+      // UX-PASS-01: несохранённые поля возвращаются в очередь (свежие правки
+      // поверх), иначе они молча пропадали: поле показывало новое значение,
+      // а на сервере оставалось старое. Повтор — со следующей правкой, не сам.
+      pendingRef.current = { ...payload, ...pendingRef.current };
       setStatus("error");
+      // Отказ не гаснет через 3 с, как раньше, — он держится до успешного
+      // сохранения: иначе «не сохранено» исчезало, а данные так и не доехали.
       if (fadeRef.current) clearTimeout(fadeRef.current);
-      fadeRef.current = setTimeout(() => setStatus("idle"), ERROR_FADE_MS);
     }
   }, [onSaved]));
 

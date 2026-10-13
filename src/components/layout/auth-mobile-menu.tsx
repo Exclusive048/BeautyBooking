@@ -162,7 +162,10 @@ export function AuthMobileMenu({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -DISTANCE.nudge, transition: MOTION.exit }}
             transition={MOTION.micro}
-            className="w-[min(88vw,320px)] rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
+            // UX-PASS-01: на невысоком экране (телефон боком) меню длиннее
+            // экрана — прокрутка внутри, иначе нижние пункты и «Выйти» были
+            // недостижимы (панель `fixed`, страница под ней не помогает).
+            className="max-h-[var(--anchored-max-h)] w-[min(88vw,320px)] overflow-y-auto overscroll-contain rounded-3xl border border-border-subtle/80 bg-bg-card/95 p-2 shadow-hover backdrop-blur"
           >
             {!isGuest && (
               <div className="rounded-2xl bg-bg-input px-3 py-2">

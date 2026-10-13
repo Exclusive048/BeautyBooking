@@ -2,14 +2,14 @@
 
 import { Eye, EyeOff, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useConfirm } from "@/hooks/use-confirm";
 import { cn } from "@/lib/cn";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { useToast } from "@/components/ui/toast";
+import { AnchoredPortal } from "@/components/ui/anchored-portal";
 import { Button } from "@/components/ui/button";
-import { DismissLayer } from "@/components/ui/dismiss-layer";
 
 const ROW_T = UI_TEXT.cabinetMaster.servicesPage.row;
 const M = UI_TEXT.cabinetMaster.servicesPage.menu;
@@ -27,6 +27,11 @@ type Props = {
  * actions hit the per-resource endpoints; on a 409 (`SERVICE_HAS_BOOKINGS`)
  * we surface a friendly Russian alert pointing the master at the disable
  * action instead.
+ *
+ * UX-PASS-01: меню — порталом (`AnchoredPortal`, слой `z-popover`). Внутри
+ * строки его обрезал `<details overflow-hidden>` аккордеона, а у выключенной
+ * услуги или пакета (`opacity-60`) оно становилось полупрозрачным. У нижнего
+ * края экрана открывается вверх; Escape и клик мимо закрывают его.
  */
 export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
   const router = useRouter();
@@ -34,6 +39,7 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
   const { confirm, modal: confirmModal } = useConfirm();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
 
   const baseUrl =
     itemType === "service"
@@ -85,22 +91,23 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
   };
 
   return (
-    <div className="relative shrink-0">
+    <div ref={anchorRef} className="relative shrink-0">
       <Button variant="wrapper"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((prev) => !prev);
         }}
         aria-label={ROW_T.menuAria}
+        aria-haspopup="menu"
+        aria-expanded={open}
         disabled={busy}
         className="flex h-7 w-7 items-center justify-center rounded-md text-text-sec transition-colors hover:bg-bg-input hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <MoreVertical className="h-3.5 w-3.5" aria-hidden />
       </Button>
-      {open ? (
-        <>
-          <DismissLayer label={UI_TEXT.a11y.closeMenu} onDismiss={() => setOpen(false)} className="z-10" />
-          <ul className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-border-subtle bg-bg-card py-1 shadow-card">
+      <AnchoredPortal open={open} anchorRef={anchorRef} onDismiss={() => setOpen(false)} align="end" offset={4} flip>
+        {open ? (
+          <ul className="w-48 rounded-xl border border-border-subtle bg-bg-card py-1 shadow-card">
             <Item
               icon={Pencil}
               label={M.edit}
@@ -117,8 +124,8 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
             <li className="my-0.5 border-t border-border-subtle" />
             <Item icon={Trash2} label={M.delete} onClick={remove} destructive />
           </ul>
-        </>
-      ) : null}
+        ) : null}
+      </AnchoredPortal>
       {confirmModal}
     </div>
   );

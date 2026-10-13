@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -15,6 +16,26 @@ type Props = {
 };
 
 /**
+ * UX-PASS-01: виден ли подвал сайта. Кнопка стоит поверх страницы (≈68px), и
+ * на телефоне закрывала последнюю строку подвала — реквизиты и ссылки на
+ * документы. Пока подвал в кадре, кнопка уходит и возвращается при прокрутке
+ * вверх. Подвал — общий `Footer` (`role="contentinfo"`); его самого не трогаем.
+ */
+function useSiteFooterInView(): boolean {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const footer = document.querySelector<HTMLElement>('footer[role="contentinfo"]');
+    if (!footer || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setInView(Boolean(entry?.isIntersecting));
+    });
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
+  return inView;
+}
+
+/**
  * BOOKING-WIDGET-DIALOG — плавающая «Записаться» публичных страниц мастера и
  * студии: открывает окно записи с первого шага.
  *
@@ -25,11 +46,15 @@ type Props = {
  * до гидратации кнопка не прыгает. Safe-area забирает сама панель.
  */
 export function FloatingBookingButton({ label, onClick, showOnDesktop = false }: Props) {
+  const footerInView = useSiteFooterInView();
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-[var(--bottom-nav-h,calc(3rem+max(0px,calc(env(safe-area-inset-bottom,0px)-10px))))] z-float",
+        "fixed inset-x-0 bottom-[var(--bottom-nav-h,calc(3rem+max(0px,calc(env(safe-area-inset-bottom,0px)-10px))))] z-float transition-[opacity,visibility] duration-200",
         showOnDesktop ? "lg:inset-x-auto lg:bottom-6 lg:right-6" : "lg:hidden",
+        // `invisible` убирает кнопку и из порядка табуляции, и из дерева
+        // доступности — скрытая, но фокусируемая кнопка хуже отсутствующей.
+        footerInView ? "invisible opacity-0" : "visible opacity-100",
       )}
     >
       <div className="mx-4 mb-3 lg:m-0">

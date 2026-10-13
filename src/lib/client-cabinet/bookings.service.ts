@@ -133,9 +133,23 @@ export type ClientBookingsKpi = {
   spentLast90dKopeks: number;
 };
 
+/**
+ * UX-PASS-01: числа на вкладках «Все / Предстоящие / Завершённые /
+ * Отменённые». Считаются по набору с поиском и датами, но БЕЗ фильтра статуса —
+ * раньше клиент считал их по уже отфильтрованному ответу, и на вкладке
+ * «Предстоящие» у «Все» стояло то же число, а у остальных — 0.
+ */
+export type ClientBookingStatusCounts = {
+  all: number;
+  upcoming: number;
+  finished: number;
+  cancelled: number;
+};
+
 export type ClientBookingsPayload = {
   bookings: ClientBookingDTO[];
   kpi: ClientBookingsKpi;
+  statusCounts: ClientBookingStatusCounts;
 };
 
 const CLIENT_BOOKING_PROVIDER_SELECT = {
@@ -379,13 +393,8 @@ export async function listClientBookings(
   const chatSlugs = await resolveChatSlugs(rows, userId);
   const dtos: ClientBookingDTO[] = rows.map((r) => toClientBookingDto(r, { userId, now, chatSlugs }));
 
-  // Filter
-  const filtered = dtos.filter((b) => {
-    if (filter.status && filter.status !== "all") {
-      if (filter.status === "upcoming" && !b.isUpcoming) return false;
-      if (filter.status === "finished" && !b.isFinished) return false;
-      if (filter.status === "cancelled" && !b.isCancelled) return false;
-    }
+  // Filter: поиск и даты — отдельно от статуса, чтобы посчитать вкладки.
+  const matched = dtos.filter((b) => {
     if (filter.search) {
       const q = filter.search.toLowerCase();
       const hay = `${b.provider.name} ${b.service.name}`.toLowerCase();
@@ -398,6 +407,18 @@ export async function listClientBookings(
       if (new Date(b.startAtUtc) > new Date(filter.dateTo)) return false;
     }
     return true;
+  });
+  const statusCounts: ClientBookingStatusCounts = {
+    all: matched.length,
+    upcoming: matched.filter((b) => b.isUpcoming).length,
+    finished: matched.filter((b) => b.isFinished).length,
+    cancelled: matched.filter((b) => b.isCancelled).length,
+  };
+  const filtered = matched.filter((b) => {
+    if (!filter.status || filter.status === "all") return true;
+    if (filter.status === "upcoming") return b.isUpcoming;
+    if (filter.status === "finished") return b.isFinished;
+    return b.isCancelled;
   });
 
   // Sort: upcoming ASC by start, then finished DESC, cancelled last by start DESC
@@ -444,5 +465,5 @@ export async function listClientBookings(
     spentLast90dKopeks,
   };
 
-  return { bookings: filtered, kpi };
+  return { bookings: filtered, kpi, statusCounts };
 }

@@ -74,7 +74,10 @@ export function ChatShell({ perspective }: Props) {
   const totalConversations = conversations.length;
 
   return (
-    <div className="flex h-[calc(100vh-var(--topbar-h,4rem)-6rem)] min-h-[560px] overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm">
+    // UX-PASS-01: высота — от ВИДИМОЙ части экрана (`dvh`) за вычетом нижней
+    // навигации телефона (`--bottom-nav-h`, на ПК 0). С `100vh` и жёстким
+    // минимумом 560px поле ввода на телефоне оказывалось под навигацией.
+    <div className="flex h-[calc(100dvh-var(--topbar-h,4rem)-var(--bottom-nav-h,0px)-6rem)] min-h-[360px] overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm md:min-h-[560px]">
       <ConversationList
         conversations={conversations}
         activeSlug={activeSlug}

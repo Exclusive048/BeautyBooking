@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Mail } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
@@ -97,12 +97,28 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
   }
 
   const emailValid = email.trim().length > 0 && email.includes("@");
+  const codeValid = code.length === 6;
+
+  // UX-PASS-01: каждый шаг — форма, Enter в поле отправляет её. Раньше шаги
+  // были просто блоками с кнопками, и Enter после ввода адреса или кода не
+  // делал ничего. Повторная отправка во время запроса отсекается здесь же.
+  function submitEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!emailValid || submitting) return;
+    void requestOtp();
+  }
+
+  function submitCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!codeValid || submitting) return;
+    void verifyOtp();
+  }
 
   return (
     <ModalSurface open onClose={onClose} title={T.modalTitle}>
-      <div className="space-y-4">
+      <div>
         {step === "email" ? (
-          <>
+          <form className="space-y-4" onSubmit={submitEmail} noValidate>
             <p className="text-sm text-text-sec">{T.modalDescription}</p>
             <div>
               <FieldLabel htmlFor="email-verify-input" tone="eyebrow">
@@ -135,20 +151,19 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
                 {UI_TEXT.common.cancel}
               </Button>
               <Button
+                type="submit"
                 variant="primary"
                 size="sm"
-                onClick={requestOtp}
                 disabled={!emailValid || submitting}
               >
-                {submitting ? "Отправляем…" : T.sendCode}
+                {submitting ? T.sending : T.sendCode}
               </Button>
             </div>
-          </>
+          </form>
         ) : (
-          <>
+          <form className="space-y-4" onSubmit={submitCode} noValidate>
             <p className="text-sm text-text-sec">
-              Код отправлен на <b className="text-text-main">{email}</b>.
-              Проверьте почту и папку «Спам».
+              {T.codeSentTo} <b className="text-text-main">{email}</b>. {T.checkSpam}
             </p>
             <div>
               <FieldLabel htmlFor="email-code-input" tone="eyebrow">
@@ -190,18 +205,19 @@ export function EmailVerifyModal({ currentEmail, onClose, onSuccess }: Props) {
                 }}
                 disabled={submitting}
               >
-                ← Изменить email
+                <ArrowLeft className="h-4 w-4" aria-hidden />
+                {T.changeEmail}
               </Button>
               <Button
+                type="submit"
                 variant="primary"
                 size="sm"
-                onClick={verifyOtp}
-                disabled={code.length !== 6 || submitting}
+                disabled={!codeValid || submitting}
               >
-                {submitting ? "Проверяем…" : T.confirm}
+                {submitting ? T.verifying : T.confirm}
               </Button>
             </div>
-          </>
+          </form>
         )}
       </div>
     </ModalSurface>

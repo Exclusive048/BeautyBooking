@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { Notice } from "@/components/ui/notice";
+import { ApiClientError, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
 export type ConfirmVariant = "default" | "danger";
@@ -21,11 +23,25 @@ type Props = ConfirmOptions & {
   onCancel: () => void;
 };
 
+/** Текст отказа `onConfirm` для плашки в окне. */
+function refusalMessage(error: unknown): string {
+  if (error instanceof ApiClientError) return serverMessageOr(error, UI_TEXT.common.errorGeneric);
+  if (error instanceof Error && error.message) return error.message;
+  return UI_TEXT.common.errorGeneric;
+}
+
 /**
  * Reusable confirm dialog backed by `ModalSurface`. Replaces native
  * `window.confirm()` across the app — see `useConfirm()` for the
  * imperative API. Supports an async `onConfirm` (await-friendly) and
  * a danger variant for destructive actions.
+ *
+ * UX-PASS-01: если `onConfirm` бросает, окно остаётся открытым и показывает
+ * причину отказа — `message` брошенной ошибки (вызывающий кладёт туда
+ * курируемую строку, см. `client-reviews-page.tsx`; у `ApiClientError` —
+ * строка сервера по FIX-C8). Раньше `try/finally` без `catch` глотал отказ:
+ * кнопка возвращалась в исходное состояние без единого слова, а промис
+ * уходил необработанным.
  */
 export function ConfirmModal({
   open,
@@ -38,6 +54,13 @@ export function ConfirmModal({
   onCancel,
 }: Props) {
   const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Отказ прошлого открытия не переезжает в следующее.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) setError(null);
+  }
 
   const resolvedTitle = title ?? UI_TEXT.common.confirmDefaultTitle;
   const resolvedConfirm = confirmLabel ?? UI_TEXT.common.confirmDefaultLabel;
@@ -46,8 +69,11 @@ export function ConfirmModal({
   async function handleConfirm() {
     if (isPending) return;
     setIsPending(true);
+    setError(null);
     try {
       await onConfirm();
+    } catch (err) {
+      setError(refusalMessage(err));
     } finally {
       setIsPending(false);
     }
@@ -58,6 +84,12 @@ export function ConfirmModal({
       <p className="whitespace-pre-line text-sm leading-relaxed text-text-main">
         {message}
       </p>
+
+      {error ? (
+        <Notice tone="danger" className="mt-4">
+          {error}
+        </Notice>
+      ) : null}
 
       <div className="mt-5 flex justify-end gap-2">
         <Button

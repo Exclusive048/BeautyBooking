@@ -125,9 +125,11 @@ export function WhenFilter({ date, timePreset, timeFrom, timeTo, onChange }: Pro
   const isTomorrow = date === tomorrowKey;
   const isCustomDate = Boolean(picked && !isToday && !isTomorrow);
 
-  const pickDate = (next: string | null) =>
+  const pickDate = (next: string | null) => {
+    setCalendarOpen(false);
     // «Сегодня» — тот же фильтр, что «Свободно сегодня»: снимаем обе формы.
     onChange(next ? { date: next } : { date: null, availableToday: null });
+  };
 
   const pickPreset = (preset: Exclude<WhenTimePreset, "custom">) =>
     onChange(
@@ -155,32 +157,35 @@ export function WhenFilter({ date, timePreset, timeFrom, timeTo, onChange }: Pro
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* UX-PASS-01: календарь привязан к началу строки чипов, а не к
+          третьему чипу — от чипа «Календарь» окно (~280px) уезжало за правый
+          край шторки фильтров на телефоне (ширина содержимого 335px). */}
+      <div ref={containerRef} className="relative flex flex-wrap items-center gap-1.5">
         <ChipButton active={isToday} onClick={() => pickDate(isToday ? null : todayKey)}>
           {TS.todayChip}
         </ChipButton>
         <ChipButton active={isTomorrow} onClick={() => pickDate(isTomorrow ? null : tomorrowKey)}>
           {TS.tomorrowChip}
         </ChipButton>
-        <div ref={containerRef} className="relative">
-          <ChipButton active={isCustomDate} onClick={() => setCalendarOpen((open) => !open)}>
-            <CalendarDays className="-ml-0.5 mr-1.5 h-3.5 w-3.5" aria-hidden />
-            {isCustomDate && picked ? UI_FMT.dateKey(date, "dayMonthShort") : TS.calendarChip}
-          </ChipButton>
-          {calendarOpen ? (
-            <div className="absolute left-0 top-full z-30 mt-2 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">
-              <DatePresetCalendar
-                selected={picked ?? undefined}
-                minDate={new Date(now.getFullYear(), now.getMonth(), now.getDate())}
-                maxDate={addDays(now, FREE_SLOT_HORIZON_DAYS - 1)}
-                onSelect={(next) => {
-                  pickDate(viewerDateKey(next));
-                  setCalendarOpen(false);
-                }}
-              />
-            </div>
-          ) : null}
-        </div>
+        <ChipButton
+          active={isCustomDate}
+          aria-expanded={calendarOpen}
+          aria-haspopup="dialog"
+          onClick={() => setCalendarOpen((open) => !open)}
+        >
+          <CalendarDays className="-ml-0.5 mr-1.5 h-3.5 w-3.5" aria-hidden />
+          {isCustomDate && picked ? UI_FMT.dateKey(date, "dayMonthShort") : TS.calendarChip}
+        </ChipButton>
+        {calendarOpen ? (
+          <div className="absolute left-0 top-full z-30 mt-2 rounded-2xl border border-border-subtle bg-bg-card p-3 shadow-card">
+            <DatePresetCalendar
+              selected={picked ?? undefined}
+              minDate={new Date(now.getFullYear(), now.getMonth(), now.getDate())}
+              maxDate={addDays(now, FREE_SLOT_HORIZON_DAYS - 1)}
+              onSelect={(next) => pickDate(viewerDateKey(next))}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">

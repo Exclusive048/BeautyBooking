@@ -70,8 +70,18 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
     endsOn: autoExtend ? null : endsOn,
   };
   const hoursError = validateDayHours(hours);
+  // UX-PASS-01: `min` у поля даты не мешает ввести дату руками и не
+  // пересчитывается, когда первый день сдвигают позже конца, — проверяем сами.
+  const endBeforeStart = !autoExtend && endsOn < firstDay;
   const coverage = ordered.length > 0 ? teamRhythmCoverage(input, 14) : [];
-  const canApply = ordered.length > 0 && !hoursError && !busy;
+  const canApply = ordered.length > 0 && !hoursError && !endBeforeStart && !busy;
+
+  // UX-PASS-01: пока графики пишутся по очереди, окно не закрывается — иначе
+  // отказ по мастеру пропадал вместе с окном, а запись шла дальше «вслепую».
+  const handleClose = () => {
+    if (busy) return;
+    onClose();
+  };
 
   const apply = async () => {
     setBusy(true);
@@ -99,15 +109,24 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
   return (
     <ModalSurface
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       header={{ title: T.title, subtitle: T.hint }}
       size="lg"
       stickyFooter
       footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="primary" size="md" className="rounded-xl" onClick={apply} disabled={!canApply}>
-            {busy ? T.applying : T.apply}
-          </Button>
+        // UX-PASS-01: отказ — рядом с кнопкой, в закреплённом подвале: внизу
+        // длинного окна его не было видно без прокрутки.
+        <div className="space-y-2">
+          {error ? (
+            <p role="alert" className="text-sm text-danger-text">
+              {error}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="primary" size="md" className="rounded-xl" onClick={apply} disabled={!canApply}>
+              {busy ? T.applying : T.apply}
+            </Button>
+          </div>
         </div>
       }
     >
@@ -175,8 +194,14 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
               max={lastKey}
               value={endsOn}
               onChange={(event) => event.target.value && setEndsOn(event.target.value)}
+              aria-invalid={endBeforeStart}
               className="h-11 rounded-xl px-3 text-sm"
             />
+            {endBeforeStart ? (
+              <p role="alert" className="text-xs text-danger-text">
+                {T.endBeforeStart}
+              </p>
+            ) : null}
           </ScheduleField>
         ) : null}
 
@@ -207,7 +232,6 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
           <p className="text-sm text-text-sec">{T.noMasters}</p>
         )}
 
-        {error ? <p className="text-sm text-danger-text">{error}</p> : null}
       </div>
     </ModalSurface>
   );

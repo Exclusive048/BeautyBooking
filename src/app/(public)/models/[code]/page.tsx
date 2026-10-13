@@ -217,8 +217,10 @@ export default async function ModelOfferPage({ params }: PageProps) {
             </section>
           </div>
 
-          {/* ── Right column — Apply form (sticky on desktop) ── */}
-          <aside className="lg:sticky lg:top-6">
+          {/* ── Right column — Apply form (sticky on desktop) ──
+              UX-PASS-01: липнет ниже шапки сайта — при `top-6` заголовок
+              формы уходил под липкую шапку. */}
+          <aside className="lg:sticky lg:top-[calc(var(--topbar-h)+1.5rem)]">
             <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground">
                 {UI_TEXT.pages.modelOffer.applyTitle}

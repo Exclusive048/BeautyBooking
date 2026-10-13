@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { BillingTabEmpty } from "@/features/admin-cabinet/billing/components/billing-tab-empty";
 import { CancelSubscriptionDialog } from "@/features/admin-cabinet/billing/components/subscriptions-tab/cancel-subscription-dialog";
 import { SubscriptionsTableRow } from "@/features/admin-cabinet/billing/components/subscriptions-tab/subscriptions-row";
+import { useCursorPagedRows } from "@/features/admin-cabinet/lib/server-rows";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import type { AdminSubscriptionRow } from "@/features/admin-cabinet/billing/types";
@@ -34,7 +35,13 @@ export function SubscriptionsTable({ rows: initialRows, nextCursor }: Props) {
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [rows, setRows] = useState<AdminSubscriptionRow[]>(initialRows);
+  // UX-PASS-01: строки — из ответа сервера; «Загрузить ещё» (`?subCursor=`)
+  // дописывает страницу. Фильтров у списка нет, поэтому заново он не
+  // начинается — только с возвратом курсора к первой странице.
+  const [rows, setRows] = useCursorPagedRows<AdminSubscriptionRow>(initialRows, {
+    cursor: searchParams?.get("subCursor") ?? null,
+    resetKey: "",
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [target, setTarget] = useState<AdminSubscriptionRow | null>(null);
   const toast = useToast();

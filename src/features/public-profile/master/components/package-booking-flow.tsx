@@ -28,6 +28,10 @@ import { fetchRetryingDuplicates } from "@/lib/http/idempotent-retry";
 
 const T = UI_TEXT.publicProfile.packageBooking;
 
+function newIdempotencyKey(): string {
+  return typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`;
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -103,9 +107,7 @@ export function PackageBookingFlow({
   const viewerTz = useViewerTimeZoneContext();
   // LOGIC-09: ключ идемпотентности живёт весь визард — повтор сабмита обязан
   // вернуть тот же пакет, а не «это время занято».
-  const idempotencyKeyRef = useRef<string>(
-    typeof crypto !== "undefined" ? crypto.randomUUID() : `pkg-${Date.now()}`,
-  );
+  const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
 
   const [phase, setPhase] = useState<Phase>("build");
   const [placements, setPlacements] = useState<Record<string, Placement>>({});
@@ -318,6 +320,10 @@ export function PackageBookingFlow({
       });
       setManageUrl(created?.manageUrl ?? null);
       setPhase("success");
+      // UX-PASS-01: пакет создан — следующий визард с этой же кнопки уже
+      // другой запрос. С прежним ключом сервер 10 минут отдавал бы кэш этого
+      // пакета («Готово» без новой записи). Обрыв сети ключ не меняет.
+      idempotencyKeyRef.current = newIdempotencyKey();
     } catch (error) {
       if (!(error instanceof ApiClientError)) {
         setError(T.networkError);
@@ -347,6 +353,11 @@ export function PackageBookingFlow({
       {phase === "build" ? (
         <div className="space-y-4" data-testid="package-wizard">
           <p className="text-sm text-text-sec">{T.buildHint}</p>
+          {/* UX-PASS-01: у выбранных услуг время салона — метка зоны и тут,
+              а не только в сетке активной услуги и на шаге проверки. */}
+          {zoneLabel ? (
+            <p className="font-mono text-xs text-accent-text">{zoneLabel}</p>
+          ) : null}
 
           <ol className="space-y-2">
             {components.map((component, index) => {
@@ -535,39 +546,32 @@ export function PackageBookingFlow({
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {T.back}
           </Button>
-          {!me ? (
-            <>
-              <label className="block text-sm">
-                <FieldLabel tone="muted" className="text-sm font-normal">{T.nameLabel}</FieldLabel>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={T.namePlaceholder}
-                />
-                {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
-                <span className="mt-1 block text-xs text-text-sec">
-                  {UI_TEXT.common.ownNameHint}
-                </span>
-              </label>
-              <label className="block text-sm">
-                <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder={T.phonePlaceholder}
-                  inputMode="tel"
-                />
-              </label>
-            </>
-          ) : (
+          {/* UX-PASS-01: у вошедшего без имени в профиле (VK/Яндекс/почта)
+              раньше была только плашка «Записываюсь как » с пустым именем, а
+              проверка требовала имя — запись падала на «Укажите имя» без
+              поля, куда его ввести. Поле — всем, у кого имени нет. */}
+          {me?.displayName?.trim() ? (
             <div className="rounded-xl border border-border-subtle bg-bg-input/60 px-3 py-2 text-sm text-text-sec">
-              {T.bookingAs.replace("{name}", me.displayName ?? name)}
+              {T.bookingAs.replace("{name}", me.displayName.trim())}
             </div>
+          ) : (
+            <label className="block text-sm">
+              <FieldLabel tone="muted" className="text-sm font-normal">{T.nameLabel}</FieldLabel>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={T.namePlaceholder}
+              />
+              {/* FIX-NAME-HINT: общий ключ на все поверхности записи. */}
+              <span className="mt-1 block text-xs text-text-sec">
+                {UI_TEXT.common.ownNameHint}
+              </span>
+            </label>
           )}
           {/* BOOKING-AUTH-NO-PHONE-01: вошедший без телефона в профиле. Раньше
               поле рендерилось только гостю, а проверка требовала номер —
               запись падала на «Проверьте телефон» без поля, куда его ввести. */}
-          {me && !me.phone ? (
+          {!me?.phone ? (
             <label className="block text-sm">
               <FieldLabel tone="muted" className="text-sm font-normal">{T.phoneLabel}</FieldLabel>
               <Input

@@ -1,4 +1,3 @@
-import { BookingStatus } from "@prisma/client";
 import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionUser } from "@/lib/auth/session";
@@ -12,19 +11,18 @@ import {
   loadStudioMasterOptions,
 } from "@/features/studio-cabinet/bookings/server/bookings-kpis.service";
 import { listStudioBookings } from "@/features/studio-cabinet/bookings/server/bookings-list.service";
+import { STUDIO_BOOKING_STATUS_GROUPS } from "@/features/studio-cabinet/bookings/lib/status-groups";
 
 export const runtime = "nodejs";
 
 const ROUTE = "GET /api/cabinet/studio/bookings";
 
-/** Группы статусов журнала: сохранённые статусы, которые попадают в фильтр. */
-const STATUS_GROUPS = {
-  awaiting: [BookingStatus.NEW, BookingStatus.PENDING, BookingStatus.CHANGE_REQUESTED],
-  confirmed: [BookingStatus.CONFIRMED, BookingStatus.PREPAID, BookingStatus.STARTED, BookingStatus.IN_PROGRESS],
-  finished: [BookingStatus.FINISHED],
-  cancelled: [BookingStatus.REJECTED, BookingStatus.CANCELLED],
-  no_show: [BookingStatus.NO_SHOW],
-} as const satisfies Record<string, readonly BookingStatus[]>;
+/**
+ * Группы статусов журнала: сохранённые статусы, которые попадают в фильтр.
+ * UX-PASS-01: те же группы — у фильтра веб-журнала, источник один
+ * (`studio-cabinet/bookings/lib/status-groups.ts`).
+ */
+const STATUS_GROUPS = STUDIO_BOOKING_STATUS_GROUPS;
 
 const querySchema = z.object({
   range: z.enum(["today", "tomorrow", "week", "all"]).default("today"),

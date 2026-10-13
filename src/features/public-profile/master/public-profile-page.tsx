@@ -67,25 +67,25 @@ export async function PublicMasterProfilePage({
 
         <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
           <div className="min-w-0 space-y-8">
-            <div id="services" className="scroll-mt-24">
+            <div id="services" className="scroll-mt-[calc(var(--topbar-h)+3.5rem)]">
               <Suspense fallback={<ServicesSkeleton />}>
                 <ServicesSection providerId={providerId} />
               </Suspense>
             </div>
 
-            <div id="portfolio" className="scroll-mt-24">
+            <div id="portfolio" className="scroll-mt-[calc(var(--topbar-h)+3.5rem)]">
               <Suspense fallback={<PortfolioSkeleton />}>
                 <PortfolioSection providerId={providerId} />
               </Suspense>
             </div>
 
-            <div id="reviews" className="scroll-mt-24">
+            <div id="reviews" className="scroll-mt-[calc(var(--topbar-h)+3.5rem)]">
               <Suspense fallback={<ReviewsSkeleton />}>
                 <ReviewsSection providerId={providerId} />
               </Suspense>
             </div>
 
-            <div id="about" className="scroll-mt-24">
+            <div id="about" className="scroll-mt-[calc(var(--topbar-h)+3.5rem)]">
               <Suspense
                 fallback={
                   <div className="h-32 animate-pulse rounded-2xl bg-bg-card/60" />
@@ -105,8 +105,9 @@ export async function PublicMasterProfilePage({
           </div>
 
           {/* Запись идёт в окне, здесь только короткая карточка — без своей
-              прокрутки, иначе обёртка срезала её тень. */}
-          <div id="booking" className="h-fit lg:sticky lg:top-20">
+              прокрутки, иначе обёртка срезала её тень. UX-PASS-01: липнет
+              ниже шапки сайта и полосы вкладок (обе липкие). */}
+          <div id="booking" className="h-fit lg:sticky lg:top-[calc(var(--topbar-h)+4rem)]">
             {isOwner ? (
               <OwnerProfileNotice />
             ) : (

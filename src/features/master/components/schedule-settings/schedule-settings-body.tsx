@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Tabs, type TabItem } from "@/components/ui/tabs";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
@@ -62,6 +62,12 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [revision, setRevision] = useState(0);
   const [calendarBrush, setCalendarBrush] = useState<string | null>(null);
+  // UX-PASS-01: вкладки «Перерывы», «Правила», «Видимость» поднимают сюда
+  // сохранённый срез. Без пересоздания (`revision`): открытая вкладка держит
+  // свой черновик, а свежий снапшот нужен ей при следующем монтировании.
+  const patchSnapshot = useCallback((patch: Partial<ScheduleEditorSnapshot>) => {
+    setSnapshot((prev) => ({ ...prev, ...patch }));
+  }, []);
   const endpoint = useScheduleEndpoint();
   const studioProfile = useIsStudioProfileSchedule();
   const pathname = usePathname();
@@ -124,11 +130,15 @@ export function ScheduleSettingsBody({ initialSnapshot, hotSlotsAllowed, studioA
             requestMode={studioProfile}
           />
         ) : active === "breaks" ? (
-          <BreaksTab initialSnapshot={snapshot} />
+          <BreaksTab initialSnapshot={snapshot} onSnapshotPatch={patchSnapshot} />
         ) : active === "rules" ? (
-          <RulesTab initialSnapshot={snapshot} hotSlotsAllowed={hotSlotsAllowed} />
+          <RulesTab
+            initialSnapshot={snapshot}
+            hotSlotsAllowed={hotSlotsAllowed}
+            onSnapshotPatch={patchSnapshot}
+          />
         ) : (
-          <VisibilityTab initialSnapshot={snapshot} />
+          <VisibilityTab initialSnapshot={snapshot} onSnapshotPatch={patchSnapshot} />
         )}
       </div>
     </div>

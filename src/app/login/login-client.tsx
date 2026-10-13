@@ -209,7 +209,9 @@ export default function LoginClient({
   const emailValid = isEmailValid(email);
   const inputValid = mode === "phone" ? phoneValid : emailValid;
 
-  // Lock body scroll on desktop only (left panel is fixed-height there)
+  // Lock body scroll on desktop only (left panel is fixed-height there).
+  // UX-PASS-01: прокручивается сама сцена (`lg:overflow-y-auto`), а не
+  // страница под ней — поэтому блокировка `body` остаётся.
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
     const previousOverflow = document.body.style.overflow;
@@ -531,14 +533,17 @@ export default function LoginClient({
   // `py-6` / `md:py-10` обёртки `AppShellContent`. На ПК — прежняя
   // фиксированная сцена во всю высоту под шапкой.
   return (
-    <div className="bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-sticky lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-hidden">
+    // UX-PASS-01: сцена ПК прокручивается по вертикали. С `overflow-hidden` на
+    // невысоком экране (ноутбук 1366×650, масштаб 125%) шаг с кодом и
+    // согласиями обрезался снизу — кнопку входа было не достать.
+    <div className="bg-bg-page lg:fixed lg:left-0 lg:right-0 lg:top-[var(--topbar-h)] lg:z-sticky lg:h-[calc(100dvh-var(--topbar-h))] lg:overflow-y-auto">
       {/* LOGIN-WOW-01 — `lg:items-center`, not `items-stretch`: the brand pane
           is capped at `max-h-[760px]`, and a stretch item that cannot stretch
           falls back to START alignment. On any viewport taller than the cap
           that parked the pane at the top of the row with dead space beneath it,
           while the form column centred itself — which is exactly the
           off-centre reading. Centring the row aligns both columns on one axis. */}
-      <div className="mx-auto grid min-h-[calc(100dvh-var(--topbar-h)-3rem)] w-full max-w-6xl gap-8 px-1 md:min-h-[calc(100dvh-var(--topbar-h)-5rem)] lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-10 lg:px-4 lg:py-8">
+      <div className="mx-auto grid min-h-[calc(100dvh-var(--topbar-h)-3rem)] w-full max-w-6xl gap-8 px-1 md:min-h-[calc(100dvh-var(--topbar-h)-5rem)] lg:min-h-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-10 lg:px-4 lg:py-8">
 
         {/* ── LEFT PANEL — brand stage (desktop only) ── */}
         <LoginShowcase heroImageUrl={heroImageUrl} stats={stats} />
@@ -546,8 +551,11 @@ export default function LoginClient({
         {/* ── RIGHT PANEL — form ── */}
         {/* `lg:overflow-hidden` clips the decorative halo to this pane on desktop
             (where the layout is fixed-height); on mobile there is no clip and no
-            halo, so a tall form step can never be cut off. */}
-        <main className="relative flex min-h-0 flex-col lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
+            halo, so a tall form step can never be cut off.
+            UX-PASS-01: колонка растягивается на строку сетки (не ниже своего
+            содержимого), а форма центрируется `my-auto`, а не `justify-center`:
+            центрирование флексом при нехватке высоты уводило верх формы за край. */}
+        <main className="relative flex min-h-0 flex-col lg:items-center lg:self-stretch lg:overflow-hidden">
           <div className="login-halo hidden lg:block" aria-hidden />
           {/* Deliberately NOT wrapped in an entrance animation. A framer
               `initial` is serialised into the SSR HTML as `opacity:0`, so an
@@ -556,7 +564,7 @@ export default function LoginClient({
               first impression for a blank screen. The form's motion language
               is interaction-driven instead: step transitions, the panel
               reveal, the CTA shine and the OTP choreography. */}
-          <div className="relative z-1 mx-auto flex w-full max-w-[400px] flex-1 flex-col lg:flex-none">
+          <div className="relative z-1 mx-auto flex w-full max-w-[400px] flex-1 flex-col lg:my-auto lg:flex-none">
 
             {/* Mobile brand row — logo + live-stat chip. The brand stage itself
                 stays desktop-only (it is decorative and would push the form

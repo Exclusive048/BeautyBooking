@@ -67,13 +67,18 @@ export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
   const groups = uniqueGroups(data);
   const lastPage = data && data.length > 0 ? data[data.length - 1] : null;
   const isReachingEnd = Boolean(lastPage && lastPage.nextCursor === null);
+  // UX-PASS-01: после отказа следующей страницы `data[size - 1]` так и
+  // остаётся пустым — без `!error` ряд заглушек пульсировал вечно, а
+  // подгрузка при прокрутке больше не запускалась.
   const isLoadingMore =
-    Boolean(isLoading) ||
-    (size > 0 && data !== undefined && typeof data[size - 1] === "undefined");
+    !error &&
+    (Boolean(isLoading) ||
+      (size > 0 && data !== undefined && typeof data[size - 1] === "undefined"));
 
-  // Infinite scroll
+  // Infinite scroll — пока висит отказ, страницы не добавляем: повтор
+  // идёт кнопкой в плашке.
   useEffect(() => {
-    if (!sentinelRef.current || isReachingEnd) return;
+    if (!sentinelRef.current || isReachingEnd || error) return;
     const node = sentinelRef.current;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -85,12 +90,27 @@ export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [isLoadingMore, isReachingEnd, setSize]);
+  }, [isLoadingMore, isReachingEnd, error, setSize]);
 
   const isInitialLoading = isLoading && !data;
   const isEmpty = !isInitialLoading && !error && groups.length === 0;
 
   const T = UI_TEXT.homeFeed;
+
+  const errorNotice = (
+    <div
+      role="alert"
+      className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-warning-border bg-warning-surface p-4 text-sm text-warning-text"
+    >
+      <div>
+        <p className="font-medium">{T.error.title}</p>
+        <p className="mt-0.5 text-xs opacity-80">{T.error.description}</p>
+      </div>
+      <Button variant="ghost" size="sm" onClick={() => void mutate()}>
+        {T.error.retry}
+      </Button>
+    </div>
+  );
 
   return (
     <StoriesViewerProvider>
@@ -100,20 +120,8 @@ export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
 
       <RecentMastersSection />
 
-      {error && !isInitialLoading ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-warning-border bg-warning-surface p-4 text-sm text-warning-text"
-        >
-          <div>
-            <p className="font-medium">{T.error.title}</p>
-            <p className="mt-0.5 text-xs opacity-80">{T.error.description}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => void mutate()}>
-            {T.error.retry}
-          </Button>
-        </div>
-      ) : null}
+      {/* Не загрузилась первая страница — плашка над лентой. */}
+      {error && !isInitialLoading && groups.length === 0 ? errorNotice : null}
 
       {isInitialLoading ? <FeedCollageSkeleton count={columns * 3} columns={columns} /> : null}
 
@@ -133,6 +141,10 @@ export function HomeFeed({ isAuthenticated }: HomeFeedProps) {
         // HOME-FEED-COLLAGE: коллаж плиток-групп; 3 колонки на телефоне, 6 на ПК.
         <FeedCollage groups={groups} columns={columns} isAuthenticated={isAuthenticated} />
       ) : null}
+
+      {/* UX-PASS-01: не загрузилась следующая страница — плашка там, где
+          человек и смотрит, внизу ленты, а не над ней. */}
+      {error && groups.length > 0 ? errorNotice : null}
 
       {/* Loading next page — one row of skeletons */}
       {!isInitialLoading && isLoadingMore && !isReachingEnd ? (

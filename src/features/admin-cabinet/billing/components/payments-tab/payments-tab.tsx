@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { BillingTabEmpty } from "@/features/admin-cabinet/billing/components/billing-tab-empty";
 import { PaymentTableRow } from "@/features/admin-cabinet/billing/components/payments-tab/payment-row";
 import { RefundPaymentDialog } from "@/features/admin-cabinet/billing/components/payments-tab/refund-payment-dialog";
+import {
+  useCursorPagedRows,
+  useServerRows,
+} from "@/features/admin-cabinet/lib/server-rows";
 import { cn } from "@/lib/cn";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -36,8 +40,13 @@ export function PaymentsTab({
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [pending, setPending] = useState<AdminPaymentRow[]>(initialPending);
-  const [history, setHistory] = useState<AdminPaymentRow[]>(initialHistory);
+  // UX-PASS-01: строки — из ответа сервера. «Ожидают» приходят целиком при
+  // каждом ответе, история — постранично: `?payCursor=` дописывает страницу.
+  const [pending, setPending] = useServerRows<AdminPaymentRow>(initialPending);
+  const [history, setHistory] = useCursorPagedRows<AdminPaymentRow>(initialHistory, {
+    cursor: searchParams?.get("payCursor") ?? null,
+    resetKey: "",
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [target, setTarget] = useState<AdminPaymentRow | null>(null);
   const toast = useToast();

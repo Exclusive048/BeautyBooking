@@ -7,17 +7,10 @@ import { TaskRow, type TaskUrgency } from "@/features/master/components/dashboar
 import { workContextLabel } from "@/features/master/components/work-context-badge";
 import type { DashboardData } from "@/lib/master/dashboard.service";
 import { formatLocalHm } from "@/lib/schedule/timezone";
+import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.cabinetMaster.dashboard.attention;
-
-function pluralizeTasks(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "задача";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "задачи";
-  return "задач";
-}
 
 type TaskItem = {
   key: string;
@@ -37,12 +30,16 @@ function buildTasks(
 ): TaskItem[] {
   const tasks: TaskItem[] = [];
 
+  // UX-PASS-01: ждущие решения записи — не только сегодняшние (ближайшие
+  // будущие), поэтому время без даты читалось как «сегодня в 14:30». Дата и
+  // время — по часам салона (rule 17, salon-tz).
+  const formatWhen = (value: Date) => UI_FMT.date(value, "dayMonthShortTime", { timeZone: timezone });
   for (const pb of data.pendingBookings) {
-    const when = pb.startAtUtc ? formatLocalHm(pb.startAtUtc, timezone) : "";
+    const when = pb.startAtUtc ? formatWhen(pb.startAtUtc) : "";
     // RESCHEDULE-CURRENT-TIME: у запроса переноса АКТУАЛЬНОЕ время — то, что
     // просит клиент; прежнее показывается рядом, иначе мастер читал первую
     // дату как текущую (клиент записался и тут же перенёс).
-    const proposed = pb.proposedStartAt ? formatLocalHm(pb.proposedStartAt, timezone) : "";
+    const proposed = pb.proposedStartAt ? formatWhen(pb.proposedStartAt) : "";
     const whenText = proposed && when ? `${when} → ${proposed}` : proposed || when;
     tasks.push({
       key: `pending-${pb.id}`,
@@ -143,9 +140,7 @@ export function AttentionSection({
           <h2 className="font-display text-lg text-text-main">{T.title}</h2>
           {hasTasks ? (
             <p className="mt-0.5 text-xs text-text-sec">
-              {T.subtitleTemplate
-                .replace("{count}", String(tasks.length))
-                .replace("{plural}", pluralizeTasks(tasks.length))}
+              {T.subtitle(tasks.length)}
             </p>
           ) : null}
         </div>

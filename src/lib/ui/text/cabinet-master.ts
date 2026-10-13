@@ -1656,7 +1656,9 @@ export const cabinetMaster = {
     },
     bookings: {
       title: "Ближайшие записи",
-      subtitleTemplate: "Сегодня · ещё {count} {plural}",
+      subtitle: (count: number, totalToday: number) =>
+        `Сегодня · ещё ${count} ${pluralize(count, "запись", "записи", "записей")}` +
+        (totalToday > 0 ? ` из ${totalToday}` : ""),
       seeAll: "Все записи",
       emptyTitle: "На сегодня записей нет",
       emptyDescription: "Можно поправить расписание или добавить запись вручную.",
@@ -1678,7 +1680,7 @@ export const cabinetMaster = {
     },
     attention: {
       title: "Требуют внимания",
-      subtitleTemplate: "{count} {plural}",
+      subtitle: (count: number) => `${count} ${pluralize(count, "задача", "задачи", "задач")}`,
       sortLabel: "Сортировка: важность",
       emptyTitle: "Всё под контролем",
       emptyDescription:
@@ -1711,6 +1713,9 @@ export const cabinetMaster = {
       blockTimeSub: "Перерыв или выходной",
       sharePublic: "Поделиться профилем",
       sharePublicSub: "Ссылка для соцсетей",
+      // UX-PASS-01: копирование ссылки было молчаливым — итог теперь тостом.
+      shareCopied: "Ссылка на профиль скопирована",
+      shareCopyFailed: "Не удалось скопировать ссылку. Попробуйте ещё раз.",
       invitePeople: "Пригласить клиента",
       invitePeopleSub: "По телефону или ссылке",
       addPortfolio: "Добавить в портфолио",

@@ -548,7 +548,7 @@ function DayCell({
       data-requested={requested ? "true" : undefined}
       onClick={onClick}
       className={cn(
-        "relative flex min-h-11 flex-col items-start justify-between rounded-lg p-1 text-left text-xs transition-opacity sm:min-h-16 sm:p-1.5",
+        "relative flex min-h-11 min-w-0 flex-col items-start justify-between rounded-lg p-1 text-left text-xs transition-opacity sm:min-h-16 sm:p-1.5",
         day.isWorking
           ? template
             ? DAY_COLOR_FILL[template.color]
@@ -560,16 +560,20 @@ function DayCell({
         pending && "opacity-70",
       )}
     >
-      <span className="flex w-full items-start justify-between gap-1">
+      {/* UX-PASS-01: на 375 px клетка ~36 px — число, два значка, точка и счётчик
+          записей вылезали за её край. Верхняя строка обрезается, а значки
+          заявки и студии на телефоне скрыты (они есть в подписи клетки и в
+          шторке дня); число и счётчик записей видны всегда. */}
+      <span className="flex w-full min-w-0 items-start justify-between gap-1 overflow-hidden">
         <span className={cn("font-medium", day.isWorking ? "text-text-main" : "text-text-sec")}>{number}</span>
-        <span className="flex shrink-0 items-center gap-0.5">
-          {requested ? <Hourglass aria-hidden className="h-3 w-3 text-info-text" /> : null}
-          {studioDay ? <Building2 aria-hidden className="h-3 w-3 text-text-sec" /> : null}
-          {day.painted ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent-text" /> : null}
+        <span className="flex min-w-0 items-center gap-0.5">
+          {requested ? <Hourglass aria-hidden className="hidden h-3 w-3 shrink-0 text-info-text sm:block" /> : null}
+          {studioDay ? <Building2 aria-hidden className="hidden h-3 w-3 shrink-0 text-text-sec sm:block" /> : null}
+          {day.painted ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent-text" /> : null}
           {day.bookings > 0 ? (
             <span
               aria-hidden
-              className="rounded-full bg-bg-card px-1 text-3xs font-medium leading-4 text-text-main"
+              className="shrink-0 rounded-full bg-bg-card px-1 text-3xs font-medium leading-4 text-text-main"
             >
               {day.bookings}
             </span>

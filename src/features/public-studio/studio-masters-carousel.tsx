@@ -26,13 +26,6 @@ type PortfolioFeedItem = {
   mediaUrl: string;
 };
 
-type MasterExtra = {
-  avatarUrl: string | null;
-  specialization: string | null;
-  grade: string;
-  portfolioThumbs: string[];
-};
-
 type Props = {
   studio: { id: string; publicUsername: string | null };
   masters: StudioMasterCard[];
@@ -47,17 +40,20 @@ function gradeLabel(rating: number, reviews: number): string {
 }
 
 export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
-  const [extras, setExtras] = useState<Record<string, MasterExtra>>({});
+  // UX-PASS-01: догружаются только миниатюры работ. Лицо, описание и
+  // рейтинг приходят со списком команды — раньше и они ждали самого
+  // медленного запроса портфолио, и до того карточки показывали инициалы
+  // и «Новый» даже у мастеров с рейтингом.
+  const [thumbs, setThumbs] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     if (masters.length === 0) return;
     let cancelled = false;
 
     async function load() {
-      // STUDIO-MASTER-PROFILES (этап 4): лицо, описание и рейтинг профиля в
-      // студии приходят со списком команды — отдельный запрос профиля отдавал
-      // бы 404 (у профиля в студии нет публичной страницы). Миниатюры — работы
-      // с личной страницы мастера, если она открыта.
+      // STUDIO-MASTER-PROFILES (этап 4): миниатюры — работы с личной
+      // страницы мастера, если она открыта (у профиля в студии публичной
+      // страницы нет).
       const entries = await Promise.all(
         masters.map(async (master) => {
           const portfolioOwner = master.portfolioProviderId ?? null;
@@ -71,19 +67,12 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
                 .catch(() => [] as PortfolioFeedItem[])
             : [];
 
-          const value: MasterExtra = {
-            avatarUrl: master.avatarUrl ?? null,
-            specialization: master.tagline?.trim() || null,
-            grade: gradeLabel(master.ratingAvg ?? 0, master.ratingCount ?? 0),
-            portfolioThumbs: portfolio.slice(0, 3).map((item) => item.mediaUrl),
-          };
-
-          return [master.id, value] as const;
+          return [master.id, portfolio.slice(0, 3).map((item) => item.mediaUrl)] as const;
         })
       );
 
       if (cancelled) return;
-      setExtras(Object.fromEntries(entries));
+      setThumbs(Object.fromEntries(entries));
     }
 
     void load();
@@ -95,17 +84,14 @@ export function StudioMastersCarousel({ studio, masters, hideBooking }: Props) {
   const hasMasters = masters.length > 0;
   const masterCards = useMemo(
     () =>
-      masters.map((master) => {
-        const extra = extras[master.id];
-        return {
-          ...master,
-          avatarUrl: extra?.avatarUrl ?? null,
-          specialization: extra?.specialization ?? null,
-          grade: extra?.grade ?? UI_TEXT.publicStudio.gradeNew,
-          thumbs: extra?.portfolioThumbs ?? [],
-        };
-      }),
-    [extras, masters]
+      masters.map((master) => ({
+        ...master,
+        avatarUrl: master.avatarUrl ?? null,
+        specialization: master.tagline?.trim() || null,
+        grade: gradeLabel(master.ratingAvg ?? 0, master.ratingCount ?? 0),
+        thumbs: thumbs[master.id] ?? [],
+      })),
+    [thumbs, masters]
   );
 
   if (!hasMasters) {

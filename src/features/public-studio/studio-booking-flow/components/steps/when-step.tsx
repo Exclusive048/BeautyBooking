@@ -1,13 +1,13 @@
 "use client";
 
 import { ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import * as UI_TEXT from "@/lib/ui/text";
 import { formatZoneLabel, zonesDifferForViewer } from "@/lib/ui/zone-label";
 import type { SlotItem } from "@/features/booking/lib/studio-booking";
-import { todayKey, buildDateBounds } from "@/features/booking/lib/studio-booking";
+import { buildDateBounds } from "@/features/booking/lib/studio-booking";
 import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
 import { addDaysToDateKey } from "@/lib/schedule/dateKey";
 import { getLocalTimeParts, toLocalDateKey } from "@/lib/schedule/timezone";
@@ -82,6 +82,12 @@ type Props = {
    */
   horizonDays: number;
   onBack: () => void;
+  /**
+   * UX-PASS-01: окошки не загрузились — показываем причину и «Повторить»,
+   * а не «свободных окошек нет».
+   */
+  error?: string | null;
+  onRetry?: () => void;
 };
 
 export function WhenStep({
@@ -97,6 +103,8 @@ export function WhenStep({
   isAnyMaster,
   horizonDays,
   onBack,
+  error = null,
+  onRetry,
 }: Props) {
   const daysAhead = Math.max(1, Math.min(horizonDays || SCHEDULE_HORIZON_DAYS, SCHEDULE_HORIZON_DAYS));
   const strip = useMemo(() => buildStrip(daysAhead, salonTimeZone), [daysAhead, salonTimeZone]);
@@ -123,6 +131,20 @@ export function WhenStep({
 
   // Salon-tz «(город, GMT+N)» label — shown when the viewer's zone differs from
   // the salon's, so a cross-tz client reads the salon-local clock correctly.
+  // UX-PASS-01: выбранный день — в поле зрения полосы. При возврате на шаг
+  // (с «Вы», после отказа) полоса открывалась с «Сегодня», и выбранный
+  // 20-й день оставался где-то справа за краем.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = stripRef.current;
+    const cell = scroller?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (!scroller || !cell) return;
+    const box = scroller.getBoundingClientRect();
+    const rect = cell.getBoundingClientRect();
+    if (rect.left >= box.left && rect.right <= box.right) return;
+    scroller.scrollLeft += rect.left - box.left - (box.width - rect.width) / 2;
+  }, [selectedDate]);
+
   const zoneLabel =
     slots.length > 0 &&
     zonesDifferForViewer({ iso: slots[0]!.startAtUtc, salonTimeZone, viewerTimeZone })
@@ -151,7 +173,7 @@ export function WhenStep({
         </Button>
       </header>
 
-      <div className="-mx-1 overflow-x-auto">
+      <div ref={stripRef} className="-mx-1 overflow-x-auto">
         <ul className="flex min-w-full snap-x snap-mandatory gap-2 px-1 pb-1">
           {strip.map((cell) => {
             const isSelected = cell.dateKey === selectedDate;
@@ -194,6 +216,18 @@ export function WhenStep({
             <div key={idx} className="h-9 animate-pulse rounded-lg bg-muted/60" />
           ))}
         </div>
+      ) : error && slots.length === 0 ? (
+        <div
+          role="alert"
+          className="space-y-3 rounded-xl border border-danger-border bg-danger-surface p-6 text-center text-sm text-danger-text"
+        >
+          <p>{error}</p>
+          {onRetry ? (
+            <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
+              {UI_TEXT.bookingWidget.whenStep.retry}
+            </Button>
+          ) : null}
+        </div>
       ) : slots.length === 0 ? (
         <div className="rounded-xl border border-border-subtle bg-muted/40 p-8 text-center text-sm text-text-muted">
           {UI_TEXT.bookingWidget.whenStep.noSlots}
@@ -232,7 +266,6 @@ export function WhenStep({
         </div>
       )}
 
-      <p className="sr-only">{todayKey(salonTimeZone)}</p>
     </section>
   );
 }

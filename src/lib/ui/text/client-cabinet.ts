@@ -298,6 +298,12 @@ export const clientCabinet = {
       modalDescription: "Введите адрес — мы отправим 6-значный код.",
       emailLabel: "Email",
       sendCode: "Отправить код",
+      // UX-PASS-01: строки модалки, которые жили в разметке.
+      sending: "Отправляем…",
+      codeSentTo: "Код отправлен на",
+      checkSpam: "Проверьте почту и папку «Спам».",
+      changeEmail: "Изменить email",
+      verifying: "Проверяем…",
       codeLabel: "Код из письма",
       codeHint: "Письмо приходит за 1–2 минуты.",
       resendIn: (sec: number) => `Отправить снова через ${sec} с`,

@@ -36,6 +36,8 @@ type Props = {
   serviceDurationMin: number;
   selectedDateKey: string | null;
   selectedSlot: BookingFlowSlot | null;
+  /** Пояс салона — для метки зоны в итоге (UX-PASS-01). */
+  providerTimezone: string;
 
   // Form values
   clientName: string;
@@ -89,6 +91,7 @@ export function FormPhase({
   serviceDurationMin,
   selectedDateKey,
   selectedSlot,
+  providerTimezone,
   clientName,
   clientPhone,
   comment,
@@ -113,7 +116,6 @@ export function FormPhase({
   onBack,
   onSubmit,
 }: Props) {
-  const silentLabelId = useId();
   const referencePhotoId = useId();
   const isAuthPhone = Boolean(me?.phone);
   const hasName = clientName.trim().length > 0;
@@ -201,7 +203,9 @@ export function FormPhase({
         <Switch
           checked={silentMode}
           onCheckedChange={onChangeSilentMode}
-          aria-labelledby={silentLabelId}
+          // UX-PASS-01: `aria-labelledby` ссылался на id, которого нет ни у
+          // одного элемента; имя переключателю даёт `aria-label` (заголовок
+          // рядом несёт смайлик — читать его вслух незачем).
           aria-label={TB.silentModeAria}
           className="mt-0.5 shrink-0"
         />
@@ -294,6 +298,7 @@ export function FormPhase({
         serviceDurationMin={serviceDurationMin}
         slot={selectedSlot}
         dateKey={selectedDateKey}
+        timeZone={providerTimezone}
       />
 
       {/* RKN-FIX-02 — directly above the CTA, so the act of consenting and the

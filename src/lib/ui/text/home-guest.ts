@@ -1,3 +1,5 @@
+import { pluralize } from "@/lib/utils/pluralize";
+
 export const homeGuest = {
   eyebrow: "Мастера красоты рядом",
   // FIX-EXP-CONTENT-GRAMMAR (EXP-008): stat counts all published providers
@@ -10,7 +12,11 @@ export const homeGuest = {
     "Маникюр, брови, ресницы, стрижка — выберите услугу, удобное время и мастера в вашем районе",
   searchPlaceholder: "Какая услуга?",
   searchCta: "Найти мастера",
-  statsBookings: "завершённых записей",
+  // UX-PASS-01: число в статистике героя — со склонением («1 услуга»,
+  // «2 услуги»); раньше было «1 услуг», а слово «услуг» жило в разметке.
+  statsBookings: (count: number) =>
+    pluralize(count, "завершённая запись", "завершённые записи", "завершённых записей"),
+  statsServices: (count: number) => pluralize(count, "услуга", "услуги", "услуг"),
   howItWorks: {
     title: "Как это",
     titleAccent: "работает",
