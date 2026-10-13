@@ -6,6 +6,7 @@ import { useId, useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModalSurface } from "@/components/ui/modal-surface";
+import { ResilientImage } from "@/components/ui/resilient-image";
 import { useConfirm } from "@/hooks/use-confirm";
 import { fetchJson, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import type {
@@ -208,12 +209,13 @@ export function EditItemModal({
             <p className="eyebrow">
               {T.photoLabel}
             </p>
-            <div className="aspect-square overflow-hidden rounded-xl border border-border-subtle bg-bg-input">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.mediaUrl}
+            {/* PORTFOLIO-CROP-01: кадр работы — вырез по сохранённой области, 4:5. */}
+            <div className="relative aspect-[4/5] overflow-hidden rounded-xl border border-border-subtle bg-bg-input">
+              <ResilientImage
+                src={item.displayUrl}
                 alt={T.photoAlt}
-                className="h-full w-full object-cover"
+                sizes="180px"
+                className="object-cover"
               />
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -330,6 +332,7 @@ export function EditItemModal({
           onClose={() => setCropOpen(false)}
           assetId={item.mediaAssetId}
           imageUrl={item.mediaUrl}
+          initialCrop={item.crop}
         />
       ) : null}
       {confirmModal}

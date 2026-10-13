@@ -273,7 +273,7 @@ export function UploadModal({ open, onClose, providerId, categories }: Props) {
                   src={entry.previewUrl}
                   alt={T.previewAltTemplate.replace("{name}", entry.file.name)}
                   className={cn(
-                    "aspect-square w-full rounded-xl border border-border-subtle object-cover",
+                    "aspect-[4/5] w-full rounded-xl border border-border-subtle object-cover",
                     entry.errorCode && "opacity-50"
                   )}
                 />

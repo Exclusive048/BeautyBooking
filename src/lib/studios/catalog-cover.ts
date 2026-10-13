@@ -1,9 +1,10 @@
 import { MediaAssetStatus, MediaEntityType, MediaKind } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { findHiddenPortfolioAssetIds } from "@/lib/media/service";
-import { buildMediaFileUrl } from "@/lib/media/types";
+import { buildMediaDisplayUrl, buildMediaFileUrl } from "@/lib/media/types";
 import { prisma } from "@/lib/prisma";
 import { isStudioPortfolioAsset } from "@/lib/studios/banner";
+import { studioBannerSettingKey } from "@/lib/studios/portfolio-items-sync";
 
 /**
  * CATALOG-MAIN-PHOTO — главное фото студии в карточке каталога.
@@ -62,7 +63,7 @@ export async function loadStudioCardPhotos(studioProviderIds: string[]): Promise
 
   const [covers, assets] = await Promise.all([
     prisma.appSetting.findMany({
-      where: { key: { in: ids.map(coverSettingKey) } },
+      where: { key: { in: [...ids.map(coverSettingKey), ...ids.map(studioBannerSettingKey)] } },
       select: { key: true, value: true },
     }),
     prisma.mediaAsset.findMany({
@@ -74,14 +75,17 @@ export async function loadStudioCardPhotos(studioProviderIds: string[]): Promise
         status: MediaAssetStatus.READY,
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true, entityId: true },
+      select: { id: true, entityId: true, cropX: true, cropY: true, cropWidth: true, cropHeight: true },
     }),
   ]);
 
   const coverByStudio = new Map<string, string>();
+  const bannerAssetIds = new Set<string>();
   for (const id of ids) {
     const cover = covers.find((row) => row.key === coverSettingKey(id));
     if (cover?.value) coverByStudio.set(id, cover.value);
+    const banner = covers.find((row) => row.key === studioBannerSettingKey(id));
+    if (banner?.value) bannerAssetIds.add(banner.value);
   }
 
   // До проверки видимости — только то, что попадёт в карточку: главное и
@@ -95,10 +99,23 @@ export async function loadStudioCardPhotos(studioProviderIds: string[]): Promise
     candidatesByStudio.set(asset.entityId, list);
   }
 
+  const assetById = new Map(assets.map((asset) => [asset.id, asset]));
   const hidden = await findHiddenPortfolioAssetIds([...candidatesByStudio.values()].flat());
   for (const [studioId, candidates] of candidatesByStudio) {
     const visible = candidates.filter((assetId) => !hidden.has(assetId)).slice(0, STUDIO_CARD_OWN_PHOTOS);
-    if (visible.length > 0) result.set(studioId, visible.map(buildMediaFileUrl));
+    // PORTFOLIO-CROP-01: фото — так, как их обрезал администратор студии
+    // (работа — 4:5, как плитка карточки). У баннера вырез 16:9 — кадр шапки
+    // страницы; в плитке 4:5 от него осталась бы середина, поэтому баннер
+    // идёт исходником, как и в «Фото» на странице студии.
+    if (visible.length > 0) {
+      result.set(
+        studioId,
+        visible.map((assetId) => {
+          const asset = assetById.get(assetId);
+          return asset && !bannerAssetIds.has(assetId) ? buildMediaDisplayUrl(asset) : buildMediaFileUrl(assetId);
+        }),
+      );
+    }
   }
   return result;
 }

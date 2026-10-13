@@ -54,7 +54,7 @@ export function PortfolioReadonlySection({ data }: Props) {
     >
       <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {data.items.map((item, index) => (
-          <li key={item.id} className="aspect-square">
+          <li key={item.id} className="aspect-[4/5]">
             <Link
               href="/cabinet/master/portfolio"
               className="relative block h-full w-full overflow-hidden rounded-xl bg-bg-input transition-shadow hover:shadow-card"

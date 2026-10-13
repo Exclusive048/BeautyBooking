@@ -44,7 +44,10 @@ export type MediaAssetDto = {
   mimeType: string;
   sizeBytes: number;
   originalFilename: string;
+  /** Исходник — для редактора обрезки. */
   url: string;
+  /** Для показа: вырез по сохранённой области, без неё — исходник. */
+  displayUrl: string;
   cropX: number | null;
   cropY: number | null;
   cropWidth: number | null;
@@ -66,6 +69,17 @@ export function buildMediaFileUrl(assetId: string): string {
   return `/api/media/file/${assetId}`;
 }
 
+/**
+ * Id ассета из ссылки на исходник — относительной (`/api/media/file/{id}`) или
+ * абсолютной на тот же путь, с необязательной query-строкой. Ссылка выреза
+ * (`…/crop/{v}`) и любая другая форма дают `null`.
+ */
+const MEDIA_FILE_URL_PATTERN = /^(?:https?:\/\/[^/]+)?\/api\/media\/file\/([A-Za-z0-9_-]+)\/?(?:[?#].*)?$/;
+
+export function parseMediaFileAssetId(url: string): string | null {
+  return MEDIA_FILE_URL_PATTERN.exec(url.trim())?.[1] ?? null;
+}
+
 export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
   return {
     id: asset.id,
@@ -76,6 +90,7 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     sizeBytes: asset.sizeBytes,
     originalFilename: asset.originalFilename,
     url: buildMediaFileUrl(asset.id),
+    displayUrl: buildMediaDisplayUrl(asset),
     cropX: asset.cropX ?? null,
     cropY: asset.cropY ?? null,
     cropWidth: asset.cropWidth ?? null,
@@ -108,15 +123,18 @@ export function cropVersionToken(crop: CropFields): string {
 }
 
 /**
- * CROP-PUBLIC-01 — ссылка, по которой аватар показывают ВНЕ редактора
- * (`Provider.avatarUrl`, логотип сайта): при сохранённой области — вырезанная
- * сервером картинка (`/api/media/file/[id]/crop/[v]`), иначе исходник.
+ * CROP-PUBLIC-01 / PORTFOLIO-CROP-01 — ссылка, по которой фото показывают ВНЕ
+ * редактора: при сохранённой области — вырезанная сервером картинка
+ * (`/api/media/file/[id]/crop/[v]`), иначе исходник. Аватар (`Provider.avatarUrl`,
+ * логотип сайта) хранит её готовой; фото портфолио — нет: `PortfolioItem.mediaUrl`
+ * остаётся ссылкой на исходник (по ней работа связана с файлом), а ссылку для
+ * показа выводит `portfolio-display.ts` на чтении.
  *
  * До этого область хранилась, но снаружи редактора её не применял никто:
  * профиль мастера, карточка каталога, страница студии и шапка брали голую
  * ссылку на файл и показывали центр фото, а не выбранный кадр.
  */
-export function buildAvatarDisplayUrl(asset: { id: string } & CropFields): string {
+export function buildMediaDisplayUrl(asset: { id: string } & CropFields): string {
   const base = buildMediaFileUrl(asset.id);
   return assetHasCrop(asset) ? `${base}/crop/${cropVersionToken(asset)}` : base;
 }

@@ -4,6 +4,7 @@ import { decodePublicId, encodePublicId } from "@/lib/public-id";
 import { Prisma } from "@prisma/client";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
 
 /**
  * FEED-UNPUBLISHED-MASTER (2026-09-15). Лента портфолио на главной для
@@ -407,9 +408,14 @@ export async function listPortfolioFeed(input: {
 
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, -1) : rows;
-  const visualReadyByUrl = await buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl));
   // FEED-PORTFOLIO-N1-FIX-A: single batched lookup replaces per-row masterServices include.
-  const overrides = await loadMasterServiceOverridesMap(collectMasterServicePairs(pageRows));
+  // PORTFOLIO-CROP-01: `mediaUrl` в ответе — работа так, как её обрезал автор;
+  // хранимая ссылка на исходник остаётся ключом для готовности к поиску.
+  const [visualReadyByUrl, overrides, displayUrl] = await Promise.all([
+    buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl)),
+    loadMasterServiceOverridesMap(collectMasterServicePairs(pageRows)),
+    loadPortfolioDisplayUrls(pageRows.map((row) => row.mediaUrl)),
+  ]);
 
   const items = pageRows.map((row) => {
     const snapshot = buildPortfolioSnapshot({
@@ -419,7 +425,7 @@ export async function listPortfolioFeed(input: {
     });
     return {
       id: encodePublicId(row.id),
-      mediaUrl: row.mediaUrl,
+      mediaUrl: displayUrl(row.mediaUrl),
       visualSearchReady: visualReadyByUrl.get(row.mediaUrl) === true,
       caption: row.caption ?? null,
       width: row.width ?? null,
@@ -533,9 +539,14 @@ export async function listHomePortfolioFeed(input: {
 
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, -1) : rows;
-  const visualReadyByUrl = await buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl));
   // FEED-PORTFOLIO-N1-FIX-A: single batched lookup replaces per-row masterServices include.
-  const overrides = await loadMasterServiceOverridesMap(collectMasterServicePairs(pageRows));
+  // PORTFOLIO-CROP-01: `mediaUrl` в ответе — работа так, как её обрезал автор;
+  // хранимая ссылка на исходник остаётся ключом для готовности к поиску.
+  const [visualReadyByUrl, overrides, displayUrl] = await Promise.all([
+    buildVisualSearchReadyMapByUrl(pageRows.map((row) => row.mediaUrl)),
+    loadMasterServiceOverridesMap(collectMasterServicePairs(pageRows)),
+    loadPortfolioDisplayUrls(pageRows.map((row) => row.mediaUrl)),
+  ]);
 
   const items = pageRows.map((row) => {
     const snapshot = buildPortfolioSnapshot({
@@ -545,7 +556,7 @@ export async function listHomePortfolioFeed(input: {
     });
     return {
       id: encodePublicId(row.id),
-      mediaUrl: row.mediaUrl,
+      mediaUrl: displayUrl(row.mediaUrl),
       visualSearchReady: visualReadyByUrl.get(row.mediaUrl) === true,
       caption: row.caption ?? null,
       width: row.width ?? null,
@@ -670,9 +681,11 @@ export async function getPortfolioDetail(
   });
 
   // FEED-PORTFOLIO-N1-FIX-A: single batched lookup for similar items.
-  const similarOverrides = await loadMasterServiceOverridesMap(
-    collectMasterServicePairs(similarRows),
-  );
+  // PORTFOLIO-CROP-01: работы — так, как их обрезали авторы.
+  const [similarOverrides, displayUrl] = await Promise.all([
+    loadMasterServiceOverridesMap(collectMasterServicePairs(similarRows)),
+    loadPortfolioDisplayUrls([item.mediaUrl, ...similarRows.map((similar) => similar.mediaUrl)]),
+  ]);
 
   const similarItems = similarRows.map((similar) => {
     const similarSnapshot = buildPortfolioSnapshot({
@@ -682,7 +695,7 @@ export async function getPortfolioDetail(
     });
     return {
       id: encodePublicId(similar.id),
-      mediaUrl: similar.mediaUrl,
+      mediaUrl: displayUrl(similar.mediaUrl),
       masterName: similar.master.name,
       totalPrice: similarSnapshot.totalPrice,
     };
@@ -690,7 +703,7 @@ export async function getPortfolioDetail(
 
   return {
     id: encodePublicId(item.id),
-    mediaUrl: item.mediaUrl,
+    mediaUrl: displayUrl(item.mediaUrl),
     visualSearchReady: visualReadyByUrl.get(item.mediaUrl) === true,
     caption: item.caption ?? null,
     width: item.width ?? null,

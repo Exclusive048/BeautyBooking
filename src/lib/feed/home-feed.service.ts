@@ -16,6 +16,7 @@ import {
   type FeedWorkStamp,
   type UploadGroup,
 } from "@/lib/feed/upload-window";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
 
 /**
  * HOME-FEED-COLLAGE — лента главной в виде коллажа: одна плитка = группа
@@ -189,7 +190,11 @@ export async function listHomeFeedGroups(input: {
       : Promise.resolve([]),
   ]);
 
-  const overrides = await loadMasterServiceOverridesMap(collectMasterServicePairs(rows));
+  // PORTFOLIO-CROP-01: работа — так, как её обрезал автор.
+  const [overrides, displayUrl] = await Promise.all([
+    loadMasterServiceOverridesMap(collectMasterServicePairs(rows)),
+    loadPortfolioDisplayUrls(rows.map((row) => row.mediaUrl)),
+  ]);
   const rowById = new Map(rows.map((row) => [row.id, row]));
   const favoritedAuthors = new Set(favorites.map((favorite) => favorite.providerId));
 
@@ -217,7 +222,7 @@ export async function listHomeFeedGroups(input: {
         });
         return {
           id: encodePublicId(row.id),
-          mediaUrl: row.mediaUrl,
+          mediaUrl: displayUrl(row.mediaUrl),
           caption: row.caption ?? null,
           performerName: row.performer?.name ?? null,
           primaryServiceTitle: snapshot.primaryServiceTitle,

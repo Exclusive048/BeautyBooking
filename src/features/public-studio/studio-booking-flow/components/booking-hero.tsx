@@ -28,7 +28,6 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
 
   const visibleMasters = masters.slice(0, 6);
   const rest = masters.length - visibleMasters.length;
-  const crop = studio.bannerCrop;
 
   const initialsTile = (
     <span className="flex h-full w-full items-center justify-center font-display text-3xl font-semibold text-primary">
@@ -52,27 +51,23 @@ export function BookingHero({ studio, masters, prefilledMaster, backHref }: Prop
       </Link>
       <div className="relative overflow-hidden rounded-2xl border border-border-subtle bg-bg-card shadow-sm">
       {/* STUDIO-BOOKING-BANNER (2026-09-24): баннер, загруженный в кабинете,
-          а не декоративная полоса. На телефоне бокс 16:9 — те же пропорции,
-          что у рамки кроппера; шире — фиксированная высота, и кадр наводится
-          на центр выбранной области (`focal`: точная подгонка исказила бы
-          картинку в боксе других пропорций). Без баннера — прежняя полоса. */}
+          а не декоративная полоса. Показывается вырез по выбранной области
+          (PORTFOLIO-CROP-01): на телефоне бокс 16:9 — вырез встаёт целиком;
+          шире — фиксированная высота (16:9 во всю колонку отодвинул бы запись
+          на полэкрана), и видна середина выреза. Без баннера — прежняя полоса. */}
       <div
         className={cn(
           "relative bg-brand-gradient",
-          studio.bannerUrl ? "aspect-[16/9] sm:aspect-auto sm:h-60" : "h-28 sm:h-32",
+          studio.bannerDisplayUrl ? "aspect-[16/9] sm:aspect-auto sm:h-60" : "h-28 sm:h-32",
         )}
       >
-        {studio.bannerUrl ? (
+        {studio.bannerDisplayUrl ? (
           <>
             <ResilientImage
-              src={studio.bannerUrl}
+              src={studio.bannerDisplayUrl}
               alt=""
               sizes="(min-width: 1024px) 800px, 100vw"
               priority
-              cropX={crop?.x}
-              cropY={crop?.y}
-              cropWidth={crop?.width}
-              cropHeight={crop?.height}
               className="object-cover"
             />
             {/* Скрим сверху: чипы адреса и рейтинга читаются на любом фото. */}

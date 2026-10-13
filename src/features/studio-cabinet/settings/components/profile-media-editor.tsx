@@ -9,6 +9,8 @@ import { StickySaveBar } from "@/features/studio-cabinet/components/sticky-save-
 import { StudioProfileForm } from "@/features/studio-cabinet/components/studio-profile-form";
 import { StudioProfileHero } from "@/features/studio-cabinet/components/studio-profile-hero";
 import { useAddressWithGeocode } from "@/lib/maps/use-address-with-geocode";
+import type { CropArea } from "@/lib/media/crop-geometry";
+import { buildMediaDisplayUrl } from "@/lib/media/types";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import { SOCIAL_FIELD, SOCIAL_KINDS, type SocialKind } from "@/lib/providers/social-links";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -61,6 +63,8 @@ type StudioProfileData = {
     isPublished: boolean;
     bannerAssetId: string | null;
     bannerUrl: string | null;
+    bannerDisplayUrl: string | null;
+    bannerCrop: CropArea | null;
   };
 };
 
@@ -110,11 +114,21 @@ export function ProfileMediaEditor({ providerId }: Props) {
     handleAddressChange,
   } = useAddressWithGeocode();
 
+  // PORTFOLIO-CROP-01: исходник — редактору обрезки, вырез — шапке кабинета.
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [bannerDisplayUrl, setBannerDisplayUrl] = useState<string | null>(null);
+  const [bannerCrop, setBannerCrop] = useState<CropArea | null>(null);
   const [bannerAssetId, setBannerAssetId] = useState<string | null>(null);
   const [pickingBannerFocal, setPickingBannerFocal] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const savedTimeoutRef = useRef<number | null>(null);
+
+  const applyBanner = useCallback((studio: StudioProfileData["studio"]) => {
+    setBannerUrl(studio.bannerUrl);
+    setBannerDisplayUrl(studio.bannerDisplayUrl ?? studio.bannerUrl);
+    setBannerCrop(studio.bannerCrop ?? null);
+    setBannerAssetId(studio.bannerAssetId ?? null);
+  }, []);
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -147,15 +161,14 @@ export function ProfileMediaEditor({ providerId }: Props) {
         max: studio.socialMax ?? "",
       });
       setIsPublished(studio.isPublished);
-      setBannerUrl(studio.bannerUrl);
-      setBannerAssetId(studio.bannerAssetId ?? null);
+      applyBanner(studio);
       setTimezone(studio.timezone || null);
     } catch (err) {
       setError(serverMessageOr(err, t.loadFailed));
     } finally {
       setLoading(false);
     }
-  }, [providerId, setAddressSnapshot, t.loadFailed]);
+  }, [applyBanner, providerId, setAddressSnapshot, t.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -251,8 +264,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bannerAssetId: uploaded.asset.id }),
       });
-      setBannerUrl(saved.studio.bannerUrl);
-      setBannerAssetId(saved.studio.bannerAssetId ?? null);
+      applyBanner(saved.studio);
       setPickingBannerFocal(true);
       markSaved();
     } catch (err) {
@@ -273,8 +285,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bannerAssetId: null }),
       });
-      setBannerUrl(saved.studio.bannerUrl);
-      setBannerAssetId(saved.studio.bannerAssetId ?? null);
+      applyBanner(saved.studio);
       setPickingBannerFocal(false);
       markSaved();
     } catch (err) {
@@ -322,7 +333,7 @@ export function ProfileMediaEditor({ providerId }: Props) {
       {/* SETUP-GUIDE-01: шаг «Профиль студии» подсвечивает шапку. */}
       <div data-guide="profile" className="rounded-2xl">
         <StudioProfileHero
-          bannerUrl={bannerUrl}
+          bannerUrl={bannerDisplayUrl}
           avatar={avatarNode}
           studioName={name}
           subtitle={UI_TEXT.studio.profile.subtitle}
@@ -379,13 +390,25 @@ export function ProfileMediaEditor({ providerId }: Props) {
           onClose={() => setPickingBannerFocal(false)}
           title={UI_TEXT.media.crop.titleBanner}
         >
+          {/* Окно открывается на сохранённой области; после «Применить»
+              меняется только баннер — несохранённые поля формы остаются
+              (раньше обрезка перезагружала весь профиль). */}
           <CropPicker
+            key={bannerDisplayUrl ?? bannerAssetId}
             assetId={bannerAssetId!}
             imageUrl={bannerUrl!}
             shape="rect"
             aspectRatio={16 / 9}
-            onSave={async () => {
-              await load();
+            initialCropX={bannerCrop?.x}
+            initialCropY={bannerCrop?.y}
+            initialCropWidth={bannerCrop?.width}
+            initialCropHeight={bannerCrop?.height}
+            onSave={(cropX, cropY, cropWidth, cropHeight) => {
+              const crop = { x: cropX, y: cropY, width: cropWidth, height: cropHeight };
+              setBannerCrop(crop);
+              setBannerDisplayUrl(
+                buildMediaDisplayUrl({ id: bannerAssetId!, cropX, cropY, cropWidth, cropHeight }),
+              );
               setPickingBannerFocal(false);
             }}
             onSkip={() => setPickingBannerFocal(false)}

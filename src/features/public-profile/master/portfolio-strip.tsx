@@ -62,7 +62,7 @@ export function PortfolioStrip({ items }: Props) {
                 size="none"
                 onClick={() => setViewerIndex(index)}
                 aria-label={UI_TEXT.publicProfile.portfolio.openWork.replace("{title}", workAlt(item))}
-                className={`group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 hover:shadow-card ${HOVER_LIFT}`}
+                className={`group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/60 hover:shadow-card ${HOVER_LIFT}`}
               >
                 <ResilientImage
                   src={item.mediaUrl}

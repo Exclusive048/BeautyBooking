@@ -7,7 +7,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { getRequestId, logError } from "@/lib/logging/logger";
 import { ensureCanReadMedia } from "@/lib/media/access";
 import { toCropArea } from "@/lib/media/crop-geometry";
-import { renderCroppedImage } from "@/lib/media/crop-render";
+import { cropMaxSideForKind, renderCroppedImage } from "@/lib/media/crop-render";
+import { MEDIA_PREVIEW_QUERY_PARAM, parseMediaPreviewWidth } from "@/lib/media/preview-variants";
 import { mediaAssetIdParamSchema } from "@/lib/media/schemas";
 import { isProviderMediaPubliclyVisible } from "@/lib/media/service";
 import { getStorageProvider } from "@/lib/media/storage";
@@ -15,7 +16,7 @@ import {
   isStorageUnavailableError,
   storageUnavailableHeaders,
 } from "@/lib/media/storage/unavailable";
-import { buildAvatarDisplayUrl, cropVersionToken } from "@/lib/media/types";
+import { buildMediaDisplayUrl, cropVersionToken } from "@/lib/media/types";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -34,6 +35,9 @@ export const runtime = "nodejs";
  * доверяют, поэтому подставить произвольные координаты нельзя. Устаревшая
  * версия (область с тех пор поменяли) уводит редиректом на актуальную ссылку,
  * а не отдаёт новый вырез под старым адресом, закэшированным как `immutable`.
+ *
+ * PORTFOLIO-CROP-01: тем же роутом показываются обрезанные работы портфолио
+ * (мастера и студии) — потолок стороны у них свой (`cropMaxSideForKind`).
  */
 const PUBLIC_MEDIA_KINDS = new Set<MediaKind>([MediaKind.PORTFOLIO, MediaKind.AVATAR]);
 const PUBLIC_MEDIA_ENTITY_TYPES = new Set<MediaEntityType>([
@@ -79,10 +83,17 @@ export async function GET(req: Request, ctx: RouteContext) {
       return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
     }
 
+    // MOBILE-B1 / PORTFOLIO-CROP-01: `?w=` — та же ширина превью, что у
+    // исходника; мусорное значение даёт полный вырез, не 400.
+    const width = parseMediaPreviewWidth(new URL(req.url).searchParams.get(MEDIA_PREVIEW_QUERY_PARAM));
+
     const area = toCropArea(asset.cropX, asset.cropY, asset.cropWidth, asset.cropHeight);
     if (!area || params.v !== cropVersionToken(asset)) {
-      // Области нет или она уже другая — ведём на то, что актуально сейчас.
-      return NextResponse.redirect(new URL(buildAvatarDisplayUrl(asset), req.url), {
+      // Области нет или она уже другая — ведём на то, что актуально сейчас
+      // (с той же шириной: исходник её тоже понимает).
+      const target = new URL(buildMediaDisplayUrl(asset), req.url);
+      if (width) target.searchParams.set(MEDIA_PREVIEW_QUERY_PARAM, String(width));
+      return NextResponse.redirect(target, {
         status: 307,
         headers: { "Cache-Control": "no-store" },
       });
@@ -101,7 +112,12 @@ export async function GET(req: Request, ctx: RouteContext) {
     if (!file) {
       return jsonFail(404, "Файл не найден.", "MEDIA_ASSET_NOT_FOUND");
     }
-    const cropped = await renderCroppedImage(await streamToBuffer(file.stream), area);
+    const cropped = await renderCroppedImage(
+      await streamToBuffer(file.stream),
+      area,
+      cropMaxSideForKind(asset.kind),
+      width ?? undefined,
+    );
 
     return new NextResponse(new Uint8Array(cropped), {
       status: 200,

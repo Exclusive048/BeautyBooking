@@ -56,6 +56,7 @@ export function StudioSettingsPage({ data, section }: Props) {
             <PortfolioSection
               providerId={data.general.providerId}
               catalogCoverAssetId={data.general.catalogCoverAssetId}
+              bannerAssetId={data.general.bannerAssetId}
             />
           ) : null}
           {effectiveSection === "owner-team" ? <OwnerTeamSection team={data.team} /> : null}

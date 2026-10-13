@@ -5,6 +5,7 @@ import { getRedisConnection, withRedisCommandTimeout } from "@/lib/redis/connect
 import { logError } from "@/lib/logging/logger";
 import { catalogVisibleProviderWhere } from "@/lib/providers/catalog-visibility";
 import { PORTFOLIO_CATEGORY_INCLUDE, publicCategoryTitle } from "@/lib/feed/work-category";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * V2: getActiveStoriesGroups (used by /api/feed/stories)
@@ -127,6 +128,9 @@ async function fetchStoriesFromDb(cityId?: string): Promise<StoriesPayload> {
     orderBy: [{ masterId: "asc" }, { createdAt: "desc" }],
   });
 
+  // PORTFOLIO-CROP-01: работа — так, как её обрезал автор.
+  const displayUrl = await loadPortfolioDisplayUrls(recentItems.map((item) => item.mediaUrl));
+
   const byMaster = new Map<string, StoriesGroup>();
   for (const item of recentItems) {
     let group = byMaster.get(item.masterId);
@@ -146,7 +150,7 @@ async function fetchStoriesFromDb(cityId?: string): Promise<StoriesPayload> {
     const service = item.services[0]?.service;
     group.items.push({
       id: encodePublicId(item.id),
-      mediaUrl: item.mediaUrl,
+      mediaUrl: displayUrl(item.mediaUrl),
       createdAt: item.createdAt.toISOString(),
       performerName: item.performer?.name ?? null,
       serviceTitle: service ? service.title?.trim() || service.name : null,

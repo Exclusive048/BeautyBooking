@@ -52,6 +52,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { SESSION_REFRESHED_REQUEST_HEADER } from "@/lib/api/cache-headers";
+import { cropVersionToken } from "@/lib/media/types";
 import { GET } from "./route";
 
 async function quadrants(): Promise<Buffer> {
@@ -78,8 +79,8 @@ async function quadrants(): Promise<Buffer> {
 const CROP = { cropX: 700 / 1200, cropY: 450 / 800, cropWidth: 300 / 1200, cropHeight: 300 / 800 };
 const TOKEN = "5833-5625-2500-3750";
 
-function call(v: string, headers?: Record<string, string>) {
-  return GET(new Request(`https://example.test/api/media/file/asset1/crop/${v}`, { headers }), {
+function call(v: string, headers?: Record<string, string>, query = "") {
+  return GET(new Request(`https://example.test/api/media/file/asset1/crop/${v}${query}`, { headers }), {
     params: Promise.resolve({ id: "cmasset00000000000000001", v }),
   });
 }
@@ -158,5 +159,40 @@ describe("GET /api/media/file/[id]/crop/[v]", () => {
     const res = await call(TOKEN);
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  describe("PORTFOLIO-CROP-01 — вырез работы портфолио", () => {
+    // Работа 4:5: вся высота исходника, 640 px по ширине слева.
+    const WORK_CROP = { cropX: 0, cropY: 0, cropWidth: 640 / 1200, cropHeight: 1 };
+    const WORK_TOKEN = cropVersionToken(WORK_CROP);
+
+    beforeEach(() => {
+      state.asset = { ...state.asset!, kind: MediaKind.PORTFOLIO, ...WORK_CROP };
+    });
+
+    async function sizeOf(res: Response) {
+      const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+      return [meta.width, meta.height];
+    }
+
+    it("работа не ужимается до потолка аватара (640)", async () => {
+      const res = await call(WORK_TOKEN);
+      expect(res.status).toBe(200);
+      expect(await sizeOf(res)).toEqual([640, 800]);
+    });
+
+    it("`?w=` — превью выреза нужной ширины", async () => {
+      const res = await call(WORK_TOKEN, undefined, "?w=320");
+      expect(res.status).toBe(200);
+      expect(await sizeOf(res)).toEqual([320, 400]);
+    });
+
+    it("редирект устаревшей версии сохраняет ширину превью", async () => {
+      const res = await call("1-2-3-4", undefined, "?w=320");
+      expect(res.status).toBe(307);
+      const location = new URL(res.headers.get("location")!);
+      expect(location.pathname).toBe(`/api/media/file/cmasset00000000000000001/crop/${WORK_TOKEN}`);
+      expect(location.searchParams.get("w")).toBe("320");
+    });
   });
 });

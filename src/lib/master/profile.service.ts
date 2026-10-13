@@ -13,6 +13,7 @@ import { logError } from "@/lib/logging/logger";
 import * as UI_TEXT from "@/lib/ui/text";
 import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
+import { loadPortfolioDisplayUrls } from "@/lib/media/portfolio-display";
 
 export type MasterContext = {
   id: string;
@@ -158,7 +159,10 @@ export type MasterProfileServiceItem = {
 
 export type MasterPortfolioItem = {
   id: string;
+  /** Исходник — редактору обрезки. */
   mediaUrl: string;
+  /** PORTFOLIO-CROP-01: для показа — вырез по сохранённой области. */
+  displayUrl: string;
   caption: string | null;
   serviceIds: string[];
   globalCategoryId: string | null;
@@ -211,6 +215,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
     orderBy: { createdAt: "desc" },
     take: 100,
   });
+  const displayUrl = await loadPortfolioDisplayUrls(portfolio.map((item) => item.mediaUrl));
 
   if (context.isSolo) {
     const services = await prisma.service.findMany({
@@ -276,6 +281,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       portfolio: portfolio.map((item) => ({
         id: item.id,
         mediaUrl: item.mediaUrl,
+        displayUrl: displayUrl(item.mediaUrl),
         caption: item.caption ?? null,
         serviceIds: item.services.map((link) => link.serviceId),
         globalCategoryId: item.globalCategoryId ?? null,
@@ -370,6 +376,7 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
     portfolio: portfolio.map((item) => ({
       id: item.id,
       mediaUrl: item.mediaUrl,
+      displayUrl: displayUrl(item.mediaUrl),
       caption: item.caption ?? null,
       serviceIds: item.services.map((link) => link.serviceId),
       globalCategoryId: item.globalCategoryId ?? null,
@@ -882,11 +889,13 @@ export async function listMasterPortfolio(
     }),
     prisma.portfolioItem.count({ where }),
   ]);
+  const displayUrl = await loadPortfolioDisplayUrls(items.map((item) => item.mediaUrl));
   return {
     total,
     items: items.map((item) => ({
       id: item.id,
       mediaUrl: item.mediaUrl,
+      displayUrl: displayUrl(item.mediaUrl),
       caption: item.caption ?? null,
       serviceIds: item.services.map((link) => link.serviceId),
       globalCategoryId: item.globalCategoryId ?? null,

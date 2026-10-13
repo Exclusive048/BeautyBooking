@@ -1,6 +1,7 @@
 import { MediaEntityType, MediaKind } from "@prisma/client";
 import { AppError } from "@/lib/api/errors";
 import { toCropArea, type CropArea } from "@/lib/media/crop-geometry";
+import { buildMediaDisplayUrl, buildMediaFileUrl } from "@/lib/media/types";
 import { prisma } from "@/lib/prisma";
 import { studioBannerSettingKey } from "@/lib/studios/portfolio-items-sync";
 
@@ -38,19 +39,19 @@ export async function getStudioBannerAssetId(studioProviderId: string): Promise<
 }
 
 export type StudioBanner = {
+  /** Исходник — редактору обрезки. */
   url: string;
   /**
-   * STUDIO-BOOKING-BANNER (2026-09-24): область 16:9, выбранная в кабинете
-   * (`CropPicker`). Отдаётся отдельно от ссылки: полноразмерный баннер нельзя
-   * резать серверным `/crop/{v}` (он ограничен 640 px), поэтому витрина
-   * показывает исходник и наводит кадр на центр области.
+   * PORTFOLIO-CROP-01: для показа — вырез 16:9 по выбранной области
+   * (`/api/media/file/[id]/crop/[v]`), без области — исходник. Раньше витрина
+   * показывала исходник и наводила кадр на центр области: серверный вырез был
+   * ограничен 640 px. Для фото портфолио потолок теперь 2560 px
+   * (`cropMaxSideForKind`), и шапка показывает ровно то, что выбрано.
    */
+  displayUrl: string;
+  /** STUDIO-BOOKING-BANNER (2026-09-24): область 16:9, выбранная в кабинете (`CropPicker`). */
   crop: CropArea | null;
 };
-
-export async function getStudioBannerUrl(studioProviderId: string): Promise<string | null> {
-  return (await getStudioBanner(studioProviderId))?.url ?? null;
-}
 
 export async function getStudioBanner(studioProviderId: string): Promise<StudioBanner | null> {
   const assetId = await getStudioBannerAssetId(studioProviderId);
@@ -81,7 +82,8 @@ export async function getStudioBanner(studioProviderId: string): Promise<StudioB
   }
 
   return {
-    url: `/api/media/file/${asset.id}`,
+    url: buildMediaFileUrl(asset.id),
+    displayUrl: buildMediaDisplayUrl(asset),
     crop: toCropArea(asset.cropX, asset.cropY, asset.cropWidth, asset.cropHeight),
   };
 }

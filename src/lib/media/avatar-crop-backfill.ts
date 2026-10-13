@@ -1,5 +1,5 @@
 import { MediaAssetStatus, MediaEntityType, MediaKind, type PrismaClient } from "@prisma/client";
-import { buildAvatarDisplayUrl } from "@/lib/media/types";
+import { buildMediaDisplayUrl } from "@/lib/media/types";
 
 /**
  * CROP-PUBLIC-01 — `Provider.avatarUrl` → ссылка на вырез по сохранённой
@@ -9,7 +9,7 @@ import { buildAvatarDisplayUrl } from "@/lib/media/types";
  * Выборка: кабинеты мастера/студии, у ТЕКУЩЕГО аватара которых (последний
  * READY — тот же выбор, что в `media/service.ts`) есть область, а `avatarUrl`
  * ещё не равен ожидаемому. Ссылку строит та же функция, что рантайм
- * (`buildAvatarDisplayUrl`). Идемпотентен: повторный проход находит ноль строк,
+ * (`buildMediaDisplayUrl`). Идемпотентен: повторный проход находит ноль строк,
  * поэтому безопасно гонять на каждом деплое (`scripts/post-deploy.ts`).
  */
 export async function backfillAvatarCropUrls(
@@ -49,7 +49,7 @@ export async function backfillAvatarCropUrls(
       where: { id: asset.entityId },
       select: { id: true, avatarUrl: true },
     });
-    const expected = buildAvatarDisplayUrl(asset);
+    const expected = buildMediaDisplayUrl(asset);
     if (!provider || provider.avatarUrl === expected) continue;
 
     changed += 1;

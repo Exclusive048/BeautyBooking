@@ -37,7 +37,7 @@ export function StudioPhotosGrid({ photos }: Props) {
             size="none"
             onClick={() => setViewerIndex(index)}
             aria-label={UI_TEXT.publicStudio.openPhotoAria.replace("{title}", photo.caption ?? photo.alt)}
-            className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input"
+            className="group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border border-border-subtle bg-bg-input"
           >
             <ResilientImage
               src={photo.url}

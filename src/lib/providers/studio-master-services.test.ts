@@ -26,7 +26,7 @@ const resolveProvider = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/prisma", () => ({ prisma: { masterService: { findMany } } }));
 vi.mock("@/lib/providers/resolve-provider", () => ({ resolveProviderBySlugOrId: resolveProvider }));
 vi.mock("@/lib/reviews/badges", () => ({ getProviderSuperpowerBadges: async () => [] }));
-vi.mock("@/lib/studios/banner", () => ({ getStudioBannerUrl: async () => null }));
+vi.mock("@/lib/studios/banner", () => ({ getStudioBanner: async () => null }));
 
 const { getProviderProfile } = await import("@/lib/providers/usecases");
 

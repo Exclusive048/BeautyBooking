@@ -51,15 +51,14 @@ export async function StudioHeroSection({ studioId }: Props) {
     );
   }
 
-  const portfolioItems = portfolio.map((item) => ({
-    url: item.url,
-  }));
-  const bannerItem = studio.bannerUrl
-    ? { url: studio.bannerUrl, crop: studio.bannerCrop }
-    : null;
-  const imageItems = bannerItem
-    ? [bannerItem, ...portfolioItems.filter((item) => item.url !== studio.bannerUrl)]
-    : portfolioItems;
+  // PORTFOLIO-CROP-01: показываем вырезы, выбранные админом студии (баннер —
+  // 16:9, работы — 4:5). Баннер узнаётся по исходнику: он же фото портфолио.
+  const workItems = portfolio
+    .filter((item) => item.url !== studio.bannerUrl)
+    .map((item) => ({ url: item.displayUrl, kind: "work" as const }));
+  const imageItems = studio.bannerDisplayUrl
+    ? [{ url: studio.bannerDisplayUrl, kind: "banner" as const }, ...workItems]
+    : workItems;
 
   const bookingHref = studioBookingUrl(
     { id: studio.id, publicUsername: studio.publicUsername },

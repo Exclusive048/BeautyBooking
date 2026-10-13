@@ -6,6 +6,7 @@ import { getStudioPortfolioCaptions, type StudioPortfolioCaption } from "@/lib/s
 import * as UI_TEXT from "@/lib/ui/text";
 import {
   getStudioPortfolio,
+  getStudioProfile,
 } from "@/features/public-studio/server/studio-query";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import { StudioPhotosGrid, type StudioPhoto } from "@/features/public-studio/components/studio-photos-grid";
@@ -30,13 +31,21 @@ type Props = {
 export async function StudioPhotosSection({ studioId }: Props) {
   let portfolio: MediaAssetDto[] = [];
   let captions = new Map<string, StudioPortfolioCaption>();
+  let bannerUrl: string | null = null;
   let hasError = false;
 
   try {
-    [portfolio, captions] = await Promise.all([getStudioPortfolio(studioId), loadCaptions(studioId)]);
+    const [assets, captionMap, studio] = await Promise.all([
+      getStudioPortfolio(studioId),
+      loadCaptions(studioId),
+      getStudioProfile(studioId),
+    ]);
+    portfolio = assets;
+    captions = captionMap;
+    bannerUrl = studio?.bannerUrl ?? null;
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("photos-section", error, ["listMediaAssets"]);
+    logPublicStudioBlockError("photos-section", error, ["listMediaAssets", "getProviderProfile"]);
   }
 
   if (hasError) {
@@ -52,10 +61,13 @@ export async function StudioPhotosSection({ studioId }: Props) {
   }
 
   // Наружу — ссылка, подпись и alt; id файла клиенту не нужен (он и так в ссылке).
+  // PORTFOLIO-CROP-01: работа — вырез 4:5, выбранный админом. У баннера вырез
+  // 16:9 (кадр шапки), в плитке 4:5 он смотрелся бы полосой — плитка баннера
+  // берёт исходник.
   const photos: StudioPhoto[] = portfolio.map((asset, index) => {
     const caption = captions.get(asset.id);
     return {
-      url: asset.url,
+      url: asset.url === bannerUrl ? asset.url : asset.displayUrl,
       alt: UI_TEXT.publicStudio.photoAltTemplate.replace("{n}", String(index + 1)),
       caption: caption ? formatWorkCaption(caption.performerName, caption.subject) : null,
     };
@@ -71,7 +83,7 @@ export async function StudioPhotosSection({ studioId }: Props) {
             ) : (
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="aspect-square rounded-2xl border border-border-subtle bg-bg-input" />
+                  <div key={i} className="aspect-[4/5] rounded-2xl border border-border-subtle bg-bg-input" />
                 ))}
               </div>
             )}

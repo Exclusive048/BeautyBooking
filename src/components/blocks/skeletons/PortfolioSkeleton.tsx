@@ -8,7 +8,7 @@ export function PortfolioSkeleton() {
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={`portfolio-skeleton-${index}`}
-            className="aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/70"
+            className="aspect-[4/5] overflow-hidden rounded-2xl border border-border-subtle bg-bg-input/70"
           >
             <Skeleton className="h-full w-full rounded-none" />
           </div>
