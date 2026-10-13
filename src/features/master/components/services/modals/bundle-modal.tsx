@@ -18,7 +18,6 @@ import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 import { computeBundlePricing } from "../lib/compute-bundle-pricing";
 import { toKopeks } from "@/lib/money/kopeks";
-import { formatDuration } from "../lib/format";
 import { Select } from "@/components/ui/select";
 import { FieldLabel } from "@/components/ui/field-label";
 import { UI_FMT } from "@/lib/ui/fmt";
@@ -220,7 +219,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
                         />
                         <span className="flex-1 truncate text-text-main">{service.name}</span>
                         <span className="shrink-0 font-mono text-2xs text-text-sec">
-                          {formatDuration(service.durationMin)}
+                          {UI_FMT.durationLabelOrDash(service.durationMin)}
                         </span>
                         <span className="w-20 shrink-0 text-right font-mono text-sm text-text-main">
                           {UI_FMT.priceLabelOrDash(service.price)}
@@ -286,7 +285,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
             <div className="mt-1">
               <PreviewRow
                 label={T.previewDurationLabel}
-                value={formatDuration(pricing.totalDurationMin)}
+                value={UI_FMT.durationLabelOrDash(pricing.totalDurationMin)}
                 muted
               />
             </div>

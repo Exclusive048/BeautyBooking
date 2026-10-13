@@ -516,7 +516,7 @@ function BookingRow({
             isToday={booking.isToday}
           />
           <span className="font-mono text-xs text-text-sec">
-            {formatDuration(booking.durationMin)}
+            {UI_FMT.durationLabel(booking.durationMin)}
           </span>
         </div>
 
@@ -980,9 +980,3 @@ function formatRelativeDateTime(iso: string, timeZone: string): string {
   );
 }
 
-function formatDuration(minutes: number): string {
-  if (minutes <= 60) return `${minutes} мин`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m === 0 ? `${h} ч` : `${h} ч ${m} мин`;
-}

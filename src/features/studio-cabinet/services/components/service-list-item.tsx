@@ -61,7 +61,7 @@ export function ServiceListItem({
         </p>
         <div className="mt-2 flex items-center gap-3 text-2xs text-text-sec">
           <span>
-            {T.durationTemplate.replace("{min}", String(service.durationMin))}
+            {UI_FMT.durationLabel(service.durationMin)}
           </span>
           <span aria-hidden>·</span>
           <span className="font-mono tabular-nums">

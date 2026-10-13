@@ -12,7 +12,6 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { BundleModal } from "./modals/bundle-modal";
 import { ReorderControls } from "./reorder-controls";
 import { RowMenu } from "./row-menu";
-import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +94,7 @@ export function BundleRow({ bundle, allServices }: Props) {
             </span>
           </span>
           <span aria-hidden>·</span>
-          <span>{formatDuration(bundle.totalDurationMin)}</span>
+          <span>{UI_FMT.durationLabelOrDash(bundle.totalDurationMin)}</span>
         </div>
       </div>
 

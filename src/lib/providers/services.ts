@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
 import type { ServiceInput, ServiceRecord, ServiceUpdate } from "@/lib/domain/services";
+import { snapServiceDurationMin } from "@/lib/services/service-duration";
 
 function isPositiveInt(value: number): boolean {
   return Number.isInteger(value) && value > 0;
@@ -9,14 +10,15 @@ function isPositiveInt(value: number): boolean {
 function validateCreate(input: ServiceInput): Result<ServiceInput> {
   const name = input.name.trim();
   if (!name) return { ok: false, status: 400, message: "Укажите название услуги.", code: "NAME_REQUIRED" };
-  if (!isPositiveInt(input.durationMin) || input.durationMin % 5 !== 0) {
-    return { ok: false, status: 400, message: "Длительность должна быть кратна 5 минутам.", code: "DURATION_INVALID" };
+  if (!isPositiveInt(input.durationMin)) {
+    return { ok: false, status: 400, message: "Укажите длительность услуги.", code: "DURATION_INVALID" };
   }
   if (!isPositiveInt(input.price)) {
     return { ok: false, status: 400, message: "Цена должна быть положительным числом.", code: "PRICE_INVALID" };
   }
 
-  return { ok: true, data: { ...input, name } };
+  // SERVICE-DURATION-GRID: длительность — на общей сетке, ввод мимо неё округляется.
+  return { ok: true, data: { ...input, name, durationMin: snapServiceDurationMin(input.durationMin) } };
 }
 
 function validateUpdate(input: ServiceUpdate): Result<ServiceUpdate> {
@@ -26,9 +28,11 @@ function validateUpdate(input: ServiceUpdate): Result<ServiceUpdate> {
     input = { ...input, name };
   }
   if (input.durationMin !== undefined) {
-    if (!isPositiveInt(input.durationMin) || input.durationMin % 5 !== 0) {
-      return { ok: false, status: 400, message: "Длительность должна быть кратна 5 минутам.", code: "DURATION_INVALID" };
+    if (!isPositiveInt(input.durationMin)) {
+      return { ok: false, status: 400, message: "Укажите длительность услуги.", code: "DURATION_INVALID" };
     }
+    // SERVICE-DURATION-GRID: длительность — на общей сетке, ввод мимо неё округляется.
+    input = { ...input, durationMin: snapServiceDurationMin(input.durationMin) };
   }
   if (input.price !== undefined) {
     if (!isPositiveInt(input.price)) {

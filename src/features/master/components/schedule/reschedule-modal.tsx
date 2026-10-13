@@ -362,7 +362,7 @@ export function RescheduleModal({
             </p>
             {context ? (
               <p className="mt-0.5 text-xs text-text-sec">
-                {T.durationLabel.replace("{N}", String(context.durationMin))}
+                {T.durationLabel.replace("{duration}", UI_FMT.durationLabel(context.durationMin))}
               </p>
             ) : null}
           </div>

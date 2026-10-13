@@ -10,7 +10,6 @@ import * as UI_TEXT from "@/lib/ui/text";
 import { ServiceModal } from "./modals/service-modal";
 import { ReorderControls } from "./reorder-controls";
 import { RowMenu } from "./row-menu";
-import { formatDuration } from "./lib/format";
 import { Button } from "@/components/ui/button";
 import { UI_FMT } from "@/lib/ui/fmt";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +54,7 @@ export function ServiceRow({ service, categories, onlinePaymentsAvailable }: Pro
           ) : null}
         </Button>
         <span className="shrink-0 font-mono text-2xs text-text-sec">
-          {formatDuration(service.durationMin)}
+          {UI_FMT.durationLabelOrDash(service.durationMin)}
         </span>
         <span className="w-20 shrink-0 text-right font-mono text-sm font-medium text-text-main">
           {UI_FMT.priceLabelOrDash(service.price)}

@@ -124,7 +124,7 @@ function BookingCard({
 
         <div className="flex items-center gap-1.5 text-text-sec">
           <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          <span>{card.durationMin} мин</span>
+          <span>{UI_FMT.durationLabel(card.durationMin)}</span>
         </div>
 
         {card.address ? (

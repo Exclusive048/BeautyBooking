@@ -175,10 +175,7 @@ export function ServiceStep({
                             <div className="line-clamp-2 break-words text-sm font-semibold">{service.name}</div>
                             <div className="mt-1 text-xs opacity-80">
                               {service.durationMin
-                                ? UI_TEXT.bookingWidget.serviceStep.duration.replace(
-                                    "{min}",
-                                    String(service.durationMin),
-                                  )
+                                ? UI_FMT.durationLabel(service.durationMin)
                                 : ""}
                               {service.durationMin && service.price > 0 ? " · " : ""}
                               {service.price > 0

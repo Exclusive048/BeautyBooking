@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  SERVICE_DURATION_STEP_MIN,
   SERVICE_PRICE_STEP_RUB,
-  snapServiceDuration,
   snapServicePrice,
   snapToStep,
 } from "./service-steps";
@@ -35,17 +33,10 @@ describe("snapToStep", () => {
   });
 });
 
-describe("service field snappers", () => {
+describe("service price snapper", () => {
   it("price steps by 100 ₽ and admits a free service", () => {
     expect(SERVICE_PRICE_STEP_RUB).toBe(100);
     expect(snapServicePrice("1490")).toBe("1500");
     expect(snapServicePrice("0")).toBe("0");
-  });
-
-  it("duration steps by 10 min and never reaches zero", () => {
-    expect(SERVICE_DURATION_STEP_MIN).toBe(10);
-    expect(snapServiceDuration("95")).toBe("100");
-    expect(snapServiceDuration("1")).toBe("10");
-    expect(snapServiceDuration("0")).toBe("10");
   });
 });

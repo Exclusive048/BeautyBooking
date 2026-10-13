@@ -118,7 +118,7 @@ export function PackageCard({ studioId, pkg, pickerServices }: Props) {
             </div>
             <div className="inline-flex items-center gap-1.5 rounded-full bg-bg-card/85 px-2.5 py-1 text-xs text-text-sec">
               <Clock className="h-3 w-3" aria-hidden strokeWidth={1.8} />
-              {T.durationTemplate.replace("{min}", String(pkg.totalDurationMin))}
+              {UI_FMT.durationLabel(pkg.totalDurationMin)}
             </div>
           </div>
         </div>

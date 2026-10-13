@@ -10,6 +10,7 @@ import { FieldLabel } from "@/components/ui/field-label";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
+import { UI_FMT } from "@/lib/ui/fmt";
 import type { ScheduleMasterColumn } from "../../server/types";
 import {
   OperatorSlotPicker,
@@ -217,7 +218,7 @@ export function CreateBookingDialog({
             <option value="">{T.servicePlaceholder}</option>
             {availableServices.map((service) => (
               <option key={service.id} value={service.id}>
-                {service.name} · {service.durationMin} {UI_TEXT.common.minutesShort}
+                {service.name} · {UI_FMT.durationLabel(service.durationMin)}
               </option>
             ))}
           </Select>

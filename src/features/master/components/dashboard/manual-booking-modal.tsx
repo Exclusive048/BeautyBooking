@@ -165,7 +165,7 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
             <option value="">{T.chooseService}</option>
             {services.map((service) => (
               <option key={service.id} value={service.id}>
-                {service.title} • {service.durationMin} {UI_TEXT.common.minutesShort} • {formatRub(service.price)}
+                {service.title} • {UI_FMT.durationLabel(service.durationMin)} • {formatRub(service.price)}
               </option>
             ))}
           </Select>

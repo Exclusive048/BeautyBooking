@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Result } from "@/lib/domain/result";
 import type { MasterServiceOverride } from "@/lib/domain/services";
 import { ProviderType } from "@prisma/client";
+import { snapServiceDurationMin } from "@/lib/services/service-duration";
 
 type MasterServiceRecord = {
   id: string;
@@ -24,14 +25,16 @@ function validateOverride(input: MasterServiceOverride): Result<MasterServiceOve
   }
 
   if (input.durationOverrideMin !== undefined && input.durationOverrideMin !== null) {
-    if (!isPositiveInt(input.durationOverrideMin) || input.durationOverrideMin % 5 !== 0) {
+    if (!isPositiveInt(input.durationOverrideMin)) {
       return {
         ok: false,
         status: 400,
-        message: "Длительность должна быть кратна 5 минутам.",
+        message: "Укажите длительность услуги.",
         code: "DURATION_INVALID",
       };
     }
+    // SERVICE-DURATION-GRID: переопределение длительности — на той же сетке.
+    input = { ...input, durationOverrideMin: snapServiceDurationMin(input.durationOverrideMin) };
   }
 
   return { ok: true, data: input };

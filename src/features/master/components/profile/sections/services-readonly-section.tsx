@@ -3,7 +3,6 @@ import { ChevronRight, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MasterProfileViewData } from "@/lib/master/profile-view.service";
 import * as UI_TEXT from "@/lib/ui/text";
-import { formatMinutes } from "../lib/format";
 import { SectionShell } from "./section-shell";
 import { UI_FMT } from "@/lib/ui/fmt";
 
@@ -75,7 +74,7 @@ export function ServicesReadonlySection({ data }: Props) {
                     >
                       <span className="flex-1 truncate text-text-main">{service.title}</span>
                       <span className="font-mono text-xs text-text-sec">
-                        {formatMinutes(service.durationMin)}
+                        {UI_FMT.durationLabelOrDash(service.durationMin)}
                       </span>
                       <span className="font-mono text-sm font-medium text-text-main">
                         {UI_FMT.priceLabelOrDash(service.price)}

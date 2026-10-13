@@ -57,25 +57,50 @@ describe("UI_FMT.priceLabel — kopeks → rubles formatting", () => {
 describe("UI_FMT.priceDurationLabel — combined", () => {
   it("formats both parts", () => {
     expect(stripSeparators(UI_FMT.priceDurationLabel(350000, 60))).toBe(
-      "3 500 ₽ • 1 ч",
+      "3 500 ₽ • 1 час",
+    );
+    expect(stripSeparators(UI_FMT.priceDurationLabel(350000, 75))).toBe(
+      "3 500 ₽ • 1 час 15 мин",
     );
   });
 });
 
-describe("UI_FMT.durationLabel — minutes (unchanged convention)", () => {
-  it("renders hours when divisible by 60", () => {
-    expect(UI_FMT.durationLabel(60)).toBe("1 ч");
-    expect(UI_FMT.durationLabel(120)).toBe("2 ч");
+/**
+ * SERVICE-DURATION-GRID (решение владельца 2026-10-13): от часа — часами явно,
+ * «1 час 15 мин», а не «75 мин». Число и единица — через неразрывный пробел.
+ */
+describe("UI_FMT.durationLabel — «1 час 15 мин»", () => {
+  const nb = (text: string) => text.replace(/ /g, " ").replace(/ (\d)/g, " $1");
+
+  it("меньше часа — минутами", () => {
+    expect(UI_FMT.durationLabel(15)).toBe(nb("15 мин"));
+    expect(UI_FMT.durationLabel(45)).toBe(nb("45 мин"));
   });
 
-  it("renders minutes otherwise", () => {
-    expect(UI_FMT.durationLabel(45)).toBe("45 мин");
-    expect(UI_FMT.durationLabel(90)).toBe("90 мин");
+  it("ровно часы — часами со склонением", () => {
+    expect(UI_FMT.durationLabel(60)).toBe(nb("1 час"));
+    expect(UI_FMT.durationLabel(120)).toBe(nb("2 часа"));
+    expect(UI_FMT.durationLabel(300)).toBe(nb("5 часов"));
+    expect(UI_FMT.durationLabel(21 * 60)).toBe(nb("21 час"));
   });
 
-  it("returns '0 мин' for zero or negative", () => {
-    expect(UI_FMT.durationLabel(0)).toBe("0 мин");
-    expect(UI_FMT.durationLabel(-10)).toBe("0 мин");
+  it("часы и минуты — оба явно", () => {
+    expect(UI_FMT.durationLabel(75)).toBe(nb("1 час 15 мин"));
+    expect(UI_FMT.durationLabel(90)).toBe(nb("1 час 30 мин"));
+    expect(UI_FMT.durationLabel(150)).toBe(nb("2 часа 30 мин"));
+    expect(UI_FMT.durationLabel(110)).toBe(nb("1 час 50 мин"));
+  });
+
+  it("число и единица не разъезжаются по строкам", () => {
+    expect(UI_FMT.durationLabel(75)).toBe("1 час 15 мин");
+  });
+
+  it("ноль и отрицательное — «0 мин», в варианте OrDash — прочерк", () => {
+    expect(UI_FMT.durationLabel(0)).toBe(nb("0 мин"));
+    expect(UI_FMT.durationLabel(-10)).toBe(nb("0 мин"));
+    expect(UI_FMT.durationLabelOrDash(0)).toBe("—");
+    expect(UI_FMT.durationLabelOrDash(null)).toBe("—");
+    expect(UI_FMT.durationLabelOrDash(90)).toBe(nb("1 час 30 мин"));
   });
 });
 

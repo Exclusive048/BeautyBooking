@@ -2,6 +2,19 @@ import { z } from "zod";
 import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { isValidTimeZone } from "@/lib/schedule/timezone";
+import { snapServiceDurationMin } from "@/lib/services/service-duration";
+
+/**
+ * SERVICE-DURATION-GRID: длительность услуги (и её переопределение) приводится
+ * к общей сетке — 15 … 120 шагом 15, дальше шагом 30. Ввод мимо сетки
+ * (приложение, старый клиент) не отклоняется, а округляется.
+ */
+const serviceDurationMinSchema = z
+  .number()
+  .int()
+  .min(15)
+  .max(12 * 60)
+  .transform(snapServiceDurationMin);
 
 export const masterDayQuerySchema = z.object({
   date: z.string().trim().min(1),
@@ -82,7 +95,7 @@ export const upsertMasterServicesSchema = z.object({
         serviceId: z.string().trim().min(1),
         isEnabled: z.boolean(),
         onlinePaymentEnabled: z.boolean().optional(),
-        durationOverrideMin: z.number().int().min(15).max(12 * 60).nullable().optional(),
+        durationOverrideMin: serviceDurationMinSchema.nullable().optional(),
         priceOverride: z.number().int().min(0).nullable().optional(),
         globalCategoryId: z.string().trim().min(1).nullable().optional(),
         description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
@@ -94,7 +107,7 @@ export const upsertMasterServicesSchema = z.object({
 export const createMasterServiceSchema = z.object({
   title: z.string().trim().min(1).max(240).superRefine(rejectForbiddenWords("name")),
   price: z.number().int().min(0),
-  durationMin: z.number().int().min(15).max(12 * 60),
+  durationMin: serviceDurationMinSchema,
   // services-category-creation-restore: accept null in addition to
   // undefined — the service modal sends `categoryId || null` and
   // `description.trim() || null`, which previously surfaced as a
@@ -123,7 +136,7 @@ export const updateMasterServiceSchema = z
     name: z.string().trim().min(1).max(240).superRefine(rejectForbiddenWords("name")).optional(),
     title: z.string().trim().max(240).superRefine(rejectForbiddenWords("name")).nullable().optional(),
     description: z.string().trim().max(2000).superRefine(rejectForbiddenWords("text")).nullable().optional(),
-    durationMin: z.number().int().min(15).max(12 * 60).optional(),
+    durationMin: serviceDurationMinSchema.optional(),
     price: z.number().int().min(0).optional(),
     globalCategoryId: z.string().trim().min(1).nullable().optional(),
     isEnabled: z.boolean().optional(),

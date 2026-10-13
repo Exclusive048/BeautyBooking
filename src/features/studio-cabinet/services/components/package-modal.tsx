@@ -220,8 +220,8 @@ export function PackageModal({
                       ) : null}
                     </span>
                     <span className="shrink-0 font-mono text-xs text-text-sec">
-                      {UI_FMT.priceLabel(service.priceKopeks)} · {service.durationMin}{" "}
-                      {T.minShort}
+                      {UI_FMT.priceLabel(service.priceKopeks)} ·{" "}
+                      {UI_FMT.durationLabel(service.durationMin)}
                     </span>
                   </Button>
                 );
@@ -287,8 +287,8 @@ export function PackageModal({
           </div>
           <p className="mt-1 text-2xs text-text-sec">
             {T.previewDurationTemplate.replace(
-              "{min}",
-              String(pricing.totalDurationMin),
+              "{duration}",
+              UI_FMT.durationLabel(pricing.totalDurationMin),
             )}
           </p>
         </div>

@@ -16,15 +16,6 @@ const T = UI_TEXT.models.card;
 // 900 ₽ offer). Display goes through the canonical kopeks→₽ formatter.
 const formatRub = (kopeks: number): string => UI_FMT.priceLabel(kopeks);
 
-function formatDuration(min: number): string {
-  if (min <= 0) return "—";
-  const hours = Math.floor(min / 60);
-  const minutes = min % 60;
-  if (hours === 0) return `${minutes} мин`;
-  if (minutes === 0) return `${hours} ч`;
-  return `${hours} ч ${minutes} мин`;
-}
-
 function formatDateLocal(dateLocal: string): string {
   // dateLocal is "YYYY-MM-DD" — format as "1 мая" / "12 марта"
   const parts = dateLocal.split("-");
@@ -132,17 +123,17 @@ export function OfferCard({ offer }: Props) {
         </div>
         <div className="flex items-center justify-between gap-3">
           <dt className="text-text-sec">{T.durationServiceLabel}</dt>
-          <dd className="text-text-main tabular-nums">{formatDuration(serviceMin)}</dd>
+          <dd className="text-text-main tabular-nums">{UI_FMT.durationLabelOrDash(serviceMin)}</dd>
         </div>
         {showContentRow ? (
           <>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-text-sec">{T.durationContentLabel}</dt>
-              <dd className="text-text-main tabular-nums">~{formatDuration(contentMin)}</dd>
+              <dd className="text-text-main tabular-nums">~{UI_FMT.durationLabelOrDash(contentMin)}</dd>
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-border-subtle/40 pt-1.5 font-medium">
               <dt className="text-text-main">{T.durationTotalLabel}</dt>
-              <dd className="text-text-main tabular-nums">~{formatDuration(totalMin)}</dd>
+              <dd className="text-text-main tabular-nums">~{UI_FMT.durationLabelOrDash(totalMin)}</dd>
             </div>
           </>
         ) : null}

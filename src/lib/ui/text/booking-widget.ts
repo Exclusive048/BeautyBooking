@@ -34,7 +34,6 @@ export const bookingWidget = {
     noServices: "Услуги пока не добавлены",
     noServicesMaster: "У мастера пока нет услуг в этой студии",
     priceOnRequest: "Цена по запросу",
-    duration: "{min} мин",
   },
   masterStep: {
     title: "Кто из мастеров?",

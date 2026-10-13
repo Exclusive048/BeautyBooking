@@ -2,6 +2,7 @@ import { z } from "zod";
 import { rejectForbiddenWords } from "@/lib/moderation/zod";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { normalizeStudioServiceDurationMin, normalizeStudioServicePrice } from "@/lib/studio/service-normalization";
+import { snapServiceDurationMin } from "@/lib/services/service-duration";
 
 export const createStudioBlockSchema = z.object({
   studioId: z.string().trim().min(1),
@@ -176,7 +177,15 @@ export const bulkMasterServicesSchema = z.object({
         // calendar-blowing duration (the cross-tenant reach is closed by the
         // master-scoping above; these keep the values sane for one's own team).
         priceOverride: z.number().int().min(0).nullable().optional(),
-        durationOverrideMin: z.number().int().min(1).max(24 * 60).nullable().optional(),
+        // SERVICE-DURATION-GRID: переопределение длительности — на той же сетке.
+        durationOverrideMin: z
+          .number()
+          .int()
+          .min(1)
+          .max(24 * 60)
+          .transform(snapServiceDurationMin)
+          .nullable()
+          .optional(),
         commissionPct: z.number().min(0).max(100).nullable().optional(),
       })
     )

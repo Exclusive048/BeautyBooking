@@ -178,7 +178,7 @@ export default async function ModelOfferPage({ params }: PageProps) {
                     {UI_TEXT.pages.modelOffer.durationLabel}
                   </span>
                   <span className="font-medium text-foreground">
-                    {offer.service.durationMin} {UI_TEXT.common.minutesShort}
+                    {UI_FMT.durationLabel(offer.service.durationMin)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

@@ -13,8 +13,11 @@ export const common = {
   noLimit: "Без ограничений",
   home: "Главная",
   minutesShort: "мин",
-  minutesShortLetter: "м",
-  hoursShortLetter: "ч",
+  // SERVICE-DURATION-GRID: от часа длительность пишется часами явно —
+  // «1 час 15 мин», «2 часа», «5 часов». Склеивает `UI_FMT.durationLabel`.
+  hourOne: "час",
+  hourFew: "часа",
+  hourMany: "часов",
   currencyRub: "₽",
   // 29.09 доработки · 24 (решение 24.1): сокращения крупных чисел — по-русски
   // везде, «4,2 млн ₽», «12 тыс». Склеивает `UI_FMT.countShort` / `moneyShort`.
