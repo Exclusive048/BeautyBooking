@@ -30,10 +30,6 @@ export const studio = {
     phonePlaceholder: "+7 900 000 00 00",
     emailLabel: "Email",
     emailPlaceholder: "studio@email.com",
-    vkLabel: "VK",
-    vkPlaceholder: "vk.ru/studio",
-    instagramLabel: "Instagram",
-    instagramPlaceholder: "https://instagram.com/username",
   },
   profilePage: {
     loading: "Загружаем профиль студии…",

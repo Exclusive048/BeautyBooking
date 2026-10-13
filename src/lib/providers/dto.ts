@@ -86,6 +86,8 @@ export type ProviderProfileDto = {
   // Rule-12-safe — a social link is public by design (no internal id).
   socialVk: string | null;
   socialInstagram: string | null;
+  socialTelegram: string | null;
+  socialMax: string | null;
   cancellationDeadlineHours: number | null;
   /**
    * Сколько дней вперёд виджет записи показывает в полосе дат

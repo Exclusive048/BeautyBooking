@@ -63,6 +63,8 @@ describe("PATCH /api/studios/{id} — тексты валидации", () => {
     ["contactEmail", "not-an-email"],
     ["socialVk", "x".repeat(201)],
     ["socialInstagram", 7],
+    ["socialTelegram", "x".repeat(201)],
+    ["socialMax", 7],
     ["description", "x".repeat(2001)],
     ["geoLat", "55.7"],
     ["geoLng", "37.6"],

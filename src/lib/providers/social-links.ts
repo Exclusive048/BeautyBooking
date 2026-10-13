@@ -1,11 +1,14 @@
-// FEAT-PROVIDER-SOCIALS — VK + Instagram community links for providers
-// (studios + masters). Free-text community/page links, NOT OAuth account auth.
+// FEAT-PROVIDER-SOCIALS — VK / Instagram / Telegram / MAX community links for
+// providers (studios + masters). Free-text community/page links, NOT OAuth
+// account auth and NOT the Telegram integration (FZ-199 killswitch gates login
+// and delivery; a link to the master's own channel sends nothing anywhere).
 //
 // 🔴 SECURITY: a provider-entered value becomes a PUBLIC clickable href, so it
 // is an XSS/phishing vector. This module is the single normalization boundary:
 // it extracts a validated handle and RECONSTRUCTS the URL from a hardcoded
 // `https://<allowed-host>/` base. Consequences by construction:
-//   - the stored/rendered href can only ever point at vk.ru / instagram.com;
+//   - the stored/rendered href can only ever point at vk.ru / instagram.com /
+//     t.me / max.ru;
 //   - a non-http(s) scheme (`javascript:`, `data:`, …) can never survive;
 //   - a foreign host (`evil.com/…`) is rejected outright.
 // The SAME pure function runs on the server (persist-time validation — the
@@ -14,7 +17,23 @@
 //
 // Client-safe: pure, zero server-only deps (rule 13) — importable anywhere.
 
-export type SocialKind = "vk" | "instagram";
+export type SocialKind = "vk" | "instagram" | "telegram" | "max";
+
+/** Все виды — в порядке показа (кабинеты, публичные иконки). */
+export const SOCIAL_KINDS: readonly SocialKind[] = ["vk", "instagram", "telegram", "max"];
+
+/** Колонка `Provider` (и поле API) для вида ссылки. */
+export const SOCIAL_FIELD = {
+  vk: "socialVk",
+  instagram: "socialInstagram",
+  telegram: "socialTelegram",
+  max: "socialMax",
+} as const satisfies Record<SocialKind, string>;
+
+export type SocialField = (typeof SOCIAL_FIELD)[SocialKind];
+
+/** Значения ссылок провайдера по видам — то, что читают публичные иконки. */
+export type SocialLinkValues = Partial<Record<SocialKind, string | null | undefined>>;
 
 export type SocialNormalizeResult =
   | { status: "empty" }
@@ -32,6 +51,65 @@ const HANDLE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 // `javascript:alert(1)` (no `//`) as a plain token (which then fails HANDLE_RE).
 const EXPLICIT_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
+// SOCIAL-TG-MAX: Telegram username — латиница, цифры, `_`; 5–32 знака, у
+// аукционных (Fragment) бывает 4. Точки и дефиса в нём нет.
+const TELEGRAM_USERNAME_RE = /^[A-Za-z0-9_]{4,32}$/;
+
+// Код приглашения в закрытый канал (Telegram `+…`, MAX `join/…`) и код ссылки
+// на профиль MAX (`u/…`) — base64url, без структурных знаков URL.
+const INVITE_CODE_RE = /^[A-Za-z0-9_-]{8,128}$/;
+
+// Служебные адреса t.me — не каналы: `t.me/share`, `t.me/proxy`… Сохранить их
+// значило бы показать в профиле ссылку, которая открывает не канал мастера.
+const TELEGRAM_RESERVED = new Set([
+  "share",
+  "addstickers",
+  "addemoji",
+  "addtheme",
+  "addlist",
+  "proxy",
+  "socks",
+  "login",
+  "setlanguage",
+  "confirmphone",
+  "invoice",
+  "contact",
+  "boost",
+  "giftcode",
+  "joinchat",
+]);
+
+// Первые сегменты max.ru, за которыми идёт код, а не сам адрес канала.
+const MAX_RESERVED = new Set(["join", "u"]);
+
+/**
+ * Путь ссылки → канонический хвост адреса (без ведущего `/`) либо `null`.
+ * Хвост собирается только из прошедших проверку сегментов, поэтому схемы и
+ * хоста в нём быть не может — их подставляет `base`.
+ */
+type PathRule = (segments: readonly string[]) => string | null;
+
+type SocialConfig = {
+  base: string;
+  hosts: readonly string[];
+  label: string;
+  fromPath: PathRule;
+  /** Голое значение после `@` («durov», «+AbCd…»). */
+  fromToken: (token: string) => string | null;
+};
+
+const firstSegmentHandle: PathRule = ([first]) => (first && HANDLE_RE.test(first) ? first : null);
+const bareHandle = (token: string) => (HANDLE_RE.test(token) ? token : null);
+
+function telegramUsername(value: string | undefined): string | null {
+  if (!value || !TELEGRAM_USERNAME_RE.test(value)) return null;
+  return TELEGRAM_RESERVED.has(value.toLowerCase()) ? null : value;
+}
+
+function telegramInvite(code: string | undefined): string | null {
+  return code && INVITE_CODE_RE.test(code) ? `+${code}` : null;
+}
+
 // FIX-VK-RU-DOMAIN: канонический домен ВКонтакте в РФ — `vk.ru`. Он же —
 // единственная база, из которой реконструируется href (`base`).
 //
@@ -41,16 +119,58 @@ const EXPLICIT_SCHEME_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 // такая строка канонизируется в `vk.ru`). Убрать `vk.com` из `hosts` значило бы
 // отвергать легитимный ввод и ронять `safeSocialHref` на существующих строках,
 // то есть тихо гасить уже сохранённую ссылку на публичном профиле.
-const SOCIAL_CONFIG: Record<SocialKind, { base: string; hosts: readonly string[]; label: string }> = {
+//
+// SOCIAL-TG-MAX: у Telegram и MAX адрес — не только ник. Telegram: открытый
+// канал `t.me/<ник>` (веб-превью `t.me/s/<ник>` и ссылка на пост
+// `t.me/<ник>/123` сводятся к нему же), закрытый — `t.me/+<код>` (старая форма
+// `t.me/joinchat/<код>` сводится к ней). MAX: открытый канал `max.ru/<ник>`,
+// приглашение в закрытый — `max.ru/join/<код>`, ссылка на профиль —
+// `max.ru/u/<код>` (ника у профиля MAX нет). `web.max.ru` в `hosts` нет:
+// адреса веб-версии содержат внутренний номер чата, по ним канал не откроется.
+const SOCIAL_CONFIG: Record<SocialKind, SocialConfig> = {
   vk: {
     base: "https://vk.ru/",
     hosts: ["vk.ru", "www.vk.ru", "m.vk.ru", "vk.com", "www.vk.com", "m.vk.com"],
     label: "vk.ru",
+    fromPath: firstSegmentHandle,
+    fromToken: bareHandle,
   },
   instagram: {
     base: "https://instagram.com/",
     hosts: ["instagram.com", "www.instagram.com", "m.instagram.com"],
     label: "instagram.com",
+    fromPath: firstSegmentHandle,
+    fromToken: bareHandle,
+  },
+  telegram: {
+    base: "https://t.me/",
+    hosts: ["t.me", "www.t.me", "telegram.me", "www.telegram.me"],
+    label: "t.me",
+    fromPath: ([first, second]) => {
+      if (!first) return null;
+      if (first.startsWith("+")) return telegramInvite(first.slice(1));
+      const lower = first.toLowerCase();
+      if (lower === "joinchat") return telegramInvite(second);
+      if (lower === "s") return telegramUsername(second);
+      return telegramUsername(first);
+    },
+    fromToken: (token) =>
+      token.startsWith("+") ? telegramInvite(token.slice(1)) : telegramUsername(token),
+  },
+  max: {
+    base: "https://max.ru/",
+    hosts: ["max.ru", "www.max.ru"],
+    label: "max.ru",
+    fromPath: ([first, second]) => {
+      if (!first) return null;
+      const lower = first.toLowerCase();
+      if (MAX_RESERVED.has(lower)) {
+        return second && INVITE_CODE_RE.test(second) ? `${lower}/${second}` : null;
+      }
+      return HANDLE_RE.test(first) ? first : null;
+    },
+    fromToken: (token) =>
+      HANDLE_RE.test(token) && !MAX_RESERVED.has(token.toLowerCase()) ? token : null,
   },
 };
 
@@ -64,12 +184,14 @@ function stripLeadingAt(value: string): string {
 }
 
 /**
- * Normalize a free-text VK / Instagram input (a full URL — with or without
- * scheme / `www.` / `m.` — OR a bare `@handle` / `handle`) into a canonical,
- * guaranteed-safe `https://<host>/<handle>` URL plus the bare handle.
+ * Normalize a free-text social input (a full URL — with or without scheme /
+ * `www.` / `m.` — OR a bare `@handle` / `handle`) into a canonical,
+ * guaranteed-safe `https://<host>/<path>` URL plus the canonical path.
  *
  * - `{ status: "empty" }`   → blank input; the caller clears the field (null).
- * - `{ status: "ok", url, handle }` → safe canonical link (host + scheme locked).
+ * - `{ status: "ok", url, handle }` → safe canonical link (host + scheme locked);
+ *                             `handle` — canonical path after the host
+ *                             (`durov`, `+AbCd…`, `join/AbCd…`).
  * - `{ status: "invalid" }` → hostile / foreign-host / malformed; the caller
  *                             rejects it (never stores a live href).
  */
@@ -84,7 +206,7 @@ export function normalizeSocialLink(
   const withoutAt = stripLeadingAt(trimmed).trim();
   if (!withoutAt) return { status: "empty" };
 
-  let handle: string;
+  let handle: string | null;
 
   // Anything with a path separator or an explicit scheme is parsed as a URL and
   // its host is validated against the allowlist. A bare token skips URL parsing.
@@ -105,21 +227,21 @@ export function normalizeSocialLink(
     if (!cfg.hosts.includes(parsed.hostname.toLowerCase())) {
       return { status: "invalid" };
     }
-    handle = parsed.pathname.split("/").filter(Boolean)[0] ?? "";
+    handle = cfg.fromPath(parsed.pathname.split("/").filter(Boolean));
   } else {
     // Bare token. A lone allowed-host domain ("vk.ru") carries no handle.
     if (cfg.hosts.includes(withoutAt.toLowerCase())) {
       return { status: "invalid" };
     }
-    handle = withoutAt;
+    handle = cfg.fromToken(withoutAt);
   }
 
-  if (!handle || !HANDLE_RE.test(handle)) {
+  if (!handle) {
     return { status: "invalid" };
   }
 
   // Reconstruct from the hardcoded safe base — the host + scheme are ours, only
-  // the validated handle is user-derived.
+  // the validated path is user-derived.
   return { status: "ok", url: `${cfg.base}${handle}`, handle };
 }
 

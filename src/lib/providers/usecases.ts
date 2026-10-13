@@ -50,6 +50,8 @@ export async function getProviderProfile(providerKey: string): Promise<ProviderP
       timezone: true,
       socialVk: true,
       socialInstagram: true,
+      socialTelegram: true,
+      socialMax: true,
       cancellationDeadlineHours: true,
       maxBookingDaysAhead: true,
       visibleSlotDays: true,

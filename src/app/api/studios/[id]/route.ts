@@ -35,6 +35,8 @@ const FIELD_MESSAGES = {
   contactEmail: "Проверьте адрес почты.",
   socialVk: "Ссылка ВКонтакте — не длиннее 200 символов.",
   socialInstagram: "Ссылка Instagram — не длиннее 200 символов.",
+  socialTelegram: "Ссылка Telegram — не длиннее 200 символов.",
+  socialMax: "Ссылка MAX — не длиннее 200 символов.",
   description: "Описание — не длиннее 2000 символов.",
   geo: "Выберите адрес из подсказок — так клиенты найдут вас на карте.",
   isPublished: "Проверьте, показывать ли страницу студии.",
@@ -85,6 +87,11 @@ const updateSchema = z
         .max(200, FIELD_MESSAGES.socialInstagram)
         .nullable()
         .optional(),
+      socialTelegram: text(FIELD_MESSAGES.socialTelegram)
+        .max(200, FIELD_MESSAGES.socialTelegram)
+        .nullable()
+        .optional(),
+      socialMax: text(FIELD_MESSAGES.socialMax).max(200, FIELD_MESSAGES.socialMax).nullable().optional(),
       description: text(FIELD_MESSAGES.description)
         .max(2000, FIELD_MESSAGES.description)
         .superRefine(rejectForbiddenWords("text"))
@@ -137,6 +144,8 @@ const updateSchema = z
       data.contactEmail !== undefined ||
       data.socialVk !== undefined ||
       data.socialInstagram !== undefined ||
+      data.socialTelegram !== undefined ||
+      data.socialMax !== undefined ||
       data.description !== undefined ||
       data.geoLat !== undefined ||
       data.geoLng !== undefined ||

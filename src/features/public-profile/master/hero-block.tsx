@@ -237,11 +237,16 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
               </m.div>
             ) : null}
 
-            {/* FEAT-PROVIDER-SOCIALS: VK / Instagram community icons (shown only
-                when set; each href re-validated in the shared component). */}
+            {/* FEAT-PROVIDER-SOCIALS / SOCIAL-TG-MAX: VK / Instagram / Telegram /
+                MAX icons (shown only when set; each href re-validated in the
+                shared component). */}
             <ProviderSocialLinks
-              vk={provider.socialVk}
-              instagram={provider.socialInstagram}
+              links={{
+                vk: provider.socialVk,
+                instagram: provider.socialInstagram,
+                telegram: provider.socialTelegram,
+                max: provider.socialMax,
+              }}
               className="mt-4"
             />
           </div>

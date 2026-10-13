@@ -66,10 +66,13 @@ export const updateMasterProfileSchema = z.object({
     .max(64)
     .refine(isValidTimeZone, { message: "timezone must be a valid IANA timezone" })
     .optional(),
-  // FEAT-PROVIDER-SOCIALS: raw VK / Instagram input (URL or handle); normalized
-  // + host/scheme validated server-side in updateMasterProfile (security boundary).
+  // FEAT-PROVIDER-SOCIALS: raw VK / Instagram / Telegram / MAX input (URL or
+  // handle); normalized + host/scheme validated server-side in
+  // updateMasterProfile (security boundary).
   socialVk: z.string().trim().max(200).nullable().optional(),
   socialInstagram: z.string().trim().max(200).nullable().optional(),
+  socialTelegram: z.string().trim().max(200).nullable().optional(),
+  socialMax: z.string().trim().max(200).nullable().optional(),
 });
 
 export const upsertMasterServicesSchema = z.object({

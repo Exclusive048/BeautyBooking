@@ -6,29 +6,13 @@ import { prisma } from "@/lib/prisma";
 import { invalidateAdvisorCache } from "@/lib/advisor/cache";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import { invalidateStoriesCache } from "@/lib/feed/stories.service";
-import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
+import { resolveSocialFieldsOrThrow } from "@/lib/providers/resolve-social-link";
 import { deleteAssetById } from "@/lib/media/service";
 import { PORTFOLIO_DISPLAY_ORDER } from "@/lib/master/portfolio-order";
 import { logError } from "@/lib/logging/logger";
 import * as UI_TEXT from "@/lib/ui/text";
 import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
 import { CategoryStatus, MediaEntityType, MediaKind, Prisma, SubscriptionScope } from "@prisma/client";
-
-// FEAT-PROVIDER-SOCIALS: normalize a raw social input into the value to store
-// (safe URL or null); throws a clean 400 on hostile/foreign input. Server is
-// the authoritative validation boundary. Shared shape with the studio path.
-function resolveSocialOrThrow(kind: SocialKind, raw: string | null | undefined): string | null {
-  const result = resolveStoredSocialLink(kind, raw);
-  if ("invalid" in result) {
-    const label = kind === "vk" ? "VK" : "Instagram";
-    throw new AppError(
-      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${socialHostLabel(kind)}.`,
-      400,
-      "INVALID_SOCIAL_LINK",
-    );
-  }
-  return result.value;
-}
 
 export type MasterContext = {
   id: string;
@@ -45,6 +29,8 @@ export type MasterContext = {
   avatarUrl: string | null;
   socialVk: string | null;
   socialInstagram: string | null;
+  socialTelegram: string | null;
+  socialMax: string | null;
   isPublished: boolean;
   ratingAvg: number;
   ratingCount: number;
@@ -72,6 +58,8 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       avatarUrl: true,
       socialVk: true,
       socialInstagram: true,
+      socialTelegram: true,
+      socialMax: true,
       isPublished: true,
       ratingAvg: true,
       ratingCount: true,
@@ -102,6 +90,8 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
       avatarUrl: master.avatarUrl,
       socialVk: master.socialVk,
       socialInstagram: master.socialInstagram,
+      socialTelegram: master.socialTelegram,
+      socialMax: master.socialMax,
       isPublished: master.isPublished,
       ratingAvg: master.ratingAvg,
       ratingCount: master.ratingCount,
@@ -136,6 +126,8 @@ export async function getMasterContext(masterId: string): Promise<MasterContext>
     avatarUrl: master.avatarUrl,
     socialVk: master.socialVk,
     socialInstagram: master.socialInstagram,
+    socialTelegram: master.socialTelegram,
+    socialMax: master.socialMax,
     isPublished: master.isPublished,
     ratingAvg: master.ratingAvg,
     ratingCount: master.ratingCount,
@@ -191,6 +183,8 @@ export type MasterProfileData = {
     avatarUrl: string | null;
     socialVk: string | null;
     socialInstagram: string | null;
+    socialTelegram: string | null;
+    socialMax: string | null;
     isPublished: boolean;
     isSolo: boolean;
     ratingAvg: number;
@@ -249,6 +243,8 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
         avatarUrl: context.avatarUrl,
         socialVk: context.socialVk,
         socialInstagram: context.socialInstagram,
+        socialTelegram: context.socialTelegram,
+        socialMax: context.socialMax,
         isPublished: context.isPublished,
         isSolo: true,
         ratingAvg: context.ratingAvg,
@@ -333,6 +329,8 @@ export async function getMasterProfileData(masterId: string): Promise<MasterProf
       avatarUrl: context.avatarUrl,
       socialVk: context.socialVk,
       socialInstagram: context.socialInstagram,
+      socialTelegram: context.socialTelegram,
+      socialMax: context.socialMax,
       isPublished: context.isPublished,
       isSolo: false,
       ratingAvg: context.ratingAvg,
@@ -395,10 +393,13 @@ export async function updateMasterProfile(
     avatarUrl?: string | null;
     isPublished?: boolean;
     district?: string;
-    /** FEAT-PROVIDER-SOCIALS: raw VK / Instagram input (URL or handle).
-     * Normalized + host/scheme validated below (throws 400 on hostile input). */
+    /** FEAT-PROVIDER-SOCIALS: raw VK / Instagram / Telegram / MAX input (URL
+     * or handle). Normalized + host/scheme validated below (throws 400 on
+     * hostile input). */
     socialVk?: string | null;
     socialInstagram?: string | null;
+    socialTelegram?: string | null;
+    socialMax?: string | null;
     /**
      * FIX-R2-02-A — explicit timezone override from the cabinet selector.
      * Applied last so it wins over any value derived from the city on this
@@ -412,12 +413,7 @@ export async function updateMasterProfile(
   await getMasterContext(masterId);
 
   // FEAT-PROVIDER-SOCIALS: validate before any write (throws 400 on invalid).
-  const nextSocialVk =
-    input.socialVk !== undefined ? resolveSocialOrThrow("vk", input.socialVk) : undefined;
-  const nextSocialInstagram =
-    input.socialInstagram !== undefined
-      ? resolveSocialOrThrow("instagram", input.socialInstagram)
-      : undefined;
+  const socialData = resolveSocialFieldsOrThrow(input);
 
   // 1. Apply non-publication fields first. We split publication out because
   //    it depends on cityId being set, and cityId may be (re-)derived here
@@ -458,8 +454,7 @@ export async function updateMasterProfile(
         ? { description: typeof input.bio === "string" ? input.bio.trim() || null : null }
         : {}),
       ...(input.avatarUrl !== undefined ? { avatarUrl: input.avatarUrl?.trim() || null } : {}),
-      ...(nextSocialVk !== undefined ? { socialVk: nextSocialVk } : {}),
-      ...(nextSocialInstagram !== undefined ? { socialInstagram: nextSocialInstagram } : {}),
+      ...socialData,
     },
   });
 

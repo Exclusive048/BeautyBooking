@@ -49,6 +49,8 @@ const BASE = {
   timezone: "Asia/Yekaterinburg",
   socialVk: null,
   socialInstagram: null,
+  socialTelegram: null,
+  socialMax: null,
   cancellationDeadlineHours: 24,
   geoLat: null,
   geoLng: null,

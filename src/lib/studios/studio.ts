@@ -4,7 +4,7 @@ import { AppError } from "@/lib/api/errors";
 import { detectCityFromAddress } from "@/lib/cities/detect-city";
 import * as UI_TEXT from "@/lib/ui/text";
 import { isSelectableTimeZone } from "@/lib/ui/timezone-options";
-import { resolveStoredSocialLink, socialHostLabel, type SocialKind } from "@/lib/providers/social-links";
+import { resolveSocialFieldsOrThrow } from "@/lib/providers/resolve-social-link";
 import { getStudioBannerAssetId, getStudioBannerUrl, setStudioBannerAssetId } from "@/lib/studios/banner";
 import { syncStudioPortfolioItemsSafe } from "@/lib/studios/portfolio-items";
 import { getStudioCatalogCoverAssetId, setStudioCatalogCoverAssetId } from "@/lib/studios/catalog-cover";
@@ -12,22 +12,6 @@ import {
   applyProviderBookingPolicy,
   type LateCancelAction,
 } from "@/lib/schedule/editor";
-
-// FEAT-PROVIDER-SOCIALS: normalize a raw social input into the value to store
-// (safe URL or null), throwing a clean 400 on hostile/foreign input. The
-// server is the authoritative validation boundary (client preview mirrors it).
-function resolveSocialOrThrow(kind: SocialKind, raw: string | null | undefined): string | null {
-  const result = resolveStoredSocialLink(kind, raw);
-  if ("invalid" in result) {
-    const label = kind === "vk" ? "VK" : "Instagram";
-    throw new AppError(
-      `Не удалось сохранить ссылку на ${label}. Укажите адрес страницы на ${socialHostLabel(kind)}.`,
-      400,
-      "INVALID_SOCIAL_LINK",
-    );
-  }
-  return result.value;
-}
 
 export type StudioProviderPrivateDto = {
   id: string;
@@ -41,6 +25,8 @@ export type StudioProviderPrivateDto = {
   contactEmail: string | null;
   socialVk: string | null;
   socialInstagram: string | null;
+  socialTelegram: string | null;
+  socialMax: string | null;
   description: string | null;
   avatarUrl: string | null;
   geoLat: number | null;
@@ -80,6 +66,8 @@ export async function getStudioProviderById(
       contactEmail: true,
       socialVk: true,
       socialInstagram: true,
+      socialTelegram: true,
+      socialMax: true,
       description: true,
       avatarUrl: true,
       geoLat: true,
@@ -116,6 +104,8 @@ export async function getStudioProviderById(
     contactEmail: provider.contactEmail,
     socialVk: provider.socialVk,
     socialInstagram: provider.socialInstagram,
+    socialTelegram: provider.socialTelegram,
+    socialMax: provider.socialMax,
     description: provider.description,
     avatarUrl: provider.avatarUrl,
     geoLat: provider.geoLat,
@@ -146,6 +136,8 @@ export type StudioProfileUpdate = {
   contactEmail?: string | null;
   socialVk?: string | null;
   socialInstagram?: string | null;
+  socialTelegram?: string | null;
+  socialMax?: string | null;
   description?: string | null;
   geoLat?: number | null;
   geoLng?: number | null;
@@ -202,13 +194,7 @@ export async function updateStudioProviderProfile(
   // FEAT-PROVIDER-SOCIALS: normalize + validate before the write (throws 400
   // on hostile/foreign input). Computed up-front so an invalid link never
   // reaches the DB update.
-  const socialData: { socialVk?: string | null; socialInstagram?: string | null } = {};
-  if (input.socialVk !== undefined) {
-    socialData.socialVk = resolveSocialOrThrow("vk", input.socialVk);
-  }
-  if (input.socialInstagram !== undefined) {
-    socialData.socialInstagram = resolveSocialOrThrow("instagram", input.socialInstagram);
-  }
+  const socialData = resolveSocialFieldsOrThrow(input);
 
   // VISIBILITY-DEFAULT-01: прежний гейт публикации (R2-02-B, «нужен адрес с
   // городом») снят, зеркально мастеру. Видимость включена с рождения кабинета,
@@ -227,10 +213,7 @@ export async function updateStudioProviderProfile(
       ...(input.contactName !== undefined ? { contactName: input.contactName } : {}),
       ...(input.contactPhone !== undefined ? { contactPhone: input.contactPhone } : {}),
       ...(input.contactEmail !== undefined ? { contactEmail: input.contactEmail } : {}),
-      ...(socialData.socialVk !== undefined ? { socialVk: socialData.socialVk } : {}),
-      ...(socialData.socialInstagram !== undefined
-        ? { socialInstagram: socialData.socialInstagram }
-        : {}),
+      ...socialData,
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.geoLat !== undefined ? { geoLat: input.geoLat } : {}),
       ...(input.geoLng !== undefined ? { geoLng: input.geoLng } : {}),
@@ -251,6 +234,8 @@ export async function updateStudioProviderProfile(
       contactEmail: true,
       socialVk: true,
       socialInstagram: true,
+      socialTelegram: true,
+      socialMax: true,
       description: true,
       avatarUrl: true,
       geoLat: true,
@@ -339,6 +324,8 @@ export async function updateStudioProviderProfile(
     contactEmail: provider.contactEmail,
     socialVk: provider.socialVk,
     socialInstagram: provider.socialInstagram,
+    socialTelegram: provider.socialTelegram,
+    socialMax: provider.socialMax,
     description: provider.description,
     avatarUrl: provider.avatarUrl,
     geoLat: provider.geoLat,

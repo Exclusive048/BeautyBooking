@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { PRESS } from "@/components/ui/motion-classes";
+import { TelegramIcon } from "@/components/ui/telegram-icon";
 import { VkIcon } from "@/components/ui/vk-icon";
 import * as UI_TEXT from "@/lib/ui/text";
 import { env, isTelegramEnabled } from "@/lib/env";
@@ -16,14 +17,8 @@ type SocialLink = {
 // нарост слева внизу.
 const VK_ICON = <VkIcon className="h-5 w-5" />;
 
-const TELEGRAM_ICON = (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-    <path
-      fill="currentColor"
-      d="M21.3 4.6c.3-.1.6.1.6.4 0 .1 0 .2-.1.3l-3.2 15.2c-.1.4-.5.6-.9.4l-4.5-3.4-2.4 2.3c-.3.3-.8.1-.8-.3v-3.9l8.4-7.6c.2-.2 0-.5-.3-.4l-10.4 6.2-4.2-1.4c-.4-.1-.4-.6 0-.8Z"
-    />
-  </svg>
-);
+// SOCIAL-TG-MAX: тот же знак, что у ссылки на канал в публичных профилях.
+const TELEGRAM_ICON = <TelegramIcon className="h-5 w-5" />;
 
 // FOOTER-VK: the VK community link is env-driven (NEXT_PUBLIC_VK_COMMUNITY_URL).
 // The old hardcoded `vk.com/beautyhub` was a stale pre-rebrand handle. When the

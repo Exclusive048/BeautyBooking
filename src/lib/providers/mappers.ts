@@ -23,6 +23,8 @@ type ProviderProfileSource = Pick<
   | "timezone"
   | "socialVk"
   | "socialInstagram"
+  | "socialTelegram"
+  | "socialMax"
   | "cancellationDeadlineHours"
   | "maxBookingDaysAhead"
   | "visibleSlotDays"
@@ -104,6 +106,8 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     timezone: provider.timezone,
     socialVk: provider.socialVk ?? null,
     socialInstagram: provider.socialInstagram ?? null,
+    socialTelegram: provider.socialTelegram ?? null,
+    socialMax: provider.socialMax ?? null,
     cancellationDeadlineHours: provider.cancellationDeadlineHours ?? null,
     bookingHorizonDays: publicBookingHorizonDays({
       maxBookingDaysAhead: provider.maxBookingDaysAhead,
