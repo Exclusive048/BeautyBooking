@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { AnimatePresence, m, useReducedMotion } from "framer-motion";
 import { INSTANT, MOTION } from "@/lib/ui/motion";
 import { ChevronDown } from "lucide-react";
@@ -24,6 +24,16 @@ type Props = {
  */
 export function FAQItem({ id, question, answer }: Props) {
   const [open, setOpen] = useState(false);
+  // Ссылка прямо на вопрос (/faq#faq-<id>) его и раскрывает — после гидратации,
+  // чтобы разметка сервера и клиента совпала.
+  useEffect(() => {
+    const openIfTargeted = () => {
+      if (window.location.hash === `#faq-${id}`) setOpen(true);
+    };
+    openIfTargeted();
+    window.addEventListener("hashchange", openIfTargeted);
+    return () => window.removeEventListener("hashchange", openIfTargeted);
+  }, [id]);
   // Раскрытие по высоте `reducedMotion="user"` не гасит (это не transform).
   const reduce = useReducedMotion();
 

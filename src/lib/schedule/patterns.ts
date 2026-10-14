@@ -9,14 +9,16 @@ import {
   buildDefaultWeekSchedule,
   mapTemplateForDay,
   normalizeFixedSlotTimes,
-  parseDateKeyToUtcStart,
   type DayScheduleDto,
 } from "@/lib/schedule/editor-shared";
-import { paletteColorKey } from "@/lib/schedule/calendar-shared";
+import { assignPaletteColors } from "@/lib/schedule/calendar-shared";
 import {
   createPeriodTx,
   ensureAutoTemplateTx,
   ensurePatternHistoryTx,
+  paletteColorPickerTx,
+  paletteMembership,
+  paletteTemplateCountsSelect,
 } from "@/lib/schedule/patterns-core";
 import {
   MAX_PATTERN_CYCLE_DAYS,
@@ -507,6 +509,7 @@ export async function saveWeekAsPatternTx(
 
   await ensurePatternHistoryTx(tx, providerId);
 
+  const pickColor = paletteColorPickerTx(tx, providerId, todayKey);
   const days: Array<string | null> = [];
   for (const day of weekSchedule.slice().sort((a, b) => a.dayOfWeek - b.dayOfWeek)) {
     if (!day.isWorkday) {
@@ -521,7 +524,7 @@ export async function saveWeekAsPatternTx(
         breaks: mapped.breaks,
         scheduleMode: day.scheduleMode,
         fixedSlotTimes: day.fixedSlotTimes,
-      }),
+      }, pickColor),
     );
   }
 
@@ -569,7 +572,6 @@ export async function loadSchedulePlan(providerId: string, now = new Date()): Pr
   if (!provider) throw new AppError("Мастер не найден.", 404, "MASTER_NOT_FOUND");
   const todayKey = toLocalDateKey(now, provider.timezone);
 
-  const todayStart = parseDateKeyToUtcStart(todayKey);
   const [rows, templates, hasLegacyWeek] = await Promise.all([
     prisma.schedulePattern.findMany({
       where: { providerId, OR: [{ endsOn: null }, { endsOn: { gte: todayKey } }] },
@@ -581,17 +583,7 @@ export async function loadSchedulePlan(providerId: string, now = new Date()): Pr
       select: {
         ...TEMPLATE_DTO_SELECT,
         label: true,
-        _count: {
-          select: {
-            // include-ok: счётчики, а не выборка строк.
-            patternDays: true,
-            // include-ok: счётчик, а не выборка строк.
-            weeklyScheduleDays: true,
-            // «Особый день» в прошлом держит свою копию часов (`SetNull` при
-            // удалении шаблона), будущий — нет: он и есть расписание.
-            scheduleOverrides: { where: { date: { gte: todayStart } } },
-          },
-        },
+        _count: paletteTemplateCountsSelect(todayKey),
       },
       orderBy: { createdAt: "asc" },
     }),
@@ -618,19 +610,12 @@ export async function loadSchedulePlan(providerId: string, now = new Date()): Pr
   const legacy = totalPatterns === 0 && hasLegacyWeek > 0;
 
   const scheduledIds = new Set(periods.flatMap((period) => period.days).filter((id): id is string => id !== null));
-  const paletteFlags = templates.map((template) => {
-    const counts = template._count;
-    const inUse = counts.patternDays > 0 || counts.weeklyScheduleDays > 0 || counts.scheduleOverrides > 0;
-    const inPalette =
-      template.label !== null ||
-      scheduledIds.has(template.id) ||
-      counts.scheduleOverrides > 0 ||
-      (legacy && counts.weeklyScheduleDays > 0);
-    return { inUse, inPalette };
-  });
-  // Цвет без сохранённого ключа — по порядку среди дней палитры (стабильно:
-  // шаблоны идут по дате создания).
-  let paletteIndex = 0;
+  const paletteFlags = templates.map((template) => paletteMembership(template, { scheduledIds, legacy }));
+  // Цвет без сохранённого ключа — свободный, по порядку дней палитры
+  // (стабильно: шаблоны идут по дате создания).
+  const colors = assignPaletteColors(
+    templates.map((template, index) => ({ color: template.color, inPalette: paletteFlags[index]!.inPalette })),
+  );
 
   return {
     todayKey,
@@ -640,7 +625,7 @@ export async function loadSchedulePlan(providerId: string, now = new Date()): Pr
     hasSchedule: legacy || periods.length > 0,
     templates: templates.map((template, index): DayTemplateDto => {
       const { inUse, inPalette } = paletteFlags[index]!;
-      const color = paletteColorKey(template.color, inPalette ? paletteIndex++ : 0);
+      const color = colors[index]!;
       return {
         id: template.id,
         // Имя от человека — только `label` (этап 3): `name` — технический ключ,

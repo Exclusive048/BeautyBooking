@@ -41,19 +41,29 @@ export function ServiceRow({ service, categories, onlinePaymentsAvailable }: Pro
           isFirst={isFirst}
           isLast={isLast}
         />
+        {/* На телефоне длительность — строкой под названием, а само название
+            переносится на две строки (и на ПК): в одну строку со стрелками, ценой и
+            меню оно сжималось до «Педи…». */}
         <Button variant="wrapper"
           onClick={() => setEditOpen(true)}
           aria-label={T.editAriaLabel}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left sm:flex-row sm:items-center sm:gap-2"
         >
-          <span className="truncate text-sm text-text-main">{service.name}</span>
-          {!service.isEnabled ? (
-            <Badge size="xs" variant="muted">
-              {T.disabledBadge}
-            </Badge>
-          ) : null}
+          <span className="flex min-w-0 max-w-full items-center gap-2">
+            <span className="line-clamp-2 break-words text-sm text-text-main">
+              {service.name}
+            </span>
+            {!service.isEnabled ? (
+              <Badge size="xs" variant="muted">
+                {T.disabledBadge}
+              </Badge>
+            ) : null}
+          </span>
+          <span className="font-mono text-2xs text-text-sec sm:hidden">
+            {UI_FMT.durationLabelOrDash(service.durationMin)}
+          </span>
         </Button>
-        <span className="shrink-0 font-mono text-2xs text-text-sec">
+        <span className="hidden shrink-0 font-mono text-2xs text-text-sec sm:inline">
           {UI_FMT.durationLabelOrDash(service.durationMin)}
         </span>
         <span className="w-20 shrink-0 text-right font-mono text-sm font-medium text-text-main">

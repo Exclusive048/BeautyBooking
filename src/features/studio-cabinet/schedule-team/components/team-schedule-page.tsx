@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { TeamBoardDto } from "@/lib/schedule/calendar-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { TeamBoard } from "./team-board";
@@ -12,6 +13,7 @@ export function TeamSchedulePage({ studioId, board }: { studioId: string; board:
   return (
     <div className="min-w-0 space-y-5 lg:space-y-6">
       <header className="space-y-1">
+        <BackLink href="/cabinet/studio/schedule" />
         <p className="eyebrow">{T.breadcrumb}</p>
         <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">{T.title}</h1>
       </header>

@@ -91,7 +91,10 @@ export function BookingRow({ booking, timezone, showWorkContext = false }: Props
           </p>
         ) : null}
 
-        <div className="mt-3 flex items-center justify-between gap-2">
+        {/* На телефоне «Отклонить / Подтвердить» не помещаются в строку рядом
+            с действиями записи — переносятся вниз, а не раздвигают страницу
+            шире экрана (нижняя навигация уезжала за край). */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <BookingRowActions booking={booking} />
           {/* MASTER-BOOKING-UI-FIX-A #2а: confirm/decline visible only when
               the master is the actionable side. For PENDING that's always

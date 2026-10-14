@@ -82,6 +82,9 @@ const ERROR_CODES = [
   "MASTER_NOT_ACTIVE",
   "MASTER_NOT_FOUND",
   "MASTER_NOT_INVITED",
+  // Решение владельца 2026-10-14: приглашение в студию — только с пройденными
+  // «Первыми шагами» кабинета мастера (`invites/master-readiness.ts`).
+  "MASTER_ONBOARDING_REQUIRED",
   "MASTER_PROFILE_NOT_FOUND",
   "MASTER_REQUIRED",
   "MASTER_SERVICE_MISMATCH",

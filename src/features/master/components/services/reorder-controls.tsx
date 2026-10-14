@@ -43,7 +43,9 @@ export function ReorderControls({ itemId, endpoint, isFirst, isLast }: Props) {
   };
 
   return (
-    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+    // Прятать до наведения — только там, где наведение есть (`hover: hover`):
+    // на телефоне стрелки были невидимы, но занимали место и нажимались.
+    <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100">
       <ArrowButton
         disabled={isFirst || pending !== null}
         onClick={() => move("up")}

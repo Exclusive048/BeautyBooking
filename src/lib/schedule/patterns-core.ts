@@ -1,8 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
+  assignPaletteColors,
+  nextPaletteColor,
+  type ScheduleDayColorKey,
+} from "@/lib/schedule/calendar-shared";
+import {
   AUTO_TEMPLATE_PREFIX,
   normalizeFixedSlotTimes,
+  parseDateKeyToUtcStart,
   signatureHash,
   type BreakDto,
 } from "@/lib/schedule/editor-shared";
@@ -48,11 +54,19 @@ export function autoTemplateSignature(def: DayTemplateDefinition): string {
     : base;
 }
 
+/**
+ * Цвет нового рабочего дня — `paletteColorPickerTx`. Без него день создаётся
+ * без цвета и получает его при чтении (`assignPaletteColors`): так создаёт
+ * перенос недель пост-деплоем.
+ */
+export type PickPaletteColor = () => Promise<ScheduleDayColorKey>;
+
 /** Шаблон по подписи: найти или создать. Содержимое определяется подписью. */
 export async function ensureAutoTemplateTx(
   tx: Db,
   providerId: string,
   def: DayTemplateDefinition,
+  pickColor?: PickPaletteColor,
 ): Promise<string> {
   const name = `${AUTO_TEMPLATE_PREFIX}${signatureHash(autoTemplateSignature(def))}`;
   const existing = await tx.scheduleTemplate.findUnique({
@@ -68,7 +82,7 @@ export async function ensureAutoTemplateTx(
       name,
       startLocal: def.startTime,
       endLocal: def.endTime,
-      color: null,
+      color: pickColor ? await pickColor() : null,
       scheduleMode: def.scheduleMode,
       fixedSlotTimes: def.scheduleMode === "FIXED" ? normalizeFixedSlotTimes(def.fixedSlotTimes) : [],
       breaks: {
@@ -125,6 +139,7 @@ export async function ensurePaletteTemplateTx(
   tx: Db,
   providerId: string,
   def: DayTemplateDefinition & { label: string; color: string | null },
+  pickColor?: PickPaletteColor,
 ): Promise<string> {
   const signature = autoTemplateSignature(def);
   const sameLabel = await tx.scheduleTemplate.findMany({
@@ -147,7 +162,7 @@ export async function ensurePaletteTemplateTx(
       providerId,
       name: `${PALETTE_TEMPLATE_PREFIX}${randomUUID()}`,
       label: def.label,
-      color: def.color,
+      color: def.color ?? (pickColor ? await pickColor() : null),
       startLocal: def.startTime,
       endLocal: def.endTime,
       scheduleMode: def.scheduleMode,
@@ -164,6 +179,101 @@ export async function ensurePaletteTemplateTx(
     select: { id: true },
   });
   return created.id;
+}
+
+// ─── Палитра и цвета ─────────────────────────────────────────────────────────
+
+/**
+ * Счётчики шаблона, из которых выводится «в палитре» / «используется». Один
+ * select на чтение кабинета (`loadSchedulePlan`) и выбор цвета нового дня.
+ */
+export function paletteTemplateCountsSelect(todayKey: string) {
+  return {
+    select: {
+      // include-ok: счётчики, а не выборка строк.
+      patternDays: true,
+      // include-ok: счётчик, а не выборка строк.
+      weeklyScheduleDays: true,
+      // «Особый день» в прошлом держит свою копию часов (`SetNull` при
+      // удалении шаблона), будущий — нет: он и есть расписание.
+      scheduleOverrides: { where: { date: { gte: parseDateKeyToUtcStart(todayKey) } } },
+    },
+  } as const;
+}
+
+export type PaletteTemplateCounts = {
+  patternDays: number;
+  weeklyScheduleDays: number;
+  scheduleOverrides: number;
+};
+
+/**
+ * Рабочий день в палитре: у него имя от человека, на него ссылается график,
+ * не кончившийся до сегодня, или будущий «Особый день», либо (у профиля без
+ * графика, `legacy`) рабочий день недели. «Используется» — на него ссылается
+ * хоть что-то: удалить его нельзя.
+ */
+export function paletteMembership(
+  template: { id: string; label: string | null; _count: PaletteTemplateCounts },
+  context: { scheduledIds: ReadonlySet<string>; legacy: boolean },
+): { inUse: boolean; inPalette: boolean } {
+  const counts = template._count;
+  const inUse = counts.patternDays > 0 || counts.weeklyScheduleDays > 0 || counts.scheduleOverrides > 0;
+  const inPalette =
+    template.label !== null ||
+    context.scheduledIds.has(template.id) ||
+    counts.scheduleOverrides > 0 ||
+    (context.legacy && counts.weeklyScheduleDays > 0);
+  return { inUse, inPalette };
+}
+
+/** Цвета дней палитры профиля на сегодня — те же, что видит кабинет. */
+async function loadPaletteColorsTx(tx: Db, providerId: string, todayKey: string): Promise<ScheduleDayColorKey[]> {
+  const periods = await tx.schedulePattern.findMany({
+    where: { providerId, OR: [{ endsOn: null }, { endsOn: { gte: todayKey } }] },
+    // include-ok: позиции одного периода — не больше длины цикла.
+    select: { days: { select: { templateId: true } } },
+  });
+  const totalPatterns =
+    periods.length > 0 ? periods.length : await tx.schedulePattern.count({ where: { providerId } });
+  const hasLegacyWeek =
+    totalPatterns === 0
+      ? await tx.weeklyScheduleConfig.count({
+          where: { providerId, days: { some: { isActive: true, templateId: { not: null } } } },
+        })
+      : 0;
+  const templates = await tx.scheduleTemplate.findMany({
+    where: { providerId },
+    select: { id: true, label: true, color: true, _count: paletteTemplateCountsSelect(todayKey) },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const scheduledIds = new Set(
+    periods.flatMap((period) => period.days.map((day) => day.templateId)).filter((id): id is string => id !== null),
+  );
+  const legacy = totalPatterns === 0 && hasLegacyWeek > 0;
+  const rows = templates.map((template) => ({
+    color: template.color,
+    inPalette: paletteMembership(template, { scheduledIds, legacy }).inPalette,
+  }));
+  const colors = assignPaletteColors(rows);
+  return colors.filter((_, index) => rows[index]!.inPalette);
+}
+
+/**
+ * Выдача цветов новым рабочим дням одной транзакции: занятые цвета палитры
+ * читаются один раз — при первом создании (найденный по подписи день цвет не
+ * запрашивает), — а каждый выданный тут же считается занятым, поэтому два дня
+ * одного окна графика («разные часы по дням») не получат один цвет.
+ */
+export function paletteColorPickerTx(tx: Db, providerId: string, todayKey: string): PickPaletteColor {
+  let taken: ScheduleDayColorKey[] | null = null;
+  return async () => {
+    taken ??= await loadPaletteColorsTx(tx, providerId, todayKey);
+    const color = nextPaletteColor(taken);
+    taken.push(color);
+    return color;
+  };
 }
 
 // ─── Периоды ─────────────────────────────────────────────────────────────────

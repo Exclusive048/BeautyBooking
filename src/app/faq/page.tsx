@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FAQItem } from "@/features/faq/components/faq-item";
 import { FAQ_DATA } from "@/features/faq/content/faq-content";
+import { HelpAnswer } from "@/features/help/components/help-answer";
+import { plainAnswer } from "@/features/help/content/help-types";
 import { safeJsonLd } from "@/lib/seo/schema";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -16,7 +18,7 @@ const FAQ_JSON_LD = {
     cat.questions.map((item) => ({
       "@type": "Question",
       name: item.question,
-      acceptedAnswer: { "@type": "Answer", text: item.answer },
+      acceptedAnswer: { "@type": "Answer", text: plainAnswer(item) },
     })),
   ),
 };
@@ -66,7 +68,7 @@ export default function FaqPage() {
                   key={item.id}
                   id={item.id}
                   question={item.question}
-                  answer={item.answer}
+                  answer={<HelpAnswer content={item} />}
                 />
               ))}
             </div>

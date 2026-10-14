@@ -18,6 +18,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   Bell,
+  CircleHelp,
   MessageSquare,
   X,
   type LucideIcon,
@@ -194,6 +195,15 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                 >
                   <ExternalLink className="h-5 w-5" aria-hidden />
                   <span className="text-2xs font-medium leading-tight">{t.menuMyPage}</span>
+                </Link>
+                {/* HELP-GUIDE-01: инструкция по кабинету мастера (`/help`). */}
+                <Link
+                  href="/help?tab=master"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
+                >
+                  <CircleHelp className="h-5 w-5" aria-hidden />
+                  <span className="text-2xs font-medium leading-tight">{t.menuHelp}</span>
                 </Link>
               </div>
             </m.div>

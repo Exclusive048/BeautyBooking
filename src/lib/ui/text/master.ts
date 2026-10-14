@@ -16,6 +16,8 @@ export const master = {
     menuAnalytics: "Аналитика",
     menuSettings: "Настройки",
     menuMyPage: "Моя страница →",
+    // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=master`.
+    menuHelp: "Помощь",
     menuModels: "Модели",
     menuBilling: "Тариф",
   },

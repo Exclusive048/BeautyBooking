@@ -22,11 +22,24 @@ export default async function StudioSettingsPublicPage() {
     redirect("/403");
   }
 
+  // Визитке нужны те же поля, что у мастера (`/cabinet/master/settings/public`):
+  // без них она рисовалась одним названием — без фото, адреса и описания.
   const studio = await prisma.studio.findUnique({
     where: { id: studioId },
-    select: { provider: { select: { name: true } } },
+    select: {
+      provider: {
+        select: {
+          name: true,
+          tagline: true,
+          address: true,
+          description: true,
+          avatarUrl: true,
+        },
+      },
+    },
   });
-  const studioName = studio?.provider?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
+  const provider = studio?.provider ?? null;
+  const studioName = provider?.name ?? UI_TEXT.studioCabinet.layout.studioFallbackName;
 
   return (
     <section className="space-y-4">
@@ -39,6 +52,10 @@ export default async function StudioSettingsPublicPage() {
       <PublicSettingsClient
         endpoint="/api/cabinet/studio/public-username"
         name={studioName}
+        tagline={provider?.tagline ?? ""}
+        address={provider?.address ?? ""}
+        bio={provider?.description ?? ""}
+        avatarUrl={provider?.avatarUrl ?? null}
       />
     </section>
   );

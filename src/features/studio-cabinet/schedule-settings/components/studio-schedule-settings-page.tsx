@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { StudioScheduleSettingsBody } from "./studio-schedule-settings-body";
@@ -35,6 +36,7 @@ export function StudioScheduleSettingsPage({
   return (
     <div className="space-y-5 lg:space-y-6">
       <header className="space-y-1">
+        <BackLink href="/cabinet/studio/schedule/team" />
         <p className="eyebrow">
           {T.breadcrumb}
         </p>

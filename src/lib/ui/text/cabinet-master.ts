@@ -37,6 +37,11 @@ export const cabinetMaster = {
       profile: "Мой профиль",
       accountSettings: "Настройки аккаунта",
       publicPage: "Публичная страница",
+      // Ссылка, QR-код и визитка страницы (`/cabinet/master/settings/public`);
+      // на телефоне — «Моя страница →» в листе «Ещё».
+      myPage: "Моя страница",
+      // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=master`.
+      help: "Помощь",
     },
     ariaLabel: "Навигация кабинета мастера",
   },

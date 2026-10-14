@@ -90,6 +90,10 @@ export const studioCabinet = {
       // remains in active use for the «Open studio page» link.
       publicPage: "Публичная страница",
       publicPageExternal: "Открыть страницу студии",
+      // Ссылка, QR-код и визитка страницы студии (`/cabinet/studio/settings/public`).
+      myPage: "Моя страница",
+      // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=studio`.
+      help: "Помощь",
       settings: "Настройки",
     },
   },
@@ -103,6 +107,11 @@ export const studioCabinet = {
     close: "Закрыть",
     // NAV-STUDIO-SETTINGS-TAB — вкладка раздела «Профиль» настроек студии.
     profile: "Профиль",
+    // Пункт листа «Ещё» — как «Моя страница →» у мастера: ссылка, QR-код и
+    // визитка страницы студии (`/cabinet/studio/settings/public`).
+    myPage: "Моя страница →",
+    // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=studio`.
+    help: "Помощь",
   },
   dashboard: {
     cards: {
@@ -278,6 +287,9 @@ export const studioCabinet = {
       refresh: "Обновить",
       refreshedAtTemplate: "обновлено {time}",
       addBooking: "Добавить запись",
+      // Вход в «График команды» прямо со вкладки «Расписание» — на телефоне
+      // без похода в лист «Ещё» (как «Настроить расписание» у мастера).
+      setupSchedule: "Настроить расписание",
       manageBreaks: "Перерывы",
       salonTimeNote: "Время студии",
     },

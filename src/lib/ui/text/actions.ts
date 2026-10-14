@@ -8,4 +8,5 @@ export const actions = {
   decline: "Отклонить",
   openChat: "Открыть чат",
   later: "Позже",
+  back: "Назад",
 } as const;

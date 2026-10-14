@@ -171,8 +171,9 @@ export function ScheduleWizard({
           ? startsOn
           : mondayOfWeekKey(startsOn);
 
-  const templates: Array<DayTemplateRequest & { label?: string; color?: string }> = manual
-    ? [{ ...dayHoursToTemplate(sameHours), label: T.hours.manualDayLabel, color: "1" }]
+  // Цвет нового рабочего дня выбирает сервер — свободный в палитре мастера.
+  const templates: Array<DayTemplateRequest & { label?: string }> = manual
+    ? [{ ...dayHoursToTemplate(sameHours), label: T.hours.manualDayLabel }]
     : built.templates;
   const patternDays: Array<number | null> = manual ? [null] : built.days;
 
