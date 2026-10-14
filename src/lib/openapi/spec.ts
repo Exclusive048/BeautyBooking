@@ -3841,11 +3841,32 @@ export const openApiSpec = {
           openHref: { type: "string", nullable: true },
         },
       },
+      MasterInviteReadiness: {
+        type: "object",
+        description:
+          "Можно ли принять приглашение в студию: только с кабинетом мастера, где пройдены все «Первые шаги» (иначе `POST /api/invites/{id}/accept` — 409 `MASTER_ONBOARDING_REQUIRED`).",
+        required: ["hasCabinet", "ready", "doneCount", "total", "href"],
+        properties: {
+          hasCabinet: { type: "boolean", description: "Есть личный кабинет мастера." },
+          ready: { type: "boolean", description: "Все шаги пройдены — приглашение можно принять." },
+          doneCount: { type: "integer" },
+          total: { type: "integer" },
+          href: {
+            type: "string",
+            description: "Веб-экран следующего шага (`?guide=<шаг>`) либо `/cabinet/roles` — создание кабинета мастера.",
+          },
+        },
+      },
       NotificationCenterData: {
         type: "object",
-        required: ["invites", "notifications", "unreadCount", "hasPhone"],
+        required: ["invites", "masterReadiness", "notifications", "unreadCount", "hasPhone"],
         properties: {
           invites: { type: "array", items: { $ref: "#/components/schemas/NotificationCenterInviteItem" } },
+          masterReadiness: {
+            allOf: [{ $ref: "#/components/schemas/MasterInviteReadiness" }],
+            nullable: true,
+            description: "Только когда есть приглашения, иначе `null`.",
+          },
           notifications: { type: "array", items: { $ref: "#/components/schemas/NotificationCenterNotificationItem" } },
           unreadCount: { type: "integer" },
           hasPhone: { type: "boolean" },

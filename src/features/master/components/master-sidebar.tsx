@@ -5,11 +5,13 @@ import {
   Bell,
   Calendar,
   CalendarDays,
+  CircleHelp,
   Cog,
   ExternalLink,
   Home,
   LineChart,
   MessageSquare,
+  QrCode,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -69,6 +71,8 @@ const HREF = {
   // 302 from `/account` → `/account/notifications`. The /account
   // index redirect remains as a fallback for old bookmarks.
   settings: "/cabinet/master/account/notifications",
+  // Ссылка, QR-код и визитка страницы — на телефоне «Моя страница →» в «Ещё».
+  myPage: "/cabinet/master/settings/public",
 } as const;
 
 function isActive(pathname: string, href: string, exact = false): boolean {
@@ -226,6 +230,11 @@ export function MasterSidebar({
             // though we navigate to /notifications by default.
             activeMatch: "/cabinet/master/account",
           })}
+          {renderItem({
+            href: HREF.myPage,
+            label: T.nav.items.myPage,
+            icon: QrCode,
+          })}
           {publicUsername
             ? renderItem({
                 href: `/u/${publicUsername}`,
@@ -234,6 +243,13 @@ export function MasterSidebar({
                 target: "_blank",
               })
             : null}
+          {/* HELP-GUIDE-01: инструкция по кабинету мастера. Не в `HREF` —
+              это не раздел кабинета, а публичная страница `/help`. */}
+          {renderItem({
+            href: "/help?tab=master",
+            label: T.nav.items.help,
+            icon: CircleHelp,
+          })}
         </NavGroup>
       </nav>
 

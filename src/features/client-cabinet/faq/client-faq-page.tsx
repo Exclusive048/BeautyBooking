@@ -8,6 +8,8 @@ import { Tabs } from "@/components/ui/tabs";
 import { FAQAccordionItem } from "@/components/ui/faq-accordion";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { HelpAnswer } from "@/features/help/components/help-answer";
+import { plainAnswer } from "@/features/help/content/help-types";
 import * as UI_TEXT from "@/lib/ui/text";
 import { FAQ_DATA, type FaqCategory } from "./faq-data";
 
@@ -33,7 +35,8 @@ export function ClientFaqPage() {
       if (category !== "all" && item.category !== category) return false;
       if (!q) return true;
       return (
-        item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q)
+        item.q.toLowerCase().includes(q) ||
+        plainAnswer({ answer: item.a, steps: item.steps }).toLowerCase().includes(q)
       );
     });
   }, [query, category]);
@@ -98,6 +101,11 @@ export function ClientFaqPage() {
                 <FAQAccordionItem
                   key={item.id}
                   item={{ q: item.q, a: item.a }}
+                  answer={
+                    <HelpAnswer
+                      content={{ answer: item.a, steps: item.steps, shots: item.shots }}
+                    />
+                  }
                 />
               ))}
             </div>
@@ -169,7 +177,7 @@ export function ClientFaqPage() {
               </li>
               <li>
                 <a
-                  href="/faq"
+                  href="/faq#faq-cancel-or-reschedule"
                   className="inline-flex items-center gap-2 text-text-main hover:text-accent-text"
                 >
                   <FileText className="h-3.5 w-3.5 text-text-sec" aria-hidden />

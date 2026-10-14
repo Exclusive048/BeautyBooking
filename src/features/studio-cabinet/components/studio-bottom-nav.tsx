@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MoreHorizontal, UserRound, X } from "lucide-react";
+import { CircleHelp, ExternalLink, MoreHorizontal, UserRound, X } from "lucide-react";
 import { m, AnimatePresence } from "framer-motion";
 import {
   STUDIO_NAV,
@@ -33,6 +33,18 @@ const T = UI_TEXT.studioCabinet;
 const PRIMARY_TAB_IDS = ["dashboard", "schedule", "masters"] as const;
 const PROFILE_TAB_HREF = "/cabinet/studio/settings?section=profile";
 const SETTINGS_PATH = "/cabinet/studio/settings";
+/**
+ * «Моя страница» — ссылка, QR-код и визитка страницы студии, как пункт
+ * «Моя страница →» в листе «Ещё» у мастера (`/cabinet/master/settings/public`).
+ * Лежит под `/settings`, но живёт в «Ещё»: на нём горит «Ещё», а не «Профиль».
+ */
+const MY_PAGE_HREF = "/cabinet/studio/settings/public";
+/** HELP-GUIDE-01: инструкция по кабинету студии. */
+const HELP_HREF = "/help?tab=studio";
+
+function isMyPagePath(pathname: string): boolean {
+  return pathname === MY_PAGE_HREF || pathname.startsWith(`${MY_PAGE_HREF}/`);
+}
 
 function flatNavItems(): StudioNavItem[] {
   return STUDIO_NAV.flatMap((group) => group.items);
@@ -75,8 +87,12 @@ export function StudioBottomNav({ counts }: Props) {
 
   const primary = pickPrimaryTabs();
   const more = pickMoreItems();
-  const profileActive = pathname === SETTINGS_PATH || pathname.startsWith(`${SETTINGS_PATH}/`);
-  const moreActive = !profileActive && more.some((item) => isStudioNavItemActive(pathname, item));
+  const myPageActive = isMyPagePath(pathname);
+  const profileActive =
+    !myPageActive && (pathname === SETTINGS_PATH || pathname.startsWith(`${SETTINGS_PATH}/`));
+  const moreActive =
+    myPageActive ||
+    (!profileActive && more.some((item) => isStudioNavItemActive(pathname, item)));
   const moreNeedsAttention = more.some((item) => badgeValue(counts, item.badgeKey) > 0);
 
   return (
@@ -126,7 +142,9 @@ export function StudioBottomNav({ counts }: Props) {
               <div className="grid grid-cols-3 gap-1 px-4 pb-6 pt-1">
                 {more.map((item) => {
                   const Icon = item.icon;
-                  const active = isStudioNavItemActive(pathname, item);
+                  // «Моя страница» лежит под `/settings`: без исключения на ней
+                  // горел бы и пункт «Настройки».
+                  const active = !myPageActive && isStudioNavItemActive(pathname, item);
                   const badge = badgeValue(counts, item.badgeKey);
                   return (
                     <Link
@@ -148,6 +166,27 @@ export function StudioBottomNav({ counts }: Props) {
                     </Link>
                   );
                 })}
+                <Link
+                  href={MY_PAGE_HREF}
+                  onClick={() => setMoreOpen(false)}
+                  className={cn(
+                    "flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center transition-colors",
+                    myPageActive
+                      ? "bg-primary/10 text-accent-text"
+                      : "text-text-sec hover:bg-bg-input",
+                  )}
+                >
+                  <ExternalLink className="h-5 w-5" aria-hidden />
+                  <span className="text-2xs font-medium leading-tight">{T.bottomNav.myPage}</span>
+                </Link>
+                <Link
+                  href={HELP_HREF}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
+                >
+                  <CircleHelp className="h-5 w-5" aria-hidden />
+                  <span className="text-2xs font-medium leading-tight">{T.bottomNav.help}</span>
+                </Link>
               </div>
             </m.div>
           </>

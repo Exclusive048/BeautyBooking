@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { m, AnimatePresence, useReducedMotion } from "framer-motion";
 import { INSTANT, MOTION } from "@/lib/ui/motion";
 import { ChevronDown } from "lucide-react";
@@ -8,7 +8,13 @@ import { ChevronDown } from "lucide-react";
 export type FAQItem = { readonly q: string; readonly a: string };
 export type FAQGroup = { readonly title: string; readonly items: readonly FAQItem[] };
 
-function FAQAccordionItem({ item }: { item: FAQItem }) {
+type FAQAccordionItemProps = {
+  item: FAQItem;
+  /** Тело ответа разметкой (шаги, снимки) — вместо абзаца `item.a`. */
+  answer?: ReactNode;
+};
+
+function FAQAccordionItem({ item, answer }: FAQAccordionItemProps) {
   const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
 
@@ -41,7 +47,11 @@ function FAQAccordionItem({ item }: { item: FAQItem }) {
             transition={reduce ? INSTANT : MOTION.base}
             className="overflow-hidden"
           >
-            <p className="px-5 pb-5 text-sm text-text-sec leading-relaxed">{item.a}</p>
+            {answer ? (
+              <div className="px-5 pb-5 text-sm text-text-sec leading-relaxed">{answer}</div>
+            ) : (
+              <p className="px-5 pb-5 text-sm text-text-sec leading-relaxed">{item.a}</p>
+            )}
           </m.div>
         )}
       </AnimatePresence>

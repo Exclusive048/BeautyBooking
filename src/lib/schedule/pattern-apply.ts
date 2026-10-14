@@ -17,7 +17,11 @@ import {
   setScheduleEndTx,
   writeSchedulePeriodTx,
 } from "@/lib/schedule/patterns";
-import { ensureAutoTemplateTx, ensurePaletteTemplateTx } from "@/lib/schedule/patterns-core";
+import {
+  ensureAutoTemplateTx,
+  ensurePaletteTemplateTx,
+  paletteColorPickerTx,
+} from "@/lib/schedule/patterns-core";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 
@@ -64,25 +68,32 @@ export async function previewSchedulePattern(
   return { conflicts };
 }
 
-/** Рабочие дни и период графика из запроса — внутри транзакции вызывающего. */
+/**
+ * Рабочие дни и период графика из запроса — внутри транзакции вызывающего.
+ * Новый рабочий день получает свободный цвет палитры, если запрос цвета не
+ * назвал (`paletteColorPickerTx`).
+ */
 async function writePatternTx(
   tx: Prisma.TransactionClient,
   providerId: string,
   request: PatternRequest,
   templates: ReturnType<typeof normalizeRequestTemplates>,
   pattern: ReturnType<typeof normalizePatternInput>,
+  todayKey: string,
 ): Promise<void> {
+  const pickColor = paletteColorPickerTx(tx, providerId, todayKey);
   const ids: string[] = [];
   for (const [index, template] of templates.entries()) {
     const label = request.templates[index]?.label;
     ids.push(
       label
-        ? await ensurePaletteTemplateTx(tx, providerId, {
-            ...template,
-            label,
-            color: request.templates[index]?.color ?? null,
-          })
-        : await ensureAutoTemplateTx(tx, providerId, template),
+        ? await ensurePaletteTemplateTx(
+            tx,
+            providerId,
+            { ...template, label, color: request.templates[index]?.color ?? null },
+            pickColor,
+          )
+        : await ensureAutoTemplateTx(tx, providerId, template, pickColor),
     );
   }
   await writeSchedulePeriodTx(
@@ -110,7 +121,7 @@ export async function applyPatternRequestTx(
 ): Promise<void> {
   const templates = normalizeRequestTemplates(request);
   const pattern = normalizePatternInput(patternWithTemplateRefs(request), todayKey);
-  await writePatternTx(tx, providerId, request, templates, pattern);
+  await writePatternTx(tx, providerId, request, templates, pattern, todayKey);
 }
 
 /** Записать график. Возвращает записи, которые он оставил на выходных или вне часов. */
@@ -120,10 +131,10 @@ export async function applySchedulePattern(
   now = new Date(),
 ): Promise<{ conflicts: PatternConflict[] }> {
   const timezone = await loadTimezone(providerId);
-  const { templates, pattern } = prepare(request, timezone, now);
+  const { templates, pattern, todayKey } = prepare(request, timezone, now);
 
   await prisma.$transaction(
-    (tx: Prisma.TransactionClient) => writePatternTx(tx, providerId, request, templates, pattern),
+    (tx: Prisma.TransactionClient) => writePatternTx(tx, providerId, request, templates, pattern, todayKey),
     SCHEDULE_SNAPSHOT_TX_OPTIONS,
   );
 

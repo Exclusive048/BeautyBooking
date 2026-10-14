@@ -27,14 +27,46 @@ export function isScheduleDayColorKey(value: unknown): value is ScheduleDayColor
 }
 
 /**
- * Цвет рабочего дня: сохранённый ключ, а если его нет (день создан редактором
- * недели или до этапа 3) — по порядку в палитре. Порядок стабилен (по дате
- * создания), поэтому цвет не «прыгает» между открытиями.
+ * Цвет для нового рабочего дня: первый, которого ещё нет в палитре; заняты
+ * все — самый редкий (при равенстве — первый по порядку). Новый день поэтому
+ * не повторяет цвет соседа, пока цвета не кончились (решение владельца
+ * 2026-10-14: «новый режим — новым цветом»). Одно правило для сервера (день,
+ * созданный окном графика или неделей, `patterns-core.ts`) и для окна палитры
+ * (цвет по умолчанию).
  */
-export function paletteColorKey(color: string | null, index: number): ScheduleDayColorKey {
-  if (isScheduleDayColorKey(color)) return color;
-  return SCHEDULE_DAY_COLOR_KEYS[((index % SCHEDULE_DAY_COLOR_KEYS.length) + SCHEDULE_DAY_COLOR_KEYS.length) %
-    SCHEDULE_DAY_COLOR_KEYS.length];
+export function nextPaletteColor(used: readonly (string | null)[]): ScheduleDayColorKey {
+  const counts = new Map<ScheduleDayColorKey, number>(SCHEDULE_DAY_COLOR_KEYS.map((key) => [key, 0]));
+  for (const color of used) {
+    if (isScheduleDayColorKey(color)) counts.set(color, (counts.get(color) ?? 0) + 1);
+  }
+  let best: ScheduleDayColorKey = SCHEDULE_DAY_COLOR_KEYS[0];
+  for (const key of SCHEDULE_DAY_COLOR_KEYS) {
+    if ((counts.get(key) ?? 0) < (counts.get(best) ?? 0)) best = key;
+  }
+  return best;
+}
+
+/**
+ * Цвета рабочих дней профиля. Сохранённый ключ — как есть. День палитры без
+ * ключа (создан до того, как цвет стал выдаваться при создании) получает
+ * свободный цвет — по порядку шаблонов (по дате создания), в обход цветов,
+ * сохранённых у других дней палитры. Раньше он брал цвет по номеру в палитре
+ * и совпадал с соседом, у которого этот цвет был сохранён. День вне палитры
+ * цвет не занимает.
+ */
+export function assignPaletteColors(
+  rows: ReadonlyArray<{ color: string | null; inPalette: boolean }>,
+): ScheduleDayColorKey[] {
+  const taken: ScheduleDayColorKey[] = rows.flatMap((row) =>
+    row.inPalette && isScheduleDayColorKey(row.color) ? [row.color] : [],
+  );
+  return rows.map((row) => {
+    if (isScheduleDayColorKey(row.color)) return row.color;
+    if (!row.inPalette) return SCHEDULE_DAY_COLOR_KEYS[0];
+    const color = nextPaletteColor(taken);
+    taken.push(color);
+    return color;
+  });
 }
 
 /**

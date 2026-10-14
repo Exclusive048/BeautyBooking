@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { PublicSettingsClient } from "@/features/billing/components/public-settings-client";
+import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import * as UI_TEXT from "@/lib/ui/text";
 import { personalMasterProviderWhere } from "@/lib/master/access";
 
@@ -23,22 +24,29 @@ export default async function MasterSettingsPublicPage() {
   });
   if (!provider) redirect("/403");
 
+  // HELP-GUIDE-01: на страницу ведёт пункт «Моя страница» меню мастера —
+  // шапка и поля те же, что у остальных страниц кабинета (раньше без них
+  // текст на телефоне прижимался к краю экрана).
   return (
-    <section className="space-y-4">
-      <header>
-        <h2 className="text-xl font-semibold text-text-main">
-          {UI_TEXT.billing.publicPage.title}
-        </h2>
-        <p className="text-sm text-text-sec">{UI_TEXT.billing.publicPage.subtitle}</p>
-      </header>
-      <PublicSettingsClient
-        endpoint="/api/cabinet/master/public-username"
-        name={provider.name}
-        tagline={provider.tagline ?? ""}
-        address={provider.address ?? ""}
-        bio={provider.description ?? ""}
-        avatarUrl={provider.avatarUrl ?? null}
+    <>
+      <MasterPageHeader
+        breadcrumb={[
+          { label: UI_TEXT.cabinetMaster.pageHeader.breadcrumbHome, href: "/cabinet/master/dashboard" },
+          { label: UI_TEXT.cabinetMaster.nav.items.myPage },
+        ]}
+        title={UI_TEXT.billing.publicPage.title}
+        subtitle={UI_TEXT.billing.publicPage.subtitle}
       />
-    </section>
+      <div className="px-4 py-6 md:px-6 lg:px-8">
+        <PublicSettingsClient
+          endpoint="/api/cabinet/master/public-username"
+          name={provider.name}
+          tagline={provider.tagline ?? ""}
+          address={provider.address ?? ""}
+          bio={provider.description ?? ""}
+          avatarUrl={provider.avatarUrl ?? null}
+        />
+      </div>
+    </>
   );
 }

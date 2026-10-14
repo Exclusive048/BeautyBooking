@@ -69,7 +69,7 @@ export function BookingActionButtons({ bookingId, isPastConfirmWindow = false }:
 
   return (
     <>
-      <div className="flex flex-col items-end gap-1">
+      <div className="ml-auto flex flex-col items-end gap-1">
         <div className="flex gap-2">
           <Button
             type="button"

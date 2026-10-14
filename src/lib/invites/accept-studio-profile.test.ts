@@ -15,20 +15,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * краснеет «личный профиль в студию не привязывается». Снята проверка другой
  * студии (`otherStudioProfile`): краснеет «профиль в другой студии — отказ».
  * Возвращено — зелёный.
+ *
+ * Решение владельца 2026-10-14: принять приглашение можно только с кабинетом
+ * мастера, где пройдены все «Первые шаги» (`invites/master-readiness.ts`).
+ * @probe 2026-10-14 — проверка `readiness.ready` в `acceptStudioInvite` снята:
+ * краснеют «шаги не пройдены — отказ» и «кабинета нет — отказ» (приглашение
+ * принято, профиль в студии создан). Перенесена после места в команде —
+ * краснеет «проверка до места в команде».
  */
 
 const db = vi.hoisted(() => ({
   inviteFindUnique: vi.fn(),
   providerFindFirst: vi.fn(),
   providerUpdate: vi.fn(async () => ({ id: "x" })),
-  masterProfileFindUnique: vi.fn<() => Promise<{ id: string; providerId: string } | null>>(async () => null),
+  masterProfileFindUnique: vi.fn<() => Promise<{ id: string; providerId: string } | null>>(async () => ({
+    id: "mp",
+    providerId: "personal",
+  })),
 }));
+const readiness = vi.hoisted(() => ({
+  resolveMasterInviteReadiness: vi.fn(async () => ({
+    hasCabinet: true,
+    ready: true,
+    doneCount: 7,
+    total: 7,
+    href: "/cabinet/master/dashboard",
+  })),
+}));
+const teamLimits = vi.hoisted(() => ({ ensureStudioTeamLimit: vi.fn(async () => undefined) }));
 const split = vi.hoisted(() => ({
   claimStagedStudioProfileTx: vi.fn(async () => undefined),
   createStudioMasterProfileTx: vi.fn(async () => "created-studio-profile"),
 }));
 const attachMasterToStudio = vi.hoisted(() => vi.fn(async () => ({ ok: true })));
-const createMasterProfile = vi.hoisted(() => vi.fn(async () => ({ providerId: "personal" })));
 
 const tx = {
   studioMembership: {
@@ -51,10 +70,10 @@ vi.mock("@/lib/invites/access", () => ({
   resolveInviteAccess: vi.fn(async () => "PHONE_OWNER"),
   normalizeInviteEmail: (value: string | null) => value?.trim().toLowerCase() || null,
 }));
-vi.mock("@/lib/studio/team-limits", () => ({ ensureStudioTeamLimit: vi.fn(async () => undefined) }));
+vi.mock("@/lib/invites/master-readiness", () => readiness);
+vi.mock("@/lib/studio/team-limits", () => teamLimits);
 vi.mock("@/lib/studios/masters", () => ({ attachMasterToStudio }));
 vi.mock("@/lib/auth/roles", () => ({ addRoleToUser: vi.fn(async () => []) }));
-vi.mock("@/lib/profiles/professional", () => ({ createMasterProfile }));
 vi.mock("@/lib/deletion/enqueue-media-purge", () => ({ enqueueMediaPurge: vi.fn() }));
 vi.mock("@/lib/media/purge", () => ({ collectProviderMedia: vi.fn(async () => []) }));
 vi.mock("@/lib/logging/logger", () => ({ logError: vi.fn(), logInfo: vi.fn() }));
@@ -122,21 +141,12 @@ describe("acceptStudioInvite — профиль в студии отдельно
     }
   });
 
-  it("нет личного кабинета — он создаётся обычным путём (у него и будет страница)", async () => {
-    providerLookups({ staged: STAGED });
-
-    await acceptStudioInvite("invite-1", USER);
-
-    expect(createMasterProfile).toHaveBeenCalledWith({ userId: "user-1", roles: USER.roles });
-  });
-
   it("🔴 личный профиль в студию не привязывается", async () => {
     db.masterProfileFindUnique.mockResolvedValueOnce({ id: "mp", providerId: "personal" });
     providerLookups({ staged: STAGED });
 
     await acceptStudioInvite("invite-1", USER);
 
-    expect(createMasterProfile).not.toHaveBeenCalled();
     expect(attachMasterToStudio).toHaveBeenCalledWith("studio-provider", "staged");
     expect(attachMasterToStudio).not.toHaveBeenCalledWith("studio-provider", "personal");
   });
@@ -163,5 +173,90 @@ describe("acceptStudioInvite — профиль в студии отдельно
     expect(result).toMatchObject({ ok: false, status: 409, code: "MASTER_ALREADY_ASSIGNED" });
     expect(split.claimStagedStudioProfileTx).not.toHaveBeenCalled();
     expect(split.createStudioMasterProfileTx).not.toHaveBeenCalled();
+  });
+});
+
+describe("acceptStudioInvite — только с пройденными «Первыми шагами»", () => {
+  function expectNothingJoined() {
+    expect(split.claimStagedStudioProfileTx).not.toHaveBeenCalled();
+    expect(split.createStudioMasterProfileTx).not.toHaveBeenCalled();
+    expect(attachMasterToStudio).not.toHaveBeenCalled();
+    expect(tx.studioInvite.update).not.toHaveBeenCalled();
+  }
+
+  it("🔴 шаги не пройдены — отказ, в студию ничего не попадает", async () => {
+    readiness.resolveMasterInviteReadiness.mockResolvedValueOnce({
+      hasCabinet: true,
+      ready: false,
+      doneCount: 5,
+      total: 7,
+      href: "/cabinet/master/portfolio?guide=portfolio",
+    });
+    providerLookups({ staged: STAGED });
+
+    const result = await acceptStudioInvite("invite-1", USER);
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: "MASTER_ONBOARDING_REQUIRED" });
+    expect(!result.ok && result.message).toContain("«Первые шаги»");
+    expectNothingJoined();
+  });
+
+  it("🔴 кабинета мастера нет — отказ с просьбой его создать; сам он не создаётся", async () => {
+    readiness.resolveMasterInviteReadiness.mockResolvedValueOnce({
+      hasCabinet: false,
+      ready: false,
+      doneCount: 0,
+      total: 7,
+      href: "/cabinet/roles",
+    });
+    providerLookups({ staged: STAGED });
+
+    const result = await acceptStudioInvite("invite-1", USER);
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: "MASTER_ONBOARDING_REQUIRED" });
+    expect(!result.ok && result.message).toContain("создайте кабинет мастера");
+    expect(db.masterProfileFindUnique).not.toHaveBeenCalled();
+    expectNothingJoined();
+  });
+
+  it("проверка до места в команде: отказ говорит о шагах, а не о полной студии", async () => {
+    readiness.resolveMasterInviteReadiness.mockResolvedValueOnce({
+      hasCabinet: true,
+      ready: false,
+      doneCount: 6,
+      total: 7,
+      href: "/cabinet/master/services?guide=services",
+    });
+
+    const result = await acceptStudioInvite("invite-1", USER);
+
+    expect(result).toMatchObject({ code: "MASTER_ONBOARDING_REQUIRED" });
+    expect(teamLimits.ensureStudioTeamLimit).not.toHaveBeenCalled();
+  });
+
+  it("отозванное приглашение — свой ответ, шаги не проверяются", async () => {
+    db.inviteFindUnique.mockResolvedValueOnce({
+      id: "invite-1",
+      phone: "+79991234567",
+      email: null,
+      studioId: "studio-1",
+      status: "LEFT",
+      studio: { providerId: "studio-provider" },
+    });
+
+    const result = await acceptStudioInvite("invite-1", USER);
+
+    expect(result).toMatchObject({ code: "INVITE_REVOKED" });
+    expect(readiness.resolveMasterInviteReadiness).not.toHaveBeenCalled();
+  });
+
+  it("кабинет удалили между проверкой и принятием — тот же отказ", async () => {
+    db.masterProfileFindUnique.mockResolvedValueOnce(null);
+    providerLookups({ staged: STAGED });
+
+    const result = await acceptStudioInvite("invite-1", USER);
+
+    expect(result).toMatchObject({ ok: false, status: 409, code: "MASTER_ONBOARDING_REQUIRED" });
+    expectNothingJoined();
   });
 });

@@ -1,8 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ChevronLeft, ChevronRight, Coffee, Plus, RefreshCw } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Coffee,
+  Plus,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { useViewerTimeZoneContext } from "@/components/providers/viewer-timezone-provider";
@@ -25,6 +33,8 @@ import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { UI_FMT, VIEWER_TZ } from "@/lib/ui/fmt";
 
 const T = UI_TEXT.studioCabinet.scheduleV2.header;
+/** «График команды»: графики всех мастеров, день и «Задать график» по строке. */
+const TEAM_SCHEDULE_HREF = "/cabinet/studio/schedule/team";
 const WEEKDAY_LONG_RU = [
   "Воскресенье",
   "Понедельник",
@@ -166,10 +176,37 @@ export function ScheduleHeader({
               </p>
             ) : null}
           </div>
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4" aria-hidden />
-            {T.addBooking}
-          </Button>
+          {/* Вход в «График команды» — на вкладке «Расписание», а не только в
+              листе «Ещё»: из PWA владелец правит графики мастеров одним
+              нажатием. На телефоне — как у расписания мастера: подписанная
+              «Настроить расписание» на всю строку, «Добавить запись» —
+              квадратной кнопкой-значком (две подписи в строку не помещаются). */}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Button asChild variant="secondary" className="flex-1 whitespace-nowrap sm:flex-none">
+              <Link href={TEAM_SCHEDULE_HREF}>
+                <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                {T.setupSchedule}
+              </Link>
+            </Button>
+            <Button
+              variant="primary"
+              size="none"
+              onClick={() => setCreateOpen(true)}
+              className="h-11 w-11 shrink-0 p-0 sm:hidden"
+              aria-label={T.addBooking}
+              title={T.addBooking}
+            >
+              <Plus className="h-5 w-5" aria-hidden />
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => setCreateOpen(true)}
+              className="hidden sm:inline-flex"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              {T.addBooking}
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

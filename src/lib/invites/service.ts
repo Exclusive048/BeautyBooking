@@ -4,11 +4,11 @@ import { addRoleToUser } from "@/lib/auth/roles";
 import { enqueueMediaPurge } from "@/lib/deletion/enqueue-media-purge";
 import type { Result, StatusCode } from "@/lib/domain/result";
 import { normalizeInviteEmail, resolveInviteAccess } from "@/lib/invites/access";
+import { resolveMasterInviteReadiness } from "@/lib/invites/master-readiness";
 import { logError } from "@/lib/logging/logger";
 import { collectProviderMedia } from "@/lib/media/purge";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { prisma } from "@/lib/prisma";
-import { createMasterProfile } from "@/lib/profiles/professional";
 import { ensureStudioTeamLimit } from "@/lib/studio/team-limits";
 import { attachMasterToStudio } from "@/lib/studios/masters";
 import { claimStagedStudioProfileTx, createStudioMasterProfileTx } from "@/lib/studios/master-profile-split";
@@ -106,6 +106,22 @@ export async function findPendingInvitesAddressedTo(contact: {
   return { inviteIds: invites.map((invite) => invite.id), stagedMasterIds };
 }
 
+/**
+ * Отказ «сначала Первые шаги» (решение владельца 2026-10-14,
+ * `invites/master-readiness.ts`). Текст называет, что сделать, — кнопку туда
+ * карточка приглашения показывает заранее.
+ */
+function masterOnboardingRequired(hasCabinet: boolean): Result<never> {
+  return {
+    ok: false,
+    status: 409,
+    message: hasCabinet
+      ? "Сначала пройдите все «Первые шаги» в кабинете мастера — после этого приглашение можно принять."
+      : "Сначала создайте кабинет мастера и пройдите в нём «Первые шаги» — после этого приглашение можно принять.",
+    code: "MASTER_ONBOARDING_REQUIRED",
+  };
+}
+
 export async function acceptStudioInvite(
   inviteId: string,
   user: InviteActor & { roles: AccountType[] }
@@ -141,6 +157,13 @@ export async function acceptStudioInvite(
   if (invite.status === MembershipStatus.REJECTED) {
     return { ok: false, status: 409, message: "Приглашение уже отклонено.", code: "INVITE_ALREADY_REJECTED" };
   }
+
+  // Решение владельца 2026-10-14: в команду студии — только с настроенным
+  // кабинетом мастера (все «Первые шаги»). Проверка — до места в команде:
+  // её человек исправляет сам. Свой адрес приглашения у владельца студии —
+  // не исключение.
+  const readiness = await resolveMasterInviteReadiness(user.id);
+  if (!readiness.ready) return masterOnboardingRequired(readiness.hasCabinet);
 
   // BC-CAP: accepting an invite makes a master ACTIVE (consumes a seat). Under
   // ACTIVE-only counting, pending invites don't reserve seats, so enforcement
@@ -195,17 +218,17 @@ export async function acceptStudioInvite(
   // студию не привязывается. Раньше привязывался сам личный профиль, и одно
   // расписание, одни правила и одни услуги обслуживали обе работы.
   //
-  // 1. Личный профиль: есть — остаётся как есть; нет — создаётся обычным путём
-  //    (кабинет мастера держится на нём: страница, свои услуги, настройки).
+  // 1. Личный профиль остаётся как есть. Он есть всегда: без кабинета мастера
+  //    приглашение не принимается (проверка выше); пропал между проверкой и
+  //    этим местом (удалили кабинет) — тот же отказ.
   const existingMasterProfile = await prisma.masterProfile.findUnique({
     where: { userId: user.id },
     select: { id: true, providerId: true },
   });
-  const personalProviderId = existingMasterProfile
-    ? existingMasterProfile.providerId
-    : (await createMasterProfile({ userId: user.id, roles: user.roles })).providerId;
+  if (!existingMasterProfile) return masterOnboardingRequired(false);
+  const personalProviderId = existingMasterProfile.providerId;
 
-  // Роль — вместе с кабинетом мастера, ДО привязки к студии.
+  // Роль у владельца кабинета мастера есть; страховка — ДО привязки к студии.
   if (!user.roles.includes(AccountType.MASTER)) {
     await addRoleToUser(user.id, user.roles, AccountType.MASTER);
   }

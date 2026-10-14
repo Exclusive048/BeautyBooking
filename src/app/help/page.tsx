@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { FAQItem } from "@/features/faq/components/faq-item";
+import { HelpAnswer } from "@/features/help/components/help-answer";
 import { HelpTabsClient } from "@/features/help/components/help-tabs-client";
 import {
   type HelpTab,
@@ -69,6 +70,20 @@ export default async function HelpPage({ searchParams }: PageProps) {
       {/* Categories — `key={activeTab}` forces a fresh subtree on tab switch
           so <FAQItem> open/close state doesn't leak between decks. */}
       <div key={activeTab} className="mx-auto max-w-3xl px-4 pb-12">
+        {/* HELP-GUIDE-01: оглавление — переход к разделу якорем, без JS. */}
+        <nav aria-label={T.toc.label} className="mb-10">
+          <p className="eyebrow mb-3">{T.toc.label}</p>
+          <ul className="flex flex-wrap gap-2">
+            {data.map((category) => (
+              <li key={category.id}>
+                <Button asChild variant="secondary" size="sm">
+                  <a href={`#help-cat-${activeTab}-${category.id}`}>{category.title}</a>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
         {data.map((category) => (
           <section
             key={category.id}
@@ -88,7 +103,7 @@ export default async function HelpPage({ searchParams }: PageProps) {
                   key={q.id}
                   id={`${activeTab}-${q.id}`}
                   question={q.question}
-                  answer={q.answer}
+                  answer={<HelpAnswer content={q} />}
                 />
               ))}
             </div>

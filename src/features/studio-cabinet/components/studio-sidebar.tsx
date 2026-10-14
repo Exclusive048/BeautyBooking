@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { CircleHelp, ExternalLink, QrCode } from "lucide-react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { SidebarItem } from "@/components/ui/sidebar-item";
@@ -29,6 +29,8 @@ type Props = {
 };
 
 const T = UI_TEXT.studioCabinet;
+const MY_PAGE_HREF = "/cabinet/studio/settings/public";
+const HELP_HREF = "/help?tab=studio";
 
 function badgeValue(
   counts: StudioSidebarCounts,
@@ -48,8 +50,11 @@ function badgeValue(
 export function StudioSidebar({ counts, user, studio }: Props) {
   const pathname = usePathname();
 
+  const myPageActive = pathname === MY_PAGE_HREF;
+
   const renderItem = (item: StudioNavItem) => {
-    const active = isStudioNavItemActive(pathname, item);
+    // «Моя страница» лежит под `/settings`: без исключения горели бы оба пункта.
+    const active = !myPageActive && isStudioNavItemActive(pathname, item);
     const label = T.nav.items[item.labelKey];
     const badge = badgeValue(counts, item.badgeKey);
     return (
@@ -86,8 +91,8 @@ export function StudioSidebar({ counts, user, studio }: Props) {
           </NavGroup>
         ))}
 
-        {studio.publicHref ? (
-          <NavGroup label={T.nav.groups.studioMetaExternal}>
+        <NavGroup label={T.nav.groups.studioMetaExternal}>
+          {studio.publicHref ? (
             <li>
               <Link
                 href={studio.publicHref}
@@ -99,8 +104,21 @@ export function StudioSidebar({ counts, user, studio }: Props) {
                 <span className="flex-1 truncate">{T.nav.items.publicPageExternal}</span>
               </Link>
             </li>
-          </NavGroup>
-        ) : null}
+          ) : null}
+          {/* «Моя страница» — ссылка, QR-код и визитка страницы студии, как
+              «Моя страница →» в листе «Ещё»; «Помощь» — инструкция по кабинету. */}
+          <li>
+            <SidebarItem
+              href={MY_PAGE_HREF}
+              label={T.nav.items.myPage}
+              icon={QrCode}
+              active={myPageActive}
+            />
+          </li>
+          <li>
+            <SidebarItem href={HELP_HREF} label={T.nav.items.help} icon={CircleHelp} />
+          </li>
+        </NavGroup>
       </nav>
 
       <div className="mt-8">

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { ResilientImage } from "@/components/ui/resilient-image";
+import type { MasterInviteReadiness } from "@/lib/invites/master-readiness";
 import type { NotificationCenterInviteItem } from "@/lib/notifications/center";
 import { ApiClientError, fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -13,6 +15,12 @@ import { useRevalidateMe } from "@/lib/hooks/use-me";
 
 type Props = {
   invites: NotificationCenterInviteItem[];
+  /**
+   * Пройдены ли «Первые шаги» кабинета мастера: до этого «Принять» выключена,
+   * а над приглашениями — что осталось и кнопка туда (решение владельца
+   * 2026-10-14). `null` — не известно; решает сервер при принятии.
+   */
+  masterReadiness?: MasterInviteReadiness | null;
   onChanged?: (items: NotificationCenterInviteItem[]) => void;
   className?: string;
 };
@@ -32,7 +40,7 @@ function InviteTitle({ studioName }: { studioName: string }) {
   );
 }
 
-export function StudioInviteCards({ invites, onChanged, className }: Props) {
+export function StudioInviteCards({ invites, masterReadiness = null, onChanged, className }: Props) {
   const t = UI_TEXT.notificationsCenter.invites;
   const tCenter = UI_TEXT.notificationsCenter;
   const [items, setItems] = useState<NotificationCenterInviteItem[]>(invites);
@@ -98,6 +106,8 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
     }
   };
 
+  const setupBlocked = masterReadiness !== null && !masterReadiness.ready;
+
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-border-subtle bg-bg-input/65 p-4 text-sm text-text-sec">
@@ -108,6 +118,20 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
 
   return (
     <div className={className}>
+      {masterReadiness && setupBlocked ? (
+        <Notice tone="info" className="mb-3 space-y-3" data-testid="invite-setup-required">
+          <p>
+            {masterReadiness.hasCabinet
+              ? t.setupRequired(masterReadiness.doneCount, masterReadiness.total)
+              : t.cabinetRequired}
+          </p>
+          <Button asChild size="sm" className="rounded-full">
+            <Link href={masterReadiness.href}>
+              {masterReadiness.hasCabinet ? t.continueSetup : t.createCabinet}
+            </Link>
+          </Button>
+        </Notice>
+      ) : null}
       <div className="space-y-3">
         {items.map((invite) => (
           <div
@@ -140,7 +164,7 @@ export function StudioInviteCards({ invites, onChanged, className }: Props) {
               <Button
                 type="button"
                 onClick={() => void postInviteAction(invite.id, "accept")}
-                disabled={savingId === invite.id}
+                disabled={savingId === invite.id || setupBlocked}
                 size="sm"
                 className="rounded-full"
               >

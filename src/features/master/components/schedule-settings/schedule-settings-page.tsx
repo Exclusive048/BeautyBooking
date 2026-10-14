@@ -92,6 +92,7 @@ export async function ScheduleSettingsPage({ profile = null }: { profile?: strin
         ]}
         title={S.title}
         subtitle={S.subtitle}
+        backHref="/cabinet/master/schedule"
         actions={
           <>
             <SaveStatusIndicator />

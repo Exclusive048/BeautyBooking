@@ -9,6 +9,7 @@ import { fetchJson, serverMessageOr } from "@/lib/http/client";
 import {
   PALETTE_LABEL_MAX,
   SCHEDULE_DAY_COLOR_KEYS,
+  nextPaletteColor,
   type ScheduleDayColorKey,
 } from "@/lib/schedule/calendar-shared";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
@@ -104,7 +105,9 @@ export function PaletteModal({
           key="create"
           mode="create"
           template={null}
-          defaultColor={SCHEDULE_DAY_COLOR_KEYS[palette.length % SCHEDULE_DAY_COLOR_KEYS.length]!}
+          // Новый день — свободным цветом, а не по числу дней (то повторяло
+          // цвет соседа, у которого он выбран вручную).
+          defaultColor={nextPaletteColor(palette.map((item) => item.color))}
           paletteEndpoint={paletteEndpoint}
           onBack={startWithCreate ? onClose : () => setView({ kind: "list" })}
           onDone={(snapshot, templateId) => {

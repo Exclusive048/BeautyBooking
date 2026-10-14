@@ -266,6 +266,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
   const viewerTimeZone = useViewerTimeZoneContext();
   const [filter, setFilter] = useState<FilterKey>("all");
   const [invites, setInvites] = useState(initialData.invites);
+  const [masterReadiness, setMasterReadiness] = useState(initialData.masterReadiness);
   const [invitesCount, setInvitesCount] = useState(initialData.invites.length);
   const [notifications, setNotifications] = useState(initialData.notifications);
   const [onlyUnread, setOnlyUnread] = useState(false);
@@ -291,6 +292,10 @@ export function NotificationsCenterPage({ initialData }: Props) {
     setInvites(initialData.invites);
     setInvitesCount(initialData.invites.length);
   }, [initialData.invites]);
+
+  useEffect(() => {
+    setMasterReadiness(initialData.masterReadiness);
+  }, [initialData.masterReadiness]);
 
   // 29.09 доработки · 10: итог действий над записью — общий тост (раньше —
   // своя плашка на 3 с в потоке страницы, невидимая после прокрутки).
@@ -364,6 +369,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
       cache: "no-store",
     });
     setInvites(data.invites);
+    setMasterReadiness(data.masterReadiness);
     setNotifications(data.notifications);
     setInvitesCount(data.invites.length);
     emitBellRefresh();
@@ -646,6 +652,7 @@ export function NotificationsCenterPage({ initialData }: Props) {
           <h2 className="mb-3 text-sm font-semibold text-text-main">{t.invitesTitle}</h2>
           <StudioInviteCards
             invites={invites}
+            masterReadiness={masterReadiness}
             onChanged={(items) => {
               setInvites(items);
               setInvitesCount(items.length);

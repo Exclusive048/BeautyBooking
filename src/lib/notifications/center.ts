@@ -1,5 +1,6 @@
 import { MembershipStatus, NotificationType, ProviderType, StudioRole } from "@prisma/client";
 import { pendingInvitesVisibleToUserWhere } from "@/lib/invites/access";
+import { resolveMasterInviteReadiness, type MasterInviteReadiness } from "@/lib/invites/master-readiness";
 import { normalizeRussianPhone } from "@/lib/phone/russia";
 import { resolveNotificationOpenHref } from "@/lib/notifications/presentation";
 import { prisma } from "@/lib/prisma";
@@ -31,6 +32,11 @@ export type NotificationCenterNotificationItem = {
 
 export type NotificationCenterData = {
   invites: NotificationCenterInviteItem[];
+  /**
+   * Можно ли сейчас принять приглашение (все «Первые шаги» кабинета мастера)
+   * и куда идти, если нет. Только когда приглашения есть, иначе `null`.
+   */
+  masterReadiness: MasterInviteReadiness | null;
   notifications: NotificationCenterNotificationItem[];
   unreadCount: number;
   hasPhone: boolean;
@@ -376,7 +382,10 @@ export async function getNotificationCenterData(input: {
   ]);
 
   const { studioIds, adminStudioIds } = audience;
-  const scheduleRequestNotifications = await loadPendingScheduleRequestItems(adminStudioIds);
+  const [scheduleRequestNotifications, masterReadiness] = await Promise.all([
+    loadPendingScheduleRequestItems(adminStudioIds),
+    invites.length > 0 ? resolveMasterInviteReadiness(input.userId) : null,
+  ]);
 
   const timelineNotifications: NotificationCenterNotificationItem[] = [
     ...notifications.map((item) => {
@@ -423,6 +432,7 @@ export async function getNotificationCenterData(input: {
         studioPublicUsername: invite.studio.provider.publicUsername ?? null,
         createdAt: invite.createdAt.toISOString(),
       })),
+    masterReadiness,
     notifications: timelineNotifications,
     unreadCount: unreadCount + scheduleRequestNotifications.length,
     hasPhone: Boolean(input.phone && normalizeRussianPhone(input.phone)),
