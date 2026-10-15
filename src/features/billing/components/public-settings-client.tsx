@@ -1,11 +1,41 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Copy, Download, ExternalLink, Pencil, QrCode, Smartphone } from "lucide-react";
+import {
+  Check,
+  Copy,
+  CreditCard,
+  Download,
+  ExternalLink,
+  Pencil,
+  QrCode,
+  Share2,
+  Smartphone,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Notice } from "@/components/ui/notice";
 import { QrCodeCanvas } from "@/components/ui/qr-code-canvas";
-import { BRAND_COLORS, withAlpha } from "@/lib/ui/brand-colors";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/toast";
+import {
+  canvasToBlob,
+  downloadFromUrl,
+  ensureCardFonts,
+  loadCardImage,
+  readQrFromCanvas,
+  resolveCardFontFamily,
+  shareCardImage,
+  waitForQr,
+} from "@/features/billing/lib/business-card/browser";
+import {
+  BUSINESS_CARD_FORMATS,
+  renderBusinessCard,
+  renderQrImage,
+  type BusinessCardFormat,
+} from "@/features/billing/lib/business-card/render";
+import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 
@@ -23,318 +53,25 @@ type Props = {
   avatarUrl?: string | null;
 };
 
-// ─── Canvas helpers ────────────────────────────────────────────────
+type CardImage = { blob: Blob; href: string };
 
 /**
- * UI-04: постер скачивают и публикуют — он обязан быть в бренд-палитре, но
- * `ctx.fillStyle` принимает только строку цвета, поэтому значения идут из
- * `BRAND_COLORS` (зеркало `globals.css`), а не литералами.
- *
- * Канонические стопы бренд-градиента — та же форма, что у утилиты
- * `bg-brand-gradient`: три стопа на 0 / 55% / 100%. Одна функция на все
- * акцентные полосы обоих постеров, чтобы форма не разъехалась между ними.
+ * Готовые картинки визитки для одного набора данных (`key`). Обе формы
+ * рисуются сразу и заранее: «Поделиться» обязано вызвать `navigator.share`
+ * прямо в нажатии, а Safari теряет жест на первом же ожидании — рисовать на
+ * клике нельзя.
  */
-function paintBrandGradient(grad: CanvasGradient): CanvasGradient {
-  grad.addColorStop(0, BRAND_COLORS.brandFrom);
-  grad.addColorStop(0.55, BRAND_COLORS.brandVia);
-  grad.addColorStop(1, BRAND_COLORS.brandDeep);
-  return grad;
-}
+type CardState = {
+  key: string;
+  images: Record<BusinessCardFormat, CardImage> | null;
+  failed: boolean;
+};
 
-function loadCanvasImage(src: string): Promise<HTMLImageElement | null> {
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = src;
-  });
-}
+const QR_EXPORT_SIZE = 1024;
 
-function drawCircleAvatar(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement | null,
-  cx: number,
-  cy: number,
-  r: number,
-  initial: string
-): void {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  if (img) {
-    ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2);
-  } else {
-    const grad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-    grad.addColorStop(0, withAlpha(BRAND_COLORS.brandFrom, 0.12));
-    grad.addColorStop(1, withAlpha(BRAND_COLORS.brandVia, 0.1));
-    ctx.fillStyle = grad;
-    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-    ctx.fillStyle = BRAND_COLORS.brandFrom;
-    ctx.font = `bold ${Math.round(r * 0.9)}px system-ui,-apple-system,sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(initial, cx, cy);
-  }
-  ctx.restore();
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = BRAND_COLORS.borderSubtle;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-}
-
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
-// ─── Horizontal card (1050×600, for print) ──────────────────────
-
-async function renderHorizontalCard(
-  ctx: CanvasRenderingContext2D,
-  W: number,
-  H: number,
-  data: {
-    name: string;
-    hashtag: string;
-    address: string;
-    bio: string;
-    avatarImg: HTMLImageElement | null;
-    profileUrl: string;
-    qrCanvas: HTMLCanvasElement;
-  }
-): Promise<void> {
-  const { name, hashtag, address, bio, avatarImg, profileUrl, qrCanvas } = data;
-  const PAD = 56;
-  const AVATAR_R = 56;
-  const AVATAR_CX = PAD + AVATAR_R;
-  const AVATAR_CY = Math.round(H * 0.38);
-  const TEXT_X = AVATAR_CX + AVATAR_R + 28;
-  const QR_SIZE = 180;
-  const QR_X = W - PAD - QR_SIZE;
-  const QR_Y = H - PAD - QR_SIZE;
-
-  // White background — намеренно чистый белый, а не `surfaceCard`: это бумага
-  // печатной карточки и подложка QR, где нужен максимальный контраст для
-  // сканера, а не оттенок палитры.
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-
-  // Left accent bar (brand gradient)
-  const accentGrad = paintBrandGradient(ctx.createLinearGradient(0, 0, 0, H));
-  ctx.fillStyle = accentGrad;
-  ctx.fillRect(0, 0, 8, H);
-
-  // Top accent line (thin)
-  const topGrad = paintBrandGradient(ctx.createLinearGradient(0, 0, W, 0));
-  ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, W, 4);
-
-  // Avatar
-  drawCircleAvatar(ctx, avatarImg, AVATAR_CX, AVATAR_CY, AVATAR_R, name.charAt(0).toUpperCase());
-
-  // Name
-  const nameFont = name.length > 20 ? 30 : 36;
-  ctx.fillStyle = BRAND_COLORS.textMain;
-  ctx.font = `bold ${nameFont}px system-ui,-apple-system,sans-serif`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillText(truncate(name, 30), TEXT_X, AVATAR_CY - AVATAR_R + 4);
-
-  // Hashtag
-  if (hashtag.trim()) {
-    ctx.fillStyle = BRAND_COLORS.brandFrom;
-    ctx.font = "22px system-ui,-apple-system,sans-serif";
-    const tag = hashtag.startsWith("#") ? hashtag : `#${hashtag}`;
-    ctx.fillText(truncate(tag, 40), TEXT_X, AVATAR_CY - AVATAR_R + nameFont + 12);
-  }
-
-  // Address
-  if (address.trim()) {
-    ctx.fillStyle = BRAND_COLORS.textSecondary;
-    ctx.font = "20px system-ui,-apple-system,sans-serif";
-    ctx.fillText(`📍 ${truncate(address, 50)}`, TEXT_X, AVATAR_CY + 6);
-  }
-
-  // Bio
-  if (bio.trim()) {
-    ctx.fillStyle = BRAND_COLORS.textLabel;
-    ctx.font = "18px system-ui,-apple-system,sans-serif";
-    ctx.fillText(truncate(bio, 72), TEXT_X, AVATAR_CY + 36);
-  }
-
-  // QR white background chip
-  ctx.fillStyle = BRAND_COLORS.surfacePage;
-  ctx.beginPath();
-  ctx.roundRect(QR_X - 12, QR_Y - 12, QR_SIZE + 24, QR_SIZE + 24, 16);
-  ctx.fill();
-  ctx.strokeStyle = BRAND_COLORS.borderSubtle;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // QR code
-  ctx.drawImage(qrCanvas, QR_X, QR_Y, QR_SIZE, QR_SIZE);
-
-  // URL
-  ctx.fillStyle = BRAND_COLORS.brandFrom;
-  ctx.font = "20px system-ui,-apple-system,sans-serif";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "bottom";
-  ctx.fillText(profileUrl, PAD + 20, H - PAD + 4);
-
-  // Brand name
-  ctx.fillStyle = BRAND_COLORS.textSecondary;
-  ctx.font = "15px system-ui,-apple-system,sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "bottom";
-  ctx.fillText("МастерРядом", W / 2, H - 12);
-}
-
-// ─── Vertical card (1080×1920, for socials) ─────────────────────
-
-async function renderVerticalCard(
-  ctx: CanvasRenderingContext2D,
-  W: number,
-  H: number,
-  data: {
-    name: string;
-    hashtag: string;
-    address: string;
-    bio: string;
-    avatarImg: HTMLImageElement | null;
-    profileUrl: string;
-    username: string;
-    qrCanvas: HTMLCanvasElement;
-  }
-): Promise<void> {
-  const { name, hashtag, address, bio, avatarImg, profileUrl, username, qrCanvas } = data;
-  const s = W / 1080;
-
-  // White background
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
-
-  // Top gradient accent bar
-  const topGrad = paintBrandGradient(ctx.createLinearGradient(0, 0, W, 0));
-  ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, W, 10 * s);
-
-  // Brand
-  ctx.fillStyle = BRAND_COLORS.brandFrom;
-  ctx.font = `600 ${28 * s}px system-ui,-apple-system,sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText("МастерРядом", W / 2, 50 * s);
-
-  // Avatar
-  const AVATAR_R = 120 * s;
-  const AVATAR_CX = W / 2;
-  const AVATAR_CY = 240 * s;
-  drawCircleAvatar(ctx, avatarImg, AVATAR_CX, AVATAR_CY, AVATAR_R, name.charAt(0).toUpperCase());
-
-  // Name
-  ctx.fillStyle = BRAND_COLORS.textMain;
-  ctx.font = `bold ${52 * s}px system-ui,-apple-system,sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText(truncate(name, 28), W / 2, 400 * s);
-
-  // Hashtag
-  if (hashtag.trim()) {
-    ctx.fillStyle = BRAND_COLORS.brandFrom;
-    ctx.font = `${32 * s}px system-ui,-apple-system,sans-serif`;
-    const tag = hashtag.startsWith("#") ? hashtag : `#${hashtag}`;
-    ctx.fillText(truncate(tag, 36), W / 2, 466 * s);
-  }
-
-  // Divider
-  ctx.fillStyle = BRAND_COLORS.borderSubtle;
-  ctx.fillRect(80 * s, 520 * s, W - 160 * s, 1.5 * s);
-
-  let curY = 560 * s;
-
-  // Address
-  if (address.trim()) {
-    ctx.fillStyle = BRAND_COLORS.textSecondary;
-    ctx.font = `${30 * s}px system-ui,-apple-system,sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(`📍 ${truncate(address, 48)}`, W / 2, curY);
-    curY += 60 * s;
-  }
-
-  // Bio
-  if (bio.trim()) {
-    const lines = wrapText(ctx, truncate(bio, 120), W - 160 * s, `${28 * s}px system-ui,-apple-system,sans-serif`);
-    ctx.fillStyle = BRAND_COLORS.textLabel;
-    ctx.font = `${28 * s}px system-ui,-apple-system,sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    for (const line of lines.slice(0, 4)) {
-      ctx.fillText(line, W / 2, curY);
-      curY += 42 * s;
-    }
-    curY += 12 * s;
-  }
-
-  // Divider 2
-  ctx.fillStyle = BRAND_COLORS.borderSubtle;
-  ctx.fillRect(80 * s, curY, W - 160 * s, 1.5 * s);
-  curY += 40 * s;
-
-  // "Записаться:" label
-  ctx.fillStyle = BRAND_COLORS.textSecondary;
-  ctx.font = `${26 * s}px system-ui,-apple-system,sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText("Записаться:", W / 2, curY);
-  curY += 40 * s;
-
-  // URL
-  ctx.fillStyle = BRAND_COLORS.brandFrom;
-  ctx.font = `600 ${28 * s}px system-ui,-apple-system,sans-serif`;
-  ctx.fillText(profileUrl, W / 2, curY);
-  curY += 70 * s;
-
-  // QR code
-  const QR_SIZE = 280 * s;
-  const QR_X = (W - QR_SIZE) / 2;
-  ctx.fillStyle = BRAND_COLORS.surfacePage;
-  ctx.beginPath();
-  ctx.roundRect(QR_X - 16 * s, curY - 16 * s, QR_SIZE + 32 * s, QR_SIZE + 32 * s, 20 * s);
-  ctx.fill();
-  ctx.strokeStyle = BRAND_COLORS.borderSubtle;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.drawImage(qrCanvas, QR_X, curY, QR_SIZE, QR_SIZE);
-
-  // Username under QR
-  ctx.fillStyle = BRAND_COLORS.textSecondary;
-  ctx.font = `${22 * s}px system-ui,-apple-system,sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText(`@${username}`, W / 2, curY + QR_SIZE + 24 * s);
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, font: string): string[] {
-  ctx.font = font;
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
+function cardFileName(format: BusinessCardFormat, username: string): string {
+  const stem = username || "profile";
+  return format === "print" ? `masterryadom-vizitka-${stem}.png` : `masterryadom-stories-${stem}.png`;
 }
 
 // ─── Component ────────────────────────────────────────────────────
@@ -348,6 +85,7 @@ export function PublicSettingsClient({
   avatarUrl = null,
 }: Props) {
   const t = UI_TEXT.billing.publicPage;
+  const toast = useToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -357,13 +95,16 @@ export function PublicSettingsClient({
   const [username, setUsername] = useState("");
   const [url, setUrl] = useState("");
   const [draft, setDraft] = useState("");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [cardGenerating, setCardGenerating] = useState(false);
+  const [format, setFormat] = useState<BusinessCardFormat>("print");
+  const [card, setCard] = useState<CardState | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
-  // Hidden QR canvas for export (larger size for crisp output)
+  // Скрытый крупный QR — источник матрицы модулей для визитки и «Скачать QR».
   const qrExportRef = useRef<HTMLCanvasElement>(null);
-  // Visible QR canvas for UI display
+  // Видимый QR в карточке «QR-код профиля».
   const qrRef = useRef<HTMLCanvasElement>(null);
+  // Blob-ссылки показанных картинок: освобождаются при замене и при уходе со страницы.
+  const issuedHrefsRef = useRef<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -384,58 +125,57 @@ export function PublicSettingsClient({
     void load();
   }, [load]);
 
-  // Build business card data, render preview
-  const buildCardData = useCallback(async () => {
-    if (!url || !username) return null;
-    const profileUrl = url.replace(/^https?:\/\//, "");
-    const avatarImg = avatarUrl ? await loadCanvasImage(avatarUrl) : null;
-    const qrCanvas = qrExportRef.current;
-    if (!qrCanvas) return null;
-    return {
-      name: name || username,
-      hashtag: tagline,
-      address,
-      bio,
-      avatarImg,
-      profileUrl,
-      username,
-      qrCanvas,
-    };
-  }, [url, username, name, tagline, address, bio, avatarUrl]);
+  const displayName = name || username;
+  const cardKey = [url, displayName, tagline, address, bio, avatarUrl ?? "", retryNonce].join("\n");
 
-  // Generate preview (horizontal card at reduced scale)
+  // Обе формы визитки рисуются, как только известен адрес страницы.
   useEffect(() => {
-    if (!url || !username) return;
+    if (!url) return;
     let cancelled = false;
+    const created: string[] = [];
     void (async () => {
-      // Small delay to let QR canvas render
-      await new Promise((r) => setTimeout(r, 120));
-      if (cancelled) return;
-
-      const data = await buildCardData();
-      if (!data || cancelled) return;
-
-      const SCALE = 0.45;
-      const W = Math.round(1050 * SCALE);
-      const H = Math.round(600 * SCALE);
-      const canvas = document.createElement("canvas");
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.scale(SCALE, SCALE);
-      await renderHorizontalCard(ctx, 1050, 600, data);
-      canvas.toBlob((blob) => {
-        if (cancelled || !blob) return;
-        const newUrl = URL.createObjectURL(blob);
-        setPreviewUrl((prev) => {
-          if (prev) URL.revokeObjectURL(prev);
-          return newUrl;
-        });
-      }, "image/png");
+      try {
+        const fontFamily = resolveCardFontFamily();
+        const [qr, avatar] = await Promise.all([
+          waitForQr(() => qrExportRef.current, () => cancelled),
+          avatarUrl ? loadCardImage(avatarUrl) : Promise.resolve(null),
+          ensureCardFonts(fontFamily),
+        ]);
+        if (cancelled) return;
+        const content = { name: displayName, tagline, address, bio, profileUrl: url, avatar, qr, fontFamily };
+        const images = {} as Record<BusinessCardFormat, CardImage>;
+        for (const cardFormat of BUSINESS_CARD_FORMATS) {
+          const blob = await canvasToBlob(renderBusinessCard(cardFormat, content));
+          if (cancelled) return;
+          const href = URL.createObjectURL(blob);
+          created.push(href);
+          images[cardFormat] = { blob, href };
+        }
+        const previous = issuedHrefsRef.current;
+        issuedHrefsRef.current = created.splice(0);
+        setCard({ key: cardKey, images, failed: false });
+        previous.forEach((href) => URL.revokeObjectURL(href));
+      } catch {
+        if (!cancelled) setCard({ key: cardKey, images: null, failed: true });
+      }
     })();
-    return () => { cancelled = true; };
-  }, [url, username, buildCardData]);
+    return () => {
+      cancelled = true;
+      created.forEach((href) => URL.revokeObjectURL(href));
+    };
+  }, [cardKey, url, displayName, tagline, address, bio, avatarUrl]);
+
+  useEffect(
+    () => () => {
+      issuedHrefsRef.current.forEach((href) => URL.revokeObjectURL(href));
+      issuedHrefsRef.current = [];
+    },
+    [],
+  );
+
+  const currentCard = card?.key === cardKey ? card : null;
+  const cardImage = currentCard?.images?.[format] ?? null;
+  const cardFailed = currentCard?.failed ?? false;
 
   const handleCopy = useCallback(async () => {
     if (!url) return;
@@ -470,66 +210,42 @@ export function PublicSettingsClient({
   }, [draft, endpoint, t.saveFailed]);
 
   const handleDownloadQr = useCallback(() => {
-    const canvas = qrRef.current;
-    if (!canvas) return;
+    const qr = readQrFromCanvas(qrExportRef.current) ?? qrRef.current;
+    if (!qr) return;
     const exportCanvas = document.createElement("canvas");
-    const SIZE = 1024;
-    exportCanvas.width = SIZE;
-    exportCanvas.height = SIZE;
+    exportCanvas.width = QR_EXPORT_SIZE;
+    exportCanvas.height = QR_EXPORT_SIZE;
     const ctx = exportCanvas.getContext("2d");
     if (!ctx) return;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, SIZE, SIZE);
-    ctx.drawImage(canvas, 0, 0, SIZE, SIZE);
-    const link = document.createElement("a");
-    link.download = `qr-${username || "profile"}.png`;
-    link.href = exportCanvas.toDataURL("image/png");
-    link.click();
+    renderQrImage(ctx, qr, QR_EXPORT_SIZE);
+    downloadFromUrl(exportCanvas.toDataURL("image/png"), `masterryadom-qr-${username || "profile"}.png`);
   }, [username]);
 
-  const handleDownloadCard = useCallback(async () => {
-    setCardGenerating(true);
-    try {
-      const data = await buildCardData();
-      if (!data) return;
-      const canvas = document.createElement("canvas");
-      const W = 1050;
-      const H = 600;
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      await renderHorizontalCard(ctx, W, H, data);
-      const link = document.createElement("a");
-      link.download = `card-${username || "profile"}.png`;
-      link.href = canvas.toDataURL("image/png", 0.95);
-      link.click();
-    } finally {
-      setCardGenerating(false);
-    }
-  }, [buildCardData, username]);
+  const handleDownloadCard = useCallback(() => {
+    if (!cardImage) return;
+    downloadFromUrl(cardImage.href, cardFileName(format, username));
+  }, [cardImage, format, username]);
 
-  const handleDownloadVertical = useCallback(async () => {
-    setCardGenerating(true);
+  const copyProfileLink = useCallback(async () => {
     try {
-      const data = await buildCardData();
-      if (!data) return;
-      const canvas = document.createElement("canvas");
-      const W = 1080;
-      const H = 1920;
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      await renderVerticalCard(ctx, W, H, data);
-      const link = document.createElement("a");
-      link.download = `card-social-${username || "profile"}.png`;
-      link.href = canvas.toDataURL("image/png", 0.95);
-      link.click();
-    } finally {
-      setCardGenerating(false);
+      await navigator.clipboard.writeText(url);
+      toast.success(t.shareLinkCopied);
+    } catch {
+      toast.error(t.shareFailed);
     }
-  }, [buildCardData, username]);
+  }, [url, toast, t.shareLinkCopied, t.shareFailed]);
+
+  const handleShareCard = useCallback(async () => {
+    if (!cardImage) return;
+    // Без ожиданий до `navigator.share` — иначе Safari сочтёт вызов не жестом.
+    const outcome = await shareCardImage({
+      blob: cardImage.blob,
+      filename: cardFileName(format, username),
+      title: displayName,
+      url,
+    });
+    if (outcome === "unsupported") await copyProfileLink();
+  }, [cardImage, format, username, displayName, url, copyProfileLink]);
 
   if (loading) {
     return (
@@ -677,56 +393,101 @@ export function PublicSettingsClient({
               <p className="mt-0.5 text-xs text-text-sec">{t.cardSectionHint}</p>
             </div>
 
-            <div className="p-4 space-y-4">
-              {/* Live preview */}
-              {previewUrl ? (
-                <div className="rounded-xl border border-border-subtle bg-bg-input/50 p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- blob URL, next/image doesn't support it */}
-                  <img
-                    src={previewUrl}
-                    alt={t.cardPreviewAlt}
-                    className="w-full rounded-lg shadow-sm"
-                    style={{ maxHeight: 260, objectFit: "contain" }}
-                  />
-                </div>
-              ) : (
-                <div className="flex h-32 items-center justify-center rounded-xl border border-border-subtle bg-bg-input/50 text-xs text-text-sec">
-                  {t.cardGenerating}
-                </div>
-              )}
+            <div className="space-y-4 p-4">
+              <SegmentedTabs
+                value={format}
+                onChange={setFormat}
+                ariaLabel={t.cardFormatLabel}
+                className="sm:max-w-sm"
+                options={[
+                  {
+                    value: "print",
+                    label: t.cardFormatPrint,
+                    icon: <CreditCard className="h-4 w-4" aria-hidden />,
+                    testId: "business-card-format-print",
+                  },
+                  {
+                    value: "story",
+                    label: t.cardFormatStory,
+                    icon: <Smartphone className="h-4 w-4" aria-hidden />,
+                    testId: "business-card-format-story",
+                  },
+                ]}
+              />
 
-              {/* Download buttons */}
+              <div className="flex justify-center rounded-2xl bg-bg-input/50 p-4 sm:p-6">
+                {cardImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- blob-ссылка на картинку с холста: next/image её не оптимизирует
+                  <img
+                    src={cardImage.href}
+                    alt={t.cardPreviewAlt}
+                    data-testid="business-card-preview"
+                    className={cn(
+                      "shadow-card",
+                      format === "print"
+                        ? "w-full max-w-xl rounded-lg"
+                        : "h-96 w-auto rounded-2xl sm:h-[30rem]",
+                    )}
+                  />
+                ) : cardFailed ? (
+                  <div className="flex w-full max-w-xl flex-col items-start gap-3">
+                    <Notice tone="danger" className="w-full">
+                      {t.cardFailed}
+                    </Notice>
+                    <Button variant="secondary" size="sm" onClick={() => setRetryNonce((n) => n + 1)}>
+                      {t.cardRetry}
+                    </Button>
+                  </div>
+                ) : (
+                  <div role="status" className="flex w-full justify-center">
+                    <Skeleton
+                      className={cn(
+                        format === "print"
+                          ? "aspect-[9/5] w-full max-w-xl rounded-lg"
+                          : "aspect-[9/16] h-96 rounded-2xl sm:h-[30rem]",
+                      )}
+                    />
+                    <span className="sr-only">{t.cardGenerating}</span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-text-sec">
+                {format === "print" ? t.cardFormatPrintNote : t.cardFormatStoryNote}
+              </p>
+
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant="secondary"
                   size="sm"
-                  onClick={() => void handleDownloadCard()}
-                  disabled={cardGenerating}
+                  onClick={() => void handleShareCard()}
+                  disabled={!cardImage}
                   className="gap-2"
+                  data-testid="business-card-share"
                 >
-                  <Download className="h-4 w-4" />
-                  {t.downloadCard}
+                  <Share2 className="h-4 w-4" aria-hidden />
+                  {t.shareCard}
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => void handleDownloadVertical()}
-                  disabled={cardGenerating}
+                  onClick={handleDownloadCard}
+                  disabled={!cardImage}
                   className="gap-2"
+                  data-testid="business-card-download"
                 >
-                  <Smartphone className="h-4 w-4" />
-                  {t.downloadCardSocial}
+                  <Download className="h-4 w-4" aria-hidden />
+                  {t.downloadCard}
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* Hidden export QR (large size for crisp card output) */}
+          {/* Скрытый крупный QR: из него читается матрица модулей */}
           <div className="sr-only" aria-hidden="true">
             <QrCodeCanvas
               canvasRef={qrExportRef}
               value={url}
-              size={400}
+              size={512}
               level="M"
               includeMargin={false}
             />

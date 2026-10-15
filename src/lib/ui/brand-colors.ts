@@ -5,7 +5,9 @@
  * `globals.css`:
  *   • HTML транзакционной почты (`lib/email/templates/*`) — рендерит почтовый
  *     клиент получателя: ни переменных, ни классов, ни темы;
- *   • canvas-постеры кабинета (`ctx.fillStyle` принимает только строку цвета);
+ *   • canvas-постеры кабинета — визитка с QR-кодом
+ *     (`features/billing/lib/business-card`; `ctx.fillStyle` принимает только
+ *     строку цвета);
  *   • OG-превью через `next/og` (satori понимает только инлайновые стили);
  *   • `app/global-error.tsx` — рендерится при падении root-layout, то есть
  *     Tailwind недоступен по определению;
@@ -37,6 +39,14 @@ export const BRAND_COLORS = {
   brandAccent: "#C6A97E",
   /** `--primary-foreground` (`:root`) — текст поверх бренд-заливки. */
   textOnBrand: "#FFFFFF",
+  /**
+   * `--logo-mark-fixed-*` — стопы знака на поверхности, тёмной в обеих темах
+   * (`LogoMark variant="fixedDark"`). На canvas-визитке знак стоит на
+   * бордовой панели — там нужна ровно эта, светлая версия.
+   */
+  logoMarkFixedFrom: "#D44A6A",
+  logoMarkFixedVia: "#F0839B",
+  logoMarkFixedTo: "#FEC6D3",
 
   /* === Светлые поверхности (`:root`) === */
   /** `--bg-page` — кремовая бумага. */

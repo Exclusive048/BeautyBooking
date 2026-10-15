@@ -21,7 +21,9 @@ const STOP_CLASSES: Record<LogoMarkVariant, readonly [string, string, string]> =
 };
 
 // Четыре лепестка-линзы, поле 100×100 — дословно из `svg/mark-*.svg` набора.
-const PETALS = [
+// Экспорт — для canvas-визитки (`features/billing/lib/business-card`): знак там
+// рисуется `Path2D` по тем же контурам, второй копии путей быть не должно.
+export const LOGO_MARK_PETALS = [
   "M6 6 A46 46 0 0 1 62 62 A46 46 0 0 1 6 6Z",
   "M94 6 A46 46 0 0 1 38 62 A46 46 0 0 1 94 6Z",
   "M94 94 A46 46 0 0 1 38 38 A46 46 0 0 1 94 94Z",
@@ -62,7 +64,7 @@ export function LogoMark({ size, variant = "themed", className }: Props) {
           <stop offset="1" className={cn(to, "[stop-color:currentColor]")} />
         </linearGradient>
       </defs>
-      {PETALS.map((d) => (
+      {LOGO_MARK_PETALS.map((d) => (
         <path key={d} d={d} fill={`url(#${gradientId})`} fillOpacity={0.5} />
       ))}
     </svg>
