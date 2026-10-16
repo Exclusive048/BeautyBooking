@@ -18,6 +18,8 @@ type Props = {
   providerId: string;
   enabled: boolean;
   className?: string;
+  /** Классы обёртки (кнопка + согласие + ошибка) — для раскладки в ряду вызывающего. */
+  wrapperClassName?: string;
 };
 
 /**
@@ -38,7 +40,7 @@ type Props = {
  *     fires when the `smart-price-job` mints a new hot slot for the
  *     provider — push + telegram via existing delivery pipeline.
  */
-export function HotSlotsSubscribeButton({ providerId, enabled, className }: Props) {
+export function HotSlotsSubscribeButton({ providerId, enabled, className, wrapperClassName }: Props) {
   const { user } = useMe();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -164,7 +166,7 @@ export function HotSlotsSubscribeButton({ providerId, enabled, className }: Prop
     // FIX-C8: обёртка нужна, чтобы отказу было где появиться. Без ошибки внутри
     // ровно один потомок — кнопка, — поэтому в обычном состоянии ряд hero-блока
     // выглядит как прежде.
-    <div className="flex flex-col items-start gap-1">
+    <div className={cn("flex flex-col items-start gap-1", wrapperClassName)}>
       <Button
         variant={subscribed ? "secondary" : "primary"}
         size="sm"

@@ -76,7 +76,9 @@ export function CitySelector() {
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={T.label}
-        className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5 py-1 text-sm font-medium text-text-main transition-colors hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        // `min-h-11` — зона нажатия на высоту шапки; фона у кнопки нет, так
+        // что внешне она не меняется (было 28px — мимо на телефоне).
+        className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5 text-sm font-medium text-text-main transition-colors hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         {currentCity ? (
           <span className="min-w-0 max-w-[140px] truncate">{currentCity.name}</span>
@@ -107,7 +109,7 @@ export function CitySelector() {
               <li key={city.id} role="option" aria-selected={isCurrent}>
                 <Button variant="wrapper"
                   onClick={() => handleSelect(city.slug)}
-                  className={`block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60 ${
+                  className={`block w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/60 ${
                     isCurrent ? "font-medium text-accent-text" : "text-text-main"
                   }`}
                 >

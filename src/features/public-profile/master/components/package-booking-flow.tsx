@@ -349,7 +349,7 @@ export function PackageBookingFlow({
   if (components.length === 0) return null;
 
   return (
-    <ModalSurface open={open} onClose={onClose} title={bundle.name} size="lg">
+    <ModalSurface fullScreenOnMobile open={open} onClose={onClose} title={bundle.name} size="lg">
       {phase === "build" ? (
         <div className="space-y-4" data-testid="package-wizard">
           <p className="text-sm text-text-sec">{T.buildHint}</p>

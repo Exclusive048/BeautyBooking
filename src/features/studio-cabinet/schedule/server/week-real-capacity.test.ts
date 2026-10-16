@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DayPlan } from "@/lib/schedule/types";
 
 /**
- * MOBILE-POLISH — неделя календаря студии в вебе (`/cabinet/studio/schedule?view=week`)
+ * MOBILE-POLISH — неделя календаря студии в вебе (`/cabinet/studio/calendar?view=week`)
  * считает загрузку по НАСТОЯЩЕМУ графику мастера, тем же расчётом, что неделя
  * приложения (`loadStudioWeekCells` → `buildStudioWeekCell`), а не
  * «5 записей = 100%»: ёмкость — рабочие минуты без перерывов, день

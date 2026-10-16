@@ -92,7 +92,9 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
 
   return (
     <div ref={anchorRef} className="relative shrink-0">
-      <Button variant="wrapper"
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((prev) => !prev);
@@ -101,7 +103,7 @@ export function RowMenu({ itemId, itemType, isEnabled, onEditClick }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={busy}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-text-sec transition-colors hover:bg-bg-input hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        className="h-8 w-8 rounded-lg text-text-sec hover:text-text-main focus-visible:ring-primary/40"
       >
         <MoreVertical className="h-3.5 w-3.5" aria-hidden />
       </Button>

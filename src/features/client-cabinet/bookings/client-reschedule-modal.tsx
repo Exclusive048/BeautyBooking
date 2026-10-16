@@ -149,7 +149,7 @@ export function ClientRescheduleModal({ booking, manageToken, onClose, onSuccess
   }
 
   return (
-    <ModalSurface open onClose={onClose} title={T.moveBooking}>
+    <ModalSurface fullScreenOnMobile open onClose={onClose} title={T.moveBooking}>
       <div className="space-y-4">
         <p className="text-sm text-text-sec">{T.moveBookingHint}</p>
 

@@ -37,10 +37,18 @@ export function UrlSortSelect<T extends string>({ value, defaultValue, options, 
   };
 
   return (
-    <label className="inline-flex items-center gap-2 rounded-xl border border-border-subtle bg-bg-card px-3 py-2 text-sm">
-      <ArrowDownUp className="h-3.5 w-3.5 text-text-sec" aria-hidden />
+    // Список занимает всю рамку: нажатие на телефоне открывает его, только если
+    // попало в сам `<select>` (нажатие по `<label>` лишь фокусирует), а был он
+    // высотой со строку текста — 21px.
+    <label className="relative inline-flex items-center rounded-xl border border-border-subtle bg-bg-card text-sm">
+      <ArrowDownUp className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-text-sec" aria-hidden />
       <span className="sr-only">{label}</span>
-      <Select variant="borderless" value={value} onChange={(event) => handleChange(event.target.value)}>
+      <Select
+        variant="borderless"
+        value={value}
+        onChange={(event) => handleChange(event.target.value)}
+        className="min-h-10 rounded-xl py-2 pl-9 pr-3"
+      >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

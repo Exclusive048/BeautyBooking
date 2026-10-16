@@ -3,8 +3,8 @@ import { HeroSkeleton } from "@/components/blocks/skeletons/HeroSkeleton";
 import { PortfolioSkeleton } from "@/components/blocks/skeletons/PortfolioSkeleton";
 import { ReviewsSkeleton } from "@/components/blocks/skeletons/ReviewsSkeleton";
 import { ServicesSkeleton } from "@/components/blocks/skeletons/ServicesSkeleton";
+import { STUDIO_REVIEWS_ANCHOR } from "@/features/public-studio/components/studio-hero";
 import { StudioHeroSection } from "@/features/public-studio/sections/hero-section";
-import { StudioDetailsSection } from "@/features/public-studio/sections/details-section";
 import { StudioPhotosSection } from "@/features/public-studio/sections/photos-section";
 import { StudioPackagesSection } from "@/features/public-studio/sections/packages-section";
 import { StudioReviewsSection } from "@/features/public-studio/sections/reviews-section";
@@ -39,6 +39,10 @@ type Props = {
  * replaced it with «Записаться» (`StudioStickyCta`): the anchor it scrolled to
  * did not exist, and now every booking CTA opens the same dialog.
  * Contextual CTAs (per-service, per-master, package) are legitimate and stay.
+ *
+ * STUDIO-HERO-INFO (2026-10-14): карточка «о студии» (логотип, оценка, цена,
+ * адрес, описание, категории, соцсети) переехала из низа страницы в шапку —
+ * справа от баннера; под ними — карусель работ.
  *
  * FIX-STUDIO-02 (owner parity — SELF-BOOKING-STUDIO-OWNER-PARITY): when the
  * viewer owns this studio the self-booking guard rejects them at submit, so
@@ -80,13 +84,12 @@ export function PublicStudioProfilePage({ studioId, bookingParams }: Props) {
           <StudioPhotosSection studioId={studioId} />
         </Suspense>
 
-        <Suspense fallback={<ReviewsSkeleton />}>
-          <StudioReviewsSection studioId={studioId} />
-        </Suspense>
-
-        <Suspense fallback={<ServicesSkeleton />}>
-          <StudioDetailsSection studioId={studioId} />
-        </Suspense>
+        {/* «N отзывов» в шапке ведёт сюда. */}
+        <div id={STUDIO_REVIEWS_ANCHOR} className="scroll-mt-24">
+          <Suspense fallback={<ReviewsSkeleton />}>
+            <StudioReviewsSection studioId={studioId} />
+          </Suspense>
+        </div>
 
         {/* Плавающая «Записаться» + автооткрытие окна по ссылке; владельцу — ничего. */}
         <Suspense fallback={null}>

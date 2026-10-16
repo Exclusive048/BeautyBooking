@@ -238,7 +238,7 @@ export function ServiceModal({
 
   return (
     <>
-    <ModalSurface open={open} onClose={close} title={mode === "create" ? T.title.create : T.title.edit} className="max-w-xl">
+    <ModalSurface fullScreenOnMobile open={open} onClose={close} title={mode === "create" ? T.title.create : T.title.edit} className="max-w-xl">
       <div className="space-y-4">
         <Field label={T.nameLabel}>
           {(controlId) => (

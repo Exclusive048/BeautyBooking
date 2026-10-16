@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
+import { writeThemeCookie } from "@/lib/pwa/theme-cookie";
 import { BRAND_COLORS } from "@/lib/ui/brand-colors";
 
 /**
@@ -41,31 +42,43 @@ import { BRAND_COLORS } from "@/lib/ui/brand-colors";
  * цвет стоит в `manifest.webmanifest` (`theme_color`): Android читает его при
  * установке PWA и до первого рендера страницы.
  *
- * ⚠️ iOS standalone это не покрывает: там полоса статуса управляется
- * `apple-mobile-web-app-status-bar-style` (build-time строка), а не
- * `theme-color`.
+ * IOS-STATUS-BAR-THEME (2026-10-14). На iPhone в установленном приложении
+ * (`statusBarStyle: "default"`) фон полосы статуса берётся из `theme-color`,
+ * но берётся на старте: правку `content` той же меты он может не заметить —
+ * открыли в тёмной теме, переключили на светлую, полоса осталась тёмной. Две
+ * поправки: (1) своя мета при смене цвета ЗАМЕНЯЕТСЯ новым узлом, а не
+ * правится на месте; (2) выбранная тема пишется в куку `mr-theme`, и сервер
+ * рендерит одну мету её цвета (`lib/pwa/theme-cookie.ts`) — следующий запуск и
+ * переход начинаются с верного цвета, даже если первая поправка не сработала.
  */
 const THEME_META_SELECTOR = 'meta[name="theme-color"]';
 
 function applyThemeColor(color: string): void {
-  const metas = document.head.querySelectorAll<HTMLMetaElement>(THEME_META_SELECTOR);
-  let hasApp = false;
-  metas.forEach((meta) => {
-    if (meta.getAttribute("data-theme-color") === "app") hasApp = true;
-    if (meta.getAttribute("content") !== color) meta.setAttribute("content", color);
-  });
-  if (!hasApp) {
-    const meta = document.createElement("meta");
-    meta.setAttribute("name", "theme-color");
-    meta.setAttribute("data-theme-color", "app");
-    meta.setAttribute("content", color);
-    document.head.insertBefore(meta, document.head.firstChild);
+  const metas = Array.from(document.head.querySelectorAll<HTMLMetaElement>(THEME_META_SELECTOR));
+  let appMeta: HTMLMetaElement | null = null;
+  for (const meta of metas) {
+    if (meta.getAttribute("data-theme-color") === "app") appMeta = meta;
+    else if (meta.getAttribute("content") !== color) meta.setAttribute("content", color);
   }
+  if (appMeta?.getAttribute("content") === color) return;
+  // Свою мету — новым узлом: iOS замечает вставку, а правку `content` — не всегда.
+  appMeta?.remove();
+  const meta = document.createElement("meta");
+  meta.setAttribute("name", "theme-color");
+  meta.setAttribute("data-theme-color", "app");
+  meta.setAttribute("content", color);
+  document.head.insertBefore(meta, document.head.firstChild);
 }
 
 export function ThemeColorMeta() {
-  const { resolvedTheme } = useTheme();
+  const { theme, resolvedTheme } = useTheme();
   const pathname = usePathname();
+
+  // Выбор темы — серверу, для меты первого кадра (IOS-STATUS-BAR-THEME).
+  useEffect(() => {
+    if (theme === undefined) return;
+    writeThemeCookie(theme);
+  }, [theme]);
 
   useEffect(() => {
     // До гидратации `resolvedTheme` не определён — трогать мету нечем, SSR-база

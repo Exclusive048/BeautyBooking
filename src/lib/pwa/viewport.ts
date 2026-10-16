@@ -1,4 +1,6 @@
 import type { Viewport } from "next";
+import type { ExplicitTheme } from "@/lib/pwa/theme-cookie";
+import { BRAND_COLORS } from "@/lib/ui/brand-colors";
 
 /**
  * PWA-ZOOM-01 — вьюпорт сайта и его iOS-поправка.
@@ -27,10 +29,21 @@ export const BASE_VIEWPORT: Viewport = {
   // `next-themes`, а он `prefers-color-scheme` не меняет. Значения зеркалят
   // `BRAND_COLORS.surfacePage` / `.darkSurfacePage` (инв. #40).
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F6F0EA" },
-    { media: "(prefers-color-scheme: dark)", color: "#1F1417" },
+    { media: "(prefers-color-scheme: light)", color: BRAND_COLORS.surfacePage },
+    { media: "(prefers-color-scheme: dark)", color: BRAND_COLORS.darkSurfacePage },
   ],
 };
+
+/**
+ * IOS-STATUS-BAR-THEME: тема выбрана явно (кука `mr-theme`) — одна мета её
+ * цвета без `media`. Иначе полоса статуса приложения на iPhone стартует цветом
+ * СИСТЕМНОЙ темы, а не выбранной в продукте (`lib/pwa/theme-cookie.ts`).
+ */
+function themeColorFor(theme: ExplicitTheme | null): Viewport["themeColor"] {
+  if (theme === "light") return BRAND_COLORS.surfacePage;
+  if (theme === "dark") return BRAND_COLORS.darkSurfacePage;
+  return BASE_VIEWPORT.themeColor;
+}
 
 /**
  * iPhone / iPod / iPad со «своим» UA. iPadOS в режиме «сайт для компьютера»
@@ -41,7 +54,11 @@ export function isIosUserAgent(userAgent: string | null | undefined): boolean {
   return /\b(iPhone|iPad|iPod)\b/.test(userAgent ?? "");
 }
 
-export function resolveViewport(userAgent: string | null | undefined): Viewport {
+export function resolveViewport(
+  userAgent: string | null | undefined,
+  theme: ExplicitTheme | null = null,
+): Viewport {
+  const base: Viewport = { ...BASE_VIEWPORT, themeColor: themeColorFor(theme) };
   // `userScalable: false` не ставится намеренно: он и есть запрет щипка.
-  return isIosUserAgent(userAgent) ? { ...BASE_VIEWPORT, maximumScale: 1 } : BASE_VIEWPORT;
+  return isIosUserAgent(userAgent) ? { ...base, maximumScale: 1 } : base;
 }

@@ -172,6 +172,7 @@ export function BundleModal({ open, onClose, mode, bundle, allServices }: Props)
   return (
     <>
     <ModalSurface
+      fullScreenOnMobile
       open={open}
       onClose={close}
       title={mode === "create" ? T.title.create : T.title.edit}

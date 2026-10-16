@@ -82,7 +82,38 @@ export function mapProviderCard(provider: ProviderCardSource): ProviderCardDto {
   };
 }
 
+/**
+ * Категории профиля — из его включённых услуг (PROFILE-CATEGORIES-FROM-SERVICES,
+ * 2026-10-14): названия категорий каталога в их порядке, без повторов.
+ * Колонку `Provider.categories` интерфейс не пишет, и страница студии с
+ * услугами в трёх категориях показывала «Без категорий». Запасным путём она
+ * не служит: заполняют её только сиды (слагами — «nails», «brows») и сторонние
+ * клиенты API, то есть на странице оказывались бы служебные слова.
+ */
+export function profileCategories(services: ProviderServiceDto[]): string[] {
+  const byName = new Map<string, number>();
+  for (const service of services) {
+    if (!service.categoryName || byName.has(service.categoryName)) continue;
+    byName.set(service.categoryName, service.categoryOrder ?? Number.MAX_SAFE_INTEGER);
+  }
+  return [...byName.entries()]
+    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0], "ru"))
+    .map(([name]) => name);
+}
+
+/**
+ * «от N ₽» профиля — самая низкая ненулевая цена его включённых услуг, как у
+ * карточки каталога (`resolveMinPrice`); цен нет — ноль, и строка не
+ * показывается. Колонку `Provider.priceFrom` никто не пересчитывает (рождается
+ * нулём), и страница студии писала «от 0 ₽».
+ */
+export function profileMinPrice(services: ProviderServiceDto[]): number {
+  const prices = services.map((service) => service.price).filter((price) => price > 0);
+  return prices.length > 0 ? Math.min(...prices) : 0;
+}
+
 export function mapProviderProfile(provider: ProviderProfileSource): ProviderProfileDto {
+  const services = provider.services.map(mapProviderService);
   return {
     id: provider.id,
     type: provider.type,
@@ -99,10 +130,10 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     isPublished: provider.isPublished,
     rating: provider.rating,
     reviews: provider.reviews,
-    priceFrom: provider.priceFrom,
+    priceFrom: profileMinPrice(services),
     address: provider.address,
     district: provider.district,
-    categories: provider.categories,
+    categories: profileCategories(services),
     availableToday: provider.availableToday,
     timezone: provider.timezone,
     socialVk: provider.socialVk ?? null,
@@ -118,7 +149,7 @@ export function mapProviderProfile(provider: ProviderProfileSource): ProviderPro
     geoLat: provider.geoLat,
     geoLng: provider.geoLng,
     superpowerBadges: [],
-    services: provider.services.map(mapProviderService),
+    services,
     sellsOwnServices: provider.type === "MASTER" && !provider.studioId,
   };
 }

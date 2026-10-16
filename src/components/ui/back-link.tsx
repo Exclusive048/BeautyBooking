@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,19 +16,45 @@ type Props = {
  * «Назад» браузера нет, а крошки в шапке мелкие и на телефоне неудобны —
  * экран, на который ведёт кнопка из другого раздела («Настроить расписание»),
  * должен уметь вернуть обратно сам.
+ *
+ * BACK-BUTTON-01: круглая кнопка 40px со стрелкой, в одну строку с заголовком
+ * экрана (`PageTitleRow`) — как «назад» в приложениях. Прежняя мелкая
+ * текстовая ссылка 14px над заголовком выглядела чужой и плохо попадала под
+ * палец. Подпись «Назад» — у экранного диктора и во всплывающей подсказке.
  */
 export function BackLink({ href, className }: Props) {
   return (
     <Button
       asChild
-      variant="ghost"
-      size="sm"
-      className={cn("-ml-2 gap-1 rounded-xl px-2 text-text-sec hover:text-text-main", className)}
+      variant="icon"
+      size="icon"
+      className={cn("shrink-0 rounded-full bg-bg-card text-text-main", className)}
     >
-      <Link href={href}>
-        <ChevronLeft className="h-4 w-4" aria-hidden />
-        {UI_TEXT.actions.back}
+      <Link href={href} aria-label={UI_TEXT.actions.back} title={UI_TEXT.actions.back}>
+        <ChevronLeft className="h-5 w-5" aria-hidden />
       </Link>
     </Button>
+  );
+}
+
+/**
+ * Строка «Назад + заголовок экрана»: кнопка слева, заголовок рядом, по центру
+ * строки. Без `backHref` — только заголовок.
+ */
+export function PageTitleRow({
+  backHref,
+  children,
+  className,
+}: {
+  backHref?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  if (!backHref) return <>{children}</>;
+  return (
+    <div className={cn("flex min-w-0 items-center gap-3", className)}>
+      <BackLink href={backHref} />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   );
 }

@@ -1,5 +1,20 @@
+import { pluralize } from "@/lib/utils/pluralize";
+
 export const publicStudio = {
   heroBook: "Записаться онлайн",
+  // STUDIO-HERO-INFO (2026-10-14): справа от баннера — название, слоган,
+  // описание, оценка, ссылки; под ними — карусель работ студии.
+  hero: {
+    reviewsLink: (count: number) => `${count} ${pluralize(count, "отзыв", "отзыва", "отзывов")}`,
+    // Без отзывов «0,0 (0 отзывов)» читалось бы как нулевая оценка.
+    noReviewsYet: "Пока без отзывов",
+    priceFrom: (price: string) => `от ${price}`,
+    descriptionExpand: "Показать полностью",
+    descriptionCollapse: "Свернуть",
+    worksTitle: "Работы студии",
+    worksPrev: "Предыдущие работы",
+    worksNext: "Следующие работы",
+  },
   // FIX-STUDIO-02 (owner parity): shown in place of the booking CTAs when the
   // viewer owns this studio (self-booking is server-rejected). Mirrors the
   // master-side owner notice.
@@ -24,14 +39,10 @@ export const publicStudio = {
   openMaster: "Открыть профиль",
   blockLoadFailed: "Не удалось загрузить этот раздел. Попробуйте ещё раз.",
   profileLoadFailed: "Не удалось загрузить профиль студии. Попробуйте ещё раз.",
-  studioDataLoadFailed: "Не удалось загрузить данные студии. Попробуйте ещё раз.",
   servicesLoadFailed: "Не удалось загрузить услуги. Попробуйте ещё раз.",
   reviewsLoadFailed: "Не удалось загрузить отзывы. Попробуйте ещё раз.",
-  typeStudio: "Студия",
   availableToday: "Свободно сегодня",
-  noCategories: "Без категорий",
   studioOnlyProfileError: "Эта страница — только для студий",
-  from: "от",
   selectSlotFirst: "Выберите удобное время",
   bookingError: "Не удалось создать запись. Попробуйте ещё раз.",
   mastersLoadFailed: "Не удалось загрузить мастеров. Попробуйте ещё раз.",

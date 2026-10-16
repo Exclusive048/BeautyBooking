@@ -80,13 +80,17 @@ export function InlineEditField({
   );
 }
 
-/** Бледный карандаш справа от строки: виден при наведении на строку и в фокусе. */
+/**
+ * Бледный карандаш справа от строки: виден при наведении на строку и в фокусе,
+ * а там, где наведения нет (телефон), — всегда: иначе строку не отличить от
+ * обычного текста.
+ */
 export function InlineEditPencil({ className, ...props }: React.ComponentProps<typeof Button> & { "aria-label": string }) {
   return (
     <Button
       variant="wrapper"
       className={cn(
-        "shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100",
+        "shrink-0 rounded-md p-1.5 text-text-sec opacity-0 transition-opacity hover:text-accent-text group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
         className,
       )}
       {...props}

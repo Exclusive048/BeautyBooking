@@ -156,7 +156,7 @@ export function AddServiceDialog({
   }
 
   return (
-    <ModalSurface open={open} onClose={handleClose} title={T.title}>
+    <ModalSurface fullScreenOnMobile open={open} onClose={handleClose} title={T.title}>
       <div className="space-y-4">
         <label className="block">
           <FieldLabel>

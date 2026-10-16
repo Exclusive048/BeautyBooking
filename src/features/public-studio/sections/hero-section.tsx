@@ -1,10 +1,10 @@
-import { StudioHeroGallery } from "@/features/public-studio/studio-hero-gallery";
+import { StudioHero } from "@/features/public-studio/components/studio-hero";
 import {
-  getStudioPortfolio,
+  getStudioPagePhotos,
   getStudioProfile,
+  type StudioPagePhoto,
 } from "@/features/public-studio/server/studio-query";
 import { isViewerProfileOwner } from "@/features/public-profile/master/server/owner-view";
-import type { MediaAssetDto } from "@/lib/media/types";
 import { studioBookingUrl } from "@/lib/public-urls";
 import { logPublicStudioBlockError } from "@/features/public-studio/server/block-error";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -13,9 +13,22 @@ type Props = {
   studioId: string;
 };
 
+/**
+ * Фото — дополнение к шапке: не прочитались — шапка показывает название,
+ * описание и запись без карусели, а не «Не удалось загрузить раздел».
+ */
+async function loadHeroPhotos(studioId: string): Promise<StudioPagePhoto[]> {
+  try {
+    return await getStudioPagePhotos(studioId);
+  } catch (error) {
+    logPublicStudioBlockError("hero-photos", error, ["listMediaAssets"]);
+    return [];
+  }
+}
+
 export async function StudioHeroSection({ studioId }: Props) {
   let studio = null;
-  let portfolio: MediaAssetDto[] = [];
+  let photos: StudioPagePhoto[] = [];
   // FIX-STUDIO-02 (owner parity): hide the hero booking CTA for the owner
   // (self-booking is server-rejected). Cached helper, resolves in parallel.
   let isOwner = false;
@@ -24,15 +37,15 @@ export async function StudioHeroSection({ studioId }: Props) {
   try {
     const result = await Promise.all([
       getStudioProfile(studioId),
-      getStudioPortfolio(studioId),
+      loadHeroPhotos(studioId),
       isViewerProfileOwner(studioId),
     ]);
     studio = result[0];
-    portfolio = result[1];
+    photos = result[1];
     isOwner = result[2];
   } catch (error) {
     hasError = true;
-    logPublicStudioBlockError("hero-section", error, ["getProviderProfile", "listMediaAssets"]);
+    logPublicStudioBlockError("hero-section", error, ["getProviderProfile"]);
   }
 
   if (hasError) {
@@ -51,15 +64,6 @@ export async function StudioHeroSection({ studioId }: Props) {
     );
   }
 
-  // PORTFOLIO-CROP-01: показываем вырезы, выбранные админом студии (баннер —
-  // 16:9, работы — 4:5). Баннер узнаётся по исходнику: он же фото портфолио.
-  const workItems = portfolio
-    .filter((item) => item.url !== studio.bannerUrl)
-    .map((item) => ({ url: item.displayUrl, kind: "work" as const }));
-  const imageItems = studio.bannerDisplayUrl
-    ? [{ url: studio.bannerDisplayUrl, kind: "banner" as const }, ...workItems]
-    : workItems;
-
   const bookingHref = studioBookingUrl(
     { id: studio.id, publicUsername: studio.publicUsername },
     undefined,
@@ -68,12 +72,7 @@ export async function StudioHeroSection({ studioId }: Props) {
 
   return (
     <div className="fade-in-up">
-      <StudioHeroGallery
-        studio={studio}
-        imageItems={imageItems}
-        bookingHref={bookingHref}
-        hideBooking={isOwner}
-      />
+      <StudioHero studio={studio} photos={photos} bookingHref={bookingHref} hideBooking={isOwner} />
     </div>
   );
 }

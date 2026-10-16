@@ -343,6 +343,7 @@ export function RescheduleModal({
 
   return (
     <ModalSurface
+      fullScreenOnMobile
       open={open}
       onClose={onClose}
       title={T.modalTitle}

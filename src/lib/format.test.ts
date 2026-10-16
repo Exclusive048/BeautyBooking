@@ -65,7 +65,7 @@ describe("QA-109 source guard — public surfaces don't format kopecks with a no
     { file: "src/features/client-cabinet/favorites/client-favorites-page.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/chat/chat-window/system-message.tsx", marker: "moneyRUBFromKopeks(" },
     { file: "src/features/search-by-time/components/provider-result-card.tsx", marker: "moneyRUBFromKopeks(" },
-    { file: "src/features/public-studio/sections/details-section.tsx", marker: "moneyRUBFromKopeks(" },
+    { file: "src/features/public-studio/components/studio-hero.tsx", marker: "UI_FMT.priceLabel(" },
     { file: "src/features/home/components/recent-masters-section.tsx", marker: "moneyRUBPlainFromKopeks(" },
   ];
 

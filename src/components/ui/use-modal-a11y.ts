@@ -136,24 +136,27 @@ export function useInitialFocus(
     // for the active element. Falls back through the priority chain
     // until something focusable is found.
     const id = window.requestAnimationFrame(() => {
+      // Без прокрутки — всегда: окно открывается с начала. Явная цель — обычно
+      // «якорь» вокруг содержимого, и когда он выше экрана (окно записи с
+      // длинным списком услуг на ПК), браузер прокручивал к его верху и
+      // прятал заголовок окна. Первый фокусируемый элемент — та же история
+      // (MOBILE-SHEETS-01): на телефоне окно выезжает снизу, и в кадре
+      // анимации кнопка «Закрыть» ещё ниже экрана — браузер прокручивал
+      // полноэкранное окно к ней, и оно открывалось с середины.
       const explicit = initialFocusRef?.current ?? null;
       if (explicit) {
-        // Без прокрутки: окно открывается с начала. Явная цель — обычно
-        // «якорь» вокруг содержимого, и когда он выше экрана (окно записи с
-        // длинным списком услуг на ПК), браузер прокручивал к его верху и
-        // прятал заголовок окна.
         explicit.focus({ preventScroll: true });
         return;
       }
       const focusable = getFocusable(containerRef.current);
       if (focusable.length > 0) {
-        focusable[0]!.focus();
+        focusable[0]!.focus({ preventScroll: true });
         return;
       }
       // Last resort: focus the container itself. Caller must give it
       // tabIndex={-1} for this to work; we don't mutate it here to
       // avoid surprise reflow.
-      containerRef.current?.focus();
+      containerRef.current?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(id);
   }, [open, containerRef, initialFocusRef]);
