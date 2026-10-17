@@ -108,6 +108,7 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
 
   return (
     <ModalSurface
+      fullScreenOnMobile
       open={open}
       onClose={handleClose}
       header={{ title: T.title, subtitle: T.hint }}

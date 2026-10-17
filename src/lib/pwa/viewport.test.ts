@@ -8,6 +8,8 @@
  * iOS-ветке: красный «щипок не запрещён никому». Возвращено — зелёный.
  */
 import { describe, expect, it } from "vitest";
+import { BRAND_COLORS } from "@/lib/ui/brand-colors";
+import { parseThemeCookie } from "./theme-cookie";
 import { isIosUserAgent, resolveViewport } from "./viewport";
 
 const IPHONE =
@@ -45,5 +47,40 @@ describe("resolveViewport — PWA-ZOOM-01", () => {
     expect(viewport.initialScale).toBe(1);
     expect(viewport.viewportFit).toBe("cover");
     expect(viewport.themeColor).toHaveLength(2);
+  });
+});
+
+/**
+ * IOS-STATUS-BAR-THEME — тема выбрана явно (кука `mr-theme`): одна мета цвета
+ * ВЫБРАННОЙ темы без `media`, иначе полоса статуса на iPhone стартует цветом
+ * системной темы. Без куки — прежняя пара по `prefers-color-scheme`.
+ *
+ * @probe 2026-10-14 — ветка `light` в `themeColorFor` выключена (светлая тема
+ * получала пару по системе): 1 failed «светлая тема — светлая полоса, тёмная —
+ * тёмная, одна мета без media». Возвращено — 8 passed.
+ */
+describe("resolveViewport — IOS-STATUS-BAR-THEME", () => {
+  it("светлая тема — светлая полоса, тёмная — тёмная, одна мета без media", () => {
+    expect(resolveViewport(IPHONE, "light").themeColor).toBe(BRAND_COLORS.surfacePage);
+    expect(resolveViewport(IPHONE, "dark").themeColor).toBe(BRAND_COLORS.darkSurfacePage);
+    expect(resolveViewport(ANDROID, "dark").themeColor).toBe(BRAND_COLORS.darkSurfacePage);
+  });
+
+  it("тема не выбрана — пара по системной настройке", () => {
+    expect(resolveViewport(IPHONE, null).themeColor).toHaveLength(2);
+    expect(resolveViewport(IPHONE).themeColor).toHaveLength(2);
+  });
+
+  it("кука читается только как light / dark", () => {
+    expect(parseThemeCookie("light")).toBe("light");
+    expect(parseThemeCookie("dark")).toBe("dark");
+    for (const value of ["system", "", "DARK", null, undefined]) {
+      expect(parseThemeCookie(value)).toBeNull();
+    }
+  });
+
+  it("предел масштаба iOS сохраняется и с темой", () => {
+    expect(resolveViewport(IPHONE, "dark").maximumScale).toBe(1);
+    expect(resolveViewport(ANDROID, "dark").maximumScale).toBeUndefined();
   });
 });

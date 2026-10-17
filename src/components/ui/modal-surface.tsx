@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, type ReactNode, type RefObject } from "react";
+import { useId, useRef, type ReactNode, type RefObject, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, m } from "framer-motion";
 import { X } from "lucide-react";
@@ -8,7 +8,8 @@ import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { useOverlayA11y } from "@/components/ui/use-modal-a11y";
 import { useIsHydrated } from "@/hooks/use-is-hydrated";
-import { DISTANCE, MOTION } from "@/lib/ui/motion";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { DISTANCE, MOTION, SPRING_SHEET } from "@/lib/ui/motion";
 import * as UI_TEXT from "@/lib/ui/text";
 
 export type ModalSurfaceSize = "sm" | "md" | "lg" | "xl" | "full";
@@ -38,14 +39,15 @@ type Props = {
    */
   footer?: ReactNode;
   /**
-   * Закрепить подвал внизу экрана, пока окно длиннее экрана: кнопки шагов
-   * длинной формы (часы по дням на телефоне) не уезжают за прокрутку.
+   * Закрепить подвал внизу, пока окно длиннее экрана: кнопки шагов длинной
+   * формы (часы по дням на телефоне) не уезжают за прокрутку.
    */
   stickyFooter?: boolean;
   /**
-   * На телефоне (до `sm`) — во весь экран: шапка с крестиком закреплена
-   * сверху, подвал прижат к низу с отступом под «домашнюю полоску»; с `sm`
-   * окно прежнее. Для окон, где главное — фото и длинная форма (портфолио).
+   * На телефоне (до `sm`) — экран целиком, как отдельная страница: шапка с
+   * крестиком закреплена сверху, подвал прижат к низу с отступом под
+   * «домашнюю полоску»; с `sm` окно прежнее. Для длинных форм и пошаговых
+   * сценариев (запись, услуга, график). Без флага на телефоне — нижняя шторка.
    */
   fullScreenOnMobile?: boolean;
   /**
@@ -79,37 +81,31 @@ const SIZE_CLASS: Record<ModalSurfaceSize, string> = {
   full: "max-w-7xl",
 };
 
+/** Шторку закрывает протяжка вниз за шапку дальше этого порога (px). */
+const SHEET_DISMISS_PX = 80;
+
 /**
- * Centered modal with backdrop click-to-close.
+ * Окно поверх страницы.
  *
- * modals-investigation: ModalSurface renders through
- * `createPortal(..., document.body)` so the `fixed inset-0` always
- * anchors to the **viewport**, regardless of any ancestor CSS that
- * might otherwise establish a containing block (`transform`,
- * `filter`, `backdrop-filter`, `contain`, etc.). This is the
- * canonical fix after three recurrences of the "modal top clipped
- * above viewport" bug in Services / Portfolio modals — see
- * BACKLOG.md for the diagnostic story.
+ * modals-investigation: рендер — порталом в `document.body`, поэтому
+ * `fixed inset-0` всегда привязан к экрану, а не к предку с `transform` /
+ * `filter` / `backdrop-filter` (три рецидива «верх окна срезан»).
  *
- * MODAL-UNIFY-IMPL-A: extended with `size`, `header`, `footer`
- * slots and a framer-motion entrance/exit animation (fade + scale).
- * All additions are opt-in — passing only the original
- * `{open, onClose, title?, className?, children}` produces the
- * identical layout the ~79 existing callers rely on.
+ * MOBILE-SHEETS-01 (2026-10-14, замечание владельца: «раскрывается почти на
+ * весь экран, но не на весь — как будто не по-мобильному»). До `sm` окно было
+ * карточкой с полями 16px по бокам и 40px сверху и снизу, без крестика и без
+ * своей прокрутки: длинная форма уезжала вместе с подложкой. Теперь на
+ * телефоне две формы, и обе — родные для телефона:
+ *  - **нижняя шторка** (по умолчанию): выезжает снизу, скругление только
+ *    сверху, ручка и крестик в закреплённой шапке, своя прокрутка, отступ под
+ *    «домашнюю полоску»; закрывается крестиком, подложкой, Escape и протяжкой
+ *    вниз за шапку. Короткое окно — компактная шторка, длинное — высокая;
+ *  - **экран целиком** (`fullScreenOnMobile`): для длинных форм и сценариев
+ *    по шагам — читается как отдельная страница.
+ * С `sm` — прежняя карточка по центру, с прокруткой всего слоя.
  *
- * Scroll model: the outer fixed layer carries `overflow-y-auto`
- * itself, so tall modal content scrolls the **whole** modal
- * surface (backdrop included) rather than being trapped in an
- * inner scroll container with a `max-h-[90vh]` cap. On `sm+`
- * viewports the modal centres vertically; on mobile it pins to
- * the top with `my-6` breathing room so the title is always
- * visible on open and the user scrolls from the top down — the
- * standard mobile-modal pattern.
- *
- * Side effects: body scroll lock (`overflow: hidden`) while open
- * prevents the page behind the modal from scrolling. ESC closes.
- * Backdrop click closes — the modal box stops propagation.
- * Restored on unmount or `open → false`.
+ * Side effects: body scroll lock while open, ESC closes, backdrop click
+ * closes — the panel stops propagation (`useOverlayA11y`).
  */
 export function ModalSurface({
   open,
@@ -127,15 +123,19 @@ export function ModalSurface({
 }: Props) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef<number | null>(null);
+  // Анимация входа зависит от раскладки: на телефоне окно выезжает снизу,
+  // с `sm` — появляется по центру. Портал рисуется только после гидратации,
+  // так что серверное значение хука на экран не попадает.
+  const isWide = useMediaQuery("(min-width: 640px)");
   // MODAL-A11Y-BATCH-A: prefers-reduced-motion уважается централизованно —
   // `MotionConfig reducedMotion="user"` (MotionProvider) гасит масштаб и сдвиг,
   // оставляя прозрачность (29.09 доработки · 19).
 
   // MODAL-A11Y-BATCH-A + UI-13: весь контракт диалога одним вызовом —
   // Escape, блокировка прокрутки фона, WCAG SC 2.4.3 (Focus Order) и
-  // SC 3.2.1 (On Focus). Escape и scroll-lock жили здесь и в `Drawer`
-  // дословными копиями; после UI-13 у контракта одна реализация, и
-  // оверлеи, написанные мимо примитивов, берут ровно её.
+  // SC 3.2.1 (On Focus).
   useOverlayA11y({ open, onClose, containerRef: panelRef, initialFocusRef });
 
   // MODAL-SSR-OPEN-HYDRATION: портала нет в серверной разметке, поэтому и
@@ -148,8 +148,36 @@ export function ModalSurface({
   const ariaLabelledBy = headerTitle ? titleId : ownLabelledBy;
   const fullScreen = fullScreenOnMobile;
 
+  // Протяжка шторки вниз: двигается обёртка, а не панель — у панели свой
+  // `transform` от framer. Только шапка — содержимое прокручивается.
+  function onSheetTouchStart(event: TouchEvent) {
+    if (isWide) return;
+    dragStartY.current = event.touches[0]?.clientY ?? null;
+    if (sheetRef.current) sheetRef.current.style.transition = "none";
+  }
+  function onSheetTouchMove(event: TouchEvent) {
+    const start = dragStartY.current;
+    const sheet = sheetRef.current;
+    if (start === null || !sheet) return;
+    const delta = Math.max(0, (event.touches[0]?.clientY ?? start) - start);
+    sheet.style.transform = delta > 0 ? `translateY(${delta}px)` : "";
+  }
+  function onSheetTouchEnd(event: TouchEvent) {
+    const start = dragStartY.current;
+    const sheet = sheetRef.current;
+    dragStartY.current = null;
+    if (start === null || !sheet) return;
+    sheet.style.transition = "";
+    const delta = (event.changedTouches[0]?.clientY ?? start) - start;
+    if (delta > SHEET_DISMISS_PX) {
+      onClose();
+      return;
+    }
+    sheet.style.transform = "";
+  }
+
   const heading = header ? (
-    <header className={cn("flex items-start gap-3", !fullScreen && "mb-4")}>
+    <header className="flex items-start gap-3">
       {header.icon ? (
         <span className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-accent-text">
           {header.icon}
@@ -163,10 +191,66 @@ export function ModalSurface({
       </div>
     </header>
   ) : title ? (
-    <h3 id={titleId} className={cn("text-base font-semibold text-text-main", !fullScreen && "mb-3")}>
+    <h3 id={titleId} className="text-base font-semibold text-text-main">
       {title}
     </h3>
   ) : null;
+
+  const closeButton = (
+    <Button
+      type="button"
+      variant="icon"
+      size="icon"
+      aria-label={UI_TEXT.common.close}
+      onClick={onClose}
+      className="-mr-2 shrink-0 sm:hidden"
+    >
+      <X className="h-4 w-4" aria-hidden />
+    </Button>
+  );
+
+  let top: ReactNode = null;
+  if (fullScreen) {
+    top = (
+      <div className="sticky top-0 z-10 -mx-5 mb-4 flex items-start gap-3 border-b border-border-subtle bg-bg-card px-5 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:static sm:mx-0 sm:mb-3 sm:border-b-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
+        <div className="min-w-0 flex-1 pt-2 sm:pt-0">{heading}</div>
+        {closeButton}
+      </div>
+    );
+  } else if (heading) {
+    top = (
+      <div
+        className={cn(
+          "sticky top-0 z-10 -mx-5 -mt-5 touch-none bg-bg-card px-5 pb-3 pt-2 sm:static sm:mx-0 sm:mt-0 sm:touch-auto sm:bg-transparent sm:p-0",
+          header ? "mb-4" : "mb-3",
+        )}
+        onTouchStart={onSheetTouchStart}
+        onTouchMove={onSheetTouchMove}
+        onTouchEnd={onSheetTouchEnd}
+        onTouchCancel={onSheetTouchEnd}
+      >
+        <span aria-hidden className="mx-auto mb-2 block h-1 w-10 rounded-full bg-border sm:hidden" />
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1 pt-1 sm:pt-0">{heading}</div>
+          {closeButton}
+        </div>
+      </div>
+    );
+  }
+
+  const enter = isWide
+    ? {
+        initial: { opacity: 0, scale: 0.97, y: DISTANCE.nudge },
+        animate: { opacity: 1, scale: 1, y: 0 },
+        exit: { opacity: 0, scale: 0.98, y: DISTANCE.nudge, transition: MOTION.exit },
+        transition: MOTION.base,
+      }
+    : {
+        initial: { y: "100%" },
+        animate: { y: 0 },
+        exit: { y: "100%", transition: MOTION.exit },
+        transition: SPRING_SHEET,
+      };
 
   const node = (
     <AnimatePresence>
@@ -176,7 +260,7 @@ export function ModalSurface({
           role="dialog"
           aria-modal="true"
           aria-labelledby={ariaLabelledBy}
-          className="fixed inset-0 z-modal overflow-y-auto bg-black/50"
+          className="fixed inset-0 z-modal overflow-y-auto overscroll-contain bg-black/50"
           onClick={onClose}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -184,60 +268,47 @@ export function ModalSurface({
           transition={MOTION.micro}
         >
           <div
-            className={cn(
-              "flex min-h-full items-start justify-center sm:items-center",
-              fullScreen ? "sm:p-4" : "p-4",
-            )}
+            ref={sheetRef}
+            className="flex min-h-full items-end justify-center transition-transform duration-200 ease-brand sm:items-center sm:p-4"
           >
             <m.section
               ref={panelRef}
               onClick={(event) => event.stopPropagation()}
-              initial={{ opacity: 0, scale: 0.97, y: DISTANCE.nudge }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: DISTANCE.nudge, transition: MOTION.exit }}
-              transition={MOTION.base}
+              initial={enter.initial}
+              animate={enter.animate}
+              exit={enter.exit}
+              transition={enter.transition}
               className={cn(
                 fullScreen
                   ? // Телефон: страница во весь экран, без рамки и скругления;
                     // с `sm` — прежняя карточка.
                     "relative flex min-h-[100dvh] w-full flex-col bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] sm:my-6 sm:block sm:min-h-0 sm:rounded-3xl sm:border sm:border-border-subtle sm:p-5 sm:shadow-hover"
-                  : "relative my-6 w-full rounded-3xl border border-border-subtle bg-bg-card p-5 shadow-hover",
+                  : // Телефон: нижняя шторка со своей прокруткой (над ней —
+                    // полоска подложки, по ней видно, что это окно, а не
+                    // страница); с `sm` — прежняя карточка. Нижний отступ —
+                    // одно значение без `sm:`: на ПК `env()` = 0, и это ровно
+                    // прежний `p-5` (окна с `className="p-0"` его снимают).
+                    "relative max-h-[calc(100dvh-env(safe-area-inset-top,0px)-2rem)] w-full overflow-y-auto overscroll-contain rounded-t-3xl border-t border-border-subtle bg-bg-card p-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] shadow-hover sm:my-6 sm:max-h-none sm:overflow-visible sm:rounded-3xl sm:border",
                 SIZE_CLASS[size],
                 className,
               )}
               tabIndex={-1}
               data-fullscreen-mobile={fullScreen || undefined}
             >
-              {fullScreen ? (
-                <div className="sticky top-0 z-10 -mx-5 mb-4 flex items-start gap-3 border-b border-border-subtle bg-bg-card px-5 pb-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] sm:static sm:mx-0 sm:mb-3 sm:border-b-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
-                  <div className="min-w-0 flex-1 pt-2 sm:pt-0">{heading}</div>
-                  <Button
-                    type="button"
-                    variant="icon"
-                    size="icon"
-                    aria-label={UI_TEXT.common.close}
-                    onClick={onClose}
-                    className="shrink-0 sm:hidden"
-                  >
-                    <X className="h-4 w-4" aria-hidden />
-                  </Button>
-                </div>
-              ) : (
-                heading
-              )}
+              {top}
               {children}
               {footer ? (
                 <div
                   className={cn(
                     "flex justify-end gap-2",
-                    fullScreen
-                      ? stickyFooter
-                        ? // Телефон: подвал прижат к низу экрана и виден при прокрутке.
-                          "sticky bottom-0 z-10 -mx-5 mt-auto -mb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] border-t border-border-subtle bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:-mb-5 sm:mt-5 sm:rounded-b-3xl sm:py-4"
-                        : "mt-auto pt-5 sm:mt-5 sm:pt-0"
-                      : stickyFooter
-                        ? "sticky bottom-0 z-10 -mx-5 mt-5 -mb-5 rounded-b-3xl border-t border-border-subtle bg-bg-card px-5 py-4"
+                    stickyFooter
+                      ? // Подвал прижат к низу и виден при прокрутке; отступ —
+                        // под «домашнюю полоску» (на ПК `env()` = 0).
+                        "sticky bottom-0 z-10 -mx-5 -mb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] border-t border-border-subtle bg-bg-card px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4 sm:-mb-5 sm:mt-5 sm:rounded-b-3xl sm:py-4"
+                      : fullScreen
+                        ? "mt-auto pt-5 sm:mt-5 sm:pt-0"
                         : "mt-5",
+                    stickyFooter && (fullScreen ? "mt-auto" : "mt-5"),
                   )}
                 >
                   {footer}

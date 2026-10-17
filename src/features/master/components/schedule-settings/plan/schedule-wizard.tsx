@@ -371,6 +371,7 @@ export function ScheduleWizard({
 
   return (
     <ModalSurface
+      fullScreenOnMobile
       open={open}
       onClose={onClose}
       header={{ title: T.title, subtitle: T.stepLabel(stepIndex + 1, steps.length) }}

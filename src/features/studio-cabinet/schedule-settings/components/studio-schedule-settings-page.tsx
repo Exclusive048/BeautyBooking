@@ -1,4 +1,5 @@
-import { BackLink } from "@/components/ui/back-link";
+import { PageTitleRow } from "@/components/ui/back-link";
+import { ClientViewLink } from "@/features/cabinet/components/client-view-link";
 import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { StudioScheduleSettingsBody } from "./studio-schedule-settings-body";
@@ -16,6 +17,8 @@ type Props = {
   masters: MasterOption[];
   selectedMasterId: string | null;
   snapshot: ScheduleEditorSnapshot | null;
+  /** Адрес страницы студии — для «Посмотреть глазами клиента» (как у мастера). */
+  studioPublicUsername: string | null;
 };
 
 /**
@@ -32,18 +35,23 @@ export function StudioScheduleSettingsPage({
   masters,
   selectedMasterId,
   snapshot,
+  studioPublicUsername,
 }: Props) {
   return (
     <div className="space-y-5 lg:space-y-6">
-      <header className="space-y-1">
-        <BackLink href="/cabinet/studio/schedule/team" />
-        <p className="eyebrow">
-          {T.breadcrumb}
-        </p>
-        <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
-          {T.title}
-        </h1>
-        <p className="mt-1 text-sm text-text-sec">{T.studioSubtitle}</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <PageTitleRow backHref="/cabinet/studio/schedule/team">
+            <p className="eyebrow">
+              {T.breadcrumb}
+            </p>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-text-main md:text-3xl">
+              {T.title}
+            </h1>
+          </PageTitleRow>
+          <p className="mt-2 text-sm text-text-sec">{T.studioSubtitle}</p>
+        </div>
+        <ClientViewLink publicUsername={studioPublicUsername} />
       </header>
 
       {masters.length === 0 ? (

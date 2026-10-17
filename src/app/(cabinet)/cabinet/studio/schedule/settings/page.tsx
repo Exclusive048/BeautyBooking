@@ -44,15 +44,17 @@ export default async function StudioScheduleSettingsRoute({
 
   let studioId: string;
   let studioProviderId: string;
+  let studioPublicUsername: string | null;
   try {
     const access = await resolveCurrentStudioAccess(user.id);
     studioId = access.studioId;
     const studio = await prisma.studio.findUnique({
       where: { id: studioId },
-      select: { providerId: true },
+      select: { providerId: true, provider: { select: { publicUsername: true } } },
     });
     if (!studio) redirect("/403");
     studioProviderId = studio.providerId;
+    studioPublicUsername = studio.provider.publicUsername;
   } catch {
     redirect("/403");
   }
@@ -98,6 +100,7 @@ export default async function StudioScheduleSettingsRoute({
       masters={masters}
       selectedMasterId={selectedMasterId}
       snapshot={snapshot}
+      studioPublicUsername={studioPublicUsername}
     />
   );
 }

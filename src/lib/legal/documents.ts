@@ -40,7 +40,8 @@ export const LEGAL_DOCUMENTS = {
    */
   // 1.1 (2026-09-23, SESSION-REFRESH-PATH-01): из описания `bh_refresh` убран
   // путь `/api/auth/refresh` — кука теперь отправляется на весь сайт.
-  PRIVACY: { version: "1.1", updatedAt: "2026-09-23", href: "/privacy" },
+  // 1.2 (2026-10-14, IOS-STATUS-BAR-THEME): в список cookie добавлена `mr-theme`.
+  PRIVACY: { version: "1.2", updatedAt: "2026-10-14", href: "/privacy" },
   /**
    * Согласие на обработку персональных данных — `/consent`. The separate
    * per-purpose document the law asks for; deliberately NOT the privacy policy.

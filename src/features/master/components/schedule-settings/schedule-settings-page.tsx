@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SubscriptionScope } from "@prisma/client";
-import { ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ClientViewLink } from "@/features/cabinet/components/client-view-link";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import { getSessionUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/lib/billing/get-current-plan";
@@ -57,7 +55,6 @@ export async function ScheduleSettingsPage({ profile = null }: { profile?: strin
     getCurrentPlan(user.id, SubscriptionScope.MASTER),
   ]);
 
-  const previewHref = provider?.publicUsername ? `/u/${provider.publicUsername}` : null;
   // Горящие окошки — личные (по своим услугам); у расписания в студии их нет.
   const hotSlotsAllowed = !activeStudioProfile && Boolean(plan.features.hotSlots);
 
@@ -96,14 +93,7 @@ export async function ScheduleSettingsPage({ profile = null }: { profile?: strin
         actions={
           <>
             <SaveStatusIndicator />
-            {previewHref ? (
-              <Button asChild variant="secondary" size="md" className="rounded-xl">
-                <Link href={previewHref} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />
-                  {S.previewCta}
-                </Link>
-              </Button>
-            ) : null}
+            <ClientViewLink publicUsername={provider?.publicUsername ?? null} />
           </>
         }
       />

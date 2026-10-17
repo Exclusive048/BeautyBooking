@@ -29,6 +29,7 @@ import { MotionProvider } from "@/components/providers/motion-provider";
 import { resolveAuthMethods } from "@/lib/auth/auth-methods";
 import { getRefreshCookieName } from "@/lib/auth/session";
 import { getNonce } from "@/lib/csp/nonce";
+import { parseThemeCookie, THEME_COOKIE } from "@/lib/pwa/theme-cookie";
 import { resolveViewport } from "@/lib/pwa/viewport";
 import { COOKIE_NOTICE_COOKIE, hasAcknowledgedCookieNotice } from "@/lib/legal/cookie-notice";
 import * as UI_TEXT from "@/lib/ui/text";
@@ -80,9 +81,11 @@ const LOCAL_SW_RESET_SCRIPT = `
 // запрещает щипок (WCAG 1.4.4). PWA-ZOOM-01: iOS получает `maximumScale: 1`,
 // который гасит автоприближение полей ввода, но не щипок — `lib/pwa/viewport.ts`.
 // Layout и так динамический (nonce читает заголовки), поэтому чтение UA ничего
-// не меняет в режиме рендера.
+// не меняет в режиме рендера. IOS-STATUS-BAR-THEME: кука выбранной темы даёт
+// полосе статуса цвет темы продукта, а не системной (`lib/pwa/theme-cookie.ts`).
 export async function generateViewport(): Promise<Viewport> {
-  return resolveViewport((await headers()).get("user-agent"));
+  const theme = parseThemeCookie((await cookies()).get(THEME_COOKIE)?.value);
+  return resolveViewport((await headers()).get("user-agent"), theme);
 }
 
 // `||`, а не `??`: пустая строка в env — тоже «не задано».

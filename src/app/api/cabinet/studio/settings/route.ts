@@ -46,8 +46,9 @@ export async function GET(req: Request) {
           isAdmin: settings.scope.isAdmin,
           roles: settings.scope.roles,
           canDanger: settings.scope.canDanger,
-          // `/api/cabinet/studio/public-username` ищет студию по владельцу.
-          canEditPublicUsername: settings.scope.isOwner,
+          // Адрес страницы правят владелец и администратор — тот же доступ,
+          // что у этого запроса (`/api/cabinet/studio/public-username`).
+          canEditPublicUsername: settings.scope.isOwner || settings.scope.isAdmin,
         },
         studio: {
           id: access.studioId,

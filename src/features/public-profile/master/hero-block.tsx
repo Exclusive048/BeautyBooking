@@ -251,10 +251,15 @@ export function HeroBlock({ view, isAuthenticated = false, initialFavorited = fa
             />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 self-start">
+          {/* На телефоне подписка — отдельной строкой во всю ширину под
+              избранным и «Поделиться»: в одном ряду с ними подпись не
+              помещалась, переносилась на две строки и вылезала из пилюли. */}
+          <div className="flex flex-wrap items-center gap-2 self-stretch sm:flex-nowrap sm:self-start md:shrink-0">
             <HotSlotsSubscribeButton
               providerId={provider.id}
               enabled={provider.hotSlotsEnabled}
+              wrapperClassName="order-last basis-full sm:order-none sm:basis-auto"
+              className="h-auto min-h-10 w-full py-2 leading-snug sm:h-9 sm:min-h-0 sm:w-auto sm:py-0"
             />
             <FavoriteToggleButton
               providerId={provider.id}

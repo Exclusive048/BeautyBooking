@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Check,
   Copy,
@@ -51,6 +52,12 @@ type Props = {
   address?: string;
   bio?: string;
   avatarUrl?: string | null;
+  /**
+   * Адрес, который видела страница при рендере. Если GET выдал адрес впервые
+   * (он выдаётся лениво) или его переименовали — страница перерисовывается,
+   * чтобы кнопка «Посмотреть глазами клиента» в шапке вела на актуальный.
+   */
+  initialUsername?: string | null;
 };
 
 type CardImage = { blob: Blob; href: string };
@@ -83,9 +90,15 @@ export function PublicSettingsClient({
   address = "",
   bio = "",
   avatarUrl = null,
+  initialUsername = null,
 }: Props) {
   const t = UI_TEXT.billing.publicPage;
   const toast = useToast();
+  const router = useRouter();
+  const renderedUsernameRef = useRef(initialUsername);
+  useEffect(() => {
+    renderedUsernameRef.current = initialUsername;
+  }, [initialUsername]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -114,12 +127,13 @@ export function PublicSettingsClient({
       setUsername(data.username);
       setUrl(data.url);
       setDraft(data.username);
+      if (data.username !== renderedUsernameRef.current) router.refresh();
     } catch (err) {
       setError(serverMessageOr(err, t.saveFailed));
     } finally {
       setLoading(false);
     }
-  }, [endpoint, t.saveFailed]);
+  }, [endpoint, router, t.saveFailed]);
 
   useEffect(() => {
     void load();
@@ -202,12 +216,13 @@ export function PublicSettingsClient({
       setUsername(data.username);
       setUrl(data.url);
       setIsEditing(false);
+      if (data.username !== renderedUsernameRef.current) router.refresh();
     } catch (err) {
       setError(serverMessageOr(err, t.saveFailed));
     } finally {
       setSaving(false);
     }
-  }, [draft, endpoint, t.saveFailed]);
+  }, [draft, endpoint, router, t.saveFailed]);
 
   const handleDownloadQr = useCallback(() => {
     const qr = readQrFromCanvas(qrExportRef.current) ?? qrRef.current;

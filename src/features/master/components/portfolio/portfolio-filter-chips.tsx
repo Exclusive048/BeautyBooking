@@ -114,7 +114,7 @@ function CategoryChip({
     <Link
       href={href}
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-xs transition-colors",
+        "inline-flex min-h-8 items-center rounded-full border px-3 py-1 text-xs transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         active
           ? "border-primary/40 bg-primary/10 text-accent-text"

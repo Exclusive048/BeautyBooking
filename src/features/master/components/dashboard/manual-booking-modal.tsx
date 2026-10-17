@@ -142,6 +142,7 @@ export function ManualBookingModal({ providerId, services, canManualBook, timezo
 
   return (
     <ModalSurface
+      fullScreenOnMobile
       open={isOpen}
       onClose={closeModal}
       title={T.title}

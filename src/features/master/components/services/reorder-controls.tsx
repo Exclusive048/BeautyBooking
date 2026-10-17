@@ -45,7 +45,7 @@ export function ReorderControls({ itemId, endpoint, isFirst, isLast }: Props) {
   return (
     // Прятать до наведения — только там, где наведение есть (`hover: hover`):
     // на телефоне стрелки были невидимы, но занимали место и нажимались.
-    <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+    <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100">
       <ArrowButton
         disabled={isFirst || pending !== null}
         onClick={() => move("up")}
@@ -76,13 +76,17 @@ function ArrowButton({
   children: React.ReactNode;
 }) {
   return (
-    <Button variant="wrapper"
+    // `size="icon"` — ради невидимой зоны нажатия 44px (UI-29): стрелка 24px
+    // на телефоне попадала через раз.
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
       className={cn(
-        "flex h-6 w-6 items-center justify-center rounded text-text-sec transition-colors",
-        "hover:bg-bg-input hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "h-8 w-8 rounded-lg text-text-sec",
+        "hover:text-text-main focus-visible:ring-primary/40",
         "disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
       )}
     >

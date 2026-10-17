@@ -224,14 +224,17 @@ export function AvatarEditor({
         )}
 
         {canEdit && !isClickableVariant ? (
-          <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          // Прятать до наведения — только там, где наведение есть: на
+          // телефоне кнопки были невидимы, и аватар нельзя было ни сменить,
+          // ни обрезать, ни удалить. `size="icon"` — зона нажатия 44px (UI-29).
+          <div className="absolute right-2 top-2 flex items-center gap-1.5 opacity-100 transition [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
             <Button
               variant="ghost"
-              size="none"
+              size="icon"
               onClick={() => inputRef.current?.click()}
               disabled={busy}
               aria-label={filePickerLabel}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
+              className="h-8 w-8 rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -239,24 +242,24 @@ export function AvatarEditor({
               <>
                 <Button
                   variant="ghost"
-                  size="none"
+                  size="icon"
                   onClick={() => {
                     setCropAsset(activeAsset);
                     setPickingCrop(true);
                   }}
                   disabled={busy}
                   aria-label={cropButtonLabel}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
+                  className="h-8 w-8 rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
                   <Crop className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="ghost"
-                  size="none"
+                  size="icon"
                   onClick={remove}
                   disabled={busy}
                   aria-label={t.remove}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
+                  className="h-8 w-8 rounded-full border border-border-subtle bg-bg-card/90 text-text-main shadow-card hover:bg-bg-input disabled:opacity-60"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

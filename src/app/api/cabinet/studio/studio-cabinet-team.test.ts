@@ -535,7 +535,7 @@ describe("GET /api/cabinet/studio/settings", () => {
     expect(getStudioProviderById).toHaveBeenCalledWith("provider-s1");
   });
 
-  it("does not let an admin edit the public username", async () => {
+  it("lets an admin edit the public username", async () => {
     resolveCurrentStudioAccess.mockResolvedValue({
       studioId: "studio-1",
       providerId: "provider-s1",
@@ -550,7 +550,7 @@ describe("GET /api/cabinet/studio/settings", () => {
     const body = await read(await getSettings(new Request(url("/settings"))));
 
     expect(body.data).toMatchObject({
-      scope: { isOwner: false, isAdmin: true, canDanger: false, canEditPublicUsername: false },
+      scope: { isOwner: false, isAdmin: true, canDanger: false, canEditPublicUsername: true },
       studio: { cityName: null, mapUrl: null },
     });
   });

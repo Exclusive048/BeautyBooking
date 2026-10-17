@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
-import { BackLink } from "@/components/ui/back-link";
+import { PageTitleRow } from "@/components/ui/back-link";
 import { cn } from "@/lib/cn";
 import * as UI_TEXT from "@/lib/ui/text";
 
@@ -25,9 +25,10 @@ type Props = {
    */
   actionsInline?: boolean;
   /**
-   * Кнопка «Назад» к родительскому экрану. На телефоне она заменяет крошки
-   * (мелкие ссылки 12px — неудобная цель для пальца, а в установленном
-   * приложении браузерного «Назад» нет), с `lg` стоит перед ними.
+   * Кнопка «Назад» к родительскому экрану — круглая, слева от заголовка
+   * (BACK-BUTTON-01). На телефоне крошки при ней скрыты (мелкие ссылки 12px —
+   * неудобная цель для пальца, а в установленном приложении браузерного
+   * «Назад» нет), с `lg` крошки стоят над строкой заголовка.
    */
   backHref?: string;
 };
@@ -71,41 +72,40 @@ export function MasterPageHeader({
         )}
       >
         <div className="min-w-0 flex-1">
-          <div className={cn("flex items-center gap-2", backHref ? "mb-1 lg:mb-1.5" : "mb-1.5")}>
-            {backHref ? <BackLink href={backHref} /> : null}
-            <nav
-              aria-label={UI_TEXT.a11y.breadcrumbs}
-              className={cn(
-                "flex items-center gap-1 text-xs text-text-sec",
-                backHref && "hidden lg:flex",
-              )}
-            >
-              <Home className="h-3 w-3 shrink-0" aria-hidden />
-              {breadcrumb.map((crumb, index) => (
-                <Fragment key={`${crumb.label}-${index}`}>
-                  {index > 0 ? (
-                    <ChevronRight
-                      className="h-3 w-3 shrink-0 text-text-sec/60"
-                      aria-hidden
-                    />
-                  ) : null}
-                  {crumb.href ? (
-                    <Link
-                      href={crumb.href}
-                      className="rounded transition-colors hover:text-text-main"
-                    >
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span className="text-text-main">{crumb.label}</span>
-                  )}
-                </Fragment>
-              ))}
-            </nav>
-          </div>
-          <h1 className="truncate font-display text-2xl text-text-main lg:text-3xl">
-            {title}
-          </h1>
+          <nav
+            aria-label={UI_TEXT.a11y.breadcrumbs}
+            className={cn(
+              "mb-1.5 flex items-center gap-1 text-xs text-text-sec",
+              backHref && "hidden lg:flex",
+            )}
+          >
+            <Home className="h-3 w-3 shrink-0" aria-hidden />
+            {breadcrumb.map((crumb, index) => (
+              <Fragment key={`${crumb.label}-${index}`}>
+                {index > 0 ? (
+                  <ChevronRight
+                    className="h-3 w-3 shrink-0 text-text-sec/60"
+                    aria-hidden
+                  />
+                ) : null}
+                {crumb.href ? (
+                  <Link
+                    href={crumb.href}
+                    className="rounded transition-colors hover:text-text-main"
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span className="text-text-main">{crumb.label}</span>
+                )}
+              </Fragment>
+            ))}
+          </nav>
+          <PageTitleRow backHref={backHref}>
+            <h1 className="truncate font-display text-2xl text-text-main lg:text-3xl">
+              {title}
+            </h1>
+          </PageTitleRow>
           {subtitle ? (
             <p className="mt-1 text-sm text-text-sec">{subtitle}</p>
           ) : null}

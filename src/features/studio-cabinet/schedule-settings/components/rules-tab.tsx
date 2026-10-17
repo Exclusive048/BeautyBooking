@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import { NumberInput } from "@/components/ui/number-input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -15,6 +17,8 @@ import * as UI_TEXT from "@/lib/ui/text";
 
 const T = UI_TEXT.studioCabinet.scheduleSettings.rules;
 const E = UI_TEXT.studioCabinet.scheduleSettings.errors;
+/** Правила всей студии — раздел «Правила студии» в настройках (как у «Первых шагов»). */
+const STUDIO_RULES_HREF = "/cabinet/studio/settings?section=policy";
 
 type Props = {
   studioId: string;
@@ -76,6 +80,13 @@ export function RulesTab({ studioId, masterId, initialSnapshot }: Props) {
 
   return (
     <div className="space-y-4">
+      <Notice tone="info" className="space-y-3" data-testid="studio-rules-link">
+        <p>{T.studioRulesNote}</p>
+        <Button asChild variant="secondary" size="sm" className="rounded-full">
+          <Link href={STUDIO_RULES_HREF}>{T.studioRulesCta}</Link>
+        </Button>
+      </Notice>
+
       <div className="space-y-3 rounded-2xl border border-border-subtle bg-bg-card p-5">
         <Row title={T.minHoursTitle} hint={T.minHoursHint}>
           <NumberInput

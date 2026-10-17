@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { clientEnv } from "@/lib/env.client";
+import { useMe, useRevalidateMe } from "@/lib/hooks/use-me";
 import {
   getPushPermission,
   isPushSupported,
@@ -10,10 +11,6 @@ import {
 } from "@/lib/notifications/push/push-client";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
-
-type MeUser = {
-  pushNotificationsEnabled: boolean;
-};
 
 export type PushOptIn = {
   enabled: boolean;
@@ -29,32 +26,32 @@ export type PushOptIn = {
  * одна логика на все поверхности (настройки, онбординг «Приложение и
  * уведомления»). Разрешение браузера запрашивается ТОЛЬКО из `toggle(true)`,
  * то есть из жеста пользователя, — никогда на загрузке страницы.
+ *
+ * Флаг читается из общего ответа `/api/me` (`useMe`, SWR): раньше хук делал
+ * свой запрос, и на главной кабинета `/api/me` уходил лишний раз на каждое
+ * открытие. Разрешение браузера читается после монтирования — до этого хук
+ * отдаёт `loading`, и первый рендер совпадает с серверным (оба потребителя
+ * в загрузке ничего не рисуют).
  */
 export function usePushOptIn(): PushOptIn {
   const t = UI_TEXT.settings.notifications.push;
+  const me = useMe();
+  const revalidateMe = useRevalidateMe();
 
-  const [enabled, setEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Выбор пользователя в этой вкладке — поверх ответа сервера, пока SWR его
+  // не перечитал.
+  const [chosen, setChosen] = useState<boolean | null>(null);
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchJsonWithAuth<{ user: MeUser | null }>("/api/me", { cache: "no-store" });
-      if (data.user) setEnabled(Boolean(data.user.pushNotificationsEnabled));
-    } catch {
-      // Фон: не прочитали — остаётся состояние по умолчанию, тумблер работает.
-    } finally {
-      setPermission(getPushPermission());
-      setLoading(false);
-    }
-  }, []);
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported" | null>(null);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // API браузера, на сервере его нет.
+    setPermission(getPushPermission());
+  }, []);
+
+  const enabled = chosen ?? Boolean(me.user?.pushNotificationsEnabled);
+  const loading = me.isLoading || permission === null;
 
   const persist = useCallback(
     async (next: boolean) => {
@@ -63,8 +60,10 @@ export function usePushOptIn(): PushOptIn {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pushNotificationsEnabled: next }),
       });
+      setChosen(next);
+      void revalidateMe();
     },
-    []
+    [revalidateMe]
   );
 
   const toggle = useCallback(
@@ -96,10 +95,8 @@ export function usePushOptIn(): PushOptIn {
           // "subscribed" or "no-sw" (permission granted; SW will subscribe on a
           // production load) — persist the opt-in intent either way.
           await persist(true);
-          setEnabled(true);
         } else {
           await persist(false);
-          setEnabled(false);
           void unsubscribeBrowserPush();
         }
       } catch (err) {
@@ -111,5 +108,5 @@ export function usePushOptIn(): PushOptIn {
     [persist, t.denied, t.enableFailed, t.toggleFailed, t.unsupported]
   );
 
-  return { enabled, loading, toggling, error, permission, toggle };
+  return { enabled, loading, toggling, error, permission: permission ?? "default", toggle };
 }

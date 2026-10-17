@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { m } from "framer-motion";
-import { Bell, Check, Download, Smartphone } from "lucide-react";
+import { Bell, Check, ChevronDown, Download, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -55,7 +55,9 @@ function StepMarker({ index, done }: { index: number; done: boolean }) {
 type Props = {
   /**
    * `dashboard` — карточка на главной кабинета: её можно скрыть, и она уходит
-   * сама, когда приложение установлено и уведомления включены.
+   * сама, когда приложение установлено и уведомления включены. Свёрнута:
+   * заголовок, следующий шаг одной кнопкой и «Подробнее» — развёрнутые шаги
+   * занимали весь первый экран телефона, и записи уезжали под него.
    * `settings` — постоянный блок в настройках (здесь же выключают уведомления).
    */
   variant?: "dashboard" | "settings";
@@ -77,6 +79,7 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
   const [dismissed, setDismissed] = useState(readDismissed);
   const [platform, setPlatform] = useState<PwaPlatform | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [expanded, setExpanded] = useState(variant === "settings");
 
   if (push.loading) return null;
 
@@ -86,6 +89,14 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
 
   const shownPlatform = platform ?? install.platform;
   const iosBeforeInstall = install.platform === "ios" && !install.installed;
+  const collapsible = variant === "dashboard";
+  // Следующий шаг одной кнопкой — то, что можно сделать прямо отсюда.
+  const nextAction: "install" | "push" | null =
+    !install.installed && install.canPrompt
+      ? "install"
+      : !pushDone && !iosBeforeInstall && push.permission !== "unsupported" && push.permission !== "denied"
+        ? "push"
+        : null;
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -110,7 +121,7 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
       className={className}
     >
       <Card className="p-5 md:p-6">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Smartphone className="h-5 w-5 text-accent-text" strokeWidth={1.5} aria-hidden />
           </div>
@@ -119,7 +130,6 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
             <h2 id="app-setup-title" className="mt-1 font-display text-xl text-text-main">
               {T.title}
             </h2>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-sec">{T.subtitle}</p>
           </div>
           {variant === "dashboard" ? (
             <Button variant="ghost" size="sm" onClick={handleDismiss} className="shrink-0 text-text-sec">
@@ -127,102 +137,145 @@ export function AppSetupCard({ variant = "dashboard", className }: Props) {
             </Button>
           ) : null}
         </div>
+        {/* На телефоне описание — во всю ширину карточки: в колонке между
+            значком и «Скрыть» оно занимало пять строк. С `sm` — под заголовком
+            (значок 40px + зазор 16px = `pl-14`). */}
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-sec sm:pl-14">{T.subtitle}</p>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {/* Шаг 1 — установка */}
-          <div className="rounded-2xl border border-border-subtle bg-bg-input/40 p-4">
-            <div className="flex items-start gap-3">
-              <StepMarker index={1} done={install.installed} />
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-text-main">{T.installStep.title}</h3>
-                <p className="mt-0.5 text-xs leading-relaxed text-text-sec">{T.installStep.desc}</p>
-              </div>
-            </div>
+        {collapsible ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2 sm:pl-14">
+            {!expanded && nextAction === "install" ? (
+              <Button size="sm" onClick={() => void handleInstall()} disabled={installing}>
+                <Download className="mr-1.5 h-4 w-4" strokeWidth={1.5} aria-hidden />
+                {T.installStep.installCta}
+              </Button>
+            ) : null}
+            {!expanded && nextAction === "push" ? (
+              <Button size="sm" onClick={() => void push.toggle(true)} disabled={push.toggling}>
+                <Bell className="mr-1.5 h-4 w-4" strokeWidth={1.5} aria-hidden />
+                {T.pushStep.enableCta}
+              </Button>
+            ) : null}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+              aria-controls="app-setup-steps"
+            >
+              {expanded ? T.hideSteps : T.showSteps}
+              <ChevronDown
+                className={cn("ml-1.5 h-4 w-4 transition-transform", expanded && "rotate-180")}
+                strokeWidth={1.5}
+                aria-hidden
+              />
+            </Button>
+          </div>
+        ) : null}
 
-            {install.installed ? (
-              <Badge variant="success" className="mt-3">
-                {T.installStep.installed}
-              </Badge>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {install.canPrompt ? (
-                  <Button size="sm" onClick={() => void handleInstall()} disabled={installing}>
-                    <Download className="mr-1.5 h-4 w-4" strokeWidth={1.5} aria-hidden />
-                    {T.installStep.installCta}
-                  </Button>
-                ) : null}
+        {collapsible && !expanded && push.error ? (
+          <p role="alert" className="mt-2 text-xs text-danger-text">
+            {push.error}
+          </p>
+        ) : null}
 
-                <div>
-                  <p className="mb-2 text-xs font-medium text-text-main">{T.installStep.manualTitle}</p>
-                  <SegmentedTabs<PwaPlatform>
-                    value={shownPlatform}
-                    onChange={setPlatform}
-                    ariaLabel={T.installStep.platformsLabel}
-                    options={[
-                      { value: "ios", label: T.installStep.platforms.ios },
-                      { value: "android", label: T.installStep.platforms.android },
-                      { value: "desktop", label: T.installStep.platforms.desktop },
-                    ]}
-                  />
-                  <ol className="mt-3 space-y-1.5">
-                    {T.installStep.steps[shownPlatform].map((step, index) => (
-                      <li key={step} className="flex gap-2 text-xs leading-relaxed text-text-sec">
-                        <span className="w-4 shrink-0 font-semibold text-text-main">{index + 1}.</span>
-                        <span>{step}</span>
-                      </li>
-                    ))}
-                  </ol>
+        {expanded ? (
+          <div id="app-setup-steps" className="mt-5 grid gap-4 md:grid-cols-2">
+            {/* Шаг 1 — установка */}
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/40 p-4">
+              <div className="flex items-start gap-3">
+                <StepMarker index={1} done={install.installed} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-text-main">{T.installStep.title}</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-text-sec">{T.installStep.desc}</p>
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Шаг 2 — уведомления */}
-          <div className="rounded-2xl border border-border-subtle bg-bg-input/40 p-4">
-            <div className="flex items-start gap-3">
-              <StepMarker index={2} done={pushDone} />
-              <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-text-main">{T.pushStep.title}</h3>
-                <p className="mt-0.5 text-xs leading-relaxed text-text-sec">{T.pushStep.desc}</p>
+              {install.installed ? (
+                <Badge variant="success" className="mt-3">
+                  {T.installStep.installed}
+                </Badge>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {install.canPrompt ? (
+                    <Button size="sm" onClick={() => void handleInstall()} disabled={installing}>
+                      <Download className="mr-1.5 h-4 w-4" strokeWidth={1.5} aria-hidden />
+                      {T.installStep.installCta}
+                    </Button>
+                  ) : null}
+
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-text-main">{T.installStep.manualTitle}</p>
+                    <SegmentedTabs<PwaPlatform>
+                      value={shownPlatform}
+                      onChange={setPlatform}
+                      ariaLabel={T.installStep.platformsLabel}
+                      options={[
+                        { value: "ios", label: T.installStep.platforms.ios },
+                        { value: "android", label: T.installStep.platforms.android },
+                        { value: "desktop", label: T.installStep.platforms.desktop },
+                      ]}
+                    />
+                    <ol className="mt-3 space-y-1.5">
+                      {T.installStep.steps[shownPlatform].map((step, index) => (
+                        <li key={step} className="flex gap-2 text-xs leading-relaxed text-text-sec">
+                          <span className="w-4 shrink-0 font-semibold text-text-main">{index + 1}.</span>
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Шаг 2 — уведомления */}
+            <div className="rounded-2xl border border-border-subtle bg-bg-input/40 p-4">
+              <div className="flex items-start gap-3">
+                <StepMarker index={2} done={pushDone} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-text-main">{T.pushStep.title}</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-text-sec">{T.pushStep.desc}</p>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                {iosBeforeInstall ? (
+                  <p className="text-xs leading-relaxed text-text-sec">{T.pushStep.iosNeedsInstall}</p>
+                ) : push.permission === "unsupported" ? (
+                  <p className="text-xs leading-relaxed text-text-sec">{PUSH.unsupported}</p>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="flex items-center gap-2 text-sm text-text-main">
+                        <Bell className="h-4 w-4 text-text-sec" strokeWidth={1.5} aria-hidden />
+                        {pushDone ? T.pushStep.enabled : T.pushStep.toggle}
+                      </span>
+                      <Switch
+                        checked={pushDone}
+                        disabled={push.toggling}
+                        onCheckedChange={(next) => void push.toggle(next)}
+                        aria-label={T.pushStep.toggle}
+                      />
+                    </div>
+                    {!push.enabled && push.permission === "default" ? (
+                      <p className="mt-2 text-xs text-text-sec">{PUSH.permissionPrompt}</p>
+                    ) : null}
+                    {push.permission === "denied" ? (
+                      <p className="mt-2 text-xs text-text-sec">{PUSH.denied}</p>
+                    ) : null}
+                  </>
+                )}
+
+                {push.error ? (
+                  <p role="alert" className="mt-2 text-xs text-danger-text">
+                    {push.error}
+                  </p>
+                ) : null}
               </div>
             </div>
-
-            <div className="mt-3">
-              {iosBeforeInstall ? (
-                <p className="text-xs leading-relaxed text-text-sec">{T.pushStep.iosNeedsInstall}</p>
-              ) : push.permission === "unsupported" ? (
-                <p className="text-xs leading-relaxed text-text-sec">{PUSH.unsupported}</p>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-2 text-sm text-text-main">
-                      <Bell className="h-4 w-4 text-text-sec" strokeWidth={1.5} aria-hidden />
-                      {pushDone ? T.pushStep.enabled : T.pushStep.toggle}
-                    </span>
-                    <Switch
-                      checked={pushDone}
-                      disabled={push.toggling}
-                      onCheckedChange={(next) => void push.toggle(next)}
-                      aria-label={T.pushStep.toggle}
-                    />
-                  </div>
-                  {!push.enabled && push.permission === "default" ? (
-                    <p className="mt-2 text-xs text-text-sec">{PUSH.permissionPrompt}</p>
-                  ) : null}
-                  {push.permission === "denied" ? (
-                    <p className="mt-2 text-xs text-text-sec">{PUSH.denied}</p>
-                  ) : null}
-                </>
-              )}
-
-              {push.error ? (
-                <p role="alert" className="mt-2 text-xs text-danger-text">
-                  {push.error}
-                </p>
-              ) : null}
-            </div>
           </div>
-        </div>
+        ) : null}
       </Card>
     </m.section>
   );

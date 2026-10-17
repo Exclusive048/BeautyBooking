@@ -169,6 +169,7 @@ export function PackageModal({
 
   return (
     <ModalSurface
+      fullScreenOnMobile
       open={open}
       onClose={handleClose}
       title={mode === "create" ? T.titleCreate : T.titleEdit}

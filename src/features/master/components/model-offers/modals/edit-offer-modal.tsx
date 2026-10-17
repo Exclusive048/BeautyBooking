@@ -98,7 +98,7 @@ export function EditOfferModal({ open, onClose, offer, services }: Props) {
   };
 
   return (
-    <ModalSurface open={open} onClose={close} title={T.title} className="max-w-xl">
+    <ModalSurface fullScreenOnMobile open={open} onClose={close} title={T.title} className="max-w-xl">
       <p className="mb-4 text-sm text-text-sec">{T.subtitle}</p>
       <OfferFormFields
         state={state}

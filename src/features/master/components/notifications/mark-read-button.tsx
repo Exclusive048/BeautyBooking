@@ -42,12 +42,15 @@ export function MarkReadButton({ notificationId, isUnread }: Props) {
   };
 
   return (
-    <Button variant="wrapper"
+    // `size="icon"` — невидимая зона нажатия 44px (UI-29) у галочки 32px.
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={handleClick}
       disabled={!isUnread || busy}
       aria-label={T.markRead}
       className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+        "h-8 w-8 shrink-0 rounded-lg",
         isUnread
           ? "text-text-sec hover:bg-bg-input hover:text-text-main"
           : "text-success-text"

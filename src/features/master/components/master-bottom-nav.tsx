@@ -13,8 +13,9 @@ import {
   Star,
   BarChart3,
   Settings,
-  ExternalLink,
   CreditCard,
+  QrCode,
+  Scissors,
   Sparkles,
   SlidersHorizontal,
   Bell,
@@ -61,16 +62,22 @@ const TABS: TabItem[] = [
  */
 type AttentionKey = "notifications" | "messages" | "reviews";
 
+// NAV-PARITY-02: порядок и подписи — как в сайдбаре (`MasterSidebar`) без
+// вкладок панели; общие с кабинетом студии разделы стоят там же, где у неё
+// (`STUDIO_NAV`): «Уведомления» и «Услуги» — в работе, «Тариф» и «Моя
+// страница» — в конце.
 const MORE_ITEMS: Array<{ href: string; label: string; icon: LucideIcon; attentionKey?: AttentionKey }> = [
-  { href: "/cabinet/master/schedule/settings", label: tItems.scheduleSettings, icon: SlidersHorizontal },
   { href: "/cabinet/master/notifications", label: tItems.notifications, icon: Bell, attentionKey: "notifications" },
   { href: "/cabinet/master/messages", label: tItems.messages, icon: MessageSquare, attentionKey: "messages" },
-  { href: "/cabinet/master/clients", label: t.menuClients, icon: Users },
-  { href: "/cabinet/master/model-offers", label: t.menuModels, icon: Sparkles },
-  { href: "/cabinet/master/reviews", label: t.menuReviews, icon: Star, attentionKey: "reviews" },
-  { href: "/cabinet/master/analytics", label: t.menuAnalytics, icon: BarChart3 },
-  { href: "/cabinet/master/billing", label: t.menuBilling, icon: CreditCard },
-  { href: "/cabinet/master/account", label: t.menuSettings, icon: Settings },
+  { href: "/cabinet/master/schedule/settings", label: tItems.scheduleSettings, icon: SlidersHorizontal },
+  { href: "/cabinet/master/services", label: tItems.services, icon: Scissors },
+  { href: "/cabinet/master/clients", label: tItems.clients, icon: Users },
+  { href: "/cabinet/master/reviews", label: tItems.reviews, icon: Star, attentionKey: "reviews" },
+  { href: "/cabinet/master/model-offers", label: tNav.models, icon: Sparkles },
+  { href: "/cabinet/master/analytics", label: tItems.analytics, icon: BarChart3 },
+  { href: "/cabinet/master/account", label: tItems.accountSettings, icon: Settings },
+  { href: "/cabinet/master/billing", label: tItems.billing, icon: CreditCard },
+  { href: "/cabinet/master/settings/public", label: tItems.myPage, icon: QrCode },
 ];
 
 const MORE_PATHS = MORE_ITEMS.map((item) => item.href);
@@ -188,14 +195,6 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                     </Link>
                   );
                 })}
-                <Link
-                  href="/cabinet/master/settings/public"
-                  onClick={() => setMoreOpen(false)}
-                  className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
-                >
-                  <ExternalLink className="h-5 w-5" aria-hidden />
-                  <span className="text-2xs font-medium leading-tight">{t.menuMyPage}</span>
-                </Link>
                 {/* HELP-GUIDE-01: инструкция по кабинету мастера (`/help`). */}
                 <Link
                   href="/help?tab=master"
@@ -203,7 +202,7 @@ export function MasterBottomNav({ pendingBookingsCount = 0, attention = NO_ATTEN
                   className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
                 >
                   <CircleHelp className="h-5 w-5" aria-hidden />
-                  <span className="text-2xs font-medium leading-tight">{t.menuHelp}</span>
+                  <span className="text-2xs font-medium leading-tight">{tItems.help}</span>
                 </Link>
               </div>
             </m.div>

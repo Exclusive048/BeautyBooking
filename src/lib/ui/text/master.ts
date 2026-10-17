@@ -11,15 +11,6 @@ export const master = {
   },
   bookingsPage: {
     moreDrawerTitle: "Ещё",
-    menuClients: "Клиенты",
-    menuReviews: "Отзывы",
-    menuAnalytics: "Аналитика",
-    menuSettings: "Настройки",
-    menuMyPage: "Моя страница →",
-    // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=master`.
-    menuHelp: "Помощь",
-    menuModels: "Модели",
-    menuBilling: "Тариф",
   },
   advisor: {
     aiInsightTitle: "Совет от ИИ",

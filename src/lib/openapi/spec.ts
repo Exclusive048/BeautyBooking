@@ -6038,7 +6038,7 @@ export const openApiSpec = {
               isAdmin: { type: "boolean" },
               roles: { type: "array", items: { type: "string", enum: ["OWNER", "ADMIN", "MASTER"] } },
               canDanger: { type: "boolean", description: "Только владелец: удалить студию." },
-              canEditPublicUsername: { type: "boolean" },
+              canEditPublicUsername: { type: "boolean", description: "Владелец или администратор." },
             },
           },
           studio: {
@@ -10651,20 +10651,21 @@ export const openApiSpec = {
     "/api/cabinet/studio/public-username": {
       get: {
         operationId: "studioPublicUsername",
-        summary: "Studio public profile address and link (owner only; creates one on first call)",
+        summary: "Studio public profile address and link (owner or admin; creates one on first call)",
         tags: ["mobile", "studio"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/StudioPublicUsernameData" }),
           "401": errorResponse("UNAUTHORIZED"),
-          "404": errorResponse("PROVIDER_NOT_FOUND — нет студии во владении (в т.ч. администратор)"),
+          "403": errorResponse("FORBIDDEN — мастер студии"),
+          "404": errorResponse("PROVIDER_NOT_FOUND"),
           "429": errorResponse("RATE_LIMITED"),
           "500": errorResponse("INTERNAL_ERROR | APP_PUBLIC_URL_MISSING"),
         },
       },
       post: {
         operationId: "studioPublicUsernameSet",
-        summary: "Change the studio public profile address (owner only; the old one keeps redirecting)",
+        summary: "Change the studio public profile address (owner or admin; the old one keeps redirecting)",
         tags: ["mobile", "studio"],
         security: [{ bearerAuth: [] }, { cookieAuth: [] }],
         requestBody: {
@@ -10679,6 +10680,7 @@ export const openApiSpec = {
           "200": okResponse({ $ref: "#/components/schemas/StudioPublicUsernameData" }),
           "400": errorResponse("VALIDATION_ERROR"),
           "401": errorResponse("UNAUTHORIZED"),
+          "403": errorResponse("FORBIDDEN — мастер студии"),
           "404": errorResponse("PROVIDER_NOT_FOUND"),
           "409": errorResponse("CONFLICT — адрес занят"),
           "429": errorResponse("RATE_LIMITED"),

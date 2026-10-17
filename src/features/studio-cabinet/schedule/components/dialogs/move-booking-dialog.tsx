@@ -110,7 +110,7 @@ export function MoveBookingDialog({
   const title = mode === "master" ? T.titleToMaster : T.titleTime;
 
   return (
-    <ModalSurface open={open} onClose={handleClose} title={title}>
+    <ModalSurface fullScreenOnMobile open={open} onClose={handleClose} title={title}>
       <div className="space-y-4">
         {mode === "master" ? (
           <label className="block">

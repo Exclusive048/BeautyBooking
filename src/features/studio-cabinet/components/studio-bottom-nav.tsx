@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, ExternalLink, MoreHorizontal, UserRound, X } from "lucide-react";
+import { CircleHelp, MoreHorizontal, QrCode, UserRound, X } from "lucide-react";
 import { m, AnimatePresence } from "framer-motion";
 import {
   STUDIO_NAV,
@@ -35,7 +35,7 @@ const PROFILE_TAB_HREF = "/cabinet/studio/settings?section=profile";
 const SETTINGS_PATH = "/cabinet/studio/settings";
 /**
  * «Моя страница» — ссылка, QR-код и визитка страницы студии, как пункт
- * «Моя страница →» в листе «Ещё» у мастера (`/cabinet/master/settings/public`).
+ * «Моя страница» в листе «Ещё» у мастера (`/cabinet/master/settings/public`).
  * Лежит под `/settings`, но живёт в «Ещё»: на нём горит «Ещё», а не «Профиль».
  */
 const MY_PAGE_HREF = "/cabinet/studio/settings/public";
@@ -176,8 +176,8 @@ export function StudioBottomNav({ counts }: Props) {
                       : "text-text-sec hover:bg-bg-input",
                   )}
                 >
-                  <ExternalLink className="h-5 w-5" aria-hidden />
-                  <span className="text-2xs font-medium leading-tight">{T.bottomNav.myPage}</span>
+                  <QrCode className="h-5 w-5" aria-hidden />
+                  <span className="text-2xs font-medium leading-tight">{T.nav.items.myPage}</span>
                 </Link>
                 <Link
                   href={HELP_HREF}
@@ -185,7 +185,7 @@ export function StudioBottomNav({ counts }: Props) {
                   className="flex flex-col items-center gap-1.5 rounded-2xl px-2 py-3.5 text-center text-text-sec transition-colors hover:bg-bg-input"
                 >
                   <CircleHelp className="h-5 w-5" aria-hidden />
-                  <span className="text-2xs font-medium leading-tight">{T.bottomNav.help}</span>
+                  <span className="text-2xs font-medium leading-tight">{T.nav.items.help}</span>
                 </Link>
               </div>
             </m.div>

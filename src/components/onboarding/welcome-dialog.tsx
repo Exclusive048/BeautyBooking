@@ -52,7 +52,7 @@ export function WelcomeDialog({ onClose }: Props) {
       size="md"
       ariaLabelledBy={titleId}
       initialFocusRef={headingRef}
-      className="overflow-hidden p-0"
+      className="overflow-hidden p-0 sm:overflow-hidden"
     >
       <div className="relative overflow-hidden bg-brand-gradient px-6 pb-7 pt-8 text-white sm:px-8">
         <div
