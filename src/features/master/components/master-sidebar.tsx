@@ -7,11 +7,13 @@ import {
   CalendarDays,
   CircleHelp,
   Cog,
+  CreditCard,
   ExternalLink,
   Home,
   LineChart,
   MessageSquare,
   QrCode,
+  Scissors,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -54,6 +56,7 @@ const HREF = {
   messages: "/cabinet/master/messages",
   schedule: "/cabinet/master/schedule",
   scheduleSettings: "/cabinet/master/schedule/settings",
+  services: "/cabinet/master/services",
   clients: "/cabinet/master/clients",
   reviews: "/cabinet/master/reviews",
   analytics: "/cabinet/master/analytics",
@@ -71,7 +74,8 @@ const HREF = {
   // 302 from `/account` → `/account/notifications`. The /account
   // index redirect remains as a fallback for old bookmarks.
   settings: "/cabinet/master/account/notifications",
-  // Ссылка, QR-код и визитка страницы — на телефоне «Моя страница →» в «Ещё».
+  billing: "/cabinet/master/billing",
+  // Ссылка, QR-код и визитка страницы — на телефоне тот же пункт в «Ещё».
   myPage: "/cabinet/master/settings/public",
 } as const;
 
@@ -187,6 +191,11 @@ export function MasterSidebar({
             label: T.nav.items.scheduleSettings,
             icon: SlidersHorizontal,
           })}
+          {renderItem({
+            href: HREF.services,
+            label: T.nav.items.services,
+            icon: Scissors,
+          })}
         </NavGroup>
 
         <NavGroup label={T.nav.groups.clients}>
@@ -229,6 +238,11 @@ export function MasterSidebar({
             // Keep highlight when on any /account/* sub-page even
             // though we navigate to /notifications by default.
             activeMatch: "/cabinet/master/account",
+          })}
+          {renderItem({
+            href: HREF.billing,
+            label: T.nav.items.billing,
+            icon: CreditCard,
           })}
           {renderItem({
             href: HREF.myPage,

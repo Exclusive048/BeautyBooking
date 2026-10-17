@@ -286,6 +286,17 @@ test.describe("HELP-GUIDE-01 · снимки базы знаний", () => {
         run: async (page) => {
           await open(page, "/cabinet/master/bookings");
           await clickButton(page, "Новая запись");
+          // Ночью и в загруженный день окошек на сегодня нет — на снимке
+          // нужен ближайший день, где они есть.
+          const picker = page.getByTestId("operator-slot-picker");
+          const days = picker.locator("button[aria-pressed]");
+          const empty = picker.getByText("Свободных окошек в этот день нет", { exact: false });
+          const count = await days.count();
+          for (let index = 1; index < count && (await empty.isVisible()); index += 1) {
+            await days.nth(index).click();
+            await waitLoaded(page);
+          }
+          await settle(page, 400);
         },
       },
       { name: "master-clients", run: (page) => open(page, "/cabinet/master/clients") },

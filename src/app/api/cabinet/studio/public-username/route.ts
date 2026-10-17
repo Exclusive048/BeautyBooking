@@ -11,6 +11,7 @@ import {
   normalizeUsernameInput,
   validateUsername,
 } from "@/lib/publicUsername";
+import { requireStudioCabinetAdmin } from "@/lib/studio/cabinet-access";
 import { parseBody } from "@/lib/validation";
 import { ProviderType } from "@prisma/client";
 
@@ -24,6 +25,18 @@ function buildPublicUrl(appUrl: string, username: string) {
   return `${appUrl}/u/${username}`;
 }
 
+/**
+ * Студия — та же, что у страницы «Моя страница» и всего кабинета
+ * (`resolveCurrentStudioAccess`: OWNER > ADMIN > MASTER); править адрес может
+ * владелец и администратор (как профиль студии, `PATCH /api/studios/[id]`),
+ * мастеру студии — 403. Раньше студия искалась по `ownerUserId`, и
+ * администратор получал 404 «Профиль студии не найден.».
+ */
+async function resolveStudioProviderId(userId: string): Promise<string> {
+  const access = await requireStudioCabinetAdmin(userId);
+  return access.providerId;
+}
+
 export async function GET(req: Request) {
   try {
     const auth = await requireAuth();
@@ -35,7 +48,7 @@ export async function GET(req: Request) {
     }
 
     const provider = await prisma.provider.findFirst({
-      where: { type: ProviderType.STUDIO, ownerUserId: auth.user.id },
+      where: { id: await resolveStudioProviderId(auth.user.id), type: ProviderType.STUDIO },
       select: { id: true, name: true, publicUsername: true },
     });
     if (!provider) {
@@ -82,7 +95,7 @@ export async function POST(req: Request) {
     }
 
     const provider = await prisma.provider.findFirst({
-      where: { type: ProviderType.STUDIO, ownerUserId: auth.user.id },
+      where: { id: await resolveStudioProviderId(auth.user.id), type: ProviderType.STUDIO },
       select: { id: true, publicUsername: true },
     });
     if (!provider) {

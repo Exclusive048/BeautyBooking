@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { PublicSettingsClient } from "@/features/billing/components/public-settings-client";
+import { ClientViewLink } from "@/features/cabinet/components/client-view-link";
 import { MasterPageHeader } from "@/features/master/components/master-page-header";
 import * as UI_TEXT from "@/lib/ui/text";
 import { personalMasterProviderWhere } from "@/lib/master/access";
@@ -20,6 +21,7 @@ export default async function MasterSettingsPublicPage() {
       address: true,
       description: true,
       avatarUrl: true,
+      publicUsername: true,
     },
   });
   if (!provider) redirect("/403");
@@ -36,6 +38,7 @@ export default async function MasterSettingsPublicPage() {
         ]}
         title={UI_TEXT.billing.publicPage.title}
         subtitle={UI_TEXT.billing.publicPage.subtitle}
+        actions={<ClientViewLink publicUsername={provider.publicUsername} />}
       />
       <div className="px-4 py-6 md:px-6 lg:px-8">
         <PublicSettingsClient
@@ -45,6 +48,7 @@ export default async function MasterSettingsPublicPage() {
           address={provider.address ?? ""}
           bio={provider.description ?? ""}
           avatarUrl={provider.avatarUrl ?? null}
+          initialUsername={provider.publicUsername}
         />
       </div>
     </>

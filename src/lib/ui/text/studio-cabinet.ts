@@ -60,13 +60,14 @@ export const studioCabinet = {
     billing: "Тарифы",
     settingsAria: "Настройки",
     ariaLabel: "Навигация студии",
+    // NAV-PARITY-02: группы — как у кабинета мастера («Работа», «Клиенты»,
+    // «Бизнес»; последняя — «Студия» вместо мастерского «Аккаунт»).
     groups: {
-      studio: "Студия",
+      work: "Работа",
       team: "Команда",
       clients: "Клиенты",
       business: "Бизнес",
-      studioMeta: "Настройки студии",
-      studioMetaExternal: "Внешние",
+      studio: "Студия",
     },
     items: {
       dashboard: "Главная",
@@ -83,13 +84,9 @@ export const studioCabinet = {
       reviews: "Отзывы",
       notifications: "Уведомления",
       analytics: "Аналитика",
-      // STUDIO-CLEANUP-FIX-A #9: `publicPage` sidebar label kept
-      // for backwards-compat (other consumers may reference it) but
-      // its sidebar entry was removed — the page was a misleading
-      // `redirect("/cabinet/studio/settings")`. `publicPageExternal`
-      // remains in active use for the «Open studio page» link.
+      billing: "Тариф",
+      // Страница студии `/u/<адрес>` в новой вкладке — подпись как у мастера.
       publicPage: "Публичная страница",
-      publicPageExternal: "Открыть страницу студии",
       // Ссылка, QR-код и визитка страницы студии (`/cabinet/studio/settings/public`).
       myPage: "Моя страница",
       // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=studio`.
@@ -107,11 +104,6 @@ export const studioCabinet = {
     close: "Закрыть",
     // NAV-STUDIO-SETTINGS-TAB — вкладка раздела «Профиль» настроек студии.
     profile: "Профиль",
-    // Пункт листа «Ещё» — как «Моя страница →» у мастера: ссылка, QR-код и
-    // визитка страницы студии (`/cabinet/studio/settings/public`).
-    myPage: "Моя страница →",
-    // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=studio`.
-    help: "Помощь",
   },
   dashboard: {
     cards: {
@@ -216,6 +208,12 @@ export const studioCabinet = {
       hint: "Всё, что ниже, — про выбранного мастера.",
     },
     rules: {
+      // Правила всей студии живут в «Настройки» → «Правила студии»; здесь —
+      // правила выбранного мастера. Окно записи на услугу студии — более
+      // строгое из двух (BOOKING-WINDOW-STRICTER).
+      studioRulesNote:
+        "Здесь — правила выбранного мастера. Общие правила записи для всей студии задаются в настройках студии. При записи на услугу студии действует более строгий срок записи из двух.",
+      studioRulesCta: "Открыть правила студии",
       minHoursTitle: "Минимум за",
       minHoursHint:
         "За сколько часов до визита клиент должен записаться.",

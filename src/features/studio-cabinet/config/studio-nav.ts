@@ -4,10 +4,12 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  CreditCard,
   Home,
   ListChecks,
   Scissors,
   Settings,
+  SlidersHorizontal,
   Star,
   UserCircle,
   Users,
@@ -43,7 +45,8 @@ export type StudioNavItem = {
     | "reviews"
     | "notifications"
     | "analytics"
-    | "settings";
+    | "settings"
+    | "billing";
   icon: LucideIcon;
   badgeKey?: StudioNavBadgeKey;
 };
@@ -51,7 +54,7 @@ export type StudioNavItem = {
 export type StudioNavGroup = {
   id: string;
   /** UI_TEXT path under `studioCabinet.nav.groups`. */
-  labelKey: "studio" | "team" | "clients" | "business" | "studioMeta";
+  labelKey: "work" | "team" | "clients" | "business" | "studio";
   items: StudioNavItem[];
 };
 
@@ -60,15 +63,20 @@ export type StudioNavGroup = {
  * sidebar and the mobile bottom-nav read from this config; UI_TEXT keys
  * resolve to localised labels at render time.
  *
- * 13 nav items in 5 groups (SCHEDULE-PATTERNS-01 этап 4 добавил «График команды»). "Rooms" is intentionally excluded (out of
- * scope for current release). Schedule-requests was added in the
- * preceding STUDIO-SCHEDULE-REQUEST-APPROVAL-A commit; this config
- * surfaces it as a first-class nav item with a pending badge.
+ * 14 nav items in 5 groups. "Rooms" is intentionally excluded (out of
+ * scope for current release).
+ *
+ * NAV-PARITY-02 (2026-10-16): разделы с тем же названием, что у кабинета
+ * мастера (`MasterSidebar`), стоят в той же группе и в том же порядке:
+ * «Работа» — Главная, Записи, Уведомления, Расписание, Настройки расписания,
+ * Услуги; «Клиенты» — Клиенты, Отзывы; «Бизнес» — Аналитика; последняя
+ * группа — настройки, Тариф, затем (в сайдбаре) Моя страница, Публичная
+ * страница, Помощь. Своё у студии — группа «Команда».
  */
 export const STUDIO_NAV: StudioNavGroup[] = [
   {
-    id: "studio",
-    labelKey: "studio",
+    id: "work",
+    labelKey: "work",
     items: [
       {
         id: "dashboard",
@@ -78,39 +86,36 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         exact: true,
       },
       {
+        id: "bookings",
+        href: "/cabinet/studio/bookings",
+        labelKey: "bookings",
+        icon: ListChecks,
+      },
+      {
+        id: "notifications",
+        href: "/cabinet/studio/notifications",
+        labelKey: "notifications",
+        icon: Bell,
+        badgeKey: "notificationsUnread",
+      },
+      {
         id: "schedule",
         href: "/cabinet/studio/calendar",
         labelKey: "schedule",
         icon: CalendarDays,
       },
-      {
-        id: "schedule-requests",
-        href: "/cabinet/studio/schedule-requests",
-        labelKey: "scheduleRequests",
-        icon: CalendarClock,
-        badgeKey: "scheduleRequestsPending",
-      },
-      // STUDIO-SCHEDULE-SETTINGS-A Phase A: schedule-settings entry —
-      // Phase A surfaces Hours + Rules tabs; Phase B adds Exceptions /
-      // Breaks / Visibility. Per-master picker inside the page.
+      // STUDIO-SCHEDULE-SETTINGS-A: per-master picker inside the page.
       {
         id: "schedule-settings",
         href: "/cabinet/studio/schedule/settings",
         labelKey: "scheduleSettings",
-        icon: Settings,
-      },
-      // SCHEDULE-PATTERNS-01 (этап 4): мастера студии × дни.
-      {
-        id: "team-schedule",
-        href: "/cabinet/studio/schedule/team",
-        labelKey: "teamSchedule",
-        icon: CalendarRange,
+        icon: SlidersHorizontal,
       },
       {
-        id: "bookings",
-        href: "/cabinet/studio/bookings",
-        labelKey: "bookings",
-        icon: ListChecks,
+        id: "services",
+        href: "/cabinet/studio/services",
+        labelKey: "services",
+        icon: Scissors,
       },
     ],
   },
@@ -124,11 +129,19 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         labelKey: "masters",
         icon: Users,
       },
+      // SCHEDULE-PATTERNS-01 (этап 4): мастера студии × дни.
       {
-        id: "services",
-        href: "/cabinet/studio/services",
-        labelKey: "services",
-        icon: Scissors,
+        id: "team-schedule",
+        href: "/cabinet/studio/schedule/team",
+        labelKey: "teamSchedule",
+        icon: CalendarRange,
+      },
+      {
+        id: "schedule-requests",
+        href: "/cabinet/studio/schedule-requests",
+        labelKey: "scheduleRequests",
+        icon: CalendarClock,
+        badgeKey: "scheduleRequestsPending",
       },
     ],
   },
@@ -149,13 +162,6 @@ export const STUDIO_NAV: StudioNavGroup[] = [
         icon: Star,
         badgeKey: "reviewsUnanswered",
       },
-      {
-        id: "notifications",
-        href: "/cabinet/studio/notifications",
-        labelKey: "notifications",
-        icon: Bell,
-        badgeKey: "notificationsUnread",
-      },
     ],
   },
   {
@@ -171,22 +177,20 @@ export const STUDIO_NAV: StudioNavGroup[] = [
     ],
   },
   {
-    id: "studio-meta",
-    labelKey: "studioMeta",
+    id: "studio",
+    labelKey: "studio",
     items: [
-      // STUDIO-CLEANUP-FIX-A #9: «Публичная страница» entry removed.
-      // It linked to `/cabinet/studio/profile` which was just a
-      // `redirect("/cabinet/studio/settings?tab=main")` — sidebar
-      // label promised a public profile view but routed to settings,
-      // making both the label and the destination misleading. Page
-      // file deleted alongside this entry. A real public-page entry
-      // (pointing at the studio's external `/u/<publicUsername>`
-      // profile) is parked in backlog as a future feature.
       {
         id: "settings",
         href: "/cabinet/studio/settings",
         labelKey: "settings",
         icon: Settings,
+      },
+      {
+        id: "billing",
+        href: "/cabinet/studio/billing",
+        labelKey: "billing",
+        icon: CreditCard,
       },
     ],
   },

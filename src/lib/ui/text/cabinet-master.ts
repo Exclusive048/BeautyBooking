@@ -31,14 +31,16 @@ export const cabinetMaster = {
       messages: "Сообщения",
       schedule: "Расписание",
       scheduleSettings: "Настройки расписания",
+      services: "Услуги",
       clients: "Клиенты",
       reviews: "Отзывы",
       analytics: "Аналитика",
       profile: "Мой профиль",
       accountSettings: "Настройки аккаунта",
+      billing: "Тариф",
       publicPage: "Публичная страница",
       // Ссылка, QR-код и визитка страницы (`/cabinet/master/settings/public`);
-      // на телефоне — «Моя страница →» в листе «Ещё».
+      // на телефоне — тот же пункт в листе «Ещё».
       myPage: "Моя страница",
       // HELP-GUIDE-01: инструкция по кабинету — `/help?tab=master`.
       help: "Помощь",
@@ -54,7 +56,6 @@ export const cabinetMaster = {
     breadcrumb: "Настройки расписания",
     title: "Настройки расписания",
     subtitle: "График, календарь, перерывы и правила записи",
-    previewCta: "Посмотреть глазами клиента",
     studioApproval: {
       infoTemplate:
         "Вы в команде студии «{studio}». Изменения расписания отправляются на одобрение студии — текущее расписание не меняется, пока студия не подтвердит.",

@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import { CircleHelp, ExternalLink, QrCode } from "lucide-react";
-import Link from "next/link";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { SidebarItem } from "@/components/ui/sidebar-item";
 import { NavGroup } from "@/features/master/components/nav-group";
@@ -88,37 +87,36 @@ export function StudioSidebar({ counts, user, studio }: Props) {
             first={groupIndex === 0}
           >
             {group.items.map((item) => renderItem(item))}
+            {groupIndex === STUDIO_NAV.length - 1 ? (
+              <>
+                {/* NAV-PARITY-02: в конце последней группы, как у мастера в
+                    «Аккаунте»: «Моя страница» (ссылка, QR-код, визитка),
+                    сама страница в новой вкладке и «Помощь». */}
+                <li>
+                  <SidebarItem
+                    href={MY_PAGE_HREF}
+                    label={T.nav.items.myPage}
+                    icon={QrCode}
+                    active={myPageActive}
+                  />
+                </li>
+                {studio.publicHref ? (
+                  <li>
+                    <SidebarItem
+                      href={studio.publicHref}
+                      label={T.nav.items.publicPage}
+                      icon={ExternalLink}
+                      target="_blank"
+                    />
+                  </li>
+                ) : null}
+                <li>
+                  <SidebarItem href={HELP_HREF} label={T.nav.items.help} icon={CircleHelp} />
+                </li>
+              </>
+            ) : null}
           </NavGroup>
         ))}
-
-        <NavGroup label={T.nav.groups.studioMetaExternal}>
-          {studio.publicHref ? (
-            <li>
-              <Link
-                href={studio.publicHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-text-sec transition-colors hover:bg-bg-input/70 hover:text-text-main"
-              >
-                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="flex-1 truncate">{T.nav.items.publicPageExternal}</span>
-              </Link>
-            </li>
-          ) : null}
-          {/* «Моя страница» — ссылка, QR-код и визитка страницы студии, как
-              «Моя страница →» в листе «Ещё»; «Помощь» — инструкция по кабинету. */}
-          <li>
-            <SidebarItem
-              href={MY_PAGE_HREF}
-              label={T.nav.items.myPage}
-              icon={QrCode}
-              active={myPageActive}
-            />
-          </li>
-          <li>
-            <SidebarItem href={HELP_HREF} label={T.nav.items.help} icon={CircleHelp} />
-          </li>
-        </NavGroup>
       </nav>
 
       <div className="mt-8">
