@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AppError } from "@/lib/api/errors";
 import { BROWSER_DENY_URLS, BROWSER_IGNORE_ERRORS, shouldDropError, shouldReportFailure } from "./noise";
+import { parseAndValidateFlightRouterState } from "next/dist/server/app-render/parse-and-validate-flight-router-state";
 
 /**
  * OBSERVABILITY-GLITCHTIP-01 — the filters exist so the channel stays worth
@@ -42,6 +43,50 @@ describe("shouldDropError", () => {
     expect(shouldDropError(null)).toBe(false);
     expect(shouldDropError("boom")).toBe(false);
     expect(shouldDropError({ nested: { deep: true } })).toBe(false);
+  });
+});
+
+/**
+ * ROUTER-STATE-HEADER-NOISE — the errors come from the REAL Next validator, not
+ * from copied strings: a reworded message after a Next upgrade turns this red
+ * instead of letting the noise back into GlitchTip unnoticed.
+ *
+ * @probe 2026-10-27: `MALFORMED_ROUTER_STATE` emptied in `noise.ts` — «drops
+ * every way Next rejects the header» went red on the first case (expected
+ * false to be true), the other cases in this file stayed green.
+ */
+describe("shouldDropError — malformed router state header", () => {
+  const encode = (tree: unknown) => encodeURIComponent(JSON.stringify(tree));
+
+  function rejectionOf(header: string | string[]): unknown {
+    try {
+      parseAndValidateFlightRouterState(header);
+    } catch (error) {
+      return error;
+    }
+    throw new Error("Next accepted the header — the case no longer tests a rejection");
+  }
+
+  it("control: the current router state format still parses", () => {
+    expect(parseAndValidateFlightRouterState(encode(["", { children: ["__PAGE__", {}] }, null, null]))).toBeTruthy();
+  });
+
+  it("drops every way Next rejects the header", () => {
+    const cases: Array<string | string[]> = [
+      // Canned scanner header in an older Next format (5th item was a boolean).
+      encode(["", { children: ["__PAGE__", {}] }, null, null, true]),
+      "not-json",
+      "%E0%A4%A",
+      "x".repeat(40_001),
+      ["a", "b"],
+    ];
+    for (const header of cases) {
+      expect(shouldDropError(rejectionOf(header))).toBe(true);
+    }
+  });
+
+  it("keeps other errors that merely mention the header", () => {
+    expect(shouldDropError(new Error("Failed to read router state from cache"))).toBe(false);
   });
 });
 

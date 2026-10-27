@@ -6,7 +6,7 @@ import { snapServiceDurationMin } from "@/lib/services/service-duration";
 
 /**
  * SERVICE-DURATION-GRID: длительность услуги (и её переопределение) приводится
- * к общей сетке — 15 … 120 шагом 15, дальше шагом 30. Ввод мимо сетки
+ * к общей сетке — 15, 20, 30, 40, 45 … 120, дальше шагом 30. Ввод мимо сетки
  * (приложение, старый клиент) не отклоняется, а округляется.
  */
 const serviceDurationMinSchema = z

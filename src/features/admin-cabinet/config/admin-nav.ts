@@ -1,6 +1,7 @@
 import {
   BookMarked,
   Flag,
+  History,
   LayoutDashboard,
   MapPin,
   MessageSquareWarning,
@@ -13,6 +14,7 @@ import * as UI_TEXT from "@/lib/ui/text";
 
 export type AdminNavItemKey =
   | "dashboard"
+  | "events"
   | "catalog"
   | "cities"
   | "users"
@@ -47,6 +49,15 @@ export const ADMIN_NAV: ReadonlyArray<AdminNavItem> = [
     sublabel: UI_TEXT.adminPanel.page.dashboard.sublabel,
     icon: LayoutDashboard,
     exact: true,
+  },
+  {
+    // ADMIN-EVENTS-02: вся история событий — фильтр по разделам и «Показать ещё».
+    key: "events",
+    href: "/admin/events",
+    label: UI_TEXT.adminPanel.nav.events,
+    pageTitle: UI_TEXT.adminPanel.page.events.title,
+    sublabel: UI_TEXT.adminPanel.page.events.sublabel,
+    icon: History,
   },
   {
     key: "catalog",

@@ -302,7 +302,8 @@ describe("FIX-B18 · производный пин: набор навигаци�
     // (`api/auth/oauth-start-navigation.test.ts`). Query-строка (`?verifyPhone=1`)
     // роут не меняет — сравнение идёт по пути.
     // ADMIN-EVENTS-EXPORT: выгрузка истории событий в Excel — отказ ведёт на
-    // дашборд (`?eventsExport=`) или на вход.
+    // «Историю событий» (`/admin/events?eventsExport=`, ADMIN-EVENTS-02) или
+    // на вход.
     const FROZEN = [
       "/api/admin/dashboard/events/export",
       "/api/auth/vk/start",

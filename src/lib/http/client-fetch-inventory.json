@@ -1,11 +1,11 @@
 {
-  "src/features/admin-cabinet/dashboard/components/events-feed.tsx": {
+  "src/features/admin-cabinet/dashboard/components/system-health.tsx": {
     "rawFetch": 1,
     "manualParse": 0,
     "decision": "silent",
     "reason": "фоновый опрос живой панели админки: следующий опрос повторит, сохранённые данные остаются на экране; сообщение каждые несколько секунд было бы шумом"
   },
-  "src/features/admin-cabinet/dashboard/components/system-health.tsx": {
+  "src/features/admin-cabinet/dashboard/lib/use-admin-events-poll.ts": {
     "rawFetch": 1,
     "manualParse": 0,
     "decision": "silent",

@@ -40,6 +40,24 @@ const FRAMEWORK_CONTROL_FLOW = [
 const CLIENT_DISCONNECT = ["ECONNRESET", "ECONNABORTED", "EPIPE", "ABORT_ERR", "ResponseAborted"] as const;
 
 /**
+ * ROUTER-STATE-HEADER-NOISE — the client sent a malformed `Next-Router-State-Tree`
+ * header (router state of an RSC navigation). Next.js validates it before
+ * rendering and throws one of these, which surfaces as a 500 although it is
+ * the request that is wrong. Sources: vulnerability scanners replaying a
+ * canned header in an older Next format, and stale clients. A real browser
+ * treats the failed RSC response as a full page load (`doMpaNavigation`), so
+ * there is nothing to act on. The proxy cannot strip the header instead: Next
+ * removes flight headers before `proxy.ts` and restores them after it.
+ * Exact messages from `parse-and-validate-flight-router-state.js`; the test runs
+ * the real validator, so a reworded message after an upgrade turns it red.
+ */
+const MALFORMED_ROUTER_STATE = [
+  "The router state header was sent but could not be parsed.",
+  "The router state header was too large.",
+  "Multiple router state headers were sent. This is not allowed.",
+] as const;
+
+/**
  * 5xx codes that mean "deliberately unavailable", not "broken":
  *  - `SERVICE_UNAVAILABLE` 503 is what the AUTH-KILLSWITCH-ENFORCE-01 gates
  *    return when VK / Yandex / Telegram auth is switched off (FZ-199). Every
@@ -87,6 +105,7 @@ export function shouldDropError(error: unknown): boolean {
 
   if (FRAMEWORK_CONTROL_FLOW.some((marker) => text.includes(marker))) return true;
   if (CLIENT_DISCONNECT.some((marker) => text.includes(marker))) return true;
+  if (MALFORMED_ROUTER_STATE.some((marker) => text.includes(marker))) return true;
 
   return false;
 }

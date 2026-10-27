@@ -7,9 +7,9 @@ import * as UI_TEXT from "@/lib/ui/text";
  * (currently never triggers because `Review.author` is required, but
  * defensive).
  *
- * Same rationale as the dashboard live feed (`maskLastName`) — admin
- * needs to *recognise* who wrote the review without exposing full
- * PII on screen.
+ * Admin needs to *recognise* who wrote the review without exposing full
+ * PII on screen. (The event history, ADMIN-EVENTS-02, shows full names on
+ * purpose — it is a support tool and writes a PdAccessLog trail.)
  */
 export function maskAuthorDisplay(name: string | null | undefined): string {
   if (!name) return UI_TEXT.adminPanel.reviews.card.authorDeleted;
