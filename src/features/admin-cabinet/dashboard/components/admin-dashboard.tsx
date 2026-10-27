@@ -31,7 +31,7 @@ export function AdminDashboard({
       <KpiRow data={initialKpis} />
       <ChartsRow data={initialCharts} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_1fr] lg:gap-4">
-        <EventsFeed initial={initialEvents.items} initialNextBefore={initialEvents.nextBefore} />
+        <EventsFeed initial={initialEvents.items} />
         <SystemHealth initial={initialHealth} />
       </div>
     </div>

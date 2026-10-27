@@ -5,12 +5,12 @@ import {
 } from "./service-duration";
 
 describe("SERVICE_DURATION_OPTIONS — одна сетка длительности услуги", () => {
-  it("до двух часов — шагом 15 минут", () => {
-    expect(SERVICE_DURATION_OPTIONS.slice(0, 8)).toEqual([15, 30, 45, 60, 75, 90, 105, 120]);
+  it("до двух часов — шагом 15 минут плюс 20 и 40 минут (SERVICE-DURATION-20-40)", () => {
+    expect(SERVICE_DURATION_OPTIONS.slice(0, 10)).toEqual([15, 20, 30, 40, 45, 60, 75, 90, 105, 120]);
   });
 
   it("после двух часов — шагом 30 минут, до 12 часов", () => {
-    const coarse = SERVICE_DURATION_OPTIONS.slice(8);
+    const coarse = SERVICE_DURATION_OPTIONS.slice(10);
     expect(coarse.slice(0, 4)).toEqual([150, 180, 210, 240]);
     expect(coarse.at(-1)).toBe(720);
     coarse.forEach((value, index) => {
@@ -36,6 +36,17 @@ describe("snapServiceDurationMin — ввод мимо сетки округля
     expect(snapServiceDurationMin(113)).toBe(120);
     expect(snapServiceDurationMin(50)).toBe(45);
     expect(snapServiceDurationMin(53)).toBe(60);
+  });
+
+  it("20 и 40 минут — свои ступени; ничья — вверх", () => {
+    expect(snapServiceDurationMin(20)).toBe(20);
+    expect(snapServiceDurationMin(40)).toBe(40);
+    expect(snapServiceDurationMin(17)).toBe(15);
+    expect(snapServiceDurationMin(18)).toBe(20);
+    expect(snapServiceDurationMin(25)).toBe(30);
+    expect(snapServiceDurationMin(35)).toBe(40);
+    expect(snapServiceDurationMin(42)).toBe(40);
+    expect(snapServiceDurationMin(43)).toBe(45);
   });
 
   it("после двух часов — к ближайшим 30 минутам, ничья вверх", () => {

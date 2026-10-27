@@ -165,6 +165,11 @@ describe("инструментирование: где след есть и гд
     expect(read("src/features/admin-cabinet/billing/server/subscriptions.service.ts")).toContain(
       "recordPdAccess",
     );
+    // ADMIN-EVENTS-02: «История событий» показывает полные имена и телефоны
+    // (подпись человека без имени) — страница и «Показать ещё».
+    expect(read("src/features/admin-cabinet/dashboard/server/events.service.ts")).toContain(
+      "recordPdAccess",
+    );
   });
 
   it("каждый ключ PdAccessSurface действительно используется", () => {
@@ -181,6 +186,7 @@ describe("инструментирование: где след есть и гд
       "src/features/admin-cabinet/billing/server/payments.service.ts",
       "src/features/admin-cabinet/billing/server/subscriptions.service.ts",
       "src/app/api/admin/dashboard/events/export/route.ts",
+      "src/features/admin-cabinet/dashboard/server/events.service.ts",
     ].map(read).join("\n");
 
     const unused = keys.filter((k) => !sources.includes(`"${k}"`));

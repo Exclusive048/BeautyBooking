@@ -73,16 +73,3 @@ export function computeAbsoluteDelta(
 export function utcDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
-
-/** "Анна Сергеевна Иванова" → "Анна И.". Used in the live feed where
- * we want to identify clients without exposing full PII to admin
- * sessions. Single given name passes through unchanged. */
-export function maskLastName(name: string | null | undefined): string {
-  if (!name) return "—";
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "—";
-  if (parts.length === 1) return parts[0]!;
-  const first = parts[0]!;
-  const last = parts[parts.length - 1]!;
-  return `${first} ${last.charAt(0).toUpperCase()}.`;
-}

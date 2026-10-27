@@ -52,19 +52,39 @@ export type AdminCharts = {
   bookings: AdminChartSeries;
 };
 
+/**
+ * ADMIN-EVENTS-02 (2026-10-27, запрос владельца: «не видно ни действий, ни
+ * имён, фамилий, нельзя подгрузить ещё»). Один тип — один источник событий;
+ * порядок источников в выдаче задаёт `ADMIN_EVENT_TYPES` (`lib/event-categories.ts`).
+ */
 export type AdminEventType =
   | "booking"
   | "booking_cancel"
-  | "registration_master"
-  | "registration_client"
+  | "registration"
+  | "cabinet_created"
   | "subscription"
+  | "payment"
+  | "review"
   | "complaint"
   // MOBILE-POLISH (App Store 1.2): жалоба пользователя на контент.
-  | "content_report";
+  | "content_report"
+  | "admin_action";
+
+/** Группа событий — вкладка фильтра на странице «История событий». */
+export type AdminEventCategory = "all" | "bookings" | "users" | "billing" | "reviews" | "admin";
 
 export type AdminEventDotTone = "ok" | "new" | "sub" | "cancel" | "alert";
 
 export type AdminEventAmountTone = "neutral" | "positive" | "negative";
+
+/** Участник события: имя и фамилия полностью (без имени — телефон или почта). */
+export type AdminEventPerson = {
+  name: string;
+  /** Подпись под именем: «клиент», «мастер», «студия», «администратор». */
+  role: string | null;
+  /** Карточка в админке (`/admin/users?q=<id>`); `null` — открыть нечего. */
+  href: string | null;
+};
 
 export type AdminEventItem = {
   /** Composite `"{type}:{entityId}"` — stable across polls, used to
@@ -75,12 +95,15 @@ export type AdminEventItem = {
   timeIso: string;
   /** Unix ms — handy for `?since=` polling without re-parsing. */
   timeMs: number;
-  /** "Мария П. → Анна К." or "Регистрация · мастер". */
-  primary: string;
-  /** "Маникюр + гель" or "Юлия Серебрянникова". */
-  secondary: string;
-  /** Right-column text — "3 500 ₽", "−2 200 ₽", "Косметология". `null`
-   * when not applicable. */
+  /** Что произошло: «Новая запись», «Отмена клиентом», «Выдача тарифа». */
+  action: string;
+  /** Кто сделал. `null` — система. */
+  actor: AdminEventPerson | null;
+  /** Кого касается: мастер записи, автор отзыва, пользователь действия админа. */
+  subject: AdminEventPerson | null;
+  /** Подробности по пунктам: услуга, время визита, причина, комментарий. */
+  details: string[];
+  /** Right-column text — "3 500 ₽", "−2 200 ₽", "Открыта". `null` when not applicable. */
   amountText: string | null;
   amountTone: AdminEventAmountTone;
   dotTone: AdminEventDotTone;
@@ -88,8 +111,8 @@ export type AdminEventItem = {
 
 export type AdminEventsResponse = {
   items: AdminEventItem[];
-  /** ADMIN-EVENTS-TABLE: `?before=` для следующей страницы; `null` — старше нет. */
-  nextBefore: number | null;
+  /** Непрозрачный курсор `?before=` следующей страницы; `null` — старше нет. */
+  nextCursor: string | null;
 };
 
 export type AdminHealthTone = "ok" | "warn" | "error" | "neutral";
