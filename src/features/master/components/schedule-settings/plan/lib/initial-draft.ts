@@ -6,6 +6,7 @@ import {
   type SchedulePlanDto,
 } from "@/lib/schedule/patterns-shared";
 import { SCHEDULE_HORIZON_DAYS } from "@/lib/schedule/publish-horizon";
+import * as UI_TEXT from "@/lib/ui/text";
 import { dayHoursFromTemplate, type DayHoursDraft } from "./day-hours";
 import { cycleWorkOff, isManualPattern } from "./describe-plan";
 
@@ -14,6 +15,9 @@ export type WizardKind = SchedulePatternKindValue | "MANUAL";
 export type WizardHoursMode = "same" | "perDay";
 
 export const WORKDAYS_MASK = [true, true, true, true, true, false, false];
+
+/** Имя рабочего дня, который создаёт «Каждый раз по-разному» (то же, что шлёт окно). */
+const MANUAL_DAY_LABEL = UI_TEXT.cabinetMaster.scheduleSettings.wizard.hours.manualDayLabel;
 
 export type WizardDraft = {
   kind: WizardKind;
@@ -56,6 +60,13 @@ export function initialDraft(plan: SchedulePlanDto): WizardDraft {
   const split = current && current.kind === "CYCLE" ? cycleWorkOff(current.days) : null;
   const preset = split ? CYCLE_PRESETS.find((item) => item.work === split.work && item.off === split.off) : undefined;
   const manual = current ? isManualPattern(current) : false;
+  // «Каждый раз по-разному»: в графике рабочих дней нет, часы живут в рабочем
+  // дне палитры, который создало это окно. Раньше бралась ПЕРВАЯ по времени
+  // создания строка палитры — после правки часов окно открывалось со старыми
+  // (SCHEDULE-BREAKS-MANY, 2026-10-29). Самый новый с этим именем — текущий.
+  const manualTemplate = manual
+    ? [...plan.templates].reverse().find((item) => item.inPalette && item.name === MANUAL_DAY_LABEL)
+    : undefined;
 
   // Разные часы у рабочих дней действующего графика — окно открывается
   // «разными по дням» с этими часами (фиксированное время — только одинаковое).
@@ -99,7 +110,9 @@ export function initialDraft(plan: SchedulePlanDto): WizardDraft {
     autoExtend: current ? currentEnds === null : false,
     endsOn: currentEnds && currentEnds >= todayKey && currentEnds <= lastKey ? currentEnds : lastKey,
     hoursMode: canPerDay ? "perDay" : "same",
-    sameHours: dayHoursFromTemplate(templateOf(firstId) ?? plan.templates.find((item) => item.inPalette)),
+    sameHours: dayHoursFromTemplate(
+      templateOf(firstId) ?? manualTemplate ?? plan.templates.find((item) => item.inPalette),
+    ),
     perDay,
   };
 }

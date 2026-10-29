@@ -73,7 +73,7 @@ const ERROR_CODES = [
   "INVALID_REQUEST_PAYLOAD",
   "INVALID_SOCIAL_LINK",
   "INVITE_NOT_FOUND",
-  // LAUNCH-PROMO-01: до 1 ноября платный тариф не продаётся — у всех PREMIUM по акции.
+  // LAUNCH-PROMO-01: пока идёт акция (до 31 декабря), платный тариф не продаётся — у всех PREMIUM по акции.
   "LAUNCH_PROMO_ACTIVE",
   "MASTER_ALREADY_ASSIGNED",
   // STUDIO-LEAVE-GUARD: у мастера есть живые записи студии — уход/исключение запрещены.

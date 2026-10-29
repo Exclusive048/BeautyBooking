@@ -399,7 +399,7 @@ export function BillingPage({ scope }: BillingPageProps) {
   const isFreePlan = !subscription || subscription.plan.tier === "FREE";
   const isActiveSub = subscription?.status === "ACTIVE" || subscription?.status === "PAST_DUE";
   const availablePeriods = getAvailablePeriods(scopePlans);
-  // LAUNCH-PROMO-01: до 1 ноября тарифы не продаются — у кабинета PREMIUM по акции.
+  // LAUNCH-PROMO-01: пока идёт акция, тарифы не продаются — у кабинета PREMIUM по акции.
   const launchPromo = isLaunchPromoActive();
 
   return (

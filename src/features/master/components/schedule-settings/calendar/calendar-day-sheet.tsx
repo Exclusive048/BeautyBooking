@@ -8,8 +8,8 @@ import type { CalendarDayDto, CalendarPaintAction, CalendarStudioDayDto } from "
 import type { DayTemplateDto } from "@/lib/schedule/patterns-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
-import { DayHoursEditor } from "../plan/day-hours-editor";
-import { DEFAULT_DAY_HOURS, validateDayHours, type DayHoursDraft } from "../plan/lib/day-hours";
+import { DayHoursEditor, dayHoursErrorText } from "../plan/day-hours-editor";
+import { DEFAULT_DAY_HOURS, dayHoursToTemplate, validateDayHours, type DayHoursDraft } from "../plan/lib/day-hours";
 import { WEEKDAY_SHORT, weekdayIndex } from "../plan/lib/describe-plan";
 import { DAY_COLOR_FILL } from "./lib/calendar-grid";
 import { templateDisplayName, templateHoursLabel } from "./lib/template-label";
@@ -50,11 +50,19 @@ export function CalendarDaySheet({
   onPaint: (action: CalendarPaintAction) => void;
 }) {
   const [ownHoursOpen, setOwnHoursOpen] = useState(false);
-  const [hours, setHours] = useState<DayHoursDraft>(() => ({
-    ...DEFAULT_DAY_HOURS,
-    startTime: day.isWorking && !day.fixed && day.start ? day.start : DEFAULT_DAY_HOURS.startTime,
-    endTime: day.isWorking && !day.fixed && day.end ? day.end : DEFAULT_DAY_HOURS.endTime,
-  }));
+  // SCHEDULE-BREAKS-MANY: открывается с тем, что сейчас стоит в дне, включая
+  // все перерывы. Раньше подставлялись только часы, и «Применить» без правок
+  // молча стирало перерывы дня.
+  const [hours, setHours] = useState<DayHoursDraft>(() =>
+    day.isWorking && !day.fixed && day.start && day.end
+      ? {
+          ...DEFAULT_DAY_HOURS,
+          startTime: day.start,
+          endTime: day.end,
+          breaks: day.breaks.map((item) => ({ start: item.start, end: item.end })),
+        }
+      : { ...DEFAULT_DAY_HOURS, breaks: [] },
+  );
   const editable = !day.past && !day.beyond;
   const current = day.templateId ? templates.find((item) => item.id === day.templateId) : undefined;
   const palette = templates.filter((item) => item.inPalette);
@@ -144,6 +152,7 @@ export function CalendarDaySheet({
             {ownHoursOpen ? (
               <div className="space-y-3 rounded-2xl border border-border-subtle p-3">
                 <DayHoursEditor compact value={hours} onChange={setHours} />
+                {hoursError ? <p className="text-sm text-text-sec">{dayHoursErrorText(hoursError)}</p> : null}
                 <Button
                   type="button"
                   variant="primary"
@@ -155,7 +164,7 @@ export function CalendarDaySheet({
                       kind: "hours",
                       startTime: hours.startTime,
                       endTime: hours.endTime,
-                      breaks: hours.breakOn ? [{ start: hours.breakStart, end: hours.breakEnd, title: null }] : [],
+                      breaks: dayHoursToTemplate({ ...hours, mode: "FLEXIBLE" }).breaks,
                     })
                   }
                 >

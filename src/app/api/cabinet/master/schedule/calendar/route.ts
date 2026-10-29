@@ -6,6 +6,7 @@ import { loadScheduleCalendar, paintScheduleDays, validateCalendarRequest } from
 import type { CalendarRequestAction, ScheduleCalendarDto } from "@/lib/schedule/calendar-shared";
 import { loadPendingScheduleChanges, submitStudioScheduleChange } from "@/lib/schedule/change-requests";
 import { buildScheduleSnapshot } from "@/lib/schedule/editor";
+import { MAX_DAY_BREAKS } from "@/lib/schedule/editor-shared";
 import { resolveScheduleActor, type ScheduleActorContext } from "@/lib/schedule/schedule-actor";
 import {
   assertCanEditSchedulePlan,
@@ -47,7 +48,7 @@ const paintSchema = z.object({
       endTime: TIME,
       breaks: z
         .array(z.object({ start: TIME, end: TIME, title: z.string().max(40).nullable().optional() }))
-        .max(6)
+        .max(MAX_DAY_BREAKS)
         .default([]),
     }),
   ]),

@@ -16,6 +16,13 @@
  *      графиком «с начала времён, продлевается автоматически» (у действующих
  *      мастеров ничего не меняется). Сбой одного профиля деплой НЕ
  *      останавливает — до переноса движок читает его неделю по-старому.
+ *   9. SCHEDULE-BREAKS-MANY — «Рабочий день» окна графика: у профилей, где
+ *      повторное «Каждый раз по-разному» оставило несколько версий, дни
+ *      календаря с начала графика (не раньше сегодня) переходят на новейшую,
+ *      прежние уходят (`repairNamedWizardDays`). Идёт ПОСЛЕ шага 6. Сбой
+ *      одного профиля деплой не останавливает. Ответы прежнего движка новая
+ *      версия не читает (`SCHEDULE_COMPUTE_GENERATION` в ключах кэша), а
+ *      воркер при старте пересчитывает «свободно сегодня» всем.
  *   8. SYSTEM-CATEGORIES-01 — фиксированный набор категорий каталога
  *      (`lib/catalog/system-categories.ts`): досоздаёт недостающие, существующие
  *      строки — из набора и ручные — не меняет и не удаляет. Первый слой —
@@ -47,7 +54,8 @@ import {
   reconcileStudioVisitReviewsWith,
   splitAllStudioMastersWith,
 } from "../src/lib/studios/master-profile-split";
-import { backfillWeeklySchedulePatterns } from "../src/lib/schedule/patterns-core";
+import { backfillWeeklySchedulePatterns, repairNamedWizardDays } from "../src/lib/schedule/patterns-core";
+import * as UI_TEXT from "../src/lib/ui/text";
 import {
   bookingStudioScopeDriftTotal,
   reportBookingStudioScopeDrift,
@@ -101,6 +109,18 @@ async function main(): Promise<void> {
   );
   for (const item of schedulePatterns.failed) {
     console.error(`post-deploy · schedule pattern backfill failed for ${item.providerId}: ${item.error}`);
+  }
+
+  const wizardDays = await repairNamedWizardDays(
+    prisma,
+    UI_TEXT.cabinetMaster.scheduleSettings.wizard.hours.manualDayLabel,
+  );
+  console.log(
+    `post-deploy · schedule wizard working day: repaired ${wizardDays.repaired}, ` +
+      `moved days ${wizardDays.movedDays}, failed ${wizardDays.failed.length}`,
+  );
+  for (const item of wizardDays.failed) {
+    console.error(`post-deploy · schedule wizard working day repair failed for ${item.providerId}: ${item.error}`);
   }
 
   const studioScopeDrift = await reportBookingStudioScopeDrift(prisma);

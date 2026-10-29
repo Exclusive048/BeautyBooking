@@ -5,7 +5,7 @@ import { catalogPlanCode } from "@/lib/billing/plan-catalog";
 import { isSubscriptionActive } from "@/lib/billing/subscription-active";
 
 /**
- * LAUNCH-PROMO-01 — выдача PREMIUM «до 1 ноября» ОДНОЙ функцией на двух путях:
+ * LAUNCH-PROMO-01 — выдача PREMIUM до конца акции ОДНОЙ функцией на двух путях:
  * регистрация кабинета (`activateTrialForNewProvider`) и бэкфилл уже
  * зарегистрированных кабинетов в сиде деплоя (`scripts/seed-billing-plans.ts`).
  *

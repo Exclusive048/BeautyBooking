@@ -236,7 +236,11 @@ export function getProviderWorkday(input: {
         isWorkday: true,
         startLocal: override.startLocal,
         endLocal: override.endLocal,
-        breaks: override.breaks ?? base.breaks,
+        // SCHEDULE-BREAKS-MANY (2026-10-29): перерывы дня со своими часами —
+        // ровно его перерывы. Раньше при пустом списке день наследовал перерывы
+        // графика: «свои часы без перерыва» молча получали обед из графика, и
+        // окошки расходились с тем, что мастер сохранил в шторке дня.
+        breaks: override.breaks ?? [],
         // Режим решает исключение, а не график (см. `ScheduleOverrideConfig`).
         fixedStarts: override.fixedStarts ?? null,
         templateId: override.templateId ?? null,

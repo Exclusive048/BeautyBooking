@@ -7,6 +7,7 @@ import { parseDateKeyParts } from "@/lib/schedule/dateKey";
 import { toLocalDateKey } from "@/lib/schedule/timezone";
 import { SCHEDULE_OVERRIDE_RANGE_ORDER } from "@/lib/schedule/override-order";
 import {
+  SCHEDULE_COMPUTE_GENERATION,
   readCachedScheduleVersion,
   writeCachedScheduleVersion,
 } from "@/lib/schedule/schedule-version-cache";
@@ -322,8 +323,9 @@ async function resolveScheduleVersion(masterId: string): Promise<ScheduleVersion
   // максимумом (максимум при этом не двигается). Для блокировок это не
   // теоретический случай — они по природе временные, и снятие блокировки
   // обязано вернуть слот. Обе величины идут из одного агрегата, лишнего
-  // запроса нет.
-  const value = `${latest ? latest.getTime() : 0}:${timeBlockAgg._count}:${patternAgg._count}:${overrideMax._count}`;
+  // запроса нет. Первым — поколение вычисления: ответы прежнего движка после
+  // деплоя не читаются (`SCHEDULE_COMPUTE_GENERATION`).
+  const value = `g${SCHEDULE_COMPUTE_GENERATION}:${latest ? latest.getTime() : 0}:${timeBlockAgg._count}:${patternAgg._count}:${overrideMax._count}`;
   const version: ScheduleVersion = { value, updatedAt: latest };
   await writeCachedScheduleVersion(masterId, version);
   return version;

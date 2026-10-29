@@ -77,7 +77,9 @@ import { LAUNCH_PROMO_ENDS_AT } from "@/lib/billing/launch-promo";
 
 // LAUNCH-PROMO-01: сценарии обычного 30-дневного trial живут ПОСЛЕ акции.
 // «Сейчас» фиксируется за её пределами; ветка акции проверяется явным `now`.
-const AFTER_PROMO = new Date("2026-11-15T12:00:00Z");
+// Отсчёт — от границы акции, а не датой: продление акции (BETA-PROMO-DEC)
+// не должно превращать эти сценарии в сценарии акции.
+const AFTER_PROMO = new Date(LAUNCH_PROMO_ENDS_AT.getTime() + 14 * 86_400_000);
 
 /**
  * Крон листает кандидатов пачками (`notIn` уже обработанных) — двойник
@@ -122,7 +124,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("activateTrialForNewProvider — стартовая акция (до 1 ноября)", () => {
+describe("activateTrialForNewProvider — стартовая акция (бета-тестирование)", () => {
   const DURING_PROMO = new Date("2026-09-22T12:00:00Z");
 
   it("выдаёт PREMIUM до конца акции, а не на 30 дней", async () => {

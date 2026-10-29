@@ -17,6 +17,7 @@ import {
   type ScheduleModeValue,
   type SchedulePatternDto,
 } from "@/lib/schedule/patterns-shared";
+import { toLocalDateKey } from "@/lib/schedule/timezone";
 
 /**
  * SCHEDULE-PATTERNS-01 (этап 2) — ядро писателя графиков уровня транзакции.
@@ -97,6 +98,104 @@ export async function ensureAutoTemplateTx(
     select: { id: true },
   });
   return created.id;
+}
+
+/**
+ * SCHEDULE-BREAKS-MANY (2026-10-29) — рабочий день, НАЗВАННЫЙ окном графика
+ * («Каждый раз по-разному» шлёт «Рабочий день»): новые часы заменяют прежние
+ * на всех днях с `fromDateKey`.
+ *
+ * Найдено жалобой владельца: мастер поменял часы в окне, а записи шли по
+ * старым. Окно создавало НОВЫЙ день палитры с тем же именем (правило «другие
+ * часы — новый день», `ensurePaletteTemplateTx`), а отмеченные в календаре дни
+ * ссылались на прежний — сохранённое в окне на запись не влияло, и в палитре
+ * появлялось два «Рабочих дня».
+ *
+ * Правило «часы существующего дня не меняются» этим не нарушается: строка
+ * прежнего дня не правится — дни с `fromDateKey` переходят на новую строку
+ * (копия часов в строке «Особого дня» — тоже), прошедшие остаются на старой.
+ * Прежняя версия теряет имя и уходит из палитры; когда на неё больше никто не
+ * ссылается, её удаляет `deleteUnusedAutoTemplatesTx` после записи периода
+ * (до неё на прежнюю версию ещё ссылается прежний график). Цвет — прежнего
+ * дня, если запрос его не назвал: для человека это тот же «Рабочий день».
+ */
+export async function ensureNamedWizardDayTx(
+  tx: Db,
+  providerId: string,
+  def: DayTemplateDefinition & { label: string; color: string | null },
+  fromDateKey: string,
+  pickColor?: PickPaletteColor,
+): Promise<string> {
+  const previous = await tx.scheduleTemplate.findMany({
+    where: { providerId, label: def.label },
+    select: { id: true, color: true },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+  const id = await ensurePaletteTemplateTx(
+    tx,
+    providerId,
+    { ...def, color: def.color ?? previous.find((row) => row.color)?.color ?? null },
+    pickColor,
+  );
+  const stale = previous.map((row) => row.id).filter((other) => other !== id);
+  if (stale.length > 0) await replaceNamedDayVersionsTx(tx, providerId, id, stale, fromDateKey);
+  return id;
+}
+
+/**
+ * Дни календаря с `fromDateKey` на прежних версиях дня (`stale`) переходят на
+ * `targetId` — вместе с копией часов в строке «Особого дня», по которой движок
+ * их и считает; прежние версии теряют имя. Возвращает число переведённых дней.
+ */
+async function replaceNamedDayVersionsTx(
+  tx: Db,
+  providerId: string,
+  targetId: string,
+  stale: string[],
+  fromDateKey: string,
+): Promise<number> {
+  const target = await tx.scheduleTemplate.findUniqueOrThrow({
+    where: { id: targetId },
+    select: { startLocal: true, endLocal: true, scheduleMode: true, fixedSlotTimes: true },
+  });
+  const moved = await tx.scheduleOverride.updateMany({
+    where: {
+      providerId,
+      kind: "TEMPLATE",
+      templateId: { in: stale },
+      date: { gte: parseDateKeyToUtcStart(fromDateKey) },
+    },
+    data: {
+      templateId: targetId,
+      startLocal: target.startLocal,
+      endLocal: target.endLocal,
+      scheduleMode: target.scheduleMode,
+      fixedSlotTimes: target.scheduleMode === "FIXED" ? target.fixedSlotTimes : [],
+    },
+  });
+  await tx.scheduleTemplate.updateMany({ where: { id: { in: stale } }, data: { label: null } });
+  return moved.count;
+}
+
+/**
+ * Шаблоны редактора, на которые больше никто не ссылается — ни график (в том
+ * числе прошлый), ни неделя, ни «Особый день». Шаблон, которому человек дал
+ * имя в палитре (`label`, этап 3), — его выбор, а не побочный продукт
+ * редактора: он не удаляется. День палитры без имени — прежняя версия
+ * «Рабочего дня» окна графика, которую заменила новая
+ * (`ensureNamedWizardDayTx`, SCHEDULE-BREAKS-MANY): удаляется так же.
+ */
+export async function deleteUnusedAutoTemplatesTx(tx: Db, providerId: string): Promise<void> {
+  await tx.scheduleTemplate.deleteMany({
+    where: {
+      providerId,
+      OR: [{ name: { startsWith: AUTO_TEMPLATE_PREFIX } }, { name: { startsWith: PALETTE_TEMPLATE_PREFIX } }],
+      label: null,
+      patternDays: { none: {} },
+      weeklyScheduleDays: { none: {} },
+      scheduleOverrides: { none: {} },
+    },
+  });
 }
 
 /**
@@ -379,4 +478,88 @@ export async function backfillWeeklySchedulePatterns(
     }
   }
   return { converted, failed };
+}
+
+// ─── «Рабочий день» окна графика: починка прежних данных (пост-деплой) ────────
+
+/** Период окна графика пишется той же транзакцией, что новая версия дня. */
+const SAME_WRITE_WINDOW_MS = 60_000;
+
+export type NamedWizardDaysRepair = {
+  repaired: number;
+  movedDays: number;
+  failed: Array<{ providerId: string; error: string }>;
+};
+
+/**
+ * SCHEDULE-BREAKS-MANY (2026-10-29) — данные, оставленные до
+ * `ensureNamedWizardDayTx`: повторное «Каждый раз по-разному» с другими часами
+ * создавало ВТОРОЙ рабочий день с тем же именем, а отмеченные в календаре дни
+ * оставались на первом — записи шли по старым часам (жалоба владельца). Здесь
+ * тот же перевод, что окно делает теперь: новейшая версия — текущая (её же
+ * открывает окно, `initial-draft.ts`), дни с начала её графика переходят на
+ * неё, прежние версии теряют имя и удаляются, когда на них никто не ссылается.
+ *
+ * Начало графика — период, записанный вместе с новейшей версией (в ручном
+ * режиме период дня не содержит, связи по ссылке нет), но не раньше сегодня
+ * салона: прошедшие дни остаются с часами, по которым работали.
+ *
+ * Идемпотентно: после прохода у профиля одна версия с этим именем, и второй
+ * запуск его не находит. Сбой одного профиля остальных не останавливает.
+ */
+export async function repairNamedWizardDays(
+  client: PrismaClient,
+  label: string,
+  now: Date = new Date(),
+): Promise<NamedWizardDaysRepair> {
+  const rows = await client.scheduleTemplate.findMany({ where: { label }, select: { providerId: true } });
+  const versions = new Map<string, number>();
+  for (const row of rows) versions.set(row.providerId, (versions.get(row.providerId) ?? 0) + 1);
+
+  const result: NamedWizardDaysRepair = { repaired: 0, movedDays: 0, failed: [] };
+  for (const [providerId, count] of versions) {
+    if (count < 2) continue;
+    try {
+      result.movedDays += await client.$transaction(async (tx) => {
+        const [current, ...stale] = await tx.scheduleTemplate.findMany({
+          where: { providerId, label },
+          select: { id: true, createdAt: true },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        });
+        if (!current || stale.length === 0) return 0;
+
+        const provider = await tx.provider.findUniqueOrThrow({
+          where: { id: providerId },
+          select: { timezone: true },
+        });
+        const todayKey = toLocalDateKey(now, provider.timezone);
+        const period = await tx.schedulePattern.findFirst({
+          where: {
+            providerId,
+            createdAt: {
+              gte: new Date(current.createdAt.getTime() - SAME_WRITE_WINDOW_MS),
+              lte: new Date(current.createdAt.getTime() + SAME_WRITE_WINDOW_MS),
+            },
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          select: { startsOn: true },
+        });
+        const fromDateKey = period?.startsOn && period.startsOn > todayKey ? period.startsOn : todayKey;
+
+        const moved = await replaceNamedDayVersionsTx(
+          tx,
+          providerId,
+          current.id,
+          stale.map((row) => row.id),
+          fromDateKey,
+        );
+        await deleteUnusedAutoTemplatesTx(tx, providerId);
+        return moved;
+      });
+      result.repaired += 1;
+    } catch (error) {
+      result.failed.push({ providerId, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return result;
 }

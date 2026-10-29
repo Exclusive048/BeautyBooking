@@ -3,6 +3,7 @@
 import { useId, useRef } from "react";
 import { m } from "framer-motion";
 import { Copy, HeartHandshake, Mail, Sparkles, TrendingUp, type LucideIcon } from "lucide-react";
+import { BetaPromoBanner } from "@/components/billing/beta-promo-banner";
 import { Button } from "@/components/ui/button";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { useToast } from "@/components/ui/toast";
@@ -97,6 +98,8 @@ export function WelcomeDialog({ onClose }: Props) {
             );
           })}
         </m.ul>
+
+        <BetaPromoBanner showPricingLink={false} className="mt-5" />
 
         <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border-subtle bg-bg-input px-3 py-3 sm:px-4">
           <Mail className="hidden h-4 w-4 shrink-0 text-accent-text sm:block" strokeWidth={1.5} aria-hidden />

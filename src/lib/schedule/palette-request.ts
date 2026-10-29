@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PALETTE_LABEL_MAX, SCHEDULE_DAY_COLOR_KEYS } from "@/lib/schedule/calendar-shared";
+import { MAX_DAY_BREAKS } from "@/lib/schedule/editor-shared";
 
 /**
  * SCHEDULE-PATTERNS-01 (этап 3) — тела запросов палитры рабочих дней
@@ -16,7 +17,7 @@ export const paletteDaySchema = z.object({
   endTime: TIME,
   breaks: z
     .array(z.object({ start: TIME, end: TIME, title: z.string().max(40).nullable().optional() }))
-    .max(6)
+    .max(MAX_DAY_BREAKS)
     .default([]),
   scheduleMode: z.enum(["FLEXIBLE", "FIXED"]),
   fixedSlotTimes: z.array(TIME).max(48).default([]),

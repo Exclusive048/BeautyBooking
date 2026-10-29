@@ -1,5 +1,6 @@
 import { ProviderType } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { BetaPromoBanner } from "@/components/billing/beta-promo-banner";
 import { HeaderBlock } from "@/components/ui/header-block";
 import { RolesCards } from "@/features/cabinet/roles/roles-cards";
 import { getSessionUser } from "@/lib/auth/session";
@@ -144,6 +145,9 @@ export default async function RolesPage() {
         title={UI_TEXT.cabinetRolesPage.title}
         subtitle={UI_TEXT.cabinetRolesPage.subtitle}
       />
+
+      {/* BETA-PROMO-DEC: пока есть кабинет, который можно создать, — сказать, что он будет на PREMIUM без оплаты. */}
+      {!me.hasMasterProfile || !me.hasStudioProfile ? <BetaPromoBanner /> : null}
 
       <RolesCards
         hasMasterProfile={me.hasMasterProfile}

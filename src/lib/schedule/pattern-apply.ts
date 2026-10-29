@@ -19,7 +19,7 @@ import {
 } from "@/lib/schedule/patterns";
 import {
   ensureAutoTemplateTx,
-  ensurePaletteTemplateTx,
+  ensureNamedWizardDayTx,
   paletteColorPickerTx,
 } from "@/lib/schedule/patterns-core";
 import { invalidateSlotsForMaster } from "@/lib/schedule/slotsCache";
@@ -71,7 +71,10 @@ export async function previewSchedulePattern(
 /**
  * Рабочие дни и период графика из запроса — внутри транзакции вызывающего.
  * Новый рабочий день получает свободный цвет палитры, если запрос цвета не
- * назвал (`paletteColorPickerTx`).
+ * назвал (`paletteColorPickerTx`). Рабочий день с именем («Каждый раз
+ * по-разному») заменяет прежнюю версию с тем же именем на днях с начала
+ * графика (`ensureNamedWizardDayTx`, SCHEDULE-BREAKS-MANY) — иначе отмеченные
+ * дни оставались на старых часах.
  */
 async function writePatternTx(
   tx: Prisma.TransactionClient,
@@ -87,10 +90,11 @@ async function writePatternTx(
     const label = request.templates[index]?.label;
     ids.push(
       label
-        ? await ensurePaletteTemplateTx(
+        ? await ensureNamedWizardDayTx(
             tx,
             providerId,
             { ...template, label, color: request.templates[index]?.color ?? null },
+            pattern.startsOn,
             pickColor,
           )
         : await ensureAutoTemplateTx(tx, providerId, template, pickColor),

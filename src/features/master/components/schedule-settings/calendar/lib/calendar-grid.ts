@@ -51,8 +51,15 @@ export function buildMonthGrids(days: readonly CalendarDayDto[]): MonthGrid[] {
 export function applyPaintOptimistic(
   day: CalendarDayDto,
   action: CalendarPaintAction,
-  template: { startTime: string; endTime: string; fixed: boolean } | null,
+  template: {
+    startTime: string;
+    endTime: string;
+    fixed: boolean;
+    breaks: ReadonlyArray<{ start: string; end: string }>;
+  } | null,
 ): CalendarDayDto {
+  // Перерывы — тоже (SCHEDULE-BREAKS-MANY): шторка дня, открытая до ответа
+  // сервера, иначе показала бы перерывы прежнего дня.
   if (action.kind === "template") {
     return {
       ...day,
@@ -60,12 +67,13 @@ export function applyPaintOptimistic(
       templateId: action.templateId,
       start: template?.startTime ?? day.start,
       end: template?.endTime ?? day.end,
+      breaks: template ? (template.fixed ? [] : sortedBreaks(template.breaks)) : day.breaks,
       fixed: template?.fixed ?? false,
       painted: true,
     };
   }
   if (action.kind === "off") {
-    return { ...day, isWorking: false, templateId: null, start: null, end: null, fixed: false, painted: true };
+    return { ...day, isWorking: false, templateId: null, start: null, end: null, breaks: [], fixed: false, painted: true };
   }
   if (action.kind === "hours") {
     return {
@@ -74,12 +82,19 @@ export function applyPaintOptimistic(
       templateId: null,
       start: action.startTime,
       end: action.endTime,
+      breaks: sortedBreaks(action.breaks),
       fixed: false,
       painted: true,
     };
   }
   // «Как по графику»: каким станет день, знает только сервер.
   return { ...day, painted: false };
+}
+
+function sortedBreaks(breaks: ReadonlyArray<{ start: string; end: string }>): CalendarDayDto["breaks"] {
+  return breaks
+    .map((item) => ({ start: item.start, end: item.end }))
+    .sort((left, right) => (left.start < right.start ? -1 : left.start > right.start ? 1 : 0));
 }
 
 /** «09:00» → «9», «09:30» → «9:30» — подпись часов в клетке. */

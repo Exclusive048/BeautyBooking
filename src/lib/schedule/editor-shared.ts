@@ -43,6 +43,14 @@ export type BreakDto = {
   title?: string | null;
 };
 
+/**
+ * SCHEDULE-BREAKS-MANY (2026-10-29, решение владельца): перерывов в дне —
+ * сколько угодно. Это не правило продукта, а граница тела запроса против
+ * раздутого ввода: столько перерывов в одном дне человеку не нужно. Одна на все
+ * схемы, принимающие часы дня (окно графика, палитра, «свои часы» дня).
+ */
+export const MAX_DAY_BREAKS = 100;
+
 export type DayScheduleDto = {
   dayOfWeek: number; // 0=Mon ... 6=Sun
   isWorkday: boolean;
