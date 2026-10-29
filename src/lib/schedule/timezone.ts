@@ -62,7 +62,12 @@ function partsFormatter(timeZone: string): Intl.DateTimeFormat {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false,
+    // TZ-HOUR-CYCLE-H23: именно `hourCycle`, не `hour12: false`. На Node 20.20
+    // (ICU 78) `hour12: false` даёт цикл h24 — полночь пишется «24:00» того же
+    // дня, и перевод местного времени в UTC (`toUtcFromLocalDateTime`) уезжал
+    // на сутки назад ровно в час «24 − смещение пояса»: 21:00 в Москве, 19:00 в
+    // Екатеринбурге. Сторож — `timezone-hour-cycle.test.ts`.
+    hourCycle: "h23",
   });
   partsFormatters.set(timeZone, dtf);
   return dtf;
@@ -86,7 +91,9 @@ function partsFromDate(date: Date, timeZone: string): DateParts {
     year: Number(lookup.year),
     month: Number(lookup.month),
     day: Number(lookup.day),
-    hour: Number(lookup.hour),
+    // Страховка на движок, который всё же отдаст «24» за полночь: число дня у
+    // такой записи то же, поэтому 24 — это 0 этого дня.
+    hour: Number(lookup.hour) % 24,
     minute: Number(lookup.minute),
     second: Number(lookup.second),
   };

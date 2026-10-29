@@ -157,6 +157,7 @@ const showZone = zonesDifferForViewer({ iso: slot.startAtUtc, salonTimeZone: sal
 - ❌ Тестировать salon-tz поверхность только на Москве (маскирует баг — см. §5).
 - ❌ «Чинить» поверхность из §3b (viewer-tz намеренно) в salon-tz — это регрессия, не фикс.
 - ✅ Датаключи в tz сущности — `toLocalDateKey(now, entityTz)`, не UTC-дата.
+- ❌ `hour12: false` в `Intl.DateTimeFormat` — только `hourCycle: "h23"`. На Node 20.20 (ICU 78, это CI и боевые образы) `hour12: false` даёт цикл h24: полночь = «24:00» того же дня, и перевод местного времени в UTC уезжал на сутки в час «24 − смещение» (21:00 МСК, 19:00 Екб). Сторож — `src/lib/schedule/timezone-hour-cycle.test.ts` (TZ-HOUR-CYCLE-H23).
 
 ---
 
