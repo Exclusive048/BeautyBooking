@@ -2,12 +2,18 @@
   "name": "beautyhub",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.20.2"
+  },
   "scripts": {
+    "predev": "node scripts/check-node-version.mjs",
     "dev": "next dev --webpack",
+    "prebuild": "node scripts/check-node-version.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "npx tsc --noEmit",
+    "pretest": "node scripts/check-node-version.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "prisma:validate": "npx prisma validate",
@@ -32,6 +38,7 @@
     "db:reset:dev": "npx prisma migrate reset --force && npm run redis:flush:dev && npm run seed:test",
     "redis:flush:dev": "node scripts/dev-redis-flush.mjs",
     "worker:build": "npx tsc --noEmit",
+    "preworker": "node scripts/check-node-version.mjs",
     "worker": "npx --yes tsx --conditions=react-server src/worker.ts",
     "seed:test": "npx tsx prisma/seeds/test-data/index.ts",
     "seed:test:reset": "npx tsx prisma/seeds/test-data/reset.ts",

@@ -84,6 +84,12 @@ jobs:
       # маршруты, first-load JS `/`, `/catalog`, `/u/[username]` — в бюджете.
       # Единственное место, где есть собранные чанки: `.next` берётся из образа
       # (standalone несёт server/ и build-manifest, static копируется рядом).
+      # Скрипт проверки — на той же версии Node, что образ (NODE-VERSION-PIN-01).
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
       - name: UI-тексты в клиентском бандле (PERF-02)
         run: |
           id="$(docker create beautyhub-app:ci)"
