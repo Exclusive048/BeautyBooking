@@ -42,8 +42,18 @@ import * as UI_TEXT from "@/lib/ui/text";
  */
 
 const ROOT = process.cwd();
-const COMPOSE = readFileSync(resolve(ROOT, "docker-compose.prod.yml"), "utf8");
-const DEPLOY = readFileSync(resolve(ROOT, ".github/workflows/deploy.yml"), "utf8");
+
+/**
+ * Файл конфига с переводами строк LF: разбор ниже режет блоки по `\n`, а
+ * Windows-чекаут (`core.autocrlf=true`) отдаёт CRLF — без нормализации сторож
+ * краснел бы на любом ПК разработчика при зелёном CI.
+ */
+function readConfig(path: string): string {
+  return readFileSync(resolve(ROOT, path), "utf8").replace(/\r\n/g, "\n");
+}
+
+const COMPOSE = readConfig("docker-compose.prod.yml");
+const DEPLOY = readConfig(".github/workflows/deploy.yml");
 
 /** Блок сервиса верхнего уровня (2 пробела отступа) без соседей. */
 function serviceBlock(name: string): string | null {
@@ -264,8 +274,8 @@ describe("APP-TIER-SPLIT-02 · deploy.yml согласован с тополог
  */
 describe("MAINTENANCE-PAGE-01 · страница работ поднимается сама", () => {
   const maintenance = serviceBlock("maintenance");
-  const HTML = readFileSync(resolve(ROOT, "deploy/maintenance/index.html"), "utf8");
-  const NGINX = readFileSync(resolve(ROOT, "deploy/maintenance/nginx.conf"), "utf8");
+  const HTML = readConfig("deploy/maintenance/index.html");
+  const NGINX = readConfig("deploy/maintenance/nginx.conf");
 
   it("сервис maintenance: fallback-роутер с приоритетом ниже web и api, TLS, порт 80", () => {
     expect(maintenance, "нет сервиса maintenance").toBeTruthy();

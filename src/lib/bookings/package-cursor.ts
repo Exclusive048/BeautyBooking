@@ -81,30 +81,3 @@ export function studioNextComponentEarliestStart(input: {
   }
   return new Date(earliestMs);
 }
-
-export type PackagePlacedComponent = {
-  masterProviderId: string | null;
-  endAtUtc: Date;
-  bufferMin: number;
-};
-
-/**
- * SLOTS-FLUSH-STARTS (2026-10-29) — начала «сразу после» уже размещённых услуг
- * пакета для следующей услуги у исполнителя `masterProviderId`: у того же
- * мастера — конец + его пауза, у другого — сам конец (клиент переходит к другому
- * креслу без паузы, как в `intraPackageOverlapMultiMaster`). Предыдущая услуга
- * ещё не записана, поэтому день мастера о ней не знает и такого начала сам не
- * выведет; сервер передаёт эти моменты в проверку окошка (`resolveBookingCore`
- * → `extraStartsUtc`). Курсор визарда (`nextComponentEarliestStart` /
- * `studioNextComponentEarliestStart`) всегда равен одному из них.
- */
-export function packageFlushStarts(input: {
-  placed: PackagePlacedComponent[];
-  masterProviderId: string | null;
-}): Date[] {
-  return input.placed.map((component) =>
-    component.masterProviderId === input.masterProviderId
-      ? nextComponentEarliestStart(component.endAtUtc, component.bufferMin)
-      : component.endAtUtc,
-  );
-}

@@ -78,7 +78,7 @@ export async function listBookableSlots(input: {
   now: Date;
   /** RESCHEDULE-SELF-SLOT: бронь, которую переносят — её окно не занято (см. usecases.ts). */
   excludeBookingId?: string;
-  /** SLOTS-FLUSH-STARTS: дополнительные начала — конец предыдущей услуги пакета (см. slots.ts). */
+  /** SLOTS-FLUSH-STARTS: дополнительные начала дня — курсор визарда пакета (см. slots.ts). */
   extraStartsUtc?: Date[];
   /**
    * MANUAL-BOOKING-SLOTS-01: окно для ОПЕРАТОРА — ручной записи мастером или

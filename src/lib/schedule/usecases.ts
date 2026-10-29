@@ -252,10 +252,10 @@ export async function listAvailabilitySlotsPaginated(
      */
     excludeBookingId?: string;
     /**
-     * SLOTS-FLUSH-STARTS (2026-10-29): дополнительные начала — конец
-     * предыдущей услуги пакета (`buildSlotsForDay.extraStartsUtc`). Выдача с
-     * ними — не общая выдача дня, поэтому кэш обходится так же, как при
-     * исключении брони.
+     * SLOTS-FLUSH-STARTS (2026-10-29): дополнительные начала дня
+     * (`buildSlotsForDay.extraStartsUtc`) — курсор визарда пакета (`?after=`)
+     * и время, которое проверяет запись (`resolveBookingCore`). Они входят в
+     * ключ кэша ТОЛЬКО своего дня: остальные дни делят общий кэш.
      */
     extraStartsUtc?: Date[];
   }
@@ -263,7 +263,7 @@ export async function listAvailabilitySlotsPaginated(
   const startedAt = Date.now();
   const excludeBookingId = input.excludeBookingId ?? null;
   const extraStartsUtc = input.extraStartsUtc ?? [];
-  const bypassCache = excludeBookingId !== null || extraStartsUtc.length > 0;
+  const bypassCache = excludeBookingId !== null;
 
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
     return { ok: false, status: 400, message: "Некорректная длительность.", code: "DURATION_INVALID" };
@@ -318,6 +318,24 @@ export async function listAvailabilitySlotsPaginated(
   // (`schedule-version-cache.ts`), а не через пятиоператорную транзакцию.
   const scheduleWindow = await getScheduleWindow(providerId, timezone);
 
+  // SLOTS-FLUSH-STARTS: дополнительные начала по дням салона, минутами эпохи —
+  // так они входят в ключ кэша своего дня (секунды движок отбрасывает).
+  const extraMinutesByDateKey = new Map<string, number[]>();
+  for (const value of extraStartsUtc) {
+    if (Number.isNaN(value.getTime())) continue;
+    const dateKey = toLocalDateKey(value, timezone);
+    const minutes = extraMinutesByDateKey.get(dateKey) ?? [];
+    minutes.push(Math.floor(value.getTime() / 60_000));
+    extraMinutesByDateKey.set(dateKey, minutes);
+  }
+  for (const [dateKey, minutes] of extraMinutesByDateKey) {
+    extraMinutesByDateKey.set(dateKey, Array.from(new Set(minutes)).sort((a, b) => a - b));
+  }
+  const extraLockSuffix = (lockDays: Array<{ dateKey: string }>): string => {
+    const minutes = lockDays.flatMap((day) => extraMinutesByDateKey.get(day.dateKey) ?? []);
+    return minutes.length > 0 ? `:x${minutes.join(",")}` : "";
+  };
+
   const days: Array<{ dateKey: string; cacheKey: string }> = [];
   for (
     let cursorKey = requestedStartKey;
@@ -336,6 +354,7 @@ export async function listAvailabilitySlotsPaginated(
         timeZone: timezone,
         scheduleVersion: scheduleWindow.scheduleVersion,
         publishedUntilLocal: scheduleWindow.publishedUntilLocal,
+        extraStartMinutes: extraMinutesByDateKey.get(cursorKey),
       }),
     });
   }
@@ -456,7 +475,7 @@ export async function listAvailabilitySlotsPaginated(
         computed.set(day.dateKey, daySlots);
         // RESCHEDULE-SELF-SLOT: выдача без одной брони — не то, что лежит в
         // общем кэше; писать её туда значило бы отдать следующему клиенту
-        // занятое окно как свободное. То же с дополнительными началами пакета.
+        // занятое окно как свободное.
         if (bypassCache) continue;
         await setCachedSlotsForDate({
           key: day.cacheKey,
@@ -474,8 +493,9 @@ export async function listAvailabilitySlotsPaginated(
       : await withSingleFlight<Map<string, AvailabilitySlot[]>>({
           // Замок именует ровно ту работу, которую защищает: провайдер, услуга,
           // параметры сетки, версия расписания и непокрытый отрезок. Запросы с
-          // разными отрезками друг друга не блокируют.
-          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}`,
+          // разными отрезками друг друга не блокируют. Дополнительные начала —
+          // тоже часть работы (их дни пишутся под своими ключами).
+          lockKey: `sf:slots:${providerId}:${serviceId}:${durationMin}:${bufferMin}:${slotStepMin}:${timezone}:${scheduleWindow.scheduleVersion}:${missingDays[0].dateKey}:${missingDays[missingDays.length - 1].dateKey}${extraLockSuffix(missingDays)}`,
           read: async () => {
             const values = await Promise.all(missingDays.map((day) => getCachedSlots(day.cacheKey)));
             // Частично заполненный набор — ещё не результат: победитель пишет дни по

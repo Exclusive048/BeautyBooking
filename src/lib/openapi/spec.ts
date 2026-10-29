@@ -359,7 +359,7 @@ const flushAfterQuery: ParameterObject = {
   required: false,
   schema: { type: "string", format: "date-time" },
   description:
-    "Package wizard: an extra start (the previous component's end + the master's buffer) that the day's own starts can't know, because that component isn't booked yet. Checked like any other start. Honoured only for a single-day request (`limit=1` or `to` = `from`) and only when the instant falls on that salon-local day; otherwise ignored.",
+    "Package wizard: an extra start (the previous component's end + the master's buffer) that the day's own starts can't know, because that component isn't booked yet. Checked like any other start, only on the salon-local day it falls on; an unparsable value is ignored.",
 };
 
 // MOVE-PICKER-DURATION: студийный перенос этой записи к запрошенному мастеру.

@@ -22,7 +22,6 @@ import {
   intraPackageOverlap,
 } from "@/lib/bookings/package-math";
 import { toKopeks } from "@/lib/money/kopeks";
-import { packageFlushStarts } from "@/lib/bookings/package-cursor";
 import {
   canCancelBookingStatus,
   ensureBookingActionWindow,
@@ -333,23 +332,6 @@ function orderSoloSlots(
  * the widget cursor (the backend enforces non-overlap, not order — same
  * contract as studio).
  */
-/**
- * SLOTS-FLUSH-STARTS: начала «сразу после» уже проверенных услуг пакета (конец
- * + пауза мастера). Без них время «впритык» к предыдущей услуге, которое
- * предложил визард (`?after=` у окошек), проверка отклонила бы: день мастера о
- * незаписанной соседке не знает.
- */
-function soloFlushStarts(providerId: string, cores: BookingCoreContext[]): Date[] {
-  return packageFlushStarts({
-    placed: cores.map((core) => ({
-      masterProviderId: core.resolvedMasterProviderId,
-      endAtUtc: core.endAtUtc,
-      bufferMin: core.bufferMin,
-    })),
-    masterProviderId: providerId,
-  });
-}
-
 export async function proposeSoloPackageSelections(input: {
   packageId: string;
   slots: SoloPackageSlot[];
@@ -368,7 +350,6 @@ export async function proposeSoloPackageSelections(input: {
         masterProviderId: null, // solo → resolvedMasterProviderId === provider.id
         clientUserId: input.clientUserId ?? null,
         startAtUtc,
-        extraStartsUtc: soloFlushStarts(pkg.providerId, cores),
       });
       cores.push(core);
     } catch (error) {
@@ -488,7 +469,6 @@ async function createSoloPackageBookingUnguarded(
       masterProviderId: null, // solo → resolvedMasterProviderId === provider.id
       clientUserId: input.clientUserId,
       startAtUtc,
-      extraStartsUtc: soloFlushStarts(pkg.providerId, cores),
     });
     cores.push(core);
   }

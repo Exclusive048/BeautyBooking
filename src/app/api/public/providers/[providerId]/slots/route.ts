@@ -145,12 +145,7 @@ export async function GET(
       provider.id,
       url.searchParams.get("excludeBookingId"),
     );
-    const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"), {
-      fromKey,
-      toKey,
-      limit,
-      timeZone: provider.timezone,
-    });
+    const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"));
 
     // EXP-025/026: the shared bookable-window primitive applies the
     // `minBookingHoursAhead` cutoff + effective weekly/override schedule
@@ -168,7 +163,7 @@ export async function GET(
         now: nowForPolicy,
         excludeBookingId: exclusion?.bookingId,
         // SLOTS-FLUSH-STARTS: визард пакета показывает время сразу после
-        // предыдущей услуги (`?after=`, только для одного дня).
+        // предыдущей услуги (`?after=`).
         extraStartsUtc: flushAfter ? [flushAfter] : undefined,
       }),
       prisma.discountRule.findUnique({

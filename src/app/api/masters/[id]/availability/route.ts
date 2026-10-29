@@ -166,13 +166,8 @@ export async function GET(
     });
 
     // SLOTS-FLUSH-STARTS: визард пакета студии показывает время сразу после
-    // предыдущей услуги (`?after=`, только для одного дня).
-    const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"), {
-      fromKey,
-      toKey,
-      limit,
-      timeZone: provider.timezone,
-    });
+    // предыдущей услуги (`?after=`).
+    const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"));
 
     const bookable = await listBookableSlots({
       provider,

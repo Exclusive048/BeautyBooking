@@ -20,6 +20,10 @@ const SLOTS_INDEX_TTL_SECONDS = SLOTS_TTL_SECONDS;
  * убран (её двигали отзывы и пересчёт `availableToday`), поэтому шаг обязан
  * стоять там же, где уже стоят его два соседа, — иначе смена шага в
  * настройках расписания отдавала бы старую сетку до истечения TTL.
+ *
+ * SLOTS-FLUSH-STARTS — дополнительные начала дня (`extraStartMinutes`, минуты
+ * эпохи) тоже вход результата: выдача с ними — своя запись кэша, суффиксом. Без
+ * них ключ прежний, поэтому общая выдача дня делит кэш как раньше.
  */
 export function buildSlotsCacheKey(input: {
   masterId: string;
@@ -31,8 +35,10 @@ export function buildSlotsCacheKey(input: {
   timeZone: string;
   scheduleVersion: string;
   publishedUntilLocal: string;
+  extraStartMinutes?: number[];
 }): string {
-  return `slots:${input.masterId}:${input.dateKey}:${input.serviceId}:${input.serviceDuration}:${input.bufferMin}:${input.slotStepMin}:${input.timeZone}:${input.scheduleVersion}:${input.publishedUntilLocal}`;
+  const extra = input.extraStartMinutes?.length ? `:x${input.extraStartMinutes.join(",")}` : "";
+  return `slots:${input.masterId}:${input.dateKey}:${input.serviceId}:${input.serviceDuration}:${input.bufferMin}:${input.slotStepMin}:${input.timeZone}:${input.scheduleVersion}:${input.publishedUntilLocal}${extra}`;
 }
 
 function buildSlotsIndexKey(masterId: string, dateKey: string): string {

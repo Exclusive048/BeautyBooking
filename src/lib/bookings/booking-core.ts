@@ -315,13 +315,6 @@ export async function resolveBookingCore(input: {
   startAtUtc?: Date;
   endAtUtc?: Date | null;
   slotLabel?: string;
-  /**
-   * SLOTS-FLUSH-STARTS (2026-10-29): начала, которые проверка окошка должна
-   * знать, хотя день их не выводит, — конец предыдущей услуги пакета (+ пауза
-   * мастера). Её запись ещё не создана, поэтому «сразу после» неё время без
-   * этого не нашлось бы. Передают только пакеты, значение считает сервер.
-   */
-  extraStartsUtc?: Date[];
 }): Promise<BookingCoreContext> {
   const [provider, service] = await Promise.all([
     prisma.provider.findUnique({
@@ -544,29 +537,39 @@ export async function resolveBookingCore(input: {
 
   const availabilityProviderId = resolvedMasterProviderId ?? provider.id;
   const availabilityTimezone = master?.timezone ?? provider.timezone;
-  const availability = await listAvailabilitySlotsPaginated(
-    availabilityProviderId,
-    service.id,
-    durationMin,
-    {
+  // SLOTS-FLUSH-STARTS (2026-10-29): проверка отвечает «свободно ли это время
+  // и проходит ли оно правила записи», а не «стоит ли оно на сетке шага».
+  // Начало «впритык» держится на соседе — записи, перерыве, блокировке: сняли
+  // соседа, и выбранное клиентом время пропало бы из выдачи, хотя оно свободно.
+  // Так же следующая услуга пакета: предыдущая ещё не записана, и день о ней не
+  // знает. Поэтому, если времени нет в обычной выдаче дня (кэш), оно
+  // проверяется само — как дополнительное начало, теми же правилами движка.
+  // Длительность по-прежнему выводит сервер: конец окошка обязан совпасть.
+  const loadDaySlots = (extraStartsUtc?: Date[]) =>
+    listAvailabilitySlotsPaginated(availabilityProviderId, service.id, durationMin, {
       fromKey: toLocalDateKey(startAtUtc, availabilityTimezone),
       limit: 1,
-      extraStartsUtc: input.extraStartsUtc,
-    }
-  );
+      extraStartsUtc,
+    });
+  const matchesRequest = (slots: Array<{ startAtUtc: Date | string; endAtUtc: Date | string }>) =>
+    slots.some((slot) => {
+      const slotStart = toDate(slot.startAtUtc);
+      const slotEnd = toDate(slot.endAtUtc);
+      if (!slotStart || !slotEnd) return false;
+      return slotStart.getTime() === startAtUtc.getTime() && slotEnd.getTime() === endAtUtc.getTime();
+    });
+
+  let availability = await loadDaySlots();
+  if (availability.ok && !matchesRequest(availability.data.slots)) {
+    availability = await loadDaySlots([startAtUtc]);
+  }
   if (!availability.ok) {
     const mapped = mapAvailabilityError(availability.code);
     const code = resolveErrorCode(availability.code, "INTERNAL_ERROR");
     throw new AppError(mapped.message, mapped.status, code);
   }
 
-  const hasSlot = availability.data.slots.some((slot) => {
-    const slotStart = toDate(slot.startAtUtc);
-    const slotEnd = toDate(slot.endAtUtc);
-    if (!slotStart || !slotEnd) return false;
-    return slotStart.getTime() === startAtUtc.getTime() && slotEnd.getTime() === endAtUtc.getTime();
-  });
-  if (!hasSlot) {
+  if (!matchesRequest(availability.data.slots)) {
     throw new AppError(
       "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
       409,
