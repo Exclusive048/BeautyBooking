@@ -282,6 +282,48 @@ export async function ensureNoConflicts(
   });
 }
 
+/**
+ * SLOTS-FLUSH-STARTS — сколько «пропавший сосед» оправдывает начало впритык к
+ * нему: время между выбором окошка и записью (контакты, вход по коду).
+ */
+export const VANISHED_NEIGHBOUR_WINDOW_MS = 60 * 60_000;
+
+/**
+ * Начало «впритык» к записи, которую недавно сняли: запрошенное окно стоит
+ * сразу после её конца (с паузой мастера) или кончается ровно к её началу —
+ * так, как это начало выводит движок (`buildFlushStarts` в `slots.ts`).
+ * Свободно ли время и проходит ли правила — по-прежнему решает движок; здесь
+ * только «было ли у него основание появиться». Снятые перерывы и блокировки и
+ * перенесённого соседа не видно — тогда честный 409 и выбор заново.
+ */
+async function isFlushToVanishedNeighbour(input: {
+  providerId: string;
+  masterProviderId: string | null;
+  startAtUtc: Date;
+  endAtUtc: Date;
+  bufferMin: number;
+  now: Date;
+}): Promise<boolean> {
+  const occupancyIds = await resolveConflictOccupancyIds(prisma, input);
+  const neighbour = await prisma.booking.findFirst({
+    where: {
+      AND: [
+        buildConflictScopeWhere({ ...input, occupancyIds }),
+        {
+          OR: [
+            { endAtUtc: shiftMinutes(input.startAtUtc, -input.bufferMin) },
+            { startAtUtc: shiftMinutes(input.endAtUtc, input.bufferMin) },
+          ],
+        },
+      ],
+      status: { in: ["REJECTED", "CANCELLED"] },
+      updatedAt: { gte: new Date(input.now.getTime() - VANISHED_NEIGHBOUR_WINDOW_MS) },
+    },
+    select: { id: true },
+  });
+  return neighbour !== null;
+}
+
 function mapAvailabilityError(code?: string): { message: string; status: number } {
   switch (code) {
     case "DURATION_INVALID":
@@ -315,6 +357,14 @@ export async function resolveBookingCore(input: {
   startAtUtc?: Date;
   endAtUtc?: Date | null;
   slotLabel?: string;
+  /**
+   * SLOTS-FLUSH-STARTS: дополнительные начала дня, которые вывел САМ сервер, —
+   * «сразу после» уже проверенных услуг пакета (`packageFlushStarts`): день
+   * мастера о незаписанной соседке не знает. Ввод клиента (`?after=` и т.п.)
+   * сюда не передаётся — иначе прямой запрос записывал бы на любое свободное
+   * время мимо «Шага окошек» мастера.
+   */
+  extraStartsUtc?: Date[];
 }): Promise<BookingCoreContext> {
   const [provider, service] = await Promise.all([
     prisma.provider.findUnique({
@@ -537,40 +587,63 @@ export async function resolveBookingCore(input: {
 
   const availabilityProviderId = resolvedMasterProviderId ?? provider.id;
   const availabilityTimezone = master?.timezone ?? provider.timezone;
-  const availability = await listAvailabilitySlotsPaginated(
-    availabilityProviderId,
-    service.id,
-    durationMin,
-    {
+  const bufferSource =
+    resolvedMasterProviderId && resolvedMasterProviderId !== provider.id
+      ? master?.bufferBetweenBookingsMin
+      : provider.bufferBetweenBookingsMin;
+  const bufferMin = normalizeBufferMinutes(bufferSource);
+  // SLOTS-FLUSH-STARTS (2026-10-29): время записи — одно из начал, которые
+  // движок предлагает сам: сетка шага, «впритык» к занятому и начала, выведенные
+  // сервером (`extraStartsUtc` — следующая услуга пакета). Произвольное
+  // свободное время мимо шага окошек мастера не принимается.
+  // Исключение одно: начало «впритык», у которого только что пропал сосед, —
+  // запись, к которой его предложили, отменили, пока клиент оформлялся. Время
+  // свободно, но из выдачи дня исчезло, и отказ «кто-то записался первым» был
+  // бы ложью. Такое начало проверяется само, теми же правилами движка.
+  // Длительность по-прежнему выводит сервер: конец окошка обязан совпасть.
+  const loadDaySlots = (extraStartsUtc?: Date[]) =>
+    listAvailabilitySlotsPaginated(availabilityProviderId, service.id, durationMin, {
       fromKey: toLocalDateKey(startAtUtc, availabilityTimezone),
       limit: 1,
-    }
-  );
+      extraStartsUtc,
+    });
+  const matchesRequest = (slots: Array<{ startAtUtc: Date | string; endAtUtc: Date | string }>) =>
+    slots.some((slot) => {
+      const slotStart = toDate(slot.startAtUtc);
+      const slotEnd = toDate(slot.endAtUtc);
+      if (!slotStart || !slotEnd) return false;
+      return slotStart.getTime() === startAtUtc.getTime() && slotEnd.getTime() === endAtUtc.getTime();
+    });
+
+  const serverExtraStarts = input.extraStartsUtc?.length ? input.extraStartsUtc : undefined;
+  let availability = await loadDaySlots(serverExtraStarts);
+  if (
+    availability.ok &&
+    !matchesRequest(availability.data.slots) &&
+    (await isFlushToVanishedNeighbour({
+      providerId: provider.id,
+      masterProviderId: resolvedMasterProviderId ?? null,
+      startAtUtc,
+      endAtUtc,
+      bufferMin,
+      now,
+    }))
+  ) {
+    availability = await loadDaySlots([...(serverExtraStarts ?? []), startAtUtc]);
+  }
   if (!availability.ok) {
     const mapped = mapAvailabilityError(availability.code);
     const code = resolveErrorCode(availability.code, "INTERNAL_ERROR");
     throw new AppError(mapped.message, mapped.status, code);
   }
 
-  const hasSlot = availability.data.slots.some((slot) => {
-    const slotStart = toDate(slot.startAtUtc);
-    const slotEnd = toDate(slot.endAtUtc);
-    if (!slotStart || !slotEnd) return false;
-    return slotStart.getTime() === startAtUtc.getTime() && slotEnd.getTime() === endAtUtc.getTime();
-  });
-  if (!hasSlot) {
+  if (!matchesRequest(availability.data.slots)) {
     throw new AppError(
       "Кто-то записался первым на это время. Выберите другое — обычно есть много вариантов.",
       409,
       "SLOT_CONFLICT"
     );
   }
-
-  const bufferSource =
-    resolvedMasterProviderId && resolvedMasterProviderId !== provider.id
-      ? master?.bufferBetweenBookingsMin
-      : provider.bufferBetweenBookingsMin;
-  const bufferMin = normalizeBufferMinutes(bufferSource);
 
   // STUDIO-AUTOCONFIRM-01: решает флаг ИСПОЛНИТЕЛЯ. Переключатель
   // «Автоподтверждение» пишет `autoConfirmBookings` в строку мастера — и из

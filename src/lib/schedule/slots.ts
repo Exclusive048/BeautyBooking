@@ -30,6 +30,15 @@ type BuildSlotsInput = {
    * Falls back to 30 only when a caller omits it (callers pass the normalized value).
    */
   slotStepMin?: number;
+  /**
+   * SLOTS-FLUSH-STARTS (2026-10-29): начала, которых нет ни в сетке, ни среди
+   * «впритык» этого дня, но которые нужно проверить, — курсор визарда пакета
+   * (конец предыдущей, ещё не записанной услуги + пауза мастера) и время,
+   * которое проверяет запись (`resolveBookingCore`). Проходят те же проверки,
+   * что и остальные начала; моменты других дат и день «Фиксированное время» их
+   * не берут.
+   */
+  extraStartsUtc?: Date[];
 };
 
 type BlockInterval = { start: number; end: number };
@@ -87,6 +96,30 @@ function buildGridStarts(input: {
   return starts;
 }
 
+/**
+ * SLOTS-FLUSH-STARTS (2026-10-29, запрос мастера) — начала «впритык». Сетка
+ * шага одна теряла время у занятого: услуга 20 минут при шаге 15, запись на
+ * 7:00 — следующее окошко 7:30, и три записи подряд занимали час двадцать
+ * вместо часа. Поэтому к сетке добавляются начала сразу ПОСЛЕ занятого (конец
+ * записи + пауза, конец перерыва и блокировки, начало рабочего отрезка) и
+ * вплотную ДО него (так, чтобы услуга кончилась ровно к началу записи с учётом
+ * паузы, к перерыву или к концу рабочего отрезка). На пустом отрезке остаётся
+ * сетка — лишних времён там нет. Проверки начала (перерывы, блокировки, записи)
+ * не меняются: это только кандидаты.
+ */
+function buildFlushStarts(input: {
+  windowStart: number;
+  windowEnd: number;
+  durationMin: number;
+  busy: BlockInterval[];
+}): number[] {
+  const starts = [input.windowStart, input.windowEnd - input.durationMin];
+  for (const item of input.busy) {
+    starts.push(item.end, item.start - input.durationMin);
+  }
+  return starts;
+}
+
 export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
   if (!input.dayPlan.isWorking) return [];
   if (input.dayPlan.workingIntervals.length === 0) return [];
@@ -105,41 +138,38 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
   const dayStartUtc = toUtcFromLocalDateTime(dateForLocal, 0, 0, input.timeZone);
   const dayEndUtc = toUtcFromLocalDateTime(nextDateForLocal, 0, 0, input.timeZone);
 
+  // Отрезок в минутах местного дня салона, обрезанный по границам суток.
+  const toDayMinutes = (startUtc: Date, endUtc: Date): BlockInterval | null => {
+    if (endUtc <= dayStartUtc || startUtc >= dayEndUtc) return null;
+    const startMinutes =
+      startUtc <= dayStartUtc
+        ? 0
+        : (() => {
+            const parts = getLocalTimeParts(startUtc, input.timeZone);
+            return parts.hour * 60 + parts.minute;
+          })();
+    const endMinutes =
+      endUtc >= dayEndUtc
+        ? 24 * 60
+        : (() => {
+            const parts = getLocalTimeParts(endUtc, input.timeZone);
+            return parts.hour * 60 + parts.minute;
+          })();
+    if (startMinutes >= endMinutes) return null;
+    return { start: startMinutes, end: endMinutes };
+  };
+
+  const bookingIntervals = input.bookings
+    .map((booking) =>
+      toDayMinutes(
+        input.bufferMin ? addMinutes(booking.startAtUtc, -input.bufferMin) : booking.startAtUtc,
+        input.bufferMin ? addMinutes(booking.endAtUtc, input.bufferMin) : booking.endAtUtc,
+      ),
+    )
+    .filter((item): item is BlockInterval => item !== null);
+
   const useMergedBookings = input.bookings.length > BOOKING_MERGE_THRESHOLD;
-  const mergedBookings = useMergedBookings
-    ? mergeIntervals(
-        input.bookings
-          .map((booking) => {
-            const bufferedStart = input.bufferMin
-              ? addMinutes(booking.startAtUtc, -input.bufferMin)
-              : booking.startAtUtc;
-            const bufferedEnd = input.bufferMin
-              ? addMinutes(booking.endAtUtc, input.bufferMin)
-              : booking.endAtUtc;
-
-            if (bufferedEnd <= dayStartUtc || bufferedStart >= dayEndUtc) return null;
-
-            const startMinutes =
-              bufferedStart <= dayStartUtc
-                ? 0
-                : (() => {
-                    const parts = getLocalTimeParts(bufferedStart, input.timeZone);
-                    return parts.hour * 60 + parts.minute;
-                  })();
-            const endMinutes =
-              bufferedEnd >= dayEndUtc
-                ? 24 * 60
-                : (() => {
-                    const parts = getLocalTimeParts(bufferedEnd, input.timeZone);
-                    return parts.hour * 60 + parts.minute;
-                  })();
-
-            if (startMinutes >= endMinutes) return null;
-            return { start: startMinutes, end: endMinutes };
-          })
-          .filter((item): item is BlockInterval => item !== null)
-      )
-    : null;
+  const mergedBookings = useMergedBookings ? mergeIntervals(bookingIntervals) : null;
 
   // SCHEDULE-PATTERNS-01 (этап 1): у дня «Фиксированное время» кандидаты —
   // ровно выбранные мастером начала, а не сетка шага. Раньше движок строил
@@ -153,6 +183,28 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
         .sort((a, b) => a - b)
     : null;
 
+  // Занятое время дня одним списком — от него считаются начала «впритык».
+  // Касающиеся отрезки сливаются: конец записи, за которой сразу перерыв, не
+  // начало.
+  const busyIntervals = fixedStarts
+    ? []
+    : mergeIntervals([
+        ...bookingIntervals,
+        ...blockIntervals,
+        ...(input.blocks ?? [])
+          .map((block) => toDayMinutes(block.startAtUtc, block.endAtUtc))
+          .filter((item): item is BlockInterval => item !== null),
+      ]);
+
+  const extraStarts = fixedStarts
+    ? []
+    : (input.extraStartsUtc ?? [])
+        .filter((value) => toLocalDateKey(value, input.timeZone) === input.dateKey)
+        .map((value) => {
+          const parts = getLocalTimeParts(value, input.timeZone);
+          return parts.hour * 60 + parts.minute;
+        });
+
   for (const interval of input.dayPlan.workingIntervals) {
     const windowStart = timeToMinutes(interval.start);
     const windowEnd = timeToMinutes(interval.end);
@@ -165,13 +217,28 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
       ? fixedStarts.filter(
           (t) => t >= windowStart && t >= earliest && t + input.serviceDurationMin <= windowEnd,
         )
-      : buildGridStarts({
-          windowStart,
-          windowEnd,
-          stepMin,
-          earliest: input.dateKey === nowLocalKey ? roundUpToStep(nowMinutes, stepMin) : 0,
-          durationMin: input.serviceDurationMin,
-        });
+      : Array.from(
+          new Set([
+            ...buildGridStarts({
+              windowStart,
+              windowEnd,
+              stepMin,
+              earliest: input.dateKey === nowLocalKey ? roundUpToStep(nowMinutes, stepMin) : 0,
+              durationMin: input.serviceDurationMin,
+            }),
+            ...[
+              ...buildFlushStarts({
+                windowStart,
+                windowEnd,
+                durationMin: input.serviceDurationMin,
+                busy: busyIntervals,
+              }),
+              ...extraStarts,
+            ].filter(
+              (t) => t >= windowStart && t >= earliest && t + input.serviceDurationMin <= windowEnd,
+            ),
+          ]),
+        ).sort((a, b) => a - b);
 
     let bookingCursor = 0;
     for (const t of candidates) {

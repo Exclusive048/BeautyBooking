@@ -98,6 +98,13 @@ export function TimeGrid({
   // Чужой или устаревший ответ (и ответ после размонтирования) не пишет ничего.
   const requestSeqRef = useRef(0);
 
+  // SLOTS-FLUSH-STARTS: курсор пакета, приходящийся на этот день салона,
+  // уходит на сервер (`?after=`): день мастера не знает о незаписанной
+  // предыдущей услуге, и время сразу после неё без подсказки не появилось бы.
+  // Курсор другого дня на выдачу не влияет — запрос не повторяется.
+  const flushAfter =
+    minStartAtUtc && toLocalDateKey(minStartAtUtc, providerTimezone) === dateKey ? minStartAtUtc : null;
+
   const loadSlots = useCallback(async () => {
     const seq = ++requestSeqRef.current;
     setLoading(true);
@@ -115,6 +122,7 @@ export function TimeGrid({
       url.searchParams.set("serviceId", serviceId);
       url.searchParams.set("from", dateKey);
       url.searchParams.set("to", dateKey);
+      if (flushAfter) url.searchParams.set("after", flushAfter);
       const data = await fetchJson<{ slots: SlotPayload[] }>(url.toString(), { cache: "no-store" });
       const parsed: BookingFlowSlot[] = data.slots
         .map((slot) => ({
@@ -145,7 +153,7 @@ export function TimeGrid({
     } finally {
       if (seq === requestSeqRef.current) setLoading(false);
     }
-  }, [dateKey, providerId, providerTimezone, serviceId]);
+  }, [dateKey, flushAfter, providerId, providerTimezone, serviceId]);
 
   useEffect(() => {
     void loadSlots();
@@ -154,8 +162,8 @@ export function TimeGrid({
     };
   }, [loadSlots]);
 
-  // Cursor filter at render (not in the fetch) — the day's slots are the same
-  // regardless of the floor, so re-picking an earlier component doesn't refetch.
+  // Cursor filter at render: the fetch only adds the cursor as a start (see
+  // `flushAfter`), the slots before it are still dropped here.
   const visibleSlots = useMemo(() => {
     if (!minStartAtUtc) return slots;
     const floorMs = new Date(minStartAtUtc).getTime();

@@ -14,6 +14,7 @@ import {
   intraPackageOverlapMultiMaster,
 } from "@/lib/bookings/package-math";
 import { toKopeks } from "@/lib/money/kopeks";
+import { packageFlushStarts } from "@/lib/bookings/package-cursor";
 import {
   loadPackageForBooking,
   mapPrismaBookingConflict,
@@ -137,6 +138,22 @@ function orderSelections(
  * accept-new-clients check matches the eventual create (a returning client
  * isn't prematurely blocked).
  */
+/**
+ * SLOTS-FLUSH-STARTS: начала «сразу после» уже проверенных услуг пакета для
+ * мастера следующей услуги — у того же мастера конец + его пауза, у другого сам
+ * конец (`packageFlushStarts`). Курсор визарда студии — одно из этих значений.
+ */
+function studioFlushStarts(masterProviderId: string, cores: BookingCoreContext[]): Date[] {
+  return packageFlushStarts({
+    placed: cores.map((core) => ({
+      masterProviderId: core.resolvedMasterProviderId,
+      endAtUtc: core.endAtUtc,
+      bufferMin: core.bufferMin,
+    })),
+    masterProviderId,
+  });
+}
+
 export async function proposeStudioPackagePlacement(input: {
   packageId: string;
   selections: StudioPackageSelection[];
@@ -155,6 +172,7 @@ export async function proposeStudioPackagePlacement(input: {
         masterProviderId: selection.masterProviderId,
         clientUserId: input.clientUserId ?? null,
         startAtUtc: selection.startAtUtc,
+        extraStartsUtc: studioFlushStarts(selection.masterProviderId, cores),
       });
       cores.push(core);
     } catch (error) {
@@ -273,6 +291,7 @@ async function createStudioPackageBookingUnguarded(
       masterProviderId: selection.masterProviderId,
       clientUserId: input.clientUserId,
       startAtUtc: selection.startAtUtc,
+      extraStartsUtc: studioFlushStarts(selection.masterProviderId, cores),
     });
     cores.push(core);
   }

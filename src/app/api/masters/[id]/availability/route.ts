@@ -7,6 +7,7 @@ import { resolveServiceDuration } from "@/lib/schedule/resolveDuration";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
+import { resolveFlushAfterParam } from "@/lib/schedule/flush-after";
 import { resolveStudioMoveSlots } from "@/lib/studio/move-plan";
 import { toAppError } from "@/lib/api/errors";
 import { clampVisibleSlotsHorizon, stricterBookingWindow } from "@/lib/bookings/policy-enforcement";
@@ -164,6 +165,10 @@ export async function GET(
       },
     });
 
+    // SLOTS-FLUSH-STARTS: визард пакета студии показывает время сразу после
+    // предыдущей услуги (`?after=`).
+    const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"));
+
     const bookable = await listBookableSlots({
       provider,
       serviceId,
@@ -173,6 +178,7 @@ export async function GET(
       limit,
       now,
       excludeBookingId: studioMove ? studioMove.excludeBookingId : exclusion?.bookingId,
+      extraStartsUtc: flushAfter ? [flushAfter] : undefined,
       operatorWindow: operatorProvider !== null,
       // BOOKING-WINDOW-STRICTER: более строгое из окон владельца услуги и мастера.
       windowPolicy: serviceOwner?.provider

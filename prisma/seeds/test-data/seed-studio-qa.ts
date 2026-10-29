@@ -53,7 +53,7 @@ function startOfUtcDay(date: Date): Date {
 function tzOffsetMs(at: Date, timeZone: string): number {
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    hour12: false,
+    hourCycle: "h23",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

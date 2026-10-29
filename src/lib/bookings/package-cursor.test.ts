@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   nextComponentEarliestStart,
+  packageFlushStarts,
   studioNextComponentEarliestStart,
 } from "@/lib/bookings/package-cursor";
 import {
@@ -197,5 +198,47 @@ describe("studioNextComponentEarliestStart", () => {
     expect(
       intraPackageOverlapMultiMaster([first, component(MASTER_A, cursor, 30, 0)]),
     ).toBe(false);
+  });
+});
+
+// SLOTS-FLUSH-STARTS: начала «сразу после» размещённых услуг пакета, которые
+// сервер передаёт в проверку окошка. Курсор визарда обязан быть среди них —
+// иначе выбранное «впритык» время сервер отклонил бы как занятое.
+describe("packageFlushStarts", () => {
+  const end = (hm: string) => new Date(`2026-03-03T${hm}:00Z`);
+
+  it("у того же мастера — конец + пауза, у другого — сам конец", () => {
+    const starts = packageFlushStarts({
+      placed: [
+        { masterProviderId: "A", endAtUtc: end("10:20"), bufferMin: 10 },
+        { masterProviderId: "B", endAtUtc: end("11:00"), bufferMin: 15 },
+      ],
+      masterProviderId: "A",
+    });
+    expect(starts.map((d) => d.toISOString())).toEqual([
+      "2026-03-03T10:30:00.000Z",
+      "2026-03-03T11:00:00.000Z",
+    ]);
+  });
+
+  it("содержит курсор визарда студии и соло", () => {
+    const placed = [
+      { masterProviderId: "A", endAtUtc: end("10:20"), bufferMin: 10 },
+      { masterProviderId: "B", endAtUtc: end("10:40"), bufferMin: 0 },
+    ];
+    const studioCursor = studioNextComponentEarliestStart({
+      prevEndAtUtc: end("10:40"),
+      placed,
+      masterProviderId: "A",
+      masterBufferMin: 10,
+    });
+    expect(
+      packageFlushStarts({ placed, masterProviderId: "A" }).map((d) => d.getTime()),
+    ).toContain(studioCursor.getTime());
+
+    const soloCursor = nextComponentEarliestStart(end("10:20"), 10);
+    expect(
+      packageFlushStarts({ placed: [placed[0]!], masterProviderId: "A" }).map((d) => d.getTime()),
+    ).toContain(soloCursor.getTime());
   });
 });

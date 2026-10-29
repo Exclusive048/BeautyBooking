@@ -9,6 +9,7 @@ import { resolveProviderBySlugOrId } from "@/lib/providers/resolve-provider";
 import { clampVisibleSlotsHorizon } from "@/lib/bookings/policy-enforcement";
 import { listBookableSlots } from "@/lib/schedule/bookable-window";
 import { resolveRescheduleExclusion } from "@/lib/schedule/reschedule-exclusion";
+import { resolveFlushAfterParam } from "@/lib/schedule/flush-after";
 import { isActiveMasterOfPublishedStudio } from "@/lib/studio/active-studio-master";
 
 function toIso(value: Date | string | null | undefined): string | null {
@@ -144,6 +145,7 @@ export async function GET(
       provider.id,
       url.searchParams.get("excludeBookingId"),
     );
+    const flushAfter = resolveFlushAfterParam(url.searchParams.get("after"));
 
     // EXP-025/026: the shared bookable-window primitive applies the
     // `minBookingHoursAhead` cutoff + effective weekly/override schedule
@@ -160,6 +162,9 @@ export async function GET(
         limit,
         now: nowForPolicy,
         excludeBookingId: exclusion?.bookingId,
+        // SLOTS-FLUSH-STARTS: визард пакета показывает время сразу после
+        // предыдущей услуги (`?after=`).
+        extraStartsUtc: flushAfter ? [flushAfter] : undefined,
       }),
       prisma.discountRule.findUnique({
         where: { providerId: provider.id },

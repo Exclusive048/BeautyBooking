@@ -69,6 +69,27 @@ describe("schedule/slotsCache", () => {
     expect(key).toBe("slots:m1:2026-03-03:s1:60:10:30:UTC:v1:2026-04-01");
   });
 
+  // SLOTS-FLUSH-STARTS: выдача с дополнительными началами — своя запись кэша
+  // (суффикс), без них ключ прежний — общая выдача дня делит кэш как раньше.
+  it("keys extra starts with a suffix and leaves the plain key unchanged", () => {
+    const input = {
+      masterId: "m1",
+      dateKey: "2026-03-03",
+      serviceId: "s1",
+      serviceDuration: 20,
+      bufferMin: 0,
+      slotStepMin: 15,
+      timeZone: "UTC",
+      scheduleVersion: "v1",
+      publishedUntilLocal: "2026-04-01",
+    };
+    const plain = buildSlotsCacheKey(input);
+    expect(buildSlotsCacheKey({ ...input, extraStartMinutes: [] })).toBe(plain);
+    expect(buildSlotsCacheKey({ ...input, extraStartMinutes: [29_542_340] })).toBe(`${plain}:x29542340`);
+    // Ключ остаётся в пространстве мастера — его сбрасывает `invalidateSlotsForMaster`.
+    expect(buildSlotsCacheKey({ ...input, extraStartMinutes: [29_542_340] }).startsWith("slots:m1:")).toBe(true);
+  });
+
   it("stores slots and registers index", async () => {
     cacheGet.mockResolvedValueOnce(null);
     await setCachedSlotsForDate({

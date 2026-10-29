@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSlotsForDay } from "@/lib/schedule/slots";
+import type { DayPlan } from "@/lib/schedule/types";
 
 describe("schedule/slots", () => {
   const basePlan = {
@@ -125,7 +126,9 @@ describe("schedule/slots", () => {
     expect(fine).toEqual(["10:00", "10:15", "10:30", "10:45", "11:00", "11:15", "11:30"]);
 
     const coarse = buildSlotsForDay({ ...args, slotStepMin: 60 }).map((s) => s.label.slice(-5));
-    expect(coarse).toEqual(["10:00", "11:00"]);
+    // SLOTS-FLUSH-STARTS: 11:30 — начало «впритык» к концу рабочего отрезка
+    // (услуга кончается ровно в 12:00), сетка шага 60 его не даёт.
+    expect(coarse).toEqual(["10:00", "11:00", "11:30"]);
 
     // Omitting slotStepMin falls back to the legacy 30-min step.
     const fallback = buildSlotsForDay(args).map((s) => s.label.slice(-5));
@@ -144,5 +147,168 @@ describe("schedule/slots", () => {
     });
 
     expect(slots).toEqual([]);
+  });
+});
+
+// SLOTS-FLUSH-STARTS (2026-10-29, запрос мастера): к сетке шага добавляются
+// начала вплотную после и до занятого времени, чтобы короткая услуга при
+// мелком шаге не теряла время между записями.
+describe("schedule/slots — начала «впритык»", () => {
+  const day = (start: string, end: string, extra: Partial<DayPlan> = {}): DayPlan => ({
+    isWorking: true,
+    workingIntervals: [{ start, end }],
+    breaks: [],
+    meta: { source: "weekly-template" as const },
+    ...extra,
+  });
+  const at = (hm: string, dateKey = "2026-03-03") => new Date(`${dateKey}T${hm}:00Z`);
+  const booking = (from: string, to: string) => ({ startAtUtc: at(from), endAtUtc: at(to) });
+  const times = (slots: Array<{ label: string }>) => slots.map((slot) => slot.label.slice(-5));
+  const base = {
+    dateKey: "2026-03-03",
+    timeZone: "UTC",
+    serviceDurationMin: 20,
+    bufferMin: 0,
+    slotStepMin: 15,
+    now: new Date("2026-03-03T05:00:00Z"),
+  };
+
+  it("предлагает время сразу после записи: 20 минут при шаге 15, запись на 7:00 → 7:20", () => {
+    const labels = times(
+      buildSlotsForDay({ ...base, dayPlan: day("07:00", "09:00"), bookings: [booking("07:00", "07:20")] }),
+    );
+    expect(labels.slice(0, 3)).toEqual(["07:20", "07:30", "07:45"]);
+    expect(labels).not.toContain("07:15");
+  });
+
+  it("три записи по 20 минут укладываются в час", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("07:00", "09:00"),
+        bookings: [booking("07:00", "07:20"), booking("07:20", "07:40")],
+      }),
+    );
+    // Третья запись начинается в 7:40 и кончается в 8:00.
+    expect(labels[0]).toBe("07:40");
+  });
+
+  it("учитывает паузу между записями", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        bufferMin: 5,
+        dayPlan: day("10:00", "12:00"),
+        bookings: [booking("10:00", "10:20"), booking("11:00", "11:20")],
+      }),
+    );
+    // После 10:20 — пауза 5 минут; до 11:00 — услуга кончается за 5 минут.
+    expect(labels).toContain("10:25");
+    expect(labels).toContain("10:35");
+    expect(labels).not.toContain("10:20");
+    expect(labels).not.toContain("10:40");
+    // После второй записи — 11:25 (+ пауза).
+    expect(labels).toContain("11:25");
+  });
+
+  it("предлагает время вплотную до записи", () => {
+    const labels = times(
+      buildSlotsForDay({ ...base, dayPlan: day("10:00", "12:00"), bookings: [booking("11:00", "12:00")] }),
+    );
+    // 10:40–11:00 — ровно до записи; 10:45 залезает на неё.
+    expect(labels).toEqual(["10:00", "10:15", "10:30", "10:40"]);
+  });
+
+  it("считает от перерыва и блокировки времени, а не от сетки", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        serviceDurationMin: 30,
+        slotStepMin: 30,
+        dayPlan: day("10:00", "13:00", { breaks: [{ start: "10:40", end: "10:50" }] }),
+        bookings: [],
+        blocks: [booking("11:30", "11:55")],
+      }),
+    );
+    // 10:10 — кончается к перерыву, 10:50 — сразу после него, 11:00 — до
+    // блокировки, 11:55 — после неё, 12:30 — к концу дня.
+    expect(labels).toEqual(["10:00", "10:10", "10:50", "11:00", "11:55", "12:00", "12:30"]);
+  });
+
+  it("на пустом отрезке остаётся сетка и одно время к концу дня", () => {
+    const labels = times(
+      buildSlotsForDay({ ...base, slotStepMin: 30, dayPlan: day("10:00", "12:00"), bookings: [] }),
+    );
+    expect(labels).toEqual(["10:00", "10:30", "11:00", "11:30", "11:40"]);
+  });
+
+  it("не трогает день «Фиксированное время»", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("10:00", "12:00", { fixedStarts: ["10:00", "11:00"] }),
+        bookings: [booking("10:00", "10:20")],
+        extraStartsUtc: [at("10:20")],
+      }),
+    );
+    expect(labels).toEqual(["11:00"]);
+  });
+
+  it("сегодня не предлагает начало, которое уже прошло", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("09:00", "12:00"),
+        bookings: [booking("09:30", "10:02"), booking("10:10", "10:30")],
+        now: new Date("2026-03-03T10:05:00Z"),
+      }),
+    );
+    // 10:02 (после первой записи) уже прошло; 10:15 по сетке задевает вторую.
+    expect(labels).not.toContain("10:02");
+    expect(labels[0]).toBe("10:30");
+  });
+
+  it("предлагает переданные начала, если они свободны и в этот день", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("10:00", "12:00"),
+        bookings: [booking("11:00", "11:20")],
+        extraStartsUtc: [at("10:25"), at("10:50"), at("10:25", "2026-03-04")],
+      }),
+    );
+    expect(labels).toContain("10:25");
+    // 10:50–11:10 пересекает запись — отброшено обычной проверкой.
+    expect(labels).not.toContain("10:50");
+    expect(labels.filter((label) => label === "10:25")).toHaveLength(1);
+  });
+
+  it("работает и при большом числе записей (слитые отрезки)", () => {
+    const bookings = Array.from({ length: 11 }, (_, index) => {
+      const start = 7 * 60 + index * 20;
+      const end = start + 20;
+      const hm = (minutes: number) =>
+        `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+      return booking(hm(start), hm(end));
+    });
+    const labels = times(buildSlotsForDay({ ...base, dayPlan: day("07:00", "12:00"), bookings }));
+    // 11 записей по 20 минут с 7:00 — следующее время 10:40.
+    expect(labels[0]).toBe("10:40");
+    expect(labels).not.toContain("10:30");
+  });
+
+  // Тестовый якорь пояса: салон в Екатеринбурге (GMT+5), запись 08:00Z–08:20Z
+  // = 13:00–13:20 по салону. Начало после неё — 13:20 салона = 08:20Z.
+  it("считает в поясе салона (Екатеринбург)", () => {
+    const slots = buildSlotsForDay({
+      ...base,
+      timeZone: "Asia/Yekaterinburg",
+      dayPlan: day("12:00", "15:00"),
+      bookings: [{ startAtUtc: at("08:00"), endAtUtc: at("08:20") }],
+      now: new Date("2026-03-03T02:00:00Z"),
+    });
+    const after = slots.find((slot) => slot.label === "2026-03-03 13:20");
+    expect(after?.startAtUtc.toISOString()).toBe("2026-03-03T08:20:00.000Z");
+    expect(times(slots)).not.toContain("13:15");
   });
 });

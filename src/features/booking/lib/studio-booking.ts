@@ -190,7 +190,12 @@ export async function fetchStudioMasters(studioId: string): Promise<MastersResul
 export async function fetchMasterAvailability(
   masterId: string,
   serviceId: string,
-  dateKey: string
+  dateKey: string,
+  /**
+   * SLOTS-FLUSH-STARTS: момент, с которого визард пакета показывает время
+   * следующей услуги, — сервер добавит его к началам дня (`?after=`).
+   */
+  options: { after?: string | null } = {}
 ): Promise<AvailabilityResult> {
   if (!isValidDateKey(dateKey)) {
     return { ok: false, error: TS.dateInvalid, code: "DATE_INVALID" };
@@ -200,6 +205,7 @@ export async function fetchMasterAvailability(
   url.searchParams.set("serviceId", serviceId);
   url.searchParams.set("from", dateKey);
   url.searchParams.set("limit", "1");
+  if (options.after) url.searchParams.set("after", options.after);
 
   try {
     const data = await fetchJson<{ slots: SlotItem[]; meta: { toDateExclusive: string } }>(url.toString(), {

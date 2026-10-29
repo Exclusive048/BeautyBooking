@@ -36,8 +36,9 @@ const SCHEDULE_VERSION_TTL_SECONDS = 120;
  * Поднимайте число вместе с такой правкой движка.
  *
  * 2 — у дня со своими часами только его перерывы (без обеда из графика).
+ * 3 — начала «впритык» к занятому времени (SLOTS-FLUSH-STARTS).
  */
-export const SCHEDULE_COMPUTE_GENERATION = 2;
+export const SCHEDULE_COMPUTE_GENERATION = 3;
 
 export type ScheduleVersionValue = {
   value: string;
