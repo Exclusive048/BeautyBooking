@@ -193,6 +193,12 @@ export function calendarDayFromPlan(
     isWorking,
     start: isWorking ? (fixed ? fixedStarts[0] ?? null : hours.start) : null,
     end: isWorking ? (fixed ? fixedStarts[fixedStarts.length - 1] ?? null : hours.end) : null,
+    breaks:
+      isWorking && !fixed && plan
+        ? [...plan.breaks]
+            .map((item) => ({ start: item.start, end: item.end }))
+            .sort((left, right) => (left.start < right.start ? -1 : left.start > right.start ? 1 : 0))
+        : [],
     fixed,
     templateId: isWorking ? plan?.meta.templateId ?? null : null,
     painted: plan?.meta.source === "override",

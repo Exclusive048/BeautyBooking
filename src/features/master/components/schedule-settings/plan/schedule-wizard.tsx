@@ -24,7 +24,7 @@ import { formatZoneLabel } from "@/lib/ui/zone-label";
 import { cn } from "@/lib/cn";
 import { ChipGroup } from "@/components/ui/chip-group";
 import { ModeCard } from "@/components/ui/mode-card";
-import { DayHoursEditor, ScheduleField as Field } from "./day-hours-editor";
+import { DayHoursEditor, ScheduleField as Field, dayHoursErrorText } from "./day-hours-editor";
 import {
   buildPatternTemplates,
   dayHoursToTemplate,
@@ -728,10 +728,7 @@ export function ScheduleWizard({
 // ─── Шаги: проверка ─────────────────────────────────────────────────────────
 
 function hoursErrorText(draft: DayHoursDraft): string | null {
-  const error = validateDayHours(draft);
-  if (error === "noFixedTimes") return T.hours.noFixedTimes;
-  if (error === "invalidRange") return T.hours.invalidRange;
-  return null;
+  return dayHoursErrorText(validateDayHours(draft));
 }
 
 function validateStep(

@@ -11,6 +11,7 @@ function day(date: string, patch: Partial<CalendarDayDto> = {}): CalendarDayDto 
     isWorking: false,
     start: null,
     end: null,
+    breaks: [],
     fixed: false,
     templateId: null,
     painted: false,
@@ -37,13 +38,40 @@ describe("buildMonthGrids", () => {
 });
 
 describe("applyPaintOptimistic", () => {
-  it("кисть рабочего дня ставит его часы и отметку «изменён»", () => {
-    const next = applyPaintOptimistic(day("2026-10-05"), { kind: "template", templateId: "t1" }, {
-      startTime: "09:00",
-      endTime: "15:00",
-      fixed: false,
+  it("кисть рабочего дня ставит его часы, перерывы и отметку «изменён»", () => {
+    const next = applyPaintOptimistic(
+      day("2026-10-05", { isWorking: true, start: "10:00", end: "20:00", breaks: [{ start: "14:00", end: "15:00" }] }),
+      { kind: "template", templateId: "t1" },
+      {
+        startTime: "09:00",
+        endTime: "15:00",
+        fixed: false,
+        breaks: [
+          { start: "12:00", end: "12:30" },
+          { start: "10:30", end: "10:45" },
+        ],
+      },
+    );
+    expect(next).toMatchObject({
+      isWorking: true,
+      templateId: "t1",
+      start: "09:00",
+      end: "15:00",
+      breaks: [
+        { start: "10:30", end: "10:45" },
+        { start: "12:00", end: "12:30" },
+      ],
+      painted: true,
     });
-    expect(next).toMatchObject({ isWorking: true, templateId: "t1", start: "09:00", end: "15:00", painted: true });
+  });
+
+  it("свои часы дня — ровно его перерывы, без перерывов прежнего дня", () => {
+    const next = applyPaintOptimistic(
+      day("2026-10-05", { isWorking: true, start: "10:00", end: "20:00", breaks: [{ start: "14:00", end: "15:00" }] }),
+      { kind: "hours", startTime: "11:00", endTime: "19:00", breaks: [] },
+      null,
+    );
+    expect(next).toMatchObject({ start: "11:00", end: "19:00", breaks: [] });
   });
 
   it("выходной снимает часы", () => {
@@ -52,7 +80,7 @@ describe("applyPaintOptimistic", () => {
       { kind: "off" },
       null,
     );
-    expect(next).toMatchObject({ isWorking: false, templateId: null, start: null, painted: true });
+    expect(next).toMatchObject({ isWorking: false, templateId: null, start: null, breaks: [], painted: true });
   });
 
   it("«как по графику» — каким станет день, знает только сервер: меняется лишь отметка", () => {

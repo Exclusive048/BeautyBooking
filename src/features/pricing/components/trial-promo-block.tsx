@@ -8,7 +8,7 @@ const P = UI_TEXT.pricing.launchPromo;
 
 type Props = {
   scope: "master" | "studio";
-  /** LAUNCH-PROMO-01: во время акции подарок — PREMIUM до 1 ноября, а не 30 дней. */
+  /** LAUNCH-PROMO-01: во время акции подарок — PREMIUM до конца акции, а не 30 дней. */
   launchPromo?: boolean;
 };
 

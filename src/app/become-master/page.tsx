@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/seo/page-metadata";
+import { BetaPromoBanner } from "@/components/billing/beta-promo-banner";
 import { MarketingLayout } from "@/features/marketing/components/marketing-layout";
 import { HeroSection } from "@/features/marketing/sections/hero-section";
 import { TextWithImage } from "@/features/marketing/sections/text-with-image";
@@ -71,6 +72,11 @@ export default async function BecomeMasterPage() {
           secondary: { label: "Посмотреть тарифы", href: PRICING_URL },
         }}
       />
+
+      {/* BETA-PROMO-DEC: пока идёт бета-тестирование, новый кабинет — сразу на PREMIUM без оплаты. */}
+      <div className="mx-auto max-w-3xl px-4 pt-8">
+        <BetaPromoBanner />
+      </div>
 
       <TextWithImage
         eyebrow={T.pain.eyebrow}

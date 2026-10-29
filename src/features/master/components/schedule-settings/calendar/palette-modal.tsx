@@ -16,14 +16,13 @@ import type { ScheduleEditorSnapshot } from "@/lib/schedule/editor-shared";
 import type { DayTemplateDto } from "@/lib/schedule/patterns-shared";
 import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
-import { DayHoursEditor, ScheduleField } from "../plan/day-hours-editor";
+import { DayHoursEditor, ScheduleField, dayHoursErrorText } from "../plan/day-hours-editor";
 import { scheduleSubEndpoint } from "../schedule-endpoint-context";
 import { DEFAULT_DAY_HOURS, dayHoursToTemplate, validateDayHours, type DayHoursDraft } from "../plan/lib/day-hours";
 import { DAY_COLOR_FILL } from "./lib/calendar-grid";
 import { templateHoursLabel } from "./lib/template-label";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.calendar.palette;
-const HOURS_T = UI_TEXT.cabinetMaster.scheduleSettings.wizard.hours;
 
 type View = { kind: "list" } | { kind: "create" } | { kind: "edit"; templateId: string };
 
@@ -240,9 +239,7 @@ function PaletteDayForm({
         <>
           <DayHoursEditor value={hours} onChange={setHours} />
           {hoursError ? (
-            <p className="text-sm text-text-sec">
-              {hoursError === "noFixedTimes" ? HOURS_T.noFixedTimes : HOURS_T.invalidRange}
-            </p>
+            <p className="text-sm text-text-sec">{dayHoursErrorText(hoursError)}</p>
           ) : null}
         </>
       ) : template ? (

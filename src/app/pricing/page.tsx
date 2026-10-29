@@ -89,7 +89,7 @@ export default async function PricingPage({ searchParams }: PageProps) {
           FIX-EXP-PRICING-COPY (EXP-015): `id` anchor — the final-CTA "Сравнить
           тарифы" scrolls here (the real tariff comparison) instead of the
           unrelated /become-master redirect. */}
-      {/* LAUNCH-PROMO-01: до 1 ноября цены на карточках — будущие, сейчас всё бесплатно. */}
+      {/* LAUNCH-PROMO-01: пока идёт акция, цены на карточках — будущие, сейчас всё бесплатно. */}
       {launchPromo ? (
         <section className="mx-auto max-w-3xl px-4">
           <div className="rounded-2xl border border-primary/30 bg-primary/[0.06] px-5 py-4 text-center">

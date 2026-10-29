@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { patternPosition, type SchedulePatternDto, type SchedulePlanDto } from "@/lib/schedule/patterns-shared";
+import * as UI_TEXT from "@/lib/ui/text";
 import { initialDraft } from "./initial-draft";
 
 /**
@@ -13,6 +14,8 @@ import { initialDraft } from "./initial-draft";
  * вместо 2026-10-03, и 01.10 из выходного стал рабочим). Возвращено — зелёный.
  * @probe 2026-09-28 — `weeksDays` снова `[...WORKDAYS_MASK, ...WORKDAYS_MASK]`:
  * покраснел «чередование недель» (вторая неделя Пн–Пт вместо Чт–Вс).
+ * @probe 2026-10-29 — `manualTemplate` снова первый по созданию (`find` без
+ * `reverse`): покраснел «Каждый раз по-разному» (пришли 06:00–18:00 без перерывов).
  */
 
 const TEMPLATE = {
@@ -80,6 +83,42 @@ describe("окно графика открывается с действующе
     // 07.10 — среда второй недели.
     expect(draft.currentWeek).toBe(2);
     expect(draft.autoExtend).toBe(true);
+  });
+
+  it("«Каждый раз по-разному» — часы и перерывы самого нового «Рабочего дня»", () => {
+    // SCHEDULE-BREAKS-MANY: брался первый по времени создания — окно открывалось
+    // со старыми часами, хотя записи шли уже по новым.
+    const label = UI_TEXT.cabinetMaster.scheduleSettings.wizard.hours.manualDayLabel;
+    const current: SchedulePatternDto = {
+      kind: "CYCLE",
+      cycleDays: 1,
+      anchorOn: "2026-10-29",
+      startsOn: "2026-10-29",
+      endsOn: "2027-01-29",
+      days: [null],
+    };
+    const older = { ...TEMPLATE, id: "old", name: label, startTime: "06:00", endTime: "18:00" };
+    const newer = {
+      ...TEMPLATE,
+      id: "new",
+      name: label,
+      startTime: "06:30",
+      endTime: "18:20",
+      breaks: [
+        { start: "07:40", end: "07:50", title: null },
+        { start: "13:00", end: "14:00", title: null },
+      ],
+    };
+    const draft = initialDraft({ ...plan("2026-10-29", current), templates: [TEMPLATE, older, newer] });
+    expect(draft.kind).toBe("MANUAL");
+    expect(draft.sameHours).toMatchObject({
+      startTime: "06:30",
+      endTime: "18:20",
+      breaks: [
+        { start: "07:40", end: "07:50" },
+        { start: "13:00", end: "14:00" },
+      ],
+    });
   });
 
   it("без графика — значения по умолчанию: автопродление выключено, до горизонта", () => {

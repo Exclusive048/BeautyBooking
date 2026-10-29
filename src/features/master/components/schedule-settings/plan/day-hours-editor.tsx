@@ -6,14 +6,25 @@ import { Input } from "@/components/ui/input";
 import * as UI_TEXT from "@/lib/ui/text";
 import { cn } from "@/lib/cn";
 import { ModeCard } from "@/components/ui/mode-card";
-import type { DayHoursDraft } from "./lib/day-hours";
+import { suggestNextBreak, type DayBreakDraft, type DayHoursDraft, type DayHoursError } from "./lib/day-hours";
 
 const T = UI_TEXT.cabinetMaster.scheduleSettings.wizard.hours;
 
+/** Текст ошибки черновика часов — один на окно графика, палитру, «свои часы» и график команды. */
+export function dayHoursErrorText(error: DayHoursError | null): string | null {
+  if (error === "noFixedTimes") return T.noFixedTimes;
+  if (error === "breakOutside") return T.breakOutside;
+  if (error === "breakOverlap") return T.breakOverlap;
+  if (error === "invalidRange") return T.invalidRange;
+  return null;
+}
+
 /**
  * SCHEDULE-PATTERNS-01 (этап 3) — часы рабочего дня: режим записи, начало и
- * конец, один перерыв или времена приёма. Общий для пошагового окна, палитры и
- * «своих часов» дня в календаре.
+ * конец, перерывы или времена приёма. Общий для пошагового окна, палитры и
+ * «своих часов» дня в календаре. Перерывов — сколько угодно
+ * (SCHEDULE-BREAKS-MANY): у «Фиксированного времени» их нет, там окошки — сами
+ * выбранные времена.
  */
 export function DayHoursEditor({
   value,
@@ -25,10 +36,12 @@ export function DayHoursEditor({
   onChange: (next: DayHoursDraft) => void;
   /** Разрешить «Фиксированное время» (у «своих часов» дня и разных часов по дням — нет). */
   allowFixed?: boolean;
-  /** Одна строка «начало — конец + перерыв» без выбора режима (списки по дням). */
+  /** Только «начало — конец + перерывы», без выбора режима (списки по дням). */
   compact?: boolean;
 }) {
   const set = (patch: Partial<DayHoursDraft>) => onChange({ ...value, ...patch });
+  const setBreak = (index: number, patch: Partial<DayBreakDraft>) =>
+    set({ breaks: value.breaks.map((item, i) => (i === index ? { ...item, ...patch } : item)) });
 
   const flexible = (
     <div className="space-y-3">
@@ -40,34 +53,47 @@ export function DayHoursEditor({
           <TimeInput ariaLabel={T.endLabel} value={value.endTime} onChange={(endTime) => set({ endTime })} />
         </ScheduleField>
       </div>
-      {value.breakOn ? (
-        <div className="flex items-end gap-2">
-          <ScheduleField label={T.breakLabel} className="flex-1">
-            <div className="grid grid-cols-2 gap-2">
-              <TimeInput
-                ariaLabel={T.breakStartAria}
-                value={value.breakStart}
-                onChange={(breakStart) => set({ breakStart })}
-              />
-              <TimeInput ariaLabel={T.breakEndAria} value={value.breakEnd} onChange={(breakEnd) => set({ breakEnd })} />
-            </div>
-          </ScheduleField>
-          <Button
-            type="button"
-            variant="icon"
-            size="icon"
-            aria-label={T.removeBreakAria}
-            onClick={() => set({ breakOn: false })}
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </Button>
-        </div>
-      ) : (
-        <Button type="button" variant="ghost" size="sm" className="rounded-xl" onClick={() => set({ breakOn: true })}>
-          <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-          {T.addBreak}
-        </Button>
-      )}
+      {value.breaks.length > 0 ? (
+        <ScheduleField label={T.breaksLabel}>
+          <ul className="space-y-2">
+            {value.breaks.map((item, index) => (
+              <li key={index} className="flex items-center gap-2">
+                <div className="grid flex-1 grid-cols-2 gap-2">
+                  <TimeInput
+                    ariaLabel={T.breakStartAria(index + 1)}
+                    value={item.start}
+                    onChange={(start) => setBreak(index, { start })}
+                  />
+                  <TimeInput
+                    ariaLabel={T.breakEndAria(index + 1)}
+                    value={item.end}
+                    onChange={(end) => setBreak(index, { end })}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="icon"
+                  size="icon"
+                  aria-label={T.removeBreakAria(index + 1)}
+                  onClick={() => set({ breaks: value.breaks.filter((_, i) => i !== index) })}
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </ScheduleField>
+      ) : null}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="rounded-xl"
+        onClick={() => set({ breaks: [...value.breaks, suggestNextBreak(value)] })}
+      >
+        <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+        {T.addBreak}
+      </Button>
     </div>
   );
 

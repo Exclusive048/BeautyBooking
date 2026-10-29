@@ -23,6 +23,22 @@ import * as cache from "@/lib/cache/cache";
  */
 const SCHEDULE_VERSION_TTL_SECONDS = 120;
 
+/**
+ * SCHEDULE-BREAKS-MANY (2026-10-29) — поколение ВЫЧИСЛЕНИЯ расписания. Стоит в
+ * начале версии (`resolveScheduleVersion`), а через неё — в ключах `slots:*`,
+ * `dayPlan:*` и `bookingDays:*`; и в ключе самой версии, иначе новый код
+ * прочитал бы версию, посчитанную прежним, и с ней — его ответы.
+ *
+ * Версия следит за ДАННЫМИ расписания, а не за кодом: когда при тех же данных
+ * меняется результат движка (правило дня, перерывы, окошки), прежние ответы
+ * после деплоя ещё до 120 с отдавались бы как есть, а воркер при старте писал
+ * бы из них «свободно сегодня» и снимок фильтра «когда» на полчаса вперёд.
+ * Поднимайте число вместе с такой правкой движка.
+ *
+ * 2 — у дня со своими часами только его перерывы (без обеда из графика).
+ */
+export const SCHEDULE_COMPUTE_GENERATION = 2;
+
 export type ScheduleVersionValue = {
   value: string;
   updatedAt: Date | null;
@@ -35,7 +51,7 @@ type CachedScheduleVersion = {
 };
 
 export function buildScheduleVersionCacheKey(masterId: string): string {
-  return `schedVer:${masterId}`;
+  return `schedVer:g${SCHEDULE_COMPUTE_GENERATION}:${masterId}`;
 }
 
 export async function readCachedScheduleVersion(

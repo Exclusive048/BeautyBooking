@@ -16,6 +16,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
  *   3. `slotStepMin` попал в ключ слот-кэша. Это цена п.1: шаг сетки —
  *      единственный вход `buildSlotsForDay`, который держался ТОЛЬКО на
  *      `Provider.updatedAt`, и без него смена шага отдавала бы старую сетку.
+ *
+ * @probe 2026-10-29 (SCHEDULE-BREAKS-MANY): ключ версии возвращён к
+ * `schedVer:${masterId}` без поколения — покраснел «поколение вычисления — в
+ * версии и в ключе её кэша» (прочитана версия прежнего кода).
  */
 
 const prismaMock = vi.hoisted(() => ({
@@ -53,7 +57,10 @@ vi.mock("@/lib/cache/cache", () => ({
 
 import { getScheduleWindow } from "@/lib/schedule/engine-context";
 import { buildSlotsCacheKey } from "@/lib/schedule/slotsCache";
-import { invalidateScheduleVersion } from "@/lib/schedule/schedule-version-cache";
+import {
+  SCHEDULE_COMPUTE_GENERATION,
+  invalidateScheduleVersion,
+} from "@/lib/schedule/schedule-version-cache";
 
 const PROVIDER_ID = "prov_18";
 const TIMEZONE = "Asia/Yekaterinburg";
@@ -208,6 +215,18 @@ describe("PERF-18 · версия расписания зависит от ра�
     const after = await freshVersion();
 
     expect(after).not.toBe(before);
+  });
+
+  it("SCHEDULE-BREAKS-MANY: поколение вычисления — в версии и в ключе её кэша", async () => {
+    primeScheduleStructure(new Date("2026-10-29T10:00:00.000Z"));
+    // Версия, посчитанная прежним кодом, лежит под прежним ключом: новый код
+    // её не читает, а считает свою — и с ней не попадает в прежние ответы.
+    store.set(`schedVer:${PROVIDER_ID}`, { value: "1790000000000:0:0:0", updatedAtIso: null });
+
+    const window = await getScheduleWindow(PROVIDER_ID, TIMEZONE);
+
+    expect(window.scheduleVersion.startsWith(`g${SCHEDULE_COMPUTE_GENERATION}:`)).toBe(true);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
   });
 
   it("шаг сетки входит в ключ слот-кэша", () => {

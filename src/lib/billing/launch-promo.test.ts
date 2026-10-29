@@ -9,16 +9,18 @@ import {
 import { backfillLaunchPromo, grantLaunchPromoInTx } from "@/lib/billing/launch-promo-grant";
 
 const BEFORE = new Date("2026-09-22T12:00:00Z");
-const AFTER = new Date("2026-11-02T12:00:00Z");
+const AFTER = new Date("2027-01-02T12:00:00Z");
 
 describe("launch-promo — граница акции", () => {
-  it("конец акции — полночь 1 ноября по Москве", () => {
-    expect(LAUNCH_PROMO_ENDS_AT.toISOString()).toBe("2026-10-31T21:00:00.000Z");
+  it("конец акции — полночь 1 января 2027 по Москве (BETA-PROMO-DEC)", () => {
+    expect(LAUNCH_PROMO_ENDS_AT.toISOString()).toBe("2026-12-31T21:00:00.000Z");
   });
 
-  it("активна строго до полуночи 1 ноября МСК", () => {
-    expect(isLaunchPromoActive(new Date("2026-10-31T20:59:59.999Z"))).toBe(true);
-    expect(isLaunchPromoActive(new Date("2026-10-31T21:00:00.000Z"))).toBe(false);
+  it("активна весь день 31 декабря по Москве и гаснет в полночь 1 января", () => {
+    expect(isLaunchPromoActive(new Date("2026-12-31T20:59:59.999Z"))).toBe(true);
+    expect(isLaunchPromoActive(new Date("2026-12-31T21:00:00.000Z"))).toBe(false);
+    // Прежняя граница (1 ноября) больше не конец акции.
+    expect(isLaunchPromoActive(new Date("2026-11-15T12:00:00Z"))).toBe(true);
   });
 
   it("регистрация во время акции — PREMIUM до её конца, после — обычные 30 дней", () => {
@@ -90,6 +92,28 @@ describe("grantLaunchPromoInTx", () => {
     expect(result.outcome).toBe("upgraded");
   });
 
+  it("BETA-PROMO-DEC: PREMIUM, выданный «до 1 ноября», продлевается до новой границы", async () => {
+    const OLD_END = new Date("2026-11-01T00:00:00+03:00");
+    subFindUnique.mockResolvedValue(
+      row({ isTrial: true, plan: { tier: "PREMIUM" }, planId: "plan-premium", trialEndsAt: OLD_END, currentPeriodEnd: OLD_END }),
+    );
+    const result = await grantLaunchPromoInTx(tx, { userId: "u1", scope: "MASTER", now: BEFORE, source: "test" });
+    expect(result.outcome).toBe("upgraded");
+    const data = subUpdate.mock.calls[0][0].data;
+    expect(data.trialEndsAt.toISOString()).toBe("2026-12-31T21:00:00.000Z");
+    expect(data.currentPeriodEnd.toISOString()).toBe("2026-12-31T21:00:00.000Z");
+    // Предупреждение «пробный период заканчивается» уйдёт заново — к новой дате.
+    expect(data.trialEndingNotificationSentAt).toBeNull();
+  });
+
+  it("BETA-PROMO-DEC: деплой после 1 ноября — строка, которую крон уже перевёл на FREE, снова получает PREMIUM", async () => {
+    const afterOldEnd = new Date("2026-11-03T09:00:00Z");
+    subFindUnique.mockResolvedValue(row({}));
+    const result = await grantLaunchPromoInTx(tx, { userId: "u1", scope: "MASTER", now: afterOldEnd, source: "test" });
+    expect(result.outcome).toBe("upgraded");
+    expect(subUpdate.mock.calls[0][0].data).toMatchObject({ planId: "plan-premium", isTrial: true });
+  });
+
   it("уже на акции → ничего не пишет (идемпотентно для деплоя)", async () => {
     subFindUnique.mockResolvedValue(
       row({ isTrial: true, plan: { tier: "PREMIUM" }, trialEndsAt: new Date(LAUNCH_PROMO_ENDS_AT.getTime()) }),
@@ -109,7 +133,7 @@ describe("grantLaunchPromoInTx", () => {
     expect(subUpdate).not.toHaveBeenCalled();
   });
 
-  it("после 1 ноября — no-op", async () => {
+  it("после конца акции (1 января 2027) — no-op", async () => {
     const result = await grantLaunchPromoInTx(tx, { userId: "u1", scope: "MASTER", now: AFTER, source: "test" });
     expect(result.outcome).toBe("skipped-promo-over");
     expect(subFindUnique).not.toHaveBeenCalled();

@@ -7,7 +7,11 @@ import { Input } from "@/components/ui/input";
 import { ModalSurface } from "@/components/ui/modal-surface";
 import { Switch } from "@/components/ui/switch";
 import { ChipGroup } from "@/components/ui/chip-group";
-import { DayHoursEditor, ScheduleField } from "@/features/master/components/schedule-settings/plan/day-hours-editor";
+import {
+  DayHoursEditor,
+  ScheduleField,
+  dayHoursErrorText,
+} from "@/features/master/components/schedule-settings/plan/day-hours-editor";
 import {
   DEFAULT_DAY_HOURS,
   validateDayHours,
@@ -23,7 +27,6 @@ import { cn } from "@/lib/cn";
 import { buildTeamRhythmRequests, teamRhythmCoverage } from "../lib/team-rhythm";
 
 const T = UI_TEXT.studioCabinet.scheduleTeam.rhythm;
-const HOURS_T = UI_TEXT.cabinetMaster.scheduleSettings.wizard.hours;
 const DAYS_T = UI_TEXT.cabinetMaster.scheduleSettings.wizard.days;
 
 type MasterOption = { id: string; name: string };
@@ -180,7 +183,7 @@ export function TeamRhythmModal({ open, onClose, masters, todayKey, lastKey, end
 
         <DayHoursEditor value={hours} onChange={setHours} />
         {hoursError ? (
-          <p className="text-sm text-text-sec">{hoursError === "noFixedTimes" ? HOURS_T.noFixedTimes : HOURS_T.invalidRange}</p>
+          <p className="text-sm text-text-sec">{dayHoursErrorText(hoursError)}</p>
         ) : null}
 
         <label className="flex items-start justify-between gap-4 rounded-2xl border border-border-subtle bg-bg-card px-4 py-3">

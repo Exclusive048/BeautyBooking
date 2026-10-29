@@ -203,7 +203,7 @@ describe("LOGIC-08 · молчать о чужих ошибках нельзя",
   });
 });
 
-describe("LAUNCH-PROMO-01 · до 1 ноября платный тариф не продаётся", () => {
+describe("LAUNCH-PROMO-01 · пока идёт акция, платный тариф не продаётся", () => {
   it("платный checkout во время акции → 409 LAUNCH_PROMO_ACTIVE, ни платежа, ни ЮКассы", async () => {
     state.promoActive = true;
 

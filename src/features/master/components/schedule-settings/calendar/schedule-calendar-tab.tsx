@@ -194,7 +194,12 @@ export function ScheduleCalendarTab({
         day,
         action,
         template
-          ? { startTime: template.startTime, endTime: template.endTime, fixed: template.scheduleMode === "FIXED" }
+          ? {
+              startTime: template.startTime,
+              endTime: template.endTime,
+              fixed: template.scheduleMode === "FIXED",
+              breaks: template.breaks,
+            }
           : null,
       );
       // В заявке день ещё не изменён в расписании — отметку «изменён» не ставим.

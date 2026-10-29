@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ProviderType } from "@prisma/client";
 import { ensureStudioAdmin } from "@/lib/studios/access";
+import { MAX_DAY_BREAKS } from "@/lib/schedule/editor-shared";
 import { removeScheduleOverride, setScheduleOverride } from "@/lib/schedule/usecases";
 import { ensureStartNotAfterEnd, parseISOToUTC } from "@/lib/time";
 import { toAppError } from "@/lib/api/errors";
@@ -19,7 +20,7 @@ const overrideSchema = z.object({
   isDayOff: z.boolean(),
   startLocal: z.string().min(1).optional(),
   endLocal: z.string().min(1).optional(),
-  breaks: z.array(breakSchema).max(3).optional(),
+  breaks: z.array(breakSchema).max(MAX_DAY_BREAKS).optional(),
   reason: z.string().min(1).optional(),
 });
 

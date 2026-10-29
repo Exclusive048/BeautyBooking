@@ -5,7 +5,6 @@ import { AppError } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
 import { addDaysToDateKey, isDateKey } from "@/lib/schedule/dateKey";
 import {
-  AUTO_TEMPLATE_PREFIX,
   buildDefaultWeekSchedule,
   mapTemplateForDay,
   normalizeFixedSlotTimes,
@@ -14,6 +13,7 @@ import {
 import { assignPaletteColors } from "@/lib/schedule/calendar-shared";
 import {
   createPeriodTx,
+  deleteUnusedAutoTemplatesTx,
   ensureAutoTemplateTx,
   ensurePatternHistoryTx,
   paletteColorPickerTx,
@@ -55,24 +55,7 @@ type Db = Prisma.TransactionClient;
 
 // ─── Шаблоны рабочих дней (ядро — `patterns-core.ts`) ───────────────────────
 
-/**
- * Шаблоны редактора, на которые больше никто не ссылается — ни график (в том
- * числе прошлый), ни неделя, ни «Особый день». Шаблон, которому человек дал
- * имя в палитре (`label`, этап 3), — его выбор, а не побочный продукт
- * редактора: он не удаляется.
- */
-export async function deleteUnusedAutoTemplatesTx(tx: Db, providerId: string): Promise<void> {
-  await tx.scheduleTemplate.deleteMany({
-    where: {
-      providerId,
-      name: { startsWith: AUTO_TEMPLATE_PREFIX },
-      label: null,
-      patternDays: { none: {} },
-      weeklyScheduleDays: { none: {} },
-      scheduleOverrides: { none: {} },
-    },
-  });
-}
+export { deleteUnusedAutoTemplatesTx };
 
 // ─── Периоды ─────────────────────────────────────────────────────────────────
 

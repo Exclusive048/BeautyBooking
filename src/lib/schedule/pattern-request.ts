@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { AppError } from "@/lib/api/errors";
-import { normalizeExceptionInput } from "@/lib/schedule/editor-shared";
+import { MAX_DAY_BREAKS, normalizeExceptionInput } from "@/lib/schedule/editor-shared";
 import { PALETTE_LABEL_MAX, SCHEDULE_DAY_COLOR_KEYS } from "@/lib/schedule/calendar-shared";
 import type { DayTemplateDefinition } from "@/lib/schedule/patterns-core";
 import { MAX_PATTERN_CYCLE_DAYS, type SchedulePatternDto } from "@/lib/schedule/patterns-shared";
@@ -29,7 +29,7 @@ const dayTemplateSchema = z.object({
   endTime: TIME,
   breaks: z
     .array(z.object({ start: TIME, end: TIME, title: z.string().max(40).nullable().optional() }))
-    .max(6)
+    .max(MAX_DAY_BREAKS)
     .default([]),
   scheduleMode: z.enum(["FLEXIBLE", "FIXED"]),
   fixedSlotTimes: z.array(TIME).max(48).default([]),
