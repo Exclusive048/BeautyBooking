@@ -224,10 +224,14 @@ export function StudioPackageFlow({ open, onClose, bundle, studioTimezone, maste
     setSlotsLoading(true);
     setSlotsError(null);
     (async () => {
+      // SLOTS-FLUSH-STARTS: курсор уходит и на сервер — день мастера не знает
+      // о незаписанной предыдущей услуге, и время сразу после неё без
+      // подсказки не появилось бы (сервер учитывает его только в этот день).
       const result = await fetchMasterAvailability(
         selectedMasterId,
         activeComponent.serviceId,
         selectedDay,
+        { after: cursorMs ? new Date(cursorMs).toISOString() : null },
       );
       if (cancelled) return;
       if (!result.ok) {

@@ -352,6 +352,16 @@ const SCHEDULE_PATTERN_CONFLICT_SCHEMA: SchemaObject = {
   required: ["bookingId", "startAtUtc", "endAtUtc", "clientName", "reason"],
 };
 
+// SLOTS-FLUSH-STARTS: визард пакета — время сразу после предыдущей услуги.
+const flushAfterQuery: ParameterObject = {
+  name: "after",
+  in: "query",
+  required: false,
+  schema: { type: "string", format: "date-time" },
+  description:
+    "Package wizard: an extra start (the previous component's end + the master's buffer) that the day's own starts can't know, because that component isn't booked yet. Checked like any other start. Honoured only for a single-day request (`limit=1` or `to` = `from`) and only when the instant falls on that salon-local day; otherwise ignored.",
+};
+
 // MOVE-PICKER-DURATION: студийный перенос этой записи к запрошенному мастеру.
 const moveBookingIdQuery: ParameterObject = {
   name: "moveBookingId",
@@ -6829,6 +6839,7 @@ export const openApiSpec = {
           excludeBookingIdQuery,
           moveBookingIdQuery,
           manualWindowQuery,
+          flushAfterQuery,
         ],
         responses: {
           "200": okResponse({ $ref: "#/components/schemas/AvailabilitySlotsData" }),

@@ -251,11 +251,19 @@ export async function listAvailabilitySlotsPaginated(
      * один запрос на одно окно переноса, а не публичная выдача.
      */
     excludeBookingId?: string;
+    /**
+     * SLOTS-FLUSH-STARTS (2026-10-29): дополнительные начала — конец
+     * предыдущей услуги пакета (`buildSlotsForDay.extraStartsUtc`). Выдача с
+     * ними — не общая выдача дня, поэтому кэш обходится так же, как при
+     * исключении брони.
+     */
+    extraStartsUtc?: Date[];
   }
 ): Promise<Result<AvailabilitySlotsPageResult>> {
   const startedAt = Date.now();
   const excludeBookingId = input.excludeBookingId ?? null;
-  const bypassCache = excludeBookingId !== null;
+  const extraStartsUtc = input.extraStartsUtc ?? [];
+  const bypassCache = excludeBookingId !== null || extraStartsUtc.length > 0;
 
   if (!Number.isInteger(durationMin) || durationMin <= 0 || durationMin % 5 !== 0) {
     return { ok: false, status: 400, message: "Некорректная длительность.", code: "DURATION_INVALID" };
@@ -443,11 +451,12 @@ export async function listAvailabilitySlotsPaginated(
           blocks: blocksByDateKey.get(day.dateKey) ?? [],
           now,
           slotStepMin,
+          extraStartsUtc,
         });
         computed.set(day.dateKey, daySlots);
         // RESCHEDULE-SELF-SLOT: выдача без одной брони — не то, что лежит в
         // общем кэше; писать её туда значило бы отдать следующему клиенту
-        // занятое окно как свободное.
+        // занятое окно как свободное. То же с дополнительными началами пакета.
         if (bypassCache) continue;
         await setCachedSlotsForDate({
           key: day.cacheKey,

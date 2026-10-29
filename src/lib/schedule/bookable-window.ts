@@ -78,6 +78,8 @@ export async function listBookableSlots(input: {
   now: Date;
   /** RESCHEDULE-SELF-SLOT: бронь, которую переносят — её окно не занято (см. usecases.ts). */
   excludeBookingId?: string;
+  /** SLOTS-FLUSH-STARTS: дополнительные начала — конец предыдущей услуги пакета (см. slots.ts). */
+  extraStartsUtc?: Date[];
   /**
    * MANUAL-BOOKING-SLOTS-01: окно для ОПЕРАТОРА — ручной записи мастером или
    * администратором студии. Ручные пути `minBookingHoursAhead` намеренно не
@@ -111,6 +113,7 @@ export async function listBookableSlots(input: {
     toKeyExclusive,
     limit,
     excludeBookingId: input.excludeBookingId,
+    extraStartsUtc: input.extraStartsUtc,
   });
   if (!result.ok) {
     return { ok: false, status: result.status, code: result.code, message: result.message };

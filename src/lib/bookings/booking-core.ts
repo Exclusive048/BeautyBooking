@@ -315,6 +315,13 @@ export async function resolveBookingCore(input: {
   startAtUtc?: Date;
   endAtUtc?: Date | null;
   slotLabel?: string;
+  /**
+   * SLOTS-FLUSH-STARTS (2026-10-29): начала, которые проверка окошка должна
+   * знать, хотя день их не выводит, — конец предыдущей услуги пакета (+ пауза
+   * мастера). Её запись ещё не создана, поэтому «сразу после» неё время без
+   * этого не нашлось бы. Передают только пакеты, значение считает сервер.
+   */
+  extraStartsUtc?: Date[];
 }): Promise<BookingCoreContext> {
   const [provider, service] = await Promise.all([
     prisma.provider.findUnique({
@@ -544,6 +551,7 @@ export async function resolveBookingCore(input: {
     {
       fromKey: toLocalDateKey(startAtUtc, availabilityTimezone),
       limit: 1,
+      extraStartsUtc: input.extraStartsUtc,
     }
   );
   if (!availability.ok) {
