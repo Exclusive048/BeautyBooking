@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -211,7 +212,7 @@ describe("payment canceled — stale renewal guard (FIX-3)", () => {
 
     expect(paymentUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "pay-1" },
+        where: { id: "pay-1", status: "PENDING" },
         data: expect.objectContaining({ status: "CANCELED" }),
       }),
     );
@@ -302,6 +303,74 @@ function buildRefundedPaymentRow(status = "SUCCEEDED") {
     subscription: { userId: "user-1", scope: "MASTER" },
   };
 }
+/**
+ * YOOKASSA-PENDING-SWEEP: исход платежа пишется условно по наблюдённому статусу
+ * строки — свип PENDING-платежей и задача вебхука могут прийти к одному платежу
+ * одновременно.
+ *
+ * @probe Вернул `where: { id: billingPayment.id }` у выдачи — краснеет «выдача
+ * условна…»: «expected "vi.fn()" to be called with arguments: [ ObjectContaining{…} ]».
+ * Убрал проверку `modelName` — краснеет «P2025 подписки — не гонка…»: «promise
+ * resolved "undefined" instead of rejecting».
+ */
+describe("YOOKASSA-PENDING-SWEEP — условная запись исхода", () => {
+  function recordNotFound(modelName = "BillingPayment") {
+    return new Prisma.PrismaClientKnownRequestError("Record to update not found.", {
+      code: "P2025",
+      clientVersion: "6",
+      meta: { modelName, cause: "Record to update not found." },
+    });
+  }
+
+  it("выдача условна по статусу, прочитанному до записи", async () => {
+    paymentFindUnique.mockResolvedValue(buildPayment({ type: "INITIAL" }));
+
+    await processYookassaWebhookPayload({ event: "payment.succeeded", objectId: "yk-1" });
+
+    expect(paymentUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pay-1", status: "PENDING" },
+        data: expect.objectContaining({ status: "SUCCEEDED" }),
+      }),
+    );
+  });
+
+  it("выдачу уже записал другой путь → ни аудита, ни второго «Оплата прошла»", async () => {
+    paymentFindUnique.mockResolvedValue(buildPayment({ type: "INITIAL" }));
+    transaction.mockRejectedValueOnce(recordNotFound());
+
+    await processYookassaWebhookPayload({ event: "payment.succeeded", objectId: "yk-1" });
+
+    expect(createBillingAuditLog).not.toHaveBeenCalled();
+    expect(createBillingNotification).not.toHaveBeenCalled();
+    expect(invalidatePlanCache).not.toHaveBeenCalled();
+    expect(logInfo).toHaveBeenCalledWith(
+      "YooKassa payment.succeeded ignored (granted concurrently)",
+      expect.objectContaining({ paymentId: "pay-1" }),
+    );
+  });
+
+  it("P2025 подписки — не гонка, а сбой: пробрасывается", async () => {
+    paymentFindUnique.mockResolvedValue(buildPayment({ type: "INITIAL" }));
+    transaction.mockRejectedValueOnce(recordNotFound("UserSubscription"));
+
+    await expect(
+      processYookassaWebhookPayload({ event: "payment.succeeded", objectId: "yk-1" }),
+    ).rejects.toThrow("Record to update not found.");
+  });
+
+  it("отмену уже записал другой путь → ни PAST_DUE, ни второго «Платёж не прошёл»", async () => {
+    getPayment.mockResolvedValue(buildApiPayment({ status: "canceled" }));
+    paymentFindUnique.mockResolvedValue(buildPayment({ type: "RENEWAL" }));
+    paymentUpdate.mockRejectedValueOnce(recordNotFound());
+
+    await processYookassaWebhookPayload({ event: "payment.canceled", objectId: "yk-1" });
+
+    expect(subUpdate).not.toHaveBeenCalled();
+    expect(createBillingAuditLog).not.toHaveBeenCalled();
+    expect(createBillingNotification).not.toHaveBeenCalled();
+  });
+});
 
 describe("refund.succeeded — API re-fetch + idempotency", () => {
   it("API refund succeeded for the whole amount → marks the payment REFUNDED + audit", async () => {

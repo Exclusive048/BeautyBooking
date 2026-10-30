@@ -59,6 +59,8 @@ import {
 import { ensureVisualSearchStartupConfig, getVisualSearchConfig } from "@/lib/visual-search/config";
 import { requeueAfterPipelineChangeOnce } from "@/lib/visual-search/reindex";
 import { processYookassaWebhookPayload } from "@/lib/payments/yookassa/webhook-processor";
+import { sweepPendingYookassaPayments } from "@/lib/payments/yookassa/pending-sweep";
+import { createNoOverlapRunner } from "@/lib/queue/no-overlap";
 import { runMediaCleanupJob } from "@/lib/media/cleanup";
 import { runMediaPurge } from "@/lib/media/purge";
 import { processSlotFreed } from "@/lib/hot-slots/slot-freed";
@@ -378,6 +380,34 @@ function startPeriodicJobs() {
         reportWorkerFailure("billing.mrr.snapshot.backstop", error);
       });
   }, mrrBackstopIntervalMs);
+
+  // YOOKASSA-PENDING-SWEEP (A-02): платежи, оставшиеся PENDING дольше 15 минут
+  // (уведомление ЮКассы потерялось или задача вебхука не справилась), —
+  // перечитываются тем же путём, что и вебхук. При старте и раз в 10 минут; без
+  // наложения проходов — при деградации API ЮКассы проход может идти дольше
+  // интервала. Почему отказы по платежам не алертят — в `pending-sweep.ts`.
+  const pendingPaymentsSweep = createNoOverlapRunner(() => sweepPendingYookassaPayments());
+  const runPendingPaymentsSweepSafe = () => {
+    void pendingPaymentsSweep()
+      .then((result) => {
+        if (!result.ran) {
+          logInfo("billing.yookassa.pendingSweep.skipped", { reason: "previous pass still running" });
+          return;
+        }
+        const summary = result.value;
+        if (summary.succeeded > 0 || summary.canceled > 0) {
+          logInfo("billing.yookassa.pendingSweep.done", summary);
+        }
+      })
+      .catch((error) => {
+        logError("YooKassa pending payments sweep failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        reportWorkerFailure("billing.yookassa.pendingSweep", error);
+      });
+  };
+  runPendingPaymentsSweepSafe();
+  setInterval(runPendingPaymentsSweepSafe, 10 * 60 * 1000);
 
   const mediaCleanupIntervalMs = 60 * 60 * 1000;
   setInterval(() => {
