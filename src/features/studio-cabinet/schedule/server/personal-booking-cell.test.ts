@@ -11,12 +11,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * @probe 2026-09-23 — `isPersonalBooking` возвращал `false` всегда: красные
  *        «личная запись приходит только занятостью» и «…не считается записью
  *        студии». Возвращено — зелёный.
+ * @probe 2026-10-30 (SCHEDULE-FLEX-DATE-NAV) — окошки и загрузка без личных
+ *        записей (`!cell.isPersonal` в `buildMasterDayStats`): красный «…но
+ *        занимает время» — «expected 11 to be 22». Возвращено — зелёный.
  */
 
 const STUDIO_ID = "studio1";
 const STUDIO_PROVIDER_ID = "studio-prov";
 
 const bookingFindMany = vi.hoisted(() => vi.fn());
+const loadDayPlans = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -56,7 +60,23 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/schedule/day-plans", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schedule/day-plans")>()),
+  loadDayPlans,
+}));
+
 import { loadStudioScheduleData } from "./schedule-data.service";
+
+// 01.10.2026 Марина работает 10:00–19:00 (салон, UTC+5); «сейчас» — накануне.
+const NOW = new Date("2026-09-30T12:00:00Z");
+const PLANS = new Map([
+  [
+    "marina",
+    new Map([
+      ["2026-10-01", { isWorking: true, workingIntervals: [{ start: "10:00", end: "19:00" }], breaks: [], meta: { source: "pattern" } }],
+    ]),
+  ],
+]);
 
 function row(patch: Record<string, unknown>) {
   return {
@@ -81,12 +101,22 @@ function row(patch: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  loadDayPlans.mockResolvedValue(PLANS);
   bookingFindMany.mockReset();
   bookingFindMany.mockImplementation(async (args: { select: Record<string, unknown> }) =>
     "clientName" in args.select
       ? [
           row({ id: "studio-booking" }),
-          row({ id: "personal", studioId: null, providerId: "marina", clientName: "Ольга", clientPhone: "+79990000001" }),
+          // Личная — 12:00–13:00 салона.
+          row({
+            id: "personal",
+            studioId: null,
+            providerId: "marina",
+            clientName: "Ольга",
+            clientPhone: "+79990000001",
+            startAtUtc: new Date("2026-10-01T07:00:00Z"),
+            endAtUtc: new Date("2026-10-01T08:00:00Z"),
+          }),
         ]
       : [],
   );
@@ -112,10 +142,16 @@ describe("календарь студии — личная запись маст
   });
 
   it("личная запись не считается записью студии, но занимает время", async () => {
-    const data = await loadStudioScheduleData({ studioId: STUDIO_ID, dateKey: "2026-10-01", view: "day" });
+    const data = await loadStudioScheduleData({ studioId: STUDIO_ID, dateKey: "2026-10-01", view: "day", now: NOW });
     expect(data.kpis.bookingsCount).toBe(1);
     expect(data.kpis.revenueKopeks).toBe(150000);
-    // Загрузка считает обе: время мастера занято и личной записью.
-    expect(data.kpis.freeWindowsCount).toBe(data.kpis.occupancyHoursDenominator - 2);
+    // Загрузка и окошки считают обе: время мастера занято и личной записью.
+    // 120 из 540 минут; свободно 11–12 и 13–19 (без личной было бы 11–19).
+    expect(data.kpis.occupancyPercent).toBe(22);
+    expect(data.kpis.freeWindowsCount).toBe(2);
+    expect(data.freeWindows[0]!.days[0]!.windows).toEqual([
+      { startMin: 11 * 60, endMin: 12 * 60 },
+      { startMin: 13 * 60, endMin: 19 * 60 },
+    ]);
   });
 });

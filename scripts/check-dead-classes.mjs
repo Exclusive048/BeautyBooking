@@ -95,6 +95,9 @@ export const NOT_A_CLASS = new Set([
   "mr-stories-viewed-items",
   // Плашка «Разрешите акции мастеров» (29.09 доработки · 16) — «скрыть» на устройстве.
   "mr-marketing-banner-dismissed",
+  // Показатели над расписанием свёрнуты / развёрнуты (SCHEDULE-FLEX-DATE-NAV).
+  "mr-schedule-kpi-master",
+  "mr-schedule-kpi-studio",
   // Якорь раздела справки (`href="#fixed-vs-flexible"`), совпал с `fixed`.
   "fixed-vs-flexible",
   // Id раздела справки (`help-content.tsx`). Стал кандидатом, когда

@@ -88,12 +88,41 @@ function weekBooking(startUtc: string, endUtc: string) {
   };
 }
 
+// Запись календаря (выборка с данными клиента) — для списка записей ячейки.
+function calendarBooking(id: string, startUtc: string, endUtc: string) {
+  return {
+    id,
+    studioId: "studio1",
+    masterProviderId: "marina",
+    providerId: "studio-prov",
+    serviceId: "svc",
+    startAtUtc: new Date(startUtc),
+    endAtUtc: new Date(endUtc),
+    status: "CONFIRMED",
+    clientName: `Клиент ${id}`,
+    clientPhone: null,
+    clientUserId: null,
+    proposedStartAt: null,
+    proposedEndAt: null,
+    actionRequiredBy: null,
+    bookingPackageId: null,
+    service: { name: "Маникюр", title: null, price: 100000 },
+    serviceItems: [],
+  };
+}
+
+// «Сейчас» — до недели (салон, вс 27.09 17:00): все дни недели впереди.
+const NOW = new Date("2026-09-27T12:00:00Z");
+
 beforeEach(() => {
   vi.clearAllMocks();
   loadDayPlans.mockResolvedValue(PLANS);
   bookingFindMany.mockImplementation(async (args: { select: Record<string, unknown> }) =>
     "clientName" in args.select
-      ? []
+      ? [
+          calendarBooking("a", "2026-09-28T05:00:00Z", "2026-09-28T06:00:00Z"),
+          calendarBooking("b", "2026-09-28T09:00:00Z", "2026-09-28T11:00:00Z"),
+        ]
       : [
           // пн: 1 ч + 2 ч = 180 мин из 480 (9 ч минус перерыв)
           weekBooking("2026-09-28T05:00:00Z", "2026-09-28T06:00:00Z"),
@@ -117,7 +146,7 @@ describe("веб-неделя студии — загрузка по графи�
       "2026-10-03",
       "2026-10-04",
     ]);
-    expect(marina.cells[0]).toEqual({
+    expect(marina.cells[0]).toMatchObject({
       dateKey: "2026-09-28",
       booked: 2,
       bookedMinutes: 180,
@@ -130,6 +159,29 @@ describe("веб-неделя студии — загрузка по графи�
     expect(marina.cells[2]).toMatchObject({ isDayOff: false, booked: 1, fixedSlots: 4, capacityMinutes: null, percent: 25 });
     // Дня нет в плане (нет графика) — выходной, а не «0 из 5».
     expect(marina.cells[3]).toMatchObject({ isDayOff: true, percent: 0 });
+  });
+
+  it("SCHEDULE-FLEX-DATE-NAV: ячейка несёт записи мастера и свободное время по графику", async () => {
+    const data = await loadStudioScheduleData({ studioId: "studio1", dateKey: "2026-10-01", view: "week", now: NOW });
+    const marina = data.week!.rows.find((row) => row.master.id === "marina")!;
+    // пн 10:00–19:00, перерыв 13–14, записи 10–11 и 14–16 (салон).
+    expect(marina.cells[0]!.bookings.map((b) => b.id)).toEqual(["a", "b"]);
+    expect(marina.cells[0]!.freeWindows.windows).toEqual([
+      { startMin: 11 * 60, endMin: 13 * 60 },
+      { startMin: 16 * 60, endMin: 19 * 60 },
+    ]);
+    // ср — «Фиксированное время»: все четыре начала свободны.
+    expect(marina.cells[2]!.freeWindows.freeStarts).toEqual([600, 720, 840, 960]);
+    expect(data.week!.days.map((day) => day.isPast)).toEqual(Array(7).fill(false));
+    // Показатели недели — по графику: 180 занятых минут из 480 + 4 начала по часу.
+    expect(data.kpis).toMatchObject({
+      bookingsCount: 2,
+      occupancyPercent: 25,
+      occupancyHoursDenominator: 12,
+      mastersOnShift: 1,
+      freeWindowsCount: 6,
+    });
+    expect(data.freeWindows.map((row) => row.masterId)).toEqual(["marina"]);
   });
 
   it("приглашённый мастер — вся неделя выходная, план движка для него не грузим", async () => {
