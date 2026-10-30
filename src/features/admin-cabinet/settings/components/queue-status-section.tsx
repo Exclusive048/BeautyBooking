@@ -5,12 +5,12 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/features/admin-cabinet/settings/components/section-card";
 import { StatTile } from "@/features/admin-cabinet/settings/components/stat-tile";
-import type { QueueSnapshot } from "@/features/admin-cabinet/settings/types";
+import type { QueueSnapshot, QueueStatsView } from "@/features/admin-cabinet/settings/types";
 import { fetchJsonWithAuth, serverMessageOr } from "@/lib/http/client";
 import * as UI_TEXT from "@/lib/ui/text";
 
 type ApiPayload = {
-  stats: { pending: number; processing: number; dead: number };
+  stats: QueueStatsView;
   deadJobs: Array<{
     queueIndex: number;
     job: { type: string; attempts?: number };
@@ -110,8 +110,9 @@ export function QueueStatusSection({ initial }: Props) {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label={t.tiles.pending} value={snapshot.stats.pending} />
+        <StatTile label={t.tiles.delayed} value={snapshot.stats.delayed} />
         <StatTile label={t.tiles.processing} value={snapshot.stats.processing} />
         <StatTile
           label={t.tiles.dead}

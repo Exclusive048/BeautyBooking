@@ -20,10 +20,74 @@ const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_RECOVERY_ATTEMPTS = 3;
 const allowMemoryQueueFallback = !isProduction;
 
+// QUEUE-DELAYED-ZSET (A-01): отложенные задачи живут отдельно от готовых —
+// `queue:delayed` (ZSET, score = время запуска, member = id задачи) плюс хэш
+// `queue:delayed:jobs` с самой задачей. Раньше всё лежало в одном списке
+// `queue:jobs`, и `dequeue` на будущей задаче возвращал её в хвост и отвечал
+// «пусто»: воркер засыпал на секунду, а тысяча напоминаний «за сутки» впереди
+// срочной задачи означала тысячу секунд её ожидания. Теперь список содержит
+// только готовое к работе, а созревшее переносит в него Lua-скрипт.
+const DELAYED_KEY = "queue:delayed";
+const DELAYED_JOBS_KEY = "queue:delayed:jobs";
+// Сколько созревших задач один вызов скрипта переносит за раз и сколько
+// таких пачек подряд допускается за один `dequeue`: скрипт блокирует Redis на
+// время выполнения, поэтому пачка ограничена, а длинный хвост созревшего
+// (воркер стоял) дотягивается следующими вызовами.
+const PROMOTE_BATCH_SIZE = 100;
+const PROMOTE_MAX_BATCHES = 10;
+// Предел просмотра одного `dequeue` при самомиграции: каждая будущая задача,
+// найденная в списке, уходит в ZSET, и цикл берёт следующую сразу. Предел —
+// только страховка от бесконечного цикла; на проде он достижим лишь при
+// первом запуске новой версии над длинным списком старого формата.
+const DEQUEUE_SCAN_LIMIT = 5000;
+
+/**
+ * Атомарная постановка в отложенные. `ZADD NX` по id задачи: копия задачи с тем
+ * же id (повтор той же цепочки, детерминированный id напоминания, сверка
+ * платежа) не создаёт второй записи — побеждает первая. Хэш досоздаётся, даже
+ * если член ZSET уже есть, а полезной нагрузки нет (ручная правка ключей).
+ */
+const ADD_DELAYED_SCRIPT = `
+local added = redis.call('ZADD', KEYS[1], 'NX', ARGV[1], ARGV[2])
+if added == 1 or redis.call('HEXISTS', KEYS[2], ARGV[2]) == 0 then
+  redis.call('HSET', KEYS[2], ARGV[2], ARGV[3])
+end
+return added
+`;
+
+/**
+ * Атомарный перенос созревших задач в готовые: выборка, удаление из ZSET и
+ * хэша и `RPUSH` — в одном EVAL. Redis выполняет скрипт целиком, поэтому два
+ * воркера, переносящих одновременно, не получат одну задачу дважды: второй
+ * увидит ZSET уже без неё. Возвращает {перенесено, просмотрено} — по второму
+ * числу видно, была ли пачка полной.
+ */
+const PROMOTE_DUE_SCRIPT = `
+local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'LIMIT', 0, tonumber(ARGV[2]))
+local moved = 0
+for _, id in ipairs(ids) do
+  local payload = redis.call('HGET', KEYS[2], id)
+  redis.call('ZREM', KEYS[1], id)
+  redis.call('HDEL', KEYS[2], id)
+  if payload then
+    redis.call('RPUSH', KEYS[3], payload)
+    moved = moved + 1
+  end
+end
+return {moved, #ids}
+`;
+
+/** Для стенда очереди: тексты скриптов, чтобы двойник Redis мог их опознать. */
+export const QUEUE_LUA_SCRIPTS = {
+  addDelayed: ADD_DELAYED_SCRIPT,
+  promoteDue: PROMOTE_DUE_SCRIPT,
+} as const;
+
 const memoryQueue: Job[] = [];
 const memoryProcessing: Job[] = [];
 const memoryDead: Job[] = [];
 const memoryHeartbeat = new Map<string, number>();
+const memoryDelayed = new Map<string, Job>();
 
 type QueueRedisClient = NonNullable<Awaited<ReturnType<typeof getRedisConnection>>>;
 type QueueRedisRequiredError = Error & { code: "REDIS_REQUIRED_FOR_QUEUE" };
@@ -51,9 +115,17 @@ function runQueueRedisCommand<T>(operation: string, promise: Promise<T>): Promis
 }
 
 export type QueueStats = {
+  /** Готовые к работе (список `queue:jobs`). Отложенные сюда не входят. */
   pending: number;
+  /** Отложенные до своего времени (`queue:delayed`): напоминания, повторы. */
+  delayed: number;
   processing: number;
   dead: number;
+  /**
+   * Сколько ждёт задача в голове готовой очереди, от момента, когда она стала
+   * готовой (поставлена, созрела или восстановлена). `null` — очередь пуста.
+   */
+  oldestPendingAgeMs: number | null;
 };
 
 export type DeadQueueJobItem = {
@@ -112,6 +184,97 @@ function withoutProcessingTimestamp(job: Job): Job {
   const cleared = { ...job };
   delete cleared._processingStartedAt;
   return normalizeJobMeta(cleared);
+}
+
+/** Момент, с которого задача готова к работе: поставлена, созрела или восстановлена. */
+function readySince(job: Job): number {
+  return Math.max(job.createdAt ?? 0, toJobScheduleAt(job) ?? 0, job._recoveredAt ?? 0);
+}
+
+function addMemoryDelayed(job: Job): void {
+  // Та же семантика, что `ZADD NX`: первая копия id остаётся.
+  if (!memoryDelayed.has(job.id)) memoryDelayed.set(job.id, job);
+}
+
+function promoteMemoryDelayed(now: number): void {
+  const due = [...memoryDelayed.values()]
+    .filter((job) => (toJobScheduleAt(job) ?? 0) <= now)
+    .sort((a, b) => (toJobScheduleAt(a) ?? 0) - (toJobScheduleAt(b) ?? 0));
+  for (const job of due) {
+    memoryDelayed.delete(job.id);
+    memoryQueue.push(job);
+  }
+}
+
+async function addDelayedJob(client: QueueRedisClient, operation: string, job: Job): Promise<void> {
+  await runQueueRedisCommand(
+    `${operation}:addDelayed`,
+    client.eval(ADD_DELAYED_SCRIPT, {
+      keys: [DELAYED_KEY, DELAYED_JOBS_KEY],
+      arguments: [String(toJobScheduleAt(job) ?? Date.now()), job.id, JSON.stringify(job)],
+    })
+  );
+}
+
+/**
+ * Единственная развилка «куда класть»: будущая задача — в ZSET, готовая — в
+ * список (в хвост, а восстановленная и повторённая из dead-letter — в голову,
+ * как и прежде). Все пути постановки идут через неё — иначе будущая задача
+ * снова окажется в готовом списке и будет перекладываться при каждом чтении.
+ */
+async function placeJob(
+  client: QueueRedisClient,
+  operation: string,
+  job: Job,
+  side: "head" | "tail"
+): Promise<void> {
+  if (isScheduledForFuture(job)) {
+    await addDelayedJob(client, operation, job);
+    return;
+  }
+  const raw = JSON.stringify(job);
+  await runQueueRedisCommand(
+    `${operation}:${side === "head" ? "lPush" : "rPush"}`,
+    side === "head" ? client.lPush(QUEUE_KEY, raw) : client.rPush(QUEUE_KEY, raw)
+  );
+}
+
+function placeMemoryJob(job: Job, side: "head" | "tail"): void {
+  if (isScheduledForFuture(job)) {
+    addMemoryDelayed(job);
+    return;
+  }
+  if (side === "head") memoryQueue.unshift(job);
+  else memoryQueue.push(job);
+}
+
+/**
+ * Перенос созревших отложенных задач в готовый список. Отказ не роняет
+ * `dequeue`: готовые задачи в списке разбираются и без переноса, а созревшие
+ * дождутся следующего вызова. Возвращает число перенесённых.
+ */
+async function promoteDueJobs(client: QueueRedisClient): Promise<number> {
+  let moved = 0;
+  try {
+    for (let batch = 0; batch < PROMOTE_MAX_BATCHES; batch += 1) {
+      const reply = await runQueueRedisCommand(
+        "promoteDue:eval",
+        client.eval(PROMOTE_DUE_SCRIPT, {
+          keys: [DELAYED_KEY, DELAYED_JOBS_KEY, QUEUE_KEY],
+          arguments: [String(Date.now()), String(PROMOTE_BATCH_SIZE)],
+        })
+      );
+      const [batchMoved, scanned] = Array.isArray(reply) ? reply.map(Number) : [0, 0];
+      moved += batchMoved || 0;
+      if (!scanned || scanned < PROMOTE_BATCH_SIZE) break;
+    }
+  } catch (error) {
+    logError("Queue delayed promotion failed", {
+      error: error instanceof Error ? error.message : String(error),
+      __skipAlert: true,
+    });
+  }
+  return moved;
 }
 
 async function setJobHeartbeat(jobId: string, ts: number): Promise<void> {
@@ -198,10 +361,10 @@ export async function enqueue(job: Job, options?: EnqueueOptions): Promise<void>
   try {
     const client = await getQueueRedisConnection("enqueue");
     if (!client) {
-      memoryQueue.push(queuedJob);
+      placeMemoryJob(queuedJob, "tail");
       return;
     }
-    await runQueueRedisCommand("enqueue:rPush", client.rPush(QUEUE_KEY, JSON.stringify(queuedJob)));
+    await placeJob(client, "enqueue", queuedJob, "tail");
   } catch (error) {
     logError("Queue enqueue failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -215,52 +378,68 @@ export async function dequeue(): Promise<Job | null> {
     const client = await getQueueRedisConnection("dequeue");
 
     if (!client) {
-      const nextJob = memoryQueue.shift() ?? null;
-      if (!nextJob) return null;
+      promoteMemoryDelayed(Date.now());
+      for (let scanned = 0; scanned < DEQUEUE_SCAN_LIMIT; scanned += 1) {
+        const nextJob = memoryQueue.shift() ?? null;
+        if (!nextJob) return null;
 
-      const job = normalizeJobMeta(nextJob);
-      if (isScheduledForFuture(job)) {
-        memoryQueue.push(job); // not due yet — back to the queue, unprocessed
-        return null;
+        const job = normalizeJobMeta(nextJob);
+        if (isScheduledForFuture(job)) {
+          addMemoryDelayed(job); // не созрела — в отложенные, берём следующую
+          continue;
+        }
+
+        memoryProcessing.push(job);
+        memoryHeartbeat.set(job.id, Date.now());
+        return job;
+      }
+      return null;
+    }
+
+    await promoteDueJobs(client);
+
+    // QUEUE-DELAYED-ZSET: самомиграция. Будущая задача в готовом списке —
+    // наследие прежнего формата (до этой версии всё лежало в `queue:jobs`) или
+    // писатель в обход `enqueue`. Раньше она возвращалась в хвост, а `dequeue`
+    // отвечал «пусто», и воркер засыпал, хотя за ней могли стоять готовые.
+    // Теперь она уходит в ZSET, и цикл сразу берёт следующую: сон — только
+    // когда готовый список действительно пуст.
+    for (let scanned = 0; scanned < DEQUEUE_SCAN_LIMIT; scanned += 1) {
+      const raw = await runQueueRedisCommand(
+        "dequeue:lMove",
+        client.lMove(QUEUE_KEY, PROCESSING_KEY, "LEFT", "RIGHT")
+      );
+      if (!raw) return null;
+
+      const job = parseJob(raw);
+      if (!job) {
+        await runQueueRedisCommand("dequeue:cleanupInvalid", client.lRem(PROCESSING_KEY, 1, raw));
+        logError("Queue job parse failed", { raw });
+        continue;
       }
 
-      memoryProcessing.push(job);
-      memoryHeartbeat.set(job.id, Date.now());
+      // Сначала в ZSET, потом из processing: сбой между шагами даёт копию
+      // (recovery её подберёт, а `ZADD NX` по id не задвоит), а не потерю.
+      if (isScheduledForFuture(job)) {
+        await addDelayedJob(client, "dequeue:migrate", job);
+        await runQueueRedisCommand("dequeue:lRemMigrated", client.lRem(PROCESSING_KEY, 1, raw));
+        continue;
+      }
+
+      // FIX-12: the job stays in PROCESSING exactly as `lMove` left it — its
+      // start-time (initial heartbeat) is recorded in the side hash keyed by
+      // job.id. No lRem+rPush → there is no window where the job is in neither
+      // list. A crash between `lMove` and this hSet leaves the job in PROCESSING
+      // with no heartbeat, which recovery treats as recoverable (never lost).
+      await runQueueRedisCommand(
+        "dequeue:hSetHeartbeat",
+        client.hSet(PROCESSING_HEARTBEAT_KEY, job.id, String(Date.now()))
+      );
       return job;
     }
 
-    const raw = await runQueueRedisCommand(
-      "dequeue:lMove",
-      client.lMove(QUEUE_KEY, PROCESSING_KEY, "LEFT", "RIGHT")
-    );
-    if (!raw) return null;
-
-    const job = parseJob(raw);
-    if (!job) {
-      await runQueueRedisCommand("dequeue:cleanupInvalid", client.lRem(PROCESSING_KEY, 1, raw));
-      logError("Queue job parse failed", { raw });
-      return null;
-    }
-
-    // Not due yet → return it to the queue without processing. Add-to-queue
-    // BEFORE removing from processing, so a crash here duplicates the job
-    // (recoverable) rather than loses it.
-    if (isScheduledForFuture(job)) {
-      await runQueueRedisCommand("dequeue:rPushScheduledBack", client.rPush(QUEUE_KEY, raw));
-      await runQueueRedisCommand("dequeue:lRemScheduled", client.lRem(PROCESSING_KEY, 1, raw));
-      return null;
-    }
-
-    // FIX-12: the job stays in PROCESSING exactly as `lMove` left it — its
-    // start-time (initial heartbeat) is recorded in the side hash keyed by
-    // job.id. No lRem+rPush → there is no window where the job is in neither
-    // list. A crash between `lMove` and this hSet leaves the job in PROCESSING
-    // with no heartbeat, which recovery treats as recoverable (never lost).
-    await runQueueRedisCommand(
-      "dequeue:hSetHeartbeat",
-      client.hSet(PROCESSING_HEARTBEAT_KEY, job.id, String(Date.now()))
-    );
-    return job;
+    logError("Queue dequeue scan limit reached", { limit: DEQUEUE_SCAN_LIMIT, __skipAlert: true });
+    return null;
   } catch (error) {
     logError("Queue dequeue error", {
       error: error instanceof Error ? error.message : String(error),
@@ -353,8 +532,9 @@ export async function recoverStuckJobs(): Promise<number> {
         memoryHeartbeat.delete(job.id);
         const attempts = (job.attempts ?? 0) + 1;
         if (attempts <= MAX_RECOVERY_ATTEMPTS) {
-          memoryQueue.unshift(
-            normalizeJobMeta({ ...withoutProcessingTimestamp(job), attempts, _recoveredAt: now })
+          placeMemoryJob(
+            normalizeJobMeta({ ...withoutProcessingTimestamp(job), attempts, _recoveredAt: now }),
+            "head"
           );
           recovered += 1;
           logError("Recovered stuck job", { jobId: job.id, attempts, __skipAlert: true });
@@ -446,7 +626,9 @@ export async function recoverStuckJobs(): Promise<number> {
           attempts,
           _recoveredAt: now,
         });
-        await runQueueRedisCommand("recoverStuckJobs:lPush", client.lPush(QUEUE_KEY, JSON.stringify(recoveredJob)));
+        // QUEUE-DELAYED-ZSET: будущая задача (застряла посреди самомиграции) —
+        // в ZSET, готовая — в голову списка, как и прежде.
+        await placeJob(client, "recoverStuckJobs", recoveredJob, "head");
         recovered += 1;
         logError("Recovered stuck job", { jobId: job.id, attempts, __skipAlert: true });
       } else {
@@ -506,21 +688,33 @@ export async function getQueueStats(): Promise<QueueStats> {
   try {
     const client = await getQueueRedisConnection("getQueueStats");
     if (!client) {
+      const head = memoryQueue[0];
       return {
         pending: memoryQueue.length,
+        delayed: memoryDelayed.size,
         processing: memoryProcessing.length,
         dead: memoryDead.length,
+        oldestPendingAgeMs: head ? Math.max(0, Date.now() - readySince(head)) : null,
       };
     }
 
-    const [pending, processing, dead] = await Promise.all([
+    const [pending, delayed, processing, dead, headRaw] = await Promise.all([
       runQueueRedisCommand("getQueueStats:lLenPending", client.lLen(QUEUE_KEY)),
+      runQueueRedisCommand("getQueueStats:zCardDelayed", client.zCard(DELAYED_KEY)),
       runQueueRedisCommand("getQueueStats:lLenProcessing", client.lLen(PROCESSING_KEY)),
       runQueueRedisCommand("getQueueStats:lLenDead", client.lLen(DEAD_KEY)),
+      runQueueRedisCommand("getQueueStats:lIndexHead", client.lIndex(QUEUE_KEY, 0)),
     ]);
-    return { pending, processing, dead };
+    const head = headRaw ? parseJob(headRaw) : null;
+    return {
+      pending,
+      delayed,
+      processing,
+      dead,
+      oldestPendingAgeMs: head ? Math.max(0, Date.now() - readySince(head)) : null,
+    };
   } catch {
-    return { pending: -1, processing: -1, dead: -1 };
+    return { pending: -1, delayed: -1, processing: -1, dead: -1, oldestPendingAgeMs: null };
   }
 }
 
@@ -570,11 +764,12 @@ export async function retryDeadJobByIndex(index: number): Promise<boolean> {
       const job = memoryDead[queueIndex];
       if (!job) return false;
       memoryDead.splice(queueIndex, 1);
-      memoryQueue.unshift(
+      placeMemoryJob(
         normalizeJobMeta({
           ...withoutProcessingTimestamp(job),
           attempts: 0,
-        })
+        }),
+        "head"
       );
       return true;
     }
@@ -586,17 +781,14 @@ export async function retryDeadJobByIndex(index: number): Promise<boolean> {
     const removed = await removeListItemByIndex(DEAD_KEY, queueIndex);
     if (!removed || !job) return false;
 
-    await runQueueRedisCommand(
-      "retryDeadJobByIndex:lPush",
-      client.lPush(
-        QUEUE_KEY,
-        JSON.stringify(
-          normalizeJobMeta({
-            ...withoutProcessingTimestamp(job),
-            attempts: 0,
-          })
-        )
-      )
+    await placeJob(
+      client,
+      "retryDeadJobByIndex",
+      normalizeJobMeta({
+        ...withoutProcessingTimestamp(job),
+        attempts: 0,
+      }),
+      "head"
     );
 
     return true;

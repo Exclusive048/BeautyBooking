@@ -133,6 +133,7 @@ export type AdminHealthStat = {
     | "process"
     | "worker"
     | "queuePending"
+    | "queueDelayed"
     | "queueProcessing"
     | "queueDead"
     | "realtime"

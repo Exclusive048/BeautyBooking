@@ -23,9 +23,14 @@ export type SeoSectionData = {
 };
 
 export type QueueStatsView = {
+  /** Готовые к работе задачи (QUEUE-DELAYED-ZSET: отложенные сюда не входят). */
   pending: number;
+  /** Отложенные — время запуска ещё не пришло (`queue:delayed`). */
+  delayed: number;
   processing: number;
   dead: number;
+  /** Сколько ждёт первая готовая задача; `null` — очередь пуста или не прочитана. */
+  oldestPendingAgeMs: number | null;
 };
 
 export type DeadJobView = {

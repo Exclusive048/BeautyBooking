@@ -36,7 +36,7 @@ vi.mock("@/lib/notifications/notifier", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]) } }));
 vi.mock("@/lib/queue/queue", () => ({
-  getQueueStats: vi.fn().mockResolvedValue({ pending: 0, processing: 0, dead: 0 }),
+  getQueueStats: vi.fn().mockResolvedValue({ pending: 0, delayed: 0, processing: 0, dead: 0, oldestPendingAgeMs: null }),
 }));
 vi.mock("@/lib/redis/connection", () => ({ getRedisConnection: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/lib/logging/logger", async (importOriginal) => {

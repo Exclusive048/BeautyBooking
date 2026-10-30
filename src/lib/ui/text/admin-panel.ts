@@ -255,6 +255,7 @@ export const adminPanel = {
         redis: "Redis",
         process: "Процесс приложения",
         queuePending: "Очередь задач",
+        queueDelayed: "Отложенные задачи",
         queueProcessing: "Задачи в работе",
         queueDead: "Мёртвые задачи",
         realtime: "Уведомления в реальном времени",
@@ -300,8 +301,10 @@ export const adminPanel = {
       aiSpendHint: (meters: string) => `По потолкам: ${meters}. Счётчик сбрасывается в 00:00 UTC`,
       aiSpendOff: "ИИ не подключён",
       queuePendingSuffix: "ждёт",
-      queuePendingHint:
-        "Задачи в очереди Redis, включая отложенные напоминания с временем запуска в будущем",
+      queuePendingHint: "Задачи, готовые к работе и ждущие воркера. Отложенные считаются отдельно",
+      queuePendingOldest: (ago: string) => `Первая в очереди стала готовой ${ago}`,
+      queueDelayedHint:
+        "Напоминания и повторы, время запуска которых ещё не пришло. В перегрузку очереди не входят",
       metricUnavailable: "—",
       metricUnavailableHint: "Метрика появится после подключения мониторинга",
       noDataYetHint: "Данных ещё нет: появятся через минуту после старта приложения",
@@ -1125,6 +1128,7 @@ export const adminPanel = {
         refreshingLabel: "Обновляем…",
         tiles: {
           pending: "В очереди",
+          delayed: "Отложено",
           processing: "Обрабатывается",
           dead: "Мёртвых задач",
         },
