@@ -26,6 +26,7 @@ import { flushReports, reportError } from "@/lib/observability/report";
 import { processBookingReminder, reconcileBookingReminders } from "@/lib/bookings/reminders";
 import { detectPdAccessAnomalies } from "@/lib/audit/pd-access-anomaly";
 import { decideRetry } from "@/lib/queue/retry-policy";
+import { recordJobFate, settleFailedJob } from "@/lib/queue/failed-job";
 import type { Job } from "@/lib/queue/types";
 import {
   AVAILABLE_TODAY_RECOMPUTE_JOB_TYPE,
@@ -461,10 +462,16 @@ async function retryOrDeadLetter(job: Job): Promise<void> {
   });
 }
 
+/**
+ * WORKER-CATCH-REDIS-SAFE (A-08): отказ Redis при постановке повтора — не отказ
+ * обработчика. `recordJobFate` заворачивает его в `QueueBookkeepingError`, и
+ * общий `catch` оставляет задачу в processing вместо второй записи в тот же
+ * молчащий Redis (`lib/queue/failed-job.ts`).
+ */
 async function enqueueRetry(job: Job, delayMs: number): Promise<void> {
   const retryJob = { ...job };
   delete retryJob._processingStartedAt;
-  await enqueue(normalizeJobMeta(retryJob), { delayMs });
+  await recordJobFate("retry", () => enqueue(normalizeJobMeta(retryJob), { delayMs }));
 }
 
 async function ensureWorkerRedisReady(): Promise<void> {
@@ -525,7 +532,9 @@ function getJobScheduleAt(job: Job): number | null {
 }
 
 async function moveToDeadQueue(job: Job, error?: unknown): Promise<void> {
-  await enqueueDeadJob(normalizeJobMeta(job));
+  // WORKER-CATCH-REDIS-SAFE (A-08): алерт и отчёт — только после того, как
+  // задача действительно легла в мёртвые; не легла — она остаётся в processing.
+  await recordJobFate("dead-letter", () => enqueueDeadJob(normalizeJobMeta(job)));
   alertDeadJobs(1);
   // OBSERVABILITY-GLITCHTIP-01: a job that exhausted its retries is a permanent
   // silent failure — an unsent reminder, an unprocessed YooKassa webhook, an
@@ -846,21 +855,15 @@ async function processJob(job: Job): Promise<void> {
       });
     }
   } catch (error) {
-    logError("Worker job processing failed", {
-      jobId: job.id,
-      type: job.type,
-      error: error instanceof Error ? error.message : String(error),
+    // WORKER-CATCH-REDIS-SAFE (A-08): повтор или мёртвые — по таблице типа
+    // (QUEUE-RETRY-POLICY-PER-TYPE), но подтверждаем задачу, только если её
+    // судьба записана. Не записана (Redis молчит) — задача остаётся в
+    // processing до `recoverStuckJobs`, а процесс не падает.
+    const settled = await settleFailedJob(job, error, {
+      retry: enqueueRetry,
+      deadLetter: moveToDeadQueue,
     });
-
-    // QUEUE-RETRY-POLICY-PER-TYPE: сколько и когда — по таблице типа
-    // (`lib/queue/retry-policy.ts`); у типов без своей строки — прежние
-    // 60/120/180 с.
-    const decision = decideRetry(job);
-    if (decision.kind === "retry") {
-      await enqueueRetry({ ...job, attempts: decision.attempts }, decision.delayMs);
-    } else {
-      await moveToDeadQueue({ ...job, attempts: decision.attempts }, error);
-    }
+    if (!settled) return;
   }
 
   await acknowledge(job);

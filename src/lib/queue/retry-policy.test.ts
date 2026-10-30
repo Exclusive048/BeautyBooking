@@ -106,6 +106,9 @@ describe("QUEUE-RETRY-POLICY-PER-TYPE", () => {
    * @probe Заменил паузу на `60_000 * decision.attempts` в трёх вызовах (общий
    * `catch`, напоминание, `retryOrDeadLetter`) — краснеет: «expected
    * [ '60_000 * decision.attempts', …(2) ] to deeply equal []».
+   *
+   * С WORKER-CATCH-REDIS-SAFE общий `catch` живёт в `lib/queue/failed-job.ts`:
+   * его паузу из таблицы пиннит `failed-job.test.ts` поведением.
    */
   it("воркер не считает паузы повторов сам", () => {
     const worker = readFileSync(resolve(process.cwd(), "src/worker.ts"), "utf8");
