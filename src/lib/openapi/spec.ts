@@ -6555,6 +6555,59 @@ export const openApiSpec = {
         },
       },
     },
+    // PUBLIC-BOOKING-READ-TOKEN (SEC-11b, 2026-10-30): карточка записи для экрана
+    // успеха у гостя — по токену ссылки «Управлять записью», без сессии.
+    "/api/public/bookings/manage/{token}": {
+      get: {
+        summary: "Read a guest booking card (success screen) by its signed manage link",
+        tags: ["bookings"],
+        parameters: [{ name: "token", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": okResponse({
+            type: "object",
+            required: ["booking"],
+            properties: {
+              booking: {
+                type: "object",
+                required: ["id", "status", "slotLabel", "provider"],
+                properties: {
+                  id: { type: "string" },
+                  status: { type: "string" },
+                  slotLabel: { type: "string" },
+                  startAtUtc: { type: "string", format: "date-time", nullable: true },
+                  endAtUtc: { type: "string", format: "date-time", nullable: true },
+                  clientName: { type: "string", nullable: true },
+                  clientPhoneMasked: { type: "string", nullable: true },
+                  comment: { type: "string", nullable: true },
+                  service: {
+                    type: "object",
+                    nullable: true,
+                    properties: {
+                      id: { type: "string" },
+                      name: { type: "string" },
+                      price: { type: "integer" },
+                    },
+                  },
+                  provider: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      name: { type: "string" },
+                      publicUsername: { type: "string", nullable: true },
+                      address: { type: "string" },
+                      timezone: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          }),
+          "403": errorResponse("Booking belongs to an account — read it with a session"),
+          "404": errorResponse("Link is invalid or expired"),
+          "500": errorResponse("Internal error"),
+        },
+      },
+    },
     // GUEST-MANAGE-LINK (2026-09-24): управление гостевой записью по подписанной ссылке.
     "/api/public/bookings/manage/{token}/cancel": {
       post: {

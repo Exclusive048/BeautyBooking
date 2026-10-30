@@ -25,8 +25,11 @@ import {
   createInitialState,
 } from "@/features/booking/components/booking-flow/lib/flow-reducer";
 import {
+  bookingReadPath,
   clearBookingIdFromUrl,
   readBookingIdFromUrl,
+  readRememberedManageUrl,
+  rememberManageUrl,
   writeBookingIdToUrl,
 } from "@/features/booking/components/booking-flow/lib/url-state";
 import { toCanonicalPhone, maskRussianPhone } from "@/features/booking/components/booking-flow/lib/format-phone";
@@ -262,29 +265,44 @@ export function BookingFlowStepper({
     };
   }, [serviceId]);
 
-  // URL `?bookingId=` hydration — show success card on refresh / share
+  // URL `?bookingId=` hydration — show success card on refresh.
+  // PUBLIC-BOOKING-READ-TOKEN (SEC-11b): id сам карточку не открывает — гость
+  // читает по токену своей ссылки «Управлять записью» (запомнена во вкладке при
+  // создании), вошедшая сторона брони — по сессии. Токен перестал действовать
+  // (гость завёл аккаунт и вошёл) — второй попыткой читаем по сессии.
   useEffect(() => {
     const id = readBookingIdFromUrl();
     if (!id || state.phase === "success") return;
+    const rememberedManageUrl = readRememberedManageUrl(id);
     let cancelled = false;
     (async () => {
       try {
         let remote: { booking: RemoteBookingResponse };
+        let manageUrl: string | null = rememberedManageUrl;
         try {
-          remote = await fetchJson<{ booking: RemoteBookingResponse }>(
-            `/api/public/bookings/${encodeURIComponent(id)}`,
-            { cache: "no-store" },
-          );
+          try {
+            remote = await fetchJson<{ booking: RemoteBookingResponse }>(
+              bookingReadPath(id, manageUrl),
+              { cache: "no-store" },
+            );
+          } catch (error) {
+            if (!manageUrl || !(error instanceof ApiClientError)) throw error;
+            manageUrl = null;
+            remote = await fetchJson<{ booking: RemoteBookingResponse }>(
+              bookingReadPath(id, null),
+              { cache: "no-store" },
+            );
+          }
         } catch (error) {
-          // Запись по ссылке недоступна (удалена, чужая) — снять `?bookingId=`
-          // и показать выбор заново; обрыв сети — оставить как есть.
+          // Запись по ссылке недоступна (удалена, чужая, ссылки нет) — снять
+          // `?bookingId=` и показать выбор заново; обрыв сети — оставить как есть.
           if (error instanceof ApiClientError) clearBookingIdFromUrl();
           return;
         }
         if (cancelled) return;
         const booking = asConfirmedBooking(remote.booking, Boolean(me));
         if (booking) {
-          dispatch({ type: "loadConfirmedBooking", booking });
+          dispatch({ type: "loadConfirmedBooking", booking: { ...booking, manageUrl } });
         }
       } catch {
         // Silently — user can still re-create a booking.
@@ -423,8 +441,8 @@ export function BookingFlowStepper({
       }
 
       // Hydrate the success card with the data we already have locally —
-      // saves a roundtrip on first submit. The URL refresh path will fetch
-      // /api/public/bookings/[id] for the masked phone etc.
+      // saves a roundtrip on first submit. The URL refresh path re-reads the
+      // card via `bookingReadPath` (guest token or booking-side session).
       const fallbackConfirmation: ConfirmedBooking = {
         id: created.booking.id,
         // Статус — из ответа: у мастера с автоподтверждением запись сразу CONFIRMED.
@@ -446,6 +464,7 @@ export function BookingFlowStepper({
       };
 
       writeBookingIdToUrl(created.booking.id);
+      if (created.manageUrl) rememberManageUrl(created.booking.id, created.manageUrl);
       dispatch({ type: "submitSuccess", booking: fallbackConfirmation });
       // UX-PASS-01: запись создана — следующая (после отмены этой или «Записаться
       // ещё») — уже другой запрос. С прежним ключом сервер 10 минут отдавал бы
@@ -459,7 +478,7 @@ export function BookingFlowStepper({
       void (async () => {
         try {
           const detail = await fetchJson<{ booking: RemoteBookingResponse }>(
-            `/api/public/bookings/${encodeURIComponent(created.booking.id)}`,
+            bookingReadPath(created.booking.id, created.manageUrl),
             { cache: "no-store" },
           );
           const enriched = asConfirmedBooking(detail.booking, Boolean(me), {
