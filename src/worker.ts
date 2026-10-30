@@ -182,10 +182,20 @@ function startPeriodicJobs() {
   // once at startup (fresh values immediately post-deploy, not all-`false`
   // until the first tick) + every 30 min. The sweep is engine-safe (a pure
   // read + a column write; slot-gen untouched).
+  //
+  // AVAILABLE-TODAY-SWEEP-WRITE (B-06): проходы не накладываются. Свип считает
+  // каждому провайдеру ещё и снимок `freeSlotKeys` на 30 дней — самая тяжёлая
+  // часть прохода; при медленной базе он может идти дольше интервала, и второй
+  // проход рядом удвоил бы нагрузку и писал бы поверх первого.
+  const availableTodaySweep = createNoOverlapRunner(() => recomputeAvailableToday());
   const runAvailableTodaySweep = () => {
-    void recomputeAvailableToday()
-      .then((summary) => {
-        logInfo("availableToday.recompute.done", summary);
+    void availableTodaySweep()
+      .then((result) => {
+        if (!result.ran) {
+          logInfo("availableToday.recompute.skipped", { reason: "previous-sweep-running" });
+          return;
+        }
+        logInfo("availableToday.recompute.done", result.value);
       })
       .catch((error) => {
         logError("availableToday.recompute.failed", {

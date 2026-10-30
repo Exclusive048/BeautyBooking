@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // minimal-write → studio fan-out) from the engine + DB. The salon-tz 'today'
 // derivation lives INSIDE the (here-mocked) probe helpers and is covered by
 // available-today.test.ts (Vision +5); this suite pins the recompute logic.
-const { findUnique, updateMany } = vi.hoisted(() => ({
+const { findUnique, findMany, updateMany } = vi.hoisted(() => ({
   findUnique: vi.fn(),
+  findMany: vi.fn(),
   updateMany: vi.fn(),
 }));
 const { providerHasFreeSlotToday, hasFreeSlotToday } = vi.hoisted(() => ({
@@ -15,7 +16,7 @@ const { providerHasFreeSlotToday, hasFreeSlotToday } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { provider: { findUnique, updateMany } },
+  prisma: { provider: { findUnique, findMany, updateMany } },
 }));
 vi.mock("@/lib/schedule/available-today", () => ({
   providerHasFreeSlotToday,
@@ -30,7 +31,7 @@ vi.mock("@/lib/schedule/free-slot-keys", () => ({
   sameFreeSlotKeys: () => true,
 }));
 
-import { recomputeAvailableTodayForProvider } from "./recompute-available-today";
+import { recomputeAvailableToday, recomputeAvailableTodayForProvider } from "./recompute-available-today";
 
 const NOW = new Date("2026-07-10T08:00:00.000Z");
 
@@ -186,6 +187,78 @@ describe("recomputeAvailableTodayForProvider — resilience", () => {
     expect(updateMany).not.toHaveBeenCalled();
     expect(summary.errored).toBe(1);
     expect(summary.erroredIds).toEqual(["m1"]);
+  });
+});
+
+/**
+ * AVAILABLE-TODAY-SWEEP-WRITE (B-06) — свип пишет флаг сразу после пробы
+ * провайдера и условием `not: free`, а не пачкой в конце прохода по снимку
+ * начала.
+ *
+ * @probe Вернул пропуск по снимку начала прохода (`if (free ===
+ * provider.availableToday) continue;` перед записью) — краснеют «каждый
+ * провайдер пишется сразу…»: «expected [ 'probe:m1', 'write:m1', 'probe:m2' ]
+ * to deeply equal [ 'probe:m1', 'write:m1', …(2) ]» и «снимок начала прохода
+ * устарел…»: «expected "vi.fn()" to be called with arguments: [ { where: { id:
+ * 'm1', …(1) }, …(1) } ]». Убрал условие `availableToday: { not: free }` из
+ * `where` — краснеют все три: «expected [ { where: { id: 'm1' }, …(1) }, …(1) ]
+ * to deeply equal [ { …(2) }, { …(2) } ]».
+ */
+describe("recomputeAvailableToday — свип (AVAILABLE-TODAY-SWEEP-WRITE)", () => {
+  it("каждый провайдер пишется сразу после своей пробы, условием not: free", async () => {
+    findMany.mockResolvedValue([master({ id: "m1", availableToday: true }), master({ id: "m2", availableToday: false })]);
+    const events: string[] = [];
+    providerHasFreeSlotToday.mockImplementation(async (provider: { id: string }) => {
+      events.push(`probe:${provider.id}`);
+      return false;
+    });
+    updateMany.mockImplementation(async (args: { where: { id: string } }) => {
+      events.push(`write:${args.where.id}`);
+      return { count: args.where.id === "m1" ? 1 : 0 };
+    });
+
+    const summary = await recomputeAvailableToday(NOW);
+
+    // Запись m1 — до пробы m2: значение не лежит в памяти весь проход.
+    expect(events).toEqual(["probe:m1", "write:m1", "probe:m2", "write:m2"]);
+    expect(updateMany.mock.calls.map((call) => call[0])).toEqual([
+      { where: { id: "m1", availableToday: { not: false } }, data: { availableToday: false } },
+      { where: { id: "m2", availableToday: { not: false } }, data: { availableToday: false } },
+    ]);
+    // `changed` — строки, перевёрнутые на деле, а не расхождения со снимком.
+    expect(summary).toMatchObject({ total: 2, changed: 1, errored: 0 });
+  });
+
+  it("снимок начала прохода устарел — посчитанное значение всё равно доходит до базы", async () => {
+    // В начале прохода было true; пока свип шёл, точечный пересчёт записал
+    // false, а к пробе m1 окошко снова свободно. Пропуск «как в снимке» оставил
+    // бы в базе false.
+    findMany.mockResolvedValue([master({ id: "m1", availableToday: true })]);
+    providerHasFreeSlotToday.mockResolvedValue(true);
+    updateMany.mockResolvedValue({ count: 1 });
+
+    const summary = await recomputeAvailableToday(NOW);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "m1", availableToday: { not: true } },
+      data: { availableToday: true },
+    });
+    expect(summary.changed).toBe(1);
+  });
+
+  it("сбой пробы одного провайдера: прежнее значение, проход идёт дальше", async () => {
+    findMany.mockResolvedValue([master({ id: "m1" }), studio({ id: "s1", availableToday: false })]);
+    providerHasFreeSlotToday.mockRejectedValue(new Error("engine down"));
+    hasFreeSlotToday.mockResolvedValue(true);
+
+    const summary = await recomputeAvailableToday(NOW);
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "s1", availableToday: { not: true } },
+      data: { availableToday: true },
+    });
+    expect(summary).toMatchObject({ total: 2, changed: 1, errored: 1, erroredIds: ["m1"] });
   });
 });
 
