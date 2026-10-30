@@ -61,7 +61,7 @@
 | V7 | Redis `--maxmemory-policy noeviction` задан явно | compose + `queue/redis-eviction-policy.test.ts` |
 | V8 | `statement_timeout=30000` ставит приложение | живая проверка: `SHOW statement_timeout` → `30s`, `pg_sleep` отменяется с `57014` (RES-24) |
 | V9 | `stop_grace_period` app 30 с / worker 60 с | compose (RES-16). ⚠️ действует **только** если стек поднимается этим compose-файлом — см. D9 |
-| V10 | Откат: `:previous` тегируется **до** сборки | `deploy.yml` шаг 2/6 + симуляция (CI-DEPLOY-NOREGISTRY-01) |
+| V10 | Откат: `:previous` тегируется **до** сборки — от образа **работающего** контейнера, не от `:latest` (сборка, упавшая на середине, уже переписала `:latest`) | `deploy.yml` шаг 2/7 + симуляция (CI-DEPLOY-NOREGISTRY-01, PRISMA-ENGINE-DOWNLOAD) + `scripts/prisma-engine-download.test.ts` |
 | V11 | `/api/health` — **живость** (без I/O к зависимостям); `/api/health/ready` — готовность, граница 2 с | FIX-C2, `lib/health/probe.ts` + `api/health/health-probe-contract.test.ts` |
 | V12 | Автооткат деплоя гейтится **только `db`** | `deploy.yml` 6/6: `*'"db":"ok"'*` → пропуск, иначе `rollback_and_fail`; Redis только печатается в лог |
 | V13 | `.env.production.example` в локстепе с build-args compose | замер FIX-C9: **13 из 13** `NEXT_PUBLIC_*` присутствуют |
