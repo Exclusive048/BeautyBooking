@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { logError } from "@/lib/logging/logger";
+import { isAlertEmailConfigured, sendAlertEmail } from "@/lib/monitoring/alert-email";
 import { scrubString } from "@/lib/observability/scrub";
 
 export type AlertLevel = "critical" | "error" | "warning";
@@ -161,6 +162,10 @@ function formatAlertValue(value: unknown): string {
   return text.length > MAX_ALERT_VALUE_LENGTH ? `${text.slice(0, MAX_ALERT_VALUE_LENGTH)}…` : text;
 }
 
+/**
+ * Строки контекста без разметки — общие для Telegram и письма
+ * (ALERT-EMAIL-CHANNEL): оба канала получают ровно разрешённое и очищенное.
+ */
 function formatContext(context?: AlertContext): string[] {
   if (!context) return [];
   const lines: string[] = [];
@@ -171,7 +176,7 @@ function formatContext(context?: AlertContext): string[] {
       omitted += 1;
       continue;
     }
-    lines.push(`${escapeHtml(key)}: ${escapeHtml(formatAlertValue(value))}`);
+    lines.push(`${key}: ${formatAlertValue(value)}`);
   }
   // Число, а не имена: имена полей из разобранного внешнего JSON (`...details`)
   // выбирает не код.
@@ -179,36 +184,22 @@ function formatContext(context?: AlertContext): string[] {
   return lines;
 }
 
-export async function sendAlert(
+async function sendTelegramMessage(
+  token: string,
+  chatId: string,
   level: AlertLevel,
   message: string,
-  context?: AlertContext
+  context: AlertContext | undefined,
+  title: string,
+  contextLines: string[],
+  timestamp: string,
 ): Promise<void> {
-  if (env.NODE_ENV !== "production") return;
-
-  const token = env.MONITORING_TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = env.MONITORING_TELEGRAM_CHAT_ID?.trim();
-  if (!token || !chatId) {
-    logError(message, {
-      level,
-      ...(context ?? {}),
-      __skipAlert: true,
-    });
-    return;
-  }
-
   const { emoji, label } = LEVEL_LABELS[level];
-  const contextLines = formatContext(context);
-  const parts = [
-    `${emoji} ${label}`,
-    "",
-    // Заголовок — тоже через скраббер: тексты `logError` бывают с подстановками.
-    `[МастерРядом] ${emoji} ${escapeHtml(scrubString(message))}`,
-  ];
+  const parts = [`${emoji} ${label}`, "", `[МастерРядом] ${emoji} ${escapeHtml(title)}`];
   if (contextLines.length > 0) {
-    parts.push("", ...contextLines);
+    parts.push("", ...contextLines.map(escapeHtml));
   }
-  parts.push("", `🕐 ${formatUtcTimestamp(new Date())}`);
+  parts.push("", `🕐 ${timestamp}`);
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -240,3 +231,43 @@ export async function sendAlert(
   }
 }
 
+function buildAlertEmail(level: AlertLevel, title: string, contextLines: string[], timestamp: string) {
+  const { label } = LEVEL_LABELS[level];
+  const parts = [label, "", title];
+  if (contextLines.length > 0) parts.push("", ...contextLines);
+  parts.push("", timestamp);
+  return { level, subject: `[МастерРядом] ${label}: ${title}`, text: parts.join("\n") };
+}
+
+export async function sendAlert(
+  level: AlertLevel,
+  message: string,
+  context?: AlertContext
+): Promise<void> {
+  if (env.NODE_ENV !== "production") return;
+
+  const token = env.MONITORING_TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = env.MONITORING_TELEGRAM_CHAT_ID?.trim();
+  const telegram = Boolean(token && chatId);
+  const email = isAlertEmailConfigured();
+  if (!telegram && !email) {
+    logError(message, {
+      level,
+      ...(context ?? {}),
+      __skipAlert: true,
+    });
+    return;
+  }
+
+  // Заголовок — тоже через скраббер: тексты `logError` бывают с подстановками.
+  const title = scrubString(message);
+  const contextLines = formatContext(context);
+  const timestamp = formatUtcTimestamp(new Date());
+
+  await Promise.all([
+    telegram && token && chatId
+      ? sendTelegramMessage(token, chatId, level, message, context, title, contextLines, timestamp)
+      : undefined,
+    email ? sendAlertEmail(buildAlertEmail(level, title, contextLines, timestamp)) : undefined,
+  ]);
+}
