@@ -17,18 +17,23 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const providerFindUnique = vi.hoisted(() => vi.fn());
 const providerFindMany = vi.hoisted(() => vi.fn());
 const serviceFindUnique = vi.hoisted(() => vi.fn());
+const serviceFindMany = vi.hoisted(() => vi.fn());
 const masterServiceFindUnique = vi.hoisted(() => vi.fn());
 const masterServiceFindMany = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     provider: { findUnique: providerFindUnique, findMany: providerFindMany },
-    service: { findUnique: serviceFindUnique },
+    service: { findUnique: serviceFindUnique, findMany: serviceFindMany },
     masterService: { findUnique: masterServiceFindUnique, findMany: masterServiceFindMany },
   },
 }));
 
-import { resolveServiceDuration, resolveServiceDurations } from "@/lib/schedule/resolveDuration";
+import {
+  resolveProfileServiceDurations,
+  resolveServiceDuration,
+  resolveServiceDurations,
+} from "@/lib/schedule/resolveDuration";
 
 const SERVICE_ID = "svc_1";
 const STUDIO_ID = "studio_1";
@@ -302,5 +307,68 @@ describe("PERF-24 · мастер и услуга читаются одним з
 
     expect(providerFindUnique).toHaveBeenCalledTimes(1);
     expect(serviceFindUnique).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * SLOTS-GAP-PACKING — набор длительностей, которыми движок окошек проверяет,
+ * можно ли заполнить свободный промежуток. Правило «что профиль продаёт и
+ * сколько это длится» — то же `decideServiceDuration`, что у одной услуги:
+ * своя услуга — её длительность, услуга студии — только со связью и с
+ * переопределением мастера.
+ *
+ * @probe 2026-10-30 — во втором цикле `override` заменён на `null`: красный
+ * «профиль в студии: свои услуги и услуги студии по связям» (студийные
+ * длительности выпали — получено [30]). Возвращено — зелёный.
+ */
+describe("SLOTS-GAP-PACKING · длительности услуг профиля", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("соло-мастер: свои услуги, без повторов и по возрастанию; связи студии не читаются", async () => {
+    providerFindUnique.mockResolvedValue(SOLO);
+    serviceFindMany.mockResolvedValue([
+      { ...STUDIO_SERVICE, id: "a", providerId: SOLO.id, durationMin: 60 },
+      { ...STUDIO_SERVICE, id: "b", providerId: SOLO.id, durationMin: 20 },
+      { ...STUDIO_SERVICE, id: "c", providerId: SOLO.id, durationMin: 60 },
+    ]);
+
+    expect(await resolveProfileServiceDurations(SOLO.id)).toEqual([20, 60]);
+    expect(serviceFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { providerId: SOLO.id, isEnabled: true, isActive: true } })
+    );
+    expect(masterServiceFindMany).not.toHaveBeenCalled();
+  });
+
+  it("профиль в студии: свои услуги и услуги студии по связям", async () => {
+    providerFindUnique.mockResolvedValue(IN_STUDIO);
+    serviceFindMany.mockResolvedValue([
+      { ...STUDIO_SERVICE, id: "own", providerId: IN_STUDIO.id, durationMin: 30 },
+    ]);
+    masterServiceFindMany.mockResolvedValue([
+      { durationOverrideMin: 90, isEnabled: true, service: STUDIO_SERVICE },
+      { durationOverrideMin: null, isEnabled: true, service: { ...STUDIO_SERVICE, id: "svc_2", durationMin: 45 } },
+    ]);
+
+    expect(await resolveProfileServiceDurations(IN_STUDIO.id)).toEqual([30, 45, 90]);
+    expect(masterServiceFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          masterProviderId: IN_STUDIO.id,
+          isEnabled: true,
+          service: { providerId: STUDIO_ID, isEnabled: true, isActive: true },
+        },
+      })
+    );
+  });
+
+  it("не мастер или нет строки — пустой набор, услуги не читаются", async () => {
+    providerFindUnique.mockResolvedValue(NOT_A_MASTER);
+    expect(await resolveProfileServiceDurations(NOT_A_MASTER.id)).toEqual([]);
+    providerFindUnique.mockResolvedValue(null);
+    expect(await resolveProfileServiceDurations("missing")).toEqual([]);
+    expect(serviceFindMany).not.toHaveBeenCalled();
+    expect(masterServiceFindMany).not.toHaveBeenCalled();
   });
 });

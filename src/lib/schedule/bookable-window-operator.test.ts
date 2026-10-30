@@ -12,8 +12,8 @@ const SOON = "2026-09-23T09:30:00.000Z"; // раньше отсечки «за 2
 const LATER = "2026-09-23T14:00:00.000Z";
 const FAR = "2026-10-10T10:00:00.000Z"; // за горизонтом двухнедельного окна
 
-vi.mock("@/lib/schedule/usecases", () => ({
-  listAvailabilitySlotsPaginated: vi.fn(async () => ({
+const listAvailabilitySlotsPaginated = vi.hoisted(() =>
+  vi.fn(async () => ({
     ok: true as const,
     data: {
       slots: [PAST, SOON, LATER, FAR].map((startAtUtc) => ({
@@ -23,8 +23,10 @@ vi.mock("@/lib/schedule/usecases", () => ({
       })),
       meta: { fromDate: "2026-09-23", toDateExclusive: "2026-09-24" },
     },
-  })),
-}));
+  }))
+);
+
+vi.mock("@/lib/schedule/usecases", () => ({ listAvailabilitySlotsPaginated }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -55,6 +57,32 @@ describe("listBookableSlots · окно оператора", () => {
 
   it("с флагом — ближайшее окошко видно, прошедшее нет", async () => {
     expect(await starts(true)).toEqual([SOON, LATER, FAR]);
+  });
+
+  // SLOTS-GAP-PACKING: отбор «без дыр» — правило клиентской выдачи. Оператор
+  // выбирает время сам (ручная запись начала по движку не сверяет), поэтому
+  // видит все свободные начала.
+  //
+  // @probe 2026-10-30 — `packing: !input.operatorWindow` заменён на `true`:
+  // красный «окошки оператора — без отбора». Возвращено — зелёный.
+  it("окошки клиента — с отбором «без дыр», окошки оператора — без", async () => {
+    listAvailabilitySlotsPaginated.mockClear();
+    await starts();
+    expect(listAvailabilitySlotsPaginated).toHaveBeenCalledWith(
+      "prov1",
+      "svc1",
+      60,
+      expect.objectContaining({ packing: true })
+    );
+
+    listAvailabilitySlotsPaginated.mockClear();
+    await starts(true);
+    expect(listAvailabilitySlotsPaginated).toHaveBeenCalledWith(
+      "prov1",
+      "svc1",
+      60,
+      expect.objectContaining({ packing: false })
+    );
   });
 });
 

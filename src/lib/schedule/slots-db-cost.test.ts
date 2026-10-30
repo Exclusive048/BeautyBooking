@@ -110,6 +110,8 @@ function primeSlotCacheForDays(dateKeys: string[]): void {
       timeZone: TIMEZONE,
       scheduleVersion: SCHEDULE_VERSION,
       publishedUntilLocal,
+      // SLOTS-GAP-PACKING: клиентская выдача — с отбором «без дыр».
+      packing: true,
     });
     store.set(key, [
       {

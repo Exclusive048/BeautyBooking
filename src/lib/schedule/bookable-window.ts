@@ -114,6 +114,9 @@ export async function listBookableSlots(input: {
     limit,
     excludeBookingId: input.excludeBookingId,
     extraStartsUtc: input.extraStartsUtc,
+    // SLOTS-GAP-PACKING: оператор видит все свободные начала — время выбирает
+    // он, а ручная запись начала по движку не сверяет.
+    packing: !input.operatorWindow,
   });
   if (!result.ok) {
     return { ok: false, status: result.status, code: result.code, message: result.message };

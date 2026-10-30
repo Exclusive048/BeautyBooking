@@ -312,3 +312,142 @@ describe("schedule/slots — начала «впритык»", () => {
     expect(times(slots)).not.toContain("13:15");
   });
 });
+
+describe("schedule/slots — окошки без дыр (SLOTS-GAP-PACKING)", () => {
+  const day = (start: string, end: string, extra: Partial<DayPlan> = {}): DayPlan => ({
+    isWorking: true,
+    workingIntervals: [{ start, end }],
+    breaks: [],
+    meta: { source: "weekly-template" as const },
+    ...extra,
+  });
+  const at = (hm: string) => new Date(`2026-03-03T${hm}:00Z`);
+  const booking = (from: string, to: string) => ({ startAtUtc: at(from), endAtUtc: at(to) });
+  const times = (slots: Array<{ label: string }>) => slots.map((slot) => slot.label.slice(-5));
+  const base = {
+    dateKey: "2026-03-03",
+    timeZone: "UTC",
+    serviceDurationMin: 20,
+    bufferMin: 0,
+    slotStepMin: 15,
+    now: new Date("2026-03-02T05:00:00Z"),
+    packingDurationsMin: [20],
+  };
+
+  // Сценарий владельца: запись 6:10–6:30, услуга 20 минут, шаг 15. Раньше
+  // предлагались 6:30, 6:45, 7:00: клиент, бравший 6:45, оставлял 15 минут,
+  // куда не встаёт ни одна запись.
+  it("не предлагает 6:45 после записи 6:10–6:30 и предлагает 6:50", () => {
+    const labels = times(
+      buildSlotsForDay({ ...base, dayPlan: day("06:00", "21:00"), bookings: [booking("06:10", "06:30")] }),
+    );
+    expect(labels.filter((label) => label <= "07:30")).toEqual(["06:30", "06:50", "07:10", "07:30"]);
+  });
+
+  it("без набора услуг — прежние окошки (окно оператора)", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        packingDurationsMin: undefined,
+        dayPlan: day("06:00", "21:00"),
+        bookings: [booking("06:10", "06:30")],
+      }),
+    );
+    expect(labels.filter((label) => label <= "07:00")).toEqual(["06:30", "06:45", "07:00"]);
+  });
+
+  // Простое «не оставлять промежуток короче услуги» здесь отказало бы: после
+  // 20 минут останется 5. Остаток неизбежен — он уходит к концу промежутка.
+  it("ставит 20 минут в промежуток 25 — вплотную к записи до него", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("10:00", "12:00"),
+        bookings: [booking("10:00", "10:20"), booking("10:45", "11:05")],
+      }),
+    );
+    expect(labels).toContain("10:20");
+    expect(labels).not.toContain("10:25");
+  });
+
+  it("учитывает паузу мастера между записями", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        bufferMin: 5,
+        dayPlan: day("10:00", "12:00"),
+        bookings: [booking("10:00", "10:20")],
+      }),
+    );
+    // Запись с паузой занимает 25 минут: 10:25, 10:50, 11:15, 11:40.
+    expect(labels).toEqual(["10:25", "10:50", "11:15", "11:40"]);
+  });
+
+  it("считает промежуток всеми услугами профиля, а не только выбранной", () => {
+    const only30 = times(
+      buildSlotsForDay({ ...base, serviceDurationMin: 30, packingDurationsMin: [30], dayPlan: day("10:00", "12:00"), bookings: [] }),
+    );
+    const with45 = times(
+      buildSlotsForDay({ ...base, serviceDurationMin: 30, packingDurationsMin: [30, 45], dayPlan: day("10:00", "12:00"), bookings: [] }),
+    );
+    // До 10:45 — 45 минут: одной услугой на 30 не заполнить, услугой на 45 — да.
+    expect(only30).not.toContain("10:45");
+    expect(with45).toContain("10:45");
+  });
+
+  // Цена правила, принятая сознательно: промежуток 90 минут при услугах 20 и
+  // 45 целиком заполняют только две по 45 — короткая его бы испортила.
+  it("бережёт промежуток под услуги, которые заполняют его целиком", () => {
+    const short = times(
+      buildSlotsForDay({ ...base, packingDurationsMin: [20, 45], dayPlan: day("10:00", "11:30"), bookings: [] }),
+    );
+    const long = times(
+      buildSlotsForDay({
+        ...base,
+        serviceDurationMin: 45,
+        packingDurationsMin: [20, 45],
+        dayPlan: day("10:00", "11:30"),
+        bookings: [],
+      }),
+    );
+    expect(short).toEqual([]);
+    expect(long).toEqual(["10:00", "10:45"]);
+  });
+
+  it("сегодня не считает дырой время до «сейчас»", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("09:00", "12:00"),
+        bookings: [],
+        now: new Date("2026-03-03T10:07:00Z"),
+      }),
+    );
+    // От 9:00 до 10:15 — 75 минут, но продать их уже нельзя: 10:15 годится.
+    expect(labels[0]).toBe("10:15");
+  });
+
+  it("переданные начала (курсор пакета) отбор не проходят", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("10:00", "12:00"),
+        bookings: [booking("10:00", "10:20")],
+        extraStartsUtc: [at("10:35")],
+      }),
+    );
+    expect(labels).toContain("10:35");
+    expect(labels).not.toContain("10:30");
+  });
+
+  it("не трогает день «Фиксированное время»", () => {
+    const labels = times(
+      buildSlotsForDay({
+        ...base,
+        dayPlan: day("10:00", "12:00", { fixedStarts: ["10:00", "10:35", "11:00"] }),
+        bookings: [],
+      }),
+    );
+    expect(labels).toEqual(["10:00", "10:35", "11:00"]);
+  });
+});

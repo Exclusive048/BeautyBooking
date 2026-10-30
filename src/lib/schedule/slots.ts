@@ -39,6 +39,16 @@ type BuildSlotsInput = {
    * не берут.
    */
   extraStartsUtc?: Date[];
+  /**
+   * SLOTS-GAP-PACKING (2026-10-30, решение владельца): длительности услуг,
+   * которые профиль продаёт, — чем ещё можно заполнить свободный промежуток.
+   * Задано — день не предлагает начала, которые оставляют в нём дыру, не
+   * заполнимую никакой комбинацией этих услуг (`isPackingStart`), а к
+   * кандидатам добавляются начала «подряд» этой услуги. Не задано — прежние
+   * кандидаты без отбора: ручная запись оператора и пробы «свободно сегодня»,
+   * фильтра «когда» и ближайшего окошка профиля.
+   */
+  packingDurationsMin?: number[];
 };
 
 type BlockInterval = { start: number; end: number };
@@ -118,6 +128,116 @@ function buildFlushStarts(input: {
     starts.push(item.end, item.start - input.durationMin);
   }
   return starts;
+}
+
+/**
+ * SLOTS-GAP-PACKING — начала «подряд»: от начала рабочего отрезка и от конца
+ * каждого занятого куска — запись за записью этой услуги с паузой мастера, до
+ * следующего занятого. Без них после записи 6:10–6:30 (20 минут, шаг 15) были
+ * только 6:30 и сетка 6:45, 7:00: клиент, которому удобно около 6:50, брал 6:45
+ * и оставлял 15 минут, куда не помещается ни одна услуга.
+ */
+function buildChainStarts(input: {
+  windowStart: number;
+  windowEnd: number;
+  durationMin: number;
+  bufferMin: number;
+  busy: BlockInterval[];
+}): number[] {
+  const step = input.durationMin + input.bufferMin;
+  const starts: number[] = [];
+  const anchors = [input.windowStart, ...input.busy.map((item) => item.end)];
+  for (const anchor of anchors) {
+    if (anchor < input.windowStart || anchor >= input.windowEnd) continue;
+    // `busy` слит и отсортирован: первый кусок, начинающийся после якоря, — граница цепочки.
+    const nextBusy = input.busy.find((item) => item.start >= anchor);
+    const limit = Math.min(input.windowEnd, nextBusy ? nextBusy.start : input.windowEnd);
+    for (let t = anchor + step; t + input.durationMin <= limit; t += step) {
+      starts.push(t);
+    }
+  }
+  return starts;
+}
+
+/**
+ * SLOTS-GAP-PACKING — сколько минут промежутка заполнят услуги профиля.
+ * `best[c]` — наибольшая сумма весов не больше `c`, вес услуги — длительность
+ * плюс пауза мастера (пауза стоит между соседними записями). Неограниченный
+ * рюкзак по минутам суток: несколько тысяч операций на день.
+ */
+function buildPackingTable(durations: number[], bufferMin: number, capacity: number): Int32Array {
+  const weights = Array.from(new Set(durations))
+    .filter((value) => Number.isInteger(value) && value > 0)
+    .map((value) => value + bufferMin);
+  const reachable = new Uint8Array(capacity + 1);
+  reachable[0] = 1;
+  for (let c = 1; c <= capacity; c += 1) {
+    for (const weight of weights) {
+      if (weight <= c && reachable[c - weight]) {
+        reachable[c] = 1;
+        break;
+      }
+    }
+  }
+  const best = new Int32Array(capacity + 1);
+  for (let c = 1; c <= capacity; c += 1) {
+    best[c] = reachable[c] ? c : best[c - 1];
+  }
+  return best;
+}
+
+/**
+ * SLOTS-GAP-PACKING (2026-10-30, решение владельца) — не оставляет ли начало
+ * дыру, которую потом нечем заполнить. Свободный отрезок, где стоит начало,
+ * ограничен занятым (запись с паузой, перерыв, блокировка) или краем рабочего
+ * отрезка. Начало годится, если:
+ *   1. ДО него не остаётся минут, которые не заполнить услугами профиля, —
+ *      неизбежный остаток отрезка уходит к его концу, а не дырой к записи;
+ *   2. до и после него вместе пропадает не больше минут, чем пропадает в этом
+ *      отрезке при лучшей раскладке без него.
+ * Пример: запись 6:10–6:30, услуги по 20 минут — 6:45 не предлагается (6:30–6:45
+ * не заполнить), 6:50 предлагается. Простое «не оставлять промежуток короче
+ * самой короткой услуги» хуже прежнего: оно не даёт поставить 20 минут в
+ * промежуток 25 (симуляция плотного дня: −2…−18% записей против прежней
+ * выдачи; это правило в том же прогоне даёт +5…+13%, а при сетке шагом во всю
+ * длительность услуги — без изменений).
+ *
+ * Сегодня левый край — «сейчас», если оно позже занятого: время до «сейчас» не
+ * продать всё равно, и проверяется только то, что остаётся ПОСЛЕ начала.
+ * Вес услуги — длительность плюс пауза; ёмкость отрезка без начала — его длина
+ * плюс пауза (паузы стоят только МЕЖДУ записями).
+ */
+function isPackingStart(input: {
+  start: number;
+  durationMin: number;
+  bufferMin: number;
+  windowStart: number;
+  windowEnd: number;
+  earliest: number;
+  busy: BlockInterval[];
+  best: Int32Array;
+}): boolean {
+  const waste = (capacity: number): number => {
+    if (capacity <= 0) return 0;
+    const clamped = Math.min(capacity, input.best.length - 1);
+    return capacity - input.best[clamped];
+  };
+
+  let prev = input.windowStart;
+  let next = input.windowEnd;
+  for (const item of input.busy) {
+    if (item.end <= input.start && item.end > prev) prev = item.end;
+    if (item.start >= input.start + input.durationMin && item.start < next) next = item.start;
+  }
+  const after = next - (input.start + input.durationMin);
+
+  if (input.earliest > prev) {
+    return waste(after) <= waste(next - input.start + input.bufferMin);
+  }
+
+  const before = input.start - prev;
+  if (waste(before) > 0) return false;
+  return waste(before) + waste(after) <= waste(next - prev + input.bufferMin);
 }
 
 export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
@@ -204,6 +324,18 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
           const parts = getLocalTimeParts(value, input.timeZone);
           return parts.hour * 60 + parts.minute;
         });
+  // SLOTS-GAP-PACKING: переданные начала отбор не проходят — это курсор пакета
+  // (следующая услуга встанет вплотную к предыдущей, которой ещё нет в записях)
+  // и время, которое проверяет запись, уже показанное клиенту.
+  const exemptStarts = new Set(extraStarts);
+  const packingTable =
+    !fixedStarts && input.packingDurationsMin
+      ? buildPackingTable(
+          [...input.packingDurationsMin, input.serviceDurationMin],
+          input.bufferMin,
+          24 * 60 + input.bufferMin,
+        )
+      : null;
 
   for (const interval of input.dayPlan.workingIntervals) {
     const windowStart = timeToMinutes(interval.start);
@@ -233,6 +365,15 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
                 durationMin: input.serviceDurationMin,
                 busy: busyIntervals,
               }),
+              ...(packingTable
+                ? buildChainStarts({
+                    windowStart,
+                    windowEnd,
+                    durationMin: input.serviceDurationMin,
+                    bufferMin: input.bufferMin,
+                    busy: busyIntervals,
+                  })
+                : []),
               ...extraStarts,
             ].filter(
               (t) => t >= windowStart && t >= earliest && t + input.serviceDurationMin <= windowEnd,
@@ -274,6 +415,23 @@ export function buildSlotsForDay(input: BuildSlotsInput): AvailabilitySlot[] {
             return startUtc < bufferedEnd && endUtc > bufferedStart;
           });
       if (hasConflict) continue;
+
+      if (
+        packingTable &&
+        !exemptStarts.has(t) &&
+        !isPackingStart({
+          start: t,
+          durationMin: input.serviceDurationMin,
+          bufferMin: input.bufferMin,
+          windowStart,
+          windowEnd,
+          earliest,
+          busy: busyIntervals,
+          best: packingTable,
+        })
+      ) {
+        continue;
+      }
 
       slots.push({
         startAtUtc: startUtc,

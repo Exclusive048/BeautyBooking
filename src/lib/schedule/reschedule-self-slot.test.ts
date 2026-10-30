@@ -86,6 +86,8 @@ function slotCacheKey(dateKey: string): string {
       nowUtc: new Date(),
       timeZone: TIMEZONE,
     }),
+    // SLOTS-GAP-PACKING: клиентская выдача — с отбором «без дыр».
+    packing: true,
   });
 }
 

@@ -90,6 +90,30 @@ describe("schedule/slotsCache", () => {
     expect(buildSlotsCacheKey({ ...input, extraStartMinutes: [29_542_340] }).startsWith("slots:m1:")).toBe(true);
   });
 
+  // SLOTS-GAP-PACKING: клиентская выдача (с отбором «без дыр») и выдача
+  // оператора — разные наборы окошек одного дня, поэтому разные записи кэша.
+  // Без флага ключ прежний: операторская выдача читает то же, что и раньше.
+  it("keys the gap-packed listing with :pk before the extra-starts suffix", () => {
+    const input = {
+      masterId: "m1",
+      dateKey: "2026-03-03",
+      serviceId: "s1",
+      serviceDuration: 20,
+      bufferMin: 0,
+      slotStepMin: 15,
+      timeZone: "UTC",
+      scheduleVersion: "v1",
+      publishedUntilLocal: "2026-04-01",
+    };
+    const plain = buildSlotsCacheKey(input);
+    expect(buildSlotsCacheKey({ ...input, packing: false })).toBe(plain);
+    expect(buildSlotsCacheKey({ ...input, packing: true })).toBe(`${plain}:pk`);
+    expect(buildSlotsCacheKey({ ...input, packing: true, extraStartMinutes: [29_542_340] })).toBe(
+      `${plain}:pk:x29542340`
+    );
+    expect(buildSlotsCacheKey({ ...input, packing: true }).startsWith("slots:m1:")).toBe(true);
+  });
+
   it("stores slots and registers index", async () => {
     cacheGet.mockResolvedValueOnce(null);
     await setCachedSlotsForDate({
