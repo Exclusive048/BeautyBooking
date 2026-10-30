@@ -10,8 +10,9 @@ import { deflateRawSync } from "node:zlib";
  * админки; формул, стилей сверх жирного заголовка и нескольких листов нет
  * намеренно — библиотека ради них (exceljs ≈ 1 МБ) не окупается.
  *
- * Формат: OOXML SpreadsheetML внутри ZIP (deflate). CRC-32 считается здесь же,
- * а не `zlib.crc32` — его нет в ранних сборках Node 20, на котором собран образ.
+ * Формат: OOXML SpreadsheetML внутри ZIP (deflate). CRC-32 считается здесь же:
+ * писалось под Node 20, где `zlib.crc32` был не во всех сборках; на Node 26 он
+ * есть, но замена ничего не даёт.
  */
 
 export type XlsxCell = string | number | null;

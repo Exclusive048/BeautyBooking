@@ -180,7 +180,7 @@ services:
       # подменяет ответ страницей работ из сервиса maintenance.
       - "traefik.http.routers.web.middlewares=maintenance-html"
     healthcheck:
-      # Node 20 ships a global fetch(), so no curl/wget is needed in the slim
+      # Node (18+) ships a global fetch(), so no curl/wget is needed in the slim
       # runner image.
       #
       # FIX-C2: /api/health is a LIVENESS probe — "can this process serve at

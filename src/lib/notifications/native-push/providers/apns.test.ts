@@ -192,7 +192,9 @@ describe("APNS-SESSION-RESET — HTTP/2-транспорт", () => {
     });
     server.on("stream", (stream) => {
       stream.on("error", () => {});
-      onStream(stream, streams++);
+      // @types/node 26 типизирует поток события как общий `Http2Stream`, хотя
+      // у сервера это всегда `ServerHttp2Stream` (у него `respond`).
+      onStream(stream as http2.ServerHttp2Stream, streams++);
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     cleanups.push(

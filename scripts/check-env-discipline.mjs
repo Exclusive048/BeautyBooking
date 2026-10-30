@@ -59,6 +59,18 @@ const ALLOWED_FILES = new Set([
 /** Файлы с ограниченным разрешением: только перечисленные переменные. */
 const ALLOWED_VARS_BY_FILE = new Map([["src/instrumentation.ts", new Set(["NEXT_RUNTIME"])]]);
 
+/**
+ * Тестовые хелперы, которым `process.env` разрешён, — при условии, что их
+ * импортируют ТОЛЬКО тестовые файлы (проверяется ниже). `process-env.ts`
+ * сбрасывает окружение в тестах `env.ts`, не стирая переменные ОС
+ * (TEST-ENV-RESET-OS-KEYS): это запись в окружение, а не чтение настройки.
+ * Ключ — путь хелпера, значение — шаблон спецификатора импорта (и `@/…`, и
+ * относительный путь оканчиваются на него).
+ */
+const TEST_ONLY_HELPERS = new Map([
+  ["src/lib/testing/process-env.ts", /["'][^"']*\btesting\/process-env["']/],
+]);
+
 const DIRECT = /process\.env\.([A-Za-z_$][\w$]*)/g;
 const BRACKET = /process\.env\[\s*(?:["'`]([^"'`]+)["'`]|([A-Za-z_$][\w$]*))\s*\]/g;
 
@@ -82,10 +94,23 @@ const violations = [];
 
 for (const file of walk(SRC)) {
   const rel = path.relative(ROOT, file).split(path.sep).join("/");
-  if (ALLOWED_FILES.has(rel) || isTestFile(rel)) continue;
+  const source = readFileSync(file, "utf8");
+
+  if (!isTestFile(rel) && !TEST_ONLY_HELPERS.has(rel)) {
+    for (const [helper, importPattern] of TEST_ONLY_HELPERS) {
+      if (!importPattern.test(source)) continue;
+      violations.push({
+        rel,
+        line: 0,
+        name: helper,
+        text: "тестовый хелпер с process.env импортирован не из теста",
+      });
+    }
+  }
+
+  if (ALLOWED_FILES.has(rel) || TEST_ONLY_HELPERS.has(rel) || isTestFile(rel)) continue;
 
   const allowedVars = ALLOWED_VARS_BY_FILE.get(rel);
-  const source = readFileSync(file, "utf8");
   const lines = source.split(/\r?\n/);
 
   lines.forEach((line, index) => {
@@ -121,5 +146,5 @@ if (violations.length > 0) {
 }
 
 console.log(
-  `ENV-DISCIPLINE: OK — ${ALLOWED_FILES.size} файлов-исключений + ${ALLOWED_VARS_BY_FILE.size} с ограниченным разрешением; обе нотации (точечная и скобочная) проверены.`,
+  `ENV-DISCIPLINE: OK — ${ALLOWED_FILES.size} файлов-исключений + ${ALLOWED_VARS_BY_FILE.size} с ограниченным разрешением + ${TEST_ONLY_HELPERS.size} тестовый хелпер (только из тестов); обе нотации (точечная и скобочная) проверены.`,
 );

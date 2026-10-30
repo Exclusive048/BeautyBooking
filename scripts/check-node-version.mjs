@@ -7,7 +7,8 @@
 // Запускается перед `npm run dev` / `build` / `test` / `worker` (pre-скрипты
 // `package.json`) и падает, если Node не тот; `npm install` на чужой версии
 // предупреждает по `engines`. `engine-strict` не ставится — он проверяет и
-// зависимости, а `lighthouse` требует Node ≥ 22.19. Совпадение `.nvmrc`,
+// `engines` зависимостей: одна с диапазоном без нашей версии остановила бы
+// `npm ci` везде сразу (локально, в CI, в сборке образа). Совпадение `.nvmrc`,
 // `engines`, workflow'ов и `FROM` в Dockerfile держит `scripts/node-version.test.ts`.
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
